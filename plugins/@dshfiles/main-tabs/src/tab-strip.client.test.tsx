@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MainTabsTranslate } from './locales.js'
 import { OPEN_THREAD_ASIDE_EVENT } from './thread-aside.js'
+import { PANEL_ASIDE_EVENT } from './panel-aside.js'
 import { TabStrip, type TabView } from './tab-strip.js'
 import type { TabsEvent } from './tabs-machine.js'
 
@@ -13,6 +14,7 @@ const labels = {
   openInSidePanel: 'Open in side panel',
   moveToSidePanel: 'Move to side panel',
   sidePanelUnavailable: 'The side panel is not available here.',
+  panelAsideUnavailable: 'This panel has no side-panel view while no thread is on screen.',
   clipboardFailure: 'Could not access the clipboard.',
   running: 'Working',
 } satisfies Readonly<Record<string, string>>
@@ -36,6 +38,7 @@ const tabs = [
   {
     id: 'panel:workbench',
     kind: 'panel',
+    panelId: 'dshfiles-workbench',
     title: 'Workbench',
     active: false,
     pinned: false,
@@ -187,16 +190,40 @@ describe('TabStrip side panel drop', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('leaves panel tabs alone over the side panel: their plugins own how they move', () => {
-    mount()
+  it('moves a dragged panel tab into the side panel once its plugin answers, and closes its main tab', async () => {
+    const send = vi.fn()
+    mount(send)
     const column = seedRightSidebar()
     const panel = column.querySelector<HTMLElement>('[data-slot="rightbar"] > *')
+    if (panel === null) throw new Error('The seeded side panel is missing.')
+    const requests: unknown[] = []
+    const onPanelAside = (event: Event): void => {
+      requests.push(event instanceof CustomEvent ? event.detail : undefined)
+      event.preventDefault()
+    }
+    window.addEventListener(PANEL_ASIDE_EVENT, onPanelAside)
+
+    screen.getByRole('tab', { name: 'Workbench' }).dispatchEvent(dragEvent('dragstart'))
+    panel.dispatchEvent(dragEvent('dragover'))
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', 'Move to side panel')
+    panel.dispatchEvent(dragEvent('drop'))
+
+    expect(requests).toEqual([{ panelId: 'dshfiles-workbench' }])
+    expect(send).toHaveBeenCalledWith({ type: 'tab.close', tabId: 'panel:workbench' })
+    window.removeEventListener(PANEL_ASIDE_EVENT, onPanelAside)
+  })
+
+  it('keeps a panel tab and says it has no side-panel view when nobody answers the drop', async () => {
+    const send = vi.fn()
+    mount(send)
+    const panel = seedRightSidebar().querySelector<HTMLElement>('[data-slot="rightbar"] > *')
     if (panel === null) throw new Error('The seeded side panel is missing.')
 
     screen.getByRole('tab', { name: 'Workbench' }).dispatchEvent(dragEvent('dragstart'))
     panel.dispatchEvent(dragEvent('dragover'))
+    panel.dispatchEvent(dragEvent('drop'))
 
-    expect(column.hasAttribute('data-dshfiles-aside-drop')).toBe(false)
-    expect(screen.queryByRole('status')).toBeNull()
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('This panel has no side-panel view while no thread is on screen.'))
+    expect(send).not.toHaveBeenCalled()
   })
 })

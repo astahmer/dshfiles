@@ -42,7 +42,7 @@
         "A navigation the Host never finishes stops being awaited after two seconds.",
         "Tabs of deleted threads are dropped.",
         "Open in side panel leaves the thread alone and the strip announces that the side panel is unavailable there when no plugin offers an aside, and a request with no thread on screen is declined the same way.",
-        "Dragging a panel tab over the right column never moves it: only its own plugin knows whether it has a side-panel counterpart, so the drop stays inert.",
+        "Dragging a panel tab over the right column asks its plugin through the cancelable `dshfiles:move-panel-aside` event. A panel whose plugin offers no side-panel view keeps its tab and the strip says so; a panel tab is only moved when its owner cancels the request.",
         "A thread dropped where the aside owner declined the request keeps its main tab and announces the unavailable side panel; dragging where the right sidebar is not mounted highlights nothing.",
         "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too."
       ],
@@ -67,6 +67,23 @@
           "kind": "gherkin",
           "id": "main-tabs.move-tab-between-panels",
           "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.move-panel-between-panels",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-aside-request",
+          "file": "plugins/@dshfiles/main-tabs/src/panel-aside.test.ts",
+          "testName": "asks for one panel and reports that its plugin took it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-aside-move-unit",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "moves a dragged panel tab into the side panel once its plugin answers, and closes its main tab"
         },
         {
           "kind": "unit-test",

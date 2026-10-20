@@ -105,7 +105,10 @@ modal.
 ## Finding a thread workspace
 
 The **Thread integration** page is available from the left panel and as a tab in
-the conversation's right side panel, beside Jujutsu and other tools. It is the
+the conversation's right side panel, beside Jujutsu and other tools. The main tab
+dragged onto the open side panel moves there through the cancelable
+`dshfiles:move-panel-aside` request this entry answers; the side tab's menu row
+_Move to main area_ reverses it. It is the
 integration control center: a tab per integration state with live counts, a
 separate lifecycle filter, a banner with the primary **Integrate all (n)** action
 while work is ready, and one compact row per workspace grouped into

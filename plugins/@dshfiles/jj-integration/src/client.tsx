@@ -8,6 +8,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -17,6 +18,7 @@ import { errorMessage, PluginQueryProvider, pluginQueryClient, useMutation, useQ
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { z } from 'zod'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 import { mainViewSessionId } from './main-view-session.js'
@@ -39,6 +41,9 @@ import { requestThreadSettle } from './settle-request.js'
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
 const RIGHT_PANE_KIND = 'dshfiles-jj-integration-thread-workspaces'
+/** `@dshfiles/main-tabs` asks this for the panel's right-pane view when its main tab is dropped there. */
+const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
+const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
 // The export plugin registers its header cell at the default priority; a lower one shadows it (see SlotCore.register).
 const SESSION_LOG_SHADOW_PRIORITY = -1
 
@@ -149,6 +154,46 @@ export default defineClient({
           </PluginQueryProvider>
         )),
       ),
+    )
+    // One panel with two homes: a main tab and a right-pane tab. Moving between them is this plugin's business, so it
+    // answers the strip's request and offers the reverse row on its own right-pane tab.
+    const isMainPanel = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
+    ctx.effect(() => {
+      const onMovePanelAside = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = panelAsideRequestSchema.safeParse(event.detail)
+        if (!request.success || request.data.panelId !== PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        event.preventDefault()
+        ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+      }
+      window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+      return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+    }, 'jj-integration: move the panel into the side panel')
+    ctx.effect(
+      () =>
+        ctx.slots.inject('sidebar.right.tab.menu.item', () =>
+          ctx.slots.register(
+            { name: 'sidebar.right.tab.menu.item', id: 'jj-integration-move-to-main', order: 10 },
+            (props: PropsRuntime<'sidebar.right.tab.menu.item'>) => {
+              if (props.tab.kind !== RIGHT_PANE_KIND) return null
+              return (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-[length:calc(var(--dsh-content-font-size-secondary,13px)-1px)] dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
+                  onClick={() => {
+                    props.dismiss()
+                    if (ctx.sidebarRight.mounted.getSnapshot() !== undefined) ctx.sidebarRight.close(props.tab.id)
+                    if (isMainPanel(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+                  }}
+                >
+                  {translate('moveToMainArea')}
+                </button>
+              )
+            },
+          ),
+        ),
+      'jj-integration: move the side-panel view to the main area',
     )
     // SAFETY: The multi-host panel id is registered by @dshfiles/multi-host.
     const openRemoteThreadPanel = (): void => ctx.layout.selectPanel(REMOTE_THREAD_PANEL as MainPanelId)

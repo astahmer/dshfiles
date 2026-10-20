@@ -242,6 +242,7 @@ export default defineClient({
               return {
                 ...base,
                 kind: 'panel',
+                panelId,
                 title: panelLabels.get(panelId) ?? panelTitleFallback(panelId),
                 available: registeredPanels.has(panelId),
                 status: null,

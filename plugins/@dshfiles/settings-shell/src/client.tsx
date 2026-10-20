@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { createApiClient, defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteApi } from '@dshfiles/command-palette/api'
@@ -52,6 +52,9 @@ const OPEN_SETTINGS_COMMAND = 'settings.open'
 /** The right-sidebar tab type Settings opens as; the panel's guide offers it beside the other panel cards. */
 const SETTINGS_SIDEBAR_TAB_ID = '@dshfiles/settings-shell/side-panel'
 const SETTINGS_SIDEBAR_KIND = 'dshfiles-settings-panel'
+/** `@dshfiles/main-tabs` asks this for the side-panel Settings tab when its main tab is dropped there. */
+const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
+const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
 
 /** A frame's portal target: the element the panel or the side panel currently renders, or null while unmounted. */
 interface HostSlot {
@@ -204,6 +207,46 @@ export default defineClient({
       }
       actor.send(sectionId === undefined ? { type: 'open', surface: next } : { type: 'open', surface: next, sectionId })
     }
+
+    // Settings has a main page and a side-panel tab. Moving between them is this plugin's business, so it answers the
+    // strip's request and offers the reverse row on its own side-panel tab.
+    ctx.effect(() => {
+      const onMovePanelAside = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = panelAsideRequestSchema.safeParse(event.detail)
+        if (!request.success || request.data.panelId !== SETTINGS_PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        event.preventDefault()
+        openSidePanelSettings()
+      }
+      window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+      return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+    }, 'settings-shell: move settings into the side panel')
+    ctx.effect(
+      () =>
+        ctx.slots.inject('sidebar.right.tab.menu.item', () =>
+          ctx.slots.register(
+            { name: 'sidebar.right.tab.menu.item', id: 'settings-shell-move-to-main', order: 10 },
+            (props: PropsRuntime<'sidebar.right.tab.menu.item'>) => {
+              if (props.tab.kind !== SETTINGS_SIDEBAR_KIND) return null
+              return (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-[length:calc(var(--dsh-content-font-size-secondary,13px)-1px)] dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
+                  onClick={() => {
+                    props.dismiss()
+                    if (ctx.sidebarRight.mounted.getSnapshot() !== undefined) ctx.sidebarRight.close(props.tab.id)
+                    if (isMainPanelId(SETTINGS_PANEL_ID)) ctx.layout.selectPanel(SETTINGS_PANEL_ID)
+                  }}
+                >
+                  {t('sidebar.moveToMain')}
+                </button>
+              )
+            },
+          ),
+        ),
+      'settings-shell: move the side-panel settings to the main view',
+    )
 
     // Bundle manifests title each namespace ("Thread Sidebar" for `thread-sidebar`); read once Settings first opens.
     const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())

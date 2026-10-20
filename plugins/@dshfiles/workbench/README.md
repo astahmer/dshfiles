@@ -16,7 +16,9 @@ contributes an editor panel, and [`@dshfiles/jujutsu`](../jujutsu/README.md) one
   opens empty — a panel lives in exactly one region, so the row takes the one dragged or moved into it rather than
   duplicating a panel the dock already shows.
 - **Per-thread side panel**: the old right-pane tab type, kept for the native per-thread surface. It is one tab inside
-  the session's own right sidebar, so it changes with the thread.
+  the session's own right sidebar, so it changes with the thread. The workbench main tab dragged onto that open panel
+  moves there (and back with the side tab's _Move to main area_ row), through the same cancelable
+  `dshfiles:move-panel-aside` request the other panel plugins answer.
 - **Move**: each surface's header lists where an open panel can go — the other docking regions, and the feature's own
   full main-view page when its definition names one. A panel lives in exactly one region, so moving it closes the copy
   the source held; asking for a region that is closed opens it first and hands the panel over when it reports ready.

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Reac
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
+import { requestPanelAside } from './panel-aside.js'
 import { requestThreadAside } from './thread-aside.js'
 import { buildThreadTabLink } from './thread-link.js'
 import { CompassGlyph } from './start-page.js'
@@ -26,7 +27,13 @@ interface TabViewBase {
 
 export type TabView =
   | (TabViewBase & { readonly kind: 'thread'; readonly sessionId: string; readonly workspaceId?: string })
-  | (TabViewBase & { readonly kind: 'panel' | 'start' })
+  | (TabViewBase & { readonly kind: 'panel'; readonly panelId: string })
+  | (TabViewBase & { readonly kind: 'start' })
+
+/** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
+type DraggedMove =
+  | { readonly kind: 'thread'; readonly tabId: string; readonly sessionId: string }
+  | { readonly kind: 'panel'; readonly tabId: string; readonly panelId: string }
 
 interface TabStripProps {
   readonly tabs: readonly TabView[]
@@ -103,9 +110,12 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const openAside = (sessionId: string): void => {
     if (!requestThreadAside(sessionId)) setStatus(t('sidePanelUnavailable'))
   }
-  const draggedThread = (): Extract<TabView, { kind: 'thread' }> | null => {
+  /** The dragged tab's move target, or null when this tab stays in the strip (reorder or start tab). */
+  const draggedMove = (): DraggedMove | null => {
     const view = tabsRef.current.find(tab => tab.id === dragged.current)
-    return view?.kind === 'thread' ? view : null
+    if (view === undefined) return null
+    if (view.kind === 'thread') return { kind: 'thread', tabId: view.id, sessionId: view.sessionId }
+    return view.kind === 'panel' ? { kind: 'panel', tabId: view.id, panelId: view.panelId } : null
   }
   const clearAsideTarget = useCallback((): void => {
     asideColumn.current?.removeAttribute(ASIDE_DROP_ATTRIBUTE)
@@ -115,18 +125,19 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
 
   useEffect(() => {
     const columnUnder = (event: DragEvent): HTMLElement | null => asideDropColumn(window.document, { x: event.clientX, y: event.clientY })
-    /** A drop on the right sidebar moves the thread there: the side panel takes it, then the main tab goes away. */
-    const moveDraggedThreadToAside = (): void => {
-      const thread = draggedThread()
-      if (thread === null) return
-      if (!requestThreadAside(thread.sessionId)) {
-        setStatus(t('sidePanelUnavailable'))
+    /** A drop on the right sidebar moves the tab there: the side panel takes it, then the main tab goes away. */
+    const moveDraggedToAside = (): void => {
+      const target = draggedMove()
+      if (target === null) return
+      const taken = target.kind === 'thread' ? requestThreadAside(target.sessionId) : requestPanelAside(target.panelId)
+      if (!taken) {
+        setStatus(t(target.kind === 'thread' ? 'sidePanelUnavailable' : 'panelAsideUnavailable'))
         return
       }
-      send({ type: 'tab.close', tabId: thread.id })
+      send({ type: 'tab.close', tabId: target.tabId })
     }
     const onDragOver = (event: DragEvent): void => {
-      if (draggedThread() === null) {
+      if (draggedMove() === null) {
         clearAsideTarget()
         return
       }
@@ -142,9 +153,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
       if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move'
     }
     const onDrop = (event: DragEvent): void => {
-      if (columnUnder(event) === null || draggedThread() === null) return
+      if (columnUnder(event) === null || draggedMove() === null) return
       event.preventDefault()
-      moveDraggedThreadToAside()
+      moveDraggedToAside()
       clearAsideTarget()
     }
     const onDragEnd = (): void => clearAsideTarget()

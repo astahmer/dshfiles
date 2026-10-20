@@ -304,6 +304,41 @@ Then('the thread is a main tab again and the side panel dropped its tab', async 
   await finishJourneyAssertions(page)
 })
 
+When('the Jujutsu panel tab is dragged onto the side panel', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  const threadTab = strip(page).locator('[data-tab-id^="thread:"]').first()
+  await expect(threadTab).toBeVisible()
+  await threadTab.dblclick()
+  await expect(threadTab).not.toHaveAttribute('data-preview')
+  await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: 'Workbench' }).click()
+  await globalPanel(page, 'Jujutsu').click()
+  await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
+  await threadTab.click()
+  await expect(page.locator('[data-slot="rightbar"]')).not.toHaveCount(0)
+  await tab(page, 'Jujutsu').dragTo(page.locator('[data-slot="rightbar"] [data-dockkit-surface]').first())
+})
+
+Then('the side panel hosts Jujutsu and its main tab is gone', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-drag-panel-into-side-panel', async () => {
+    await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'Jujutsu' })).toHaveCount(1)
+    await expect(tab(page, 'Jujutsu')).toHaveCount(0)
+  })
+})
+
+When("the moved aside Jujutsu tab's menu moves it to the main area", async ({ page }: { page: Page }) => {
+  await page.locator('[data-dockkit-tab]').filter({ hasText: 'Jujutsu' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Move to main area', exact: true }).click()
+})
+
+Then('Jujutsu is a main tab again and the side panel dropped its tab', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-move-panel-aside-back-to-main', async () => {
+    await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'Jujutsu' })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the tabs come back with the pin and the Jujutsu tab is active again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-restore-after-reload', async () => {
     await expect.poll(() => tabSummary(page)).toEqual(['Workbench (pinned)', 'Jujutsu*'])

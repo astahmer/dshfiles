@@ -9,7 +9,8 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
 - **Tab or dialog**: with `@dshfiles/main-tabs` loaded, Settings fills the main view and gets a tab like any other
   panel; without it, it opens as the native dialog. `openIn` overrides that choice.
 - **Side panel**: the right side panel's guide offers a _Settings_ card beside Files, Jujutsu and the other cards, and
-  `openIn: 'sidebar'` sends the gear, the palette and `Mod+,` there too. Settings then fills a tab in that panel,
+  `openIn: 'sidebar'` sends the gear, the palette and `Mod+,` there too. The Settings main tab dragged onto the open
+  panel moves there, and the side tab's _Move to main area_ row moves it back. Settings then fills a tab in that panel,
   listing every section and plugin page; a narrow panel shows that list and one section at a time with a back button,
   while a wide one keeps the dialog's two columns. The panel owns its tab, so closing it leaves Settings closed.
 - **Expand**: the dialog's expand button fills the window (VS Code's maximize); _Open in a tab_ moves an open dialog

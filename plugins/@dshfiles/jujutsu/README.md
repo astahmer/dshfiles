@@ -77,6 +77,10 @@ contracts.
   focuses the revision or compares it with main/default while showing its
   history path (`chatReferenceClickBehavior`); `chatReferenceLinks` turns the
   behavior off. A token outside the loaded page falls back to the graph search.
+- **Move between surfaces**: the Jujutsu main tab dropped on the open right side
+  panel moves there, through the cancelable `dshfiles:move-panel-aside` request
+  this entry answers by opening its right-pane tab. That tab's own menu row, _Move
+  to main area_, closes it and selects the main panel again.
 - Right-click a revision → New workspace here… to create an isolated JJ
   workspace checked out at it, then explicitly open a DSH Session in that
   directory. Forking a Session is left to DSH's native Branch action, and

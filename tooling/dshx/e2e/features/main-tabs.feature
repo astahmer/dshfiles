@@ -77,3 +77,11 @@ Feature: Main view tabs
     Then the side panel hosts that thread and its main tab is gone
     When the moved aside tab's menu moves that thread to the main area
     Then the thread is a main tab again and the side panel dropped its tab
+
+  @scenario:main-tabs.move-panel-between-panels
+  Scenario: A panel tab moves into the side panel and back to the main view
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted
+    When the Jujutsu panel tab is dragged onto the side panel
+    Then the side panel hosts Jujutsu and its main tab is gone
+    When the moved aside Jujutsu tab's menu moves it to the main area
+    Then Jujutsu is a main tab again and the side panel dropped its tab

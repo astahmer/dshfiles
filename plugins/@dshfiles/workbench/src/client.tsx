@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
@@ -26,6 +27,7 @@ import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import type { DockviewApi, DockviewDndOverlayEvent, DockviewGroupPanel, SerializedDockview } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { z } from 'zod'
 import { demoPanels } from './demo-panels.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import { createLayoutStore, LAYOUT_SURFACES, WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutSurface } from './layout-store.js'
@@ -40,6 +42,9 @@ import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 const PANEL_ID = 'dshfiles-workbench' satisfies typeof WORKBENCH_MAIN_PANEL_ID
 const RIGHT_PANE_ID = '@dshfiles/workbench/side-panel'
 const RIGHT_PANE_KIND = 'dshfiles-workbench-side-panel'
+/** `@dshfiles/main-tabs` asks this for the per-thread workbench when its main tab is dropped on the side panel. */
+const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
+const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
 const TOGGLE_COMMAND_ID = 'workbench.toggleSidePanel'
 const SHEET_SELECTOR = 'style[data-dshfiles-workbench-sheet]'
 
@@ -157,6 +162,45 @@ export default defineClient({
           ],
         }),
       'workbench: right pane tab type',
+    )
+    // The workbench has a main page and a per-thread side-panel tab. Moving between them is this plugin's business, so
+    // it answers the strip's request and offers the reverse row on its own side-panel tab.
+    ctx.effect(() => {
+      const onMovePanelAside = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = panelAsideRequestSchema.safeParse(event.detail)
+        if (!request.success || request.data.panelId !== PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        event.preventDefault()
+        ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+      }
+      window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+      return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+    }, 'workbench: move the panel into the side panel')
+    ctx.effect(
+      () =>
+        ctx.slots.inject('sidebar.right.tab.menu.item', () =>
+          ctx.slots.register(
+            { name: 'sidebar.right.tab.menu.item', id: 'workbench-move-to-main', order: 10 },
+            (props: PropsRuntime<'sidebar.right.tab.menu.item'>) => {
+              if (props.tab.kind !== RIGHT_PANE_KIND) return null
+              return (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-[length:calc(var(--dsh-content-font-size-secondary,13px)-1px)] dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
+                  onClick={() => {
+                    props.dismiss()
+                    if (ctx.sidebarRight.mounted.getSnapshot() !== undefined) ctx.sidebarRight.close(props.tab.id)
+                    if (isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+                  }}
+                >
+                  {translate('moveToMainView')}
+                </button>
+              )
+            },
+          ),
+        ),
+      'workbench: move the side-panel workbench to the main view',
     )
     // Every region keeps its own Dockview instance, so moving a panel between
     // them is this plugin's business: a panel lives in exactly one region, and

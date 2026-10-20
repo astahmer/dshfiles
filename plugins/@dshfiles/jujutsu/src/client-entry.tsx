@@ -2,10 +2,12 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -14,6 +16,7 @@ import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plug
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { z } from 'zod'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
@@ -25,11 +28,14 @@ const RIGHT_PANE_ID = '@dshfiles/jujutsu/revision-graph'
 const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
 /** The workbench panel id the global dock opens by default. */
 const DOCK_PANEL_ID = 'dshfiles-jujutsu.dock'
+/** `@dshfiles/main-tabs` asks this for the graph's right-pane view when its main tab is dropped there. */
+const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
+const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict()
 
 export default defineClient({
   name: '@dshfiles/jujutsu',
   // setup(ctx) reads ctx.slots; declaring it here is what injects that service.
-  inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'uiWorkspace', 'workspaces', 'shortcuts'],
+  inject: ['slots', 'layout', 'sidebarRightTabs', 'sidebarRight', 'sessions', 'uiWorkspace', 'workspaces', 'shortcuts'],
   // The panel calls useApi, so the entry must be decorated: a raw component
   // renders outside the API context and its useApi throws while rendering.
   setup(ctx, decorate) {
@@ -184,6 +190,46 @@ export default defineClient({
     )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, panelForSurface('main')))
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')))
+    // The graph is one panel with two homes: a main tab and a right-pane tab. Moving between them is this plugin's
+    // business, so it answers the strip's request and offers the reverse row on its own right-pane tab.
+    const isMainPanel = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
+    ctx.effect(() => {
+      const onMovePanelAside = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = panelAsideRequestSchema.safeParse(event.detail)
+        if (!request.success || request.data.panelId !== PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        event.preventDefault()
+        ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+      }
+      window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+      return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
+    }, 'dshfiles-jujutsu: move the panel into the side panel')
+    ctx.effect(
+      () =>
+        ctx.slots.inject('sidebar.right.tab.menu.item', () =>
+          ctx.slots.register(
+            { name: 'sidebar.right.tab.menu.item', id: 'dshfiles-jujutsu-move-to-main', order: 10 },
+            (props: PropsRuntime<'sidebar.right.tab.menu.item'>) => {
+              if (props.tab.kind !== RIGHT_PANE_KIND) return null
+              return (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-[length:calc(var(--dsh-content-font-size-secondary,13px)-1px)] dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
+                  onClick={() => {
+                    props.dismiss()
+                    if (ctx.sidebarRight.mounted.getSnapshot() !== undefined) ctx.sidebarRight.close(props.tab.id)
+                    if (isMainPanel(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+                  }}
+                >
+                  Move to main area
+                </button>
+              )
+            },
+          ),
+        ),
+      'dshfiles-jujutsu: move the side-panel graph to the main view',
+    )
     // The global dock exists to keep this panel on screen across threads, so it
     // leads the dock's default layout. The registry is page-global: registering
     // before the workbench loads is fine, and it is a no-op without it.
