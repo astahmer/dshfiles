@@ -1,9 +1,10 @@
 # Antislop rules
 
 Vendored generated Oxlint plugin from the owned `emilint` repository, revision
-`cb91a4faeacafaba333600e5af42d333cd5e02b8` (local; unpublished, with upstream
-publication pending explicit human approval). Update from its source and
-rebuild there; do not edit this bundle. Existing findings remain warnings during
+[`274a6a897910e6bb6056ccce96debe7d511db357`](https://github.com/astahmer/emilint/commit/274a6a897910e6bb6056ccce96debe7d511db357).
+This published revision includes `no-export-bag` with configurable thresholds
+and recursive path exclusions. Update from its source and rebuild there; do not
+edit this bundle. Existing findings remain warnings during
 the quality pass; correctness checks remain errors.
 
 `ast-grep/rules/` holds emilint's ast-grep rules from the same revision, also
