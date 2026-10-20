@@ -164,6 +164,30 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
         <FieldLegend>{props.t('threadSidebarKeyboardSection')}</FieldLegend>
         <FieldDescription>{props.t('threadSidebarChordHint')}</FieldDescription>
         <FieldGroup className="dshx:gap-4">
+          <Field orientation="horizontal" className="dshx:items-center">
+            <FieldContent>
+              <FieldLabel className="dshx:font-normal">{props.t('threadSidebarArrowKeys')}</FieldLabel>
+              <FieldDescription>{props.t('threadSidebarArrowKeysHint')}</FieldDescription>
+            </FieldContent>
+            <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5">
+              <Button
+                size="sm"
+                type="button"
+                variant={preferences.arrowKeysSwitchThread ? 'default' : 'outline'}
+                onClick={() => updatePreferences({ arrowKeysSwitchThread: true })}
+              >
+                {props.t('threadSidebarArrowKeysSwitch')}
+              </Button>
+              <Button
+                size="sm"
+                type="button"
+                variant={preferences.arrowKeysSwitchThread ? 'outline' : 'default'}
+                onClick={() => updatePreferences({ arrowKeysSwitchThread: false })}
+              >
+                {props.t('threadSidebarArrowKeysFocus')}
+              </Button>
+            </div>
+          </Field>
           {chordRow('paletteChord', props.t('threadSidebarPaletteChord'))}
           {chordRow('fileSearchChord', props.t('threadSidebarFileSearchChord'))}
           {chordRow('threadSearchChord', props.t('threadSidebarThreadSearchChord'))}

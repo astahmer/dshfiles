@@ -26,6 +26,13 @@ test('older preferences without group collapse default to no collapsed groups', 
   assert.deepEqual(SidebarPreferencesModel.decode(older)?.collapsedGroups, [])
 })
 
+test('older preferences default arrow keys to switching threads immediately', () => {
+  const { arrowKeysSwitchThread, ...older } = DEFAULT_PREFERENCES
+  assert.equal(arrowKeysSwitchThread, true)
+  assert.equal(SidebarPreferencesModel.decode(older)?.arrowKeysSwitchThread, true)
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, arrowKeysSwitchThread: false })?.arrowKeysSwitchThread, false)
+})
+
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
   assert.ok(stored)

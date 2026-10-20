@@ -92,6 +92,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -131,6 +132,7 @@ import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
+import { EMPTY_THREAD_SELECTION, THREAD_MAIN_BUTTON_SELECTOR, ThreadSelectionModel, type ThreadSelectionState } from './thread-selection.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -508,7 +510,11 @@ const ChildThreadList = (props: {
       <li key={child.id}>
         <button
           type="button"
-          className={cn(lineClass, 'dshx:data-[selected=true]:bg-accent')}
+          className={cn(
+            lineClass,
+            'dshx:data-[selected=true]:bg-accent',
+            'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
+          )}
           data-thread-id={child.id}
           data-thread-main-action=""
           data-selected={child.id === props.selectedChildId}
@@ -840,6 +846,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             className={cn(
               'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
               compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
+              'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
             )}
             data-thread-id={session.id}
             data-thread-main-action=""
@@ -945,6 +952,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           {childCount > 0 ? (
             <button
               type="button"
+              data-thread-children-toggle=""
               className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
               aria-expanded={props.childrenOpen}
               aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
@@ -1089,6 +1097,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [jjInventoryVisible, jjOwnerMissing, refetchJjRepositories])
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
+  const [threadSelection, setThreadSelection] = useState<ThreadSelectionState>(EMPTY_THREAD_SELECTION)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
@@ -1760,22 +1770,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     )
   }
 
-  const mutateSession = async (sessionId: SessionSummary['id'], operation: RowOperation): Promise<void> => {
+  const mutateThreads = async (threadIds: readonly SessionSummary['id'][], operation: RowOperation): Promise<boolean> => {
     const actionThreads = Object.values(sessionState.byId).filter(session => !session.blank)
-    const targetIds = threadActionTargetIds({
-      threadId: sessionId,
-      threads: actionThreads,
-      cascadeToChildren: preferences.applyActionsToChildThreads,
-    })
-    const targetIdsToChange = targetIds.filter(targetId => {
+    const targetIds = new Set<SessionSummary['id']>()
+    for (const threadId of threadIds) {
+      for (const targetId of threadActionTargetIds({ threadId, threads: actionThreads, cascadeToChildren: preferences.applyActionsToChildThreads })) {
+        targetIds.add(targetId)
+      }
+    }
+    const targetIdsToChange = [...targetIds].filter(targetId => {
       if (operation === 'pin') return !pinnedSessionIds.has(targetId)
       if (operation === 'unpin') return pinnedSessionIds.has(targetId)
       if (operation === 'archive') return !archivedSessionIds.has(targetId)
       return archivedSessionIds.has(targetId)
     })
+    if (targetIdsToChange.length === 0) return true
     if (operation === 'archive' && targetIdsToChange.some(targetId => sessionState.byId[targetId]?.running)) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
-      return
+      return false
     }
     const actions = {
       pin: props.pinSession,
@@ -1796,7 +1808,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (operation === 'archive' && archivedIds.length > 0) {
       if (!preferences.archiveUndoEnabled) {
         setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
-        return
+        return !failed
       }
       setNotice({
         tone: failed ? 'danger' : 'success',
@@ -1825,9 +1837,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           }
         })(),
       })
-      return
+      return !failed
     }
     setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
+    return !failed
+  }
+
+  const mutateSession = async (sessionId: SessionSummary['id'], operation: RowOperation): Promise<void> => {
+    await mutateThreads([sessionId], operation)
   }
 
   const tSidebar = props.tSidebar
@@ -2883,6 +2900,91 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   childRowCacheRef.current ??= createThreadChildRowCache()
   const childRowCache = childRowCacheRef.current
 
+  useEffect(() => {
+    const list = scrollAreaRef.current
+    if (list === null) return
+    ThreadSelectionModel.applyToDom({ list, sessionIds: threadSelection.sessionIds })
+    if (threadSelection.sessionIds.length === 0) return
+    const observer = new MutationObserver(() => ThreadSelectionModel.applyToDom({ list, sessionIds: threadSelection.sessionIds }))
+    observer.observe(list, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [threadSelection.sessionIds])
+
+  const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
+
+  const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+    if (rowButton === null || !event.currentTarget.contains(rowButton)) {
+      if (!event.shiftKey && !event.metaKey && !event.ctrlKey && threadSelection.sessionIds.length > 0) {
+        setThreadSelection(EMPTY_THREAD_SELECTION)
+      }
+      return
+    }
+    const sessionId = rowButton.dataset.threadId
+    if (sessionId === undefined) return
+    if (event.shiftKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      const orderedIds = orderedVisibleThreadIds(event.currentTarget)
+      setThreadSelection(current =>
+        ThreadSelectionModel.extend({
+          state: current,
+          orderedIds,
+          sessionId,
+          fallbackAnchorId: current.anchorId ?? selectedSession?.id ?? sessionId,
+        }),
+      )
+      return
+    }
+    if (event.metaKey || event.ctrlKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      setThreadSelection(current => ThreadSelectionModel.toggle(current, sessionId))
+      return
+    }
+    if (threadSelection.sessionIds.length > 0) setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  const selectedSessionIds = threadSelection.sessionIds
+  const allSelectedPinned = selectedSessionIds.length > 0 && selectedSessionIds.every(sessionId => pinnedSessionIds.has(sessionId))
+  const allSelectedSettled = selectedSessionIds.length > 0 && selectedSessionIds.every(sessionId => settledSessionIds.has(SessionId(sessionId)))
+  const applyToSelection = async (operation: RowOperation): Promise<void> => {
+    const targetIds = selectedSessionIds.flatMap(sessionId => {
+      const session = sessionState.byId[SessionId(sessionId)]
+      return session === undefined ? [] : [session.id]
+    })
+    if (targetIds.length === 0) return
+    if (await mutateThreads(targetIds, operation)) setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+  const settleSelection = (): void => {
+    const targets = new Set<SessionSummary['id']>()
+    const actionThreads = Object.values(sessionState.byId).filter(session => !session.blank)
+    for (const sessionId of selectedSessionIds) {
+      const session = sessionState.byId[SessionId(sessionId)]
+      if (session === undefined) continue
+      for (const targetId of threadActionTargetIds({
+        threadId: session.id,
+        threads: actionThreads,
+        cascadeToChildren: preferences.applyActionsToChildThreads,
+      })) {
+        if (!settledSessionIds.has(targetId)) targets.add(targetId)
+      }
+    }
+    if (targets.size === 0) {
+      setThreadSelection(EMPTY_THREAD_SELECTION)
+      return
+    }
+    if ([...targets].some(sessionId => SidebarOrganization.hasRunningDescendant({ sessionId, sessions }))) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    settleSessions([...targets])
+    setNotice({ tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') })
+    setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel']): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
@@ -3373,12 +3475,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ) : null}
 
         <div
+          ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
+          onClickCapture={handleSelectionClickCapture}
           onKeyDown={event =>
             ThreadListNavigationModel.navigate({
               event: event.nativeEvent,
               list: event.currentTarget,
+              selection: threadSelection,
+              onSelectionChange: setThreadSelection,
+              arrowKeysSwitchThread: preferences.arrowKeysSwitchThread,
               open: sessionId => {
                 const session = sessionState.byId[SessionId(sessionId)]
                 if (session !== undefined) openThread(session.id)
@@ -3547,6 +3654,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         sectionHeaderRefs.current[index] = element
                       }}
                       type="button"
+                      data-thread-section-header=""
                       title={props.tSidebar('threadSidebarSectionReorderHint')}
                       className={cn(
                         stickyHeaderClass,
@@ -3634,6 +3742,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     {group.showHeader ? (
                       <button
                         type="button"
+                        data-thread-section-header=""
                         className={cn(
                           stickyHeaderClass,
                           'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
@@ -3696,6 +3805,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               >
                 <button
                   type="button"
+                  data-thread-section-header=""
                   className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
                   aria-expanded={draftsOpen}
                   onClick={() => setDraftsOpen(current => !current)}
@@ -3742,6 +3852,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             </Empty>
           ) : null}
         </div>
+        {selectedSessionIds.length > 0 ? (
+          <div
+            role="toolbar"
+            aria-label={props.tSidebar('threadSidebarSelection')}
+            title={props.tSidebar('threadSidebarSelectionHint')}
+            data-testid="thread-selection-bar"
+            className="dshx:mx-2 dshx:mb-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:bg-card dshx:p-1.5 dshx:text-xs"
+          >
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium" aria-live="polite">
+              {props.tSidebar('threadSidebarSelectedCount', { count: selectedSessionIds.length })}
+            </span>
+            <Button size="xs" variant="outline" onClick={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}>
+              {allSelectedPinned ? <IconPinFillRegular size={13} /> : <IconPinOutlineRegular size={13} />}
+              {props.tSidebar(allSelectedPinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+            </Button>
+            <Button size="xs" variant="outline" disabled={allSelectedSettled} onClick={settleSelection}>
+              <IconCheckCircleOutlineRegular size={13} />
+              {props.tSidebar('threadSidebarSettle')}
+            </Button>
+            <Button size="xs" variant="outline" onClick={() => void applyToSelection('archive')}>
+              <IconArchiveOutlineRegular size={13} />
+              {props.tSidebar('threadSidebarArchive')}
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label={props.tSidebar('threadSidebarClearSelection')}
+              onClick={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
+            >
+              <XIcon className="dshx:size-3.5" />
+            </Button>
+          </div>
+        ) : null}
       </section>
       <ThreadViewManager
         onOpenChange={setViewsManagerOpen}

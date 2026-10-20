@@ -95,6 +95,7 @@ const preferencesInputSchema = z
     threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),
     threadRowTime: z.boolean().default(DEFAULT_PREFERENCES.threadRowTime),
     threadRowStatusDot: z.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot),
+    arrowKeysSwitchThread: z.boolean().default(DEFAULT_PREFERENCES.arrowKeysSwitchThread),
     hiddenRowActions: z.array(threadRowActionSchema).max(THREAD_ROW_ACTIONS.length).default(DEFAULT_PREFERENCES.hiddenRowActions),
     rowActionOrder: z
       .array(threadRowActionSchema)

@@ -678,7 +678,9 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await expect(targetRow).toBeVisible()
 
   // Collapse the Today group so the reload below can prove the state is Host-synced.
-  await threadSidebar(page).getByRole('button', { name: /^Today/u }).click()
+  await threadSidebar(page)
+    .getByRole('button', { name: /^Today/u })
+    .click()
   await expect(targetRow).toHaveCount(0)
 
   await page.reload()
@@ -1088,6 +1090,78 @@ Then('Back and Forward return to the corresponding Host sessions', async ({ page
     await expect(forward).toBeEnabled()
     await forward.click()
     await expect.poll(() => currentThreadId(page)).toBe(journey.secondThreadId)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('two nonblank Host threads are listed in the sidebar', async ({ page }: { page: Page }) => {
+  const firstThreadId = await startBlankThread(page)
+  await page.getByRole('textbox').first().fill('thread sidebar keyboard first')
+  await page.getByRole('textbox').first().press('Enter')
+  await expect(threadRow(page, firstThreadId)).toHaveCount(1)
+  const secondThreadId = await startBlankThread(page)
+  expect(secondThreadId).not.toBe(firstThreadId)
+  await page.getByRole('textbox').first().fill('thread sidebar keyboard second')
+  await page.getByRole('textbox').first().press('Enter')
+  await expect(threadRow(page, secondThreadId)).toHaveCount(1)
+  threadHistoryJourneys.set(page, { firstThreadId, secondThreadId })
+})
+
+Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', async ({ page }: { page: Page }) => {
+  const journey = threadHistoryJourneys.get(page)
+  if (journey === undefined) throw new Error('No Host-created thread history was recorded for this browser page.')
+  const rowIds = await threadSidebar(page)
+    .locator('article[data-thread-id]')
+    .evaluateAll(rows => rows.map(row => row.getAttribute('data-thread-id')))
+  const targetId = rowIds.find(id => id === journey.firstThreadId || id === journey.secondThreadId)
+  if (targetId === undefined || targetId === null) throw new Error('Neither Host-created thread is listed in the sidebar.')
+  const targetIndex = rowIds.indexOf(targetId)
+  const nextId = rowIds[targetIndex + 1]
+  if (nextId === undefined || nextId === null) throw new Error('The sidebar did not render a row below the target thread.')
+  const targetTrigger = threadRow(page, targetId).locator(':scope > div > button').first()
+  await targetTrigger.focus()
+  await page.keyboard.press('ArrowDown')
+
+  await recordAssertion(page, 'thread-sidebar-keyboard-arrow-switches-thread', async () => {
+    await expect.poll(() => currentThreadId(page)).toBe(nextId)
+  })
+  await targetTrigger.focus()
+  await page.keyboard.press('Shift+ArrowDown')
+
+  await recordAssertion(page, 'thread-sidebar-keyboard-shift-range', async () => {
+    const selectionBar = page.getByTestId('thread-selection-bar')
+    await expect(selectionBar).toContainText('2 selected')
+    await expect(threadSidebar(page).locator('button[data-thread-main-action][data-multi-selected="true"]')).toHaveCount(2)
+  })
+  await recordAssertion(page, 'thread-sidebar-keyboard-toggle-and-escape', async () => {
+    const selectedRows = threadSidebar(page).locator('button[data-thread-main-action][data-multi-selected="true"]')
+    await selectedRows.last().click({ modifiers: ['ControlOrMeta'], position: { x: 24, y: 16 } })
+    await expect(page.getByTestId('thread-selection-bar')).toContainText('1 selected')
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('thread-selection-bar')).toHaveCount(0)
+  })
+  await recordAssertion(page, 'thread-sidebar-keyboard-focus-only-setting', async () => {
+    const settingsDialog = await openThreadSidebarSettingsSection(page)
+    await settingsDialog.getByRole('button', { name: 'Move focus only', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await expect(settingsDialog).toBeHidden()
+    const beforeFocusOnly = currentThreadId(page)
+    await targetTrigger.focus()
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => currentThreadId(page)).toBe(beforeFocusOnly)
+
+    const reopenedSettings = await openThreadSidebarSettingsSection(page)
+    await reopenedSettings.getByRole('button', { name: 'Switch immediately', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await expect(reopenedSettings).toBeHidden()
+  })
+  await recordAssertion(page, 'thread-sidebar-keyboard-bulk-settle', async () => {
+    await targetTrigger.focus()
+    await page.keyboard.press('ControlOrMeta+A')
+    const selectionBar = page.getByTestId('thread-selection-bar')
+    await expect(selectionBar).toContainText('2 selected')
+    await selectionBar.getByRole('button', { name: 'Settle', exact: true }).click()
+    await expect(selectionBar).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

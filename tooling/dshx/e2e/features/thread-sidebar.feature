@@ -144,6 +144,12 @@ Feature: Thread sidebar journeys
     When two Host threads are opened one after the other
     Then Back and Forward return to the corresponding Host sessions
 
+  @scenario:thread-sidebar.keyboard-selection
+  Scenario: Arrow keys move focus and Shift selects a range of threads
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When two nonblank Host threads are listed in the sidebar
+    Then arrow keys move focus and Shift+ArrowDown selects a range of threads
+
   @scenario:thread-sidebar.children-links
   Scenario: Blank Host sessions do not expose child or link actions
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

@@ -1750,6 +1750,59 @@
           "testName": "a schedule stopped for a hidden surface stays quiet through a visibility cycle"
         }
       ]
+    },
+    {
+      "id": "thread-keyboard-navigation",
+      "title": "Navigate and multi-select threads from the keyboard",
+      "summary": "Up/Down switch to the focused thread immediately by default, or move row focus only when configured; Left and Right walk the section and child-thread tree, Shift+ArrowUp/Down selects a range from the last selected row, and the primary modifier toggles individual rows. A selection bar pins, settles, or archives every selected thread and clears with Escape.",
+      "surfaces": ["client", "integration"],
+      "configuration": [
+        {
+          "key": "arrowKeysSwitchThread",
+          "defaultValue": "true",
+          "constraints": "Boolean; Up/Down switches threads immediately, or moves row focus only until Enter or a click.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.keyboard-selection-unit-switch"]
+        }
+      ],
+      "states": ["focused", "range-selected", "toggled"],
+      "failureModes": [
+        "Up/Down switches threads immediately by default, so Shift+ArrowUp/Down is the gesture that moves focus without opening one.",
+        "A range selects only rendered rows, so a collapsed section or hidden child row is never selected behind the user's back.",
+        "Bulk archive refuses while any selected thread is running, using the same running notice as a single-row archive; bulk settle applies the same guard."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.keyboard-selection",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.keyboard-selection-unit-switch",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-list-navigation.test.ts",
+          "testName": "switches to the focused thread on every arrow when immediate switching is configured"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.keyboard-selection-unit-range",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-selection.test.ts",
+          "testName": "extends a range in both directions from the anchor, inclusive"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.keyboard-selection-unit-shift-move",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-list-navigation.test.ts",
+          "testName": "extends a Shift range from the focused row and clears it on a plain move"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.keyboard-selection-unit-tree",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-list-navigation.test.ts",
+          "testName": "expands and collapses child rows with Right and Left"
+        }
+      ]
     }
   ],
   "kind": "bundle"

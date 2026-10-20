@@ -94,6 +94,8 @@ export interface SidebarPreferences {
   threadRowPath: boolean
   threadRowTime: boolean
   threadRowStatusDot: boolean
+  /** Up/Down switches to the focused thread immediately; off only moves row focus until Enter. */
+  arrowKeysSwitchThread: boolean
   /** Hover actions a row hides; an id that is absent keeps its button, so a new action ships visible. */
   hiddenRowActions: ThreadRowAction[]
   /** Left-to-right order of the hover actions; an action the list misses keeps its shipped place at the end. */
@@ -161,6 +163,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowPath: false,
   threadRowTime: true,
   threadRowStatusDot: true,
+  arrowKeysSwitchThread: true,
   hiddenRowActions: [],
   rowActionOrder: [...DEFAULT_THREAD_ROW_ACTION_ORDER],
   approvalNeededDisplay: 'group',

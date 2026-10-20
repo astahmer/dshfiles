@@ -1,3 +1,5 @@
+import { THREAD_MAIN_BUTTON_SELECTOR, THREAD_SECTION_HEADER_SELECTOR, ThreadSelectionModel, type ThreadSelectionState } from './thread-selection.js'
+
 interface VisibleThreadRow {
   readonly id: string
   readonly button: HTMLButtonElement
@@ -8,8 +10,12 @@ type ThreadNavigationDirection = -1 | 1
 interface ThreadListNavigationInput {
   readonly event: KeyboardEvent
   readonly list: HTMLElement
-  readonly open: (sessionId: string) => void
+  readonly selection: ThreadSelectionState
+  readonly onSelectionChange: (selection: ThreadSelectionState) => void
   readonly onLookahead: (sessionIds: readonly string[]) => void
+  /** Up/Down opens the focused thread immediately; absent keeps focus-only navigation. */
+  readonly arrowKeysSwitchThread?: boolean
+  readonly open?: (sessionId: string) => void
 }
 
 interface SessionHistoryReference {
@@ -22,10 +28,10 @@ interface RetainThreadHistoryLookaheadInput<SessionId extends string> {
   readonly retain: (sessionId: SessionId, signal: AbortSignal) => SessionHistoryReference
 }
 
-const THREAD_MAIN_BUTTON_SELECTOR = 'button[data-thread-main-action][data-thread-id]'
 const EDITABLE_TARGET_SELECTOR = 'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'
 const MENU_TARGET_SELECTOR = '[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="listbox"],[role="option"]'
 const MAX_LOOKAHEAD_SESSIONS = 3
+const isExpanded = (element: Element): boolean => element.getAttribute('aria-expanded') === 'true'
 
 const isRendered = (button: HTMLElement): boolean => {
   let ancestor: HTMLElement | null = button
@@ -36,6 +42,20 @@ const isRendered = (button: HTMLElement): boolean => {
     ancestor = ancestor.parentElement
   }
   return true
+}
+
+const ownArticle = (button: HTMLButtonElement): HTMLElement | null => button.closest<HTMLElement>('article[data-thread-id]')
+
+/** The row a focused child button sits under, or null for a top-level row. */
+const parentRowButton = (button: HTMLButtonElement): HTMLButtonElement | null => {
+  const article = ownArticle(button)
+  const articleButton = article?.querySelector<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+  return articleButton === undefined || articleButton === null || articleButton === button ? null : articleButton
+}
+
+const sectionHeaderOf = (button: HTMLButtonElement): HTMLButtonElement | null => {
+  const section = button.closest('section')
+  return section?.querySelector<HTMLButtonElement>(THREAD_SECTION_HEADER_SELECTOR) ?? null
 }
 
 export class ThreadListNavigationModel {
@@ -61,44 +81,147 @@ export class ThreadListNavigationModel {
     return sessionIds
   }
 
-  static navigate(input: ThreadListNavigationInput): void {
-    const direction = input.event.key === 'ArrowDown' ? 1 : input.event.key === 'ArrowUp' ? -1 : null
-    if (
-      direction === null ||
-      input.event.defaultPrevented ||
-      input.event.altKey ||
-      input.event.ctrlKey ||
-      input.event.metaKey ||
-      input.event.shiftKey ||
-      input.event.isComposing
-    )
-      return
+  private static focusRow(input: {
+    readonly rows: readonly VisibleThreadRow[]
+    readonly index: number
+    readonly direction: ThreadNavigationDirection
+    readonly selection: ThreadSelectionState
+    readonly extend: boolean
+    readonly fallbackAnchorId: string
+    readonly onSelectionChange: (selection: ThreadSelectionState) => void
+    readonly onLookahead: (sessionIds: readonly string[]) => void
+    readonly switchThread: boolean
+    readonly open: ((sessionId: string) => void) | undefined
+    readonly list: HTMLElement
+  }): boolean {
+    const row = input.rows[input.index]
+    if (row === undefined) return false
+    if (input.extend) {
+      input.onSelectionChange(
+        ThreadSelectionModel.extend({
+          state: input.selection,
+          orderedIds: input.rows.map(candidate => candidate.id),
+          sessionId: row.id,
+          fallbackAnchorId: input.fallbackAnchorId,
+        }),
+      )
+    } else if (input.selection.sessionIds.length > 0) {
+      input.onSelectionChange(ThreadSelectionModel.empty())
+    }
+    row.button.focus()
+    input.onLookahead(ThreadListNavigationModel.lookahead({ rows: input.rows, index: input.index, direction: input.direction }))
+    if (input.switchThread) {
+      input.open?.(row.id)
+      const view = input.list.ownerDocument.defaultView
+      view?.requestAnimationFrame?.(() => {
+        const restored = ThreadListNavigationModel.visibleRows(input.list).find(candidate => candidate.id === row.id)
+        restored?.button.focus()
+      })
+    }
+    return true
+  }
 
-    const target = input.event.target
+  static navigate(input: ThreadListNavigationInput): void {
+    const { event } = input
+    if (event.defaultPrevented || event.isComposing || event.altKey) return
+    const target = event.target
     if (!(target instanceof Element)) return
     if (target.closest(EDITABLE_TARGET_SELECTOR) !== null || target.closest(MENU_TARGET_SELECTOR) !== null) return
+
+    const primaryModifier = event.metaKey || event.ctrlKey
+    if (primaryModifier && event.key.toLowerCase() === 'a') {
+      const rows = ThreadListNavigationModel.visibleRows(input.list)
+      if (rows.length === 0) return
+      event.preventDefault()
+      input.onSelectionChange(ThreadSelectionModel.selectAll(rows.map(row => row.id)))
+      return
+    }
+    if (primaryModifier) return
+
+    const header = target.closest<HTMLButtonElement>(THREAD_SECTION_HEADER_SELECTOR)
+    if (header !== null && input.list.contains(header)) {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      const expanded = isExpanded(header)
+      if ((event.key === 'ArrowLeft' && !expanded) || (event.key === 'ArrowRight' && expanded)) return
+      event.preventDefault()
+      header.click()
+      return
+    }
+
     const activeButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
     const focusedElement = input.list.ownerDocument.activeElement
     if (activeButton === null || focusedElement === null || !activeButton.contains(focusedElement) || !input.list.contains(activeButton)) return
 
+    if (event.key === 'Escape') {
+      if (input.selection.sessionIds.length === 0) return
+      event.preventDefault()
+      input.onSelectionChange(ThreadSelectionModel.empty())
+      return
+    }
+
     const rows = ThreadListNavigationModel.visibleRows(input.list)
     const activeIndex = rows.findIndex(row => row.button === activeButton)
     if (activeIndex < 0) return
-    input.event.preventDefault()
 
-    const nextIndex = Math.max(0, Math.min(rows.length - 1, activeIndex + direction))
-    if (nextIndex === activeIndex) return
-    const nextRow = rows[nextIndex]
-    if (nextRow === undefined) return
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (event.shiftKey) return
+      if (event.key === 'ArrowRight') {
+        const article = ownArticle(activeButton)
+        const toggle = article?.querySelector<HTMLButtonElement>('[data-thread-children-toggle]') ?? null
+        if (toggle === null || toggle.disabled) return
+        event.preventDefault()
+        if (!isExpanded(toggle)) {
+          toggle.click()
+          return
+        }
+        const nextRow = rows[activeIndex + 1]
+        if (nextRow !== undefined && article?.contains(nextRow.button) === true) {
+          nextRow.button.focus()
+          input.onLookahead(ThreadListNavigationModel.lookahead({ rows, index: activeIndex + 1, direction: 1 }))
+        }
+        return
+      }
 
-    nextRow.button.focus()
-    input.open(nextRow.id)
-    input.onLookahead(ThreadListNavigationModel.lookahead({ rows, index: nextIndex, direction }))
-    const view = input.list.ownerDocument.defaultView
-    view?.requestAnimationFrame?.(() => {
-      const row = ThreadListNavigationModel.visibleRows(input.list).find(candidate => candidate.id === nextRow.id)
-      row?.button.focus()
+      event.preventDefault()
+      const parentButton = parentRowButton(activeButton)
+      if (parentButton !== null) {
+        parentButton.focus()
+        return
+      }
+      const toggle = ownArticle(activeButton)?.querySelector<HTMLButtonElement>('[data-thread-children-toggle]') ?? null
+      if (toggle !== null && isExpanded(toggle)) {
+        toggle.click()
+        return
+      }
+      const header = sectionHeaderOf(activeButton)
+      if (header !== null) header.focus()
+      return
+    }
+
+    const direction: ThreadNavigationDirection | null =
+      event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : event.key === 'End' ? 1 : event.key === 'Home' ? -1 : null
+    if (direction === null) return
+
+    const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, activeIndex + direction))
+    if (nextIndex === activeIndex && !event.shiftKey) {
+      event.preventDefault()
+      return
+    }
+    event.preventDefault()
+    const moved = ThreadListNavigationModel.focusRow({
+      rows,
+      index: nextIndex,
+      direction,
+      selection: input.selection,
+      extend: event.shiftKey,
+      fallbackAnchorId: activeButton.dataset.threadId ?? rows[activeIndex]?.id ?? '',
+      onSelectionChange: input.onSelectionChange,
+      onLookahead: input.onLookahead,
+      switchThread: input.arrowKeysSwitchThread === true && !event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp'),
+      open: input.open,
+      list: input.list,
     })
+    if (moved) return
   }
 
   static retainLookahead<SessionId extends string>(input: RetainThreadHistoryLookaheadInput<SessionId>): () => void {
