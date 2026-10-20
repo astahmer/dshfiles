@@ -7,6 +7,16 @@ import { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlat
 import type { DshPlatformClient, DshPlatformTransport } from '../src/platform/client.js'
 import type { CliIO } from '../src/cli/run.js'
 
+const requestBodySchema = z.looseObject({
+  rpcId: z.string().optional(),
+  method: z.string(),
+  payload: z.looseObject({ args: z.unknown().optional() }).optional(),
+})
+
+const decodeRequestBody = (body: BodyInit | null | undefined) => requestBodySchema.parse(JSON.parse(String(body)))
+
+const decodeCliEnvelope = (text: string) => z.looseObject({ ok: z.boolean() }).parse(JSON.parse(text))
+
 function io(): CliIO & {
   readonly out: PassThrough
   readonly err: PassThrough
@@ -144,7 +154,7 @@ describe('DSH platform CLI', () => {
     })
 
     expect(exitCode).toBe(0)
-    expect(JSON.parse(output())).toMatchObject({
+    expect(decodeCliEnvelope(output())).toMatchObject({
       command: 'plugins list',
       ok: true,
       data: { items: [] },
@@ -196,8 +206,7 @@ describe('DSH platform CLI', () => {
           },
         })
       }
-      const body = JSON.parse(String(init?.body))
-      const requestBody = z.object({ rpcId: z.string(), method: z.string() }).parse(body)
+      const requestBody = z.object({ rpcId: z.string(), method: z.string() }).parse(decodeRequestBody(init?.body))
       return new Response(
         JSON.stringify({
           type: 'server-response',
@@ -259,16 +268,16 @@ describe('DSH platform CLI', () => {
     expect(calls).toHaveLength(6)
     expect(calls[0]?.url).toContain('synthetic-token')
     expect(calls[2]?.url).toMatch(/^http:\/\/127\.0\.0\.1:3080\/api\/dshx-[a-f0-9]+\/list$/u)
-    expect(JSON.parse(String(calls[2]?.init?.body)).method).toMatch(/^dshx-[a-f0-9]+\/list$/u)
+    expect(decodeRequestBody(calls[2]?.init?.body).method).toMatch(/^dshx-[a-f0-9]+\/list$/u)
     expect(calls[3]?.url).toMatch(/^http:\/\/127\.0\.0\.1:3080\/api\/dshx-[a-f0-9]+\/status$/u)
-    expect(JSON.parse(String(calls[3]?.init?.body)).method).toMatch(/^dshx-[a-f0-9]+\/status$/u)
-    expect(JSON.parse(String(calls[3]?.init?.body)).payload).toMatchObject({ version: 1, input: { sessionIds: ['session-1'] } })
+    expect(decodeRequestBody(calls[3]?.init?.body).method).toMatch(/^dshx-[a-f0-9]+\/status$/u)
+    expect(decodeRequestBody(calls[3]?.init?.body).payload).toMatchObject({ version: 1, input: { sessionIds: ['session-1'] } })
     expect(apiCall?.url).toBe('http://127.0.0.1:3080/api/session/list')
     expect(new Headers(apiCall?.init?.headers).get('cookie')).toBe('dsh.session=example-cookie')
     expect(commandCall?.url).toBe('http://127.0.0.1:3080/api/commands/execute')
     expect(commandCall?.init?.signal).toBe(controller.signal)
-    expect(JSON.parse(String(apiCall?.init?.body)).payload.args).toEqual({ _request: {} })
-    expect(JSON.parse(String(commandCall?.init?.body)).payload.args).toEqual({ agentId: 'session-1', line: '/help', submittedAttachments: [] })
+    expect(decodeRequestBody(apiCall?.init?.body).payload?.args).toEqual({ _request: {} })
+    expect(decodeRequestBody(commandCall?.init?.body).payload?.args).toEqual({ agentId: 'session-1', line: '/help', submittedAttachments: [] })
   })
 
   it('refuses non loopback launch URLs before making a request', async () => {
@@ -462,7 +471,7 @@ describe('DSH platform CLI', () => {
     })
 
     expect(exitCode).toBe(0)
-    expect(JSON.parse(stdout())).toMatchObject({
+    expect(decodeCliEnvelope(stdout())).toMatchObject({
       ok: true,
       data: {
         scope: 'connected-host-profile',
@@ -488,7 +497,7 @@ describe('DSH platform CLI', () => {
     })
 
     expect(exitCode).toBe(130)
-    expect(JSON.parse(stdout())).toMatchObject({
+    expect(decodeCliEnvelope(stdout())).toMatchObject({
       ok: false,
       error: { code: 'cancelled' },
     })
@@ -559,7 +568,7 @@ describe('DSH platform CLI', () => {
     })
 
     expect(exitCode).toBe(2)
-    expect(JSON.parse(stdout())).toMatchObject({
+    expect(decodeCliEnvelope(stdout())).toMatchObject({
       schemaVersion: 1,
       command: 'plugins',
       ok: false,
@@ -809,7 +818,7 @@ describe('DSH platform CLI', () => {
     const output = stdout()
 
     expect(exitCode).toBe(0)
-    expect(JSON.parse(output)).toMatchObject({
+    expect(decodeCliEnvelope(output)).toMatchObject({
       ok: true,
       data: { sessionId: 'session-1', mode: 'queue', accepted: true },
     })

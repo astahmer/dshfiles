@@ -18,6 +18,7 @@ import { HostDefinitionModel } from '../src/host/define.js'
 import { defineSettings } from '../src/settings/index.js'
 import { defineApi, method } from '../src/api/index.js'
 import { createHostModule, createHostPlugin } from '../src/host/runtime.js'
+import type { SettingsScope } from '../src/settings/protocol-2.js'
 
 function tool(name: string): ToolDefinition {
   return { name } as ToolDefinition
@@ -332,7 +333,7 @@ describe('Host runtime adapter', () => {
     const fiber = { state: 2, config: { enabled: false } }
     const entry = { options: { id: 'example', config: { enabled: false } }, fiber }
     const describe = vi.fn(() => [{ ns: 'example', value: fiber.config }])
-    let scope: { get(): Record<string, unknown> } | undefined
+    let scope: Pick<SettingsScope, 'get'> | undefined
     const plugin = createHostPlugin({ settings: [contract.host({ setup: settingsScope => void (scope = settingsScope) })] }, { packageId: '@test/plugin' })
     const ctx = new Context()
     ctx.provide('settings', { configure: () => () => undefined, describe })

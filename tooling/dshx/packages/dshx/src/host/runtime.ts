@@ -193,7 +193,7 @@ function registerSettings(ctx: Context, contribution: SettingsContribution): voi
   // writes it in place but always installs a new raw `options.config`, so the
   // three identities together key an exact cache.
   let entry: Entry | undefined
-  let cached: { readonly fiber: Fiber; readonly config: unknown; readonly options: unknown; readonly value: Record<string, unknown> } | undefined
+  let cached: { readonly fiber: Fiber; readonly config: unknown; readonly options: unknown; readonly value: ReturnType<SettingsScope['get']> } | undefined
   const scope: SettingsScope = {
     namespace: contract.namespace,
     raw: ctx.settings,
