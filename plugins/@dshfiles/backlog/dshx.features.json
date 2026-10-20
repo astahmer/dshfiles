@@ -101,7 +101,7 @@
     {
       "id": "board-links-and-history",
       "title": "Board, links, backlinks and history",
-      "summary": "A board groups the same items by status. An item's detail edits its fields, links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; fields the user set are recorded as theirs.",
+      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. An item's detail edits its fields, links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; fields the user set are recorded as theirs.",
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
       "states": ["inbox", "todo", "doing", "done", "dropped"],

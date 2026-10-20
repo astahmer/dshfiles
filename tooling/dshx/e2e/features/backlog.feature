@@ -21,7 +21,8 @@ Feature: Backlog
     And "Parent epic" is captured
     And "Child step, part of b:1" is captured
     When item b:2 is moved to In progress on the board
-    Then the In progress column holds "Child step, part of b:1"
+    Then the board columns follow the status order through Dropped
+    And the In progress column holds "Child step, part of b:1"
     When backlog item b:1 is opened
     Then it is referenced by "Child step, part of b:1"
     When the backlink to b:2 is followed

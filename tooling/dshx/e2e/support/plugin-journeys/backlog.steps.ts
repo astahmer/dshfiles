@@ -63,6 +63,15 @@ When('item b:{int} is moved to In progress on the board', async ({ page }: { pag
   await page.getByRole('menuitem', { name: 'In progress' }).click()
 })
 
+Then('the board columns follow the status order through Dropped', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-board-status-order', async () => {
+    const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns =>
+      columns.map(column => column.getAttribute('data-backlog-column')),
+    )
+    expect(statuses).toEqual(['inbox', 'todo', 'doing', 'done', 'dropped'])
+  })
+})
+
 Then('the In progress column holds {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-board-move', async () => {
     await expect(page.getByRole('region', { name: 'In progress column' })).toContainText(title)

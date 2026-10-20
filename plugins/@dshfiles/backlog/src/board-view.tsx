@@ -13,7 +13,7 @@ import { StartThreadMenu } from './start-thread-dialog.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
-const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done']
+const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 const RECENT_EVENTS = 4
 /** Cards mounted per column before a "show more"; a long column scrolls without rendering every card. */
 const COLUMN_PAGE = 30
