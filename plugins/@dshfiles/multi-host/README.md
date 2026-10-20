@@ -124,6 +124,13 @@ title}` for threads started here, so the sidebar and view can list them.
 - The sidebar's Remote section still lists only threads started from this
   machine; threads created directly on the host appear in the Remote threads
   list, not the sidebar.
+- The remote transcript is polled (1.5 s while a turn runs, 8 s idle), not
+  streamed; the conversation is still written and read on the host.
+- DSH writes no question-request or approval-request event, so a pending
+  question is only visible as an open `tool/call`. That is why a generic tool
+  wait is announced after a minute rather than immediately, and why answering
+  or approving always happens in the host's own DSH.
+- No session handoff between machines, and no answer/approve action from here.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 
