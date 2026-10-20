@@ -234,7 +234,17 @@ export default defineHost({
         const boundary = InflightTurns.boundaryFromEvent(event)
         if (boundary === null) return
         const sessionId = String(session.id)
-        void (boundary === 'start' ? inflightTurns.start(sessionId) : inflightTurns.end(sessionId)).catch(() => undefined)
+        if (boundary === 'start') {
+          void inflightTurns.start(sessionId).catch(() => undefined)
+          return
+        }
+        // Crash recovery appends an `interrupted` turn end the moment the thread is next loaded, which
+        // can land before this process promotes the markers it inherited. Take the marker here so that
+        // turn still becomes a resume row instead of being dropped before `promote` can read it.
+        void inflightTurns
+          .end(sessionId)
+          .then(wasOpen => (wasOpen && boundary === 'interrupted' ? restartRecoveryStore.record([sessionId], 'interrupted') : undefined))
+          .catch(() => undefined)
       })
       return () => {
         stop()

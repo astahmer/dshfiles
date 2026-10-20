@@ -18,23 +18,37 @@ export type InflightTurn = z.infer<typeof inflightTurnSchema>
 export interface InflightTurnStore {
   list(): Promise<InflightTurn[]>
   start(sessionId: string): Promise<void>
-  end(sessionId: string): Promise<void>
+  /** Remove one turn and report whether this Host still had it open. */
+  end(sessionId: string): Promise<boolean>
   /** Read the turns still in flight and clear the file, so one exit is promoted once. */
   take(): Promise<InflightTurn[]>
 }
 
-const turnBoundarySchema = z.object({ type: z.union([z.literal('turn/start'), z.literal('turn/end')]) })
+const turnStartSchema = z.object({ type: z.literal('turn/start') })
+
+const turnEndSchema = z.object({
+  type: z.literal('turn/end'),
+  data: z.object({ reason: z.object({ kind: z.string().max(64) }).optional() }).optional(),
+})
+
+/** A turn opens here, closes here, or closes here because another process ended it first. */
+export type TurnBoundary = 'start' | 'end' | 'interrupted'
 
 /** The recovery rows an in-flight promotion writes, kept structural so this module owns no store. */
 interface RecoveryRecorder {
   record(sessionIds: readonly string[], reason: RecoveryReason): Promise<void>
 }
 
-/** Classify one Session event as a turn boundary, ignoring every other event. */
-const parseTurnBoundary = (event: unknown): 'start' | 'end' | null => {
-  const parsed = turnBoundarySchema.safeParse(event)
-  if (!parsed.success) return null
-  return parsed.data.type === 'turn/start' ? 'start' : 'end'
+/**
+ * Classify one Session event as a turn boundary, ignoring every other event. An
+ * `interrupted` ending is kept apart: crash recovery writes that reason for a turn
+ * another process left open, so it still needs a resume row when its marker closes.
+ */
+const parseTurnBoundary = (event: unknown): TurnBoundary | null => {
+  if (turnStartSchema.safeParse(event).success) return 'start'
+  const end = turnEndSchema.safeParse(event)
+  if (!end.success) return null
+  return end.data.data?.reason?.kind === 'interrupted' ? 'interrupted' : 'end'
 }
 
 /**
@@ -70,11 +84,13 @@ export class InflightTurns {
           if (entries.some(entry => entry.sessionId === sessionId)) return
           await write([...entries, { sessionId, startedAt: now() }].slice(-MAX_INFLIGHT_TURNS))
         }),
-      end: (sessionId: string): Promise<void> =>
+      end: (sessionId: string): Promise<boolean> =>
         transact(async () => {
           const entries = await read()
           const next = entries.filter(entry => entry.sessionId !== sessionId)
-          if (next.length !== entries.length) await write(next)
+          if (next.length === entries.length) return false
+          await write(next)
+          return true
         }),
       take: (): Promise<InflightTurn[]> =>
         transact(async () => {

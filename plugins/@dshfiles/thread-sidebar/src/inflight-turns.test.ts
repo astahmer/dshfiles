@@ -9,6 +9,7 @@ import { createRestartRecoveryStore } from './restart-recovery.js'
 test('turn boundaries are the only events that open or close an in-flight turn', () => {
   assert.equal(InflightTurns.boundaryFromEvent({ type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } }), 'start')
   assert.equal(InflightTurns.boundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'completed' } } }), 'end')
+  assert.equal(InflightTurns.boundaryFromEvent({ type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'interrupted' } } }), 'interrupted')
   assert.equal(InflightTurns.boundaryFromEvent({ type: 'step/start', seq: 3, time: 3, data: { turn: 1, step: 1 } }), null)
   assert.equal(InflightTurns.boundaryFromEvent(null), null)
 })

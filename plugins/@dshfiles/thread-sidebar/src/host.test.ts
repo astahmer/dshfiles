@@ -141,6 +141,21 @@ describe('thread-sidebar attention wiring', () => {
 
     harness.dispatch(turnEnd('completed'))
     await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual([]))
+    expect(await createRestartRecoveryStore({ home: harness.home }).list()).toEqual([])
+  })
+
+  it('keeps a resume row when crash recovery closes the turn before the boot promotion reads it', async () => {
+    const harness = await startHarness()
+
+    harness.dispatch({ type: 'turn/start', seq: 4, time: 1, data: { turn: 1 } })
+    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual(['session-1']))
+
+    harness.dispatch(turnEnd('interrupted'))
+    await vi.waitFor(async () => {
+      const entries = await createRestartRecoveryStore({ home: harness.home }).list()
+      expect(entries).toEqual([expect.objectContaining({ sessionId: 'session-1', reason: 'interrupted' })])
+    })
+    expect(await inflightSessionIds(harness.home)).toEqual([])
   })
 
   it('promotes the turns a previous process left open as interrupted recoveries', async () => {
