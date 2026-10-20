@@ -114,7 +114,8 @@ const hostServices = (ctx: Context): MemoryServices => {
     listSessions: () => sessionList.listSessions(),
     readSessionTitles: async sessionIds => {
       // The Session list serves each title from the projection cache (a log-prefix read, kept until the Session
-      // changes); core's title fold decodes the whole log, so it only answers the Sessions the list has no title for.
+      // changes). A Session it has no title for is left untitled here, so the finder falls back to its digest's title:
+      // core's title fold decodes the whole log, 57 of them took 3.1 s of the first search after a restart.
       const listed = await ctx
         .get('sessionController')
         ?.list({}, AbortSignal.timeout(10_000))
@@ -124,15 +125,6 @@ const hostServices = (ctx: Context): MemoryServices => {
         const title = listedTitleSchema.safeParse(item.projections?.values.title)
         if (title.success) fromList.set(item.sessionId, { sessionId: item.sessionId, title: title.data, updatedAt: item.updatedAt })
       }
-      const missing = sessionIds.filter(id => !fromList.has(id))
-      const folded = missing.length === 0 ? [] : await sessionQuery().readTitleSnapshots(missing.map(id => SessionId(id)))
-      for (const result of folded)
-        fromList.set(
-          result.sessionId,
-          result.status === 'fulfilled'
-            ? { sessionId: result.sessionId, title: result.value.title?.title, updatedAt: result.value.title?.updatedAt }
-            : { sessionId: result.sessionId, title: undefined, updatedAt: undefined },
-        )
       return sessionIds.map(id => fromList.get(id) ?? { sessionId: id, title: undefined, updatedAt: undefined })
     },
     searchSessionContent: async (request, signal) => {
