@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { ImageLightbox } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import {
   DropdownMenu,
@@ -30,7 +31,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
@@ -232,6 +233,8 @@ export const Composer = (props: {
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [referenceMode, setReferenceMode] = useState<ReferenceMode | null>(null)
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const closePreview = useCallback(() => setPreviewId(null), [])
   const ownRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const captureRef = useRef<VoiceCapture | null>(null)
@@ -448,6 +451,9 @@ export const Composer = (props: {
   }
 
   const preview = useMemo(() => (text.trim() === '' ? null : BacklogItems.triage(text)), [text])
+  const images = useMemo(() => files.filter(file => file.kind === 'image'), [files])
+  const lightboxImages = useMemo(() => images.map(file => ({ src: file.dataUrl, alt: file.name })), [images])
+  const previewIndex = images.findIndex(file => file.id === previewId)
   const chat = props.variant === 'chat'
   const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
   const voiceAvailable = speech.data?.available === true
@@ -523,7 +529,14 @@ export const Composer = (props: {
                 key={file.id}
                 className="dshx:group/image dshx:relative dshx:size-16 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted"
               >
-                <img src={file.dataUrl} alt={file.name} className="dshx:size-full dshx:object-cover" />
+                <button
+                  type="button"
+                  aria-label={`Open ${file.name}`}
+                  onClick={() => setPreviewId(file.id)}
+                  className="dshx:block dshx:size-full dshx:cursor-zoom-in"
+                >
+                  <img src={file.dataUrl} alt={file.name} className="dshx:size-full dshx:object-cover" />
+                </button>
                 <button
                   type="button"
                   aria-label={`Remove ${file.name}`}
@@ -556,6 +569,8 @@ export const Composer = (props: {
           )}
         </div>
       )}
+
+      {previewIndex === -1 ? null : <ImageLightbox images={lightboxImages} initialIndex={previewIndex} onClose={closePreview} />}
 
       <textarea
         ref={input}

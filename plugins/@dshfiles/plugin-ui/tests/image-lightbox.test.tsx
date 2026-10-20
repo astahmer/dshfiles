@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/dom'
 import { cleanup, render } from '@testing-library/react'
-import { ImageLightbox } from '../src/ImageLightbox.js'
+import { ImageLightbox } from '../src/components/image-lightbox.js'
 
 afterEach(cleanup)
 

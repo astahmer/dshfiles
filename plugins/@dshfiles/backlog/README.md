@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![A chat-sized capture box with files, properties and references](docs/screenshots/rich-capture.png)
+
 ![Capture anything and let it sort itself](docs/screenshots/capture-and-triage.png)
 
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It

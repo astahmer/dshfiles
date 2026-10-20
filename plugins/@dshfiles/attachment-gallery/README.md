@@ -6,7 +6,7 @@ Owned port of DSH's native attachment presentation plugin. It keeps the stock co
 
 ## Upstream and license
 
-The native baseline is `@deepseek-ai/dsh-client-ui-attachment@0.2.0-rc.2` from [`deepseek-harness/packages/client/ui-attachment`](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/client/ui-attachment). The lightbox interaction is an owned port of the DSH core `ui-primitives` implementation from revision `573ac248` in this checkout. Upstream code is MIT licensed; retain the notice in [`LICENSE`](./LICENSE).
+The native baseline is `@deepseek-ai/dsh-client-ui-attachment@0.2.0-rc.2` from [`deepseek-harness/packages/client/ui-attachment`](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/client/ui-attachment). The lightbox interaction is an owned port of the DSH core `ui-primitives` implementation from revision `573ac248` in this checkout; it lives in the shared kit as `@dshfiles/plugin-ui/components/image-lightbox`, so the backlog composer uses the same gallery. Upstream code is MIT licensed; retain the notice in [`LICENSE`](./LICENSE).
 
 This plugin is the deployed UI implementation. The core package stays available and unchanged; this bundle disables Loader row `ui-attachment` and inserts `dshfiles-attachment-gallery`. When DSH changes its attachment contracts or behavior, compare against the pinned upstream baseline and deliberately port the relevant changes here. Do not silently patch core or assume the fork stays in sync.
 

@@ -3,7 +3,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AttachmentRailLabels } from '../AttachmentRail.js'
 import type { DropOverlayLabels } from '../DropOverlay.js'
 import type { FileCardLabels } from '../FileCard.js'
-import type { ImageLightboxLabels } from '../ImageLightbox.js'
+import type { ImageLightboxLabels } from '@dshfiles/plugin-ui/components/image-lightbox'
 import type { GalleryTranslate } from '../locales.js'
 import type { ImageLabels } from '../MessageImage.js'
 

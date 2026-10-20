@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { LoaderCircleIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from './ImageLightbox.js'
+import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import styles from './MessageImage.module.css'
 
 type MessageImageSource = MessageImagesProps['images'][number]

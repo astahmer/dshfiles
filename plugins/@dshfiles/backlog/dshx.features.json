@@ -438,13 +438,18 @@
     {
       "id": "rich-capture",
       "title": "A chat-sized capture box with files, properties and references",
-      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, links a backlog item or a thread, or sets a project; status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count.",
+      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, links a backlog item or a thread, or sets a project; status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
         "expect button \"Dictate\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
         "expect img \"red.png\"",
+        "click button \"Open red.png\"",
+        "expect dialog \"Image preview\"",
+        "expect button \"Image 2 of 2\"",
+        "press Escape",
         "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
         "expect text \"note.txt\"",
         "click button \"Status\"",
@@ -458,11 +463,15 @@
         "expect text \"rich capture with an image\"",
         "click text \"rich capture with an image\"",
         "expect img \"red.png\"",
-        "expect text \"note.txt\""
+        "expect text \"note.txt\"",
+        "click button \"Open red.png\"",
+        "expect dialog \"Image preview\"",
+        "expect button \"Image 1 of 2\"",
+        "expect img \"red.png\""
       ],
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
-      "states": ["empty", "typing", "images", "properties", "sending", "saved"],
+      "states": ["empty", "gallery", "images", "properties", "saved", "sending", "typing"],
       "failureModes": [
         "A file that is not a supported image, or one still larger than 8 MB after shrinking, is refused with the reason and the rest of the draft stays.",
         "Voice input is disabled with a title when the browser has no speech recognizer.",

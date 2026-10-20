@@ -1,7 +1,7 @@
 import type { FactoryComponentPropsOf } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { ImageGallery } from '../MessageImage.js'
-import type { ImageLightboxLabels } from '../ImageLightbox.js'
+import type { ImageLightboxLabels } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { AttachmentGalleryLabelsModel } from './labels.js'
 
 /** Shared gallery definition: one registration fills every image position. */
