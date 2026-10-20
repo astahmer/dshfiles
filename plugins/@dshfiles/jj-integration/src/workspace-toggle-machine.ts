@@ -148,17 +148,20 @@ export const defersIsolationToSend = (move: DeferredMove | null | undefined): bo
 const defaultDestinationMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
   const { destination } = input
   if (destination.vcs !== 'jj') return null
-  const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
-  const move = { projectWorkspaceId, leaving: null, leavingBase: null }
-  if (destination.isolateByDefault) {
-    if (ownsIsolatedThreadWorkspace(destination)) return null
-    let isolateMove: ToggleRequest = { ...move, isolate: true }
-    if (input.workspaceId !== projectWorkspaceId) isolateMove = { ...isolateMove, excludeSpareWorkspaceId: input.workspaceId }
-    if (destination.bookmark === null) return isolateMove
-    return { ...isolateMove, base: destination.bookmark }
-  }
-  if (destination.isolated) return { ...move, isolate: false }
+  if (destination.isolateByDefault) return ownsIsolatedThreadWorkspace(destination) ? null : isolatingMove(input)
+  if (destination.isolated) return { projectWorkspaceId: destination.projectWorkspaceId ?? input.workspaceId, leaving: null, leavingBase: null, isolate: false }
   return null
+}
+
+/** A move into a fresh thread workspace of the same project, never back into the workspace the Session leaves. */
+const isolatingMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
+  const { destination } = input
+  if (destination.vcs !== 'jj') return null
+  const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
+  let move: ToggleRequest = { projectWorkspaceId, leaving: null, leavingBase: null, isolate: true }
+  if (input.workspaceId !== projectWorkspaceId) move = { ...move, excludeSpareWorkspaceId: input.workspaceId }
+  if (destination.bookmark === null) return move
+  return { ...move, base: destination.bookmark }
 }
 
 const pendingFor = (client: WorkspaceToggleClient, request: ToggleRequest, name: string | null): PendingDestination => {
@@ -300,16 +303,11 @@ export const workspaceToggleMachine = setup({
   }),
   initial: 'idle',
   on: {
-    // A first send isolates its thread itself (`isolateFirstSend`): the toggle forgets the move and settles the visit,
-    // so neither a later arrival nor a timeout can move that thread again.
+    // A first send isolates its thread itself (`isolateFirstSend`): the toggle forgets the move. The visit stays
+    // unsettled because the send moves only the draft: the blank source Session stays in the workspace it left, and
+    // reopening it is a new New thread whose next send must isolate again rather than land in a shared workspace.
     claim: {
-      actions: assign(({ context, event }) => {
-        const move = deferredMoveFor(context.deferred, event.sessionId)
-        return {
-          settled: settledWith(context.settled, move?.visitId),
-          deferred: withoutDeferredSession(context.deferred, event.sessionId),
-        }
-      }),
+      actions: assign(({ context, event }) => ({ deferred: withoutDeferredSession(context.deferred, event.sessionId) })),
     },
   },
   states: {
@@ -631,6 +629,7 @@ const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; r
 
 export class WorkspaceToggle {
   static readonly defaultDestinationMove = defaultDestinationMove
+  static readonly isolatingMove = isolatingMove
   static readonly deferredMoveFor = (snapshot: { readonly context: { readonly deferred: readonly DeferredMove[] } }, sessionId: string): DeferredMove | null =>
     deferredMoveFor(snapshot.context.deferred, sessionId)
   static readonly spareKey = spareKey

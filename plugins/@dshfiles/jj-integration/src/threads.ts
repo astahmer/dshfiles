@@ -830,6 +830,21 @@ export const createThreads = (options: {
     warming.set(key, task)
   }
 
+  /** Neither a folder nor a jj workspace may already carry the name: reusing either would put two threads in one checkout. */
+  const isFreeThreadName = async (repoRoot: string, name: string): Promise<boolean> => {
+    if (existsSync(join(options.threadsDirectory(repoRoot), name))) return false
+    const names = await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)
+    return !names.split('\n').includes(name)
+  }
+  /** The client names a thread workspace before it exists; a name taken meanwhile silently yields a fresh one. */
+  const freeThreadName = async (repoRoot: string, requestedName: string | undefined): Promise<string> => {
+    if (requestedName !== undefined && (await isFreeThreadName(repoRoot, requestedName))) return requestedName
+    for (;;) {
+      const name = `thread-${randomBytes(3).toString('hex')}`
+      if (await isFreeThreadName(repoRoot, name)) return name
+    }
+  }
+
   const provision = (repoRoot: string, base?: string, requestedName?: string): Promise<{ readonly name: string; readonly path: string }> =>
     serialized(repoRoot, async () => {
       const target = base ?? options.bookmark()
@@ -839,7 +854,7 @@ export const createThreads = (options: {
         await updateSpares(repoRoot, ({ [target]: _claimed, ...rest }) => rest)
         // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
         // its relative pointer to the store still holds, and jj renames the workspace to match.
-        const name = requestedName !== undefined && !existsSync(join(directory, requestedName)) ? requestedName : spare
+        const name = requestedName !== undefined && (await isFreeThreadName(repoRoot, requestedName)) ? requestedName : spare
         const path = join(directory, name)
         if (name !== spare) {
           await rename(join(directory, spare), path)
@@ -847,17 +862,27 @@ export const createThreads = (options: {
           await jj(['workspace', 'rename', name], path)
         }
         await jj(['new', target], path)
-        prewarm(repoRoot, target)
+        if (!isCommitId(target)) prewarm(repoRoot, target)
         return { name, path }
       }
-      const name = requestedName ?? `thread-${randomBytes(3).toString('hex')}`
+      const name = await freeThreadName(repoRoot, requestedName)
       const path = join(directory, name)
       await mkdir(directory, { recursive: true })
       // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
       await jj(['workspace', 'add', path, '--name', name, '-r', target], repoRoot)
-      prewarm(repoRoot, target)
+      // A spare waits for the next thread from a bookmark; a thread branched from one exact revision gets none.
+      if (!isCommitId(target)) prewarm(repoRoot, target)
       return { name, path }
     })
+
+  /** The revision a thread branched from this workspace starts on: its working copy when it holds work, else its parent. */
+  const branchPoint = async (workspaceRoot: string, signal?: AbortSignal): Promise<string> => {
+    const [commitId] = (await jj(['log', '--no-graph', '-r', 'coalesce(@ ~ empty(), @-)', '-T', 'commit_id ++ "\\n"'], workspaceRoot, signal))
+      .split('\n')
+      .filter(isCommitId)
+    if (commitId === undefined) throw new ThreadError('jj-failed', 'Could not resolve the revision to branch the new thread from.')
+    return commitId
+  }
 
   /**
    * Checks a thread workspace out again after its folder was deleted, so a Session pinned to it can still run.
@@ -1494,6 +1519,7 @@ export const createThreads = (options: {
     status,
     provision,
     prewarm,
+    branchPoint,
     restore,
     land,
     landAt,

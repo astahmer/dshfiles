@@ -809,17 +809,39 @@ describe('defaultDestinationMove', () => {
       excludeSpareWorkspaceId: 'ws-shared',
     })
   })
+
+  it('forces a fresh thread workspace even when isolation is off by default', () => {
+    expect(
+      WorkspaceToggle.isolatingMove({
+        destination: destination({ isolated: true, isolateByDefault: false, ownedByAnotherSession: true }),
+        workspaceId: 'ws-shared',
+      }),
+    ).toEqual({ isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null, excludeSpareWorkspaceId: 'ws-shared' })
+    expect(WorkspaceToggle.isolatingMove({ destination: destination({ vcs: 'none' }), workspaceId: 'ws-shared' })).toBeNull()
+  })
 })
 
 describe('first-send isolation', () => {
-  it('retires the deferred move so a later arrival of that visit is not moved again', () => {
+  it('retires the claimed move without moving anything', () => {
     const toggle = startToggle()
     arriveAt(toggle, { sessionId: 'first', workspaceId: 'project' })
     expect(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'first')).not.toBeNull()
     toggle.actor.send({ type: 'claim', sessionId: 'first' })
-    arriveAt(toggle, { sessionId: 'first', workspaceId: 'project' })
     expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
     expect(toggle.actor.getSnapshot().value).toBe('idle')
+  })
+
+  it('isolates the next send of a blank Session reopened in the shared thread workspace its first send left', () => {
+    const toggle = startToggle()
+    const shared = isolateRequest({ excludeSpareWorkspaceId: 'ws-shared' })
+    arriveAt(toggle, { sessionId: 'source', workspaceId: 'ws-shared' })
+    resolveAt(toggle, { sessionId: 'source', request: shared })
+    toggle.actor.send({ type: 'claim', sessionId: 'source' })
+    arriveAt(toggle, { sessionId: 'source', workspaceId: 'ws-shared' })
+    resolveAt(toggle, { sessionId: 'source', request: shared })
+    const move = WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source')
+    expect(defersIsolationToSend(move)).toBe(true)
+    expect(move?.request).toEqual(shared)
   })
 
   it('provisions the thread workspace without opening it', async () => {

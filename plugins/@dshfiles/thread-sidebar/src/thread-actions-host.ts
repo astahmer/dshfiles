@@ -3,6 +3,9 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { createHostApiClient } from '@dshfiles/dshx/host'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { createThreadActions, type ThreadActionDeps } from './thread-actions.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { setSessionSettled, settledSessionIdsFromHost } from './settings.js'
@@ -82,6 +85,16 @@ const dependencies: ThreadActionDeps = {
       ...(input.cwd === undefined ? undefined : { cwd: input.cwd }),
       ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
     }),
+  ownWorkspaceFor: async projectId => {
+    const jj = createHostApiClient(requireContext(), jjIntegrationApi, '@dshfiles/thread-sidebar')
+    try {
+      return (await jj.ownWorkspaceFor({ workspaceId: projectId })).workspaceId
+    } catch (error) {
+      // Without jj-integration nothing isolates threads; any other failure must not fall back to a shared checkout.
+      if (error instanceof Error && isApiOwnerMissing(error)) return projectId
+      throw error
+    }
+  },
   stop: async sessionId => {
     requireContext().sessionController.cancel({ sessionId: SessionId(sessionId) })
   },

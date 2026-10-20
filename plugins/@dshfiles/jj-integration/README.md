@@ -27,6 +27,19 @@ thread at the new destination. Leaving an unused thread workspace keeps it as
 the project's spare for that bookmark, so toggling back reuses it and its blank
 Session.
 
+**Two threads never share a thread workspace.** Three guards hold this, whatever
+the toggle remembers:
+
+- A blank Session that sends from a thread workspace another Session uses moves
+  to a fresh one first, even with isolation off. This also covers the blank
+  source Session a first send leaves behind (the send moves only the draft), so
+  reopening and sending from it isolates again.
+- `thread_create` (and every caller of the `ownWorkspaceFor` API) pointed at an
+  occupied thread workspace starts in a new one branched from that workspace's
+  latest revision: its working copy when it holds work, else its parent.
+- The Host never reuses a requested workspace name that a folder or jj workspace
+  already holds; it silently picks another.
+
 **New thread provisions nothing until its first send.** The sidebar button, the
 palette and the project picker open the composer at once in the project (or
 current) checkout, and with `isolateByDefault` on the blank thread stays there:

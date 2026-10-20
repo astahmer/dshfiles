@@ -1018,6 +1018,21 @@ const destinationAt = async (workspaceRoot: string, isolated: boolean, projectWo
 }
 
 const api = jjIntegrationApi.host({
+  ownWorkspaceFor: async ({ input }) => {
+    const registry = registryOf()
+    const source = registry.get(WorkspaceId(input.workspaceId))
+    const unchanged = { workspaceId: input.workspaceId, branched: false }
+    if (source === undefined || source.sessionIds.length === 0) return unchanged
+    const location = await cachedLocation(requireThreads(), source.path)
+    if (location?.threadName === undefined) return unchanged
+    const activeThreads = requireThreads()
+    const thread = await activeThreads.provision(location.repoRoot, await activeThreads.branchPoint(location.workspaceRoot))
+    const project = await registry.resolveByPath(location.repoRoot)
+    const workspace = await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
+    emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name} branched from ${location.threadName}`, path: thread.path })
+    invalidateRepositories()
+    return { workspaceId: workspace.id, branched: true }
+  },
   provision: async ({ input }) => {
     const registry = registryOf()
     const source = registry.get(WorkspaceId(input.workspaceId))

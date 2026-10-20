@@ -165,6 +165,12 @@ export const jjIntegrationApi = defineApi({
   version: 1,
   owner: '@dshfiles/jj-integration',
   methods: {
+    ownWorkspaceFor: method({
+      input: z.object({ workspaceId: z.string().min(1) }).strict(),
+      output: z.object({ workspaceId: z.string(), branched: z.boolean() }).strict(),
+      description:
+        'Where a new thread may start: the given workspace, unless it is a jj thread workspace another thread already uses; then a fresh thread workspace starting from its latest revision.',
+    }),
     provision: method({
       input: z
         .object({

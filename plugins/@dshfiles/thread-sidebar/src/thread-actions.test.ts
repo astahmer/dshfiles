@@ -38,6 +38,7 @@ const createDeps = (overrides: Partial<ThreadActionDeps> = {}): ThreadActionDeps
   rename: async (_sessionId, title) => ({ title }),
   fork: async () => ({ sessionId: 'session-fork' }),
   create: async () => ({ sessionId: 'session-new' }),
+  ownWorkspaceFor: async projectId => projectId,
   stop: async () => undefined,
   selectModel: async input => ({ provider: input.provider, model: input.model }),
   registerProject: async (path, title) => ({ projectId: 'project-1', title: title ?? path, path, created: true }),
@@ -298,6 +299,25 @@ describe('thread actions: lifecycle', () => {
     await actions.create({ input: { projectId: 'project-2', cwd: '/work/project-1' }, caller: agent('session-a'), signal })
 
     expect(created).toEqual([{ projectId: 'project-1' }, { cwd: '/work/elsewhere' }, { projectId: 'project-2' }])
+  })
+
+  test('starts a thread in its own workspace when the one it names already belongs to another thread', async () => {
+    const created: Array<{ projectId?: string; cwd?: string }> = []
+    const actions = createThreadActions(
+      createDeps({
+        projects: () => [project('thread-workspace', ['session-a'])],
+        ownWorkspaceFor: async projectId => (projectId === 'thread-workspace' ? 'fresh-thread-workspace' : projectId),
+        create: async input => {
+          created.push(input)
+          return { sessionId: 'session-new' }
+        },
+      }),
+    )
+
+    await actions.create({ input: { cwd: '/work/thread-workspace' }, caller: agent('session-a'), signal })
+    await actions.create({ input: { projectId: 'project-1' }, caller: agent('session-a'), signal })
+
+    expect(created).toEqual([{ projectId: 'fresh-thread-workspace' }, { projectId: 'project-1' }])
   })
 
   test('creates and names a thread, and keeps the new id when the title is refused', async () => {

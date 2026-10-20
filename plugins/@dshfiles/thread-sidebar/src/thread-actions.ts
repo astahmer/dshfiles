@@ -46,6 +46,8 @@ export interface ThreadActionDeps {
     readonly cwd?: string
     readonly agentPreset?: string
   }) => Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
+  /** The workspace a new thread may start in: never a jj thread workspace another thread already uses. */
+  readonly ownWorkspaceFor: (projectId: string) => Promise<string>
   readonly stop: (sessionId: string) => Promise<void>
   readonly selectModel: (input: {
     readonly sessionId: string
@@ -443,7 +445,8 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   create: async ({ input }: ThreadActionContext<ThreadCreateInput>) => {
     // The Host accounts a Session to a workspace or to a bare cwd, never both, and a bare cwd leaves it ungrouped:
     // when the directory is a registered project, create the thread in that project instead.
-    const projectId = input.projectId ?? projectIdForPath(deps, input.cwd)
+    const requestedProjectId = input.projectId ?? projectIdForPath(deps, input.cwd)
+    const projectId = requestedProjectId === undefined ? undefined : await deps.ownWorkspaceFor(requestedProjectId)
     let created: { readonly sessionId: string; readonly agentPreset?: string }
     try {
       created = await deps.create({

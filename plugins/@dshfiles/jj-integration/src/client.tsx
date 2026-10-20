@@ -22,8 +22,9 @@ import { useCallback, useLayoutEffect, useMemo, useState, useSyncExternalStore }
 import { z } from 'zod'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
-import { mainViewSessionId } from './main-view-session.js'
-import { jjIntegrationApi } from './api.js'
+import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
+import { jjIntegrationApi, threadWorkspaceName } from './api.js'
+import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
 import { InlineIntegrateOffer } from './inline-integrate.js'
@@ -656,13 +657,31 @@ export default defineClient({
       })
     // The destination bar resolves a move from its own query, which unmounts (and is cancelled) when another New thread
     // opens; a send asks the Host itself.
-    const resolveMove = async (move: DeferredMove, signal: AbortSignal): Promise<ToggleRequest | null> => {
+    const resolveMove = async (move: DeferredMove, signal: AbortSignal, options: { readonly force: boolean }): Promise<ToggleRequest | null> => {
       const destination = await runHostRequest({
         signal,
         timeoutMs: 30_000,
         request: hostSignal => jjThreads.destination({ workspaceId: move.workspaceId, sessionId: move.sessionId }, { signal: hostSignal }),
       })
+      if (options.force) return WorkspaceToggle.isolatingMove({ destination, workspaceId: move.workspaceId })
       return ownsIsolatedThreadWorkspace(destination) ? null : WorkspaceToggle.defaultDestinationMove({ destination, workspaceId: move.workspaceId })
+    }
+    /**
+     * The last line of defence against two threads sharing one jj thread workspace: whatever the toggle remembers, a
+     * blank Session sending from a thread workspace another Session uses moves to a fresh one first.
+     */
+    const sharedThreadWorkspaceMove = (sessionId: SessionSummary['id'], workspaceId: string): DeferredMove | undefined => {
+      const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
+      if (workspace === undefined || !threadWorkspaceName.safeParse(workspace.path.split('/').at(-1)).success) return undefined
+      if (!workspaceHasOtherSession({ sessionId, workspaceSessionIds: workspace.sessionIds })) return undefined
+      return {
+        sessionId,
+        visitId: mainViewSessionVisitId(sessionId),
+        workspaceId,
+        name: workspaceToggle.getSnapshot().context.client.generateName(),
+        wantsIsolation: true,
+        request: null,
+      }
     }
     const releaseOnceSent = (sessionId: SessionId, release: () => void): void => {
       let timer: ReturnType<typeof setTimeout> | undefined
@@ -701,10 +720,11 @@ export default defineClient({
         return
       }
       const toggleSnapshot = workspaceToggle.getSnapshot()
-      const move = toggleSnapshot.context.deferred.find(candidate => candidate.sessionId === sessionId)
+      const source = workspaceComposerFor(sessionId)
+      const sharedWorkspaceMove = source?.blank === true ? sharedThreadWorkspaceMove(sessionId, source.workspaceId) : undefined
+      const move = toggleSnapshot.context.deferred.find(candidate => candidate.sessionId === sessionId) ?? sharedWorkspaceMove
       const deferred = defersIsolationToSend(move)
       if (toggleSnapshot.matches('idle') && !deferred) return
-      const source = workspaceComposerFor(sessionId)
       if (source === undefined || !source.blank) return
       const state = source.input.state.getSnapshot()
       if (state.phase !== 'plain' || (state.draft.trim() === '' && state.attachmentIds.length === 0)) return
@@ -726,7 +746,7 @@ export default defineClient({
           source,
           submitSource,
           destination: async signal => {
-            request ??= await resolveMove(move, signal)
+            request ??= await resolveMove(move, signal, { force: move === sharedWorkspaceMove })
             return request
           },
           isolate: signal => {

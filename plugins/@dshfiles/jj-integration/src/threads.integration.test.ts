@@ -77,6 +77,28 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
   })
 
+  it('never hands out a name another thread workspace already holds', async () => {
+    const first = await threads.provision(repo, undefined, 'thread-c0ffee')
+    const second = await threads.provision(repo, undefined, 'thread-c0ffee')
+    expect(second.name).not.toBe(first.name)
+    expect(second.path).not.toBe(first.path)
+    expect((await threads.locate(second.path)).threadName).toBe(second.name)
+  })
+
+  it('branches a new thread from another thread workspace without sharing its checkout', async () => {
+    const source = await threads.provision(repo)
+    writeFileSync(join(source.path, 'plan.md'), 'plan\n')
+    jj(source.path, 'commit', '-m', 'plan')
+    const committed = await threads.branchPoint(source.path)
+    expect(committed).toBe(commitIdAt(source.path, '@-'))
+    const branched = await threads.provision(repo, committed)
+    expect(branched.path).not.toBe(source.path)
+    expect(readFileSync(join(branched.path, 'plan.md'), 'utf8')).toBe('plan\n')
+
+    writeFileSync(join(source.path, 'draft.md'), 'draft\n')
+    expect(await threads.branchPoint(source.path)).toBe(commitIdAt(source.path, '@'))
+  })
+
   it('checks the next thread out ahead, then hands it over under the requested name on the bookmark as it is now', async () => {
     const first = await threads.provision(repo)
     const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
