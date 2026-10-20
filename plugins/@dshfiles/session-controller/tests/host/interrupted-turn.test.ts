@@ -42,3 +42,14 @@ it('does not resume other terminal failures or signed-out tasks', () => {
   ]
   expect(latestInterruptedTurn(events)).toBeUndefined()
 })
+
+it('offers a task the Host shutdown cut off, but not one the user stopped', () => {
+  const aborted = (seq: number, cause: 'disposed' | 'user'): SessionEvent => ({
+    type: 'turn/end',
+    seq: SessionSeq(seq),
+    time: 300,
+    data: { turn: 2, reason: { kind: 'aborted', reason: { kind: cause } } },
+  })
+  expect(latestInterruptedTurn([aborted(5, 'disposed')])).toBe(5)
+  expect(latestInterruptedTurn([aborted(5, 'user')])).toBeUndefined()
+})
