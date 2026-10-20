@@ -88,6 +88,7 @@ import { latestReviewProgressSnapshot } from './review-progress-queries.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
+import { WorkspaceCleanupDialog } from './workspace-cleanup-dialog.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
@@ -332,6 +333,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
   const [moveSource, setMoveSource] = useState<Revision | null>(null)
   const [copyNotice, setCopyNotice] = useState<{ readonly copied: boolean; readonly label: string } | null>(null)
   const mineOnly = preferences.mineOnly
@@ -1639,6 +1641,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                         >
                           Clear empty ancestors ({emptyAncestors.length})
                         </DropdownMenuItem>
+                        <DropdownMenuItem className="dshx:text-xs" disabled={busy} onSelect={() => setCleanupOpen(true)}>
+                          Clean up thread workspaces…
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
                           <span title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>
@@ -1813,6 +1818,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             truncated={fullDiffQuery.data?.truncated ?? false}
           />
         )}
+
+        {state !== undefined && <WorkspaceCleanupDialog onCleaned={refreshRepository} onOpenChange={setCleanupOpen} open={cleanupOpen} path={state.root} />}
 
         <Dialog
           onOpenChange={open => {
@@ -2483,7 +2490,9 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 title={revisionDates(revision, props.editedAt)}
               >
                 {formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
-                {props.revisionDate === 'both' && props.editedAt !== undefined && <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>}
+                {props.revisionDate === 'both' && props.editedAt !== undefined && (
+                  <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>
+                )}
               </time>
               <span
                 aria-hidden
