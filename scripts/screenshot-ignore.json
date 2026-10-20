@@ -1,0 +1,19 @@
+{
+  "agent-questions": "Styles and scans the native question card. It renders no surface of its own; the card it decorates belongs to DSH core and needs a live model turn to appear.",
+  "diff-viewed": "Adds a Viewed toggle to the deliverables review pane. The pane only exists for a turn that produced reviewable files, and the scratch seeds create none.",
+  "goal-stall-guard": "Host-side goal policy. It renders nothing itself: the pause, continue or close it decides appears in the native goal controls.",
+  "main-tabs": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
+  "multi-host": "The runtime directory sits behind the host picker's menus and needs a registered second runtime or SSH host; a scratch instance seeds neither, and its own reach assumes a host already exists.",
+  "project-checks": "The panel only opens from its composer command, which the command palette does not list, and the overlay renders no surface until a session directory has trusted actions.",
+  "prompt-stash": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
+  "pulls-review": "Its catalog path seeds a rebase-ready thread and then drives the /pulls command, but the seeded thread cannot be selected from the sidebar the way the reach expects.",
+  "queue-reorder": "Its catalog path starts from threads the e2e database fixture seeds (Queue source, Busy target); a scratch DSH creates neither.",
+  "send-after-upload": "Its banner exists only while an attachment upload is still finishing, which a local scratch upload never holds open long enough to capture.",
+  "shared-runtime": "Loads the one shared copy of the Client UI modules. It renders no surface of its own to screenshot.",
+  "shortcuts": "Installs keyboard chords only. Every visible result belongs to the surface whose control the chord drives, not to this plugin.",
+  "test-runs": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
+  "tool-meta": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
+  "turn-summary": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
+  "ui-styles": "Compiles and injects the shared plugin stylesheet once per page. It has no screen of its own, only the sheets other plugins render with.",
+  "workspace-folder-picker": "Its directory flow opens from the workspace chip's own menu; the composer's folder picker is a different surface and never renders this picker's title."
+}

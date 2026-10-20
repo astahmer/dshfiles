@@ -8,7 +8,7 @@
     "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
-    "check:green": "pnpm run typecheck:scripts && pnpm run test:scripts && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop && pnpm run knip && pnpm run check:plugin-boot && pnpm run check:e2e:smoke",
+    "check:green": "pnpm run typecheck:scripts && pnpm run test:scripts && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:screenshots && pnpm run check:plugins && pnpm run check:desktop && pnpm run knip && pnpm run check:plugin-boot && pnpm run check:e2e:smoke",
     "check:diff": "node scripts/check-diff.mjs",
     "jj:state": "node scripts/jj-state.mjs",
     "knip": "pnpm --dir tooling/dshx exec knip --directory ../.. --config \"$PWD/knip.jsonc\" --no-config-hints",
@@ -32,7 +32,9 @@
     "test:changed": "node scripts/test-selection.mjs changed",
     "test:related": "node scripts/test-selection.mjs related",
     "test:tooling": "pnpm --dir tooling/dshx run test:evidence && pnpm --dir tooling/dshx run test:inventory && pnpm --dir tooling/dshx run test:feature-coverage && pnpm --dir tooling/dshx run test:browser-tasks",
-    "test:scripts": "node --test scripts/*.test.mjs scripts/dsh-lkg/*.test.mjs"
+    "test:scripts": "node --test scripts/*.test.mjs scripts/dsh-lkg/*.test.mjs",
+    "screenshots": "node scripts/plugin-screenshots.mjs",
+    "check:screenshots": "node scripts/plugin-screenshots.mjs --check"
   },
   "devDependencies": {
     "@ast-grep/cli": "0.45.3",

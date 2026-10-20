@@ -7,6 +7,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Recovering a broken DSH](recovery.md)                       | Start the last known good DSH, find what broke, refresh the snapshot, and upgrade DSH through the gate.                     |
 | [`profile-installs.md`](profile-installs.md)                 | Local profile installs, pnpm behavior, peer dependencies, and composition.                                                  |
 | [`e2e-testing.md`](e2e-testing.md)                           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                                              |
+| [Plugin screenshots](plugin-screenshots.md)                  | The screenshot each UI plugin ships, where captures live, the scratch-DSH capture, and the `check:screenshots` gate.       |
 | [`verification-evidence.md`](verification-evidence.md)       | Project Checks receipt ownership, safe Activity Timeline projection, Session navigation, and security evidence.             |
 | [Incremental checks](incremental-checks.md)                  | Unified pnpm workspace, Turbo caching, JJ-aware changed/related tests, and safe fallback boundaries.                        |
 | [Repository guardrails](guardrails.md)                       | Dependency and TypeScript contracts, lint ratchets, export ownership, Knip, client flows and HTTP fakes.                    |

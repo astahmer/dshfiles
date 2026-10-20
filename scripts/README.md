@@ -15,6 +15,8 @@ live in their owning package.
 | `pnpm profile:sync --profile <name>` | `profile-sync.ts`                    | Reconcile a profile from its seed (the `dsh web` supervisor runs it before each start).       |
 | `pnpm profile:boot --profile <name>` | `profile-boot.ts`                    | Start an isolated profile and report activation failures.                                     |
 | `pnpm verify:web-profile-contract`   | `verify-web-profile-contract.mjs`    | Check the checked-in `profiles/web` seed against the owned bundles.                           |
+| `pnpm screenshots`                   | `plugin-screenshots.mjs`             | Capture each UI plugin's feature from a running scratch DSH into its `docs/screenshots/`.     |
+| `pnpm check:screenshots`             | `plugin-screenshots.mjs --check`     | Every UI plugin ships a screenshot its README embeds ([rule](../docs/plugin-screenshots.md)). |
 | `pnpm typecheck:scripts`             | `tsc -p scripts/tsconfig.json`       | Typecheck the repository's TypeScript scripts.                                                |
 
 ## Incremental checks

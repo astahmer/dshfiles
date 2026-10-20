@@ -251,6 +251,14 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
   contract script rejects ranges.
 - Owned plugins are Cordis bundles: `cordis.patch.yml` inserts the package row,
   `dist/index.js` is the Host half, `dist/client.js` the browser half.
+- **Every plugin that renders UI ships a screenshot.** A plugin whose catalog
+  lists a `client` surface keeps at least one capture in
+  `plugins/@dshfiles/<name>/docs/screenshots/`, embedded under its README title
+  and named after the catalog feature it walks. Refresh it — the whole shot, or
+  only the screen that changed — after a significant UI change (a new surface, a
+  moved control, a restyle), never for copy. `node --run check:screenshots` fails
+  a UI plugin without one; `pnpm screenshots` captures them from a scratch DSH.
+  See [plugin screenshots](docs/plugin-screenshots.md).
 - **A capability the user has, the Agent gets.** Every user-facing capability a
   plugin serves — a row action, a dialog verb, a settings write — carries an
   agent tool too: bind the existing dshx method with
