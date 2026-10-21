@@ -1,8 +1,7 @@
 import type { BacklogSummaryView } from './api.js'
 
 /** A thread from the sidebar's unread list that works on backlog items and stopped in a way worth a look. */
-export const linkedThreadIds = (item: BacklogSummaryView): string[] =>
-  item.links.flatMap(link => (link.type === 'thread' ? [link.target] : []))
+export const linkedThreadIds = (item: BacklogSummaryView): string[] => item.links.flatMap(link => (link.type === 'thread' ? [link.target] : []))
 
 export interface InboxThread {
   readonly sessionId: string

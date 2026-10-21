@@ -122,7 +122,7 @@ own tests plus its Gherkin journey.
 
 - [x] `plans/persistent-agents/README.md` carries this table and the resume line (its own revision)
 - [x] Task 1: agent `memoryScope` + memory start block scoped to the thread's agent, one store, tests
-- [ ] Task 2: inline `@` agent completion in the backlog comment box and composer, scope prefixes preserved
+- [x] Task 2: inline `@` agent completion in the backlog comment box and composer, scope prefixes preserved
 - [ ] Task 3: durable `threads` table, `agents_threads` tool, panel history with open, usage after restart
 - [ ] Task 4: routine field carried into the opening message, panel routine + schedule list
 - [ ] Task 5: delegation config, enforcement in the messaging send path, Host gap for subagents

@@ -75,7 +75,7 @@
     {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The @ menu lists enabled agents, @agent:/@a: narrows it, and another source's scope stays empty.",
+      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
       "states": ["idle", "mentioned", "dispatched"],
@@ -107,6 +107,17 @@
         {
           "kind": "gherkin",
           "id": "agents.comment-dispatch",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.comment-autocomplete-scopes",
+          "file": "plugins/@dshfiles/backlog/src/inline-completion.test.ts",
+          "testName": "another source\u2019s scope keeps its own meaning, so no agent row appears"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agents.comment-autocomplete",
           "featureFile": "tooling/dshx/e2e/features/agents.feature"
         }
       ],

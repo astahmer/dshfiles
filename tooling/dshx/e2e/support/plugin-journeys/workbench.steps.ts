@@ -181,7 +181,10 @@ const setRightPanel = async (page: Page, label: string): Promise<void> => {
   // plugin's settings page already. The list virtualizes, so give the row a
   // chance to exist before deciding it is already open.
   const view = page.getByRole('button', { name: 'View @dshfiles/workbench', exact: true })
-  await view.first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined)
+  await view
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 })
+    .catch(() => undefined)
   if ((await view.count()) > 0) await view.click()
   await page.getByRole('combobox', { name: 'Right panel', exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   await page.getByRole('combobox', { name: 'Right panel', exact: true }).selectOption({ label })
@@ -260,7 +263,6 @@ When('the Jujutsu panel is moved to the bottom panel', async ({ page }: { page: 
   await page.getByRole('menuitem', { name: 'Move to the bottom panel', exact: true }).click()
 })
 
-
 Then('the bottom panel shows the Jujutsu panel and the dock no longer does', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-panel-moves-into-the-bottom-panel', async () => {
     await expect(bottomRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
@@ -321,7 +323,9 @@ When('the current layout is saved as {string}', async ({ page }: { page: Page },
 
 When('the {string} layout is applied', async ({ page }: { page: Page }, name: string) => {
   await dockRegion(page).getByRole('button', { name: 'Layouts', exact: true }).click()
-  await layoutsDialog(page).getByRole('button', { name: `Apply ${name}`, exact: true }).click()
+  await layoutsDialog(page)
+    .getByRole('button', { name: `Apply ${name}`, exact: true })
+    .click()
 })
 
 When('the Jujutsu panel is moved back to the right column', async ({ page }: { page: Page }) => {

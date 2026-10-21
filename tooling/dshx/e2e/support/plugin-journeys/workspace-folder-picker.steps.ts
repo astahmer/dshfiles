@@ -69,7 +69,12 @@ Then('a unique typed folder path opens without pressing Enter', async ({ page }:
   })
   await pathInput.fill('~/pr')
   await recordAssertion(page, 'unique-folder-prefix-auto-browses-without-enter', () =>
-    expect(dialog.locator('p').filter({ hasText: join(normalizedHomePath, 'profiles') }).first()).toBeVisible(),
+    expect(
+      dialog
+        .locator('p')
+        .filter({ hasText: join(normalizedHomePath, 'profiles') })
+        .first(),
+    ).toBeVisible(),
   )
   await finishJourneyAssertions(page)
 })

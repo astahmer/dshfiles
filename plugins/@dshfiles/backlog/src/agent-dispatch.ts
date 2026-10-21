@@ -8,13 +8,28 @@ export type AgentDispatchOutcome =
   | { readonly kind: 'skipped'; readonly reason: 'no-mention' | 'unknown-agent' | 'disabled-agent' | 'agents-unavailable' }
   | { readonly kind: 'failed'; readonly reason: string }
 
+/** One enabled agent as the comment box offers it, without the instructions a dispatch does not need to show. */
+export interface AgentChoice {
+  readonly handle: string
+  readonly name: string
+  readonly glyph: string
+  readonly description: string
+}
+
 /** The Host lookup and thread start the comment box needs; owned by the client entry. */
 export interface AgentDispatchPort {
   dispatch(input: { readonly item: StartThreadItem; readonly text: string }): Promise<AgentDispatchOutcome>
+  /** Enabled agents, loaded once when an `@` is typed; an unavailable agents bundle answers an empty list. */
+  choices(): Promise<readonly AgentChoice[]>
 }
 
 /** A mention is dispatched only from the item's own comment box; the grammar and the prompt come from the agents contract. */
 export class AgentComments {
+  /** The fields inline completion and the panel need, without the instructions. */
+  static choice(agent: Agent): AgentChoice {
+    return { handle: agent.handle, name: agent.name, glyph: agent.glyph, description: agent.description }
+  }
+
   /** The request fields an agent contributes to a start-thread call. */
   static agent(agent: Agent): StartThreadAgent {
     return { handle: agent.handle, name: agent.name, instructions: agent.instructions, preset: agent.preset, route: agent.route }

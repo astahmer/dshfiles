@@ -162,6 +162,12 @@ In any composer, `@b:` (or `@backlog:`) searches the backlog, and plain `@` show
 items next to threads and files. The chip is sent as `b:12 "title"`, so the thread signal above links the
 thread and starts the item, just as typing `b:12` does.
 
+With `@dshfiles/agents` installed, the backlog's own text boxes complete **agent handles inline**: an item's
+comment box lists enabled agents while you type `@rev` (Tab or Enter completes, Escape dismisses), and the
+capture composer adds them to its `@` list. Picking one inserts `@handle ` as plain text, which is what the
+comment box reads as a dispatch and what any other thread reads as a mention. `@b:`, `@t:` and `@f:` keep
+their own scope: no agent row appears and the typed reference is left untouched.
+
 ## Agent tools
 
 | Tool                       | Kind                                                                                  |

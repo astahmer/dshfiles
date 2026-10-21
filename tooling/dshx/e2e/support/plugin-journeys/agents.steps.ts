@@ -91,3 +91,34 @@ Then('the agent {string} lists {string} and counts {int} thread', async ({ page 
   })
   await finishJourneyAssertions(page)
 })
+
+const commentBox = (page: Page) => peek(page).getByRole('textbox', { name: 'Comment', exact: true })
+
+When('{string} is typed in the open item comment box', async ({ page }: { page: Page }, text: string) => {
+  const box = commentBox(page)
+  await box.click()
+  await box.press('End')
+  await box.type(text)
+})
+
+Then('the agent suggestion {string} is offered', async ({ page }: { page: Page }, handle: string) => {
+  await recordAssertion(page, 'agents-comment-box-completes-a-handle', async () => {
+    const list = peek(page).getByRole('listbox', { name: 'Agent suggestions', exact: true })
+    await expect(list).toBeVisible()
+    await expect(list.getByRole('option', { name: new RegExp(`@${handle}$`, 'u') })).toBeVisible()
+  })
+})
+
+When('the agent suggestion {string} is picked', async ({ page }: { page: Page }, handle: string) => {
+  const list = peek(page).getByRole('listbox', { name: 'Agent suggestions', exact: true })
+  await list.getByRole('option', { name: new RegExp(`@${handle}$`, 'u') }).click()
+})
+
+Then('the comment box reads {string}', async ({ page }: { page: Page }, text: string) => {
+  await expect(commentBox(page)).toHaveValue(text)
+})
+
+Then('no agent suggestion is offered', async ({ page }: { page: Page }) => {
+  await expect(peek(page).getByRole('listbox', { name: 'Agent suggestions', exact: true })).toHaveCount(0)
+  await finishJourneyAssertions(page)
+})

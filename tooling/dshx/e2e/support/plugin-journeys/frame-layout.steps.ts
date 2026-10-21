@@ -17,8 +17,7 @@ const sidebarHandle = (page: Page) => page.locator('[data-side="sidebar"]')
 const sidebarToggle = (page: Page) => page.getByRole('button', { name: /^(?:Collapse|Open) sidebar$/ }).first()
 
 /** The frame publishes `data-sidebar-collapsed` on its root whenever the column is closed. */
-const frameCollapsed = (page: Page): Promise<boolean> =>
-  page.evaluate(() => document.querySelector('[data-sidebar-collapsed]') !== null)
+const frameCollapsed = (page: Page): Promise<boolean> => page.evaluate(() => document.querySelector('[data-sidebar-collapsed]') !== null)
 
 /**
  * The frame's first grid track, read from the inline style: the computed value

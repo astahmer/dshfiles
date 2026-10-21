@@ -133,6 +133,14 @@ export default defineClient({
      * or an agents bundle that is not installed, leaves the comment exactly as it was.
      */
     const dispatchPort: AgentDispatchPort = {
+      choices: async () => {
+        try {
+          const snapshot = await agents.list()
+          return snapshot.agents.filter(agent => agent.enabled).map(AgentComments.choice)
+        } catch {
+          return []
+        }
+      },
       dispatch: async ({ item, text }) => {
         const mention = AgentComments.mention(text)
         if (mention === null) return { kind: 'skipped', reason: 'no-mention' }

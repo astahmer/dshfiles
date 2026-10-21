@@ -37,7 +37,10 @@ import { z } from 'zod'
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
 import { fileInput, readComposerFile, type ComposerFile } from './composer-files.js'
+import type { AgentChoice } from './agent-dispatch.js'
+import { useAgentDispatch } from './agent-dispatch-context.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
+import { InlineCompletion } from './inline-completion.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjectCommand } from './project-command.js'
@@ -65,14 +68,6 @@ const captureProject = createStoredValue({
 
 const chipClass =
   'dshx:inline-flex dshx:h-5 dshx:max-w-56 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:truncate dshx:rounded-full dshx:border dshx:border-border dshx:px-2 dshx:text-[11px] dshx:text-muted-foreground'
-
-/** The `#tag` or `@query` being typed right before the caret, if any. */
-const tokenAt = (text: string, caret: number): { readonly trigger: '#' | '@'; readonly query: string; readonly start: number } | null => {
-  const match = /(^|\s)([#@])([\w./-]*)$/.exec(text.slice(0, caret))
-  if (match === null || match[2] === undefined) return null
-  const trigger = match[2] === '#' ? '#' : '@'
-  return { trigger, query: match[3] ?? '', start: caret - (match[3] ?? '').length - 1 }
-}
 
 const iconButtonClass =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:disabled:opacity-40'
@@ -191,6 +186,7 @@ export const Composer = (props: {
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
+  const agentPort = useAgentDispatch()
   const speech = useQuery({
     queryKey: ['dshfiles-backlog-speech'],
     queryFn: ({ signal }) => api.speechStatus(undefined, { signal }),
@@ -206,6 +202,7 @@ export const Composer = (props: {
   const [highlight, setHighlight] = useState(0)
   const [navigated, setNavigated] = useState(false)
   const [itemSuggestions, setItemSuggestions] = useState<readonly Suggestion[]>([])
+  const [agentChoices, setAgentChoices] = useState<readonly AgentChoice[]>([])
   const [files, setFiles] = useState<readonly ComposerFile[]>([])
   const [status, setStatus] = useState<BacklogStatus>(props.status ?? 'inbox')
   const [statusTouched, setStatusTouched] = useState(false)
@@ -259,10 +256,23 @@ export const Composer = (props: {
     [],
   )
 
-  const token = tokenAt(text, caret)
+  const token = InlineCompletion.tokenAt(text, caret)
   const projectCommand = BacklogProjectCommand.at(text, caret)
   useEffect(() => {
-    if (token?.trigger !== '@') {
+    if (token?.trigger !== '@' || agentPort === null) return
+    let live = true
+    void agentPort
+      .choices()
+      .then(choices => {
+        if (live) setAgentChoices(choices)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [agentPort, token?.trigger])
+  useEffect(() => {
+    if (token?.trigger !== '@' || token.scope !== null) {
       setItemSuggestions([])
       return
     }
@@ -286,9 +296,10 @@ export const Composer = (props: {
       )
       .catch(() => undefined)
     return () => controller.abort()
-  }, [api, token?.trigger, token?.query])
+  }, [api, token?.scope, token?.trigger, token?.query])
 
   const suggestions = useMemo((): readonly Suggestion[] => {
+    if (token !== null && token.scope !== null) return []
     if (projectCommand !== null) {
       const query = projectCommand.query.trim().toLowerCase()
       return props.projects
@@ -331,8 +342,22 @@ export const Composer = (props: {
         ),
         hint: 'thread',
       }))
-    return [...itemSuggestions, ...threads]
-  }, [projectCommand, token, props.tags, props.threads, props.projects, itemSuggestions])
+    const agentRows = InlineCompletion.agents(token, agentChoices).map(row => {
+      const agent = agentChoices.find(choice => choice.handle === row.handle)
+      return {
+        key: `@${row.handle}`,
+        insert: row.insert,
+        label: (
+          <>
+            <span aria-hidden>{agent?.glyph ?? '🤖'}</span>
+            <span className="dshx:truncate">{agent?.name ?? row.handle}</span>
+          </>
+        ),
+        hint: `@${row.handle}`,
+      }
+    })
+    return [...agentRows, ...itemSuggestions, ...threads]
+  }, [projectCommand, token, props.tags, props.threads, props.projects, itemSuggestions, agentChoices])
 
   useEffect(() => {
     setHighlight(0)

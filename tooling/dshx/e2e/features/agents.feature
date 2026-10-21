@@ -30,3 +30,16 @@ Feature: Persistent agents
     When a thread is started from the agent "reviewer" with "Review the open pull requests"
     And the browser page is reloaded with the Agents panel open
     Then the agent "reviewer" lists "Review the open pull requests" and counts 1 thread
+
+  @scenario:agents.comment-autocomplete
+  Scenario: Complete an agent handle inside an item's comment box
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/agents, @dshfiles/ai-accounts" is booted
+    When the Backlog panel is opened
+    And "Complete the reviewer" is captured
+    When backlog item b:1 is opened
+    And "@ds" is typed in the open item comment box
+    Then the agent suggestion "@dsh" is offered
+    When the agent suggestion "@dsh" is picked
+    Then the comment box reads "@dsh "
+    When "@b:1" is typed in the open item comment box
+    Then no agent suggestion is offered

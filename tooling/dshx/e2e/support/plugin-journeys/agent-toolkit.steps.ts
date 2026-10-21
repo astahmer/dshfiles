@@ -48,8 +48,8 @@ Then(
     })
     await recordAssertion(page, 'agent-toolkit-shows-memory', async () => {
       const memory = section(page, /^Memory$/)
-    await expect(memory).toContainText('Start block for')
-    await expect(memory.getByRole('button', { name: 'Open the Memory panel', exact: true })).toBeVisible()
+      await expect(memory).toContainText('Start block for')
+      await expect(memory.getByRole('button', { name: 'Open the Memory panel', exact: true })).toBeVisible()
     })
   },
 )

@@ -130,9 +130,7 @@ When('item b:{int} is moved to In progress on the board', async ({ page }: { pag
 
 Then('the board columns follow the status order through Dropped', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-board-status-order', async () => {
-    const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns =>
-      columns.map(column => column.getAttribute('data-backlog-column')),
-    )
+    const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.map(column => column.getAttribute('data-backlog-column')))
     expect(statuses).toEqual(['inbox', 'todo', 'doing', 'done', 'dropped'])
   })
 })

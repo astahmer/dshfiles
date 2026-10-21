@@ -40,7 +40,9 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import type { AgentChoice } from './agent-dispatch.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
+import { InlineCompletion } from './inline-completion.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
@@ -411,8 +413,42 @@ const CommentBox = (props: { readonly item: StartThreadItem }): JSX.Element => {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
+  const [caret, setCaret] = useState(0)
+  const [highlight, setHighlight] = useState(0)
+  const [dismissed, setDismissed] = useState(false)
+  const [agentChoices, setAgentChoices] = useState<readonly AgentChoice[]>([])
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
+  const token = InlineCompletion.tokenAt(text, caret)
+  const rows = dismissed ? [] : InlineCompletion.agents(token, agentChoices)
+
+  useEffect(() => {
+    if (token?.trigger !== '@' || token.scope !== null || dispatch === null) return
+    let live = true
+    void dispatch
+      .choices()
+      .then(choices => {
+        if (live) setAgentChoices(choices)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [dispatch, token?.scope, token?.trigger])
+
+  useEffect(() => {
+    setHighlight(0)
+    setDismissed(false)
+  }, [token?.query, token?.scope])
+
+  const choose = (handle: string): void => {
+    if (token === null) return
+    const insert = InlineCompletion.insertFor(handle)
+    setText(`${text.slice(0, token.start)}${insert}${text.slice(caret)}`)
+    setCaret(token.start + insert.length)
+    setDismissed(true)
+  }
+
   const comment = (): void => {
     setText('')
     setFailed(null)
@@ -444,18 +480,73 @@ const CommentBox = (props: { readonly item: StartThreadItem }): JSX.Element => {
         event.preventDefault()
         void submit()
       }}
-      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-2.5 dshx:transition-colors dshx:focus-within:border-input"
+      className="dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-2.5 dshx:transition-colors dshx:focus-within:border-input"
     >
+      {rows.length === 0 ? null : (
+        <ul
+          role="listbox"
+          aria-label="Agent suggestions"
+          className="dshx:absolute dshx:bottom-full dshx:left-2 dshx:z-30 dshx:mb-1.5 dshx:w-72 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:shadow-lg"
+        >
+          {rows.map((row, index) => {
+            const choice = agentChoices.find(agent => agent.handle === row.handle)
+            return (
+              <li
+                key={row.handle}
+                role="option"
+                aria-selected={index === highlight}
+                onMouseDown={event => {
+                  event.preventDefault()
+                  choose(row.handle)
+                }}
+                onMouseEnter={() => setHighlight(index)}
+                className={cn(
+                  'dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-[13px]',
+                  index === highlight && 'dshx:bg-accent',
+                )}
+              >
+                <span aria-hidden>{choice?.glyph ?? '🤖'}</span>
+                <span className="dshx:truncate">{choice?.name ?? row.handle}</span>
+                <span className="dshx:ml-auto dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">@{row.handle}</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
       <textarea
         aria-label="Comment"
         rows={1}
         placeholder="Reply… b:12, jj:rev and URLs become links; @agent starts a thread"
         value={text}
-        onChange={event => setText(event.currentTarget.value)}
+        onChange={event => {
+          setText(event.currentTarget.value)
+          setCaret(event.currentTarget.selectionStart)
+        }}
+        onKeyUp={event => setCaret(event.currentTarget.selectionStart)}
+        onClick={event => setCaret(event.currentTarget.selectionStart)}
         onKeyDown={event => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+          if (rows.length === 0) {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault()
+              void submit()
+            }
+            return
+          }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
-            void submit()
+            setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length)
+            return
+          }
+          if (event.key === 'Escape') {
+            setDismissed(true)
+            return
+          }
+          // Tab completes the highlighted agent; a bare Enter still sends the comment once nothing is offered.
+          if (event.key === 'Tab' || event.key === 'Enter') {
+            const chosen = rows[highlight] ?? rows[0]
+            if (chosen === undefined) return
+            event.preventDefault()
+            choose(chosen.handle)
           }
         }}
         className="dshx:field-sizing-content dshx:max-h-40 dshx:min-h-10 dshx:resize-none dshx:bg-transparent dshx:text-[13px] dshx:outline-none dshx:placeholder:text-muted-foreground"
