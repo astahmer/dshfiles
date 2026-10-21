@@ -236,9 +236,7 @@ export const TestRunCard = (props: {
     file => filter === 'all' || (filter === 'failed' && file.error !== undefined) || file.tests.some(test => matchesFilter(test, filter)),
   )
   const percent = (value: number): string => `${tally.total === 0 ? 0 : (value / tally.total) * 100}%`
-  const headline = failing
-    ? `${tally.failed} failed · ${tally.passed} passed${tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''}`
-    : `${tally.passed} passed${tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''}`
+  const headline = VitestReport.summaryLabel(props.run)
   return (
     <ToolCard
       className="dshx:@container"

@@ -68,6 +68,14 @@ describe('VitestReport.parse', () => {
     expect(run?.files).toEqual([])
     expect(run?.testTally).toEqual({ passed: 2, failed: 0, skipped: 0, total: 2 })
     expect(run?.unlistedFiles).toBe(1)
+    expect(run && VitestReport.summaryLabel(run)).toBe('2 passed')
+  })
+
+  it('shows failed test files separately when their tests all passed', () => {
+    const run = VitestReport.parse(` RUN  v3.0.0 /repo/shop\n\n Test Files  1 failed | 4 passed (5)\n      Tests  20 passed (20)\n   Duration  5.2s`)
+    expect(run?.fileTally.failed).toBe(1)
+    expect(run?.testTally.failed).toBe(0)
+    expect(run && VitestReport.summaryLabel(run)).toBe('1 test file failed · 20 passed')
   })
 
   it('leaves output that carries no Vitest summary to the native card', () => {

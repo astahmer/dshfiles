@@ -206,6 +206,17 @@ export class VitestReport {
     }
   }
 
+  static summaryLabel(run: Pick<TestRun, 'fileTally' | 'testTally'>): string {
+    const tally = run.testTally
+    const skipped = tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''
+    if (tally.failed > 0) return `${tally.failed} failed · ${tally.passed} passed${skipped}`
+    if (run.fileTally.failed > 0) {
+      const files = `${run.fileTally.failed} test file${run.fileTally.failed === 1 ? '' : 's'} failed`
+      return `${files} · ${tally.passed} passed${skipped}`
+    }
+    return `${tally.passed} passed${skipped}`
+  }
+
   static isSlow(test: TestCase): boolean {
     return test.durationMs !== undefined && test.durationMs >= VitestReport.slowThresholdMs
   }
