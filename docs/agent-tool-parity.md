@@ -61,7 +61,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | diff-viewed                                                                                                                                       | 3                    | 0                                                                                                        | 1             | 2         |
 | prompt-stash                                                                                                                                      | 6                    | 0                                                                                                        | 1             | 5         |
 | agents                                                                                                                                            | 9                    | 5 (`agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove`)                        | 0             | 1         |
-| backlog                                                                                                                                           | 14                   | 14                                                                                                       | 0             | 0         |
+| backlog                                                                                                                                           | 16                   | 16                                                                                                       | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
@@ -349,7 +349,11 @@ Still missing, because they write secrets or need a browser:
   `backlog_projects` and
   `backlog_read_file`; writes `backlog_capture`, `backlog_update`, `backlog_link`,
   `backlog_comment`, `backlog_attach_file`, `backlog_remove_file`, `backlog_triage`,
-  `backlog_triage_backfill`, `backlog_accept_proposal` and `backlog_dismiss_proposal`.
+  `backlog_triage_backfill`, `backlog_accept_proposal`, `backlog_dismiss_proposal` and
+  `backlog_start_thread`
+  (`startThread`, the same Host verb the panel's dialog calls, so a thread an agent
+  starts is the thread the dialog starts: its own jj workspace, named, linked, and
+  told what to work on).
   Deliberate exception to "write tools say the user asked": the backlog exists
   so agents record and progress their own work, so the write descriptions allow
   that and nothing else. No verb destroys data; `dropped` closes an item and

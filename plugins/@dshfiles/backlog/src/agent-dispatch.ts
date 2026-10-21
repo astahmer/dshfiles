@@ -55,10 +55,10 @@ export class AgentComments {
   }
 
   /**
-   * The start-thread request for an agent comment: the agent's preset and route, its instructions, the item context
-   * the thread must name, and the comment text. The caller supplies the target because only it knows the projects.
-   * A dispatch never opens the thread it starts: the comment box keeps the item in front of the user, and the report
-   * the start writes offers the thread instead.
+   * The start-thread request for an agent comment: the agent's preset and route, the item context the thread must name,
+   * and the comment text. The Host prepends the agent's identity and instructions to the message it is handed. The
+   * caller supplies the target because only it knows the projects. A dispatch never opens the thread it starts: the
+   * comment box keeps the item in front of the user, and the report the start writes offers the thread instead.
    */
   static request(input: {
     readonly items: readonly StartThreadItem[]
@@ -75,7 +75,7 @@ export class AgentComments {
       provider: null,
       model: null,
       reasoningEffort: undefined,
-      message: AgentComments.opening(input.agent, task === '' ? context : `${context}\n\n${task}`),
+      message: task === '' ? context : `${context}\n\n${task}`,
       send: true,
       open: false,
     }

@@ -1,64 +1,46 @@
 import { describe, expect, it } from 'vitest'
 
-import { isolateStartThread, type ProvisionedThreadWorkspace } from './start-thread-workspace.js'
+import { StartThreadPlacementPlan } from './start-thread-workspace.js'
 
-const recording = (answer: ProvisionedThreadWorkspace) => {
-  const asked: string[] = []
-  return {
-    asked,
-    provision: async (workspaceId: string): Promise<ProvisionedThreadWorkspace> => {
-      asked.push(workspaceId)
-      return answer
-    },
-  }
-}
+const registered = [
+  { id: 'ws-first', path: '/Users/astahmer/dev/first' },
+  { id: 'ws-dshfiles', path: '/Users/astahmer/dev/dshfiles' },
+]
 
-describe('isolateStartThread', () => {
-  it('gives a thread started in a project its own jj workspace', async () => {
-    const provisioner = recording({ workspaceId: 'ws-thread-abc123' })
-    const placement = await isolateStartThread({
-      target: { kind: 'project', projectId: 'ws-dshfiles' as never },
-      defaultWorkspaceId: 'ws-other' as never,
-      provision: provisioner.provision,
+describe('StartThreadPlacementPlan', () => {
+  it('keeps the project a caller named, so the thread is cut from it', () => {
+    expect(StartThreadPlacementPlan.of({ workspaceId: 'ws-dshfiles', registered, itemProjects: [null] })).toEqual({
+      workspaceId: 'ws-dshfiles',
+      cwd: undefined,
     })
-    expect(provisioner.asked).toEqual(['ws-dshfiles'])
-    expect(placement.workspaceId).toBe('ws-thread-abc123')
-    expect(placement.cwd).toBeUndefined()
   })
 
-  it('isolates a thread that has no project from the workspace the composer would use', async () => {
-    const provisioner = recording({ workspaceId: 'ws-thread-def456' })
-    const placement = await isolateStartThread({ target: { kind: 'default' }, defaultWorkspaceId: 'ws-first', provision: provisioner.provision })
-    expect(provisioner.asked).toEqual(['ws-first'])
-    expect(placement.workspaceId).toBe('ws-thread-def456')
-  })
-
-  it('keeps the folder an item names instead of provisioning a workspace for it', async () => {
-    const provisioner = recording({ workspaceId: 'ws-thread-unused' })
-    const placement = await isolateStartThread({
-      target: { kind: 'cwd', path: '/Users/astahmer/dev/unregistered' },
-      defaultWorkspaceId: 'ws-first',
-      provision: provisioner.provision,
+  it('keeps a bare folder instead of provisioning a workspace for it', () => {
+    expect(StartThreadPlacementPlan.of({ cwd: '/Users/astahmer/dev/unregistered', registered, itemProjects: ['/Users/astahmer/dev/dshfiles'] })).toEqual({
+      workspaceId: undefined,
+      cwd: '/Users/astahmer/dev/unregistered',
     })
-    expect(provisioner.asked).toEqual([])
-    expect(placement).toEqual({ workspaceId: undefined, cwd: '/Users/astahmer/dev/unregistered' })
   })
 
-  it('leaves the choice to the Host when no workspace exists at all', async () => {
-    const provisioner = recording({ workspaceId: 'ws-thread-unused' })
-    const placement = await isolateStartThread({ target: { kind: 'default' }, defaultWorkspaceId: undefined, provision: provisioner.provision })
-    expect(provisioner.asked).toEqual([])
-    expect(placement).toEqual({ workspaceId: undefined, cwd: undefined })
-  })
-
-  it('starts nothing in the shared checkout when the thread workspace cannot be created', async () => {
-    const placement = isolateStartThread({
-      target: { kind: 'project', projectId: 'ws-dshfiles' as never },
-      defaultWorkspaceId: undefined,
-      provision: async () => {
-        throw new Error('jj workspace add failed')
-      },
+  it('uses the first item project a caller did not name', () => {
+    expect(StartThreadPlacementPlan.of({ registered, itemProjects: [null, '/Users/astahmer/dev/dshfiles'] })).toEqual({
+      workspaceId: 'ws-dshfiles',
+      cwd: undefined,
     })
-    await expect(placement).rejects.toThrow('jj workspace add failed')
+  })
+
+  it('takes a project path no workspace claims as a bare folder', () => {
+    expect(StartThreadPlacementPlan.of({ registered, itemProjects: ['/Users/astahmer/dev/unregistered'] })).toEqual({
+      workspaceId: undefined,
+      cwd: '/Users/astahmer/dev/unregistered',
+    })
+  })
+
+  it('joins the first registered workspace for an item with no project', () => {
+    expect(StartThreadPlacementPlan.of({ registered, itemProjects: [null] })).toEqual({ workspaceId: 'ws-first', cwd: undefined })
+  })
+
+  it('leaves the choice to the Host when no workspace is registered at all', () => {
+    expect(StartThreadPlacementPlan.of({ registered: [], itemProjects: [null] })).toEqual({ workspaceId: undefined, cwd: undefined })
   })
 })

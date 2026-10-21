@@ -80,7 +80,7 @@ Feature: Backlog
     Then the backlog panel stays open while the thread is created
     When the Backlog panel is opened again
     And backlog item b:1 is opened
-    Then the item links the thread it started
+    Then the item links the thread it started as "Ship the thread starter"
 
   @scenario:backlog.start-thread-opens
   Scenario: Open the started thread when the dialog asks for it

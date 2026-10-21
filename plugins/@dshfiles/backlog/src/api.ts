@@ -270,6 +270,38 @@ export const backlogApi = defineApi({
       description: `Link a backlog item to a thread, jj revision, branch, workspace, URL or another item (\`remove: true\` unlinks). ${writeNote}`,
       tool: { name: 'backlog_link', readOnly: false },
     }),
+    startThread: method({
+      input: z
+        .object({
+          ids: z.array(idSchema).min(1).max(20).describe('The items the thread works on; every one of them is linked and named in the opening message.'),
+          workspaceId: z.string().min(1).max(200).optional().describe('Registered project to cut the thread its own jj workspace from. Exclusive with `cwd`.'),
+          cwd: z
+            .string()
+            .min(1)
+            .max(BacklogItems.maxTargetChars)
+            .optional()
+            .describe('Bare folder to run the thread in when it is not a registered project. Exclusive with `workspaceId`.'),
+          agent: z.string().min(1).max(80).optional().describe('Agent handle (no `@`) whose preset, model route and instructions start the thread.'),
+          provider: z.string().min(1).max(120).optional().describe('Account route for the thread when no agent is named.'),
+          model: z.string().min(1).max(200).optional().describe('Model on that provider when no agent is named.'),
+          reasoningEffort: z.string().min(1).max(60).optional().describe('Effort for that model, when its adapter advertises one.'),
+          message: z
+            .string()
+            .max(4_000)
+            .optional()
+            .describe(
+              "The thread's first message; the items' own headings by default. An agent's identity and instructions are prepended when `agent` is named.",
+            ),
+          send: z
+            .boolean()
+            .default(true)
+            .describe('Send the message as the thread’s first turn; false creates the thread empty, for a caller that leaves a draft.'),
+        })
+        .strict(),
+      output: z.object({ sessionId: z.string().min(1), linked: z.array(idSchema), missing: z.array(idSchema) }).strict(),
+      description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, told what to work on and linked to every item. ${writeNote}`,
+      tool: { name: 'backlog_start_thread', readOnly: false },
+    }),
     acknowledge: method({
       input: z.object({ ids: z.array(idSchema).max(500) }).strict(),
       output: z.void(),

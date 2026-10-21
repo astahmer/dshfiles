@@ -115,15 +115,21 @@ account/model from the Host catalog with the model's reasoning efforts. The firs
 the item (title plus preview) and can be cleared to open an empty draft instead.
 
 Starting hands the request over and closes the dialog at once: the thread is created in the background, so a slow jj
-workspace never holds the panel. It selects the account/model on it, names it after the item, sends the first message
-when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off leaves it as an editable
-draft, and the dialog's _Send this message now_ box overrides the setting for one thread), and links the item to the
-thread (provenance `user`).
+workspace never holds the panel. The banner says `Starting a thread for b:<n>…` while the workspace and the Session are
+built, then reports `Thread started for b:<n>`. The Host selects the account/model on the thread, names it after the
+item, sends the first message when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off
+leaves it as an editable draft, and the dialog's _Send this message now_ box overrides the setting for one thread), and
+links the item to the thread (provenance `user`, or `agent` when an agent started it).
 
-It does not take you to the thread by default: you stay where you were, and a toast reports `Thread started for
-b:<n>` with an **Open** action. Settings → `dshfiles-backlog` → _Open the thread when it is created_ — or the dialog's
-own _Open the thread when it is created_ box, which overrides the setting for one thread — opens it instead. A comment
-that mentions an agent never opens the thread it starts; the same toast offers it.
+It does not take you to the thread by default: you stay where you were, and the report carries an **Open** action.
+Settings → `dshfiles-backlog` → _Open the thread when it is created_ — or the dialog's own _Open the thread when it is
+created_ box, which overrides the setting for one thread — opens it instead. A comment that mentions an agent never
+opens the thread it starts; the same report offers it.
+
+Agents start the same thread through `backlog_start_thread` (`startThread` on the Host): the item ids, and optionally a
+project workspace or bare folder, an agent handle, an account/model, the first message and whether to send it. The panel
+and the tool share one Host verb, so a thread an agent starts is the thread the dialog starts, and neither redirects the
+caller.
 
 A thread started from an item always runs in its own jj workspace of the chosen project, whatever the
 isolate-by-default setting says: work captured in the backlog is independent, so it never shares a checkout
@@ -226,6 +232,7 @@ their own scope: no agent row appears and the typed reference is left untouched.
 | `backlog_remove_file`      | write: remove one image or file                                                       |
 | `backlog_triage`           | write: run triage on one item now                                                     |
 | `backlog_triage_backfill`  | write: triage items captured before triage was set up, oldest first                   |
+| `backlog_start_thread`     | write: start one thread for items, in the item project's own jj workspace, linked     |
 | `backlog_projects`         | read: per-project counts, who needs you, people                                       |
 | `backlog_accept_proposal`  | write                                                                                 |
 | `backlog_dismiss_proposal` | write                                                                                 |

@@ -1,23 +1,30 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-workspace'
+import type {} from '@deepseek-ai/dsh-api-session-controller'
+import type { SessionCreateRequest, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
-import { isApiOwnerMissing, type ApiCaller } from '@dshfiles/dshx/api'
+import { agentsApi, type Agent } from '@dshfiles/agents/contract'
+import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { createHostApiClient } from '@dshfiles/dshx/host'
+import { AgentComments } from './agent-dispatch.js'
 import { backlogApi } from './api.js'
 import { writeAttachmentFile } from './attachment-file.js'
 import { BacklogBackfill, type TriageOutcome } from './backfill.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
+import { StartThreadForm, startThreadItemOf } from './start-thread.js'
+import { StartThreadPlacementPlan } from './start-thread-workspace.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogProjectTarget } from './project-target.js'
 import { BacklogSignals } from './signals.js'
@@ -485,6 +492,126 @@ const transcribeSpeech = async (
   }
 }
 
+/** The opening message carries the same bounded preview the list shows, not a whole body. */
+const PREVIEW_CHARS = 280
+
+/**
+ * The workspace a started thread runs in: jj-integration cuts a thread workspace from the project, and answers the
+ * workspace unchanged outside a jj repository. Only a missing plugin is no error, because then the project checkout is
+ * all the Host has to offer.
+ */
+const isolatedWorkspaceOf = async (ctx: Context, workspaceId: string): Promise<WorkspaceId> => {
+  const jj = createHostApiClient(ctx, jjIntegrationApi, '@dshfiles/backlog')
+  const provisioned = await jj.safe.provision({ workspaceId, isolate: true })
+  if (!provisioned.ok && !isApiOwnerMissing(provisioned.error)) {
+    throw new PluginApiError(`The thread workspace could not be created: ${provisioned.error.message}`, { code: 'workspace-failed' })
+  }
+  // SAFETY: both ids come from the Host workspace registry, the same identity the Session controller takes branded.
+  return (provisioned.ok ? provisioned.value.workspaceId : workspaceId) as WorkspaceId
+}
+
+/** The agent a start names, refused when it is unknown or disabled so the thread is not started as the wrong one. */
+const agentForStart = async (ctx: Context, handle: string): Promise<Agent> => {
+  const agents = createHostApiClient(ctx, agentsApi, '@dshfiles/backlog')
+  const found = await agents.safe.get({ handle })
+  if (!found.ok) throw new PluginApiError(`The agent registry could not be read: ${found.error.message}`, { code: 'agents-unavailable' })
+  const agent = found.value.agent
+  if (agent === null) throw new PluginApiError(`No agent is saved as @${handle}.`, { code: 'agent-not-found' })
+  if (!agent.enabled) throw new PluginApiError(`Agent @${handle} is disabled.`, { code: 'agent-disabled' })
+  return agent
+}
+
+/**
+ * One thread for the items a caller named: its own jj workspace of their project, the agent's or the caller's model, the
+ * first message, and every item link. The panel and `backlog_start_thread` share this, so a thread an agent starts is
+ * the same thread the dialog starts.
+ */
+const startThreadForItems = async (
+  ctx: Context,
+  input: {
+    readonly ids: readonly number[]
+    readonly workspaceId?: string | undefined
+    readonly cwd?: string | undefined
+    readonly agent?: string | undefined
+    readonly provider?: string | undefined
+    readonly model?: string | undefined
+    readonly reasoningEffort?: string | undefined
+    readonly message?: string | undefined
+    readonly send: boolean
+  },
+  caller: ApiCaller,
+): Promise<{ readonly sessionId: string; readonly linked: number[]; readonly missing: number[] }> => {
+  const store = await backlogFor(ctx)
+  const { items, missing } = store.getMany(input.ids)
+  if (items.length === 0) {
+    throw new PluginApiError(`No backlog item matched ${input.ids.map(id => `b:${String(id)}`).join(', ')}.`, { code: 'item-not-found' })
+  }
+  const agent = input.agent === undefined ? null : await agentForStart(ctx, input.agent)
+  const details = items.map(detail => startThreadItemOf({ ...detail.item, preview: detail.item.body.slice(0, PREVIEW_CHARS) }))
+  const heading = StartThreadForm.message(details)
+  const raw = input.message ?? heading
+  const message = agent === null ? raw : AgentComments.opening(agent, raw)
+  const placement = StartThreadPlacementPlan.of({
+    workspaceId: input.workspaceId,
+    cwd: input.cwd,
+    registered: (ctx.get('workspaceRegistry')?.list() ?? []).map(workspace => ({ id: workspace.id, path: workspace.path })),
+    itemProjects: items.map(detail => detail.item.project),
+  })
+  const base: SessionCreateRequest =
+    placement.workspaceId === undefined
+      ? placement.cwd === undefined
+        ? {}
+        : { cwd: placement.cwd }
+      : { workspaceId: await isolatedWorkspaceOf(ctx, placement.workspaceId) }
+  const controller = ctx.get('sessionController')
+  if (controller === undefined)
+    throw new PluginApiError('The Host session controller is unavailable, so no thread can be started.', { code: 'sessions-unavailable' })
+  const created = await controller.create(agent?.preset == null ? base : { ...base, agentPreset: agent.preset })
+  const sessionId = created.sessionId
+  const route =
+    agent?.route ??
+    (input.provider === undefined || input.model === undefined
+      ? null
+      : { provider: input.provider, model: input.model, reasoningEffort: input.reasoningEffort })
+  if (route !== null) {
+    try {
+      await controller.selectModel(
+        route.reasoningEffort === undefined
+          ? { sessionId, provider: route.provider, model: route.model }
+          : { sessionId, provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort },
+      )
+    } catch (error) {
+      logFailure('Backlog thread kept the Host default model')(error)
+    }
+  }
+  try {
+    await controller.rename({ sessionId, title: StartThreadForm.title(details) })
+  } catch (error) {
+    logFailure('Backlog thread kept its created title')(error)
+  }
+  if (input.send && message !== '') {
+    try {
+      // SAFETY: SessionRequestId is a type-only brand over a Host-minted unique id.
+      const requestId = randomUUID() as SessionRequestId
+      await controller.prompt({ requestId, sessionId, mode: 'queue', content: [{ type: 'text', text: message }] }, AbortSignal.timeout(30_000))
+    } catch (error) {
+      logFailure('Backlog thread started without its first message')(error)
+    }
+  }
+  const actor = actorOf(caller)
+  const linked: number[] = []
+  for (const detail of items) {
+    const result = await store.link({
+      id: detail.item.id,
+      link: { type: 'thread', target: sessionId, provenance: caller.kind === 'agent' ? 'agent' : 'user' },
+      actor,
+    })
+    if (result.ok) linked.push(detail.item.id)
+    else logFailure(`Backlog item b:${String(detail.item.id)} was not linked to its thread`)(result.reason)
+  }
+  return { sessionId, linked, missing }
+}
+
 const backlogApiHost = backlogApi.host({
   list: async ({ ctx, input }) => (await backlogFor(ctx)).list(input),
   get: async ({ ctx, input }) => (await backlogFor(ctx)).get(input.id),
@@ -516,6 +643,7 @@ const backlogApiHost = backlogApi.host({
   transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),
   update: async ({ ctx, input, caller }) => (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) }),
   link: async ({ ctx, input, caller }) => (await backlogFor(ctx)).link({ ...input, actor: actorOf(caller) }),
+  startThread: async ({ ctx, input, caller }) => startThreadForItems(ctx, input, caller),
   comment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).comment({ ...input, actor: actorOf(caller) }),
 })
 
@@ -536,7 +664,7 @@ const itemLifecycleSection = definePromptSection({
 
 export default defineHost({
   name: '@dshfiles/backlog',
-  inject: ['storageDomain'],
+  inject: ['storageDomain', 'sessionController'],
   apis: [backlogApiHost],
   prompts: [itemLifecycleSection],
   settings: [ownedSettings],

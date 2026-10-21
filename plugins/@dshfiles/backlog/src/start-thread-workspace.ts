@@ -1,11 +1,10 @@
-import type { StartThreadTarget } from './start-thread.js'
-
-/** What jj-integration answers after a thread asks for its own jj workspace. */
-export interface ProvisionedThreadWorkspace {
-  readonly workspaceId: string
+/** One registered workspace a started thread can be cut from, as the Host registry reports it. */
+export interface StartThreadWorkspace {
+  readonly id: string
+  readonly path: string
 }
 
-/** Where a backlog-started thread runs before its Session exists. */
+/** Where a started thread runs before its Session exists. */
 export interface StartThreadPlacement {
   /** The workspace to create the Session in; a just-provisioned id here may not be listed yet. */
   readonly workspaceId: string | undefined
@@ -14,18 +13,24 @@ export interface StartThreadPlacement {
 }
 
 /**
- * A thread started from an item always gets its own jj workspace, whatever the isolate-by-default setting says: work
- * captured in the backlog is independent, so it must not share the checkout another thread is editing. Outside a jj
- * repository, or without jj-integration, `provision` answers the same workspace and the thread starts there.
+ * Which workspace a thread started from an item runs in. A caller that already knows the target (the dialog does) names
+ * it; without one the first item's own project decides, a project path no workspace claims becomes a bare folder, and
+ * an item with no project joins the first registered workspace, the way the composer's New thread does.
  */
-export const isolateStartThread = async (input: {
-  readonly target: StartThreadTarget
-  readonly defaultWorkspaceId: string | undefined
-  readonly provision: (workspaceId: string) => Promise<ProvisionedThreadWorkspace>
-}): Promise<StartThreadPlacement> => {
-  if (input.target.kind === 'cwd') return { workspaceId: undefined, cwd: input.target.path }
-  const base = input.target.kind === 'project' ? input.target.projectId : input.defaultWorkspaceId
-  if (base === undefined) return { workspaceId: undefined, cwd: undefined }
-  const provisioned = await input.provision(base)
-  return { workspaceId: provisioned.workspaceId, cwd: undefined }
+export class StartThreadPlacementPlan {
+  static of(input: {
+    readonly workspaceId?: string | undefined
+    readonly cwd?: string | undefined
+    /** Every registered workspace, in the order the Host lists them. */
+    readonly registered: readonly StartThreadWorkspace[]
+    /** Each item's project path, the first one deciding when the caller named no target. */
+    readonly itemProjects: readonly (string | null)[]
+  }): StartThreadPlacement {
+    if (input.cwd !== undefined) return { workspaceId: undefined, cwd: input.cwd }
+    if (input.workspaceId !== undefined) return { workspaceId: input.workspaceId, cwd: undefined }
+    const itemPath = input.itemProjects.find(project => project !== null) ?? null
+    if (itemPath === null) return { workspaceId: input.registered[0]?.id, cwd: undefined }
+    const project = input.registered.find(candidate => candidate.path === itemPath)
+    return project === undefined ? { workspaceId: undefined, cwd: itemPath } : { workspaceId: project.id, cwd: undefined }
+  }
 }

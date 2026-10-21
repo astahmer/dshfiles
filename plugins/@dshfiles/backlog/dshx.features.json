@@ -819,7 +819,7 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked, sending immediately unless configured to keep an editable draft. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the thread opens only when the dialog's open box, or the startThreadOpensCreated setting, asks for it, and a toast reports it with an Open action otherwise.",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked, sending immediately unless configured to keep an editable draft. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the dialog's open box, or the startThreadOpensCreated setting, asks for it, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, so an agent starts the same thread without redirecting its own caller.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
@@ -843,9 +843,11 @@
         "click button \"Cancel\"",
         "fill textbox \"Comment\" \"@dsh fix\"",
         "click button \"Reply\"",
-        "expect text \"Work on b:1: Start a thread from b:1*\""
+        "expect text \"Thread started for b:1*\"",
+        "click button \"Start thread\"",
+        "expect checkbox \"Open the thread when it is created\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": ["client", "settings", "tool"],
       "configuration": [],
       "states": [
         "item-without-project",
@@ -905,7 +907,7 @@
         },
         {
           "kind": "unit-test",
-          "id": "backlog-start-thread-report",
+          "id": "backlog.start-thread-report",
           "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
           "testName": "reports a started thread by the items it works on"
         },
@@ -913,19 +915,19 @@
           "kind": "unit-test",
           "id": "backlog.start-thread-own-workspace",
           "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
-          "testName": "gives a thread started in a project its own jj workspace"
+          "testName": "keeps the project a caller named, so the thread is cut from it"
         },
         {
           "kind": "unit-test",
           "id": "backlog.start-thread-own-workspace-default",
           "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
-          "testName": "isolates a thread that has no project from the workspace the composer would use"
+          "testName": "joins the first registered workspace for an item with no project"
         },
         {
           "kind": "unit-test",
-          "id": "backlog.start-thread-own-workspace-failure",
+          "id": "backlog.start-thread-own-workspace-folder",
           "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
-          "testName": "starts nothing in the shared checkout when the thread workspace cannot be created"
+          "testName": "keeps a bare folder instead of provisioning a workspace for it"
         }
       ]
     }

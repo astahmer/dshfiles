@@ -5,7 +5,6 @@ import { MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 
-import { AgentComments } from './agent-dispatch.js'
 import {
   StartThreadForm,
   type StartThreadAgentChoice,
@@ -82,7 +81,7 @@ export const StartThreadDialog = (props: {
   /** An agent brings its own preset, route and instructions; without one the account/model fields decide. */
   const selection = (): Pick<StartThreadRequest, 'agent' | 'provider' | 'model' | 'reasoningEffort' | 'message'> | null => {
     if (chosenAgent !== undefined) {
-      return { agent: chosenAgent, provider: null, model: null, reasoningEffort: undefined, message: AgentComments.opening(chosenAgent, message.trim()) }
+      return { agent: chosenAgent, provider: null, model: null, reasoningEffort: undefined, message: message.trim() }
     }
     if (selected === undefined) return null
     return { provider: selected.provider.id, model: selected.model.id, reasoningEffort: effortValue, message: message.trim() }

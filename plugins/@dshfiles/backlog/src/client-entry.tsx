@@ -1,17 +1,15 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { agentsApi } from '@dshfiles/agents/contract'
-import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
-import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
-import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
@@ -23,15 +21,7 @@ import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { installBacklogReferenceLinks } from './backlog-reference-links.js'
 import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
 import { BacklogNotices, BacklogNoticeToast } from './notices.js'
-import {
-  defaultTargetFor,
-  StartThreadForm,
-  type StartThreadCatalog,
-  type StartThreadCreation,
-  type StartThreadOutcome,
-  type StartThreadRequest,
-} from './start-thread.js'
-import { isolateStartThread } from './start-thread-workspace.js'
+import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
@@ -79,76 +69,29 @@ export default defineClient({
         }
         // A jj workspace and a Session take a moment; the banner says the work is under way until a report replaces it.
         BacklogNotices.show({ text: StartThreadForm.starting(request.items), kind: 'progress', sessionId: null })
-        let creation: StartThreadCreation
-        try {
-          const jj = createApiClient(ctx, jjIntegrationApi)
-          const placement = await isolateStartThread({
-            target: request.target,
-            defaultWorkspaceId: ctx.workspaces.list.getSnapshot().items[0]?.workspaceId,
-            // jj-integration answers the workspace unchanged outside a jj repository; only a missing plugin is no error.
-            provision: async workspaceId => {
-              const provisioned = await jj.safe.provision({ workspaceId, isolate: true })
-              if (provisioned.ok) return provisioned.value
-              if (isApiOwnerMissing(provisioned.error)) return { workspaceId }
-              throw provisioned.error
-            },
-          })
-          const base: StartThreadCreation =
-            placement.workspaceId === undefined
-              ? placement.cwd === undefined
-                ? {}
-                : { cwd: placement.cwd }
-              : { workspaceId: (await workspaceListed({ workspaces: ctx.workspaces, workspaceId: placement.workspaceId })).workspaceId }
-          creation = request.agent?.preset == null ? base : { ...base, agentPreset: request.agent.preset }
-        } catch (cause) {
-          return failed(`The thread workspace could not be created: ${cause instanceof Error ? cause.message : String(cause)}`)
-        }
-        let sessionId
-        try {
-          sessionId = await ctx.sessions.create(creation)
-        } catch (cause) {
-          return failed(`The thread could not be created: ${cause instanceof Error ? cause.message : String(cause)}`)
-        }
-        try {
-          const route = request.agent?.route ?? null
-          const selection =
-            route === null
-              ? request.provider === null || request.model === null
-                ? null
-                : { provider: request.provider, model: request.model, reasoningEffort: request.reasoningEffort }
-              : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort ?? request.reasoningEffort }
-          if (selection !== null) {
-            const selected = await ctx.remote.session.selectModel(
-              selection.reasoningEffort === undefined
-                ? { sessionId, provider: selection.provider, model: selection.model }
-                : { sessionId, provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort },
-            )
-            if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
+        const start: Parameters<typeof api.safe.startThread>[0] = { ids: request.items.map(item => item.id), send: request.send }
+        if (request.target.kind === 'project') start.workspaceId = request.target.projectId
+        else if (request.target.kind === 'cwd') start.cwd = request.target.path
+        if (request.agent !== undefined) start.agent = request.agent.handle
+        if (request.provider !== null) start.provider = request.provider
+        if (request.model !== null) start.model = request.model
+        if (request.reasoningEffort !== undefined) start.reasoningEffort = request.reasoningEffort
+        if (request.message !== '') start.message = request.message
+        const started = await api.safe.startThread(start)
+        if (!started.ok) return failed(started.error.message)
+        // SAFETY: the Host answers the Session it just created; the brand is type-only on the wire.
+        const sessionId = started.value.sessionId as SessionId
+        if (!request.send && request.message !== '') {
+          // A draft belongs to the composer that owns it, so the panel leaves it after the Host created the thread.
+          const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
+          try {
+            await reference.ready
+            ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
+          } catch (cause) {
+            console.warn(`backlog: thread ${sessionId} started without its draft: ${String(cause)}`)
+          } finally {
+            reference.release()
           }
-          const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.items) })
-          if (!renamed.ok) console.warn(`backlog: thread ${sessionId} title kept as created: ${renamed.error.message}`)
-          if (request.message !== '') {
-            const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
-            try {
-              await reference.ready
-              if (request.send) {
-                const session = reference.binding.session
-                const handle = session.beginSubmission({ mode: 'queue', text: request.message, attachments: [] })
-                const prompted = await session.prompt([{ type: 'text', text: request.message }], 'queue', undefined, handle.requestId)
-                if (!prompted.ok) console.warn(`backlog: thread ${sessionId} started without its first message: ${prompted.error.message}`)
-              } else {
-                ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
-              }
-            } finally {
-              reference.release()
-            }
-          }
-          for (const item of request.items) {
-            const linked = await api.safe.link({ id: item.id, link: { type: 'thread', target: sessionId, provenance: 'user' } })
-            if (!linked.ok) console.warn(`backlog: item b:${String(item.id)} was not linked to thread ${sessionId}: ${linked.error.message}`)
-          }
-        } catch (cause) {
-          console.warn(`backlog: thread ${sessionId} was created without its first message or links: ${String(cause)}`)
         }
         if (request.open) {
           try {

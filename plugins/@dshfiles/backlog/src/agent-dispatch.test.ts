@@ -36,8 +36,8 @@ test('an agent comment starts on the agent preset, route and instructions', () =
   assert.equal(request.provider, null)
   assert.equal(request.model, null)
   assert.equal(request.send, true)
-  assert.match(request.message, /^Work as @reviewer — Reviewer\./u)
-  assert.match(request.message, /Work on b:12: Fix the flaky test/u)
+  // The Host prepends the agent's identity and instructions to this text, so the request carries the task alone.
+  assert.match(request.message, /^Work on b:12: Fix the flaky test/u)
   assert.match(request.message, /look at b:12$/u)
 })
 
@@ -62,7 +62,8 @@ test('the built-in agent pins no route, so the Host default serves it', () => {
   })
   assert.equal(request.agent?.route, null)
   assert.equal(request.agent?.preset, null)
-  assert.match(request.message, /^Work as @dsh — DSH\./u)
+  assert.equal(request.agent?.handle, 'dsh')
+  assert.match(request.message, /^Work on b:12: Fix the flaky test/u)
 })
 
 test('the item target follows its project, not the Host default', () => {

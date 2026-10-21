@@ -402,11 +402,12 @@ When('the Backlog panel is opened again', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
 })
 
-Then('the item links the thread it started', async ({ page }: { page: Page }) => {
+Then('the item links the thread it started as {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-start-thread-links', async () => {
-    // A draft with no message yet is not a listed thread, so the chip carries the session fallback label.
-    await expect(peek(page).getByRole('button', { name: /^Unlink thread session-/ })).toBeVisible()
-    await expect(peek(page).getByRole('button', { name: /^Thread [0-9a-f]{8}$/ })).toBeVisible()
+    const related = peek(page).getByRole('list', { name: 'Related' })
+    // The Host names the thread after the item before it links it, so the chip carries that title.
+    await expect(related.getByRole('button', { name: title, exact: true })).toBeVisible()
+    await expect(related.getByRole('button', { name: /^Unlink thread session-/ })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -594,7 +595,9 @@ Then('the board card for b:{int} is titled {string}', async ({ page }: { page: P
   await recordAssertion(page, 'backlog-inline-edit-board-saved', async () => {
     await expect(boardCard(page, id)).toContainText(title)
     await expect(inlineTitle(page)).toHaveCount(0)
-    await boardCard(page, id).getByText(`b:${String(id)}`, { exact: true }).click()
+    await boardCard(page, id)
+      .getByText(`b:${String(id)}`, { exact: true })
+      .click()
     await expect(peek(page)).toContainText(title)
   })
   await finishJourneyAssertions(page)
