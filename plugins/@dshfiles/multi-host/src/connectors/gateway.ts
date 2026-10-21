@@ -47,6 +47,11 @@ export type Gateway = {
     readonly version: number
   }): (method: string, input?: import('@dshfiles/dshx/platform').JsonValue, signal?: AbortSignal) => Promise<unknown>
   follow(endpoint: string, args: unknown, timeoutMs: number, signal?: AbortSignal): Promise<readonly unknown[]>
+  /**
+   * Open one long-lived stream and yield every item until it ends, fails, or the signal aborts. The `follow` helper is
+   * the bounded variant used for one snapshot read; a Session mirror needs the stream itself.
+   */
+  stream(endpoint: string, args: unknown, signal: AbortSignal): AsyncIterable<unknown>
   dispose(): Promise<void>
 }
 
@@ -142,6 +147,8 @@ export const connectGateway = async ({
     pluginApi,
     follow: (endpoint, args, timeoutMs, callSignal) =>
       followOnce({ origin: transport.origin, cookie, endpoint, args, timeoutMs, signal: callSignal ?? signal }),
+    stream: (endpoint, args, callSignal) =>
+      streamFrames({ origin: transport.origin, cookie, endpoint, args, signal: AbortSignal.any([callSignal, signal].filter(item => item !== undefined)) }),
     dispose,
   }
 }
@@ -250,6 +257,105 @@ const followOnce = async ({
       else finish(new GatewayUnavailableError('stream-closed', 'The runtime stream closed before returning a snapshot.'))
     })
   })
+}
+
+const streamFrames = async function* ({
+  origin,
+  cookie,
+  endpoint,
+  args,
+  signal,
+}: {
+  readonly origin: string
+  readonly cookie: string
+  readonly endpoint: string
+  readonly args: unknown
+  readonly signal: AbortSignal
+}): AsyncIterable<unknown> {
+  if (!/^[A-Za-z][A-Za-z0-9-]*\/[A-Za-z][A-Za-z0-9-]*$/.test(endpoint)) {
+    throw new GatewayUnavailableError('invalid-endpoint', 'The requested runtime stream endpoint is invalid.')
+  }
+  const url = new URL('/api/remote.mux', origin)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  const streamId = randomUUID()
+  const socket = new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: maxStreamFrameBytes, headers: { cookie, origin } })
+  const items: unknown[] = []
+  let failure: GatewayUnavailableError | undefined
+  let ended = false
+  let wake: (() => void) | undefined
+  const notify = (): void => {
+    wake?.()
+    wake = undefined
+  }
+  const close = (): void => {
+    socket.removeAllListeners()
+    if (socket.readyState === WebSocket.OPEN) {
+      if (!ended && failure === undefined) socket.send(JSON.stringify({ type: 'cancel', streamId }))
+      socket.close()
+    } else if (socket.readyState === WebSocket.CONNECTING) socket.terminate()
+  }
+  const onAbort = (): void => {
+    failure = new GatewayUnavailableError('cancelled', 'The runtime stream request was cancelled.')
+    notify()
+  }
+  signal.addEventListener('abort', onAbort, { once: true })
+  socket.once('open', () => socket.send(JSON.stringify({ type: 'open', streamId, endpoint, payload: { args } })))
+  socket.on('message', data => {
+    const chunk = Array.isArray(data) ? Buffer.concat(data) : data
+    const text = typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf8') : Buffer.from(chunk).toString('utf8')
+    let raw: unknown
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      failure = new GatewayUnavailableError('invalid-response', 'The runtime stream sent invalid JSON.')
+      notify()
+      return
+    }
+    const frame = streamFrameSchema.safeParse(raw)
+    if (!frame.success) {
+      failure = new GatewayUnavailableError('invalid-response', 'The runtime stream sent a malformed frame.')
+      notify()
+      return
+    }
+    if (frame.data.streamId !== streamId) return
+    if (frame.data.type === 'error') {
+      failure = new GatewayUnavailableError(frame.data.error?.code ?? 'stream-error', frame.data.error?.message ?? 'The runtime stream failed.')
+      notify()
+      return
+    }
+    if (frame.data.type === 'end') {
+      ended = true
+      notify()
+      return
+    }
+    items.push(frame.data.value)
+    notify()
+  })
+  socket.once('error', () => {
+    failure = new GatewayUnavailableError('stream-unreachable', 'Could not open the runtime stream.')
+    notify()
+  })
+  socket.once('close', () => {
+    ended = true
+    notify()
+  })
+  try {
+    while (true) {
+      while (items.length > 0) yield items.shift()
+      if (failure !== undefined) throw failure
+      if (ended || signal.aborted) return
+      await new Promise<void>(resolve => {
+        wake = resolve
+        if (items.length > 0 || failure !== undefined || ended || signal.aborted) {
+          wake = undefined
+          resolve()
+        }
+      })
+    }
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+    close()
+  }
 }
 
 const attemptRun = async ({

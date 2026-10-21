@@ -3,19 +3,27 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { multiHostApi, multiHostKeys, openRemoteThreadRef, RemoteThreadSelection } from '@dshfiles/multi-host/destination'
+import { multiHostApi, multiHostKeys } from '@dshfiles/multi-host/destination'
 
 /**
- * Threads started on other hosts, with their host as a badge. They are Sessions of another runtime, so they live in
- * their own section and open in the remote thread view. Nothing renders when multi-host is not installed.
+ * Threads started on other hosts, with their host as a badge. A row opens the Session in this client's own chat and
+ * composer: the Host mirrors it, so nothing here renders a second viewer. Nothing renders when multi-host is missing.
  */
-export const RemoteThreadsSection = (props: { readonly headerClassName: string; readonly onOpen: () => void }) => (
+export const RemoteThreadsSection = (props: {
+  readonly headerClassName: string
+  readonly onOpen: () => void
+  readonly onOpenSession?: ((sessionId: string) => void) | undefined
+}) => (
   <PluginQueryProvider>
     <RemoteThreadRows {...props} />
   </PluginQueryProvider>
 )
 
-const RemoteThreadRows = (props: { readonly headerClassName: string; readonly onOpen: () => void }) => {
+const RemoteThreadRows = (props: {
+  readonly headerClassName: string
+  readonly onOpen: () => void
+  readonly onOpenSession?: ((sessionId: string) => void) | undefined
+}) => {
   const api = useApi(multiHostApi)
   const threads = useQuery({
     queryKey: multiHostKeys.threads,
@@ -23,7 +31,6 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
     refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 15_000),
     retry: false,
   })
-  const open = openRemoteThreadRef.useValue()
   const rows = [...(threads.data?.threads ?? [])].reverse()
   if (rows.length === 0) return null
   return (
@@ -36,10 +43,7 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
           props.headerClassName,
           'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-left dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
         )}
-        onClick={() => {
-          RemoteThreadSelection.clear()
-          props.onOpen()
-        }}
+        onClick={() => props.onOpen()}
       >
         <ServerIcon className="dshx:size-3" aria-hidden />
         <span className="dshx:whitespace-nowrap">Remote</span>
@@ -47,7 +51,6 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
       </button>
       {rows.map(thread => {
-        const active = open?.runtimeId === thread.runtimeId && open.sessionId === thread.sessionId
         return (
           <button
             key={thread.runtimeId + thread.sessionId}
@@ -55,10 +58,12 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
             title={`${thread.title}\n${thread.hostName}: ${thread.cwd}`}
             className={cn(
               'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-left dshx:text-sm dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-              active && 'dshx:bg-accent',
             )}
             onClick={() => {
-              RemoteThreadSelection.open({ runtimeId: thread.runtimeId, sessionId: thread.sessionId })
+              if (props.onOpenSession !== undefined) {
+                props.onOpenSession(thread.sessionId)
+                return
+              }
               props.onOpen()
             }}
           >

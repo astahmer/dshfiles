@@ -32,7 +32,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | File                                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/history.ts`                 | `entryFor` sends `BrowserEvent.of(event)`: history pages and live follow events reach the browser without per-block provider replay state; opening a cold Session resumes its Agent only when the log stops inside a turn (crash closers), otherwise the first command does                                                                                                                                                     |
-| `src/native/index.ts`                   | `modelCatalog` shares one build with callers within 5 s for the same default model (a page load asked 12 times, up to 2.7 s each); `list` passes the request's projection selector to the row builder                                                                                                                                                                                                                           |
+| `src/native/index.ts`                   | `modelCatalog` shares one build with callers within 5 s for the same default model (a page load asked 12 times, up to 2.7 s each); `list` passes the request's projection selector to the row builder; `list`, `follow`, `page`, `prompt`, `cancel`, `updateQueue` and `projections` first offer the request to a registered Session source (see below) and keep their own implementation as the fallback                       |
 | `src/native/types.ts`                   | `SessionListRequest.projections` is an optional allowlist: omitted reads every column, `[]` reads none, unknown keys are ignored                                                                                                                                                                                                                                                                                                |
 | `src/native/client/sessions/manager.ts` | the list pull asks for the eight columns the list surface consumes, falling back to the full request when an older Host rejects the unknown field                                                                                                                                                                                                                                                                               |
 | `src/tail-log.ts`                       | new: decodes only the last frames of a cold Session's zstd log and folds the cached projection checkpoint over them (`sessionProjections.restore`); `follow` opens a cold, unforked Session over 1 MB from it and `page` serves its older pages from the same kept tail (3 kept, 2 min, re-validated by file identity); live, forked, torn, migrating or mid-turn logs keep the full read. `paginate` takes the tail's base seq |
@@ -52,6 +52,17 @@ the action; a deterministic request id makes retries idempotent. A message that
 arrived after the interruption but never started a turn does not invalidate it:
 a restart can persist the message and leave no turn to run it, so the stopped
 task still offers Resume.
+
+### Session sources (remote Sessions)
+
+`src/mirrored-sessions.ts` (new, not vendored) lets another plugin register Sessions this Host does not own — today
+`@dshfiles/multi-host` registers the Sessions of every reachable remote runtime. The contract is
+[`@dshfiles/session-source-port`](../session-source-port): one source mirrors the `session/*` endpoints it implements,
+so `session/list` merges its rows into this Host's list, and `follow`, `page`, `prompt`, `cancel`, `updateQueue` and
+`projections` forward the caller's request unchanged to the runtime that owns the Session. A Session this Host has
+attached always stays local, a source that cannot answer falls back to the local implementation, and one unreachable
+runtime never hides this Host's own threads. Newly listed rows are published as `api-session/added` (and a changed
+running state as `api-session/status`), so an open browser adds the thread without waiting for its next pull.
 
 ### Build
 

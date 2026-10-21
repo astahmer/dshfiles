@@ -7,7 +7,7 @@ import { ArrowUpIcon, RefreshCwIcon, ServerIcon } from '@dshfiles/plugin-ui/icon
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
-import { RemoteThreadSelection, type RemoteThreadRef } from './state.js'
+import type { RemoteThreadRef } from './state.js'
 
 const modelKey = (selection: { readonly provider: string; readonly model: string }): string => `${selection.provider}\u0000${selection.model}`
 
@@ -49,7 +49,6 @@ export const RemoteComposer = (props: {
         ...(provider === undefined || modelId === undefined ? {} : { model: { provider, model: modelId } }),
       })
       if (!result.ok) {
-        if (result.sessionId !== undefined) RemoteThreadSelection.open({ runtimeId: props.runtimeId, sessionId: result.sessionId })
         throw new Error(
           result.code === 'unknown-mutation-outcome'
             ? 'The connection dropped after the message was sent. Check the thread list before sending again.'
@@ -61,7 +60,6 @@ export const RemoteComposer = (props: {
     onSuccess: ref => {
       setText('')
       void queryClient.invalidateQueries({ queryKey: multiHostKeys.threads })
-      RemoteThreadSelection.open(ref)
       props.onStarted(ref)
     },
   })

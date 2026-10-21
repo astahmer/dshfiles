@@ -33,6 +33,7 @@ import { installModelSelectionProjection } from './model-selection-projection.ts
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
 import { ArchivedSessionGate } from './archived-session-gate.ts'
+import { MirroredSessions } from '../mirrored-sessions.ts'
 import type {
   ModelCatalog,
   SessionWorkspacePathApplication,
@@ -148,6 +149,7 @@ export class SessionController extends TypertRemoteService {
   private readonly openFileApplication: typeof openNativeFileApplication
   private readonly revealPath: (path: string, signal: AbortSignal) => Promise<void>
   private readonly canOpenPath: () => boolean
+  private readonly mirrored: MirroredSessions
   private readonly promotions = new Set<Promise<void>>()
 
   /**
@@ -175,6 +177,8 @@ export class SessionController extends TypertRemoteService {
     }, 'session-controller.promotions')
     this.history = new SessionHistoryController(ctx, (observation) => { this.promote(observation) })
     this.listState = new ApiSessionList(ctx, resolved.listWorkSliceMs)
+    this.mirrored = new MirroredSessions(ctx)
+    this.mirrored.provide()
     this.fileApplications = internals.fileApplications ?? nativeFileApplications
     this.openFileApplication = internals.openFileApplication ?? openNativeFileApplication
     this.openPath = internals.openPath ?? openNativeAssociatedPath
@@ -283,7 +287,8 @@ export class SessionController extends TypertRemoteService {
   @Remote('list')
   async list(request: SessionListRequest, signal: AbortSignal): Promise<SessionListValue> {
     const items = await this.listState.list(request, signal)
-    return { items: items.filter(item => this.ctx.remoteAccess.allows({ kind: 'session', id: item.sessionId })) }
+    const merged = await this.mirrored.merge(items, request, signal)
+    return { items: merged.filter(item => this.ctx.remoteAccess.allows({ kind: 'session', id: item.sessionId })) }
   }
 
   /**
@@ -502,7 +507,7 @@ export class SessionController extends TypertRemoteService {
       ...(clientTimeZone === undefined ? {} : { clientTimeZone }),
       ...(principal === undefined ? {} : { principal }),
     }
-    return this.commands.prompt(request, source)
+    return this.mirrored.prompt(request, signal, () => this.commands.prompt(request, source))
   }
 
   /**
@@ -522,7 +527,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('updateQueue')
   updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
-    return this.commands.updateQueue(request)
+    return this.mirrored.updateQueue(request, () => this.commands.updateQueue(request))
   }
 
   /**
@@ -531,8 +536,8 @@ export class SessionController extends TypertRemoteService {
    * @returns acknowledgement that cancellation was requested.
    */
   @Remote('cancel')
-  cancel(request: SessionCancelRequest): SessionCancelValue {
-    return this.commands.cancel(request)
+  cancel(request: SessionCancelRequest): Promise<SessionCancelValue> {
+    return this.mirrored.cancel(request, () => this.commands.cancel(request))
   }
 
   /**
@@ -543,7 +548,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote({ name: 'page', resources: { session: addressedSession } })
   page(request: SessionPageRequest, signal: AbortSignal): Promise<SessionPage> {
-    return this.history.page(request, signal)
+    return this.mirrored.page(request, signal, () => this.history.page(request, signal))
   }
 
   /**
@@ -555,7 +560,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote({ mode: 'stream', resources: { session: addressedSession } })
   follow(request: SessionFollowRequest, signal: AbortSignal): AsyncIterable<SessionFollowFrame> {
-    return this.history.follow(request, signal)
+    return this.mirrored.follow(request, signal, () => this.history.follow(request, signal))
   }
 
   /**
@@ -565,11 +570,16 @@ export class SessionController extends TypertRemoteService {
    * @returns a sequenced baseline, cached hints when migration is deferred, or null when absent.
    */
   @Remote('projections')
-  async projections(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue> {
+  projections(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue> {
+    return this.mirrored.projections(request, signal, (mirroredRequest, mirroredSignal) => this.localProjections(mirroredRequest, mirroredSignal))
+  }
+
+  private async localProjections(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue> {
     const { sessionId } = request
     if (sessionId.length === 0) {
       throw new RemoteError('gateway/bad-request', 'sessionId must not be empty', {})
     }
+
     try {
       signal.throwIfAborted()
       const live = this.liveProjections(sessionId)

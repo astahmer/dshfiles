@@ -4,6 +4,10 @@ Run new threads on other machines. Each machine runs its own stock DSH 0.2
 runtime with this plugin installed; this machine reaches it over SSH and keeps
 one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
 
+![A remote thread open in this client's own chat and composer](docs/screenshots/remote-thread-native.png)
+
+Manage hosts on a dedicated page:
+
 ![Manage hosts on a dedicated page](docs/screenshots/host-management.png)
 
 ## Using it
@@ -43,18 +47,25 @@ With a host chosen:
 - The composer is replaced: the message, and a model picked from the host's
   own catalog, start a Session **on the host**. No local Session is created.
   While the host is unreachable the composer says so and offers **Reconnect**;
-  nothing is sent.
-- The started thread opens in the main area: transcript (user and assistant
-  text, each tool call with its output), **Working** while a turn runs (polled
-  every 1.5 s, 8 s when idle), reply, stop, and **Host UI**, which opens the
-  host's own DSH in a new tab on a stable loopback origin. If the host drops,
-  the last transcript stays on screen under the error.
+  nothing is sent. This replacement is a stopgap: the plan is for a remote
+  Session to open in this client's own chat and composer, which is what bb,
+  t3code and Codex all do. Why it cannot simply reuse the local composer today,
+  and the route that removes the stopgap, are in
+  [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
+- The started thread opens in the main area as a **normal thread of this client**:
+  this Host mirrors the remote Session, so the native chat, its live transcript,
+  and this machine's own composer (commands, references, attachments, queue,
+  stop) work on it. **Host UI** still opens the host's own DSH in a new tab on a
+  stable loopback origin for what the mirror cannot answer yet (approvals,
+  terminals). If the host drops, the composer keeps its draft and the message is
+  refused until the host is back.
 - The **Remote threads** list shows every thread on every registered host,
   grouped by host and newest first: threads started from here keep their title,
   threads started on the host itself (its own UI or another machine) carry a
-  muted **started on host** badge and are titled by their folder. Status is
-  polled only while that list is open. An offline host shows one muted
-  "unavailable" line and still lists the threads started here.
+  muted **started on host** badge and are titled by their folder. A row opens the
+  thread in this client like any other. Status is polled only while that list is
+  open. An offline host shows one muted "unavailable" line and still lists the
+  threads started here.
 - While a remote turn waits, the open-thread view says what it waits on:
   **The agent ... is asking a question** when the last tool call is
   `ask_user_question` (or `ask_parent_question`), and **Waiting on <tool>**
@@ -62,7 +73,9 @@ With a host chosen:
   cannot tell a slow command from a pending approval. Both offer **Host UI**;
   answering and approving stay in the host's own DSH.
 - The thread sidebar shows a **Remote** section: every thread started from
-  here, badged with its host and whether its connection is open.
+  here, badged with its host and whether its connection is open. A row opens the
+  mirrored Session; a brand-new thread appears in the sidebar as soon as the host
+  reports it.
 
 ## Setting up a remote host
 
@@ -152,10 +165,12 @@ title}` for threads started here, so the sidebar and view can list them.
 
 ## Limits
 
-- A remote thread is a Session of another runtime. The browser client binds to
-  one runtime, so the native transcript (tool cards, approvals, attachments,
-  terminal, per-token streaming) cannot render it; the remote thread view shows
-  text and tool output and links to the host's own UI for the rest.
+- A remote thread is a Session of another runtime, mirrored into this Host:
+  `session/list`, `follow`, `page`, `prompt`, `cancel` and `updateQueue` forward
+  to the runtime that owns it, so the native chat and composer work. Model
+  catalogs, attachments, `@` references, approvals and terminals still resolve
+  on this machine or stay in the host's own DSH; the remaining slices are listed
+  in [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The agent preset chip of the New thread row does not apply to remote
   threads; the model is picked in the remote composer.
 - No password or keyboard-interactive SSH (BatchMode only). Provisioning runs

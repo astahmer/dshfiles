@@ -14,7 +14,7 @@ import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/ds
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
-import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
+import { hostDestination, multiHostApi, multiHostQueries, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
@@ -205,8 +205,6 @@ export default defineClient({
         ),
       'jj-integration: move the side-panel view to the main area',
     )
-    // SAFETY: The multi-host panel id is registered by @dshfiles/multi-host.
-    const openRemoteThreadPanel = (): void => ctx.layout.selectPanel(REMOTE_THREAD_PANEL as MainPanelId)
     const RemoteComposerBar = (): JSX.Element | null => {
       const multiHost = useApi(multiHostApi)
       const destination = hostDestination.useValue()
@@ -220,7 +218,7 @@ export default defineClient({
           hostName={directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'}
           cwd={destination.folder}
           prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
-          onStarted={openRemoteThreadPanel}
+          onStarted={ref => ctx.uiWorkspace.openSession(SessionId(ref.sessionId))}
         />
       )
     }

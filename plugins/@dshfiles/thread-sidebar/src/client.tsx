@@ -191,6 +191,7 @@ type InjectedActions = {
   renameSession: (sessionId: SessionSummary['id'], title: string) => Promise<void>
   /** Show the remote thread view; set when the layout service is available. */
   openRemoteThreads?: () => void
+  openRemoteSession?: (sessionId: string) => void
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
@@ -4423,7 +4424,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               </section>
             )
           })}
-          {props.openRemoteThreads === undefined ? null : <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} />}
+          {props.openRemoteThreads === undefined ? null : (
+            <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} onOpenSession={props.openRemoteSession} />
+          )}
           {draftSessions.length === 0 ? null : (
             <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>
               <div

@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -7,13 +8,14 @@ import { ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { HostsPage } from './destination/hosts-page.js'
 import { HOSTS_PANEL_ID, OPEN_HOSTS_EVENT } from './destination/state.js'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteThreadView } from './remote-thread-view.js'
 
 const HostsGlyph = (props: { readonly size?: number }): JSX.Element => <ServerIcon aria-hidden size={props.size ?? 18} strokeWidth={1.5} />
 
 export default defineClient({
   name: '@dshfiles/multi-host',
-  inject: ['slots', 'layout'],
+  inject: ['slots', 'layout', 'uiWorkspace'],
   setup(ctx, decorate) {
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
     const openHosts = (): void => {
@@ -41,7 +43,7 @@ export default defineClient({
         { name: 'main', key: 'dshfiles-multi-host-thread' },
         decorate(() => (
           <PluginQueryProvider>
-            <RemoteThreadView />
+            <RemoteThreadView onOpenSession={sessionId => ctx.uiWorkspace.openSession(sessionId as SessionId)} />
           </PluginQueryProvider>
         )),
       ),

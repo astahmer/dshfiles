@@ -136,8 +136,10 @@ README's Checks).
   bounded policy.
 - Which owned bundles belong on which machine? `secret-catalog`, account tooling
   and desktop integrations have real placement constraints.
-- Rendering a remote Session natively needs isolated client contexts (uploads,
-  approvals, media, terminal routing); stock DSH binds one runtime per browser
-  client, hence the polled remote thread view.
+- Rendering a remote Session natively needs an environment dimension on one
+  client's data plane (uploads, approvals, media, terminal routing); stock DSH
+  binds one runtime per browser client, hence the polled remote thread view. The
+  chosen route, its product precedents and its slices are in
+  [remote-thread-architecture.md](remote-thread-architecture.md).
 - LSP waits on protocol-matching official SSH/LSP artifacts; do not build
   upstream master to get them.

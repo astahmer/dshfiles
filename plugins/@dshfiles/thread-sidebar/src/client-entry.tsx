@@ -34,7 +34,7 @@ import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, thr
 import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
 import { requestThreadMainTab } from './main-tab-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { HoverPrefetch } from './hover-prefetch.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
@@ -769,6 +769,7 @@ export default defineClient({
             renameSession,
             open: openThread,
             openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
+            openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),
           }),
         },
         decorate(ThreadSidebarWithHistoryLookahead),

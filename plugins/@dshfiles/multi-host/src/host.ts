@@ -8,6 +8,8 @@ import { connectLocal } from './connectors/local.js'
 import { SshConnector } from './connectors/ssh.js'
 import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
+import { createRemoteSessionSource } from './remote-session-source.js'
+import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
 import { NativeRpcModel } from './native-rpc.js'
@@ -1022,6 +1024,20 @@ export default defineHost({
           if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
         }
       }, 'multi-host: launch file')
+    })
+    // A Session of another runtime opens in this Host's own chat and composer: the controller asks this source for any
+    // Session it does not hold, and every endpoint forwards to the runtime that owns it.
+    ctx.inject(['sessionSources'], scoped => {
+      const unregister = scoped.sessionSources.register(
+        createRemoteSessionSource({
+          runtimes: {
+            list: async () => (await HostDirectoryStore.listRuntimes()).map(runtime => ({ id: runtime.id, label: runtime.name })),
+            acquire: runtimeId => pool.acquire(runtimeId),
+            run: (runtimeId, request, options) => withRuntime(runtimeId, request, options),
+          },
+        }),
+      )
+      scoped.effect(() => unregister)
     })
     ctx.effect(() => async () => {
       for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)

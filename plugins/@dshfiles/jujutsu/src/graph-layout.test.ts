@@ -227,14 +227,18 @@ describe('lane allocation', () => {
 
   test('many workspaces on one shared revision stack in a single lane and curve into its line', () => {
     const heads = Array.from({ length: 10 }, (_, index) => chain(`head${index}-`, 1 + (index % 3), 'fork0'))
-    const rows = layout([
-      ...heads.flat(),
-      ...chain('fork', 3, 'main1'),
-      ...chain('main', 3, undefined, index => ({ bookmarks: index === 0 ? ['main'] : [] })),
-    ])
+    const rows = layout([...heads.flat(), ...chain('fork', 3, 'main1'), ...chain('main', 3, undefined, index => ({ bookmarks: index === 0 ? ['main'] : [] }))])
     expect(Math.max(...rows.map(row => row.laneCount))).toBe(3)
     expect(lanesOf(rows, ['head0-0', 'fork0', 'fork1', 'fork2'])).toEqual([1])
-    expect(lanesOf(rows, heads.slice(1).flat().map(row => row.commitId))).toEqual([2])
+    expect(
+      lanesOf(
+        rows,
+        heads
+          .slice(1)
+          .flat()
+          .map(row => row.commitId),
+      ),
+    ).toEqual([2])
     expect(crossings(rows)).toBe(0)
     expect(brokenLanes(rows)).toEqual([])
   })
