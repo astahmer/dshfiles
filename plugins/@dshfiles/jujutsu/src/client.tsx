@@ -46,6 +46,7 @@ import {
   CalendarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CopyPlusIcon,
   EllipsisVerticalIcon,
   FolderGit2Icon,
   MonitorIcon,
@@ -92,6 +93,7 @@ import { InlineWorkspaceProvisioner } from './inline-workspace-provisioner.js'
 import { InlineWorkspaceRemoval } from './inline-workspace-removal.js'
 import { WorkspaceCleanupDialog } from './workspace-cleanup-dialog.js'
 import { WorkspaceCleanupTrail } from './workspace-cleanup-trail.js'
+import { DEFAULT_PANEL_SCOPE, PanelScopes, usePanelScopeState } from './panel-scope.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
@@ -113,6 +115,10 @@ interface FullDiffTarget {
 interface JujutsuPanelProps {
   /** `side-panel` is the narrow per-thread surface; `dock` is the global dock, laid out like the main page. */
   readonly surface?: 'main' | 'side-panel' | 'dock'
+  /** Which context this panel serves: one main tab, one thread's side panel, or the global dock. State is kept per scope. */
+  readonly scope: string
+  /** The repository to open when this scope remembers none (a thread's own project). */
+  readonly defaultPath?: string | null
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
@@ -248,23 +254,40 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
   const repositoryRootsById = useRef(new Map<string, string>())
-  const [initialRequest] = useState(() => (sidePanel ? sidePanelRepository.takePending() : null))
-  const [path, setPath] = useState(() => initialRequest?.path ?? storedRepoPath.get())
+  const scope = props.scope
+  const [initialRequest] = useState(() => {
+    const pending = sidePanel ? sidePanelRepository.takePending() : null
+    // A request made before this panel mounted (a chat reference) wins over what the scope remembered.
+    if (pending !== null) PanelScopes.rememberPath(scope, pending.path)
+    return pending
+  })
+  const [path, setPath] = usePanelScopeState(
+    scope,
+    'path',
+    () => initialRequest?.path ?? PanelScopes.initialPath({ scope, defaultPath: props.defaultPath ?? null, legacyPath: storedRepoPath.get() }),
+  )
   const [pendingReferenceRequest, setPendingReferenceRequest] = useState(initialRequest?.reference ?? null)
   const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [chosenView, setView] = useState<View | null>(null)
+  const [chosenView, setView] = usePanelScopeState<View | null>(scope, 'view', () => PanelScopes.persisted(scope).view ?? null)
   const view = chosenView ?? preferences.defaultView
-  const [authorFilter, setAuthorFilter] = useState('')
-  const [textFilter, setTextFilter] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [showSearch, setShowSearch] = useState(!sidePanel)
-  const [showDates, setShowDates] = useState(false)
-  const [collapsedDays, setCollapsedDays] = useState<ReadonlySet<string>>(() => new Set())
-  const [selection, setSelection] = useState<RevisionSelection | null>(null)
-  const [comparisonSelection, setComparisonSelection] = useState<RevisionSelection | null>(null)
+  const [authorFilter, setAuthorFilter] = usePanelScopeState(scope, 'authorFilter', () => '')
+  const [textFilter, setTextFilter] = usePanelScopeState(scope, 'textFilter', () => '')
+  const [fromDate, setFromDate] = usePanelScopeState(scope, 'fromDate', () => '')
+  const [toDate, setToDate] = usePanelScopeState(scope, 'toDate', () => '')
+  const [showSearch, setShowSearch] = usePanelScopeState(scope, 'showSearch', () => !sidePanel)
+  const [showDates, setShowDates] = usePanelScopeState(scope, 'showDates', () => false)
+  const [collapsedDays, setCollapsedDays] = usePanelScopeState<ReadonlySet<string>>(scope, 'collapsedDays', () => new Set())
+  const [selection, setSelection] = usePanelScopeState<RevisionSelection | null>(scope, 'selection', () => null)
+  const [comparisonSelection, setComparisonSelection] = usePanelScopeState<RevisionSelection | null>(scope, 'comparisonSelection', () => null)
+  useEffect(() => {
+    const selectedPath = path.trim()
+    if (selectedPath.length > 0) PanelScopes.remember(scope, { path: selectedPath })
+  }, [scope, path])
+  useEffect(() => {
+    if (chosenView !== null) PanelScopes.remember(scope, { view: chosenView })
+  }, [scope, chosenView])
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
   const reviewApi = useApi(jujutsuReviewProgressApi)
   const reviewQuery = useQuery({
@@ -281,7 +304,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const localReviewStore = storedReviewProgress.useValue()
   const reviewMigrationDone = storedReviewMigration.useValue() === 1
   const reviewStore = reviewQuery.data?.store ?? localReviewStore
-  const [hideReviewedFiles, setHideReviewedFiles] = useState(false)
+  const [hideReviewedFiles, setHideReviewedFiles] = usePanelScopeState(scope, 'hideReviewedFiles', () => false)
   const [reviewNotice, setReviewNotice] = useState('')
 
   const adoptReviewSnapshot = useCallback(
@@ -389,7 +412,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
       setRepoHistory(nextHistory)
       storedRepoHistory.set(nextHistory)
-      storedRepoPath.set(registered.root)
+      PanelScopes.remember(scope, { path: registered.root })
+      if (scope === DEFAULT_PANEL_SCOPE) storedRepoPath.set(registered.root)
     },
   })
 
@@ -489,7 +513,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setComparisonSelection(null)
     setPendingLocateId(null)
     setLocatedId(null)
-  }, [repoId])
+  }, [repoId, setComparisonSelection])
 
   const detailsQuery = useQuery({
     queryKey: jujutsuQueryKeys.details(path, selectedRevision?.commitId ?? ''),
@@ -508,6 +532,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
 
   const shownRoot = state?.root ?? null
+  useEffect(() => PanelScopes.publishTitle(scope, shownRoot), [scope, shownRoot])
   useEffect(() => (sidePanel ? sidePanelRepository.show(shownRoot) : undefined), [sidePanel, shownRoot])
   const shownRootRef = useRef(shownRoot)
   shownRootRef.current = shownRoot
@@ -700,7 +725,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.committerTime ?? revision.authorTime))))
       setPendingLocateId(revision.commitId)
     },
-    [visibleRevisions],
+    [setCollapsedDays, visibleRevisions],
   )
 
   useEffect(() => {
@@ -724,7 +749,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       navigation.applySlice(match, 'history')
     }
     locateRevision(match)
-  }, [allRevisions, locateRevision, navigation, pendingReferenceRequest, repoId, state])
+  }, [allRevisions, locateRevision, navigation, pendingReferenceRequest, repoId, setComparisonSelection, setSelection, setTextFilter, setView, state])
 
   const resetGraphView = (): void => {
     navigation.reset()
@@ -1616,6 +1641,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       </>
     )
 
+  const openInNewTab = (): void => {
+    PanelScopes.requestTab({ scope: PanelScopes.newMainTab(), path: shownRoot })
+  }
+
   const emptyState = repositoryStatus.showEmptyPrompt ? (
     <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
       <EmptyHeader>
@@ -1695,6 +1724,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 )}
               </span>
               <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+                {props.surface === 'main' ? (
+                  <Button
+                    aria-label="Open this repository in a new tab"
+                    disabled={shownRoot === null}
+                    onClick={openInNewTab}
+                    size="icon-sm"
+                    title="Open this repository in a new tab"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <CopyPlusIcon />
+                  </Button>
+                ) : null}
                 <PreferencesMenu />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

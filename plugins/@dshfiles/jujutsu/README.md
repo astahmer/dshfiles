@@ -4,6 +4,8 @@
 
 ![Locate landmarks and compare revision ancestry](docs/screenshots/graph-navigation.png)
 
+![Keep one repository per Jujutsu tab, thread and dock](docs/screenshots/panel-scopes.png)
+
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
@@ -64,6 +66,17 @@ contracts.
   also opens from its own rail), and the `jujutsu.toggleSessionRepository`
   command, unbound by default under Settings › Shortcuts. It opens the page on
   that repository, or collapses the panel when it already shows it.
+- One Jujutsu tab per repository in the main view, through the copy-plus button
+  in the page header (_Open this repository in a new tab_): `@dshfiles/main-tabs`
+  opens a tab scoped to that repository, named _Jujutsu · <repo>_ and renamed
+  after whichever repository the tab shows later. A scoped tab keeps its own
+  repository, view, filters, selection and expanded rows; closing it leaves the
+  others alone.
+
+- Each context keeps its own repository: a thread's right-panel Jujutsu page
+  opens on that thread's project and remembers what it was changed to, and the
+  global dock and the default main page keep theirs. Switching threads no
+  longer retargets every side panel to the last repository picked anywhere.
 - Repository selection through the shared project/folder command palette
   (registered DSH projects, recent repositories, `/` folder browsing).
 - Dragging a local bookmark or revision onto a revision (main page and side
@@ -71,7 +84,9 @@ contracts.
   Every mutation, fetch, and push needs a second explicit confirmation.
 - View settings (default tab, ancestor groups, file layout, raw patch expanded,
   day grouping, graph density, hide immutable, mine only, revisions loaded) are saved in this
-  browser and shared live by the main page and side panel.
+  browser and shared live by every Jujutsu surface; the repository, view and
+  filters a given tab, thread or the dock was left on are kept per scope
+  (`dshfiles.jujutsu.panel-scopes.v1` for the repository and view).
 - Inline code in a chat message becomes a link when it is an explicit JJ
   identity: a `jj:`-prefixed name (`` `jj:main` ``, `` `jj:94526da8` ``), a
   revision-shaped token (a hex commit prefix of 7+, or a k–z change ID), or a

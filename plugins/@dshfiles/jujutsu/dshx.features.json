@@ -520,6 +520,94 @@
           "testName": "workspace-forget unregisters a secondary workspace and leaves its folder and files in place"
         }
       ]
+    },
+    {
+      "id": "panel-scopes",
+      "title": "Keep one repository per Jujutsu tab, thread and dock",
+      "summary": "Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The page header's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
+      "reach": [
+        "click button \"Jujutsu\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Sample project*\"",
+        "click button \"Open this repository in a new tab\"",
+        "expect tab \"Jujutsu \u00b7 sample*\"",
+        "click tab \"Source Control\"",
+        "expect textbox \"Working copy description\"",
+        "click tab \"Jujutsu\"",
+        "expect button \"Locate Current\"",
+        "click tab \"Jujutsu \u00b7 sample*\"",
+        "expect textbox \"Working copy description\"",
+        "click tab \"Revision graph\"",
+        "expect button \"Locate Current\""
+      ],
+      "surfaces": ["client", "storage", "integration"],
+      "configuration": [],
+      "states": ["default-panel", "main-tab", "thread-side-panel", "dock", "restored"],
+      "failureModes": [
+        "A thread whose project is not a Jujutsu repository shows the registration error and offers another repository.",
+        "A scope remembering a repository that no longer exists opens on the empty prompt.",
+        "Without @dshfiles/main-tabs the copy-plus button dispatches a request no tab strip answers, and the panel keeps its own state."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.panel-scope-request",
+          "file": "plugins/@dshfiles/jujutsu/src/panel-scope.test.ts",
+          "testName": "keeps a panel request repository for the scope it was made for"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.panel-scope-open-path",
+          "file": "plugins/@dshfiles/jujutsu/src/panel-scope.test.ts",
+          "testName": "opens a thread scope on its own project, a remembered repository first, and the panel default on its last pick"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.panel-scope-memory",
+          "file": "plugins/@dshfiles/jujutsu/src/panel-scope.test.ts",
+          "testName": "starts a scope on what this page already showed it, else the caller default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.panel-scope-title",
+          "file": "plugins/@dshfiles/jujutsu/src/panel-scope.test.ts",
+          "testName": "names a scoped tab after the repository it shows, and the panel default when it shows none"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.panel-scope-open-tab",
+          "file": "plugins/@dshfiles/jujutsu/src/panel-scope.test.ts",
+          "testName": "asks for another tab seeded with the repository on screen"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-scope-request",
+          "file": "plugins/@dshfiles/main-tabs/src/panel-tabs.test.ts",
+          "testName": "asks for a tab on one panel scope and names it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-scope-visible",
+          "file": "plugins/@dshfiles/main-tabs/src/panel-tabs.test.ts",
+          "testName": "reports the scoped tab on screen as what the main view shows, and a bare panel when another tab is active"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-scope-machine",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "keeps one tab per panel scope, each naming the scope it asks the Host to show"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-scope-persist",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "retitles a scoped tab wherever its set is, and saves the title and scope for a reload"
+        }
+      ]
     }
   ],
   "kind": "bundle"

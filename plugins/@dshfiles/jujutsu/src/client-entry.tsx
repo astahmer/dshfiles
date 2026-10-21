@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -15,11 +16,12 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
+import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { sidePanelRepository } from './side-panel-repository.js'
 import './client.css'
 
@@ -48,23 +50,56 @@ export default defineClient({
       const workspace = await ctx.workspaces.create({ path: canonicalPath })
       return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }
     }
-    const panelForSurface = (surface: 'main' | 'side-panel' | 'dock') =>
-      decorate(() => (
-        <PluginQueryProvider>
-          <ProjectsBoundPanel
-            workspaces={ctx.workspaces}
-            surface={surface}
-            directoryPicker={directoryPicker}
-            registerWorkspace={registerWorkspace}
-            // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
-            // the new JJ workspace is registered and opened the way the native folder picker opens one.
-            launchSession={async cwd => {
-              const workspace = await ctx.workspaces.create({ path: cwd })
-              await ctx.uiWorkspace.openWorkspace(workspace.workspaceId)
-            }}
-          />
-        </PluginQueryProvider>
-      ))
+    const panel = (surface: 'main' | 'side-panel' | 'dock', scope: string, defaultPath: string | null): JSX.Element => (
+      <PluginQueryProvider>
+        <ProjectsBoundPanel
+          workspaces={ctx.workspaces}
+          // Remounting per scope is what gives each tab, thread or the dock its own state; the scope's state outlives it.
+          key={scope}
+          scope={scope}
+          defaultPath={defaultPath}
+          surface={surface}
+          directoryPicker={directoryPicker}
+          registerWorkspace={registerWorkspace}
+          // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
+          // the new JJ workspace is registered and opened the way the native folder picker opens one.
+          launchSession={async cwd => {
+            const workspace = await ctx.workspaces.create({ path: cwd })
+            await ctx.uiWorkspace.openWorkspace(workspace.workspaceId)
+          }}
+        />
+      </PluginQueryProvider>
+    )
+    const useMountedSession = (): MountedPanelScope => {
+      const subscribeMounted = useCallback((listener: () => void) => ctx.sidebarRight.mounted.subscribe(listener), [])
+      const subscribeSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
+      const onScreen = useSyncExternalStore(subscribeMounted, () => ctx.sidebarRight.mounted.getSnapshot(), noSession)
+      // A global panel in the main view unsets the on-screen Session; the side panel still belongs to the last thread.
+      const lastSession = useRef<SessionId | undefined>(undefined)
+      useEffect(() => {
+        if (onScreen !== undefined) lastSession.current = onScreen
+      }, [onScreen])
+      const sessionId = onScreen ?? lastSession.current
+      const cwd = useSyncExternalStore(
+        subscribeSessions,
+        () => (sessionId === undefined ? undefined : ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd),
+        noSession,
+      )
+      return {
+        scope: sessionId === undefined ? DEFAULT_PANEL_SCOPE : PanelScopes.thread(sessionId),
+        defaultPath: cwd === undefined || cwd.length === 0 ? null : cwd,
+      }
+    }
+    const MainSurfacePanel = decorate(() => {
+      const scope = useActiveJujutsuScope()
+      return panel('main', scope, null)
+    })
+    const SideSurfacePanel = decorate(() => {
+      const target = useMountedSession()
+      return panel('side-panel', target.scope, target.defaultPath)
+    })
+    const DockSurfacePanel = decorate(() => panel('dock', DOCK_PANEL_SCOPE, null))
+    ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
     ctx.effect(
       () =>
@@ -188,8 +223,8 @@ export default defineClient({
         )),
       ),
     )
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, panelForSurface('main')))
-    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, MainSurfacePanel))
+    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, SideSurfacePanel))
     // The graph is one panel with two homes: a main tab and a right-pane tab. Moving between them is this plugin's
     // business, so it answers the strip's request and offers the reverse row on its own right-pane tab.
     const isMainPanel = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
@@ -241,14 +276,20 @@ export default defineClient({
           dockDefault: true,
           // The same feature's full main-view page, so the workbench offers "Move to main view" for the panel.
           mainPanelId: PANEL_ID,
-          component: panelForSurface('dock'),
+          component: DockSurfacePanel,
         }),
       'dshfiles-jujutsu: dock panel',
     )
   },
 })
 
+interface MountedPanelScope {
+  readonly scope: string
+  readonly defaultPath: string | null
+}
+
 const noProjects = (): null => null
+const noSession = (): undefined => undefined
 
 /** Follow the Host workspace registry so the repository picker lists every registered project. */
 const useRegisteredProjects = (workspaces: IWorkspaces | undefined): readonly RegisteredProject[] => {
