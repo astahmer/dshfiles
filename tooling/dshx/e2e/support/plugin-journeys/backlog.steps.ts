@@ -65,6 +65,35 @@ const contextTarget = async (page: Page, id: number, view: string): Promise<Loca
 
 const contextMenu = (page: Page) => page.getByRole('menu')
 
+const menuItemTextPosition = async (item: Locator, label: string): Promise<number> =>
+  item.evaluate((element, expectedLabel) => {
+    const textWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    let textNode = textWalker.nextNode()
+    while (textNode !== null) {
+      if (textNode.textContent?.trim() === expectedLabel) {
+        const textRange = document.createRange()
+        textRange.selectNodeContents(textNode)
+        return textRange.getBoundingClientRect().left
+      }
+      textNode = textWalker.nextNode()
+    }
+    throw new Error(`Could not find the label "${expectedLabel}" in the context-menu item`)
+  }, label)
+
+const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
+  const labels = ['Start thread…', 'Status', 'Kind', 'Project', 'Pin item', 'Run triage']
+  if (includeOpenItem) labels.push('Open item')
+  const attention = menu.getByRole('menuitem', { name: 'Attention', exact: true })
+  if ((await attention.locator('span[title]').count()) === 0) labels.push('Attention')
+
+  const referencePosition = await menuItemTextPosition(menu.getByRole('menuitem', { name: 'Start thread…', exact: true }), 'Start thread…')
+  for (const label of labels) {
+    const item = menu.getByRole('menuitem', { name: label, exact: true })
+    const position = await menuItemTextPosition(item, label)
+    expect(Math.abs(position - referencePosition), `${label} label should align with the icon column`).toBeLessThanOrEqual(1)
+  }
+}
+
 const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<void> => {
   const menu = contextMenu(page)
   await expect(menu.getByRole('menuitem', { name: 'Start thread…', exact: true })).toBeVisible()
@@ -75,6 +104,7 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
   await expect(menu.getByRole('menuitem', { name: /^(Unpin item|Pin item)$/ })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toBeVisible()
   if (includeOpenItem) await expect(menu.getByRole('menuitem', { name: 'Open item', exact: true })).toBeVisible()
+  await expectContextMenuLabelsAligned(menu, includeOpenItem)
   await menu.getByRole('menuitem', { name: 'Project', exact: true }).hover()
   await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: 'No project', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')

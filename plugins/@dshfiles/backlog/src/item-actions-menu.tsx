@@ -57,12 +57,13 @@ export const BacklogItemMenu = (props: {
         </ContextMenuItem>
         {props.openItem === undefined ? null : (
           <ContextMenuItem className="dshx:text-[13px]" onSelect={() => props.openItem?.(item.id)}>
+            <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
             Open item
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
         <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:text-[13px]">
+          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
             <ItemGlyphs.StatusIcon status={item.status} />
             Status
           </ContextMenuSubTrigger>
@@ -84,7 +85,7 @@ export const BacklogItemMenu = (props: {
           </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:text-[13px]">
+          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
             <ItemGlyphs.KindIcon kind={item.kind} />
             Kind
           </ContextMenuSubTrigger>
@@ -106,8 +107,8 @@ export const BacklogItemMenu = (props: {
           </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:text-[13px]">
-            <ItemGlyphs.AttentionBadge attention={attention} compact />
+          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+            {attention === 'none' ? <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : <ItemGlyphs.AttentionBadge attention={attention} compact />}
             Attention
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="dshx-root dshx:min-w-44">
@@ -128,7 +129,7 @@ export const BacklogItemMenu = (props: {
           </ContextMenuSubContent>
         </ContextMenuSub>
         <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:text-[13px]">
+          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
             <FolderIcon aria-hidden className="dshx:size-3.5" />
             Project
           </ContextMenuSubTrigger>

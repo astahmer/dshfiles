@@ -31,7 +31,7 @@ const statusTone = {
 /** Linear-style progress rings: dashed for untriaged, empty, half, then a green check or a red cross, since a filled
  * dot is what a project's own colour dot looks like. */
 const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?: string }): JSX.Element => (
-  <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:shrink-0', statusTone[props.status], props.className)}>
+  <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0', statusTone[props.status], props.className)}>
     {props.status === 'inbox' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.2 1.8" /> : null}
     {props.status === 'todo' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" /> : null}
     {props.status === 'doing' ? (
