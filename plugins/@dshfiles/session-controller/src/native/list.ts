@@ -94,14 +94,36 @@ export class ApiSessionList {
   private readonly coldProjections = new Map<string, SessionProjectionHints>()
 
   /**
+   * Persisted Session records, read once and kept until this Host creates or disposes a Session.
+   * `sessionQuery.listSessions` re-enumerates every project directory and then reads each Session's header and stats
+   * its log at a concurrency of three, so a 1 000-Session corpus costs thousands of filesystem round-trips per call
+   * (Host gap 71). Those headers never change after the Session is written, and every list field comes from the header
+   * or the projection cache, which keeps its own invalidation.
+   */
+  private persisted: readonly SessionRecord[] | undefined
+
+  /** The read every caller waits on, so concurrent lists fold one corpus instead of one each. */
+  private persistedRead: Promise<readonly SessionRecord[]> | undefined
+
+  /** Bumped on every invalidation so a read that started earlier cannot cache a corpus it predates. */
+  private persistedGeneration = 0
+
+  private readonly lifetime = new AbortController()
+
+  /**
    * @param ctx - Host context carrying Session, query, persistence, and projection services.
    * @param workSliceMs - Resolved positive integral list-work budget in milliseconds.
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
-    const forget = (session: Session): void => { this.coldProjections.delete(session.id) }
-    ctx.on('session/created', forget)
-    ctx.on('session/event', forget)
-    ctx.on('session/disposed', forget)
+    const forgetProjections = (session: Session): void => { this.coldProjections.delete(session.id) }
+    const forgetSession = (session: Session): void => {
+      forgetProjections(session)
+      this.invalidatePersisted()
+    }
+    ctx.on('session/created', forgetSession)
+    ctx.on('session/event', forgetProjections)
+    ctx.on('session/disposed', forgetSession)
+    ctx.effect(() => () => { this.lifetime.abort() }, 'session-controller.list: stop a background corpus read')
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataSchema,
@@ -154,7 +176,7 @@ export class ApiSessionList {
   async list(request: SessionListRequest = {}, signal?: AbortSignal): Promise<SessionSummary[]> {
     const selection = projectionSelectionOf(request.projections)
     signal?.throwIfAborted()
-    const records = await this.ctx.sessionQuery.listSessions(signal)
+    const records = await this.persistedSessions(signal)
     signal?.throwIfAborted()
     const items: SessionSummary[] = []
     const cold: SessionRecord[] = []
@@ -185,6 +207,39 @@ export class ApiSessionList {
     signal?.throwIfAborted()
     items.sort((left, right) => right.updatedAt - left.updatedAt)
     return items
+  }
+
+  /**
+   * Fold one corpus read for every caller, and honour a caller's own budget while the read runs.
+   * @param signal - caller's cancellation, which stops this caller waiting but not the shared read.
+   * @returns the persisted Session records.
+   */
+  private async persistedSessions(signal: AbortSignal | undefined): Promise<readonly SessionRecord[]> {
+    signal?.throwIfAborted()
+    const persisted = this.persisted
+    if (persisted !== undefined) return persisted
+    const read = this.persistedRead ?? this.startPersistedRead()
+    return signal === undefined ? read : abortable(read, signal)
+  }
+
+  private startPersistedRead(): Promise<readonly SessionRecord[]> {
+    const generation = this.persistedGeneration
+    const read = this.ctx.sessionQuery.listSessions(this.lifetime.signal).then(records => {
+      if (this.persistedGeneration === generation) this.persisted = records
+      return records
+    })
+    this.persistedRead = read
+    const settle = (): void => {
+      if (this.persistedRead === read) this.persistedRead = undefined
+    }
+    void read.then(settle, settle)
+    return read
+  }
+
+  private invalidatePersisted(): void {
+    this.persisted = undefined
+    this.persistedRead = undefined
+    this.persistedGeneration += 1
   }
 
   private summarizeCold({ header, formatStatus }: SessionRecord, selection?: ProjectionSelection): SessionSummary {
@@ -416,6 +471,26 @@ function hintsOf(
   // Listing hints contain every wire value the source currently holds but
   // remain partial: missing cells and cache rows are never materialized here.
   return { kind, asOfSeq: block.asOfSeq, values: block.values as SessionProjectionValues }
+}
+
+/**
+ * Wait for a shared read while keeping one caller's own cancellation: the read survives, only this wait ends.
+ * @param promise - shared work another caller may have started.
+ * @param signal - caller's cancellation.
+ * @returns the shared result, or throws the caller's abort reason.
+ */
+async function abortable<Value>(promise: Promise<Value>, signal: AbortSignal): Promise<Value> {
+  signal.throwIfAborted()
+  let onAbort = (): void => {}
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => { reject(signal.reason) }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    return await Promise.race([promise, aborted])
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+  }
 }
 
 function normalizeSearchQuery(query: string): string {
