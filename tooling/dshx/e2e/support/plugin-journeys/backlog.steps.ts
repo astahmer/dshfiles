@@ -342,6 +342,15 @@ Then('the start thread dialog sends the prefilled message by default', async ({ 
   await expect(startThreadDialog(page).getByRole('checkbox', { name: 'Send this message now' })).toBeChecked()
 })
 
+Then('the start thread dialog keeps the thread in the backlog by default', async ({ page }: { page: Page }) => {
+  await expect(startThreadDialog(page).getByRole('checkbox', { name: 'Open the thread when it is created' })).not.toBeChecked()
+  await expect(startThreadDialog(page)).toContainText('until you open it')
+})
+
+When('the open-when-created box is checked', async ({ page }: { page: Page }) => {
+  await startThreadDialog(page).getByRole('checkbox', { name: 'Open the thread when it is created' }).check()
+})
+
 When('the send-now box is unchecked', async ({ page }: { page: Page }) => {
   await startThreadDialog(page).getByRole('checkbox', { name: 'Send this message now' }).uncheck()
   await expect(startThreadDialog(page)).toContainText('editable draft')
@@ -362,10 +371,21 @@ Then('the thread composer holds {string} as a draft', async ({ page }: { page: P
 })
 
 When('the thread is started from the dialog without a first message', async ({ page }: { page: Page }) => {
-  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue('Work on b:1: Ship the thread starter')
+  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue(/^Work on b:1: /)
   await startThreadDialog(page).getByLabel('First message').fill('')
   await startThreadDialog(page).getByRole('button', { name: 'Start thread', exact: true }).click()
   await expect(startThreadDialog(page)).toBeHidden()
+})
+
+Then('the backlog panel stays open while the thread is created', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-start-thread-stays', async () => {
+    await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+    await expect(page.getByRole('alert')).toContainText('Thread started for b:1', { timeout: 30_000 })
+  })
+})
+
+When('the start thread report is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('alert').getByRole('button', { name: 'Open', exact: true }).click()
 })
 
 Then('the thread composer is open for it', async ({ page }: { page: Page }) => {

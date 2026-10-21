@@ -11,6 +11,8 @@ Feature: Persistent agents
     And "Mention the reviewer" is captured
     When backlog item b:1 is opened
     And "@dsh look at b:1" is commented on the open item
+    Then the backlog panel stays open while the thread is created
+    When the start thread report is opened
     Then the agent thread "Mention the reviewer" opens with its instructions for "look at b:1"
     When the Backlog panel is opened
     And backlog item b:1 is opened

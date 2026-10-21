@@ -139,4 +139,14 @@ describe('start thread form', () => {
   it('titles a batch with the first item and the number of extras', () => {
     expect(StartThreadForm.title([item({ title: 'first' }), item({ id: 104 }), item({ id: 105 })])).toBe('first +2')
   })
+
+  it('reports a started thread by the items it works on', () => {
+    expect(StartThreadForm.started([item()])).toBe('Thread started for b:103')
+    expect(StartThreadForm.started([item(), item({ id: 104 })])).toBe('Thread started for b:103, b:104')
+  })
+
+  it('reports the work in progress while the workspace and the Session are created', () => {
+    expect(StartThreadForm.starting([item()])).toBe('Starting a thread for b:103…')
+    expect(StartThreadForm.refs([item(), item({ id: 104 })])).toBe('b:103, b:104')
+  })
 })

@@ -15,7 +15,8 @@ where a thread starts.
   DSH, the agent's instructions are the first part of the dispatch prompt, bounded to 4,000
   characters.
 - **Where mentions mean something.** A backlog item comment whose first token is `@handle` starts
-  that agent's thread for the item (the comment is recorded and the thread linked). The backlog's
+  that agent's thread for the item (the comment is recorded and the thread linked). The dispatch never
+  takes you to that thread: the backlog reports it in a toast whose **Open** action shows it. The backlog's
   Start thread dialog also picks an agent, which replaces its account/model fields with the agent's
   preset, route and instructions. Inside a running thread the same text is a mention the Agent
   reads, because a preset and system prompt are fixed when the thread is created.

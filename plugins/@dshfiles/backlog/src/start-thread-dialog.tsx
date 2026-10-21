@@ -1,7 +1,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { LoaderCircleIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 
@@ -17,11 +17,9 @@ import {
 
 const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
 
-type StartOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string }
-
 /**
- * Chooses the project, account/model and opening message, then asks the panel to start the thread. The catalog is a
- * Host read, so it loads when the dialog opens instead of with every list refresh.
+ * Chooses the project, account/model and opening message, then hands the request to the panel and closes. Creating the
+ * thread runs in the background, so nothing here waits for it; the panel reports the outcome in a toast.
  */
 export const StartThreadDialog = (props: {
   /** One item, or the selection the thread works on; every item is linked and named in the opening message. */
@@ -31,7 +29,8 @@ export const StartThreadDialog = (props: {
   /** Every enabled agent, so the thread can start as one with its preset, route and instructions. */
   readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
   readonly sendByDefault: boolean
-  readonly start: (request: StartThreadRequest) => Promise<StartOutcome>
+  readonly openByDefault: boolean
+  readonly start: (request: StartThreadRequest) => void
   readonly close: () => void
 }): JSX.Element => {
   const targets = StartThreadForm.targets(props.items, props.projects)
@@ -41,8 +40,7 @@ export const StartThreadDialog = (props: {
   const [effort, setEffort] = useState<string | null>(null)
   const [message, setMessage] = useState(() => StartThreadForm.message(props.items))
   const [send, setSend] = useState(props.sendByDefault)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(props.openByDefault)
   const catalogQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'catalog'], queryFn: props.loadCatalog, staleTime: 30_000 })
   const agentsQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'agents'], queryFn: props.listAgents, staleTime: 30_000 })
   const chosenAgent = (agentsQuery.data ?? []).find(candidate => candidate.handle === agentHandle)
@@ -90,27 +88,15 @@ export const StartThreadDialog = (props: {
     return { provider: selected.provider.id, model: selected.model.id, reasoningEffort: effortValue, message: message.trim() }
   }
 
-  const submit = async (): Promise<void> => {
+  const submit = (): void => {
     const picked = selection()
     if (picked === null) return
-    setBusy(true)
-    setError(null)
-    try {
-      const outcome = await props.start({ items: props.items, target, ...picked, send })
-      if (outcome.ok) {
-        props.close()
-        return
-      }
-      setError(outcome.reason)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setBusy(false)
-    }
+    props.close()
+    props.start({ items: props.items, target, ...picked, send, open })
   }
 
   return (
-    <Dialog open onOpenChange={open => (open ? undefined : props.close())}>
+    <Dialog open onOpenChange={next => (next ? undefined : props.close())}>
       <DialogContent className="dshx-root dshx:sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Start thread</DialogTitle>
@@ -185,30 +171,30 @@ export const StartThreadDialog = (props: {
               value={message}
               onChange={event => setMessage(event.currentTarget.value)}
               rows={4}
-              placeholder="Leave empty to open an empty thread"
+              placeholder="Leave empty to create an empty thread"
               className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
             />
             <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
               <input type="checkbox" checked={send} onChange={event => setSend(event.currentTarget.checked)} disabled={message.trim() === ''} />
               Send this message now
             </label>
+            <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
+              <input type="checkbox" aria-label="Open the thread when it is created" checked={open} onChange={event => setOpen(event.currentTarget.checked)} />
+              Open the thread when it is created
+            </label>
             <span className="dshx:text-[11px] dshx:text-muted-foreground">
               {props.items.length > 1 ? `The thread is linked to all ${String(props.items.length)} items. ` : 'The thread is linked to this item. '}
-              {message.trim() === ''
-                ? 'It opens as an empty draft.'
-                : send
-                  ? 'It is told what to work on and opened.'
-                  : 'It opens with the message as an editable draft.'}
+              {message.trim() === '' ? 'It is created empty' : send ? 'It is told what to work on' : 'It opens with the message as an editable draft'}
+              {open ? ' and opens when it is ready.' : ', in the background, until you open it.'}
             </span>
           </label>
-          {error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={props.close} disabled={busy}>
+          <Button variant="outline" onClick={props.close}>
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={busy || selection() === null}>
-            {busy ? <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:animate-spin" /> : <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />}
+          <Button onClick={submit} disabled={selection() === null}>
+            <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
             Start thread
           </Button>
         </DialogFooter>

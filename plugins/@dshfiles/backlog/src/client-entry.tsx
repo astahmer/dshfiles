@@ -22,7 +22,15 @@ import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { installBacklogReferenceLinks } from './backlog-reference-links.js'
 import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
-import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadCreation, type StartThreadRequest } from './start-thread.js'
+import { BacklogNotices, BacklogNoticeToast } from './notices.js'
+import {
+  defaultTargetFor,
+  StartThreadForm,
+  type StartThreadCatalog,
+  type StartThreadCreation,
+  type StartThreadOutcome,
+  type StartThreadRequest,
+} from './start-thread.js'
 import { isolateStartThread } from './start-thread-workspace.js'
 import './client.css'
 
@@ -63,10 +71,17 @@ export default defineClient({
           return []
         }
       },
-      start: async (request: StartThreadRequest) => {
-        const jj = createApiClient(ctx, jjIntegrationApi)
+      start: async (request: StartThreadRequest): Promise<StartThreadOutcome> => {
+        /** Nothing was created; the dialog is already gone, so the reason travels as a report. */
+        const failed = (reason: string): StartThreadOutcome => {
+          BacklogNotices.show({ text: reason, kind: 'failure', sessionId: null })
+          return { ok: false, reason }
+        }
+        // A jj workspace and a Session take a moment; the banner says the work is under way until a report replaces it.
+        BacklogNotices.show({ text: StartThreadForm.starting(request.items), kind: 'progress', sessionId: null })
         let creation: StartThreadCreation
         try {
+          const jj = createApiClient(ctx, jjIntegrationApi)
           const placement = await isolateStartThread({
             target: request.target,
             defaultWorkspaceId: ctx.workspaces.list.getSnapshot().items[0]?.workspaceId,
@@ -86,55 +101,65 @@ export default defineClient({
               : { workspaceId: (await workspaceListed({ workspaces: ctx.workspaces, workspaceId: placement.workspaceId })).workspaceId }
           creation = request.agent?.preset == null ? base : { ...base, agentPreset: request.agent.preset }
         } catch (cause) {
-          return { ok: false, reason: `The thread workspace could not be created: ${cause instanceof Error ? cause.message : String(cause)}` }
+          return failed(`The thread workspace could not be created: ${cause instanceof Error ? cause.message : String(cause)}`)
         }
         let sessionId
         try {
           sessionId = await ctx.sessions.create(creation)
         } catch (cause) {
-          return { ok: false, reason: `The thread could not be created: ${cause instanceof Error ? cause.message : String(cause)}` }
+          return failed(`The thread could not be created: ${cause instanceof Error ? cause.message : String(cause)}`)
         }
-        const route = request.agent?.route ?? null
-        const selection =
-          route === null
-            ? request.provider === null || request.model === null
-              ? null
-              : { provider: request.provider, model: request.model, reasoningEffort: request.reasoningEffort }
-            : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort ?? request.reasoningEffort }
-        if (selection !== null) {
-          const selected = await ctx.remote.session.selectModel(
-            selection.reasoningEffort === undefined
-              ? { sessionId, provider: selection.provider, model: selection.model }
-              : { sessionId, provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort },
-          )
-          if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
-        }
-        const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.items) })
-        if (!renamed.ok) console.warn(`backlog: thread ${sessionId} title kept as created: ${renamed.error.message}`)
-        if (request.message !== '') {
-          const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
-          try {
-            await reference.ready
-            if (request.send) {
-              const session = reference.binding.session
-              const handle = session.beginSubmission({ mode: 'queue', text: request.message, attachments: [] })
-              const prompted = await session.prompt([{ type: 'text', text: request.message }], 'queue', undefined, handle.requestId)
-              if (!prompted.ok) console.warn(`backlog: thread ${sessionId} started without its first message: ${prompted.error.message}`)
-            } else {
-              ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
+        try {
+          const route = request.agent?.route ?? null
+          const selection =
+            route === null
+              ? request.provider === null || request.model === null
+                ? null
+                : { provider: request.provider, model: request.model, reasoningEffort: request.reasoningEffort }
+              : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort ?? request.reasoningEffort }
+          if (selection !== null) {
+            const selected = await ctx.remote.session.selectModel(
+              selection.reasoningEffort === undefined
+                ? { sessionId, provider: selection.provider, model: selection.model }
+                : { sessionId, provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort },
+            )
+            if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
+          }
+          const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.items) })
+          if (!renamed.ok) console.warn(`backlog: thread ${sessionId} title kept as created: ${renamed.error.message}`)
+          if (request.message !== '') {
+            const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
+            try {
+              await reference.ready
+              if (request.send) {
+                const session = reference.binding.session
+                const handle = session.beginSubmission({ mode: 'queue', text: request.message, attachments: [] })
+                const prompted = await session.prompt([{ type: 'text', text: request.message }], 'queue', undefined, handle.requestId)
+                if (!prompted.ok) console.warn(`backlog: thread ${sessionId} started without its first message: ${prompted.error.message}`)
+              } else {
+                ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
+              }
+            } finally {
+              reference.release()
             }
+          }
+          for (const item of request.items) {
+            const linked = await api.safe.link({ id: item.id, link: { type: 'thread', target: sessionId, provenance: 'user' } })
+            if (!linked.ok) console.warn(`backlog: item b:${String(item.id)} was not linked to thread ${sessionId}: ${linked.error.message}`)
+          }
+        } catch (cause) {
+          console.warn(`backlog: thread ${sessionId} was created without its first message or links: ${String(cause)}`)
+        }
+        if (request.open) {
+          try {
+            ctx.uiWorkspace.openSession(sessionId)
           } catch (cause) {
-            console.warn(`backlog: thread ${sessionId} started without its first message: ${String(cause)}`)
-          } finally {
-            reference.release()
+            console.warn(`backlog: thread ${sessionId} could not be opened: ${String(cause)}`)
           }
         }
-        for (const item of request.items) {
-          const linked = await api.safe.link({ id: item.id, link: { type: 'thread', target: sessionId, provenance: 'user' } })
-          if (!linked.ok) console.warn(`backlog: item b:${String(item.id)} was not linked to thread ${sessionId}: ${linked.error.message}`)
-        }
-        ctx.uiWorkspace.openSession(sessionId)
-        return { ok: true }
+        // Opening it is already done when asked, so the report only carries the thread when it is still the user's to do.
+        BacklogNotices.show({ text: StartThreadForm.started(request.items), kind: 'success', sessionId: request.open ? null : sessionId })
+        return { ok: true, sessionId }
       },
     }
     /**
@@ -206,6 +231,7 @@ export default defineClient({
             ctx.layout.selectPanel(PANEL_ID as MainPanelId)
           }}
         />
+        <BacklogNoticeToast openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)} />
       </PluginQueryProvider>
     )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))

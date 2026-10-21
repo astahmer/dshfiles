@@ -101,10 +101,10 @@
     {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
+      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
-      "states": ["idle", "mentioned", "dispatched"],
+      "states": ["idle", "mentioned", "dispatched", "reported"],
       "failureModes": [
         "An unknown handle stays a plain comment.",
         "A disabled agent is not offered and does not dispatch.",

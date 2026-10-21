@@ -33,14 +33,14 @@ export class AgentComments {
 
   /** The request fields an agent contributes to a start-thread call. */
   static agent(agent: Agent): StartThreadAgent {
-    return {
+    const fields = {
       handle: agent.handle,
       name: agent.name,
       instructions: agent.instructions,
       preset: agent.preset,
       route: agent.route,
-      ...(agent.routine === undefined || agent.routine === '' ? {} : { routine: agent.routine }),
     }
+    return agent.routine === undefined || agent.routine === '' ? fields : { ...fields, routine: agent.routine }
   }
 
   /** The opening message for a chosen agent: identity, then its instructions, then the task. */
@@ -57,6 +57,8 @@ export class AgentComments {
   /**
    * The start-thread request for an agent comment: the agent's preset and route, its instructions, the item context
    * the thread must name, and the comment text. The caller supplies the target because only it knows the projects.
+   * A dispatch never opens the thread it starts: the comment box keeps the item in front of the user, and the report
+   * the start writes offers the thread instead.
    */
   static request(input: {
     readonly items: readonly StartThreadItem[]
@@ -75,6 +77,7 @@ export class AgentComments {
       reasoningEffort: undefined,
       message: AgentComments.opening(input.agent, task === '' ? context : `${context}\n\n${task}`),
       send: true,
+      open: false,
     }
   }
 }

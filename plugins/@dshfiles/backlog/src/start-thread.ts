@@ -117,7 +117,12 @@ export interface StartThreadRequest {
   readonly message: string
   /** Send the message as the thread's first turn; false leaves it as an editable draft. */
   readonly send: boolean
+  /** Open the created thread once it exists; false leaves the panel where it is. */
+  readonly open: boolean
 }
+
+/** What a start-thread run answered: the Session it created, or why nothing was started. */
+export type StartThreadOutcome = { readonly ok: true; readonly sessionId: string } | { readonly ok: false; readonly reason: string }
 
 const TITLE_MAX = 200
 const MESSAGE_MAX = 4_000
@@ -203,6 +208,21 @@ export class StartThreadForm {
     const first = items[0]?.title ?? ''
     const extra = items.length - 1
     return (extra > 0 ? `${first} +${String(extra)}` : first).slice(0, TITLE_MAX)
+  }
+
+  /** The items a report names, so the panel can say what a background run is doing. */
+  static refs(items: readonly StartThreadItem[]): string {
+    return items.map(item => `b:${String(item.id)}`).join(', ')
+  }
+
+  /** What a run reports while it waits for the jj workspace and the Session: the work is under way, not done. */
+  static starting(items: readonly StartThreadItem[]): string {
+    return `Starting a thread for ${StartThreadForm.refs(items)}…`
+  }
+
+  /** What a started thread reports without opening it: the items it works on, so the panel can say what happened. */
+  static started(items: readonly StartThreadItem[]): string {
+    return `Thread started for ${StartThreadForm.refs(items)}`
   }
 }
 

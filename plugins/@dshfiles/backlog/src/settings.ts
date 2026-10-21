@@ -49,6 +49,11 @@ export const backlogSettings = defineSettings({
       .description(
         'When a thread is started from an item, send its prefilled first message at once. Off opens the thread with that text as a draft you can edit before sending.',
       ),
+    startThreadOpensCreated: Schema.boolean()
+      .default(false)
+      .description(
+        'Open a thread the start-thread dialog created as soon as it exists. Off leaves you where you were; the thread shows up in the sidebar, linked to its items, and the report offers to open it. A comment that mentions an agent never opens the thread it starts.',
+      ),
     revisionRepositories: Schema.array(Schema.string())
       .default([])
       .description('Repositories whose main bookmark is read for "Closes b:<n>", besides every project an open item names.'),

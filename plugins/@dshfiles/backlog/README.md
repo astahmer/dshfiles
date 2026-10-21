@@ -114,21 +114,27 @@ other projects plus a bare folder for a project path the registry does not know,
 account/model from the Host catalog with the model's reasoning efforts. The first message is prefilled from
 the item (title plus preview) and can be cleared to open an empty draft instead.
 
-Starting creates the thread, selects the account/model on it, names it after the item, sends the first message
-when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off opens it as an editable
-draft, and the dialog's _Send this message now_ box overrides the setting for one thread), links the item to the
-thread (provenance `user`) and opens it.
+Starting hands the request over and closes the dialog at once: the thread is created in the background, so a slow jj
+workspace never holds the panel. It selects the account/model on it, names it after the item, sends the first message
+when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off leaves it as an editable
+draft, and the dialog's _Send this message now_ box overrides the setting for one thread), and links the item to the
+thread (provenance `user`).
+
+It does not take you to the thread by default: you stay where you were, and a toast reports `Thread started for
+b:<n>` with an **Open** action. Settings → `dshfiles-backlog` → _Open the thread when it is created_ — or the dialog's
+own _Open the thread when it is created_ box, which overrides the setting for one thread — opens it instead. A comment
+that mentions an agent never opens the thread it starts; the same toast offers it.
 
 A thread started from an item always runs in its own jj workspace of the chosen project, whatever the
 isolate-by-default setting says: work captured in the backlog is independent, so it never shares a checkout
 another thread is editing. `@dshfiles/jj-integration` creates that workspace (one `thread-xxxxxx` beside the
 project) and the thread starts in it; outside a jj repository, or with the plugin not installed, the thread
 starts in the project workspace as before. A thread with no project joins the first registered workspace, the
-way the composer's New thread does, and is isolated there too. A workspace that cannot be created is reported
-in the dialog and nothing is started, so a jj failure never falls back to a shared checkout.
+way the composer's New thread does, and is isolated there too. A workspace that cannot be created reports its reason
+in the toast and nothing is started, so a jj failure never falls back to a shared checkout.
 
-Failures after creation keep the thread and open it: a refused model switch leaves the Host default model, and
-a failed link is logged rather than losing the thread.
+Failures after creation keep the thread and the toast still offers it: a refused model switch leaves the Host default
+model, and a failed link is logged rather than losing the thread.
 
 ## Automatic triage
 

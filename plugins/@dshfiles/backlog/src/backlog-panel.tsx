@@ -49,7 +49,7 @@ import { BacklogProjects, ProjectPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
-import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadProject, StartThreadRequest } from './start-thread.js'
+import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
@@ -240,7 +240,7 @@ export interface StartThreadPorts {
   readonly loadCatalog: () => Promise<StartThreadCatalog>
   /** Every enabled agent, so the dialog can start the thread as one. */
   readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
-  readonly start: (request: StartThreadRequest) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
+  readonly start: (request: StartThreadRequest) => Promise<StartThreadOutcome>
 }
 
 export const BacklogPanel = (props: {
@@ -624,7 +624,11 @@ export const BacklogPanel = (props: {
           loadCatalog={props.startThread.loadCatalog}
           listAgents={props.startThread.listAgents}
           sendByDefault={settings.value?.startThreadSendsFirstMessage ?? true}
-          start={props.startThread.start}
+          openByDefault={settings.value?.startThreadOpensCreated ?? false}
+          start={request => {
+            // Creating the thread runs on in the background; the entry reports it in a toast wherever the user went.
+            void props.startThread.start(request)
+          }}
           close={() => setStartThreadItems(null)}
         />
       )}
