@@ -1,5 +1,4 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { ImageLightbox } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import {
   DropdownMenu,
@@ -16,31 +15,27 @@ import {
   CheckIcon,
   FolderIcon,
   HashIcon,
-  FileIcon,
   PaperclipIcon,
   SquareIcon,
   LinkIcon,
   ListIcon,
   LoaderCircleIcon,
   MessageSquareIcon,
-  MessagesSquareIcon,
   MicIcon,
   PlusIcon,
   RotateCcwIcon,
-  XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
-import { fileInput, readComposerFile, type ComposerFile } from './composer-files.js'
-import type { AgentChoice } from './agent-dispatch.js'
-import { useAgentDispatch } from './agent-dispatch-context.js'
+import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { fileInput } from './composer-files.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
-import { InlineCompletion } from './inline-completion.js'
+import { MentionMenu, useMentionCompletion } from './mention-completion.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjectCommand } from './project-command.js'
@@ -71,9 +66,6 @@ const chipClass =
 
 const iconButtonClass =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:disabled:opacity-40'
-
-const sizeLabel = (bytes: number): string =>
-  bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${String(Math.max(1, Math.round(bytes / 1024)))} KB`
 
 const propertyClass =
   'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground'
@@ -186,7 +178,6 @@ export const Composer = (props: {
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
-  const agentPort = useAgentDispatch()
   const speech = useQuery({
     queryKey: ['dshfiles-backlog-speech'],
     queryFn: ({ signal }) => api.speechStatus(undefined, { signal }),
@@ -201,9 +192,7 @@ export const Composer = (props: {
   const [failed, setFailed] = useState<string | null>(null)
   const [highlight, setHighlight] = useState(0)
   const [navigated, setNavigated] = useState(false)
-  const [itemSuggestions, setItemSuggestions] = useState<readonly Suggestion[]>([])
-  const [agentChoices, setAgentChoices] = useState<readonly AgentChoice[]>([])
-  const [files, setFiles] = useState<readonly ComposerFile[]>([])
+  const attachments = useComposerFiles({ onError: setFailed })
   const [status, setStatus] = useState<BacklogStatus>(props.status ?? 'inbox')
   const [statusTouched, setStatusTouched] = useState(false)
   const [kind, setKind] = useState<BacklogKind | null>(null)
@@ -211,12 +200,9 @@ export const Composer = (props: {
     CaptureProject.initial({ filter: props.projectFilter ?? null, remembered: storedProject, reuse: reuseProject }),
   )
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
-  const [dragging, setDragging] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [referenceMode, setReferenceMode] = useState<ReferenceMode | null>(null)
-  const [previewId, setPreviewId] = useState<string | null>(null)
-  const closePreview = useCallback(() => setPreviewId(null), [])
   const ownRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const captureRef = useRef<VoiceCapture | null>(null)
@@ -256,113 +242,33 @@ export const Composer = (props: {
     [],
   )
 
-  const token = InlineCompletion.tokenAt(text, caret)
   const projectCommand = BacklogProjectCommand.at(text, caret)
-  useEffect(() => {
-    if (token?.trigger !== '@' || agentPort === null) return
-    let live = true
-    void agentPort
-      .choices()
-      .then(choices => {
-        if (live) setAgentChoices(choices)
-      })
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [agentPort, token?.trigger])
-  useEffect(() => {
-    if (token?.trigger !== '@' || token.scope !== null) {
-      setItemSuggestions([])
-      return
-    }
-    const controller = new AbortController()
-    void api
-      .list({ query: token.query, freshness: 'all', limit: 5 }, { signal: controller.signal })
-      .then(result =>
-        setItemSuggestions(
-          result.items.map(item => ({
-            key: `b:${String(item.id)}`,
-            insert: `b:${String(item.id)} `,
-            label: (
-              <>
-                <ItemGlyphs.StatusIcon status={item.status} />
-                <span className="dshx:truncate">{item.title}</span>
-              </>
-            ),
-            hint: `b:${String(item.id)}`,
-          })),
-        ),
-      )
-      .catch(() => undefined)
-    return () => controller.abort()
-  }, [api, token?.scope, token?.trigger, token?.query])
-
+  const mention = useMentionCompletion({ text, caret, threads: props.threads, tags: props.tags })
   const suggestions = useMemo((): readonly Suggestion[] => {
-    if (token !== null && token.scope !== null) return []
-    if (projectCommand !== null) {
-      const query = projectCommand.query.trim().toLowerCase()
-      return props.projects
-        .filter(path => path.toLowerCase().includes(query))
-        .slice(0, 8)
-        .map(path => ({
-          key: path,
-          insert: '',
-          project: path,
-          label: (
-            <>
-              <ItemGlyphs.ProjectDot project={path} />
-              <span className="dshx:truncate">{ItemGlyphs.projectName(path)}</span>
-              <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{path}</span>
-            </>
-          ),
-          hint: 'project',
-        }))
-    }
-    if (token === null) return []
-    const query = token.query.toLowerCase()
-    if (token.trigger === '#') {
-      const known = props.tags.filter(tag => tag.startsWith(query)).slice(0, 6)
-      const rows = known.map(tag => ({ key: `#${tag}`, insert: `#${tag} `, label: <span>#{tag}</span>, hint: 'tag' }))
-      return query !== '' && !known.includes(query)
-        ? [...rows, { key: `#${query}+`, insert: `#${query} `, label: <span>#{query}</span>, hint: 'new tag' }]
-        : rows
-    }
-    const threads = props.threads
-      .filter(thread => thread.title.toLowerCase().includes(query))
-      .slice(0, 4)
-      .map(thread => ({
-        key: thread.id,
-        insert: `${thread.id} `,
+    if (projectCommand === null) return mention.suggestions
+    const query = projectCommand.query.trim().toLowerCase()
+    return props.projects
+      .filter(path => path.toLowerCase().includes(query))
+      .slice(0, 8)
+      .map(path => ({
+        key: path,
+        insert: '',
+        project: path,
         label: (
           <>
-            <MessagesSquareIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-            <span className="dshx:truncate">{thread.title}</span>
+            <ItemGlyphs.ProjectDot project={path} />
+            <span className="dshx:truncate">{ItemGlyphs.projectName(path)}</span>
+            <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{path}</span>
           </>
         ),
-        hint: 'thread',
+        hint: 'project',
       }))
-    const agentRows = InlineCompletion.agents(token, agentChoices).map(row => {
-      const agent = agentChoices.find(choice => choice.handle === row.handle)
-      return {
-        key: `@${row.handle}`,
-        insert: row.insert,
-        label: (
-          <>
-            <span aria-hidden>{agent?.glyph ?? '🤖'}</span>
-            <span className="dshx:truncate">{agent?.name ?? row.handle}</span>
-          </>
-        ),
-        hint: `@${row.handle}`,
-      }
-    })
-    return [...agentRows, ...itemSuggestions, ...threads]
-  }, [projectCommand, token, props.tags, props.threads, props.projects, itemSuggestions, agentChoices])
+  }, [mention.suggestions, projectCommand, props.projects])
 
   useEffect(() => {
     setHighlight(0)
     setNavigated(false)
-  }, [token?.trigger, token?.query, projectCommand?.query])
+  }, [mention.token?.trigger, mention.token?.query, projectCommand?.query])
 
   const pick = (suggestion: Suggestion): void => {
     if (suggestion.project !== undefined) {
@@ -378,9 +284,9 @@ export const Composer = (props: {
       })
       return
     }
-    if (token === null) return
-    const next = `${text.slice(0, token.start)}${suggestion.insert}${text.slice(caret)}`
-    const position = token.start + suggestion.insert.length
+    if (mention.token === null) return
+    const next = `${text.slice(0, mention.token.start)}${suggestion.insert}${text.slice(caret)}`
+    const position = mention.token.start + suggestion.insert.length
     setNavigated(false)
     setText(next)
     requestAnimationFrame(() => {
@@ -403,17 +309,8 @@ export const Composer = (props: {
     })
   }
 
-  const addFiles = async (dropped: readonly File[]): Promise<void> => {
-    if (dropped.length === 0) return
-    setFailed(null)
-    try {
-      const next: ComposerFile[] = []
-      for (const file of dropped.slice(0, Math.max(0, BacklogItems.maxAttachments - files.length))) next.push(await readComposerFile(file))
-      setFiles(current => [...current, ...next].slice(0, BacklogItems.maxAttachments))
-    } catch (error) {
-      setFailed(errorMessage(error, 'That file could not be read.'))
-    }
-  }
+  const drop = useFileDrop({ onFiles: files => void attachments.add(files) })
+  const addFromPicker = (): void => fileInputRef.current?.click()
 
   const stopVoice = async (): Promise<void> => {
     const capture = captureRef.current
@@ -471,27 +368,27 @@ export const Composer = (props: {
   }
 
   const submit = (): void => {
-    if (text.trim() === '' && files.length === 0) return
-    const submitted = { text, files, status, kind, project }
+    if (text.trim() === '' && attachments.files.length === 0) return
+    const submitted = { text, files: attachments.files, status, kind, project }
     setText('')
-    setFiles([])
+    attachments.clear()
     setKind(null)
     setProject(CaptureProject.next({ sent: project, filter: props.projectFilter ?? null, reuse: reuseProject }))
     setStatusTouched(false)
     setStatus('inbox')
     setFailed(null)
     props.onClearStatus?.()
-    const payload: Parameters<typeof api.capture>[0] = { text: text.trim() === '' ? (files[0]?.name ?? 'File capture') : text }
+    const payload: Parameters<typeof api.capture>[0] = { text: text.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : text }
     if (statusTouched || (props.status !== undefined && props.status !== null)) payload.status = status
     if (kind !== null) payload.kind = kind
     if (project !== null) payload.project = project
-    if (files.length > 0) payload.files = files.map(fileInput)
+    if (submitted.files.length > 0) payload.files = submitted.files.map(fileInput)
     actions.capture.mutate(payload, {
       onSuccess: () => captureProject.set(CaptureProject.remembered({ sent: submitted.project, reuse: reuseProject })),
       onError: error => {
         setFailed(errorMessage(error, 'The item was not saved.'))
         setTextState((current: string) => (current === '' ? submitted.text : current))
-        setFiles(current => (current.length === 0 ? submitted.files : current))
+        attachments.restore(submitted.files)
         setStatus(submitted.status)
         setKind(submitted.kind)
         setProject(submitted.project)
@@ -500,9 +397,6 @@ export const Composer = (props: {
   }
 
   const preview = useMemo(() => (text.trim() === '' ? null : BacklogItems.triage(text)), [text])
-  const images = useMemo(() => files.filter(file => file.kind === 'image'), [files])
-  const lightboxImages = useMemo(() => images.map(file => ({ src: file.dataUrl, alt: file.name })), [images])
-  const previewIndex = images.findIndex(file => file.id === previewId)
   const chat = props.variant === 'chat'
   const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
   const voiceAvailable = speech.data?.available === true
@@ -519,107 +413,27 @@ export const Composer = (props: {
         event.preventDefault()
         submit()
       }}
-      onDragOver={event => {
-        if (!event.dataTransfer.types.includes('Files')) return
-        event.preventDefault()
-        setDragging(true)
-      }}
-      onDragLeave={event => {
-        const next = event.relatedTarget
-        if (next instanceof Node && event.currentTarget.contains(next)) return
-        setDragging(false)
-      }}
-      onDrop={event => {
-        if (!event.dataTransfer.types.includes('Files')) return
-        event.preventDefault()
-        setDragging(false)
-        void addFiles([...event.dataTransfer.files])
-      }}
+      {...drop.dragProps}
       className={cn(
         'dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:transition-[border-color,box-shadow] dshx:focus-within:border-input dshx:focus-within:shadow-sm',
         failed === null ? 'dshx:border-border' : 'dshx:border-destructive/60',
-        dragging && 'dshx:border-primary/60 dshx:ring-2 dshx:ring-primary/15',
+        drop.dragging && 'dshx:border-primary/60 dshx:ring-2 dshx:ring-primary/15',
         chat ? 'dshx:px-3 dshx:pt-2.5 dshx:pb-2' : 'dshx:px-2.5 dshx:py-1.5',
       )}
     >
-      {suggestions.length === 0 ? null : (
-        <ul
-          role="listbox"
-          aria-label="Suggestions"
-          className="dshx:absolute dshx:bottom-full dshx:left-2 dshx:z-30 dshx:mb-1.5 dshx:w-80 dshx:max-w-[calc(100%-1rem)] dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-1"
-        >
-          {suggestions.map((suggestion, index) => (
-            <li
-              key={suggestion.key}
-              role="option"
-              aria-selected={index === highlight}
-              onMouseDown={event => {
-                event.preventDefault()
-                pick(suggestion)
-              }}
-              onMouseEnter={() => setHighlight(index)}
-              className={cn(
-                'dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-[13px]',
-                index === highlight && 'dshx:bg-accent',
-              )}
-            >
-              {suggestion.label}
-              <span className="dshx:ml-auto dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{suggestion.hint}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <MentionMenu suggestions={suggestions} highlight={highlight} label="Suggestions" onPick={pick} onHover={setHighlight} />
 
-      {files.length === 0 ? null : (
-        <div aria-label="Attachments" className="dshx:flex dshx:flex-wrap dshx:gap-2">
-          {files.map(file =>
-            file.kind === 'image' ? (
-              <figure
-                key={file.id}
-                className="dshx:group/image dshx:relative dshx:size-16 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted"
-              >
-                <button
-                  type="button"
-                  aria-label={`Open ${file.name}`}
-                  onClick={() => setPreviewId(file.id)}
-                  className="dshx:block dshx:size-full dshx:cursor-zoom-in"
-                >
-                  <img src={file.dataUrl} alt={file.name} className="dshx:size-full dshx:object-cover" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Remove ${file.name}`}
-                  onClick={() => setFiles(current => current.filter(candidate => candidate.id !== file.id))}
-                  className="dshx:absolute dshx:top-1 dshx:right-1 dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-background/90 dshx:text-foreground dshx:opacity-0 dshx:shadow-sm dshx:transition-opacity dshx:group-hover/image:opacity-100"
-                >
-                  <XIcon className="dshx:size-3" />
-                </button>
-              </figure>
-            ) : (
-              <div
-                key={file.id}
-                className="dshx:group/file dshx:relative dshx:flex dshx:h-16 dshx:w-52 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2"
-              >
-                <FileIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
-                <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                  <span className="dshx:truncate dshx:text-[12px] dshx:text-foreground">{file.name}</span>
-                  <span className="dshx:text-[11px] dshx:text-muted-foreground">{sizeLabel(file.bytes)}</span>
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${file.name}`}
-                  onClick={() => setFiles(current => current.filter(candidate => candidate.id !== file.id))}
-                  className="dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
-                >
-                  <XIcon className="dshx:size-3" />
-                </button>
-              </div>
-            ),
-          )}
-        </div>
-      )}
-
-      {previewIndex === -1 ? null : <ImageLightbox images={lightboxImages} initialIndex={previewIndex} onClose={closePreview} />}
+      <AttachmentTray files={attachments.files} onRemove={attachments.remove} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={event => {
+          void attachments.add([...(event.currentTarget.files ?? [])])
+          event.currentTarget.value = ''
+        }}
+      />
 
       <textarea
         ref={input}
@@ -628,12 +442,7 @@ export const Composer = (props: {
         autoFocus={props.autoFocus}
         placeholder={props.placeholder}
         value={text}
-        onPaste={event => {
-          const pasted = [...event.clipboardData.files]
-          if (pasted.length === 0) return
-          event.preventDefault()
-          void addFiles(pasted)
-        }}
+        onPaste={event => pasteFiles(event, files => void attachments.add(files))}
         onChange={event => {
           setText(event.currentTarget.value)
           setCaret(event.currentTarget.selectionStart)
@@ -686,7 +495,7 @@ export const Composer = (props: {
             <PlusIcon className="dshx:size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="top" className="dshx-root dshx:w-52">
-            <DropdownMenuItem onSelect={() => fileInputRef.current?.click()} className="dshx:gap-2 dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => void addFromPicker()} className="dshx:gap-2 dshx:text-[13px]">
               <PaperclipIcon aria-hidden /> Add image or file
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -701,16 +510,6 @@ export const Composer = (props: {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          hidden
-          onChange={event => {
-            void addFiles([...(event.currentTarget.files ?? [])])
-            event.currentTarget.value = ''
-          }}
-        />
 
         <ChoiceChip
           label="Status"
@@ -816,11 +615,11 @@ export const Composer = (props: {
           <button
             type="submit"
             aria-label="Add"
-            disabled={text.trim() === '' && files.length === 0}
+            disabled={text.trim() === '' && attachments.files.length === 0}
             className={cn(
               'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:transition-[background-color,opacity,transform] dshx:duration-100 dshx:active:scale-95',
               chat ? 'dshx:size-7' : 'dshx:size-6',
-              text.trim() === '' && files.length === 0
+              text.trim() === '' && attachments.files.length === 0
                 ? 'dshx:bg-muted dshx:text-muted-foreground dshx:opacity-60'
                 : 'dshx:bg-primary dshx:text-primary-foreground',
             )}

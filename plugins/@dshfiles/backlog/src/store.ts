@@ -108,7 +108,12 @@ export interface BacklogStore {
     readonly remove?: boolean | undefined
     readonly actor: BacklogActor
   }): Promise<BacklogResult<BacklogDetail>>
-  comment(input: { readonly id: number; readonly text: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
+  comment(input: {
+    readonly id: number
+    readonly text: string
+    readonly files?: readonly BacklogFileInput[] | undefined
+    readonly actor: BacklogActor
+  }): Promise<BacklogResult<BacklogDetail>>
   /** The item and every other item, for a triage pass to read. */
   triageInput(id: number): { readonly item: BacklogItem; readonly others: readonly BacklogItem[] } | undefined
   /** What one backfill run should triage, oldest first, and how many eligible items it leaves for a later run. */
@@ -271,7 +276,7 @@ const createBacklogStore = ({
   const touch = async (
     item: BacklogItem,
     actor: BacklogActor,
-    event: Pick<BacklogEvent, 'kind' | 'detail'>,
+    event: { readonly kind: BacklogEvent['kind']; readonly detail: string; readonly attachments?: BacklogEvent['attachments'] },
     change: Partial<BacklogItem>,
   ): Promise<BacklogDetail> => {
     const at = now()
@@ -304,6 +309,11 @@ const createBacklogStore = ({
     if (file.height !== undefined) attachment.height = file.height
     return attachment
   }
+
+  /** An attachment kept on the item or inside one of its events, such as an image a comment carried. */
+  const attachmentOfItem = (item: BacklogItem, attachmentId: string): BacklogAttachment | undefined =>
+    item.attachments.find(attachment => attachment.id === attachmentId) ??
+    item.events.flatMap(event => event.attachments ?? []).find(attachment => attachment.id === attachmentId)
 
   const storeFiles = async (itemId: number, input: readonly BacklogFileInput[], at: number): Promise<BacklogAttachment[]> => {
     const kept: BacklogAttachment[] = []
@@ -395,7 +405,7 @@ const createBacklogStore = ({
     },
     readFile: async ({ id, attachmentId }) => {
       const item = find(id)
-      if (item === undefined || !item.attachments.some(attachment => attachment.id === attachmentId)) return { ok: false, reason: 'not-found' }
+      if (item === undefined || attachmentOfItem(item, attachmentId) === undefined) return { ok: false, reason: 'not-found' }
       const stored = files.get(fileKey(id, attachmentId))
       if (stored === undefined) return { ok: false, reason: 'not-found' }
       return { ok: true, value: { dataUrl: `data:${stored.attachment.mediaType};base64,${stored.data}` } }
@@ -487,11 +497,15 @@ const createBacklogStore = ({
       const label = `${link.relation === undefined || link.relation === 'related' ? '' : `${link.relation} `}${link.type}:${link.target}`
       return { ok: true, value: await touch(item, actor, { kind: remove === true ? 'unlinked' : 'linked', detail: label }, { links }) }
     },
-    comment: async ({ id, text, actor }) => {
+    comment: async ({ id, text, files: commentFiles = [], actor }) => {
       const item = find(id)
       if (item === undefined) return { ok: false, reason: 'not-found' }
+      const at = now()
+      const attachments = commentFiles.length === 0 ? [] : await storeFiles(id, commentFiles, at)
       const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(text), ...callerLinks(actor)])
-      return { ok: true, value: await touch(item, actor, { kind: 'commented', detail: text.slice(0, BacklogItems.maxBodyChars) }, { links }) }
+      const event = { kind: 'commented' as const, detail: text.slice(0, BacklogItems.maxBodyChars) }
+      if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, attachments }, { links }) }
+      return { ok: true, value: await touch(item, actor, event, { links }) }
     },
     triageInput: id => {
       const item = find(id)

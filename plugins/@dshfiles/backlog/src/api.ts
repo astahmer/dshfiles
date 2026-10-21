@@ -339,9 +339,19 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_dismiss_proposal', readOnly: false },
     }),
     comment: method({
-      input: z.object({ id: idSchema, text: z.string().min(1).max(BacklogItems.maxBodyChars) }).strict(),
+      input: z
+        .object({
+          id: idSchema,
+          text: z.string().min(1).max(BacklogItems.maxBodyChars),
+          files: z
+            .array(fileInputSchema)
+            .max(BacklogItems.maxAttachments)
+            .optional()
+            .describe('Images or files the comment carries: base64 `data` without a data-URL prefix, with kind, name, media type and byte size.'),
+        })
+        .strict(),
       output: detailResultSchema,
-      description: `Add a progress comment to a backlog item; references in it become links. ${writeNote}`,
+      description: `Add a progress comment to a backlog item, optionally with images or files; references in it become links. ${writeNote}`,
       tool: { name: 'backlog_comment', readOnly: false },
     }),
   },

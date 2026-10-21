@@ -399,6 +399,25 @@ describe('attention and inbox', () => {
     expect(await store.readFile({ id: detail.item.id, attachmentId: 'image-one-1234' })).toEqual({ ok: false, reason: 'not-found' })
   })
 
+  it('keeps the images a comment carries on its own event and reads them back', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1_000 })
+    await store.capture({ text: 'the description can hold screenshots', actor: user })
+    const commented = await store.comment({
+      id: 1,
+      text: 'this is what it looks like',
+      files: [{ id: 'comment-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
+      actor: user,
+    })
+    expect(commented.ok).toBe(true)
+    const event = commented.ok ? commented.value.item.events.find(candidate => candidate.kind === 'commented') : undefined
+    expect(event?.attachments?.map(attachment => attachment.name)).toEqual(['reply.png'])
+    expect(commented.ok && commented.value.item.attachments).toEqual([])
+    expect(await store.readFile({ id: 1, attachmentId: 'comment-image-1' })).toEqual({
+      ok: true,
+      value: { dataUrl: 'data:image/png;base64,aGk=' },
+    })
+  })
+
   it('takes the kind, status and project the composer set, and records them as the user owns them', async () => {
     const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1 })
     const detail = await store.capture({ text: 'fix the composer', kind: 'bug', status: 'doing', project: '/work/dshfiles', actor: user })

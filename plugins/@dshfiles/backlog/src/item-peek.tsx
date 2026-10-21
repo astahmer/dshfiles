@@ -10,13 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import {
   AlarmClockIcon,
   ArrowRightLeftIcon,
   ChevronRightIcon,
-  CornerDownLeftIcon,
   ExternalLinkIcon,
   FolderIcon,
   GitBranchIcon,
@@ -38,21 +36,22 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-import type { AgentChoice } from './agent-dispatch.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
-import { InlineCompletion } from './inline-completion.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
+import { useComposerFiles } from './composer-attachments.js'
+import { fileInput, type ComposerFile } from './composer-files.js'
 import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
-import { ItemFiles } from './item-files.js'
+import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
+import { BacklogTextBox } from './text-box.js'
 import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
@@ -221,35 +220,65 @@ const TitleField = (props: { readonly id: number; readonly title: string }): JSX
   )
 }
 
-const BodyField = (props: { readonly id: number; readonly body: string }): JSX.Element => {
+const BodyField = (props: { readonly id: number; readonly body: string; readonly threads: readonly ComposerThread[] }): JSX.Element => {
   const actions = useBacklogActions()
   const [editing, setEditing] = useState(false)
   const [body, setBody] = useState(props.body)
+  const [failed, setFailed] = useState<string | null>(null)
+  const saved = useRef(false)
+  const attachments = useComposerFiles({ onError: setFailed })
   useEffect(() => {
     if (!editing) setBody(props.body)
   }, [props.body, editing])
-  const save = (): void => {
+  useEffect(() => {
+    if (editing) saved.current = false
+  }, [editing])
+  const save = async (): Promise<void> => {
+    if (saved.current) return
+    saved.current = true
     setEditing(false)
+    setFailed(null)
+    const pending = [...attachments.files]
+    attachments.clear()
     if (body !== props.body) actions.update.mutate({ id: props.id, body })
+    for (const file of pending) {
+      try {
+        await actions.attachFile.mutateAsync({ id: props.id, file: fileInput(file) })
+      } catch (error) {
+        setFailed(errorMessage(error, 'That attachment could not be saved.'))
+        return
+      }
+    }
+  }
+  const cancel = (): void => {
+    saved.current = true
+    setBody(props.body)
+    attachments.clear()
+    setFailed(null)
+    setEditing(false)
   }
   if (editing)
     return (
-      <textarea
-        aria-label="Body"
-        autoFocus
-        value={body}
-        placeholder="Add a description… Markdown and URLs are clickable; b:12 and jj:rev add relationship links."
-        onChange={event => setBody(event.currentTarget.value)}
-        onBlur={save}
-        onKeyDown={event => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save()
-          if (event.key === 'Escape') {
-            setBody(props.body)
-            setEditing(false)
-          }
-        }}
-        className="dshx:field-sizing-content dshx:min-h-28 dshx:w-full dshx:resize-none dshx:rounded-lg dshx:border dshx:border-input dshx:bg-transparent dshx:p-2.5 dshx:text-[13px] dshx:leading-relaxed dshx:text-foreground dshx:outline-none"
-      />
+      <div className="dshx:flex dshx:flex-col dshx:gap-1">
+        <BacklogTextBox
+          ariaLabel="Body"
+          placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads and agents; paste or drop an image."
+          value={body}
+          onChange={setBody}
+          threads={props.threads}
+          attachments={attachments}
+          variant="body"
+          autoFocus
+          onBlur={() => void save()}
+          onCancel={cancel}
+          onSubmit={() => void save()}
+        />
+        {failed === null ? null : (
+          <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+            {failed}
+          </p>
+        )}
+      </div>
     )
   if (props.body === '')
     return (
@@ -345,7 +374,7 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
 type ConversationRun = { readonly kind: 'comment'; readonly event: BacklogEvent } | { readonly kind: 'changes'; readonly events: BacklogEvent[] }
 
 /** Comments read as messages; every other event folds into one "made N changes" line per actor run, opened on demand. */
-const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonly attention: BacklogAttention }): JSX.Element => {
+const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonly attention: BacklogAttention; readonly itemId: number }): JSX.Element => {
   const attention = props.attention
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
   const runs: ConversationRun[] = []
@@ -367,8 +396,9 @@ const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonl
                 <p className="dshx:text-xs dshx:text-muted-foreground">
                   <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
                 </p>
-                <div className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
+                <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
                   <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
+                  <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
                 </div>
               </div>
             </li>
@@ -409,159 +439,72 @@ const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonl
   )
 }
 
-const CommentBox = (props: { readonly item: StartThreadItem }): JSX.Element => {
+const CommentBox = (props: { readonly item: StartThreadItem; readonly threads: readonly ComposerThread[] }): JSX.Element => {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
-  const [caret, setCaret] = useState(0)
-  const [highlight, setHighlight] = useState(0)
-  const [dismissed, setDismissed] = useState(false)
-  const [agentChoices, setAgentChoices] = useState<readonly AgentChoice[]>([])
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
-  const token = InlineCompletion.tokenAt(text, caret)
-  const rows = dismissed ? [] : InlineCompletion.agents(token, agentChoices)
+  const attachments = useComposerFiles({ onError: setFailed })
 
-  useEffect(() => {
-    if (token?.trigger !== '@' || token.scope !== null || dispatch === null) return
-    let live = true
-    void dispatch
-      .choices()
-      .then(choices => {
-        if (live) setAgentChoices(choices)
-      })
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [dispatch, token?.scope, token?.trigger])
-
-  useEffect(() => {
-    setHighlight(0)
-    setDismissed(false)
-  }, [token?.query, token?.scope])
-
-  const choose = (handle: string): void => {
-    if (token === null) return
-    const insert = InlineCompletion.insertFor(handle)
-    setText(`${text.slice(0, token.start)}${insert}${text.slice(caret)}`)
-    setCaret(token.start + insert.length)
-    setDismissed(true)
-  }
-
-  const comment = (): void => {
+  const comment = (files: readonly ComposerFile[]): void => {
+    const payload = files.map(fileInput)
     setText('')
-    setFailed(null)
-    actions.comment.mutate({ id: props.item.id, text }, { onError: () => setText(current => (current === '' ? text : current)) })
+    attachments.clear()
+    const request = payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload }
+    actions.comment.mutate(request, {
+      onError: error => {
+        setText(current => (current === '' ? text : current))
+        attachments.restore(files)
+        setFailed(errorMessage(error, 'The reply was not saved.'))
+      },
+    })
   }
   /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
   const submit = async (): Promise<void> => {
-    if (text.trim() === '' || pending) return
-    if (dispatch === null) {
-      comment()
+    const files = [...attachments.files]
+    if ((text.trim() === '' && files.length === 0) || pending) return
+    if (dispatch === null || text.trim() === '') {
+      comment(files)
       return
     }
     setPending(true)
     setFailed(null)
     try {
+      // A dispatched reply carries its images with the item, so the thread can read them once it starts.
+      for (const file of files) await actions.attachFile.mutateAsync({ id: props.item.id, file: fileInput(file) })
+      if (files.length > 0) attachments.clear()
       const outcome = await dispatch.dispatch({ item: props.item, text })
       if (outcome.kind === 'dispatched') setText('')
       else if (outcome.kind === 'failed') setFailed(outcome.reason)
-      else comment()
-    } catch (cause) {
-      setFailed(cause instanceof Error ? cause.message : String(cause))
+      else comment([])
+    } catch (error) {
+      setFailed(errorMessage(error, 'The reply was not sent.'))
     } finally {
       setPending(false)
     }
   }
   return (
-    <form
-      onSubmit={event => {
-        event.preventDefault()
-        void submit()
-      }}
-      className="dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-2.5 dshx:transition-colors dshx:focus-within:border-input"
-    >
-      {rows.length === 0 ? null : (
-        <ul
-          role="listbox"
-          aria-label="Agent suggestions"
-          className="dshx:absolute dshx:bottom-full dshx:left-2 dshx:z-30 dshx:mb-1.5 dshx:w-72 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:shadow-lg"
-        >
-          {rows.map((row, index) => {
-            const choice = agentChoices.find(agent => agent.handle === row.handle)
-            return (
-              <li
-                key={row.handle}
-                role="option"
-                aria-selected={index === highlight}
-                onMouseDown={event => {
-                  event.preventDefault()
-                  choose(row.handle)
-                }}
-                onMouseEnter={() => setHighlight(index)}
-                className={cn(
-                  'dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-[13px]',
-                  index === highlight && 'dshx:bg-accent',
-                )}
-              >
-                <span aria-hidden>{choice?.glyph ?? '🤖'}</span>
-                <span className="dshx:truncate">{choice?.name ?? row.handle}</span>
-                <span className="dshx:ml-auto dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">@{row.handle}</span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <textarea
-        aria-label="Comment"
-        rows={1}
-        placeholder="Reply… b:12, jj:rev and URLs become links; @agent starts a thread"
+    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+      <BacklogTextBox
+        ariaLabel="Comment"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads and agents; paste or drop an image"
         value={text}
-        onChange={event => {
-          setText(event.currentTarget.value)
-          setCaret(event.currentTarget.selectionStart)
-        }}
-        onKeyUp={event => setCaret(event.currentTarget.selectionStart)}
-        onClick={event => setCaret(event.currentTarget.selectionStart)}
-        onKeyDown={event => {
-          if (rows.length === 0) {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault()
-              void submit()
-            }
-            return
-          }
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault()
-            setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length)
-            return
-          }
-          if (event.key === 'Escape') {
-            setDismissed(true)
-            return
-          }
-          // Tab completes the highlighted agent; a bare Enter still sends the comment once nothing is offered.
-          if (event.key === 'Tab' || event.key === 'Enter') {
-            const chosen = rows[highlight] ?? rows[0]
-            if (chosen === undefined) return
-            event.preventDefault()
-            choose(chosen.handle)
-          }
-        }}
-        className="dshx:field-sizing-content dshx:max-h-40 dshx:min-h-10 dshx:resize-none dshx:bg-transparent dshx:text-[13px] dshx:outline-none dshx:placeholder:text-muted-foreground"
+        onChange={setText}
+        threads={props.threads}
+        attachments={attachments}
+        variant="reply"
+        submitLabel="Reply"
+        submitDisabled={text.trim() === '' && attachments.files.length === 0}
+        pending={pending}
+        onSubmit={() => void submit()}
       />
-      {failed === null ? null : <p className="dshx:text-[11px] dshx:text-destructive">{failed}</p>}
-      <div className="dshx:flex dshx:items-center dshx:justify-between">
-        <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
-          <Kbd>⌘</Kbd>
-          <Kbd>↵</Kbd> to send
-        </span>
-        <Button type="submit" size="xs" disabled={text.trim() === '' || pending}>
-          <CornerDownLeftIcon /> Reply
-        </Button>
-      </div>
-    </form>
+      {failed === null ? null : (
+        <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+          {failed}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -791,7 +734,7 @@ const PeekBody = (props: {
                 className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-3"
               />
             ) : (
-              <BodyField id={item.id} body={item.body} />
+              <BodyField id={item.id} body={item.body} threads={props.threads} />
             )}
             {showCapture ? (
               <details className="dshx:group/capture dshx:text-xs">
@@ -860,8 +803,8 @@ const PeekBody = (props: {
             )}
           </Section>
           <Section title="Activity">
-            <Conversation events={item.events} attention={item.attention ?? 'none'} />
-            <CommentBox item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }} />
+            <Conversation events={item.events} attention={item.attention ?? 'none'} itemId={item.id} />
+            <CommentBox item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }} threads={props.threads} />
           </Section>
         </div>
       </div>

@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Write descriptions and replies like a capture](docs/screenshots/rich-item-text.png)
+
 ![Feed ordered by activity, with idle items sinking](docs/screenshots/activity-feed-and-freshness.png)
 
 ![Start a thread from an item](docs/screenshots/start-thread-from-item.png)
@@ -97,6 +99,11 @@ The peek opens beside the list (over it in a narrow pane). Edit the title and th
 with its actor (`user`, `system` or `agent:<sessionId>`). **Referenced by** lists the items that link to
 this one. Fields the user changes by hand are recorded in `humanFields`, so later automatic moves can
 leave them alone. Nothing is deleted; `dropped` closes an item.
+
+The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
+for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
+A description's files are kept with the item; a reply's files belong to that comment and open in the
+same gallery from the conversation.
 
 ## References in a conversation
 
@@ -209,11 +216,15 @@ In any composer, `@b:` (or `@backlog:`) searches the backlog, and plain `@` show
 items next to threads and files. The chip is sent as `b:12 "title"`, so the thread signal above links the
 thread and starts the item, just as typing `b:12` does.
 
-With `@dshfiles/agents` installed, the backlog's own text boxes complete **agent handles inline**: an item's
-comment box lists enabled agents while you type `@rev` (Tab or Enter completes, Escape dismisses), and the
-capture composer adds them to its `@` list. Picking one inserts `@handle ` as plain text, which is what the
-comment box reads as a dispatch and what any other thread reads as a mention. `@b:`, `@t:` and `@f:` keep
-their own scope: no agent row appears and the typed reference is left untouched.
+Every backlog text box — the capture composer, an item's description and its reply box — completes the same
+sources from one `@` menu: agents, backlog items and threads. With `@dshfiles/agents` installed an `@rev` lists
+enabled agents (Tab or Enter completes, Escape dismisses); picking one inserts `@handle ` as plain text, which
+is what the reply box reads as a dispatch and what any other thread reads as a mention. `@b:`, `@t:` and `@f:`
+keep their own scope: no agent row appears and the typed reference is left untouched.
+
+Images and files work the same way everywhere: the paperclip, a paste or a drop puts them above the text,
+Enter sends a reply and `⌘↵` saves a description, and a file that cannot be read says why instead of
+dropping the rest of the draft.
 
 ## Agent tools
 
@@ -226,7 +237,7 @@ their own scope: no agent row appears and the typed reference is left untouched.
 | `backlog_capture`          | write                                                                                 |
 | `backlog_update`           | write: edit or move                                                                   |
 | `backlog_link`             | write: link or unlink                                                                 |
-| `backlog_comment`          | write                                                                                 |
+| `backlog_comment`          | write, optionally with images or files                                                |
 | `backlog_attach_file`      | write: keep one base64 image or file with an item                                     |
 | `backlog_read_file`        | read: one image or file as a data URL; `save: true` also returns a temp file path     |
 | `backlog_remove_file`      | write: remove one image or file                                                       |

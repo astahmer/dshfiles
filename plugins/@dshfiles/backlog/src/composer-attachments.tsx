@@ -1,0 +1,166 @@
+import { ImageLightbox } from '@dshfiles/plugin-ui/components/image-lightbox'
+import { FileIcon, PaperclipIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { errorMessage } from '@dshfiles/plugin-ui/query'
+import { useCallback, useId, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type ReactNode } from 'react'
+
+import { readComposerFile, type ComposerFile } from './composer-files.js'
+import { BacklogItems } from './item.js'
+
+export const fileSizeLabel = (bytes: number): string =>
+  bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${String(Math.max(1, Math.round(bytes / 1024)))} KB`
+
+/** Reading, capping and removing the files a text box holds before it saves them with the item. */
+export const useComposerFiles = (props: { readonly onError: (message: string | null) => void; readonly initial?: readonly ComposerFile[] }) => {
+  const { onError } = props
+  const [files, setFiles] = useState<readonly ComposerFile[]>(props.initial ?? [])
+  const remaining = Math.max(0, BacklogItems.maxAttachments - files.length)
+  const add = useCallback(
+    async (dropped: readonly File[]): Promise<void> => {
+      if (dropped.length === 0) return
+      onError(null)
+      try {
+        const next: ComposerFile[] = []
+        for (const file of dropped.slice(0, remaining)) next.push(await readComposerFile(file))
+        setFiles(current => [...current, ...next].slice(0, BacklogItems.maxAttachments))
+      } catch (error) {
+        onError(errorMessage(error, 'That file could not be read.'))
+      }
+    },
+    [onError, remaining],
+  )
+  const remove = useCallback((id: string) => setFiles(current => current.filter(file => file.id !== id)), [])
+  const clear = useCallback(() => setFiles([]), [])
+  const restore = useCallback((next: readonly ComposerFile[]) => setFiles(current => (current.length === 0 ? next : current)), [])
+  return { files, add, remove, clear, restore }
+}
+
+/** A box accepts files dropped anywhere on it, with the same highlight in every composer. */
+export const useFileDrop = ({ onFiles }: { readonly onFiles: (files: readonly File[]) => void }) => {
+  const [dragging, setDragging] = useState(false)
+  return {
+    dragging,
+    dragProps: {
+      onDragOver: (event: DragEvent) => {
+        if (!event.dataTransfer.types.includes('Files')) return
+        event.preventDefault()
+        setDragging(true)
+      },
+      onDragLeave: (event: DragEvent) => {
+        const next = event.relatedTarget
+        if (next instanceof Node && event.currentTarget.contains(next)) return
+        setDragging(false)
+      },
+      onDrop: (event: DragEvent) => {
+        if (!event.dataTransfer.types.includes('Files')) return
+        event.preventDefault()
+        setDragging(false)
+        onFiles([...event.dataTransfer.files])
+      },
+    },
+  }
+}
+
+/** A pasted image or file joins the draft instead of landing in the text. */
+export const pasteFiles = (event: ClipboardEvent<HTMLTextAreaElement>, onFiles: (files: readonly File[]) => void): void => {
+  const pasted = [...event.clipboardData.files]
+  if (pasted.length === 0) return
+  event.preventDefault()
+  onFiles(pasted)
+}
+
+/** Pending attachments above a text box: image thumbnails that open the shared gallery, other files as rows. */
+export const AttachmentTray = (props: { readonly files: readonly ComposerFile[]; readonly onRemove: (id: string) => void }): JSX.Element | null => {
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  if (props.files.length === 0) return null
+  const images = props.files.filter(file => file.kind === 'image')
+  const previewIndex = images.findIndex(file => file.id === previewId)
+  return (
+    <>
+      <div aria-label="Attachments" className="dshx:flex dshx:flex-wrap dshx:gap-2">
+        {props.files.map(file =>
+          file.kind === 'image' ? (
+            <figure
+              key={file.id}
+              className="dshx:group/image dshx:relative dshx:size-16 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted"
+            >
+              <button
+                type="button"
+                aria-label={`Open ${file.name}`}
+                onClick={() => setPreviewId(file.id)}
+                className="dshx:block dshx:size-full dshx:cursor-zoom-in"
+              >
+                <img src={file.dataUrl} alt={file.name} className="dshx:size-full dshx:object-cover" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove ${file.name}`}
+                onClick={() => props.onRemove(file.id)}
+                className="dshx:absolute dshx:top-1 dshx:right-1 dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-background/90 dshx:text-foreground dshx:opacity-0 dshx:shadow-sm dshx:transition-opacity dshx:group-hover/image:opacity-100"
+              >
+                <XIcon className="dshx:size-3" />
+              </button>
+            </figure>
+          ) : (
+            <div
+              key={file.id}
+              className="dshx:group/file dshx:relative dshx:flex dshx:h-16 dshx:w-52 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2"
+            >
+              <FileIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
+              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                <span className="dshx:truncate dshx:text-[12px] dshx:text-foreground">{file.name}</span>
+                <span className="dshx:text-[11px] dshx:text-muted-foreground">{fileSizeLabel(file.bytes)}</span>
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove ${file.name}`}
+                onClick={() => props.onRemove(file.id)}
+                className="dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
+              >
+                <XIcon className="dshx:size-3" />
+              </button>
+            </div>
+          ),
+        )}
+      </div>
+      {previewIndex === -1 ? null : (
+        <ImageLightbox images={images.map(file => ({ src: file.dataUrl, alt: file.name }))} initialIndex={previewIndex} onClose={() => setPreviewId(null)} />
+      )}
+    </>
+  )
+}
+
+/** The paperclip button and its hidden input, for a text box that is not the capture composer. */
+export const AttachFilesButton = (props: {
+  readonly onFiles: (files: readonly File[]) => void
+  readonly label?: string
+  readonly title?: string
+  readonly className?: string
+  readonly children?: ReactNode
+}): JSX.Element => {
+  const id = useId()
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={props.label ?? 'Add an image or file'}
+        title={props.title}
+        onMouseDown={event => event.preventDefault()}
+        onClick={() => document.getElementById(id)?.click()}
+        className={cn('dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground dshx:hover:text-foreground', props.className)}
+      >
+        {props.children ?? <PaperclipIcon aria-hidden className="dshx:size-3.5" />}
+      </button>
+      <input
+        id={id}
+        type="file"
+        multiple
+        hidden
+        onChange={(event: ChangeEvent<HTMLInputElement>) => {
+          props.onFiles([...(event.currentTarget.files ?? [])])
+          event.currentTarget.value = ''
+        }}
+      />
+    </>
+  )
+}

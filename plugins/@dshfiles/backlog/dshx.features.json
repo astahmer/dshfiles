@@ -734,6 +734,40 @@
       ]
     },
     {
+      "id": "rich-item-text",
+      "title": "Write descriptions and replies like a capture",
+      "summary": "An item's description and reply boxes share the capture composer's text box: `@` completes agents, backlog items and threads, images and files can be picked, pasted or dropped, Enter sends a reply and ⌘↵ saves a description, and Markdown stays Markdown. A description's files are kept with the item; a reply's images are kept on that comment and open in the same gallery.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Describe me with a screenshot\"",
+        "press Enter",
+        "click text \"Describe me with a screenshot\"",
+        "expect complementary \"Item detail\"",
+        "expect textbox \"Comment\"",
+        "expect button \"Add an image or file\"",
+        "click button \"Edit description\"",
+        "fill textbox \"Body\" \"**Screenshot** of the bug, see b:1.\"",
+        "expect button \"Attach an image or file to this item\""
+      ],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["reading", "editing", "mentioning", "attached", "saved"],
+      "failureModes": [
+        "A file that cannot be read reports why above the box and the rest of the draft stays.",
+        "A description keeps the files it saved with an attachment failure; the failure is reported instead of losing the text.",
+        "A reply that starts with @agent dispatches a thread and keeps its images with the item."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "backlog.rich-item-text-comment-files",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "keeps the images a comment carries on its own event and reads them back"
+        }
+      ]
+    },
+    {
       "id": "project-scope",
       "title": "File and scope items by project",
       "summary": "One searchable project combobox scopes every view from the header and presets the capture box to the same project; the same picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project, with the full path in its tooltip. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",

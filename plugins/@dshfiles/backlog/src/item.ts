@@ -52,12 +52,14 @@ const attachmentSchema = z
   })
   .strict()
 
+/** `attachments` came later: events written before it decode without one, and a comment may carry images or files. */
 const eventSchema = z
   .object({
     at: z.number().int().nonnegative(),
     actor: actorIdSchema,
     kind: z.enum(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
     detail: z.string().max(MAX_BODY_CHARS),
+    attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).optional(),
   })
   .strict()
 
