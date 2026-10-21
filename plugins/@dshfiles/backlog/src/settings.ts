@@ -29,7 +29,15 @@ export const backlogSettings = defineSettings({
     lifecycleSignals: Schema.boolean()
       .default(true)
       .description(
-        'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it. Never overrides a status you set by hand.',
+        'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked, and its next finished turn clears that flag. Never overrides a status or attention you set by hand.',
+      ),
+    threadResolution: Schema.union([
+      Schema.const('off').description('Off: a finished thread never suggests anything'),
+      Schema.const('propose').description("Propose: ask Jev whether the thread's last reply resolved its open items, and leave a Done suggestion on each"),
+    ])
+      .default('off')
+      .description(
+        'When a thread finishes a turn while its items are still In progress, Jev can suggest closing them. Needs jevEnabled and a key; the suggestion waits on the item, it never moves one on its own.',
       ),
     reuseCaptureProject: Schema.boolean()
       .default(true)

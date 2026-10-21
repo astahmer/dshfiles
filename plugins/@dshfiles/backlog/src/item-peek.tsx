@@ -311,18 +311,19 @@ const TagsField = (props: { readonly id: number; readonly tags: readonly string[
   )
 }
 
-/** Triage's suggestion, shown until accepted or dismissed, with its confidence and reason. */
+/** Triage's or a finished thread's suggestion, shown until accepted or dismissed, with its confidence and reason. */
 const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogProposal }): JSX.Element => {
   const actions = useBacklogActions()
   const proposal = props.proposal
+  const fromThread = proposal.origin === 'thread'
   return (
     <section
-      aria-label="Triage suggestion"
+      aria-label={fromThread ? 'Thread suggestion' : 'Triage suggestion'}
       className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-violet/30 dshx:bg-violet/5 dshx:p-3 dshx:animate-in dshx:fade-in-0"
     >
       <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
         <WandSparklesIcon aria-hidden className="dshx:size-3.5 dshx:text-violet" />
-        <span className="dshx:font-medium">Triage suggests</span>
+        <span className="dshx:font-medium">{fromThread ? 'Thread suggests' : 'Triage suggests'}</span>
         <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">{BacklogTriage.describe(proposal)}</span>
         <span className="dshx:ml-auto dshx:text-muted-foreground">{Math.round(proposal.confidence * 100)}%</span>
       </div>

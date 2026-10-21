@@ -1,12 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import type { Session } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
-import { defineHost } from '@dshfiles/dshx/host'
+import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { backlogApi } from './api.js'
@@ -15,6 +16,7 @@ import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogSignals } from './signals.js'
+import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
 
 interface OpenedBacklog {
@@ -196,7 +198,7 @@ const activityType = (
   if (event.kind === 'linked') return 'backlog.linked'
   if (event.kind === 'commented') return 'backlog.commented'
   if (event.kind === 'triaged') return 'backlog.triaged'
-  if (event.kind === 'edited' && event.detail === 'attention') return 'backlog.attention'
+  if (event.kind === 'edited' && event.detail.startsWith('attention')) return 'backlog.attention'
   return null
 }
 
@@ -242,9 +244,51 @@ const scheduleTriage = (ctx: Context, id: number): void => {
   void triageItem(ctx, id).catch(logFailure('Backlog triage failed'))
 }
 
+/**
+ * With `threadResolution` on and Jev configured, a finished reply can suggest closing the item it worked on: one Jev
+ * question per open item, and never a status move on its own. Items the user touched or already dismissed are skipped.
+ */
+const scheduleResolution = (ctx: Context, session: Session, settings: BacklogSettings): void => {
+  if (settings.threadResolution !== 'propose' || !settings.jevEnabled) return
+  void (async () => {
+    const store = await backlogFor(ctx)
+    const open = store.referencing({ type: 'thread', target: session.id }).flatMap(item => {
+      const detail = store.get(item.id)
+      return detail.ok && ThreadLifecycle.openToResolution(detail.value.item) ? [detail.value.item] : []
+    })
+    if (open.length === 0) return
+    const reply = ThreadLifecycle.replyText(session.deriveMessages())
+    if (reply === '') return
+    const apiKey = await jevApiKey(ctx, settings)
+    if (apiKey === undefined) return
+    for (const item of open) {
+      const proposal = await BacklogTriage.resolveThread({ item, reply, jev: request => askJev({ apiKey, ...request }), now: Date.now() })
+      if (proposal !== null) await store.propose({ id: item.id, proposal })
+    }
+  })().catch(logFailure('Backlog thread resolution failed'))
+}
+
+/** A thread that stopped flags the items it works on; its next finished turn clears only that same flag. */
+const onThreadTurn = (ctx: Context, session: Session, reason: TurnEndReason): void => {
+  const outcome = ThreadLifecycle.outcome(reason)
+  if (outcome === null) return
+  void backlogFor(ctx)
+    .then(async store => {
+      for (const item of store.referencing({ type: 'thread', target: session.id }))
+        await store.applyThreadAttention({ id: item.id, attention: outcome.stalled ? 'blocked' : 'none', reason: outcome.reason })
+    })
+    .catch(logFailure('Backlog thread lifecycle signal failed'))
+  if (!outcome.stalled) scheduleResolution(ctx, session, currentSettings())
+}
+
 /** A user naming `b:12` in a thread is working on it: link the thread and start the item. */
-const onSessionEvent = (ctx: Context, session: { readonly id: string }, event: SessionEvent): void => {
-  if (!currentSettings().lifecycleSignals || event.type !== 'user/message' || event.data.source.kind !== 'user') return
+const onSessionEvent = (ctx: Context, session: Session, event: SessionEvent): void => {
+  if (!currentSettings().lifecycleSignals) return
+  if (event.type === 'turn/end') {
+    onThreadTurn(ctx, session, event.data.reason)
+    return
+  }
+  if (event.type !== 'user/message' || event.data.source.kind !== 'user') return
   const ids = BacklogSignals.mentionsIn(event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n'))
   if (ids.length === 0) return
   void backlogFor(ctx)
@@ -378,10 +422,26 @@ const backlogApiHost = backlogApi.host({
   comment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).comment({ ...input, actor: actorOf(caller) }),
 })
 
+/**
+ * What every Agent needs to know about the items it is working on, whichever thread it was started in: the panel only
+ * links and starts an item, so finishing it is the Agent's call, and so is saying what is left.
+ */
+const itemLifecycleSection = definePromptSection({
+  name: 'dshfiles-backlog:item-lifecycle',
+  order: 910,
+  text: [
+    'Backlog: a thread naming `b:12` links that item and moves it to `doing`. Keep it current while you work: move it to',
+    '`done` with `backlog_update` once the thread has resolved it. When only part of it is done, or the work is stuck,',
+    'leave it `doing`, add a `partial` or `blocked` tag, set `attention` when the user must decide something,',
+    '`backlog_comment` what is done and what is missing, and say the same in your final reply.',
+  ].join(' '),
+})
+
 export default defineHost({
   name: '@dshfiles/backlog',
   inject: ['storageDomain'],
   apis: [backlogApiHost],
+  prompts: [itemLifecycleSection],
   settings: [ownedSettings],
   setup: ctx => {
     ctx.on('session/event', (session, event) => onSessionEvent(ctx, session, event))

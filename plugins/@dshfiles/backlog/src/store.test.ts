@@ -281,6 +281,47 @@ describe('lifecycle signals', () => {
   })
 })
 
+describe('thread turn signals', () => {
+  const workingItem = async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'rework the composer chips #composer', actor: user })
+    await store.applySignal({ id: 1, status: 'doing', link: { type: 'thread', target: 'session-abc123' }, reason: 'mentioned in a thread' })
+    return store
+  }
+
+  it('flags an open item when its thread stopped and clears only that flag when the thread finishes', async () => {
+    const store = await workingItem()
+    const flagged = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'the thread failed: RATE_LIMIT' })
+    expect(flagged.ok && flagged.value.item.attention).toBe('blocked')
+    expect(flagged.ok && flagged.value.item.events.at(-1)?.detail).toBe('attention: blocked (the thread failed: RATE_LIMIT)')
+    expect(store.list({ inbox: true }).items.map(item => item.id)).toEqual([1])
+
+    const cleared = await store.applyThreadAttention({ id: 1, attention: 'none', reason: 'the thread works again' })
+    expect(cleared.ok && cleared.value.item.attention).toBe('none')
+    expect(cleared.ok && cleared.value.item.events.at(-1)?.detail).toBe('attention: none (the thread works again)')
+    expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
+  it('leaves an attention the user set by hand, and a closed item, alone', async () => {
+    const store = await workingItem()
+    await store.update({ id: 1, attention: 'needs-input', actor: user })
+    const flagged = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'the thread stopped on a block' })
+    expect(flagged.ok && flagged.value.item.attention).toBe('needs-input')
+
+    await store.update({ id: 1, attention: 'none', status: 'done', actor: user })
+    const late = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'the thread stopped on a block' })
+    expect(late.ok && late.value.item.attention).toBe('none')
+    expect(late.ok && late.value.item.status).toBe('done')
+  })
+
+  it('keeps a block an agent flagged itself when a later turn finishes', async () => {
+    const store = await workingItem()
+    await store.update({ id: 1, attention: 'blocked', actor: agent })
+    const cleared = await store.applyThreadAttention({ id: 1, attention: 'none', reason: 'the thread works again' })
+    expect(cleared.ok && cleared.value.item.attention).toBe('blocked')
+  })
+})
+
 describe('attention and inbox', () => {
   it('puts an item asking for input in the Inbox, keeps it visible, and keeps it there once acknowledged', async () => {
     const time = clock(0)

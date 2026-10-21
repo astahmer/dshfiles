@@ -270,16 +270,26 @@
     {
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
-      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it. Signals only move forward and never over a status the user set by hand.",
+      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",
       "surfaces": ["host", "settings", "integration"],
       "configuration": [],
-      "states": ["linked", "started", "finished"],
-      "failureModes": ["A repository without jj or a main bookmark is skipped.", "An unchanged main costs one read-only jj call and is not rescanned."],
+      "states": ["linked", "started", "stalled", "suggested", "finished"],
+      "failureModes": [
+        "A repository without jj or a main bookmark is skipped.",
+        "An unchanged main costs one read-only jj call and is not rescanned.",
+        "A cancelled, token-ceiling or crash-interrupted turn leaves the linked items alone.",
+        "A missing Jev key, a failing call or a reply that only reports progress suggests nothing."
+      ],
       "externalDependencies": [
         {
           "id": "jj",
           "boundary": "Read-only `jj log --ignore-working-copy` on main in the repositories open items name (and revisionRepositories), bounded output and a 20s timeout.",
           "deterministicFake": "src/signals.test.ts runs the shipped template against a throwaway jj repository."
+        },
+        {
+          "id": "typesafe-jev",
+          "boundary": "Optional POST to api.typesafe.ai/v1/systemone with the item and the thread's last reply, behind threadResolution and jevEnabled; any failure suggests nothing.",
+          "deterministicFake": "An injected jev function answers fixed probabilities in src/triage.test.ts."
         }
       ],
       "verification": [
@@ -318,6 +328,54 @@
           "id": "backlog.lifecycle-host-human",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "links but does not move an item whose status the user chose"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-turn-outcome",
+          "file": "plugins/@dshfiles/backlog/src/thread-lifecycle.test.ts",
+          "testName": "flags a thread that stopped blocked or failed, and clears the flag on a finished turn"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-thread-stall",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "flags an open item when its thread stopped and clears only that flag when the thread finishes"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-thread-human",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "leaves an attention the user set by hand, and a closed item, alone"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-thread-agent",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "keeps a block an agent flagged itself when a later turn finishes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-reply",
+          "file": "plugins/@dshfiles/backlog/src/thread-lifecycle.test.ts",
+          "testName": "reads the last thing the agent said, past later user messages"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-resolution-candidates",
+          "file": "plugins/@dshfiles/backlog/src/thread-lifecycle.test.ts",
+          "testName": "offers a done suggestion only for an in-progress item the user never touched"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-resolution",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "suggests done when Jev reads the reply as having finished the item"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-resolution-none",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "suggests nothing when the reply only reports progress, leaves work, or Jev fails"
         }
       ]
     },

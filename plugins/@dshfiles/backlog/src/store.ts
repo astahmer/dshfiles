@@ -130,6 +130,11 @@ export interface BacklogStore {
     readonly link: BacklogLink
     readonly reason: string
   }): Promise<BacklogResult<BacklogDetail>>
+  /**
+   * A thread signal about one item: a thread that stopped flags its open items so they reach the Inbox, and a later
+   * finished turn clears only that same flag. A status or attention you set by hand always wins.
+   */
+  applyThreadAttention(input: { readonly id: number; readonly attention: 'blocked' | 'none'; readonly reason: string }): Promise<BacklogResult<BacklogDetail>>
   /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
   acknowledge(input: { readonly ids: readonly number[] }): Promise<void>
   dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
@@ -541,6 +546,27 @@ const createBacklogStore = ({
       if (moves) change.status = status
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
       return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail }, change) }
+    },
+    applyThreadAttention: async ({ id, attention, reason }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (item.humanFields.includes('attention')) return { ok: true, value: detailOf(item) }
+      if (attention === 'blocked') {
+        if ((item.attention ?? 'none') !== 'none' || item.status === 'done' || item.status === 'dropped') return { ok: true, value: detailOf(item) }
+        return {
+          ok: true,
+          value: await touch(
+            item,
+            { kind: 'system' },
+            { kind: 'edited', detail: `attention: blocked (${reason})` },
+            { attention: 'blocked', acknowledgedAt: null },
+          ),
+        }
+      }
+      const last = item.events.at(-1)
+      const stalledHere = last?.actor === 'system' && last.kind === 'edited' && last.detail.startsWith('attention: blocked (')
+      if ((item.attention ?? 'none') !== 'blocked' || stalledHere !== true) return { ok: true, value: detailOf(item) }
+      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})` }, { attention: 'none' }) }
     },
     acknowledge: async ({ ids }) => {
       for (const id of ids) {

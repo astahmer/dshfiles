@@ -114,3 +114,39 @@ describe('triage', () => {
     ])
   })
 })
+
+describe('thread resolution', () => {
+  it('suggests done when Jev reads the reply as having finished the item', async () => {
+    const proposal = await BacklogTriage.resolveThread({
+      item: item(1, 'Rework the composer chips', { status: 'doing' }),
+      reply: 'Landed the rework in jj:nozwvrtk; the old chips are gone and the tests pass.',
+      jev: async request => (request.question.instructions.includes('finished the work') ? 0.86 : 0),
+      now: 9,
+    })
+    expect(proposal).toEqual({
+      status: 'done',
+      confidence: 0.86,
+      reason: "The thread's last reply says the work is done.",
+      source: 'jev',
+      origin: 'thread',
+      at: 9,
+    })
+  })
+
+  it('suggests nothing when the reply only reports progress, leaves work, or Jev fails', async () => {
+    const open = await BacklogTriage.resolveThread({
+      item: item(1, 'Rework the composer chips', { status: 'doing' }),
+      reply: 'Started on the chips; the attachment path still needs a test.',
+      jev: async () => 0.31,
+      now: 9,
+    })
+    expect(open).toBeNull()
+    const failing = await BacklogTriage.resolveThread({
+      item: item(1, 'Rework the composer chips', { status: 'doing' }),
+      reply: 'Done.',
+      jev: async () => Promise.reject(new Error('down')),
+      now: 9,
+    })
+    expect(failing).toBeNull()
+  })
+})

@@ -34,6 +34,17 @@ const sameWork = (existing: string): TriageQuestion => ({
   criteria: { true: 'The same work, a restatement or a subset of it', false: 'Different work, even if related' },
 })
 
+const resolvesItem: TriageQuestion = {
+  instructions:
+    'Does `content` (a backlog item followed by the last reply of the thread working on it) show that the reply finished the work the item describes, so the item can be marked done?',
+  criteria: {
+    true: 'The reply says the work is finished, landed, fixed or otherwise resolved',
+    false: 'The reply only answers a question, reports progress, asks something back or leaves work to do',
+  },
+}
+
+const RESOLUTION_THRESHOLD = 0.5
+
 const modelAnswerSchema = z.object({
   kind: BacklogItems.kindSchema.optional().catch(undefined),
   status: BacklogItems.statusSchema.optional().catch(undefined),
@@ -195,6 +206,29 @@ const run = async (request: {
   })
 }
 
+/**
+ * One Jev question about a finished thread, asked when `threadResolution` is on: a reply that reads as resolution leaves
+ * a `done` suggestion on the item, which the user accepts or dismisses. Jev missing or failing proposes nothing.
+ */
+const resolveThread = async (request: {
+  readonly item: Pick<BacklogItem, 'title' | 'body'>
+  readonly reply: string
+  readonly jev: (request: { readonly question: TriageQuestion; readonly text: string }) => Promise<number>
+  readonly now: number
+}): Promise<BacklogProposal | null> => {
+  const text = `Backlog item: ${request.item.title}\n${request.item.body.slice(0, 2_000)}\n\nThread reply:\n${request.reply.slice(0, 4_000)}`
+  const probability = await request.jev({ question: resolvesItem, text }).catch(() => undefined)
+  if (probability === undefined || probability < RESOLUTION_THRESHOLD) return null
+  return {
+    status: 'done',
+    confidence: probability,
+    reason: "The thread's last reply says the work is done.",
+    source: 'jev',
+    origin: 'thread',
+    at: request.now,
+  }
+}
+
 /** "kind bug, status todo, tags a b, duplicate of b:3" — the wording events and the peek share. */
 const describe = (proposal: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 'tags' | 'duplicateOf'>): string =>
   [
@@ -209,6 +243,7 @@ const describe = (proposal: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 
 
 export class BacklogTriage {
   static readonly run = run
+  static readonly resolveThread = resolveThread
   static readonly describe = describe
   static readonly candidatesFor = candidatesFor
   static readonly correctionsFrom = correctionsFrom

@@ -123,11 +123,27 @@ On by default (`lifecycleSignals`). Items move without anyone filing them:
 - A revision on `main` whose description says `Closes b:12` (also `Fixes`, `Resolves`, `Completes`,
   `Implements`; several ids with commas or `and`) links that revision and moves the item to Done. A bare
   mention such as `part of b:12` closes nothing.
+- A linked thread whose turn ended **blocked** or **failed** marks its open items as blocked, so they reach the
+  Inbox instead of sitting silently In progress. Its next finished turn clears that flag again; a cancellation,
+  a token ceiling and a crash-interrupted turn leave the item alone.
 
-Signals only move forward (never Done back to In progress, never out of Dropped) and never over a status
-you set by hand; the link is recorded either way. Revisions are read with `jj log --ignore-working-copy`
-on `main` every `revisionPollMinutes` (5) in each repository an open item names, plus
-`revisionRepositories`; an unchanged `main` costs one call.
+Signals only move forward (never Done back to In progress, never out of Dropped) and never over a status or
+attention you set by hand; the link is recorded either way. Only the block this signal set is cleared later,
+so a `blocked` an agent flagged itself stays until someone clears it. Revisions are read with
+`jj log --ignore-working-copy` on `main` every `revisionPollMinutes` (5) in each repository an open item
+names, plus `revisionRepositories`; an unchanged `main` costs one call.
+
+Working on an item is the Agent's job past that point: every thread is told (a system-prompt section, not just
+the tool descriptions) to move the item to Done with `backlog_update` once the thread resolved it, and when only
+part is done or the work is stuck, to leave it In progress with a `partial` or `blocked` tag, set `attention`
+when you must decide something, and say in its reply what is done and what is missing.
+
+A finished turn is not proof the item is done, so nothing closes an item on its own. With `threadResolution`
+(`propose`) and Jev configured (`jevEnabled` plus a key), the plugin instead asks Jev whether the thread's last
+reply finished the item and leaves a **Thread suggests** card with `status done` for **Accept** or **Dismiss**.
+It skips items whose status you set by hand, waits while a suggestion is open, and does not re-suggest an item
+you dismissed until the item changes again. A missing key, a failing call or a plain progress reply suggests
+nothing.
 
 ## `@` mentions
 

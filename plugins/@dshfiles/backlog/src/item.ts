@@ -72,6 +72,8 @@ const proposalSchema = z
     confidence: z.number().min(0).max(1),
     reason: z.string().max(500),
     source: z.enum(['jev', 'model', 'jev+model']),
+    /** `thread` when a finished thread's reply suggested it, absent for a capture-time triage suggestion. */
+    origin: z.enum(['thread']).optional(),
     at: z.number().int().nonnegative(),
   })
   .strict()
