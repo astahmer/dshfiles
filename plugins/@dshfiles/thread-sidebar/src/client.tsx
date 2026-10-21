@@ -3463,6 +3463,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
 
+  const navigateThreadList = (event: KeyboardEvent): void => {
+    const list = scrollAreaRef.current
+    if (list === null) return
+    ThreadListNavigationModel.navigate({
+      event,
+      list,
+      selection: threadSelection,
+      onSelectionChange: setThreadSelection,
+      arrowKeysSwitchThread: preferences.arrowKeysSwitchThread,
+      open: sessionId => {
+        const session = sessionState.byId[SessionId(sessionId)]
+        if (session !== undefined) openThread(session.id)
+      },
+      onLookahead: sessionIds => {
+        if (props.onNavigationLookahead === undefined) return
+        const lookaheadSessions = sessionIds.flatMap(sessionId => {
+          const session = sessionState.byId[SessionId(sessionId)]
+          return session === undefined ? [] : [session.id]
+        })
+        props.onNavigationLookahead(lookaheadSessions)
+      },
+    })
+  }
+
   const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
     // The click a pointer drag produces on release belongs to the drag, not to the row it started on.
     if (suppressRowClick.current) {
@@ -3741,7 +3765,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               <Settings2Icon />
             </Button>
           </div>
-          <div role="group" className="dshx:flex dshx:gap-1 dshx:overflow-x-auto dshx:pt-1" aria-label={props.tSidebar('threadSidebarListView')}>
+          <div
+            role="group"
+            className="dshx:flex dshx:gap-1 dshx:overflow-x-auto dshx:pt-1"
+            aria-label={props.tSidebar('threadSidebarListView')}
+            onKeyDown={event => navigateThreadList(event.nativeEvent)}
+          >
             {threadViewSettings.views
               .filter(view => view.enabled)
               .map(view => {
@@ -3760,6 +3789,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   <Button
                     key={view.id}
                     type="button"
+                    data-thread-list-view-button=""
                     variant={view.id === threadView.id ? 'secondary' : 'ghost'}
                     size="sm"
                     className="dshx:min-w-20 dshx:flex-1 dshx:shrink-0"
@@ -4079,29 +4109,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
+          onKeyDown={event => navigateThreadList(event.nativeEvent)}
           onClickCapture={handleSelectionClickCapture}
           onContextMenuCapture={handleSelectionContextMenuCapture}
-          onKeyDown={event =>
-            ThreadListNavigationModel.navigate({
-              event: event.nativeEvent,
-              list: event.currentTarget,
-              selection: threadSelection,
-              onSelectionChange: setThreadSelection,
-              arrowKeysSwitchThread: preferences.arrowKeysSwitchThread,
-              open: sessionId => {
-                const session = sessionState.byId[SessionId(sessionId)]
-                if (session !== undefined) openThread(session.id)
-              },
-              onLookahead: sessionIds => {
-                if (props.onNavigationLookahead === undefined) return
-                const lookaheadSessions = sessionIds.flatMap(sessionId => {
-                  const session = sessionState.byId[SessionId(sessionId)]
-                  return session === undefined ? [] : [session.id]
-                })
-                props.onNavigationLookahead(lookaheadSessions)
-              },
-            })
-          }
         >
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">

@@ -1832,7 +1832,7 @@
     {
       "id": "thread-keyboard-navigation",
       "title": "Navigate and multi-select threads from the keyboard",
-      "summary": "Up/Down switch to the focused thread immediately by default, or move row focus only when configured; Left and Right walk the section and child-thread tree, Shift+ArrowUp/Down selects a range from the last selected row, and the primary modifier toggles individual rows. A selection bar pins, settles, or archives every selected thread and clears with Escape.",
+      "summary": "ArrowUp/Down from a view preset enters its first/last visible row; row arrows switch to the focused thread immediately by default, or move row focus only when configured. Left and Right walk the section and child-thread tree, Shift+ArrowUp/Down selects a range from the last selected row, and the primary modifier toggles individual rows. A selection bar pins, settles, or archives every selected thread and clears with Escape.",
       "surfaces": ["client", "integration"],
       "configuration": [
         {
@@ -1845,7 +1845,7 @@
       ],
       "states": ["focused", "range-selected", "toggled"],
       "failureModes": [
-        "Up/Down switches threads immediately by default, so Shift+ArrowUp/Down is the gesture that moves focus without opening one.",
+        "After activating a view preset, ArrowDown enters its first visible thread and ArrowUp enters its last; within rows, Up/Down switches threads immediately by default, so Shift+ArrowUp/Down is the gesture that moves focus without opening one.",
         "A range selects only rendered rows, so a collapsed section or hidden child row is never selected behind the user's back.",
         "Bulk archive refuses while any selected thread is running, using the same running notice as a single-row archive; bulk settle applies the same guard."
       ],
@@ -1861,6 +1861,12 @@
           "id": "thread-sidebar.keyboard-selection-unit-switch",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-list-navigation.test.ts",
           "testName": "switches to the focused thread on every arrow when immediate switching is configured"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.keyboard-selection-unit-view-entry",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-list-navigation.test.ts",
+          "testName": "enters the active view from its view button"
         },
         {
           "kind": "unit-test",

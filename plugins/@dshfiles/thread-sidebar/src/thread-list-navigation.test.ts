@@ -29,13 +29,14 @@ const dispatchKey = (target: HTMLElement, key: string, init: KeyboardEventInit =
 const installNavigation = (
   list: HTMLElement,
   initialSelection: ThreadSelectionState = EMPTY_THREAD_SELECTION,
-  options: { readonly arrowKeysSwitchThread?: boolean } = {},
+  options: { readonly arrowKeysSwitchThread?: boolean; readonly eventRoot?: HTMLElement } = {},
 ) => {
   let selection = initialSelection
   const selections: ThreadSelectionState[] = []
   const opened: string[] = []
   const warmed: string[][] = []
-  list.addEventListener('keydown', event => {
+  const eventRoot = options.eventRoot ?? list
+  eventRoot.addEventListener('keydown', event => {
     const navigation = {
       event,
       list,
@@ -144,6 +145,30 @@ describe('thread list keyboard navigation', () => {
 
     expect(document.activeElement).toBe(next.button)
     expect(callbacks.warmed).toEqual([['next']])
+  })
+
+  it('enters the active view from its view button', () => {
+    const eventRoot = document.createElement('div')
+    const viewButton = document.createElement('button')
+    viewButton.dataset.threadListViewButton = ''
+    const list = document.createElement('div')
+    const rows = ['first', 'middle', 'last'].map(threadRow)
+    list.append(...rows.map(row => row.article))
+    eventRoot.append(viewButton, list)
+    document.body.append(eventRoot)
+    const callbacks = installNavigation(list, EMPTY_THREAD_SELECTION, { arrowKeysSwitchThread: true, eventRoot })
+
+    viewButton.focus()
+    const down = dispatchKey(viewButton, 'ArrowDown')
+    expect(down.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(rows[0]?.button)
+    expect(callbacks.opened).toEqual(['first'])
+
+    viewButton.focus()
+    const up = dispatchKey(viewButton, 'ArrowUp')
+    expect(up.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(rows[2]?.button)
+    expect(callbacks.opened).toEqual(['first', 'last'])
   })
 
   it('switches to the focused thread on every arrow when immediate switching is configured', () => {

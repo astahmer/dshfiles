@@ -31,6 +31,7 @@ interface RetainThreadHistoryLookaheadInput<SessionId extends string> {
 const EDITABLE_TARGET_SELECTOR = 'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'
 const MENU_TARGET_SELECTOR = '[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="listbox"],[role="option"]'
 const MAX_LOOKAHEAD_SESSIONS = 3
+const THREAD_LIST_VIEW_BUTTON_SELECTOR = 'button[data-thread-list-view-button]'
 const navigationDirection = (key: string): ThreadNavigationDirection | undefined => {
   switch (key) {
     case 'ArrowDown':
@@ -150,6 +151,33 @@ export class ThreadListNavigationModel {
       return
     }
     if (primaryModifier) return
+
+    const viewButton = target.closest<HTMLButtonElement>(THREAD_LIST_VIEW_BUTTON_SELECTOR)
+    if (viewButton !== null) {
+      const focusedElement = input.list.ownerDocument.activeElement
+      if (focusedElement === null || !viewButton.contains(focusedElement)) return
+      const direction = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : undefined
+      if (direction === undefined) return
+      const rows = ThreadListNavigationModel.visibleRows(input.list)
+      const index = direction === 1 ? 0 : rows.length - 1
+      const row = rows[index]
+      if (row === undefined) return
+      event.preventDefault()
+      ThreadListNavigationModel.focusRow({
+        rows,
+        index,
+        direction,
+        selection: input.selection,
+        extend: event.shiftKey,
+        fallbackAnchorId: row.id,
+        onSelectionChange: input.onSelectionChange,
+        onLookahead: input.onLookahead,
+        switchThread: input.arrowKeysSwitchThread === true && !event.shiftKey,
+        open: input.open,
+        list: input.list,
+      })
+      return
+    }
 
     const header = target.closest<HTMLButtonElement>(THREAD_SECTION_HEADER_SELECTOR)
     if (header !== null && input.list.contains(header)) {

@@ -1253,9 +1253,54 @@ When('two nonblank Host threads are listed in the sidebar', async ({ page }: { p
   threadHistoryJourneys.set(page, { firstThreadId, secondThreadId })
 })
 
+const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
+  const sidebar = threadSidebar(page)
+  await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
+  const viewManager = page.getByRole('dialog')
+  await viewManager.getByRole('button', { name: 'Edit view Working', exact: true }).click()
+  await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
+  await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
+  for (const name of ['Done', 'Gone']) {
+    await viewManager.getByRole('button', { name: 'Add view', exact: true }).click()
+    await viewManager.getByLabel('View name').fill(name)
+    await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
+    await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
+  }
+  await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
+  await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+}
+
 Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', async ({ page }: { page: Page }) => {
   const journey = threadHistoryJourneys.get(page)
   if (journey === undefined) throw new Error('No Host-created thread history was recorded for this browser page.')
+  await prepareKeyboardNavigationViews(page)
+  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
+  for (const viewName of ['All threads', 'Working', 'Done', 'Gone']) {
+    await viewTabs.getByRole('button', { name: viewName, exact: true }).click()
+    const rows = threadSidebar(page).locator('button[data-thread-main-action][data-thread-id]')
+    await expect(rows).toHaveCount(2)
+    const visibleIds = await rows.evaluateAll(buttons => buttons.map(button => button.getAttribute('data-thread-id')))
+    const firstId = visibleIds[0]
+    const secondId = visibleIds[1]
+    if (firstId === undefined || firstId === null || secondId === undefined || secondId === null) {
+      throw new Error(`The ${viewName} view did not render two thread ids.`)
+    }
+    const firstRowButton = threadRow(page, firstId).locator(':scope > div > button').first()
+    const secondRowButton = threadRow(page, secondId).locator(':scope > div > button').first()
+    const assertionKey = viewName.toLowerCase().replaceAll(' ', '-')
+    await page.keyboard.press('ArrowDown')
+    await recordAssertion(page, `thread-sidebar-keyboard-view-entry-${assertionKey}`, async () => {
+      await expect(firstRowButton).toBeFocused()
+      await expect.poll(() => currentThreadId(page)).toBe(firstId)
+    })
+    await page.keyboard.press('ArrowDown')
+    await recordAssertion(page, `thread-sidebar-keyboard-view-arrow-down-${assertionKey}`, async () => {
+      await expect(secondRowButton).toBeFocused()
+      await expect.poll(() => currentThreadId(page)).toBe(secondId)
+    })
+  }
+  await viewTabs.getByRole('button', { name: 'All threads', exact: true }).click()
   const rowIds = await threadSidebar(page)
     .locator('article[data-thread-id]')
     .evaluateAll(rows => rows.map(row => row.getAttribute('data-thread-id')))
