@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { AGENT_HANDLE_PATTERN, Agents, MAX_MESSAGE_CHARS, type Agent, type AgentDraft } from './agent.js'
+import { AGENT_HANDLE_PATTERN, agentSchema, Agents, MAX_MESSAGE_CHARS, type Agent, type AgentDraft } from './agent.js'
 
 const agent = (fields: Partial<Agent> = {}): Agent => ({
   ...Agents.builtIn(1),
@@ -84,6 +84,28 @@ test('a creating draft derives its handle from the name', () => {
   assert.equal(normalized.handle, 'bug-hunter')
   const renamed = Agents.normalizeDraft(draft({ handle: 'bug-hunter' }), { creating: false })
   assert.equal(renamed.handle, 'bug-hunter')
+})
+
+test('a row stored before memory scopes and routines existed still loads', () => {
+  // Exactly the shape Phase 2 wrote; the storage domain parses every stored row at open, so a missing key must default.
+  const legacy = Agents.builtIn(5)
+  const parsed = agentSchema.parse({
+    handle: legacy.handle,
+    name: legacy.name,
+    glyph: legacy.glyph,
+    description: legacy.description,
+    instructions: legacy.instructions,
+    preset: legacy.preset,
+    route: legacy.route,
+    enabled: legacy.enabled,
+    builtIn: legacy.builtIn,
+    createdAt: legacy.createdAt,
+    updatedAt: legacy.updatedAt,
+    lastUsedAt: legacy.lastUsedAt,
+    threadCount: legacy.threadCount,
+  })
+  assert.equal(parsed.memoryScope, null)
+  assert.equal(parsed.routine, '')
 })
 
 test('a memory scope is the agent’s own note scope, absent by default', () => {

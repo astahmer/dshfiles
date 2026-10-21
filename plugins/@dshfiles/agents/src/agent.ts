@@ -33,6 +33,8 @@ export const agentMemoryScopeSchema = z
   .max(MAX_MEMORY_SCOPE_CHARS)
   .regex(/^[A-Za-z0-9][A-Za-z0-9:._/-]*$/u, 'A memory scope is letters, digits, ":", ".", "_", "/" or "-".')
   .nullable()
+  // A row stored before this field existed must load: the domain validates every record with this schema at open.
+  .default(null)
 
 export const agentRouteSchema = z
   .object({
@@ -46,12 +48,17 @@ export const agentRouteSchema = z
  * Which peers an agent's threads may message. `any` is the default (no rule), `listed` allows only `handles`, and
  * `none` keeps the agent's threads out of DSH's messaging tools. It constrains `dshx_comm_*`, it does not replace it.
  */
+/** An agent with no rule messages anyone, broadcasts and delegates, so adding the rule changed no behavior. */
+export const AGENT_DELEGATION_UNRESTRICTED: AgentDelegation = { messaging: 'any', handles: [] }
+
 export const agentDelegationSchema = z
   .object({
     messaging: z.enum(['any', 'listed', 'none']),
     handles: z.array(handleSchema).max(MAX_PEER_HANDLES),
   })
   .strict()
+  // A row stored before delegation existed must load; a fresh object per parse, so no two records share one.
+  .default(() => ({ ...AGENT_DELEGATION_UNRESTRICTED }))
 
 /** Everything a person or an agent decides about an agent; the rest is usage metadata. */
 export const agentDraftSchema = z
@@ -66,7 +73,7 @@ export const agentDraftSchema = z
     /** The memory note scope this agent's threads read, or null for the project block only. */
     memoryScope: agentMemoryScopeSchema,
     /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
-    routine: z.string().max(MAX_ROUTINE_CHARS),
+    routine: z.string().max(MAX_ROUTINE_CHARS).default(''),
     delegation: agentDelegationSchema,
     enabled: z.boolean(),
   })
