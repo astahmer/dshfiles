@@ -285,6 +285,8 @@ const connectSsh = async ({
     endpoint.release()
     throw error
   }
+  // The tunnel outlives openTunnel, which removed its 'error' listener; a failed kill would otherwise crash the Host.
+  child.on('error', () => undefined)
   const localLaunchUrl = `http://${endpoint.address}:${endpoint.port}/?token=${encodeURIComponent(launch.token)}`
   const closed = new Promise<void>(resolve => child.once('close', () => resolve()))
   let disposed = false

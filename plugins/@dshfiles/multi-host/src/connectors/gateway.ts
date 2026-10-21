@@ -188,6 +188,8 @@ const followOnce = async ({
       clearTimeout(absoluteTimeout)
       signal?.removeEventListener('abort', onAbort)
       socket.removeAllListeners()
+      // terminate() during the handshake emits 'error' on the next tick; with no listener left that would crash the Host.
+      socket.on('error', () => undefined)
       if (socket.readyState === WebSocket.OPEN) {
         if (error === undefined) socket.send(JSON.stringify({ type: 'cancel', streamId }))
         socket.close()
