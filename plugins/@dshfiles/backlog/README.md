@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Start a thread from an item](docs/screenshots/start-thread-from-item.png)
+
 ![Select items in ranges, batch-edit them and start one thread for the selection](docs/screenshots/multi-select-items.png)
 
 ![Backfill triage on items captured before it was set up](docs/screenshots/backfill-triage.png)

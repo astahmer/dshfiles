@@ -1,8 +1,7 @@
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { CheckIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
+import { FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { ItemGlyphs } from './item-glyphs.js'
 
@@ -11,7 +10,33 @@ const NO_PROJECT = '__backlog_no_project__'
 const ALL_PROJECTS = '__backlog_all_projects__'
 
 const triggerClass =
-  'dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
+  'dshx:inline-flex dshx:h-auto dshx:w-auto dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border-0 dshx:bg-transparent dshx:px-1 dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
+
+const renderProjectOption = (option: ComboboxOption): ReactNode => {
+  if (option.value === NO_PROJECT) {
+    return (
+      <>
+        <FolderIcon aria-hidden className="dshx:text-muted-foreground/50" />
+        <span className="dshx:text-muted-foreground">No project</span>
+      </>
+    )
+  }
+  if (option.value === ALL_PROJECTS) {
+    return (
+      <>
+        <FolderIcon aria-hidden />
+        <span>{option.label}</span>
+      </>
+    )
+  }
+  return (
+    <>
+      <ItemGlyphs.ProjectDot project={option.value} />
+      <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(option.value)}</span>
+      <span className="dshx:ml-auto dshx:max-w-32 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{option.value}</span>
+    </>
+  )
+}
 
 /** A searchable project single-select: the one shadcn combobox shared by the header, the capture box and item details. */
 export const ProjectPicker = (props: {
@@ -27,68 +52,38 @@ export const ProjectPicker = (props: {
   readonly open?: boolean
   readonly onOpenChange?: (open: boolean) => void
 }): JSX.Element => {
-  const [uncontrolled, setUncontrolled] = useState(false)
-  const open = props.open ?? uncontrolled
-  const setOpen = (next: boolean): void => {
-    setUncontrolled(next)
-    props.onOpenChange?.(next)
-  }
-  const pick = (project: string): void => {
-    props.onPick(project)
-    setOpen(false)
-  }
   const selected = props.value === ALL_PROJECTS ? null : props.value
   // The item may sit in a project the candidate list no longer offers; keep it selectable so the check mark is truthful.
   const projects = selected === null || selected === NO_PROJECT || props.projects.includes(selected) ? props.projects : [selected, ...props.projects]
+  const options: readonly ComboboxOption[] = [
+    ...(props.allLabel === undefined ? [] : [{ value: ALL_PROJECTS, label: props.allLabel, keywords: ['all projects', 'every project'] }]),
+    { value: NO_PROJECT, label: 'No project', keywords: ['none', 'unassigned'], group: 'Project' },
+    ...projects.map(project => ({
+      value: project,
+      label: ItemGlyphs.projectName(project),
+      keywords: [project, ItemGlyphs.projectName(project)],
+      group: 'Project',
+    })),
+  ]
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger aria-label={props.label} className={cn(triggerClass, props.triggerClassName)}>
-        {props.trigger}
-      </PopoverTrigger>
-      <PopoverContent align={props.align ?? 'start'} side={props.side ?? 'bottom'} className="dshx-root dshx:w-64 dshx:p-0">
-        <Command>
-          <CommandInput aria-label="Search projects" placeholder="Search projects…" autoFocus />
-          <CommandList>
-            <CommandEmpty>No project matches.</CommandEmpty>
-            <CommandGroup heading="Project">
-              {props.allLabel === undefined ? null : (
-                <>
-                  <CommandItem
-                    value={ALL_PROJECTS}
-                    keywords={['all projects', 'every project']}
-                    onSelect={() => pick(ALL_PROJECTS)}
-                    className="dshx:gap-2 dshx:text-[13px]"
-                  >
-                    <FolderIcon aria-hidden />
-                    <span>{props.allLabel}</span>
-                    {props.value === ALL_PROJECTS ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
-                  </CommandItem>
-                  <CommandSeparator />
-                </>
-              )}
-              <CommandItem
-                value={NO_PROJECT}
-                keywords={['no project', 'none', 'unassigned']}
-                onSelect={() => pick(NO_PROJECT)}
-                className="dshx:gap-2 dshx:text-[13px]"
-              >
-                <FolderIcon aria-hidden className="dshx:text-muted-foreground/50" />
-                <span className="dshx:text-muted-foreground">No project</span>
-                {selected === NO_PROJECT ? <CheckIcon aria-hidden className="dshx:ml-auto dshx:size-3.5" /> : null}
-              </CommandItem>
-              {projects.map(project => (
-                <CommandItem key={project} value={project} onSelect={() => pick(project)} className="dshx:gap-2 dshx:text-[13px]">
-                  <ItemGlyphs.ProjectDot project={project} />
-                  <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
-                  <span className="dshx:ml-auto dshx:max-w-32 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{project}</span>
-                  {selected === project ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : null}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Combobox
+      align={props.align}
+      contentClassName="dshx:w-64"
+      emptyLabel="No project matches."
+      label={props.label}
+      onOpenChange={props.onOpenChange}
+      onValueChange={props.onPick}
+      open={props.open}
+      options={options}
+      renderOption={renderProjectOption}
+      searchAbove={0}
+      searchLabel="Search projects"
+      searchPlaceholder="Search projects…"
+      side={props.side}
+      triggerClassName={cn(triggerClass, props.triggerClassName)}
+      triggerContent={props.trigger}
+      value={props.value}
+    />
   )
 }
 

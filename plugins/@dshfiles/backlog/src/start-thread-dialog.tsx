@@ -1,4 +1,5 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { LoaderCircleIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
@@ -14,8 +15,6 @@ import {
   type StartThreadRequest,
 } from './start-thread.js'
 
-const fieldClass =
-  'dshx:h-8 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
 const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
 
 type StartOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string }
@@ -53,6 +52,29 @@ export const StartThreadDialog = (props: {
   const selected = rows.find(row => row.key === selectedKey)
   const effortValue = effort ?? (selected === undefined ? undefined : StartThreadForm.defaultEffort(selected))
   const target = targets.find(option => option.value === targetValue)?.target ?? { kind: 'default' }
+  const projectOptions: readonly ComboboxOption[] = targets.map(option => {
+    const optionTarget = option.target
+    const description = optionTarget.kind === 'project' ? props.projects.find(project => project.id === optionTarget.projectId)?.path : undefined
+    return description === undefined ? { value: option.value, label: option.label } : { value: option.value, label: option.label, description }
+  })
+  const agentOptions: readonly ComboboxOption[] = [
+    { value: '', label: 'None (pick an account and model)', keywords: ['no agent', 'default'] },
+    ...(agentsQuery.data ?? []).map(choice => ({
+      value: choice.handle,
+      label: `${choice.name} · @${choice.handle}`,
+      keywords: [choice.handle, choice.description, choice.preset ?? ''],
+    })),
+  ]
+  const modelOptions: readonly ComboboxOption[] =
+    catalog?.providers.flatMap(provider =>
+      provider.models.map(model => ({
+        value: `${provider.id}/${model.id}`,
+        label: model.name,
+        keywords: [model.id, provider.name],
+        group: provider.name,
+      })),
+    ) ?? []
+  const effortOptions: readonly ComboboxOption[] = selected?.model.efforts.map(option => ({ value: option.id, label: option.name })) ?? []
 
   const pickModel = (key: string): void => {
     setModelKey(key)
@@ -101,24 +123,27 @@ export const StartThreadDialog = (props: {
         <div className="dshx:flex dshx:flex-col dshx:gap-3">
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Project</span>
-            <select aria-label="Thread project" className={fieldClass} value={targetValue} onChange={event => setTargetValue(event.currentTarget.value)}>
-              {targets.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              emptyLabel="No workspace matches."
+              label="Thread project"
+              matchTriggerWidth
+              onValueChange={setTargetValue}
+              options={projectOptions}
+              searchAbove={0}
+              searchPlaceholder="Search workspaces and folders…"
+              value={targetValue}
+            />
           </label>
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Agent</span>
-            <select aria-label="Thread agent" className={fieldClass} value={agentHandle} onChange={event => setAgentHandle(event.currentTarget.value)}>
-              <option value="">None (pick an account and model)</option>
-              {(agentsQuery.data ?? []).map(choice => (
-                <option key={choice.handle} value={choice.handle}>
-                  {choice.name} · @{choice.handle}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              label="Thread agent"
+              matchTriggerWidth
+              onValueChange={setAgentHandle}
+              options={agentOptions}
+              searchPlaceholder="Search agents…"
+              value={agentHandle}
+            />
             {chosenAgent === undefined ? null : (
               <span className="dshx:text-[11px] dshx:text-muted-foreground">
                 {chosenAgent.route === null ? 'Harness default model' : `${chosenAgent.route.provider}/${chosenAgent.route.model}`} ·{' '}
@@ -133,37 +158,24 @@ export const StartThreadDialog = (props: {
               {catalogQuery.isError ? (
                 <p className="dshx:text-xs dshx:text-destructive">The model catalog is unavailable: {errorMessage(catalogQuery.error, 'unknown error')}</p>
               ) : (
-                <select
-                  aria-label="Thread model"
-                  className={fieldClass}
-                  value={selectedKey ?? ''}
+                <Combobox
                   disabled={catalog === null}
-                  onChange={event => pickModel(event.currentTarget.value)}
-                >
-                  {catalog === null ? <option value="">Loading models…</option> : null}
-                  {catalog?.providers.map(provider => (
-                    <optgroup key={provider.id} label={provider.name}>
-                      {provider.models.map(model => (
-                        <option key={`${provider.id}/${model.id}`} value={`${provider.id}/${model.id}`}>
-                          {model.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                  emptyLabel="No model matches."
+                  label="Thread model"
+                  matchTriggerWidth
+                  onValueChange={pickModel}
+                  options={modelOptions}
+                  placeholder={catalog === null ? 'Loading models…' : 'Select a model'}
+                  searchPlaceholder="Search models…"
+                  value={selectedKey ?? ''}
+                />
               )}
             </label>
           ) : null}
           {chosenAgent !== undefined || selected === undefined || selected.model.efforts.length === 0 ? null : (
             <label className="dshx:flex dshx:flex-col dshx:gap-1">
               <span className={labelClass}>Reasoning effort</span>
-              <select aria-label="Reasoning effort" className={fieldClass} value={effortValue ?? ''} onChange={event => setEffort(event.currentTarget.value)}>
-                {selected.model.efforts.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
+              <Combobox label="Reasoning effort" matchTriggerWidth onValueChange={setEffort} options={effortOptions} value={effortValue ?? ''} />
             </label>
           )}
           <label className="dshx:flex dshx:flex-col dshx:gap-1">

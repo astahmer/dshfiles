@@ -331,13 +331,10 @@ Then('the board card for b:{int} names the project it is filed under', async ({ 
 Then('the start thread dialog offers the account model and the Host default folder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-start-thread-dialog', async () => {
     await expect(startThreadDialog(page)).toBeVisible()
-    await expect(startThreadDialog(page).getByLabel('Thread project')).toHaveValue('default')
-    // The fake Command Code account publishes its route a moment after it is added.
-    await expect(async () => {
-      const options = await startThreadDialog(page).getByLabel('Thread model').locator('option').count()
-      expect(options).toBeGreaterThan(0)
-    }).toPass({ timeout: 20_000 })
-    await expect(startThreadDialog(page).getByLabel('Thread model')).toBeVisible()
+    await expect(startThreadDialog(page).getByRole('combobox', { name: 'Thread project' })).toContainText('Host default workspace')
+    // The fake Command Code account publishes its route a moment after it is added; the model picker stays disabled until
+    // the catalog resolves and then shows the selected model.
+    await expect(startThreadDialog(page).getByRole('combobox', { name: 'Thread model' })).toBeEnabled({ timeout: 20_000 })
   })
 })
 

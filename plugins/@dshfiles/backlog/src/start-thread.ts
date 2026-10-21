@@ -145,7 +145,7 @@ export class StartThreadForm {
     }
   }
 
-  /** Every model as one flat list, so a `<select>` can carry a single index and every provider stays visible. */
+  /** Every model as one flat list, so one picker carries a single key and every provider stays visible. */
   static rows(catalog: StartThreadCatalog): StartThreadModelRow[] {
     return catalog.providers.flatMap(provider => provider.models.map(model => ({ key: `${provider.id}/${model.id}`, provider, model })))
   }

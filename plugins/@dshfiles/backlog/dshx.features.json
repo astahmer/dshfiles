@@ -722,12 +722,12 @@
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
-        "expect button \"Filter by project\"",
-        "expect button \"Project of the new item\"",
-        "click button \"Project of the new item\"",
+        "expect combobox \"Filter by project\"",
+        "expect combobox \"Project of the new item\"",
+        "click combobox \"Project of the new item\"",
         "expect combobox \"Search projects\"",
         "press Escape",
-        "click button \"Filter by project\"",
+        "click combobox \"Filter by project\"",
         "expect option \"All projects\""
       ],
       "surfaces": ["client", "host", "settings"],

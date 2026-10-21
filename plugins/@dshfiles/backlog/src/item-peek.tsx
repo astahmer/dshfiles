@@ -1,6 +1,7 @@
 import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -121,7 +122,9 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
   const [type, setType] = useState<BacklogLink['type']>('url')
   const [relation, setRelation] = useState<BacklogRelation>('related')
   const [target, setTarget] = useState('')
-  const selectClass = 'dshx:h-7 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-1.5 dshx:text-xs dshx:text-foreground'
+  const pickerTrigger = 'dshx:h-7 dshx:w-auto dshx:text-xs'
+  const relationOptions: readonly ComboboxOption[] = BacklogItems.relations.map(value => ({ value, label: relationLabels[value] }))
+  const linkTypeOptions: readonly ComboboxOption[] = BacklogItems.linkTypes.map(value => ({ value, label: value }))
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -140,25 +143,22 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
           }}
         >
           <div className="dshx:flex dshx:gap-1.5">
-            <select
-              aria-label="Relation"
-              className={selectClass}
+            <Combobox
+              contentClassName="dshx:w-44"
+              label="Relation"
+              onValueChange={value => setRelation(relationOf(value) ?? 'related')}
+              options={relationOptions}
+              triggerClassName={pickerTrigger}
               value={relation}
-              onChange={event => setRelation(relationOf(event.currentTarget.value) ?? 'related')}
-            >
-              {BacklogItems.relations.map(value => (
-                <option key={value} value={value}>
-                  {relationLabels[value]}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Link type" className={selectClass} value={type} onChange={event => setType(linkTypeOf(event.currentTarget.value) ?? 'url')}>
-              {BacklogItems.linkTypes.map(value => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
+            />
+            <Combobox
+              contentClassName="dshx:w-44"
+              label="Link type"
+              onValueChange={value => setType(linkTypeOf(value) ?? 'url')}
+              options={linkTypeOptions}
+              triggerClassName={pickerTrigger}
+              value={type}
+            />
           </div>
           <input
             aria-label="Link target"
