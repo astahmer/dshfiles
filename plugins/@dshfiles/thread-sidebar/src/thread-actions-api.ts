@@ -161,14 +161,29 @@ export const threadActionsApi = defineApi({
           cwd: z.string().min(1).max(1024).optional(),
           title: z.string().min(1).max(200).optional(),
           agentPreset: z.string().min(1).max(128).optional(),
+          text: z.string().min(1).max(20_000).optional(),
         })
         .strict(),
-      output: z.object({ sessionId: z.string(), title: z.string().optional(), agentPreset: z.string().optional() }).strict(),
-      description: `Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and with an optional title. Returns the new thread id. ${ONLY_WHEN_ASKED}`,
+      output: z
+        .object({
+          sessionId: z.string(),
+          title: z.string().optional(),
+          agentPreset: z.string().optional(),
+          prompt: z.enum(['accepted', 'refused']).optional(),
+          promptError: z.string().optional(),
+        })
+        .strict(),
+      description: `Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_create',
-        render: output =>
-          `Started thread ${output.sessionId}${output.title === undefined ? '' : ` named “${output.title}”`}${output.agentPreset === undefined ? '' : ` with preset ${output.agentPreset}`}.`,
+        render: output => {
+          const head = `Started thread ${output.sessionId}${output.title === undefined ? '' : ` named “${output.title}”`}${output.agentPreset === undefined ? '' : ` with preset ${output.agentPreset}`}.`
+          if (output.prompt === 'accepted') return `${head} Its first message was accepted.`
+          if (output.prompt === 'refused') {
+            return `${head} Its first message was refused: ${output.promptError ?? 'no reason given'}. The thread exists and is idle; send the text with thread_prompt.`
+          }
+          return head
+        },
       },
     }),
     stop: method({

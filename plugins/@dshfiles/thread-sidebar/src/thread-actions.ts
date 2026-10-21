@@ -47,6 +47,8 @@ export interface ThreadActionDeps {
     readonly cwd?: string
     readonly agentPreset?: string
   }) => Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
+  /** Hand one message to a thread: queue starts its next turn, steer folds it into the running one. */
+  readonly prompt: (input: { readonly sessionId: string; readonly text: string; readonly mode: 'queue' | 'steer' }) => Promise<void>
   /** The workspace a new thread may start in: never a jj thread workspace another thread already uses. */
   readonly ownWorkspaceFor: (projectId: string) => Promise<string>
   readonly stop: (sessionId: string) => Promise<void>
@@ -102,6 +104,7 @@ export interface ThreadCreateInput {
   readonly cwd?: string | undefined
   readonly title?: string | undefined
   readonly agentPreset?: string | undefined
+  readonly text?: string | undefined
 }
 export interface ThreadSelectModelInput {
   readonly sessionId?: string | undefined
@@ -458,24 +461,29 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     } catch (error) {
       throw failure(error, 'Could not start a new thread.')
     }
-    if (input.title === undefined) {
-      return {
-        sessionId: created.sessionId,
-        ...(created.agentPreset === undefined ? undefined : { agentPreset: created.agentPreset }),
+    const started = {
+      sessionId: created.sessionId,
+      ...(created.agentPreset === undefined ? undefined : { agentPreset: created.agentPreset }),
+    }
+    // The thread already exists, so a refused title or first message must not hide its id from the caller.
+    let title: string | undefined
+    if (input.title !== undefined) {
+      try {
+        title = (await deps.rename(created.sessionId, input.title)).title
+      } catch {
+        title = undefined
       }
     }
-    // The thread already exists; a refused title must not hide the new id from the caller.
+    const withTitle = { ...started, ...(title === undefined ? undefined : { title }) }
+    if (input.text === undefined) return withTitle
     try {
-      const renamed = await deps.rename(created.sessionId, input.title)
+      await deps.prompt({ sessionId: created.sessionId, text: input.text, mode: 'queue' })
+      return { ...withTitle, prompt: 'accepted' as const }
+    } catch (error) {
       return {
-        sessionId: created.sessionId,
-        title: renamed.title,
-        ...(created.agentPreset === undefined ? undefined : { agentPreset: created.agentPreset }),
-      }
-    } catch {
-      return {
-        sessionId: created.sessionId,
-        ...(created.agentPreset === undefined ? undefined : { agentPreset: created.agentPreset }),
+        ...withTitle,
+        prompt: 'refused' as const,
+        promptError: failure(error, 'Could not send its first message.').message,
       }
     }
   },

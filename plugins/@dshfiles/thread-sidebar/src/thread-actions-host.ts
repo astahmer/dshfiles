@@ -1,4 +1,5 @@
-import type {} from '@deepseek-ai/dsh-api-session-controller'
+import { randomUUID } from 'node:crypto'
+import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller'
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -85,6 +86,14 @@ const dependencies: ThreadActionDeps = {
       ...(input.cwd === undefined ? undefined : { cwd: input.cwd }),
       ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
     }),
+  prompt: async input => {
+    // SAFETY: SessionRequestId is a type-only brand over a client-minted unique id.
+    const requestId = randomUUID() as SessionRequestId
+    await requireContext().sessionController.prompt(
+      { requestId, sessionId: SessionId(input.sessionId), mode: input.mode, content: [{ type: 'text', text: input.text }] },
+      AbortSignal.timeout(15_000),
+    )
+  },
   ownWorkspaceFor: async projectId => {
     const jj = createHostApiClient(requireContext(), jjIntegrationApi, '@dshfiles/thread-sidebar')
     try {

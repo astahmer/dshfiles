@@ -38,6 +38,7 @@ const createDeps = (overrides: Partial<ThreadActionDeps> = {}): ThreadActionDeps
   rename: async (_sessionId, title) => ({ title }),
   fork: async () => ({ sessionId: 'session-fork' }),
   create: async () => ({ sessionId: 'session-new' }),
+  prompt: async () => undefined,
   ownWorkspaceFor: async projectId => projectId,
   stop: async () => undefined,
   selectModel: async input => ({ provider: input.provider, model: input.model }),
@@ -342,6 +343,83 @@ describe('thread actions: lifecycle', () => {
       sessionId: 'session-new',
     })
   })
+
+  test('starts the new thread with its first message, after naming it', async () => {
+    const order: string[] = []
+    const prompts: Array<{ sessionId: string; text: string; mode: 'queue' | 'steer' }> = []
+    const actions = createThreadActions(
+      createDeps({
+        rename: async (_sessionId, title) => {
+          order.push('rename')
+          return { title }
+        },
+        prompt: async input => {
+          order.push('prompt')
+          prompts.push(input)
+        },
+      }),
+    )
+
+    expect(
+      await actions.create({
+        input: { projectId: 'project-1', title: 'Delegated brief', text: 'Investigate the flaky checkout test.\nDo not touch main.' },
+        caller: agent('session-a'),
+        signal,
+      }),
+    ).toEqual({ sessionId: 'session-new', title: 'Delegated brief', prompt: 'accepted' })
+    expect(prompts).toEqual([
+      { sessionId: 'session-new', text: 'Investigate the flaky checkout test.\nDo not touch main.', mode: 'queue' },
+    ])
+    expect(order).toEqual(['rename', 'prompt'])
+  })
+
+  test('leaves the title to the Host when only text is given', async () => {
+    const prompts: string[] = []
+    const actions = createThreadActions(
+      createDeps({
+        rename: async () => Promise.reject(new Error('nothing should rename')),
+        prompt: async input => {
+          prompts.push(input.text)
+        },
+      }),
+    )
+
+    expect(await actions.create({ input: { text: 'Fix the failing e2e journey' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-new',
+      prompt: 'accepted',
+    })
+    expect(prompts).toEqual(['Fix the failing e2e journey'])
+  })
+
+  test('creates a blank thread when neither title nor text is given', async () => {
+    let prompted = false
+    const actions = createThreadActions(
+      createDeps({
+        prompt: async () => {
+          prompted = true
+        },
+      }),
+    )
+
+    expect(await actions.create({ input: {}, caller: agent('session-a'), signal })).toEqual({ sessionId: 'session-new' })
+    expect(prompted).toBe(false)
+  })
+
+  test('reports a refused first message with the created thread and the failed prompt in the result', async () => {
+    const actions = createThreadActions(
+      createDeps({
+        prompt: async () => Promise.reject(Object.assign(new Error('prompt rejected'), { code: 'session/agent-busy' })),
+      }),
+    )
+
+    expect(await actions.create({ input: { title: 'Brief', text: 'Do the work' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-new',
+      title: 'Brief',
+      prompt: 'refused',
+      promptError: 'prompt rejected',
+    })
+  })
+
 })
 
 describe('thread actions: projects', () => {
