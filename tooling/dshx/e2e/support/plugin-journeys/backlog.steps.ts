@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 
 const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed' })
@@ -461,4 +462,37 @@ Then('the batch status action updates only the remaining selected items', async 
     await expect(page.getByRole('button', { name: 'Status of b:3' })).toContainText('Done')
   })
   await finishJourneyAssertions(page)
+})
+
+When('a thread on the fake model writes {string}', async ({ page }: { page: Page }, text: string) => {
+  // A provider-less profile ends the first turn immediately and the client then drops the conversation, so the
+  // reference this journey clicks would be gone; run a real turn on the local fake provider and let it settle.
+  await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
+  await sendMessage(page, text)
+})
+
+Then('the inline backlog preview shows {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'backlog-reference-inline-preview', async () => {
+    const reference = page.getByRole('link', { name: 'Preview backlog item b:1', exact: true })
+    await expect(reference).toBeVisible()
+    const preview = page.locator('[data-dshfiles-backlog-preview]')
+    // A scroll closes the card by design, and the conversation can still settle right after the turn lands, so ask
+    // again rather than reading a card the page itself just took away.
+    await expect(async () => {
+      if ((await preview.count()) === 0) await reference.click()
+      await expect(preview).toContainText(text, { timeout: 1_500 })
+    }).toPass({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the backlog preview is opened in the Backlog panel', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Open in Backlog', exact: true }).click()
+  await expect(peek(page)).toBeVisible()
+})
+
+Then('the backlog detail shows {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'backlog-reference-opened-in-panel', async () => {
+    await expect(peek(page).getByText(text, { exact: true })).toBeVisible()
+  })
 })

@@ -27,11 +27,12 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import { BoardView } from './board-view.js'
+import { BacklogFocusModel } from './backlog-focus.js'
 import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
 import { inboxThreadsFrom } from './inbox-threads.js'
@@ -278,6 +279,16 @@ export const BacklogPanel = (props: {
     if (lastRevision.current !== undefined && lastRevision.current !== revision.data) void queryClient.invalidateQueries({ queryKey: [BacklogQueries.key] })
     lastRevision.current = revision.data
   }, [revision.data, queryClient])
+  // A conversation reference asks for one item; selecting it here is what the sidebar row cannot know.
+  const focus = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.read, () => null)
+  useEffect(() => {
+    if (focus === null) return
+    setOpenId(focus)
+    setCursorId(focus)
+    setExpanded(false)
+    const timer = window.setTimeout(BacklogFocusModel.clear, 0)
+    return () => window.clearTimeout(timer)
+  }, [focus])
   const projectFilter = stored.project
   // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
   const scoped = projectFilter === null ? {} : { project: projectFilter === '' ? null : projectFilter }

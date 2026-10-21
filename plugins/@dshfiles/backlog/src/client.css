@@ -1,0 +1,11 @@
+@source './';
+
+[data-dshfiles-backlog-reference] {
+  cursor: pointer;
+}
+
+[data-dshfiles-backlog-reference]:hover,
+[data-dshfiles-backlog-reference]:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

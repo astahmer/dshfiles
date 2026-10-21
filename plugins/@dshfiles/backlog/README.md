@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Preview a referenced item from a conversation](docs/screenshots/reference-preview.png)
+
 ![A chat-sized capture box with files, properties and references](docs/screenshots/rich-capture.png)
 
 ![Capture anything and let it sort itself](docs/screenshots/capture-and-triage.png)
@@ -82,6 +84,14 @@ The peek opens beside the list (over it in a narrow pane). Edit the title and th
 with its actor (`user`, `system` or `agent:<sessionId>`). **Referenced by** lists the items that link to
 this one. Fields the user changes by hand are recorded in `humanFields`, so later automatic moves can
 leave them alone. Nothing is deleted; `dropped` closes an item.
+
+## References in a conversation
+
+An Agent writes `b:<n>` in its markdown, the way `jj:<rev>` marks a revision: prose and inline code become
+links, while fenced code, existing links and words that merely contain the token stay as written. Clicking
+one opens an inline card with the item's title, kind, status, project and body; **Open in Backlog** selects
+that item in the panel. An item that no longer exists says so in the card instead of failing the
+conversation.
 
 ## Starting a thread from an item
 

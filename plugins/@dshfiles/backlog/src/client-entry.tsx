@@ -1,5 +1,7 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -15,10 +17,14 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
 import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
+import { BacklogFocusModel } from './backlog-focus.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
+import { installBacklogReferenceLinks } from './backlog-reference-links.js'
+import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
 import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadCreation, type StartThreadRequest } from './start-thread.js'
 import { isolateStartThread } from './start-thread-workspace.js'
+import './client.css'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
 
@@ -31,8 +37,9 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'conversation', 'inputTriggers'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'conversation', 'inputTriggers'],
   setup(ctx, decorate) {
+    ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
     const api = createApiClient(ctx, backlogApi)
     const agents = createApiClient(ctx, agentsApi)
     const startThreadPorts: StartThreadPorts = {
@@ -187,8 +194,22 @@ export default defineClient({
         </AgentDispatchProvider>
       </PluginQueryProvider>
     )
+    const ReferenceOverlay = (): JSX.Element => (
+      <PluginQueryProvider>
+        <BacklogReferenceOverlay
+          openInBacklog={id => {
+            BacklogFocusModel.request(id)
+            // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
+            ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+          }}
+        />
+      </PluginQueryProvider>
+    )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-reference-preview', order: 121 }, decorate(ReferenceOverlay)),
+    )
   },
 })
 

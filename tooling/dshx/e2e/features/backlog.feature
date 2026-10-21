@@ -111,3 +111,14 @@ Feature: Backlog
     When the feed is shown
     And backlog item b:1 is opened
     Then item text links are clickable in the detail
+
+  @scenario:backlog.reference-preview
+  Scenario: Preview a referenced item from a conversation
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Ship the backlog reference preview" is captured
+    When a thread on the fake model writes "Working on b:1"
+    Then the inline backlog preview shows "Ship the backlog reference preview"
+    When the backlog preview is opened in the Backlog panel
+    Then the backlog detail shows "Ship the backlog reference preview"

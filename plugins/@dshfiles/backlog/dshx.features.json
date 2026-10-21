@@ -410,6 +410,57 @@
       ]
     },
     {
+      "id": "reference-preview",
+      "title": "Preview a referenced item from a conversation",
+      "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body, and Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship the backlog reference preview\nRemember where the link goes.\"",
+        "press Enter",
+        "expect text \"Ship the backlog reference preview\"",
+        "click button \"New*\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Working on b:1\"",
+        "press Enter",
+        "expect link \"Preview backlog item b:1\"",
+        "click link \"Preview backlog item b:1\"",
+        "expect text \"Backlog · b:1\"",
+        "expect text \"Ship the backlog reference preview\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["idle", "loading", "linked", "missing", "opened"],
+      "failureModes": [
+        "A deleted item says it no longer exists inline without failing the conversation.",
+        "A token that cannot name an item in the Host's id shape stays plain text."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.reference-preview",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reference-preview-syntax",
+          "file": "plugins/@dshfiles/backlog/src/backlog-reference.test.ts",
+          "testName": "finds an item id wherever prose, inline code or punctuation puts it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reference-preview-links",
+          "file": "plugins/@dshfiles/backlog/src/backlog-reference-links.test.ts",
+          "testName": "links an item number in prose and in inline code"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reference-preview-focus",
+          "file": "plugins/@dshfiles/backlog/src/backlog-focus.test.ts",
+          "testName": "keeps the item a reference asked for until the panel takes it"
+        }
+      ]
+    },
+    {
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
       "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Views save a view and search to the plugin settings.",
