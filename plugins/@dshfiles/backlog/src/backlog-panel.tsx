@@ -297,10 +297,28 @@ export const BacklogPanel = (props: {
   // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
   const scoped = projectFilter === null ? {} : { project: projectFilter === '' ? null : projectFilter }
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilter],
-    queryFn: async ({ signal }) =>
-      BacklogViews.list(await api.list({ query: debounced, kinds, ...scoped, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }, { signal })),
+    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilter, debounced === '' ? [] : stored.statuses],
+    queryFn: async ({ signal }) => {
+      const input: Parameters<typeof api.list>[0] = { query: debounced, kinds, ...scoped, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }
+      if (debounced !== '' && stored.statuses.length > 0) input.statuses = stored.statuses
+      return BacklogViews.list(await api.list(input, { signal }))
+    },
     placeholderData: keepPreviousData,
+  })
+  const searchStatusCounts = useQuery({
+    queryKey: [BacklogQueries.key, 'search-status-counts', debounced, kinds, projectFilter],
+    queryFn: async ({ signal }) => {
+      const counts = await Promise.all(
+        BacklogItems.statuses.map(async status => {
+          const result = await api.list({ query: debounced, kinds, statuses: [status], ...scoped, freshness: 'all', limit: 1 }, { signal })
+          return [status, BacklogViews.list(result).total] as const
+        }),
+      )
+      const totals = { inbox: 0, todo: 0, doing: 0, done: 0, dropped: 0 } satisfies Record<BacklogStatus, number>
+      for (const [status, count] of counts) totals[status] = count
+      return totals
+    },
+    enabled: debounced !== '',
   })
   const inbox = useQuery({
     queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilter],
@@ -533,6 +551,10 @@ export const BacklogPanel = (props: {
               <SearchResults
                 items={all}
                 total={list.data?.total ?? 0}
+                counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
+                statuses={stored.statuses}
+                toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                clearStatuses={() => setPreference({ statuses: [] })}
                 query={debounced}
                 openId={openId}
                 cursorId={cursorId}

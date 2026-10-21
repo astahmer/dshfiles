@@ -3,8 +3,10 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import type { BacklogStatus } from './item.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { StatusFilterBar } from './status-filter-bar.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
@@ -45,6 +47,10 @@ const Highlight = (props: { readonly text: string; readonly terms: readonly stri
 export const SearchResults = (props: {
   readonly items: readonly BacklogSummaryView[]
   readonly total: number
+  readonly counts: Record<BacklogStatus, number>
+  readonly statuses: readonly BacklogStatus[]
+  readonly toggleStatus: (status: BacklogStatus) => void
+  readonly clearStatuses: () => void
   readonly query: string
   readonly openId: number | null
   readonly cursorId: number | null
@@ -58,6 +64,7 @@ export const SearchResults = (props: {
   const actions = useBacklogActions()
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+      <StatusFilterBar counts={props.counts} statuses={props.statuses} toggle={props.toggleStatus} clear={props.clearStatuses} />
       <div className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4 dshx:text-xs dshx:text-muted-foreground">
         <SearchIcon aria-hidden className="dshx:size-3.5" />
         <span>
