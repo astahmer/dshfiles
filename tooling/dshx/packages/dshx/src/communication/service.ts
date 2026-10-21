@@ -61,6 +61,7 @@ export const ACTIVITY_BATCH_LIMIT = 100
 /** A publish fans out one recipient per subscriber, and a message carries at most 512 recipients. */
 const MAX_TOPIC_SUBSCRIBERS = 512
 const MAX_ACKNOWLEDGEMENTS = 100_000
+const generatedWorkspaceTopicPattern = /^workspace\/[a-f0-9]{24}$/
 
 const topicSchema = z
   .string()
@@ -102,9 +103,21 @@ const subscriptionInputSchema = z
   })
   .strict()
 
+const pruneWorkspaceTopicsInputSchema = z
+  .object({
+    activeTopics: z.array(topicSchema).max(MAX_SUBSCRIPTIONS),
+    inactiveBefore: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict()
+
 export interface CommunicationServiceOptions {
   readonly statePath?: string
   readonly now?: () => number
+}
+
+export interface PruneInactiveWorkspaceTopicsInput {
+  readonly activeTopics: readonly string[]
+  readonly inactiveBefore: number
 }
 
 /** One principal's unread count, as a bulk read reports it. */
@@ -313,6 +326,78 @@ export class CommunicationService {
 
   async listTopics(): Promise<readonly CommunicationTopic[]> {
     return topicsForState(await this.#readState())
+  }
+
+  async pruneInactiveWorkspaceTopics(input: PruneInactiveWorkspaceTopicsInput): Promise<number> {
+    const parsed = pruneWorkspaceTopicsInputSchema.parse(input)
+    const activeTopics = new Set(parsed.activeTopics)
+    return this.#updateState(state => {
+      const lastActivityByTopic = new Map<string, number>()
+      const messageTopics = new Map<string, string>()
+      const principalsByTopic = new Map<string, Set<string>>()
+      const recordActivity = (topic: string, occurredAt: number): void => {
+        if (!generatedWorkspaceTopicPattern.test(topic)) return
+        lastActivityByTopic.set(topic, Math.max(lastActivityByTopic.get(topic) ?? 0, occurredAt))
+      }
+      const recordPrincipal = (topic: string, principal: CommunicationPrincipal): void => {
+        if (!generatedWorkspaceTopicPattern.test(topic)) return
+        const principals = principalsByTopic.get(topic) ?? new Set<string>()
+        principals.add(principalKey(principal))
+        principalsByTopic.set(topic, principals)
+      }
+
+      for (const subscription of state.subscriptions) {
+        recordActivity(subscription.topic, subscription.createdAt)
+        recordPrincipal(subscription.topic, subscription.principal)
+      }
+      for (const message of state.messages) {
+        if (message.topic === null || !generatedWorkspaceTopicPattern.test(message.topic)) continue
+        messageTopics.set(message.id, message.topic)
+        recordActivity(message.topic, message.createdAt)
+        recordPrincipal(message.topic, message.sender)
+        for (const recipient of message.recipients) {
+          recordPrincipal(message.topic, recipient.principal)
+          if (recipient.readAt !== null) recordActivity(message.topic, recipient.readAt)
+        }
+      }
+      for (const acknowledgement of state.acknowledgements) {
+        const topic = messageTopics.get(acknowledgement.messageId)
+        if (topic === undefined) continue
+        recordActivity(topic, acknowledgement.acknowledgedAt)
+        recordPrincipal(topic, acknowledgement.principal)
+      }
+
+      const latestToolActivityByPrincipal = new Map<string, number>()
+      for (const event of state.activityEvents) {
+        const key = principalKey(event.principal)
+        latestToolActivityByPrincipal.set(key, Math.max(latestToolActivityByPrincipal.get(key) ?? 0, event.occurredAt))
+      }
+      for (const [topic, principals] of principalsByTopic) {
+        for (const principal of principals) {
+          const lastToolActivity = latestToolActivityByPrincipal.get(principal)
+          if (lastToolActivity !== undefined) recordActivity(topic, lastToolActivity)
+        }
+      }
+
+      const inactiveTopics = new Set(
+        [...lastActivityByTopic]
+          .filter(([topic, lastActivityAt]) => !activeTopics.has(topic) && lastActivityAt <= parsed.inactiveBefore)
+          .map(([topic]) => topic),
+      )
+      if (inactiveTopics.size === 0) return { state, value: 0 }
+
+      const messages = state.messages.filter(message => message.topic === null || !inactiveTopics.has(message.topic))
+      const retainedMessageIds = new Set(messages.map(message => message.id))
+      return {
+        state: {
+          ...state,
+          messages,
+          subscriptions: state.subscriptions.filter(subscription => !inactiveTopics.has(subscription.topic)),
+          acknowledgements: state.acknowledgements.filter(acknowledgement => retainedMessageIds.has(acknowledgement.messageId)),
+        },
+        value: inactiveTopics.size,
+      }
+    })
   }
 
   async browseMessages(input: CommunicationBrowseInput = {}): Promise<CommunicationMessagePage> {

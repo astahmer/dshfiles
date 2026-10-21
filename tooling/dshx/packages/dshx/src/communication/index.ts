@@ -8,6 +8,7 @@ export type {
   CommunicationPublishInput,
   CommunicationSendInput,
   CommunicationServiceOptions,
+  PruneInactiveWorkspaceTopicsInput,
 } from './service.js'
 export {
   communicationActivityEventSchema,

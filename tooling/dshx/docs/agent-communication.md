@@ -131,6 +131,16 @@ report live Agent workspace topics and actual stored subscriptions separately;
 a missing subscription is not mistaken for a populated channel. An empty
 runtime or unavailable report is not proof that the capability was never used.
 
+Generated `workspace/<24-hex>` channels are pruned by the bridge-owning Host
+at startup and hourly when their latest stored subscription, post, inbox-read,
+acknowledgement or participant Agent tool activity is at least 24 hours old and
+no durable Session or live Agent maps to that workspace. The cleanup requires a
+successful full `sessionQuery.listSessions()`; if that service is missing or
+the listing fails, it leaves channel state alone. It removes the channel's
+subscriptions, messages and their acknowledgements. Other topic names and
+direct inboxes are outside this cleanup rule. Idle status or absence from the
+live Agent registry does not count as proof that a Session was deleted.
+
 ## Commands
 
 ```sh

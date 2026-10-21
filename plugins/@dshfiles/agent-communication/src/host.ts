@@ -15,7 +15,7 @@ import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/d
 import { z } from 'zod'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
-import { registerCommunicationAgent } from './agent-lifecycle.js'
+import { AgentCommunicationLifecycle } from './agent-lifecycle.js'
 import { CommunicationDelegation, type DelegationSender } from './delegation-guard.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
@@ -490,6 +490,7 @@ const communicationOperations = createAgentCommunicationOperations({
 
 /** Sending to a dormant Session must stay possible, so the whole persisted corpus is listed — but only on demand. */
 const durableSessionIdTtlMs = 60_000
+const workspaceTopicCleanupIntervalMs = 60 * 60 * 1000
 let durableSessionIds: { readonly at: number; readonly ids: readonly string[] } | undefined
 
 const knownDurableSessionIds = async (): Promise<readonly string[] | undefined> => {
@@ -630,7 +631,7 @@ const trackToolActivity = async <Value>(input: {
 }
 
 const initializeAgent = (agent: Agent): Promise<void> =>
-  registerCommunicationAgent({
+  AgentCommunicationLifecycle.registerCommunicationAgent({
     service: requireService,
     agentId: agent.id,
     workspaceCwd: agent.session.header.cwd,
@@ -678,6 +679,29 @@ const setupHost = (context: Context): Effect<void> => {
   return {
     async *[Symbol.asyncIterator]() {
       let bridge: Awaited<ReturnType<typeof startHostCommunicationBridge>> | undefined
+      let workspaceCleanupInFlight: Promise<void> | undefined
+      const runWorkspaceTopicCleanup = (): void => {
+        if (workspaceCleanupInFlight !== undefined) return
+        workspaceCleanupInFlight = (async () => {
+          const sessionQuery = context.get('sessionQuery')
+          if (sessionQuery === undefined) return
+          const records: readonly SessionRecord[] = await sessionQuery.listSessions()
+          const removed = await AgentCommunicationLifecycle.cleanupInactiveWorkspaceChannels({
+            service,
+            sessionCwds: records.map(record => record.header.cwd),
+            liveAgentCwds: context.agents.list().map(agent => agent.session.header.cwd),
+            now: Date.now(),
+          })
+          if (removed > 0) context.logger.info('agent-communication: pruned %d inactive orphaned workspace channel(s)', removed)
+        })()
+          .catch(error => {
+            const errorCode = error instanceof CommunicationError ? error.code : 'unknown'
+            context.logger.warn('agent-communication: workspace channel cleanup skipped (code=%s)', errorCode)
+          })
+          .finally(() => {
+            workspaceCleanupInFlight = undefined
+          })
+      }
       const clearHostContext = (): void => {
         if (hostContext !== context) return
         hostContext = undefined
@@ -703,8 +727,15 @@ const setupHost = (context: Context): Effect<void> => {
         for (const agent of context.agents.list()) await initializeAgent(agent)
         void refreshUnreadCounts()
         const unreadTimer = setInterval(() => void refreshUnreadCounts(), UnreadNudgeRules.refreshIntervalMs)
+        let workspaceTopicCleanupTimer: ReturnType<typeof setInterval> | undefined
+        if (bridge !== undefined) {
+          // The bridge owner is the single Host process allowed to schedule maintenance for shared communication state.
+          runWorkspaceTopicCleanup()
+          workspaceTopicCleanupTimer = setInterval(runWorkspaceTopicCleanup, workspaceTopicCleanupIntervalMs)
+        }
         yield async () => {
           clearInterval(unreadTimer)
+          if (workspaceTopicCleanupTimer !== undefined) clearInterval(workspaceTopicCleanupTimer)
           try {
             if (bridge !== undefined) await bridge.close()
           } finally {

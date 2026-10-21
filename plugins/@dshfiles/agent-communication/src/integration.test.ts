@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService, type CommunicationService } from '@dshfiles/dshx/communication'
-import { initializeCommunicationAgent } from './agent-lifecycle.js'
+import { AgentCommunicationLifecycle } from './agent-lifecycle.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { SessionHistoryModel } from './session-history.js'
@@ -54,7 +54,7 @@ const registryFor = (agents: readonly TestAgent[], ownership: Readonly<Record<st
 })
 
 const register = async (service: CommunicationService, agent: TestAgent): Promise<void> => {
-  await initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.session.header.cwd })
+  await AgentCommunicationLifecycle.initializeCommunicationAgent({ service, agentId: agent.id, workspaceCwd: agent.session.header.cwd })
 }
 
 afterEach(async () => {

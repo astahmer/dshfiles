@@ -36,6 +36,7 @@ const persistedStateSchema = z.looseObject({
       delivery: z.string(),
     }),
   ),
+  acknowledgements: z.array(z.looseObject({ messageId: z.string() })).optional(),
   notifications: z.array(z.looseObject({})).optional(),
   activityStartedAt: z.number().nullable().optional(),
   activityEvents: z.array(z.looseObject({})).optional(),
@@ -513,6 +514,75 @@ describe('durable Agent communication', () => {
         callId: 'call-1',
       }),
     ).rejects.toThrow('disk full')
+  })
+
+  it('prunes stale hashed workspace channels without deleting named topics or direct inboxes', async () => {
+    let currentTime = now
+    const path = await statePath()
+    const service = createCommunicationService({ statePath: path, now: () => currentTime })
+    const workspaceTopic = 'workspace/0123456789abcdef01234567'
+    const namedTopic = 'workspace/team-sync'
+    const subscriber: CommunicationPrincipal = { kind: 'agent', id: 'session-workspace' }
+    const external: CommunicationPrincipal = { kind: 'external', id: 'editor' }
+
+    await service.subscribe(subscriber, { topic: workspaceTopic })
+    const channelMessage = await service.publish({ sender: external, topic: workspaceTopic, text: 'A channel message.' })
+    await service.inbox({ principal: subscriber, topic: workspaceTopic })
+    await service.acknowledge(subscriber, channelMessage.id)
+    await service.subscribe(subscriber, { topic: namedTopic })
+    const directMessage = await service.send({ sender: external, toAgentId: subscriber.id, text: 'Private message.' })
+
+    currentTime += 25 * 60 * 60 * 1000
+    const removed = await service.pruneInactiveWorkspaceTopics({ activeTopics: [], inactiveBefore: currentTime - 24 * 60 * 60 * 1000 })
+
+    expect(removed).toBe(1)
+    expect(await service.listTopics()).toEqual([{ topic: namedTopic, subscribers: 1 }])
+    expect(await service.browseMessages({ topic: workspaceTopic })).toMatchObject({ items: [], totalMatching: 0 })
+    expect(await service.inbox({ principal: subscriber, topic: 'inbox' })).toMatchObject([{ id: directMessage.id, topic: null }])
+    const persisted = await readPersistedState(path)
+    expect(persisted.messages.map(message => message.id)).toEqual([directMessage.id])
+    expect(persisted.acknowledgements).toEqual([])
+  })
+
+  it('keeps a workspace topic while it is active or has recent read activity', async () => {
+    let currentTime = now
+    const service = createCommunicationService({ statePath: await statePath(), now: () => currentTime })
+    const topic = 'workspace/0123456789abcdef01234567'
+    const subscriber: CommunicationPrincipal = { kind: 'agent', id: 'session-workspace' }
+    const external: CommunicationPrincipal = { kind: 'external', id: 'editor' }
+
+    await service.subscribe(subscriber, { topic })
+    const message = await service.publish({ sender: external, topic, text: 'A channel message.' })
+    currentTime += 23 * 60 * 60 * 1000
+    await service.inbox({ principal: subscriber, topic })
+    await service.acknowledge(subscriber, message.id)
+    currentTime += 2 * 60 * 60 * 1000
+
+    expect(await service.pruneInactiveWorkspaceTopics({ activeTopics: [topic], inactiveBefore: currentTime - 24 * 60 * 60 * 1000 })).toBe(0)
+    expect(await service.pruneInactiveWorkspaceTopics({ activeTopics: [], inactiveBefore: currentTime - 24 * 60 * 60 * 1000 })).toBe(0)
+    expect(await service.listTopics()).toEqual([{ topic, subscribers: 1 }])
+  })
+
+  it('uses recent communication-tool activity from a topic participant as channel activity', async () => {
+    let currentTime = now
+    const service = createCommunicationService({ statePath: await statePath(), now: () => currentTime })
+    const topic = 'workspace/0123456789abcdef01234567'
+    const subscriber: CommunicationPrincipal = { kind: 'agent', id: 'session-workspace' }
+
+    await service.ensureSubscription(subscriber, { topic, delivery: 'passive' })
+    currentTime += 23 * 60 * 60 * 1000
+    await service.recordActivity({
+      principal: { kind: 'agent', id: subscriber.id },
+      operation: 'dshx_comm_topics',
+      outcome: 'success',
+      occurredAt: currentTime,
+      durationMs: 1,
+      callId: 'topic-list-call',
+    })
+    currentTime += 2 * 60 * 60 * 1000
+
+    expect(await service.pruneInactiveWorkspaceTopics({ activeTopics: [], inactiveBefore: currentTime - 24 * 60 * 60 * 1000 })).toBe(0)
+    expect(await service.listTopics()).toEqual([{ topic, subscribers: 1 }])
   })
 
   it('re-reads state another process wrote instead of serving its cached copy', async () => {
