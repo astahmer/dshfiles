@@ -2509,6 +2509,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts

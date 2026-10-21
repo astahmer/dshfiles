@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",

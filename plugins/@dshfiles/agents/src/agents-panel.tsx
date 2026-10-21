@@ -44,6 +44,7 @@ const draftOf = (agent: Agent | null): AgentDraft => ({
   instructions: agent?.instructions ?? '',
   preset: agent?.preset ?? null,
   route: agent?.route ?? null,
+  memoryScope: agent?.memoryScope ?? null,
   enabled: agent?.enabled ?? true,
 })
 
@@ -237,6 +238,15 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Description</span>
             <Input value={draft.description} maxLength={agentLimits.description} onChange={event => patch({ description: event.currentTarget.value })} />
+          </label>
+          <label className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className={labelClass}>Memory scope</span>
+            <Input
+              value={draft.memoryScope ?? ''}
+              placeholder={Agents.defaultMemoryScope(editing ? Agents.handleFrom(draft.name || draft.handle) : (current?.handle ?? ''))}
+              onChange={event => patch({ memoryScope: event.currentTarget.value === '' ? null : event.currentTarget.value })}
+            />
+            <span className="dshx:text-[11px] dshx:text-muted-foreground">The notes this agent's threads read; empty keeps memory to the project.</span>
           </label>
         </div>
 

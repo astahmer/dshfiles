@@ -21,6 +21,9 @@ where a thread starts.
   reads, because a preset and system prompt are fixed when the thread is created.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
+- **A memory scope of its own.** An agent may name a memory scope (`agent:<handle>` by default). `@dshfiles/memory`
+  reads it through this plugin's contract for every thread the agent started, so those threads carry the project block
+  plus that scope's notes; memory keeps one store and one scope column.
 - **Thread history is durable.** A dispatch records its Session in the agent's `threads` table, so
   the panel lists the threads an agent started (and opens one) after a Host restart, and the usage
   counters are read back from storage rather than recomputed per page load.
@@ -40,7 +43,7 @@ where a thread starts.
 - 100 agents, 8 KB of instructions each, 32-character handles (`^[a-z][a-z0-9-]{0,31}$`).
 - A handle is the identity: it cannot be renamed after creation.
 - 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
-- Memory, routines and delegation rules are Phase 3 slices; see
+- Memory is scoped per agent (see above); routines and delegation rules are the remaining Phase 3 slices — see
   `plans/persistent-agents/README.md`.
 
 ## Development

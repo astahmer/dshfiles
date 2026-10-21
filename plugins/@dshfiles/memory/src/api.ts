@@ -204,7 +204,13 @@ const noteInput = z
       .describe(
         'user: who the user is, their role, expertise, preferences. feedback: a correction or a confirmed approach, with the why. project: a decision, constraint or context not derivable from code or git. reference: a pointer to an external resource. Default project.',
       ),
-    scope: z.string().max(256).optional().describe('repo (default), global, or path:<subpath>. Do not widen a one-off request into a global rule.'),
+    scope: z
+      .string()
+      .max(256)
+      .optional()
+      .describe(
+        'repo (default), global, path:<subpath>, or agent:<handle> for a scope only that agent’s threads read. Do not widen a one-off request into a global rule.',
+      ),
     confidence: z.enum(['stated', 'inferred']).optional().describe('stated: the user said it; inferred: you concluded it. Default stated.'),
     id: z.string().max(40).optional().describe('Note id (n:<id>) for update and forget.'),
     reason: z.string().max(500).optional().describe('Why the note is updated or forgotten (required for both).'),
@@ -264,7 +270,7 @@ export const memoryApi = defineApi({
       tool: { name: 'memory_projects', readOnly: true, render: compactJson },
     }),
     startBlock: method({
-      input: z.object({ cwd: z.string().min(1).max(4_096) }).strict(),
+      input: z.object({ cwd: z.string().min(1).max(4_096), scope: z.string().min(1).max(80).optional() }).strict(),
       output: z.object({ project: z.string(), text: z.string() }),
       description:
         'The memory block a new thread started in this folder gets now, and the project it is filed under. Empty when memory is off or has nothing for the project. Read-only.',

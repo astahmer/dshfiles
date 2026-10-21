@@ -5,17 +5,17 @@ Research date: 2026-10-21.
 
 ## What the reference products do
 
-| Feature           | Grok Bot                                                                  | OpenAI Dots                                        |
-| ----------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
-| Identity          | Name, avatar, description                                                 | Name, avatar/character                             |
-| Instructions      | Role + persistent context                                                 | Goals + ongoing instructions                       |
-| Memory            | Per-bot context                                                           | Per-dot memory                                     |
-| Integrations      | Skills, plugins, connectors                                               | Plugins, connected apps                            |
-| Autonomy          | Routines, approval boundaries                                             | Scheduled tasks, action rules                      |
-| Collaboration     | Bot DMs, group chats                                                      | Primarily personal agent                           |
-| Computer access   | Shared computer                                                           | Cloud / optional local computer                    |
-| Model selection   | Not documented as configurable                                            | Not exposed as a general model picker              |
-| Reusability       | Duplicate bot configuration                                               | Persistent dot configuration                       |
+| Feature         | Grok Bot                       | OpenAI Dots                           |
+| --------------- | ------------------------------ | ------------------------------------- |
+| Identity        | Name, avatar, description      | Name, avatar/character                |
+| Instructions    | Role + persistent context      | Goals + ongoing instructions          |
+| Memory          | Per-bot context                | Per-dot memory                        |
+| Integrations    | Skills, plugins, connectors    | Plugins, connected apps               |
+| Autonomy        | Routines, approval boundaries  | Scheduled tasks, action rules         |
+| Collaboration   | Bot DMs, group chats           | Primarily personal agent              |
+| Computer access | Shared computer                | Cloud / optional local computer       |
+| Model selection | Not documented as configurable | Not exposed as a general model picker |
+| Reusability     | Duplicate bot configuration    | Persistent dot configuration          |
 
 Read as behavior, not a spec: the parts worth copying are the **persistent identity** (a
 bot/dot you keep mentioning, not a prompt preset you retype), the **handle** as the entry
@@ -25,17 +25,17 @@ isolation and memory.
 
 ## What DSH already provides (verified 2026-10-21)
 
-| Need                     | Existing capability                                                                                                                | Where                                             |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Run an agent             | An ordinary Session; one Agent per Session                                                                                         | `sessions.create`, `sessionController`            |
-| Tool/permission profile  | Agent **presets**: `standard`, `ptc`, `minimal`, `cordis` — each a Cordis composition of tools, skills, plan mode, delegation      | `dshx presets list/show`, `agentPresets` service   |
-| Pick the model/account   | Model catalog grouped by provider route (one route per AI account), per-model reasoning efforts; `selectModel({sessionId,…})`      | `remote.session.modelCatalog`, `dshx models list`  |
-| Per-thread workspace     | `@dshfiles/jj-integration` gives a new thread its own jj workspace when its scope is `all`; `Rebase` lands it                       | `plugins/@dshfiles/jj-integration`                 |
-| Memory                   | `memory_search`/`memory_read`/`memory_note` with project scope, a frozen start block per thread, digests per project               | `plugins/@dshfiles/memory`                         |
-| Agent collaboration      | Durable inboxes and workspace topics: `dshx_comm_send`, `dshx_comm_publish`, `dshx_comm_inbox`                                     | `plugins/@dshfiles/agent-communication`            |
-| Scheduling               | `schedule_create` reminders (session-scoped)                                                                                       | native `tool-schedule`                             |
-| Dispatch already working | Backlog “Start thread…” creates a Session with a preset, selects a model, renames it, sends the first message, links the item      | `plugins/@dshfiles/backlog/src/client-entry.tsx`   |
-| `@` menu                 | Any plugin registers an `@` source with scopes; backlog, skills, MCP already do                                                    | `plugins/@dshfiles/input-trigger`, `mentions`      |
+| Need                     | Existing capability                                                                                                           | Where                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Run an agent             | An ordinary Session; one Agent per Session                                                                                    | `sessions.create`, `sessionController`            |
+| Tool/permission profile  | Agent **presets**: `standard`, `ptc`, `minimal`, `cordis` — each a Cordis composition of tools, skills, plan mode, delegation | `dshx presets list/show`, `agentPresets` service  |
+| Pick the model/account   | Model catalog grouped by provider route (one route per AI account), per-model reasoning efforts; `selectModel({sessionId,…})` | `remote.session.modelCatalog`, `dshx models list` |
+| Per-thread workspace     | `@dshfiles/jj-integration` gives a new thread its own jj workspace when its scope is `all`; `Rebase` lands it                 | `plugins/@dshfiles/jj-integration`                |
+| Memory                   | `memory_search`/`memory_read`/`memory_note` with project scope, a frozen start block per thread, digests per project          | `plugins/@dshfiles/memory`                        |
+| Agent collaboration      | Durable inboxes and workspace topics: `dshx_comm_send`, `dshx_comm_publish`, `dshx_comm_inbox`                                | `plugins/@dshfiles/agent-communication`           |
+| Scheduling               | `schedule_create` reminders (session-scoped)                                                                                  | native `tool-schedule`                            |
+| Dispatch already working | Backlog “Start thread…” creates a Session with a preset, selects a model, renames it, sends the first message, links the item | `plugins/@dshfiles/backlog/src/client-entry.tsx`  |
+| `@` menu                 | Any plugin registers an `@` source with scopes; backlog, skills, MCP already do                                               | `plugins/@dshfiles/input-trigger`, `mentions`     |
 
 Verified spot-checks:
 

@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { createRouteResolver, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'
 import type { ApiCaller } from '@dshfiles/dshx/api'
-import { defineHost } from '@dshfiles/dshx/host'
+import { createHostApiClient, defineHost, isApiServed } from '@dshfiles/dshx/host'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
@@ -75,6 +75,23 @@ const workspaceScriptsFor = async (cwd: string | undefined): Promise<WorkspaceSc
 
 const TYPESAFE_ENV_KEY = 'TYPESAFE_API_KEY'
 
+/** Session id → the memory scope of the agent that started it; a null answer is cached too, so a plain thread costs one lookup. */
+const agentScopes = new Map<string, Promise<string | null>>()
+
+const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> => {
+  const cached = agentScopes.get(sessionId)
+  if (cached !== undefined) return cached
+  const pending = (async () => {
+    const { agentsApi } = await import('@dshfiles/agents/contract')
+    if (!isApiServed(ctx, agentsApi, '@dshfiles/memory')) return null
+    const client = createHostApiClient(ctx, agentsApi, '@dshfiles/memory')
+    const result = await client.safe.threadAgent({ sessionId })
+    return result.ok ? (result.value.agent?.memoryScope ?? null) : null
+  })().catch(() => null)
+  agentScopes.set(sessionId, pending)
+  return pending
+}
+
 const hostServices = (ctx: Context): MemoryServices => {
   const sessionQuery = () => {
     const service = ctx.get('sessionQuery')
@@ -123,6 +140,7 @@ const hostServices = (ctx: Context): MemoryServices => {
       await projectNormalization
       return projectPathFor(cwd)
     },
+    agentMemoryScope: sessionId => agentScopeOf(ctx, sessionId),
     listSessions: () => sessionList.listSessions(),
     readSessionTitles: async sessionIds => {
       // The Session list serves each title from the projection cache (a log-prefix read, kept until the Session
@@ -499,7 +517,7 @@ const panelApi = memoryApi.host({
   },
   startBlock: ({ input }) => {
     if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
-    return runtime.previewStartBlock(input.cwd)
+    return runtime.previewStartBlock(input.cwd, input.scope)
   },
   notes: async ({ input }) => {
     await projectNormalization

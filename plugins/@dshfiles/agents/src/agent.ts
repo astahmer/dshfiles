@@ -13,6 +13,7 @@ export const MAX_PROVIDER_CHARS = 128
 export const MAX_MODEL_CHARS = 256
 export const MAX_EFFORT_CHARS = 64
 export const MAX_SESSION_CHARS = 256
+export const MAX_MEMORY_SCOPE_CHARS = 80
 /** Newest threads kept per agent; an older row is pruned so one agent cannot grow the table without bound. */
 export const MAX_THREADS_PER_AGENT = 50
 /** Matches the backlog start-thread limit, so a dispatch prompt travels the same path as a typed one. */
@@ -22,6 +23,14 @@ export const AGENT_MENTION_SCOPES: readonly string[] = ['agent', 'a']
 
 const handleSchema = z.string().regex(AGENT_HANDLE_PATTERN)
 const timestampSchema = z.number().int().nonnegative()
+/** A memory note scope an agent owns; the notes table already stores free-form scopes, so no new table. */
+export const agentMemoryScopeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_MEMORY_SCOPE_CHARS)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9:._/-]*$/u, 'A memory scope is letters, digits, ":", ".", "_", "/" or "-".')
+  .nullable()
 
 export const agentRouteSchema = z
   .object({
@@ -41,6 +50,8 @@ export const agentDraftSchema = z
     instructions: z.string().max(MAX_INSTRUCTIONS_CHARS),
     preset: z.string().min(1).max(MAX_PRESET_CHARS).nullable(),
     route: agentRouteSchema.nullable(),
+    /** The memory note scope this agent's threads read, or null for the project block only. */
+    memoryScope: agentMemoryScopeSchema,
     enabled: z.boolean(),
   })
   .strict()
@@ -137,6 +148,7 @@ export class Agents {
       instructions: '',
       preset: null,
       route: null,
+      memoryScope: null,
       enabled: true,
       builtIn: true,
       createdAt: now,
@@ -144,6 +156,11 @@ export class Agents {
       lastUsedAt: null,
       threadCount: 0,
     }
+  }
+
+  /** The scope an agent's threads would use if the person leaves the field empty; never stored on its own. */
+  static defaultMemoryScope(handle: string): string {
+    return `agent:${handle}`
   }
 
   /** Newest edit last is what the panel wants; the built-in agent always leads the list. */
@@ -178,7 +195,8 @@ export class Agents {
   /** A draft from form fields, with the handle kept as typed but normalized when it is a fresh agent. */
   static normalizeDraft(draft: AgentDraft, options: { readonly creating: boolean }): AgentDraft {
     const handle = options.creating ? Agents.handleFrom(draft.handle === '' ? draft.name : draft.handle) : draft.handle
-    return { ...draft, handle, instructions: draft.instructions.trimEnd() }
+    const memoryScope = draft.memoryScope === null || draft.memoryScope.trim() === '' ? null : draft.memoryScope.trim()
+    return { ...draft, handle, memoryScope, instructions: draft.instructions.trimEnd() }
   }
 }
 

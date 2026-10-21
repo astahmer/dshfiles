@@ -53,6 +53,7 @@ const draftOf = (handle: string) => ({
   instructions: '',
   preset: null,
   route: null,
+  memoryScope: null,
   enabled: true,
 })
 

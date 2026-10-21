@@ -16,6 +16,7 @@ const draft = (fields: Partial<AgentDraft> = {}): AgentDraft => ({
   instructions: 'Prefer small, falsifiable findings.',
   preset: 'standard',
   route: { provider: 'codex-alex2', model: 'gpt-6-luna' },
+  memoryScope: null,
   enabled: true,
   ...fields,
 })
@@ -81,6 +82,13 @@ test('a creating draft derives its handle from the name', () => {
   assert.equal(normalized.handle, 'bug-hunter')
   const renamed = Agents.normalizeDraft(draft({ handle: 'bug-hunter' }), { creating: false })
   assert.equal(renamed.handle, 'bug-hunter')
+})
+
+test('a memory scope is the agent’s own note scope, absent by default', () => {
+  assert.equal(Agents.builtIn(1).memoryScope, null)
+  assert.equal(Agents.defaultMemoryScope('reviewer'), 'agent:reviewer')
+  assert.equal(Agents.normalizeDraft(draft({ memoryScope: '  agent:reviewer  ' }), { creating: false }).memoryScope, 'agent:reviewer')
+  assert.equal(Agents.normalizeDraft(draft({ memoryScope: '   ' }), { creating: false }).memoryScope, null)
 })
 
 test('thread titles come from the first line of the prompt', () => {

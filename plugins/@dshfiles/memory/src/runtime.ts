@@ -28,6 +28,8 @@ export type SessionTitleRead = { readonly sessionId: string; readonly title: str
 
 export type MemoryServices = {
   readonly projectPath: (cwd: string) => Promise<string>
+  /** The memory scope of the agent that started a thread, or null when no agent did. */
+  readonly agentMemoryScope: (sessionId: string) => Promise<string | null>
   readonly listSessions: () => Promise<
     readonly { readonly header: ThreadHeader & { readonly createdAt: number }; readonly live: boolean; readonly persisted: boolean }[]
   >
@@ -361,8 +363,9 @@ export const createMemoryRuntime = (options: {
     const frozen = store.frozenBlock(caller.id)
     if (frozen !== undefined) return frozen
     const project = await projectOf(caller.session.header)
+    const agentScope = await services.agentMemoryScope(caller.id).catch(() => null)
     const withThreads = await recallGate(firstUserText === undefined ? undefined : await firstUserText().catch(() => undefined))
-    const key = `${project}|${withThreads}`
+    const key = `${project}|${withThreads}|${agentScope ?? ''}`
     const cached = blockCache.get(key)
     const settings = options.settings()
     const text =
@@ -374,6 +377,7 @@ export const createMemoryRuntime = (options: {
             budgetBytes: settings.blockBytes,
             crossProject: settings.crossProject,
             staleDays: settings.blockStaleDays,
+            agentScope,
             withThreads,
           })
     blockCache.set(key, { version: store.version(), withThreads, text })
@@ -381,13 +385,20 @@ export const createMemoryRuntime = (options: {
   }
 
   /** What a new thread in the folder would start with now: rendered fresh, frozen for no thread, and empty when memory is off. */
-  const previewStartBlock = async (cwd: string): Promise<{ readonly project: string; readonly text: string }> => {
+  const previewStartBlock = async (cwd: string, agentScope?: string | null): Promise<{ readonly project: string; readonly text: string }> => {
     const project = await projectOf({ id: 'preview', cwd })
     if (!options.settings().enabled) return { project, text: '' }
     const settings = options.settings()
     return {
       project,
-      text: renderStartBlock({ store, project, budgetBytes: settings.blockBytes, crossProject: settings.crossProject, staleDays: settings.blockStaleDays }),
+      text: renderStartBlock({
+        store,
+        project,
+        budgetBytes: settings.blockBytes,
+        crossProject: settings.crossProject,
+        staleDays: settings.blockStaleDays,
+        agentScope: agentScope ?? null,
+      }),
     }
   }
 

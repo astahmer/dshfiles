@@ -593,13 +593,23 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   }
 
   /** Valid notes for a project's block: its own and global ones, ranked by citations, then feedback and project context first, then recency. */
-  const blockNotes = (input: { readonly project: string; readonly limit: number }): readonly Note[] =>
-    statement(
-      `select * from notes where valid = 1 and (project = ? or scope = 'global')
+  /**
+   * Notes the start block may show: the project's repo and path-scoped notes, global notes everywhere, and the extra
+   * scopes an agent owns. Any other scope stays out of every block (it is still searchable), which is what makes an
+   * agent's scope its own without a second table.
+   */
+  const blockNotes = (input: { readonly project: string; readonly limit: number; readonly scopes?: readonly string[] }): readonly Note[] => {
+    const extra = input.scopes ?? []
+    const extraSql = extra.map(() => '?').join(', ')
+    const scoped = extra.length === 0 ? '' : ` or scope in (${extraSql})`
+    return statement(
+      `select * from notes where valid = 1
+         and ((project = ? and (scope = 'repo' or scope = 'global' or scope like 'path:%')) or scope = 'global'${scoped})
          order by uses desc, case category when 'feedback' then 0 when 'project' then 1 when 'user' then 2 else 3 end, created_at desc limit ?`,
     )
-      .all(input.project, input.limit)
+      .all(input.project, ...extra, input.limit)
       .map(noteRow)
+  }
 
   const putEmbedding = (input: {
     readonly kind: 'thread' | 'note' | 'message'

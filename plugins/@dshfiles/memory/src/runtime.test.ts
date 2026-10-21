@@ -48,6 +48,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
   const logs = new Map<string, SessionLog>()
   const summaries: string[] = []
   const titles = new Map<string, string>()
+  const scopes = new Map<string, string>()
   const content = {
     hits: [] as { sessionId: string; snippet: string }[],
     error: undefined as unknown,
@@ -60,6 +61,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     logger: { info: () => {}, warn: () => {} },
     services: {
       projectPath: projectPathFor,
+      agentMemoryScope: async sessionId => scopes.get(sessionId) ?? null,
       listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false, persisted: true })),
       readSessionTitles: async ids => ids.map(id => ({ sessionId: id, title: titles.get(id), updatedAt: undefined })),
       searchSessionContent: async () => {
@@ -89,7 +91,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     id,
     session: { header: origin === undefined ? { id, cwd } : { id, cwd, origin, parentSession: 'session-parent' } },
   })
-  return { logs, summaries, store, runtime, caller, titles, content }
+  return { logs, summaries, store, runtime, caller, titles, content, scopes }
 }
 
 const halyardThread = (id: string) => {
@@ -146,6 +148,28 @@ describe('memory runtime', () => {
     const blockB = await runtime.startBlock(caller('session-bbbbbbbb'))
     expect(blockB).toContain('Hannah Okafor')
     expect(Buffer.byteLength(blockB)).toBeLessThanOrEqual(settings().blockBytes)
+  })
+
+  it('shows an agent its own memory scope, and hides it from the project’s other threads', async () => {
+    const { logs, runtime, store, caller, scopes } = setup()
+    const first = halyardThread('session-11111111-0000-4000-8000-000000000000')
+    logs.set(first.header.id, first.log())
+    await runtime.digest(first.header.id)
+    const note = (text: string, scope: string): void => {
+      store.addNote({ project: root, text, category: 'project', scope, confidence: 'stated', sourceThread: null, sourceSeq: null, origin: 'agent' })
+    }
+    note('The API is on port 9644.', 'repo')
+    note('The reviewer prefers two-line findings.', 'agent:reviewer')
+    scopes.set('session-review', 'agent:reviewer')
+    const plain = await runtime.startBlock(caller('session-plain'))
+    const reviewed = await runtime.startBlock(caller('session-review'))
+    expect(plain).toContain('port 9644')
+    expect(plain).not.toContain('two-line findings')
+    expect(reviewed).toContain('port 9644')
+    expect(reviewed).toContain('two-line findings')
+    // The preview of a new thread takes the same scope, so the panel can show what an agent's thread would read.
+    expect((await runtime.previewStartBlock(root, 'agent:reviewer')).text).toContain('two-line findings')
+    expect((await runtime.previewStartBlock(root)).text).not.toContain('two-line findings')
   })
 
   it('previews the block a new thread of the project would get, without freezing one', async () => {

@@ -29,10 +29,13 @@ export const renderStartBlock = (input: {
   readonly crossProject: boolean
   /** Unused and uncited entries older than this drop out of the block (they stay searchable). */
   readonly staleDays: number
+  /** The note scope of the agent that started this thread, when one did; its notes join global ones. */
+  readonly agentScope?: string | null | undefined
   /** False when the recall gate decided this thread does not need pointers to earlier threads. */
   readonly withThreads?: boolean | undefined
 }): string => {
-  const notes = input.store.blockNotes({ project: input.project, limit: 12 })
+  const agentScope = input.agentScope ?? null
+  const notes = input.store.blockNotes({ project: input.project, limit: 12, ...(agentScope === null ? {} : { scopes: [agentScope] }) })
   const own = input.withThreads === false ? [] : input.store.blockThreads({ projects: [input.project], limit: 12, staleDays: input.staleDays })
   const others =
     input.withThreads === false || !input.crossProject
