@@ -1,4 +1,5 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
@@ -37,6 +38,10 @@ export const ApiKeySetupDialog = (props: {
   const [cwd, setCwd] = useState<string | null>(null)
   const catalogQuery = useQuery({ ...aiAccountsQueries.secretCatalogKeys(api, cwd), enabled: props.open && !folderPickerOpen, staleTime: 30_000 })
   const catalogKeys = catalogQuery.data?.items ?? []
+  const catalogOptions: readonly ComboboxOption[] = catalogKeys.map(option => ({
+    value: catalogOptionKey(option),
+    label: `${option.alias} · ${option.environment} · ${option.scope} · ${option.service}`,
+  }))
   const selectedCatalogEntry = catalogKeys.find(option => catalogOptionKey(option) === selectedCatalogKey)
   const catalogAvailable = catalogQuery.data?.available === true
   const validCredentialRef = AccountsRules.isKeyEnvName(props.draft.apiKeyEnv.trim())
@@ -189,27 +194,21 @@ export const ApiKeySetupDialog = (props: {
             {!validCredentialRef || catalogQuery.isFetching ? null : catalogAvailable ? (
               catalogKeys.length > 0 ? (
                 <>
-                  <label className="dshx:text-sm" htmlFor="ai-account-secret-catalog-entry">
-                    Secret Catalog entry
-                  </label>
-                  <select
-                    aria-label="Secret Catalog entry"
-                    className="dshx:h-9 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-3 dshx:text-sm"
+                  <span className="dshx:text-sm">Secret Catalog entry</span>
+                  <Combobox
                     disabled={busy}
-                    id="ai-account-secret-catalog-entry"
-                    onChange={event => {
+                    label="Secret Catalog entry"
+                    matchTriggerWidth
+                    onValueChange={value => {
                       send({ type: 'reset' })
-                      setSelectedCatalogKey(event.target.value)
+                      setSelectedCatalogKey(value)
                     }}
+                    options={catalogOptions}
+                    placeholder="Choose an entry"
+                    searchAbove={0}
+                    searchPlaceholder="Search entries…"
                     value={selectedCatalogKey}
-                  >
-                    <option value="">Choose an entry</option>
-                    {catalogKeys.map(option => (
-                      <option key={catalogOptionKey(option)} value={catalogOptionKey(option)}>
-                        {option.alias} · {option.environment} · {option.scope} · {option.service}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <p className="dshx:text-xs dshx:text-muted-foreground">
                     The Host imports the value directly into DSH credentials; it never crosses to this page. Unknown or ambiguous scopes are excluded.
                   </p>
