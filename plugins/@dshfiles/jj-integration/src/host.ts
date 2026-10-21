@@ -170,21 +170,26 @@ const emitActivity = (input: {
 }): void => {
   const at = Date.now()
   const path = input.path === null || input.path.length === 0 ? null : input.path
-  hostContext?.emit('dshfiles/activity/event', {
-    kind: 'workspace',
-    value: {
-      id: `workspace:${input.type}:${path ?? 'repository'}:${String(at)}`,
-      at,
-      type: input.type,
-      level: input.level ?? 'notable',
-      summary: input.summary,
-      detail: input.detail ?? null,
-      sessionId: input.sessionId ?? null,
-      correlationId: input.correlationId ?? null,
-      workspaceId: path,
-      workspaceName: path === null ? null : basename(path),
-    },
-  })
+  // Reporting must never take the host down: emit runs listeners synchronously, often from a timer here.
+  try {
+    hostContext?.emit('dshfiles/activity/event', {
+      kind: 'workspace',
+      value: {
+        id: `workspace:${input.type}:${path ?? 'repository'}:${String(at)}`,
+        at,
+        type: input.type,
+        level: input.level ?? 'notable',
+        summary: input.summary,
+        detail: input.detail ?? null,
+        sessionId: input.sessionId ?? null,
+        correlationId: input.correlationId ?? null,
+        workspaceId: path,
+        workspaceName: path === null ? null : basename(path),
+      },
+    })
+  } catch (error) {
+    hostContext?.logger.warn('jj-integration: activity event dropped: %s', error instanceof Error ? error.message : String(error))
+  }
 }
 
 const safePromptField = (value: string, maximumLength: number): string =>

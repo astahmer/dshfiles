@@ -334,3 +334,34 @@ describe('activity timeline ingest batching', () => {
     expect(await service.stats()).toMatchObject({ retained: 2, ingested: 2, duplicates: 1 })
   })
 })
+
+describe('activity timeline enqueue of a malformed event', () => {
+  it('rejects instead of throwing, so a fire-and-forget caller cannot crash the host', async () => {
+    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
+    const malformed: ActivityIngest = { ...routine(1, now), references: [{ kind: 'workspace', id: '', label: null }] }
+
+    const enqueue = () => service.enqueue(malformed).catch(() => 'caught')
+
+    expect(enqueue).not.toThrow()
+    await expect(enqueue()).resolves.toBe('caught')
+  })
+
+  it('leaves out the workspace reference when a workspace event names no workspace', async () => {
+    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
+    const event = ActivityTimelineAdapters.workspaceActivity({
+      id: 'workspace:cleanup:host:1',
+      at: now,
+      type: 'workspace.refused',
+      level: 'attention',
+      summary: 'Automatic thread-workspace cleanup failed',
+      detail: null,
+      sessionId: null,
+      workspaceId: '',
+      workspaceName: null,
+    })
+
+    const stored = await service.enqueue(event)
+
+    expect(stored.event.references).toEqual([])
+  })
+})
