@@ -17,6 +17,7 @@ import {
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader } from '@dshfiles/plugin-ui/components/ui/card'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -1026,6 +1027,7 @@ export const ThreadWorkspacesPanel = (props: {
     { id: 'finished', label: t('lifecycleFinished') },
     { id: 'missing', label: t('lifecycleMissing') },
   ]
+  const lifecycleComboboxOptions: readonly ComboboxOption[] = lifecycleOptions.map(option => ({ value: option.id, label: option.label }))
   const queuedCount = Math.max(queueSnapshot.context.queue.length - (activeIntegrationPath === null ? 0 : 1), 0)
   const failedPaths = [...integrationJobs.entries()].filter(([, job]) => job.phase === 'failed').map(([path]) => path)
   const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
@@ -1104,24 +1106,20 @@ export const ThreadWorkspacesPanel = (props: {
               </Button>
             ))}
             <Separator orientation="vertical" className="dshx:mx-1 dshx:h-5!" />
-            <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
+            <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
               {t('lifecycleFilter')}
-              <select
-                aria-label={t('lifecycleFilter')}
-                className="dshx:rounded-md dshx:border dshx:bg-background dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:text-foreground"
-                value={lifecycleFilter}
-                onChange={event => {
-                  const next = lifecycleOptions.find(option => option.id === event.currentTarget.value)
-                  if (next !== undefined) setLifecycleFilter(next.id)
+              <Combobox
+                label={t('lifecycleFilter')}
+                onValueChange={value => {
+                  const option = lifecycleOptions.find(candidate => candidate.id === value)
+                  if (option === undefined) return
+                  setLifecycleFilter(option.id)
                 }}
-              >
-                {lifecycleOptions.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={lifecycleComboboxOptions}
+                triggerClassName="dshx:h-7 dshx:w-auto dshx:bg-background dshx:px-1.5 dshx:text-xs"
+                value={lifecycleFilter}
+              />
+            </span>
           </nav>
           {queueVisible ? (
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:rounded-xl dshx:border dshx:bg-muted/30 dshx:px-4 dshx:py-2 dshx:text-xs">
