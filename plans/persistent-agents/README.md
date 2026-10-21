@@ -125,7 +125,7 @@ own tests plus its Gherkin journey.
 - [x] Task 2: inline `@` agent completion in the backlog comment box and composer, scope prefixes preserved
 - [ ] Task 3: durable `threads` table, `agents_threads` tool, panel history with open, usage after restart
 - [x] Task 4: routine field carried into the opening message, panel routine + schedule list
-- [ ] Task 5: delegation config, enforcement in the messaging send path, Host gap for subagents
+- [x] Task 5: delegation config, enforcement in the messaging send path, Host gap for subagents
 - [ ] Rebuild `@dshfiles/ui-styles` and the touched plugins; refresh the `agent-registry` screenshot
 - [ ] `DSHX_E2E_ONLY=agents node --run check:e2e` green, then Rebase onto `main`
 

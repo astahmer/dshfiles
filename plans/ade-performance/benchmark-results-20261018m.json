@@ -45,16 +45,7 @@
         "title": "ADE Perf active 01",
         "correctContentVisible": true,
         "contentVisibleMs": 123.1,
-        "frameGapsMs": [
-          4.1,
-          16.6,
-          16.8,
-          16.6,
-          16.7,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [4.1, 16.6, 16.8, 16.6, 16.7, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -62,15 +53,7 @@
         "title": "ADE Perf active 02",
         "correctContentVisible": true,
         "contentVisibleMs": 109.2,
-        "frameGapsMs": [
-          7.2,
-          16.7,
-          16.7,
-          16.7,
-          16.6,
-          16.6,
-          16.7
-        ],
+        "frameGapsMs": [7.2, 16.7, 16.7, 16.7, 16.6, 16.6, 16.7],
         "longTaskMs": []
       },
       {
@@ -78,15 +61,7 @@
         "title": "ADE Perf active 03",
         "correctContentVisible": true,
         "contentVisibleMs": 107.8,
-        "frameGapsMs": [
-          5.8,
-          16.6,
-          16.8,
-          16.6,
-          16.6,
-          16.7,
-          16.7
-        ],
+        "frameGapsMs": [5.8, 16.6, 16.8, 16.6, 16.6, 16.7, 16.7],
         "longTaskMs": []
       },
       {
@@ -94,14 +69,7 @@
         "title": "ADE Perf active 04",
         "correctContentVisible": true,
         "contentVisibleMs": 91.1,
-        "frameGapsMs": [
-          5.8,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.7
-        ],
+        "frameGapsMs": [5.8, 16.7, 16.6, 16.7, 16.7, 16.7],
         "longTaskMs": []
       },
       {
@@ -109,14 +77,7 @@
         "title": "ADE Perf active 05",
         "correctContentVisible": true,
         "contentVisibleMs": 93.3,
-        "frameGapsMs": [
-          7.9,
-          16.7,
-          16.6,
-          16.6,
-          16.8,
-          16.6
-        ],
+        "frameGapsMs": [7.9, 16.7, 16.6, 16.6, 16.8, 16.6],
         "longTaskMs": []
       },
       {
@@ -124,15 +85,7 @@
         "title": "ADE Perf active 06",
         "correctContentVisible": true,
         "contentVisibleMs": 107.4,
-        "frameGapsMs": [
-          6.3,
-          16.6,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [6.3, 16.6, 16.7, 16.6, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -140,15 +93,7 @@
         "title": "ADE Perf active 07",
         "correctContentVisible": true,
         "contentVisibleMs": 106.6,
-        "frameGapsMs": [
-          5,
-          16.6,
-          16.6,
-          16.8,
-          16.6,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [5, 16.6, 16.6, 16.8, 16.6, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -156,15 +101,7 @@
         "title": "ADE Perf active 08",
         "correctContentVisible": true,
         "contentVisibleMs": 104.4,
-        "frameGapsMs": [
-          2.2,
-          16.7,
-          16.7,
-          16.7,
-          16.6,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [2.2, 16.7, 16.7, 16.7, 16.6, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -172,15 +109,7 @@
         "title": "ADE Perf active 09",
         "correctContentVisible": true,
         "contentVisibleMs": 106.3,
-        "frameGapsMs": [
-          4.5,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [4.5, 16.7, 16.6, 16.7, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -188,15 +117,7 @@
         "title": "ADE Perf active 10",
         "correctContentVisible": true,
         "contentVisibleMs": 107.2,
-        "frameGapsMs": [
-          4.9,
-          16.6,
-          16.7,
-          16.7,
-          16.6,
-          16.7,
-          16.7
-        ],
+        "frameGapsMs": [4.9, 16.6, 16.7, 16.7, 16.6, 16.7, 16.7],
         "longTaskMs": []
       },
       {
@@ -204,15 +125,7 @@
         "title": "ADE Perf active 11",
         "correctContentVisible": true,
         "contentVisibleMs": 108.2,
-        "frameGapsMs": [
-          6.2,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [6.2, 16.7, 16.6, 16.7, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -220,15 +133,7 @@
         "title": "ADE Perf active 12",
         "correctContentVisible": true,
         "contentVisibleMs": 107.9,
-        "frameGapsMs": [
-          5.8,
-          16.7,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [5.8, 16.7, 16.7, 16.6, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -236,15 +141,7 @@
         "title": "ADE Perf active 13",
         "correctContentVisible": true,
         "contentVisibleMs": 106.5,
-        "frameGapsMs": [
-          4.1,
-          16.6,
-          16.8,
-          16.6,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [4.1, 16.6, 16.8, 16.6, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -252,15 +149,7 @@
         "title": "ADE Perf active 14",
         "correctContentVisible": true,
         "contentVisibleMs": 108.6,
-        "frameGapsMs": [
-          6,
-          16.7,
-          16.8,
-          16.5,
-          16.7,
-          16.7,
-          16.7
-        ],
+        "frameGapsMs": [6, 16.7, 16.8, 16.5, 16.7, 16.7, 16.7],
         "longTaskMs": []
       },
       {
@@ -268,15 +157,7 @@
         "title": "ADE Perf active 15",
         "correctContentVisible": true,
         "contentVisibleMs": 107.3,
-        "frameGapsMs": [
-          5.1,
-          16.7,
-          16.6,
-          16.7,
-          16.6,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [5.1, 16.7, 16.6, 16.7, 16.6, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -284,15 +165,7 @@
         "title": "ADE Perf active 16",
         "correctContentVisible": true,
         "contentVisibleMs": 106.2,
-        "frameGapsMs": [
-          3.3,
-          16.6,
-          16.7,
-          16.7,
-          16.6,
-          16.7,
-          16.7
-        ],
+        "frameGapsMs": [3.3, 16.6, 16.7, 16.7, 16.6, 16.7, 16.7],
         "longTaskMs": []
       },
       {
@@ -300,18 +173,7 @@
         "title": "ADE Perf active 17",
         "correctContentVisible": true,
         "contentVisibleMs": 157.5,
-        "frameGapsMs": [
-          5.7,
-          16.6,
-          16.7,
-          16.7,
-          16.6,
-          16.7,
-          16.6,
-          16.7,
-          16.6,
-          16.7
-        ],
+        "frameGapsMs": [5.7, 16.6, 16.7, 16.7, 16.6, 16.7, 16.6, 16.7, 16.6, 16.7],
         "longTaskMs": []
       },
       {
@@ -319,15 +181,7 @@
         "title": "ADE Perf active 18",
         "correctContentVisible": true,
         "contentVisibleMs": 106.7,
-        "frameGapsMs": [
-          4.1,
-          16.7,
-          16.6,
-          16.8,
-          16.6,
-          16.7,
-          16.7
-        ],
+        "frameGapsMs": [4.1, 16.7, 16.6, 16.8, 16.6, 16.7, 16.7],
         "longTaskMs": []
       },
       {
@@ -335,15 +189,7 @@
         "title": "ADE Perf active 19",
         "correctContentVisible": true,
         "contentVisibleMs": 106.6,
-        "frameGapsMs": [
-          4.4,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.7,
-          16.6
-        ],
+        "frameGapsMs": [4.4, 16.7, 16.6, 16.7, 16.7, 16.7, 16.6],
         "longTaskMs": []
       },
       {
@@ -351,16 +197,7 @@
         "title": "ADE Perf active 20",
         "correctContentVisible": true,
         "contentVisibleMs": 123.4,
-        "frameGapsMs": [
-          4,
-          16.7,
-          16.6,
-          16.7,
-          16.7,
-          16.6,
-          16.6,
-          16.8
-        ],
+        "frameGapsMs": [4, 16.7, 16.6, 16.7, 16.7, 16.6, 16.6, 16.8],
         "longTaskMs": []
       }
     ]
@@ -423,14 +260,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 94,
-            "frameGapsMs": [
-              8.8,
-              16.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [8.8, 16.6, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -438,14 +268,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              13,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [13, 16.6, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -453,14 +276,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.9,
-            "frameGapsMs": [
-              13.6,
-              16.7,
-              16.6,
-              16.8,
-              16.6,
-              16.6
-            ],
+            "frameGapsMs": [13.6, 16.7, 16.6, 16.8, 16.6, 16.6],
             "longTaskMs": []
           },
           {
@@ -468,14 +284,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              12.8,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -483,14 +292,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 99.1,
-            "frameGapsMs": [
-              13.9,
-              16.6,
-              16.6,
-              16.8,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13.9, 16.6, 16.6, 16.8, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -498,14 +300,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              13,
-              16.6,
-              16.8,
-              16.6,
-              16.6,
-              16.8
-            ],
+            "frameGapsMs": [13, 16.6, 16.8, 16.6, 16.6, 16.8],
             "longTaskMs": []
           },
           {
@@ -513,15 +308,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 115.3,
-            "frameGapsMs": [
-              13.3,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6,
-              16.8
-            ],
+            "frameGapsMs": [13.3, 16.7, 16.7, 16.6, 16.7, 16.6, 16.8],
             "longTaskMs": []
           },
           {
@@ -529,14 +316,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.9,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.9, 16.7, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -544,14 +324,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.8,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.8, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -559,14 +332,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              12.1,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.1, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -574,14 +340,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -589,14 +348,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.6,
-              16.8,
-              16.6,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.8, 16.6, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -604,14 +356,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.6,
-              16.8,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.6, 16.8, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -619,14 +364,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -634,14 +372,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 99.2,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -649,14 +380,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 95.4,
-            "frameGapsMs": [
-              10,
-              16.7,
-              16.5,
-              16.8,
-              16.7,
-              16.5
-            ],
+            "frameGapsMs": [10, 16.7, 16.5, 16.8, 16.7, 16.5],
             "longTaskMs": []
           },
           {
@@ -664,14 +388,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.4,
-            "frameGapsMs": [
-              12.9,
-              16.8,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.9, 16.8, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -679,14 +396,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -694,14 +404,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -709,14 +412,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 99,
-            "frameGapsMs": [
-              13.5,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13.5, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -724,15 +420,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 114.8,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -740,14 +428,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.2,
-              16.7,
-              16.6,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.2, 16.7, 16.6, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -755,14 +436,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.4,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -770,14 +444,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              12.2,
-              16.8,
-              16.7,
-              16.5,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.2, 16.8, 16.7, 16.5, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -785,14 +452,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.4,
-            "frameGapsMs": [
-              12.9,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.8
-            ],
+            "frameGapsMs": [12.9, 16.7, 16.7, 16.6, 16.7, 16.8],
             "longTaskMs": []
           },
           {
@@ -800,14 +460,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -815,14 +468,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 97.6,
-            "frameGapsMs": [
-              12.1,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.1, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -830,14 +476,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -845,14 +484,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              12.8,
-              16.7,
-              16.6,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.7, 16.6, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -860,14 +492,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 99,
-            "frameGapsMs": [
-              13.6,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [13.6, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -875,14 +500,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.9,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -890,14 +508,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              12,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -905,14 +516,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.6,
-              16.8,
-              16.6,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.8, 16.6, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -920,14 +524,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -935,14 +532,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.5,
-            "frameGapsMs": [
-              12.9,
-              16.7,
-              16.6,
-              16.8,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.9, 16.7, 16.6, 16.8, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -950,14 +540,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.7,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -965,14 +548,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 97.2,
-            "frameGapsMs": [
-              12,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.6
-            ],
+            "frameGapsMs": [12, 16.7, 16.7, 16.7, 16.6, 16.6],
             "longTaskMs": []
           },
           {
@@ -980,14 +556,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.8,
-            "frameGapsMs": [
-              13.2,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13.2, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -995,14 +564,7 @@
             "title": "Fake thread title",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1010,14 +572,7 @@
             "title": "ADE Perf active 01",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.7, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           }
         ]
@@ -1037,112 +592,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.1,
-              "frameGapsMs": [
-                12.4,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.4, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64,
-              "frameGapsMs": [
-                12,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.4,
-              "frameGapsMs": [
-                13.1,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [13.1, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65,
-              "frameGapsMs": [
-                12.9,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.9, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 80.8,
-              "frameGapsMs": [
-                11.8,
-                16.7,
-                16.7,
-                16.7,
-                16.5
-              ],
+              "frameGapsMs": [11.8, 16.7, 16.7, 16.7, 16.5],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.7,
-              "frameGapsMs": [
-                12.2,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.2, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.1,
-              "frameGapsMs": [
-                12.4,
-                16.7,
-                16.6,
-                16.8
-              ],
+              "frameGapsMs": [12.4, 16.7, 16.6, 16.8],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65,
-              "frameGapsMs": [
-                12.5,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.5, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.5,
-              "frameGapsMs": [
-                12.9,
-                16.6,
-                16.8,
-                16.6
-              ],
+              "frameGapsMs": [12.9, 16.6, 16.8, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.3,
-              "frameGapsMs": [
-                12.5,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.7, 16.7, 16.7],
               "longTaskMs": []
             }
           ]
@@ -1161,132 +665,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 120.2,
-              "frameGapsMs": [
-                11.9,
-                16.8,
-                16.6,
-                16.7,
-                16.7,
-                16.6,
-                16.6
-              ],
+              "frameGapsMs": [11.9, 16.8, 16.6, 16.7, 16.7, 16.6, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.9,
-              "frameGapsMs": [
-                12.7,
-                16.7,
-                16.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.7, 16.7, 16.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.8,
-              "frameGapsMs": [
-                12.6,
-                16.6,
-                16.6,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.6, 16.6, 16.6, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.5,
-              "frameGapsMs": [
-                12.9,
-                16.6,
-                16.8,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.9, 16.6, 16.8, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.4,
-              "frameGapsMs": [
-                12.7,
-                16.7,
-                16.6,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.7, 16.7, 16.6, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.8,
-              "frameGapsMs": [
-                12.6,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.6, 16.7, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.2,
-              "frameGapsMs": [
-                12.2,
-                16.7,
-                16.6,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.2, 16.7, 16.6, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.2,
-              "frameGapsMs": [
-                12.4,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.4, 16.7, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 99,
-              "frameGapsMs": [
-                13.4,
-                16.7,
-                16.6,
-                16.6,
-                16.8,
-                16.6
-              ],
+              "frameGapsMs": [13.4, 16.7, 16.6, 16.6, 16.8, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98,
-              "frameGapsMs": [
-                12.3,
-                16.6,
-                16.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.3, 16.6, 16.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             }
           ]
@@ -1305,112 +738,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 72,
-              "frameGapsMs": [
-                2.9,
-                16.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [2.9, 16.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.4,
-              "frameGapsMs": [
-                13.2,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [13.2, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.1,
-              "frameGapsMs": [
-                13,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [13, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65,
-              "frameGapsMs": [
-                12.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.2,
-              "frameGapsMs": [
-                12.5,
-                16.8,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.8, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 63.9,
-              "frameGapsMs": [
-                11.9,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.9, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.2,
-              "frameGapsMs": [
-                12.2,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.2, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.7,
-              "frameGapsMs": [
-                12.6,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.6, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.9,
-              "frameGapsMs": [
-                12.7,
-                16.7,
-                16.6,
-                16.6
-              ],
+              "frameGapsMs": [12.7, 16.7, 16.6, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.8,
-              "frameGapsMs": [
-                12.4,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.4, 16.7, 16.7, 16.6],
               "longTaskMs": []
             }
           ]
@@ -1474,12 +856,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 62.2,
-            "frameGapsMs": [
-              9.7,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [9.7, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1487,20 +864,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 214.2,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              33.3,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.7, 16.6, 16.7, 16.6, 16.7, 16.7, 33.3, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1508,14 +872,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.2,
-              16.7,
-              16.8,
-              16.6,
-              16.6,
-              16.8
-            ],
+            "frameGapsMs": [12.2, 16.7, 16.8, 16.6, 16.6, 16.8],
             "longTaskMs": []
           },
           {
@@ -1523,14 +880,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.7,
-              16.8,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.7, 16.8, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1538,14 +888,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              13,
-              16.7,
-              16.6,
-              16.7,
-              16.6,
-              16.8
-            ],
+            "frameGapsMs": [13, 16.7, 16.6, 16.7, 16.6, 16.8],
             "longTaskMs": []
           },
           {
@@ -1553,14 +896,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.7,
-              16.7,
-              16.8,
-              16.6,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.7, 16.7, 16.8, 16.6, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1568,14 +904,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.4,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.4, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1583,14 +912,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.3,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1598,14 +920,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.4,
-              16.8,
-              16.6,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.4, 16.8, 16.6, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1613,14 +928,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1628,14 +936,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.8,
-              16.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.8, 16.6, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1643,14 +944,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.6,
-              16.8,
-              16.6,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.8, 16.6, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1658,14 +952,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.6,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.6, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1673,14 +960,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              13.2,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13.2, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1688,14 +968,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1703,14 +976,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.8,
-              16.8,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.8, 16.8, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1718,14 +984,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              13.1,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13.1, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1733,15 +992,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 115.5,
-            "frameGapsMs": [
-              13.7,
-              16.6,
-              16.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13.7, 16.6, 16.6, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1749,14 +1000,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              13.1,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [13.1, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1764,14 +1008,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              13,
-              16.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [13, 16.6, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1779,14 +1016,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.8,
-            "frameGapsMs": [
-              13.1,
-              16.8,
-              16.6,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [13.1, 16.8, 16.6, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1794,14 +1024,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1809,14 +1032,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1824,14 +1040,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              13.1,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [13.1, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1839,14 +1048,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.7,
-            "frameGapsMs": [
-              13.3,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [13.3, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1854,14 +1056,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.7,
-              16.6,
-              16.8,
-              16.6
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.7, 16.6, 16.8, 16.6],
             "longTaskMs": []
           },
           {
@@ -1869,14 +1064,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.5,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1884,14 +1072,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.2,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.2, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1899,14 +1080,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1914,13 +1088,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 80.8,
-            "frameGapsMs": [
-              12.9,
-              16.6,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.9, 16.6, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -1928,14 +1096,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 99.2,
-            "frameGapsMs": [
-              13.8,
-              16.7,
-              16.7,
-              16.6,
-              16.8,
-              16.6
-            ],
+            "frameGapsMs": [13.8, 16.7, 16.7, 16.6, 16.8, 16.6],
             "longTaskMs": []
           },
           {
@@ -1943,14 +1104,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.8,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.8, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1958,14 +1112,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.6,
-            "frameGapsMs": [
-              12.9,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.9, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -1973,14 +1120,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 99,
-            "frameGapsMs": [
-              13.5,
-              16.7,
-              16.6,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [13.5, 16.7, 16.6, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -1988,14 +1128,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2003,14 +1136,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.4,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.7,
-              16.6,
-              16.8,
-              16.6
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.7, 16.6, 16.8, 16.6],
             "longTaskMs": []
           },
           {
@@ -2018,14 +1144,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2033,14 +1152,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2048,14 +1160,7 @@
             "title": "ADE Perf active 05",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2063,14 +1168,7 @@
             "title": "ADE Perf active 04",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.6
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.7, 16.7, 16.6, 16.6],
             "longTaskMs": []
           }
         ]
@@ -2090,111 +1188,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.8,
-              "frameGapsMs": [
-                12.8,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.8, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.7,
-              "frameGapsMs": [
-                12.8,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.8, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.5,
-              "frameGapsMs": [
-                12.6,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.6, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.7,
-              "frameGapsMs": [
-                13.2,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [13.2, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.6,
-              "frameGapsMs": [
-                13.3,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [13.3, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.3,
-              "frameGapsMs": [
-                12.8,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.8, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.8,
-              "frameGapsMs": [
-                12.7,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.7, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.9,
-              "frameGapsMs": [
-                12.3,
-                16.6,
-                16.8,
-                16.6
-              ],
+              "frameGapsMs": [12.3, 16.6, 16.8, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.6,
-              "frameGapsMs": [
-                12.1,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.1, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.3,
-              "frameGapsMs": [
-                12.5,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.6, 16.7, 16.7],
               "longTaskMs": []
             }
           ]
@@ -2213,131 +1261,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.4,
-              "frameGapsMs": [
-                11.6,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.6, 16.7, 16.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.4,
-              "frameGapsMs": [
-                13,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [13, 16.7, 16.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.6,
-              "frameGapsMs": [
-                12.9,
-                16.7,
-                16.6,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.9, 16.7, 16.6, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.6,
-              "frameGapsMs": [
-                12.5,
-                16.6,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.6, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.7,
-              "frameGapsMs": [
-                12.3,
-                16.6,
-                16.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.3, 16.6, 16.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.4,
-              "frameGapsMs": [
-                12.4,
-                16.7,
-                16.6,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.4, 16.7, 16.6, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.8,
-              "frameGapsMs": [
-                12.9,
-                16.7,
-                16.6,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.9, 16.7, 16.6, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.2,
-              "frameGapsMs": [
-                12.1,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.1, 16.7, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98,
-              "frameGapsMs": [
-                12.2,
-                16.7,
-                16.6,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.2, 16.7, 16.6, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97,
-              "frameGapsMs": [
-                12.1,
-                16.8,
-                16.6,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.1, 16.8, 16.6, 16.6, 16.7, 16.7],
               "longTaskMs": []
             }
           ]
@@ -2356,111 +1334,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 63.8,
-              "frameGapsMs": [
-                12.6,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.6, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.2,
-              "frameGapsMs": [
-                12.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.3,
-              "frameGapsMs": [
-                12.5,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.3,
-              "frameGapsMs": [
-                13.1,
-                16.6,
-                16.6,
-                16.8
-              ],
+              "frameGapsMs": [13.1, 16.6, 16.6, 16.8],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.2,
-              "frameGapsMs": [
-                12.5,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.3,
-              "frameGapsMs": [
-                12.3,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.3, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.9,
-              "frameGapsMs": [
-                12.4,
-                16.7,
-                16.6,
-                16.6
-              ],
+              "frameGapsMs": [12.4, 16.7, 16.6, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.5,
-              "frameGapsMs": [
-                12.2,
-                16.6,
-                16.6,
-                16.8
-              ],
+              "frameGapsMs": [12.2, 16.6, 16.6, 16.8],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65,
-              "frameGapsMs": [
-                12.5,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.6,
-              "frameGapsMs": [
-                13.3,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [13.3, 16.7, 16.7, 16.6],
               "longTaskMs": []
             }
           ]
@@ -2524,12 +1452,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 61.6,
-            "frameGapsMs": [
-              9.4,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [9.4, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2537,14 +1460,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.3,
-              16.6,
-              16.8,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.6, 16.8, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2552,14 +1468,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              12.3,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.6, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2567,14 +1476,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.7,
-              16.6,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.7, 16.6, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2582,14 +1484,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.7,
-            "frameGapsMs": [
-              12.2,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.2, 16.6, 16.7, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2597,15 +1492,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 129.9,
-            "frameGapsMs": [
-              11,
-              16.6,
-              16.7,
-              33.3,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [11, 16.6, 16.7, 33.3, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2613,14 +1500,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2628,14 +1508,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12, 16.7, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2643,15 +1516,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 109.3,
-            "frameGapsMs": [
-              6.9,
-              16.6,
-              16.8,
-              16.6,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [6.9, 16.6, 16.8, 16.6, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2659,14 +1524,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              11.9,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [11.9, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2674,14 +1532,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.2,
-            "frameGapsMs": [
-              11.6,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [11.6, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2689,14 +1540,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.3,
-              16.6,
-              16.7,
-              16.7,
-              16.6,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.6, 16.7, 16.7, 16.6, 16.6],
             "longTaskMs": []
           },
           {
@@ -2704,14 +1548,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.5,
-            "frameGapsMs": [
-              11.9,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [11.9, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2719,14 +1556,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.6,
-            "frameGapsMs": [
-              12.4,
-              16.7,
-              16.6,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.4, 16.7, 16.6, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2734,14 +1564,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.7,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.7, 16.6, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2749,14 +1572,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 96.8,
-            "frameGapsMs": [
-              11.9,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [11.9, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2764,14 +1580,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.6,
-            "frameGapsMs": [
-              13.1,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [13.1, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2779,14 +1588,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.6,
-              16.7,
-              16.6,
-              16.8,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.6, 16.7, 16.6, 16.8, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2794,14 +1596,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.3,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.6,
-              16.8,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.6, 16.8, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2809,14 +1604,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2824,14 +1612,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              12,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2839,14 +1620,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              11.9,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [11.9, 16.7, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2854,14 +1628,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.2,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.2, 16.7, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2869,14 +1636,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2884,15 +1644,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 114.3,
-            "frameGapsMs": [
-              12.2,
-              16.6,
-              16.7,
-              16.7,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.2, 16.6, 16.7, 16.7, 16.7, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2900,14 +1652,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.7,
-            "frameGapsMs": [
-              12.2,
-              16.7,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.2, 16.7, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2915,14 +1660,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.2,
-            "frameGapsMs": [
-              12.5,
-              16.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.6, 16.7, 16.6, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2930,14 +1668,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.4,
-            "frameGapsMs": [
-              12,
-              16.7,
-              16.6,
-              16.8,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12, 16.7, 16.6, 16.8, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -2945,14 +1676,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.6,
-              16.6,
-              16.7,
-              16.6,
-              16.8,
-              16.6
-            ],
+            "frameGapsMs": [12.6, 16.6, 16.7, 16.6, 16.8, 16.6],
             "longTaskMs": []
           },
           {
@@ -2960,14 +1684,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.4,
-              16.6,
-              16.7,
-              16.7,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.4, 16.6, 16.7, 16.7, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -2975,14 +1692,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.5,
-              16.6,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.6, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -2990,14 +1700,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.4,
-              16.6,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.4, 16.6, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -3005,14 +1708,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -3020,14 +1716,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 98,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -3035,14 +1724,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.8,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.6,
-              16.8,
-              16.6,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.6, 16.8, 16.6, 16.6],
             "longTaskMs": []
           },
           {
@@ -3050,14 +1732,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 97.9,
-            "frameGapsMs": [
-              12.5,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.7, 16.6, 16.7, 16.7, 16.7],
             "longTaskMs": []
           },
           {
@@ -3065,14 +1740,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 97.6,
-            "frameGapsMs": [
-              12.5,
-              16.6,
-              16.8,
-              16.6,
-              16.6,
-              16.7
-            ],
+            "frameGapsMs": [12.5, 16.6, 16.8, 16.6, 16.6, 16.7],
             "longTaskMs": []
           },
           {
@@ -3080,14 +1748,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 98.5,
-            "frameGapsMs": [
-              12.9,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.9, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -3095,14 +1756,7 @@
             "title": "ADE Perf active 20",
             "correctContentVisible": true,
             "contentVisibleMs": 98.1,
-            "frameGapsMs": [
-              12.3,
-              16.7,
-              16.7,
-              16.6,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [12.3, 16.7, 16.7, 16.6, 16.7, 16.6],
             "longTaskMs": []
           },
           {
@@ -3110,14 +1764,7 @@
             "title": "ADE Perf active 19",
             "correctContentVisible": true,
             "contentVisibleMs": 96.4,
-            "frameGapsMs": [
-              11.6,
-              16.7,
-              16.6,
-              16.7,
-              16.7,
-              16.6
-            ],
+            "frameGapsMs": [11.6, 16.7, 16.6, 16.7, 16.7, 16.6],
             "longTaskMs": []
           }
         ]
@@ -3137,116 +1784,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 66.7,
-              "frameGapsMs": [
-                12.9,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.9, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65,
-              "frameGapsMs": [
-                12.5,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [12.5, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 79.3,
-              "frameGapsMs": [
-                10.1,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [10.1, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 80.9,
-              "frameGapsMs": [
-                12.5,
-                16.6,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.5, 16.6, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 80.8,
-              "frameGapsMs": [
-                11.9,
-                16.6,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.9, 16.6, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 80.6,
-              "frameGapsMs": [
-                11.5,
-                16.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.5, 16.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 61.3,
-              "frameGapsMs": [
-                9,
-                16.8,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [9, 16.8, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.6,
-              "frameGapsMs": [
-                11.9,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.9, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 80.3,
-              "frameGapsMs": [
-                11.2,
-                16.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.2, 16.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.4,
-              "frameGapsMs": [
-                12.1,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.1, 16.7, 16.6, 16.7],
               "longTaskMs": []
             }
           ]
@@ -3265,131 +1857,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 96.3,
-              "frameGapsMs": [
-                10.3,
-                16.6,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [10.3, 16.6, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.6,
-              "frameGapsMs": [
-                11.6,
-                16.8,
-                16.6,
-                16.7,
-                16.6,
-                16.8
-              ],
+              "frameGapsMs": [11.6, 16.8, 16.6, 16.7, 16.6, 16.8],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.6,
-              "frameGapsMs": [
-                11.5,
-                16.6,
-                16.8,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [11.5, 16.6, 16.8, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.6,
-              "frameGapsMs": [
-                12,
-                16.7,
-                16.7,
-                16.6,
-                16.6,
-                16.8
-              ],
+              "frameGapsMs": [12, 16.7, 16.7, 16.6, 16.6, 16.8],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.9,
-              "frameGapsMs": [
-                11.4,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.4, 16.7, 16.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 97.7,
-              "frameGapsMs": [
-                11.3,
-                16.7,
-                16.7,
-                16.6,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.3, 16.7, 16.7, 16.6, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.2,
-              "frameGapsMs": [
-                12.2,
-                16.6,
-                16.7,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12.2, 16.6, 16.7, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 96.7,
-              "frameGapsMs": [
-                11.5,
-                16.7,
-                16.6,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.5, 16.7, 16.6, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 96.7,
-              "frameGapsMs": [
-                10.5,
-                16.7,
-                16.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [10.5, 16.7, 16.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 98.1,
-              "frameGapsMs": [
-                12,
-                16.8,
-                16.6,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12, 16.8, 16.6, 16.6, 16.7, 16.7],
               "longTaskMs": []
             }
           ]
@@ -3408,113 +1930,61 @@
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.1,
-              "frameGapsMs": [
-                11.7,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.7, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.1,
-              "frameGapsMs": [
-                12.1,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.1, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.3,
-              "frameGapsMs": [
-                11.9,
-                16.7,
-                16.7,
-                16.6
-              ],
+              "frameGapsMs": [11.9, 16.7, 16.7, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 79.2,
-              "frameGapsMs": [
-                11.2,
-                16.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [11.2, 16.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 80.6,
-              "frameGapsMs": [
-                11.2,
-                16.6,
-                16.7,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [11.2, 16.6, 16.7, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.3,
-              "frameGapsMs": [
-                11.7,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [11.7, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 63.4,
-              "frameGapsMs": [
-                12,
-                16.6,
-                16.7,
-                16.7
-              ],
+              "frameGapsMs": [12, 16.6, 16.7, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 65.3,
-              "frameGapsMs": [
-                12.8,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.8, 16.7, 16.6, 16.7],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.1,
-              "frameGapsMs": [
-                11.9,
-                16.6,
-                16.8,
-                16.6
-              ],
+              "frameGapsMs": [11.9, 16.6, 16.8, 16.6],
               "longTaskMs": []
             },
             {
               "correctContentVisible": true,
               "contentVisibleMs": 64.5,
-              "frameGapsMs": [
-                12.1,
-                16.7,
-                16.6,
-                16.7
-              ],
+              "frameGapsMs": [12.1, 16.7, 16.6, 16.7],
               "longTaskMs": []
             }
           ]
@@ -3528,21 +1998,9 @@
     "transcriptSwitchMs": 92.9,
     "totalCorrectContentMs": 164.2,
     "correctContentVisible": true,
-    "revealFrameGapsMs": [
-      11.3,
-      16.6,
-      16.7,
-      16.7
-    ],
+    "revealFrameGapsMs": [11.3, 16.6, 16.7, 16.7],
     "revealLongTaskMs": [],
-    "transcriptFrameGapsMs": [
-      7.4,
-      16.7,
-      16.7,
-      16.6,
-      16.7,
-      16.6
-    ],
+    "transcriptFrameGapsMs": [7.4, 16.7, 16.7, 16.6, 16.7, 16.6],
     "transcriptLongTaskMs": []
   },
   "finalSnapshot": {

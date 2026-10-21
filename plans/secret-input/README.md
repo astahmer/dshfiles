@@ -14,7 +14,7 @@ environment variable.
 
 The installed `secret` CLI already owns those values (Bitwarden-backed, see
 [Secret Catalog](../../plugins/@dshfiles/secret-catalog/README.md)). What is
-missing is the binding layer: a field that stores *which secret* it uses, and a
+missing is the binding layer: a field that stores _which secret_ it uses, and a
 Host-side resolver that turns that reference into a value only at the moment it
 is consumed.
 
@@ -42,12 +42,12 @@ is consumed.
 
 ## Why not the alternatives
 
-| Choice                            | Decision | Rationale                                                                                                                        |
-| --------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Store the plaintext in settings   | No       | DSH redacts it, so the form cannot round-trip it; a second copy also drifts from the vault.                                      |
-| Store the plaintext in a backlog item | No       | Rows sync to every browser and the Agent; a reference keeps the item shareable.                                                  |
-| Fill the revealed value into inputs | Only on explicit per-field reveal | Same policy as Secret Catalog: reveal is a deliberate click, never an implicit fill on focus.                                    |
-| A separate secrets service        | No       | secret-catalog already owns CLI access, scopes and redaction; the new parts are a grammar, a port method and a client affordance. |
+| Choice                                | Decision                          | Rationale                                                                                                                         |
+| ------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Store the plaintext in settings       | No                                | DSH redacts it, so the form cannot round-trip it; a second copy also drifts from the vault.                                       |
+| Store the plaintext in a backlog item | No                                | Rows sync to every browser and the Agent; a reference keeps the item shareable.                                                   |
+| Fill the revealed value into inputs   | Only on explicit per-field reveal | Same policy as Secret Catalog: reveal is a deliberate click, never an implicit fill on focus.                                     |
+| A separate secrets service            | No                                | secret-catalog already owns CLI access, scopes and redaction; the new parts are a grammar, a port method and a client affordance. |
 
 ## Decisions
 
@@ -65,13 +65,13 @@ Settled with the user (2026-10-20):
 
 ## Phases
 
-| Phase | Work                                                                                                        | State                                                              |
-| ----- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| 1     | Grammar, `secretReferenceSchema`, and the `secretCatalogValues` port in `credential-port`                     | Shipped                                                            |
-| 2     | `createSecretCatalogValues` in the Catalog: one unique row per alias+environment, revealed through the CLI  | Shipped                                                            |
-| 3     | `role('secret-ref')` control in settings-shell, rendered with `data-secret-input`                            | Shipped                                                            |
-| 4     | `SecretInputBinding` + the `shell.overlay` picker: key button on a focused field, alias search, controlled writes | Shipped; portaled into the field's dialog because a modal layer makes the rest of the page inert |
-| 5     | Backlog: `jevSecret` setting, `BacklogTriageKey` resolution, environment fallback, `secret` link extraction, composer attribute | Shipped                                                            |
+| Phase | Work                                                                                                                            | State                                                                                            |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1     | Grammar, `secretReferenceSchema`, and the `secretCatalogValues` port in `credential-port`                                       | Shipped                                                                                          |
+| 2     | `createSecretCatalogValues` in the Catalog: one unique row per alias+environment, revealed through the CLI                      | Shipped                                                                                          |
+| 3     | `role('secret-ref')` control in settings-shell, rendered with `data-secret-input`                                               | Shipped                                                                                          |
+| 4     | `SecretInputBinding` + the `shell.overlay` picker: key button on a focused field, alias search, controlled writes               | Shipped; portaled into the field's dialog because a modal layer makes the rest of the page inert |
+| 5     | Backlog: `jevSecret` setting, `BacklogTriageKey` resolution, environment fallback, `secret` link extraction, composer attribute | Shipped                                                                                          |
 
 Verified end to end in a scratch DSH with the fake secret CLI: Settings → "jev secret" → key
 button → `GITHUB_TOKEN@prod` → the field holds `secret:GITHUB_TOKEN`. Modals needed two fixes the

@@ -18,11 +18,11 @@ Node v22.23.3 (official fnm), pnpm 12.5.1, darwin/arm64; scratch Chromium 141.0.
 [Portable runner](graph-benchmark.mjs) uses the actual graph module, one excluded warmup and seven measured runs for each fixture. Fixtures are linear first-parent history, and an 80%-side-chain/20%-trunk graph with eight revisions per side chain. The run validates returned row count and unique identities; it does not replace the comprehensive existing graph correctness fixtures.
 
 | Revisions | Linear median / max (ms) | Branchy median / max (ms) |
-|---:|---:|---:|
-| 100 | 0.65 / 1.18 | 0.27 / 0.35 |
-| 500 | 5.05 / 7.78 | 1.94 / 2.86 |
-| 1,000 | 17.43 / 20.41 | 4.43 / 5.22 |
-| 2,000 | 37.12 / 75.15 | 7.04 / 8.23 |
+| --------: | -----------------------: | ------------------------: |
+|       100 |              0.65 / 1.18 |               0.27 / 0.35 |
+|       500 |              5.05 / 7.78 |               1.94 / 2.86 |
+|     1,000 |            17.43 / 20.41 |               4.43 / 5.22 |
+|     2,000 |            37.12 / 75.15 |               7.04 / 8.23 |
 
 Order was not randomized; JIT/GC and concurrent system activity can affect values. No p95 claim from seven samples. This specifically motivates inspecting repeated linear parent-branch scans and raw-keystroke layout, not claiming branch-heavy graphs always cost more. A 2,000-revision fixture represents accumulated history, not the initial 100-row fetch.
 
@@ -38,10 +38,10 @@ node --experimental-strip-types plans/performance-optimization/evidence/graph-be
 
 [memory-retrieval-probe.mjs](memory-retrieval-probe.mjs) (results in [memory-retrieval-results.json](memory-retrieval-results.json)) builds a scratch memory database where one project's corpus is term-dense and 1,000× larger than the requested project's notes, then asks for the requested project only. It prints the scoped hit count, the projects of the hits, and the `EXPLAIN QUERY PLAN` of the docs FTS statement.
 
-| Run | Corpus | Scoped hits | Hit projects | Scoped search |
-| --- | --- | --- | --- | --- |
-| Before the SQL predicate | 2,000 noise notes + 5 in-scope | **0 / 5** | — | ~7 ms |
-| After the SQL predicate | same | **5 / 5** | `mine` | ~5 ms |
+| Run                      | Corpus                         | Scoped hits | Hit projects | Scoped search |
+| ------------------------ | ------------------------------ | ----------- | ------------ | ------------- |
+| Before the SQL predicate | 2,000 noise notes + 5 in-scope | **0 / 5**   | —            | ~7 ms         |
+| After the SQL predicate  | same                           | **5 / 5**   | `mine`       | ~5 ms         |
 
 The query plan is unchanged (`SCAN d VIRTUAL TABLE INDEX 0:M4`, `USE TEMP B-TREE FOR ORDER BY`): the fix is a predicate evaluated inside the FTS statement, not an index. Timings are single samples on a shared machine; the hit counts are deterministic.
 
@@ -101,12 +101,12 @@ Implemented in revision `xlmxnrtl` on 2026-10-18, based on main `6ee7a86a`.
 3. **Focused checks:** 67/67 in `tests/checkout-sync.spec.ts` + `tests/client-build.spec.ts`, including three new cases — an unparseable map that is never opened when nothing changed, a manifest that wins over a corrupt map, and a fixture build asserting `src/client.tsx`/`src/helper.ts` are recorded. `check:diff` clean. Full `dshx` suite: 689 passed, 1 unrelated pre-existing failure (see below).
 4. **Probe:** [checkout-plan-probe.mjs](checkout-plan-probe.mjs) with [raw samples](checkout-plan-results.json), run against this workspace's built planner and two targets.
 
-| Case | Before (audit baseline) | After |
-|---|---|---|
-| No changed files (shared checkout, maps only) | 74 maps / 53,913,303 bytes, 171.09 ms warm median | **0 maps / 0 bytes**, 6–16 ms warm |
-| One changed source (shared checkout, maps only) | 74 maps / 53.9 MB | **2 maps / 4,099,100 bytes** (that package's own bundles), 20–114 ms |
-| One changed source (manifest-backed package) | n/a | **1 manifest / 1,414 bytes**, 0 maps |
-| Changed dshx runtime file | 74 maps / 53.9 MB | **1 manifest / 1,414 bytes** |
+| Case                                            | Before (audit baseline)                           | After                                                                |
+| ----------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------- |
+| No changed files (shared checkout, maps only)   | 74 maps / 53,913,303 bytes, 171.09 ms warm median | **0 maps / 0 bytes**, 6–16 ms warm                                   |
+| One changed source (shared checkout, maps only) | 74 maps / 53.9 MB                                 | **2 maps / 4,099,100 bytes** (that package's own bundles), 20–114 ms |
+| One changed source (manifest-backed package)    | n/a                                               | **1 manifest / 1,414 bytes**, 0 maps                                 |
+| Changed dshx runtime file                       | 74 maps / 53.9 MB                                 | **1 manifest / 1,414 bytes**                                         |
 
 Selection is byte-identical in the unit suite, `dshx dev up` still boots from existing artifacts, and the timing spread above is why the counts, not the milliseconds, are the primary evidence.
 
@@ -120,7 +120,7 @@ Implemented in the working copy of thread workspace `thread-5c0266` on 2026-10-1
 - Jujutsu: changing one code element makes the conversation's `querySelectorAll` run **zero** times while the changed code is still re-marked/unmarked correctly. JJ suite 155/155 (decorator file 6/6); `pnpm check:e2e jujutsu` → **11 passed, 0 failed**.
 - Mentions: a subtree is queued only when it can hold a reference chip, so an unrelated sidebar mutation does no document-wide query. Mentions suite 10/10, typecheck clean.
 - `check:diff` clean (5 changed files, 0 diagnostics).
-- Caveats: `memory.reference-preview` is the pre-existing flake documented in [the documented citation-preview flake](../../../docs/e2e-testing.md#provider-credentials); two fresh control runs on the reverted source also failed, and a control run *with* the change passed. The mentions journey fails with **and** without the change (the booted profile still exposes the new-thread composer placeholder instead of `Message or run a task, / commands, @ files or sessions`), so mentions is unit-verified only.
+- Caveats: `memory.reference-preview` is the pre-existing flake documented in [the documented citation-preview flake](../../../docs/e2e-testing.md#provider-credentials); two fresh control runs on the reverted source also failed, and a control run _with_ the change passed. The mentions journey fails with **and** without the change (the booted profile still exposes the new-thread composer placeholder instead of `Message or run a task, / commands, @ files or sessions`), so mentions is unit-verified only.
 
 **C06 — closed palette does no catalog work.** `PaletteOverlay` now reads only the palette snapshot and returns before mounting anything; `PaletteCatalog` owns the session/workspace subscriptions, and archived-ID/workspace joins are `Set`/`Map` lookups. Verified with 40/40 unit tests across 11 files, `typecheck`, `build`, and `pnpm check:e2e command-palette` → **12 passed, 0 failed** (includes `palette-performance`). Gap: the closed-path assertion is source-level; a unit test needs the full `shell.overlay` slot prop kit, so a shared test-props factory is the follow-up.
 
@@ -145,12 +145,12 @@ Implemented in the working copy of `thread-5c0266` on 2026-10-18 (unlanded; see 
 
 Same archived runner, same machine, one warmup + seven samples per case, before → after p50:
 
-| Shape | Revisions | Before p50 / max (ms) | After p50 / max (ms) |
-|---|---:|---:|---:|
-| linear | 500 | 4.98 / 7.76 | **1.50 / 2.18** |
-| linear | 1,000 | 16.49 / 17.26 | **2.59 / 5.87** |
-| linear | 2,000 | 34.26 / 61.61 | **5.12 / 6.80** |
-| branchy | 2,000 | 6.60 / 7.80 | 5.60 / 8.59 |
+| Shape   | Revisions | Before p50 / max (ms) | After p50 / max (ms) |
+| ------- | --------: | --------------------: | -------------------: |
+| linear  |       500 |           4.98 / 7.76 |      **1.50 / 2.18** |
+| linear  |     1,000 |         16.49 / 17.26 |      **2.59 / 5.87** |
+| linear  |     2,000 |         34.26 / 61.61 |      **5.12 / 6.80** |
+| branchy |     2,000 |           6.60 / 7.80 |          5.60 / 8.59 |
 
 Raw samples: [before](graph-results-before-c10.json), [after](graph-results-after-c10.json). Pure Node observations, not browser frame or typing latency.
 
@@ -169,11 +169,11 @@ Several live threads rewrite the shared graph concurrently. During this work the
 
 What this session verified, per register:
 
-| Register | Entries with receipts | Verified by |
-| --- | --- | --- |
-| client | C19, C01, C03, C04, C06, C07, C08, C09, C10 (algorithm half), C11, C12, C13, C14, C16, C17, C20 | unit suites for the owning plugins, `typecheck`, `build`, DSH-Node Host import checks, and `pnpm check:e2e <plugin>` (jujutsu 11/11, jj-integration 14/14, editor 2/2, command-palette 12/12, rich-composer 1/1, thread-sidebar 26/26, ai-accounts 14/14, activity-timeline 3/3, memory 3/3) |
-| Host | H01, H02, H03, H04, H06 (rolling sweeps), H07 (SQL project scoping), H08 (statement reuse), H09 (overlapped sources), H21 (fingerprint cache) | dshx and plugin unit suites, instrumented read/write/fetch counts, the memory retrieval probe, and the plugin journeys that touch each owner |
-| tooling | T01 (dependency manifest), T04 (scoped browser prerequisites) | dshx spec suite, browser-task tests, the maintain-verify-dsh live pass (`dshx dev up/doctor/open/shot/down`), and the smoke journeys |
+| Register | Entries with receipts                                                                                                                         | Verified by                                                                                                                                                                                                                                                                                  |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| client   | C19, C01, C03, C04, C06, C07, C08, C09, C10 (algorithm half), C11, C12, C13, C14, C16, C17, C20                                               | unit suites for the owning plugins, `typecheck`, `build`, DSH-Node Host import checks, and `pnpm check:e2e <plugin>` (jujutsu 11/11, jj-integration 14/14, editor 2/2, command-palette 12/12, rich-composer 1/1, thread-sidebar 26/26, ai-accounts 14/14, activity-timeline 3/3, memory 3/3) |
+| Host     | H01, H02, H03, H04, H06 (rolling sweeps), H07 (SQL project scoping), H08 (statement reuse), H09 (overlapped sources), H21 (fingerprint cache) | dshx and plugin unit suites, instrumented read/write/fetch counts, the memory retrieval probe, and the plugin journeys that touch each owner                                                                                                                                                 |
+| tooling  | T01 (dependency manifest), T04 (scoped browser prerequisites)                                                                                 | dshx spec suite, browser-task tests, the maintain-verify-dsh live pass (`dshx dev up/doctor/open/shot/down`), and the smoke journeys                                                                                                                                                         |
 
 Measured highlights: graph layout linear 1,000/2,000 revisions **16.49/34.26 ms → 2.59/5.12 ms** p50 (240/240 differential comparisons identical); browser-check preparation **41.1 s → 0.35 s** and **192 files/20.3 MB → 13 files/1.23 MB** hashed; memory scoped retrieval **0/5 → 5/5** in-scope hits under dominant cross-project noise; Activity Timeline reads **0 readFile** on the snapshot path and 50 buffered events as **1 writeFile**; telemetry bursts as **1 state write** instead of one per record; fingerprint checks issuing **zero reads** when nothing moved.
 

@@ -34,13 +34,13 @@ Separate `Discover` from `Installed/active`. The Hub routes to existing managers
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| New full marketplace | No | Existing dshmarket, Framework Hub, and MCP manager cover those domains. |
-| New Hub | Conditional, thin launchpad only | Useful if one entry point is desired; no duplicate ownership. |
-| skills.sh API | Link-out/CLI only until supported Vercel OIDC flow is available | Do not put OIDC credentials in Client code or invent auth. |
-| Installation | User-triggered, previewed, explicit target; no auto-execution | Skill files affect agent instructions and may be untrusted. |
-| Telemetry | Set `DISABLE_TELEMETRY=1` for CLI subprocesses | Respect local/private usage expectations. |
+| Choice               | Decision                                                        | Rationale                                                               |
+| -------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| New full marketplace | No                                                              | Existing dshmarket, Framework Hub, and MCP manager cover those domains. |
+| New Hub              | Conditional, thin launchpad only                                | Useful if one entry point is desired; no duplicate ownership.           |
+| skills.sh API        | Link-out/CLI only until supported Vercel OIDC flow is available | Do not put OIDC credentials in Client code or invent auth.              |
+| Installation         | User-triggered, previewed, explicit target; no auto-execution   | Skill files affect agent instructions and may be untrusted.             |
+| Telemetry            | Set `DISABLE_TELEMETRY=1` for CLI subprocesses                  | Respect local/private usage expectations.                               |
 
 ### Architecture
 
@@ -78,10 +78,10 @@ Stack tabs into a section selector; preserve clear distinction between discover 
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
-| Open MCP/Plugins tab | Navigate to existing owner; no duplicated settings. |
-| Open skills.sh | Launch official catalog externally; no client token. |
+| Action                   | Result                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| Open MCP/Plugins tab     | Navigate to existing owner; no duplicated settings.                                 |
+| Open skills.sh           | Launch official catalog externally; no client token.                                |
 | Install a skill (future) | Preview content/source/target; require explicit confirmation and telemetry opt-out. |
 
 ## Data model
@@ -115,7 +115,7 @@ V1 has no new catalog database. A small static route/config list may map tab lab
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-16 | Conditionally useful as a thin launchpad; preserve existing managers | Current DSH already has marketplace and MCP surfaces. |
-| 2026-10-16 | Gate skills.sh in-app search/install on supported OIDC/CLI path | Anonymous API search is blocked and client-side credentials are unsafe. |
+| Date       | Decision                                                             | Rationale                                                               |
+| ---------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 2026-10-16 | Conditionally useful as a thin launchpad; preserve existing managers | Current DSH already has marketplace and MCP surfaces.                   |
+| 2026-10-16 | Gate skills.sh in-app search/install on supported OIDC/CLI path      | Anonymous API search is blocked and client-side credentials are unsafe. |

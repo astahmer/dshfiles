@@ -28,6 +28,11 @@ where a thread starts.
   reviews.”). It is part of the opening message, which tells the thread to keep it with its own `schedule_*` tools, so
   the reminder lives in DSH's session-scoped schedule store. The panel lists the schedules that belong to the agent's
   threads and opens one. There is no scheduler, timer or delivery path in this plugin.
+- **Delegation targets are enforced where a message is sent.** An agent declares whether its threads may message any
+  peer, only listed handles, or nobody. `@dshfiles/agent-communication` resolves both sides through this plugin's
+  contract before it stores a `dshx_comm_send`, and refuses an unlisted peer with a reason naming both handles. A
+  broadcast has no single peer, so `listed` allows it and `none` refuses it. Subagent tools have no Host allowlist (see
+  `plans/dsh-host-gaps.md`), so that half stays advisory.
 - **Thread history is durable.** A dispatch records its Session in the agent's `threads` table, so
   the panel lists the threads an agent started (and opens one) after a Host restart, and the usage
   counters are read back from storage rather than recomputed per page load.
@@ -47,8 +52,8 @@ where a thread starts.
 - 100 agents, 8 KB of instructions each, 32-character handles (`^[a-z][a-z0-9-]{0,31}$`).
 - A handle is the identity: it cannot be renamed after creation.
 - 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
-- Memory and routines are per agent (see above); delegation targets are the remaining Phase 3 slice — see
-  `plans/persistent-agents/README.md`.
+- Memory, routines and delegation targets are per agent (see above). Subagent delegation cannot be restricted on
+  stock DSH (no per-Session policy hook); only the messaging path is enforced.
 - A routine is text, not a parsed rule: the thread decides the timing with the schedule tool, so the schedule record
   stays the single source of truth and the panel reads it back from the Host's catalog.
 

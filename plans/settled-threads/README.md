@@ -15,32 +15,32 @@ natively archived stay archived — no migration sweep.
 
 ## Design
 
-| Piece | Where |
-| --- | --- |
-| `settledSessionIds` in the Host settings namespace (`thread-sidebar`) | `src/preferences.ts`, `src/settings.ts` |
-| `settled` sidebar section, row/context actions, auto-settle scan | `src/organization.ts`, `src/client.tsx`, `src/sidebar-shell.tsx`, `src/rebased-threads.ts` |
-| Host no-wake gate over `agent/pre-step` (Session + subagent lineage) | `src/settled-gate.ts`, `src/host.ts` |
-| Agent parity: `thread_settle`, `thread_unsettle`, `settled` on `thread_list` | `src/thread-actions*.ts` |
-| Composer banner "Unsettle to reply" | `src/settled-thread-dock.tsx` |
-| Archived row click = Restore and open (one click, retry machine deleted) | `src/client.tsx` |
-| Settings keys decode from the legacy `autoArchive*` names | `src/preferences.ts` |
-| `mainTabs.closeActive` no longer claims desktop Mod+W (native `page.close` owns it) | `plugins/@dshfiles/main-tabs/src/client.tsx` |
+| Piece                                                                               | Where                                                                                      |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `settledSessionIds` in the Host settings namespace (`thread-sidebar`)               | `src/preferences.ts`, `src/settings.ts`                                                    |
+| `settled` sidebar section, row/context actions, auto-settle scan                    | `src/organization.ts`, `src/client.tsx`, `src/sidebar-shell.tsx`, `src/rebased-threads.ts` |
+| Host no-wake gate over `agent/pre-step` (Session + subagent lineage)                | `src/settled-gate.ts`, `src/host.ts`                                                       |
+| Agent parity: `thread_settle`, `thread_unsettle`, `settled` on `thread_list`        | `src/thread-actions*.ts`                                                                   |
+| Composer banner "Unsettle to reply"                                                 | `src/settled-thread-dock.tsx`                                                              |
+| Archived row click = Restore and open (one click, retry machine deleted)            | `src/client.tsx`                                                                           |
+| Settings keys decode from the legacy `autoArchive*` names                           | `src/preferences.ts`                                                                       |
+| `mainTabs.closeActive` no longer claims desktop Mod+W (native `page.close` owns it) | `plugins/@dshfiles/main-tabs/src/client.tsx`                                               |
 
 Renamed settings keys: `autoSettleEnabled`, `autoSettleSessionIds`, `autoSettleDisabledSessionIds`,
 `rebasedThreadSettleDelay`.
 
 ## Progress
 
-| # | Step | State |
-| --- | --- | --- |
-| 1 | Model: sections, preferences, settings schema, legacy decode | done |
-| 2 | Client: section, settle row action, context menu, auto-settle scan | done |
-| 3 | Composer banner + archived Restore-and-open, retry machine deleted | done |
-| 4 | Host: pre-step gate, settings host scope, settle verbs, agent tools | done |
-| 5 | Locales, README, host gaps, agent-tool parity, feature catalog | done |
-| 6 | Unit tests (241 pass) + e2e journey and feature scenario | done |
-| 7 | Verify: build, typecheck, tests (242), plugin boot (45/45), e2e journey | done |
-| 8 | `main-tabs.closeActive` shortcut conflict | done |
+| #   | Step                                                                    | State |
+| --- | ----------------------------------------------------------------------- | ----- |
+| 1   | Model: sections, preferences, settings schema, legacy decode            | done  |
+| 2   | Client: section, settle row action, context menu, auto-settle scan      | done  |
+| 3   | Composer banner + archived Restore-and-open, retry machine deleted      | done  |
+| 4   | Host: pre-step gate, settings host scope, settle verbs, agent tools     | done  |
+| 5   | Locales, README, host gaps, agent-tool parity, feature catalog          | done  |
+| 6   | Unit tests (241 pass) + e2e journey and feature scenario                | done  |
+| 7   | Verify: build, typecheck, tests (242), plugin boot (45/45), e2e journey | done  |
+| 8   | `main-tabs.closeActive` shortcut conflict                               | done  |
 
 ## Root cause found while verifying
 
@@ -98,7 +98,7 @@ preferences — the settled id never reached the dock and no banner appeared. Th
 - `feature-coverage --check` — no new issue; one pre-existing thread-sidebar gap (`usage-limit-group`
   has no Gherkin journey) and stale `pulls-review` references remain untouched.
 - `check-browser.mjs e2e thread-sidebar`: `thread-sidebar.settle` passes in every run after the dock
-  fix. Five runs each reported **26 passed, 1 failed**, and the single failure was a *different*
+  fix. Five runs each reported **26 passed, 1 failed**, and the single failure was a _different_
   scenario every time — `custom-views`, `mention-insertion`, `notification routes`,
   `archived-open-notice` (the shared `startBlankThread` helper timed out waiting for the URL) and
   `open-in-side-panel` (a dock-tab count). Every failure is a timing-sensitive `toHaveCount` /

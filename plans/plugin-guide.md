@@ -34,13 +34,13 @@ The guide is a rendered view over a whitelisted public contract catalog. Catalog
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| In-app vs CLI-only | Additive DSH panel backed by generated catalog | Complements existing CLI with a visual map. |
-| Runtime Inspect | Do not call from plugin | Inspect is development introspection, not a plugin business API. |
-| V1 occupancy | Static/unavailable only | No supported live Host projection is established. |
-| Public surface | DSH-owned/public SDK contracts only | Avoid documenting unstable Cordis internals as supported API. |
-| Shell extension | `api.panels.register`; never replace `root` | Avoid shadowing shipped UI. |
+| Choice             | Decision                                       | Rationale                                                        |
+| ------------------ | ---------------------------------------------- | ---------------------------------------------------------------- |
+| In-app vs CLI-only | Additive DSH panel backed by generated catalog | Complements existing CLI with a visual map.                      |
+| Runtime Inspect    | Do not call from plugin                        | Inspect is development introspection, not a plugin business API. |
+| V1 occupancy       | Static/unavailable only                        | No supported live Host projection is established.                |
+| Public surface     | DSH-owned/public SDK contracts only            | Avoid documenting unstable Cordis internals as supported API.    |
+| Shell extension    | `api.panels.register`; never replace `root`    | Avoid shadowing shipped UI.                                      |
 
 ### Architecture
 
@@ -78,11 +78,11 @@ Collapse categories into a selector and show one detail card at a time; no separ
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
-| Search/select API or Slot | Show purpose, version, scope, registration shape, risk, and links. |
-| Copy for agent | Insert bounded selected guidance into draft; do not send. |
-| Open live CLI command | Copy/open `dshx inspect slots --root <slot>`; UI does not claim result is live. |
+| Action                    | Result                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| Search/select API or Slot | Show purpose, version, scope, registration shape, risk, and links.              |
+| Copy for agent            | Insert bounded selected guidance into draft; do not send.                       |
+| Open live CLI command     | Copy/open `dshx inspect slots --root <slot>`; UI does not claim result is live. |
 
 ## Data model
 
@@ -138,7 +138,7 @@ V1 has no occupant IDs or arbitrary runtime props. Each entry names its source/v
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
+| Date       | Decision                                                | Rationale                                                                             |
+| ---------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | 2026-10-16 | Useful for DSH developers; static generated guide is V1 | DSH has CLI discovery but no visual map; live occupancy lacks a supported plugin API. |
-| 2026-10-16 | Keep live occupancy as a separate Host API phase | Inspect cannot be treated as a business Service. |
+| 2026-10-16 | Keep live occupancy as a separate Host API phase        | Inspect cannot be treated as a business Service.                                      |

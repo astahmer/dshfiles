@@ -34,12 +34,12 @@ A reminder belongs to one selected Session and produces a follow-up user message
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| New plugin vs official bundle | Reuse the official experimental bundle | Schedule service and UI are already shipped. |
-| Enable rows individually | No; select bundle as a unit | `time-context`, `schedule`, and `ui-schedule` are coupled patch rows. |
-| Target profile | Scratch/probe first; web only after explicit approval | Avoid changing the live profile or `:3080` without proof. |
-| Full automation | Defer | Needs separate session-independent durable job and safe-executor contracts. |
+| Choice                        | Decision                                              | Rationale                                                                   |
+| ----------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| New plugin vs official bundle | Reuse the official experimental bundle                | Schedule service and UI are already shipped.                                |
+| Enable rows individually      | No; select bundle as a unit                           | `time-context`, `schedule`, and `ui-schedule` are coupled patch rows.       |
+| Target profile                | Scratch/probe first; web only after explicit approval | Avoid changing the live profile or `:3080` without proof.                   |
+| Full automation               | Defer                                                 | Needs separate session-independent durable job and safe-executor contracts. |
 
 ### Architecture
 
@@ -69,11 +69,11 @@ Use the official Schedule UI in Plugins → Official / Automation tasks. Keep re
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
+| Action          | Result                                                        |
+| --------------- | ------------------------------------------------------------- |
 | Create reminder | Persist a prompt and exactly one time selector for a Session. |
-| Update/delete | Change or remove future delivery; confirm deletion. |
-| Review history | Show receipt status and missed-occurrence behavior. |
+| Update/delete   | Change or remove future delivery; confirm deletion.           |
+| Review history  | Show receipt status and missed-occurrence behavior.           |
 
 ## Data model
 
@@ -106,7 +106,7 @@ Reuse the official bundle's durable task/history model. No DSH plugin-owned sche
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-16 | Reuse optional official Schedule bundle for reminders; no new plugin | Existing Host service and bundle cover the scoped use case. |
+| Date       | Decision                                                                  | Rationale                                                          |
+| ---------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 2026-10-16 | Reuse optional official Schedule bundle for reminders; no new plugin      | Existing Host service and bundle cover the scoped use case.        |
 | 2026-10-16 | Probe before profile rollout; resolve bundle state through Plugin Manager | Host service is live while selected bundle/UI status is uncertain. |

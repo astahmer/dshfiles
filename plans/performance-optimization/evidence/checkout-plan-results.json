@@ -55,9 +55,7 @@
       "kind": "checkout-planner-probe",
       "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
       "targetRoot": "/Users/astahmer/dev/dshfiles",
-      "changedFiles": [
-        "plugins/@dshfiles/jujutsu/src/client.tsx"
-      ],
+      "changedFiles": ["plugins/@dshfiles/jujutsu/src/client.tsx"],
       "samples": [
         {
           "elapsedMs": 58.58,
@@ -92,18 +90,14 @@
           "selectedPlugins": 1
         }
       ],
-      "selection": [
-        "@dshfiles/jujutsu:-client"
-      ]
+      "selection": ["@dshfiles/jujutsu:-client"]
     },
     {
       "id": "one-changed-source-this-workspace",
       "kind": "checkout-planner-probe",
       "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
       "targetRoot": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266",
-      "changedFiles": [
-        "plugins/@dshfiles/shared-streams/src/host.ts"
-      ],
+      "changedFiles": ["plugins/@dshfiles/shared-streams/src/host.ts"],
       "samples": [
         {
           "elapsedMs": 67.51,
@@ -190,9 +184,7 @@
       "kind": "checkout-planner-probe",
       "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
       "targetRoot": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266",
-      "changedFiles": [
-        "tooling/dshx/packages/dshx/src/api/define.ts"
-      ],
+      "changedFiles": ["tooling/dshx/packages/dshx/src/api/define.ts"],
       "samples": [
         {
           "elapsedMs": 37.48,

@@ -21,6 +21,7 @@ Feature: Persistent agents
   Scenario: Create an agent and keep its instructions
     Given the isolated plugin profile "@dshfiles/agents" is booted
     Then the agent "Reviewer" is saved with instructions "Prefer small findings."
+    And the agent "Reviewer" may only message "dsh"
     And the Agents panel lists "Reviewer" with those instructions
 
   @scenario:agents.thread-history

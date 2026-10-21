@@ -18,6 +18,7 @@ const draft = (fields: Partial<AgentDraft> = {}): AgentDraft => ({
   route: { provider: 'codex-alex2', model: 'gpt-6-luna' },
   memoryScope: null,
   routine: '',
+  delegation: { messaging: 'any', handles: [] } as const,
   enabled: true,
   ...fields,
 })
@@ -102,6 +103,16 @@ test('a routine rides the opening message and points at the schedule tools', () 
   assert.match(message, /schedule_create/u)
   assert.match(message, /---\n\nstart the routine$/u)
   assert.equal(Agents.routineSection('   '), '')
+})
+
+test('delegation rules decide which peers an agent may message', () => {
+  assert.equal(Agents.mayMessage({ messaging: 'any', handles: [] }, 'planner'), true)
+  assert.equal(Agents.mayMessage({ messaging: 'none', handles: ['planner'] }, 'planner'), false)
+  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'] }, 'planner'), true)
+  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'] }, 'reviewer'), false)
+  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'] }, null), false)
+  assert.equal(Agents.mayBroadcast({ messaging: 'none', handles: [] }), false)
+  assert.equal(Agents.mayBroadcast({ messaging: 'listed', handles: [] }), true)
 })
 
 test('thread titles come from the first line of the prompt', () => {

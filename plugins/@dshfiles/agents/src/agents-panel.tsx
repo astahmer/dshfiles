@@ -55,6 +55,7 @@ const draftOf = (agent: Agent | null): AgentDraft => ({
   route: agent?.route ?? null,
   memoryScope: agent?.memoryScope ?? null,
   routine: agent?.routine ?? '',
+  delegation: agent?.delegation ?? { messaging: 'any', handles: [] },
   enabled: agent?.enabled ?? true,
 })
 
@@ -293,6 +294,50 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
             Carried into the opening message; the thread keeps it with its own schedule tools, not a timer.
           </span>
         </label>
+
+        <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+          <label className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className={labelClass}>Delegation (messages)</span>
+            <select
+              className={fieldClass}
+              value={draft.delegation.messaging}
+              onChange={event =>
+                patch({
+                  delegation: {
+                    messaging: event.currentTarget.value === 'none' ? 'none' : event.currentTarget.value === 'listed' ? 'listed' : 'any',
+                    handles: draft.delegation.handles,
+                  },
+                })
+              }
+            >
+              <option value="any">Any peer</option>
+              <option value="listed">Listed peers only</option>
+              <option value="none">No messaging</option>
+            </select>
+          </label>
+          <label className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className={labelClass}>Peers (handles)</span>
+            <Input
+              value={draft.delegation.handles.join(', ')}
+              disabled={draft.delegation.messaging !== 'listed'}
+              placeholder="reviewer, planner"
+              onChange={event =>
+                patch({
+                  delegation: {
+                    messaging: draft.delegation.messaging,
+                    handles: event.currentTarget.value
+                      .split(',')
+                      .map(handle => handle.trim().replace(/^@/u, ''))
+                      .filter(handle => handle !== ''),
+                  },
+                })
+              }
+            />
+          </label>
+          <span className="dshx:self-end dshx:text-[11px] dshx:text-muted-foreground">
+            Constrains this agent's <code>dshx_comm_*</code> sends; it does not replace DSH messaging.
+          </span>
+        </div>
 
         <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
           <label className="dshx:flex dshx:flex-col dshx:gap-1">

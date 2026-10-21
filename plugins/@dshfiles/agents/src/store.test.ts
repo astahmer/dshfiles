@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { AgentTable, AgentThreadTable } from './store.js'
-import type { Agent, AgentThread } from './agent.js'
+import type { Agent, AgentDraft, AgentThread } from './agent.js'
 import { AgentRegistry } from './store.js'
 
 const memoryTable = <Key extends string, Value>(
@@ -45,7 +45,7 @@ const storeOf = (now: () => number, initial: readonly Agent[] = []) => {
   }
 }
 
-const draftOf = (handle: string) => ({
+const draftOf = (handle: string): AgentDraft => ({
   handle,
   name: handle,
   glyph: '🤖',
@@ -55,6 +55,7 @@ const draftOf = (handle: string) => ({
   route: null,
   memoryScope: null,
   routine: '',
+  delegation: { messaging: 'any', handles: [] } as const,
   enabled: true,
 })
 

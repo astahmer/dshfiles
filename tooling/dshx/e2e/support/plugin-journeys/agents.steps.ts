@@ -59,6 +59,13 @@ Then('the agent {string} is saved with instructions {string}', async ({ page }: 
   await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
 })
 
+Then('the agent {string} may only message {string}', async ({ page }: { page: Page }, _name: string, peer: string) => {
+  await page.getByRole('combobox', { name: 'Delegation (messages)', exact: true }).selectOption({ label: 'Listed peers only' })
+  await page.getByRole('textbox', { name: 'Peers (handles)', exact: true }).fill(peer)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
+})
+
 Then('the Agents panel lists {string} with those instructions', async ({ page }: { page: Page }, name: string) => {
   await recordAssertion(page, 'agents-registry-persists-a-new-agent', async () => {
     const row = page.getByRole('button', { name: new RegExp(`@${name.toLowerCase()}$`, 'u') })
@@ -66,6 +73,8 @@ Then('the Agents panel lists {string} with those instructions', async ({ page }:
     await row.click()
     await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
     await expect(instructionsField(page)).toHaveValue('Prefer small findings.')
+    await expect(page.getByRole('combobox', { name: 'Delegation (messages)', exact: true })).toHaveValue('listed')
+    await expect(page.getByRole('textbox', { name: 'Peers (handles)', exact: true })).toHaveValue('dsh')
   })
   await finishJourneyAssertions(page)
 })
@@ -87,7 +96,7 @@ Then('the agent {string} lists {string} and counts {int} thread', async ({ page 
   await recordAssertion(page, 'agents-thread-history-survives-a-reload', async () => {
     await page.getByRole('button', { name: new RegExp(`@${handle}$`, 'u') }).click()
     await expect(page.getByText(new RegExp(`@${handle} · ${String(count)} thread\\b`, 'u'))).toBeVisible()
-    await expect(page.getByRole('button', { name: new RegExp(`^${title}$`, 'u') })).toBeVisible()
+    await expect(page.getByRole('button', { name: new RegExp(`^${title}\\b`, 'u') })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -105,13 +114,13 @@ Then('the agent suggestion {string} is offered', async ({ page }: { page: Page }
   await recordAssertion(page, 'agents-comment-box-completes-a-handle', async () => {
     const list = peek(page).getByRole('listbox', { name: 'Agent suggestions', exact: true })
     await expect(list).toBeVisible()
-    await expect(list.getByRole('option', { name: new RegExp(`@${handle}$`, 'u') })).toBeVisible()
+    await expect(list.getByRole('option', { name: new RegExp(`${handle}$`, 'u') })).toBeVisible()
   })
 })
 
 When('the agent suggestion {string} is picked', async ({ page }: { page: Page }, handle: string) => {
   const list = peek(page).getByRole('listbox', { name: 'Agent suggestions', exact: true })
-  await list.getByRole('option', { name: new RegExp(`@${handle}$`, 'u') }).click()
+  await list.getByRole('option', { name: new RegExp(`${handle}$`, 'u') }).click()
 })
 
 Then('the comment box reads {string}', async ({ page }: { page: Page }, text: string) => {

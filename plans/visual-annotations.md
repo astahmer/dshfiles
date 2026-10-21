@@ -40,13 +40,13 @@ Local React dev app overlay
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| Build new DSH plugin first | No | Existing MCP Servers can test the local React-app use case. |
-| Browser target | Disposable local React dev app | DSH has no generic Browser DOM/evaluate contract. |
-| Agentation package | Pin dev-only version; license review before redistribution | PolyForm Shield is not permissive/MIT. |
-| Network | Loopback only; allow exact dev origin | CORS is not authentication; no wildcard or remote exposure. |
-| DSH Web annotations | Separate later decision | Same-page overlay is possible; external Browser lifecycle and screenshot transport are not. |
+| Choice                     | Decision                                                   | Rationale                                                                                   |
+| -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Build new DSH plugin first | No                                                         | Existing MCP Servers can test the local React-app use case.                                 |
+| Browser target             | Disposable local React dev app                             | DSH has no generic Browser DOM/evaluate contract.                                           |
+| Agentation package         | Pin dev-only version; license review before redistribution | PolyForm Shield is not permissive/MIT.                                                      |
+| Network                    | Loopback only; allow exact dev origin                      | CORS is not authentication; no wildcard or remote exposure.                                 |
+| DSH Web annotations        | Separate later decision                                    | Same-page overlay is possible; external Browser lifecycle and screenshot transport are not. |
 
 ### Architecture
 
@@ -72,11 +72,11 @@ Use Agentation's dev-app overlay. In DSH, expose only existing MCP tools and a r
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
-| Annotate an element | Store bounded note/context in local dev app and return only for selected Session. |
-| Navigate/remove target | Mark annotation stale; keep unresolved until explicit user action. |
-| Add to prompt | Insert a bounded textual summary in draft; user reviews and sends. |
+| Action                 | Result                                                                            |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| Annotate an element    | Store bounded note/context in local dev app and return only for selected Session. |
+| Navigate/remove target | Mark annotation stale; keep unresolved until explicit user action.                |
+| Add to prompt          | Insert a bounded textual summary in draft; user reviews and sends.                |
 
 ## Data model
 
@@ -109,7 +109,7 @@ No DSH-owned annotation persistence in the probe. Agentation local storage/serve
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-16 | Useful for local UI feedback; adopt/probe Agentation through existing MCP Servers first | Current DSH MCP transport fits local dev app; avoids duplicate manager/plugin. |
-| 2026-10-16 | Defer native DSH annotation plugin and arbitrary Browser support | User target is not yet DSH Web; Browser lifecycle/DOM/screenshot seams are absent. |
+| Date       | Decision                                                                                | Rationale                                                                          |
+| ---------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 2026-10-16 | Useful for local UI feedback; adopt/probe Agentation through existing MCP Servers first | Current DSH MCP transport fits local dev app; avoids duplicate manager/plugin.     |
+| 2026-10-16 | Defer native DSH annotation plugin and arbitrary Browser support                        | User target is not yet DSH Web; Browser lifecycle/DOM/screenshot seams are absent. |

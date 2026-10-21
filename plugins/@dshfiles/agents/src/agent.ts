@@ -15,6 +15,7 @@ export const MAX_EFFORT_CHARS = 64
 export const MAX_SESSION_CHARS = 256
 export const MAX_MEMORY_SCOPE_CHARS = 80
 export const MAX_ROUTINE_CHARS = 400
+export const MAX_PEER_HANDLES = 50
 /** Newest threads kept per agent; an older row is pruned so one agent cannot grow the table without bound. */
 export const MAX_THREADS_PER_AGENT = 50
 /** Matches the backlog start-thread limit, so a dispatch prompt travels the same path as a typed one. */
@@ -41,6 +42,17 @@ export const agentRouteSchema = z
   })
   .strict()
 
+/**
+ * Which peers an agent's threads may message. `any` is the default (no rule), `listed` allows only `handles`, and
+ * `none` keeps the agent's threads out of DSH's messaging tools. It constrains `dshx_comm_*`, it does not replace it.
+ */
+export const agentDelegationSchema = z
+  .object({
+    messaging: z.enum(['any', 'listed', 'none']),
+    handles: z.array(handleSchema).max(MAX_PEER_HANDLES),
+  })
+  .strict()
+
 /** Everything a person or an agent decides about an agent; the rest is usage metadata. */
 export const agentDraftSchema = z
   .object({
@@ -55,6 +67,7 @@ export const agentDraftSchema = z
     memoryScope: agentMemoryScopeSchema,
     /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
     routine: z.string().max(MAX_ROUTINE_CHARS),
+    delegation: agentDelegationSchema,
     enabled: z.boolean(),
   })
   .strict()
@@ -85,6 +98,7 @@ export const agentThreadSchema = z
 export type AgentThread = z.infer<typeof agentThreadSchema>
 
 export type AgentRoute = z.infer<typeof agentRouteSchema>
+export type AgentDelegation = z.infer<typeof agentDelegationSchema>
 export type AgentDraft = z.infer<typeof agentDraftSchema>
 export type Agent = z.infer<typeof agentSchema>
 
@@ -155,6 +169,7 @@ export class Agents {
       route: null,
       memoryScope: null,
       routine: '',
+      delegation: { messaging: 'any', handles: [] },
       enabled: true,
       builtIn: true,
       createdAt: now,
@@ -162,6 +177,18 @@ export class Agents {
       lastUsedAt: null,
       threadCount: 0,
     }
+  }
+
+  /** Whether an agent's threads may message one peer; a thread no agent started has no rule to break. */
+  static mayMessage(delegation: AgentDelegation, targetHandle: string | null): boolean {
+    if (delegation.messaging === 'any') return true
+    if (delegation.messaging === 'none') return false
+    return targetHandle !== null && delegation.handles.includes(targetHandle)
+  }
+
+  /** Whether an agent's threads may broadcast to a topic: a topic has no single peer, so `listed` cannot narrow it. */
+  static mayBroadcast(delegation: AgentDelegation): boolean {
+    return delegation.messaging !== 'none'
   }
 
   /** The scope an agent's threads would use if the person leaves the field empty; never stored on its own. */

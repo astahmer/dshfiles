@@ -79,7 +79,17 @@ for (const repoRoot of repos) {
     if (!present && !name.startsWith('thread-')) return
     await Promise.all([
       run(['--ignore-working-copy', 'log', '--no-graph', '-r', `(::${name}@ ~ ::bookmarks(main)) ~ empty()`, '-T', REVISION_TEMPLATE]),
-      run(['--ignore-working-copy', 'log', '--no-graph', '-n', String(MAX_BEHIND + 1), '-r', `(::bookmarks(main) ~ ::${name}@) ~ empty()`, '-T', REVISION_TEMPLATE]),
+      run([
+        '--ignore-working-copy',
+        'log',
+        '--no-graph',
+        '-n',
+        String(MAX_BEHIND + 1),
+        '-r',
+        `(::bookmarks(main) ~ ::${name}@) ~ empty()`,
+        '-T',
+        REVISION_TEMPLATE,
+      ]),
     ])
   })
 }

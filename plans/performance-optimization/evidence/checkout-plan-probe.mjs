@@ -11,7 +11,8 @@ import { pathToFileURL } from 'node:url'
  *   node checkout-plan-probe.mjs <implementation-root> <target-root> [changed-file...]
  */
 const [implementationRoot, targetRoot, ...changedFiles] = process.argv.slice(2)
-if (implementationRoot === undefined || targetRoot === undefined) throw new Error('Usage: checkout-plan-probe.mjs <implementation-root> <target-root> [changed-file...]')
+if (implementationRoot === undefined || targetRoot === undefined)
+  throw new Error('Usage: checkout-plan-probe.mjs <implementation-root> <target-root> [changed-file...]')
 
 const originalRead = fs.readFileSync
 let mapReads = 0

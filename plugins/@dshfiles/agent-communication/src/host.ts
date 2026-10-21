@@ -1,6 +1,7 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionRecord } from '@deepseek-ai/dsh-session-query'
-import { defineHost, definePromptContext, defineTool, type AssembleContext } from '@dshfiles/dshx/host'
+import { agentsApi } from '@dshfiles/agents/contract'
+import { createHostApiClient, defineHost, definePromptContext, defineTool, isApiServed, type AssembleContext } from '@dshfiles/dshx/host'
 import {
   CommunicationError,
   createCommunicationService,
@@ -15,6 +16,7 @@ import { z } from 'zod'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
 import { registerCommunicationAgent } from './agent-lifecycle.js'
+import { CommunicationDelegation, type DelegationSender } from './delegation-guard.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
 import { RecipientDirectoryModel } from './recipient-directory.js'
@@ -42,6 +44,27 @@ const summaryOutput = {
 }
 
 const workspaceLookupInputSchema = z.object({ sessionId: z.string().min(1).max(256) }).strict()
+
+/**
+ * The agent that started a thread, when the agents bundle serves the registry. An absent bundle, a missing Session row
+ * or an older agents build all answer null, which leaves messaging exactly as it was.
+ */
+const delegationSender = async (context: Context, sessionId: string): Promise<DelegationSender | null> => {
+  if (!isApiServed(context, agentsApi, 'agent-communication')) return null
+  try {
+    const client = createHostApiClient(context, agentsApi, 'agent-communication')
+    const result = await client.safe.threadAgent({ sessionId })
+    const agent = result.ok ? result.value.agent : null
+    return agent === null ? null : { handle: agent.handle, delegation: agent.delegation }
+  } catch {
+    return null
+  }
+}
+
+const communicationContext = (): Context => {
+  if (hostContext === undefined) throw new Error('Agent communication Host is not active.')
+  return hostContext
+}
 
 const principalForAgent = (agent: Agent | undefined): CommunicationPrincipal => {
   if (agent === undefined) throw new Error('Agent communication tools require a live DSH Agent identity.')
@@ -313,6 +336,10 @@ const publishTool = defineTool({
       operation: 'dshx_comm_publish',
       run: async () => {
         const sender = principalForAgent(execution.agent)
+        const decision = CommunicationDelegation.broadcast({
+          sender: execution.agent === undefined ? null : await delegationSender(communicationContext(), execution.agent.id),
+        })
+        if (!decision.allowed) throw new Error(decision.reason)
         const message = await requireService().publish({
           sender,
           topic: args.topic,
@@ -366,6 +393,11 @@ const sendTool = defineTool({
       operation: 'dshx_comm_send',
       run: async () => {
         const sender = principalForAgent(execution.agent)
+        const context = communicationContext()
+        const senderAgent = execution.agent === undefined ? null : await delegationSender(context, execution.agent.id)
+        const recipientAgent = await delegationSender(context, args.toAgentId)
+        const decision = CommunicationDelegation.direct({ sender: senderAgent, targetHandle: recipientAgent?.handle ?? null })
+        if (!decision.allowed) throw new Error(decision.reason)
         const recipientStatus = await resolveRecipientId(args.toAgentId)
         const message = await requireService().send({
           sender,

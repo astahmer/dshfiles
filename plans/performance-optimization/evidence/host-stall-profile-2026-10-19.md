@@ -10,11 +10,11 @@ max 5 961 ms. The event loop itself stalled, so every request queued behind it, 
 A 60 s V8 CPU profile of the live Host (SIGUSR1 inspector on 127.0.0.1, closed afterwards) spent 38 % of wall time on
 the main thread. Owned work at the top:
 
-| Inclusive | Frame | Cause |
-|---|---|---|
-| 7.5 s | core `settings.describe` | called from dshx `SettingsScope.get()`: memory `currentSettings` on every Session event (4.1 s), jj-integration `readSettings` via `threadsDirectory()` and `bookmark()` (2.3 s), thread-sidebar settled status (1.1 s) |
-| 5.7 s / 3.9 s | core `configEditor.configuration` / `loadProfileDirectory` | inside each `describe()`: re-reads, parses and recomposes the whole profile from disk |
-| 4.9 s | core `session.list` → `projectionsFor` → `summarizeCold` | core client store; already a recorded Host gap |
+| Inclusive     | Frame                                                      | Cause                                                                                                                                                                                                                   |
+| ------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.5 s         | core `settings.describe`                                   | called from dshx `SettingsScope.get()`: memory `currentSettings` on every Session event (4.1 s), jj-integration `readSettings` via `threadsDirectory()` and `bookmark()` (2.3 s), thread-sidebar settled status (1.1 s) |
+| 5.7 s / 3.9 s | core `configEditor.configuration` / `loadProfileDirectory` | inside each `describe()`: re-reads, parses and recomposes the whole profile from disk                                                                                                                                   |
+| 4.9 s         | core `session.list` → `projectionsFor` → `summarizeCold`   | core client store; already a recorded Host gap                                                                                                                                                                          |
 
 Fixed: dshx now caches `SettingsScope.get()` on the Loader entry's fiber, `fiber.config` and `options.config`
 identities (a volatile-only update mutates `fiber.config` in place but always installs a new `options.config`).

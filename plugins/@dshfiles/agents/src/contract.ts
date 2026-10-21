@@ -1,5 +1,6 @@
 export {
   AGENT_HANDLE_PATTERN,
+  agentDelegationSchema,
   agentDraftSchema,
   agentLimits,
   agentRouteSchema,
@@ -10,7 +11,7 @@ export {
   MAX_MESSAGE_CHARS,
   MAX_THREADS_PER_AGENT,
 } from './agent.js'
-export type { Agent, AgentDraft, AgentIdentity, AgentMention, AgentRoute, AgentThread } from './agent.js'
+export type { Agent, AgentDelegation, AgentDraft, AgentIdentity, AgentMention, AgentRoute, AgentThread } from './agent.js'
 export { agentsApi, agentPresetRowSchema, agentRemoveResultSchema, agentSaveResultSchema, agentSnapshotSchema, agentThreadInputSchema } from './api.js'
 export type { AgentPresetRow, AgentRemoveResultView, AgentSaveResultView, AgentSnapshotView } from './api.js'
 export { AgentDispatch } from './dispatch.js'

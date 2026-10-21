@@ -36,13 +36,13 @@ One interval per Session turn, paired from `turn/start` to matching `turn/end`. 
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| Standalone plugin vs Usage tab | Add Calendar tab in Usage | Usage already owns analytics and Host SQLite; keep one analytics surface. |
-| Source | Host `sessionQuery` + `session/event` | Reads complete persisted corpus and committed live turn events without loading Sessions into an Agent. |
-| Persistence | Separate `turn_intervals` table from request records | Duration and token/cost metrics have different semantics. |
-| Child sessions | Store separately; top-level default with explicit toggle | Parallel child time must not be silently double-counted. |
-| Rounding | Exact duration default; optional display-only rounding | Time sheet conventions are not billing facts. |
+| Choice                         | Decision                                                 | Rationale                                                                                              |
+| ------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Standalone plugin vs Usage tab | Add Calendar tab in Usage                                | Usage already owns analytics and Host SQLite; keep one analytics surface.                              |
+| Source                         | Host `sessionQuery` + `session/event`                    | Reads complete persisted corpus and committed live turn events without loading Sessions into an Agent. |
+| Persistence                    | Separate `turn_intervals` table from request records     | Duration and token/cost metrics have different semantics.                                              |
+| Child sessions                 | Store separately; top-level default with explicit toggle | Parallel child time must not be silently double-counted.                                               |
+| Rounding                       | Exact duration default; optional display-only rounding   | Time sheet conventions are not billing facts.                                                          |
 
 ### Architecture
 
@@ -76,11 +76,11 @@ Use a compact agenda/list view; preserve timezone, filter, and child-count label
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
-| Select project/date range | Query local intervals and redraw calendar/timesheet. |
-| Toggle child agents | Include/exclude separately indexed child Sessions; label parallel hours. |
-| Export CSV | Emit stable, timezone-aware interval rows and summary provenance. |
+| Action                    | Result                                                                   |
+| ------------------------- | ------------------------------------------------------------------------ |
+| Select project/date range | Query local intervals and redraw calendar/timesheet.                     |
+| Toggle child agents       | Include/exclude separately indexed child Sessions; label parallel hours. |
+| Export CSV                | Emit stable, timezone-aware interval rows and summary provenance.        |
 
 ## Data model
 
@@ -134,7 +134,7 @@ Store only derived Session/turn IDs, seqs, timestamps, outcome, project/cwd labe
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-16 | Useful; add Calendar inside Usage, not a standalone plugin | Reuses existing analytics and Host SQLite while keeping a separate interval model. |
-| 2026-10-16 | Treat values as agent-turn time, never billing/productivity | Calendar records observed wall-clock intervals only. |
+| Date       | Decision                                                    | Rationale                                                                          |
+| ---------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 2026-10-16 | Useful; add Calendar inside Usage, not a standalone plugin  | Reuses existing analytics and Host SQLite while keeping a separate interval model. |
+| 2026-10-16 | Treat values as agent-turn time, never billing/productivity | Calendar records observed wall-clock intervals only.                               |

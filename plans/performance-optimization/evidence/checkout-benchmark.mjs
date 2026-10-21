@@ -30,6 +30,15 @@ for (let iteration = 0; iteration < 6; iteration += 1) {
   const elapsedMs = performance.now() - started
   samples.push({ iteration, elapsedMs, mapReads, mapBytes, selectedPlugins: plan.plugins.length })
 }
-const report = { recordedAt: new Date().toISOString(), kind: 'read-only-checkout-planner-no-changed-files', node: process.version, platform: process.platform, architecture: process.arch, implementation, samples, p50WarmMs: [...samples.slice(1).map(sample => sample.elapsedMs)].sort((left, right) => left - right)[2] }
+const report = {
+  recordedAt: new Date().toISOString(),
+  kind: 'read-only-checkout-planner-no-changed-files',
+  node: process.version,
+  platform: process.platform,
+  architecture: process.arch,
+  implementation,
+  samples,
+  p50WarmMs: [...samples.slice(1).map(sample => sample.elapsedMs)].sort((left, right) => left - right)[2],
+}
 if (process.argv[3] !== undefined) fs.writeFileSync(resolve(process.argv[3]), `${JSON.stringify(report, null, 2)}\n`)
 console.log(JSON.stringify(report, null, 2))

@@ -15,11 +15,7 @@
     "neverIndexed": 127,
     "neverIndexedBytes": 198489418
   },
-  "loadAverage": [
-    18.35546875,
-    23.18212890625,
-    19.6396484375
-  ],
+  "loadAverage": [18.35546875, 23.18212890625, 19.6396484375],
   "scenarios": [
     {
       "name": "S1 cold catch-up",

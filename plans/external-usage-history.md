@@ -34,13 +34,13 @@ Keep DSH-native requests, external usage events, provider quota snapshots, and c
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|--------|----------|-----------|
-| New plugin vs existing Usage | Extend Usage if native DSH UI is needed | Avoid a second analytics owner. |
-| TokiToki integration | Require versioned usage-only API and license confirmation first | Current event/MCP surfaces include prompt-derived fields and lack a clear public integration contract. |
-| Direct imports | Codex/OpenCode only as opt-in best-effort candidates; Claude OTel later; defer Cursor/T3 | Provider evidence and exactness vary. |
-| Persistence | Separate `external_usage_events` table/API from DSH `requests` | External records do not have DSH Session semantics. |
-| Cost | Store provider-reported vs estimated provenance separately | Token counts and subscription/quota usage are not billing totals. |
+| Choice                       | Decision                                                                                 | Rationale                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| New plugin vs existing Usage | Extend Usage if native DSH UI is needed                                                  | Avoid a second analytics owner.                                                                        |
+| TokiToki integration         | Require versioned usage-only API and license confirmation first                          | Current event/MCP surfaces include prompt-derived fields and lack a clear public integration contract. |
+| Direct imports               | Codex/OpenCode only as opt-in best-effort candidates; Claude OTel later; defer Cursor/T3 | Provider evidence and exactness vary.                                                                  |
+| Persistence                  | Separate `external_usage_events` table/API from DSH `requests`                           | External records do not have DSH Session semantics.                                                    |
+| Cost                         | Store provider-reported vs estimated provenance separately                               | Token counts and subscription/quota usage are not billing totals.                                      |
 
 ### Architecture
 
@@ -72,11 +72,11 @@ Add an `External usage` view beside DSH request analytics. Show source selection
 
 ### Common interactions
 
-| Action | Result |
-|--------|--------|
-| Enable a source | Host records selected source and begins bounded read-only scan. |
-| Refresh | Re-scan selected sources idempotently; show partial/unsupported status. |
-| Filter provider/model/date | Recompute aggregates without exposing raw source rows. |
+| Action                     | Result                                                                  |
+| -------------------------- | ----------------------------------------------------------------------- |
+| Enable a source            | Host records selected source and begins bounded read-only scan.         |
+| Refresh                    | Re-scan selected sources idempotently; show partial/unsupported status. |
+| Filter provider/model/date | Recompute aggregates without exposing raw source rows.                  |
 
 ## Data model
 
@@ -139,7 +139,7 @@ Store only allowlisted counts, model, time, source label, dedupe hash, and cost 
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-10-16 | Extend Usage only if native DSH history is needed; no new plugin | Existing Usage owns DSH analytics; TokiToki already covers much standalone reporting. |
-| 2026-10-16 | Block implementation on prompt-read semantics and a supported source contract | Local stores can contain sensitive prompt-derived data. |
+| Date       | Decision                                                                      | Rationale                                                                             |
+| ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 2026-10-16 | Extend Usage only if native DSH history is needed; no new plugin              | Existing Usage owns DSH analytics; TokiToki already covers much standalone reporting. |
+| 2026-10-16 | Block implementation on prompt-read semantics and a supported source contract | Local stores can contain sensitive prompt-derived data.                               |

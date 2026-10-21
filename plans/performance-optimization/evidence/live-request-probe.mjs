@@ -68,9 +68,7 @@ writeFileSync('/tmp/dsh-net-resources.json', JSON.stringify(resources, null, 1))
 writeFileSync('/tmp/dsh-net-requests.json', JSON.stringify([...requests.values()], null, 1))
 
 const api = resources.filter(entry => entry.name.includes('/api/') || entry.name.includes('/open-in-app/'))
-const rows = api
-  .map(entry => ({ ...entry, path: new URL(entry.name).pathname, repeats: byName.get(entry.name) }))
-  .sort((a, b) => b.durationMs - a.durationMs)
+const rows = api.map(entry => ({ ...entry, path: new URL(entry.name).pathname, repeats: byName.get(entry.name) })).sort((a, b) => b.durationMs - a.durationMs)
 
 console.log(`resources=${resources.length} api=${api.length} settleMs=${settleMs}`)
 console.log('durationMs serverMs transfer decoded path repeats')

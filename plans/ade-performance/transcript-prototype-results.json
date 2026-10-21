@@ -84,13 +84,7 @@
       "scrollToNewestVisibleMs": 42.3,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.7,
-        16.6,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.7, 16.6, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -105,12 +99,7 @@
       "scrollToNewestVisibleMs": 27.2,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.7, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -125,12 +114,7 @@
       "scrollToNewestVisibleMs": 29.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        8.1,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [8.1, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -145,12 +129,7 @@
       "scrollToNewestVisibleMs": 28.3,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.6,
-        16.7,
-        16.6,
-        16.8
-      ],
+      "frameGapsMs": [16.6, 16.7, 16.6, 16.8],
       "longTaskMs": []
     },
     {
@@ -165,12 +144,7 @@
       "scrollToNewestVisibleMs": 27.8,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.7,
-        16.5,
-        16.8
-      ],
+      "frameGapsMs": [16.7, 16.7, 16.5, 16.8],
       "longTaskMs": []
     },
     {
@@ -185,12 +159,7 @@
       "scrollToNewestVisibleMs": 28.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -205,12 +174,7 @@
       "scrollToNewestVisibleMs": 29.6,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        8.7,
-        16.6,
-        16.7,
-        16.7
-      ],
+      "frameGapsMs": [8.7, 16.6, 16.7, 16.7],
       "longTaskMs": []
     },
     {
@@ -225,12 +189,7 @@
       "scrollToNewestVisibleMs": 28.8,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.6,
-        16.7,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.6, 16.7, 16.7],
       "longTaskMs": []
     },
     {
@@ -245,12 +204,7 @@
       "scrollToNewestVisibleMs": 27.6,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        8,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [8, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -265,12 +219,7 @@
       "scrollToNewestVisibleMs": 26.9,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.6,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.6, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -285,12 +234,7 @@
       "scrollToNewestVisibleMs": 34.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.6,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.6, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -305,12 +249,7 @@
       "scrollToNewestVisibleMs": 34.8,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        13.2,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [13.2, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -325,12 +264,7 @@
       "scrollToNewestVisibleMs": 35.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.6,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.6, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -345,12 +279,7 @@
       "scrollToNewestVisibleMs": 34.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.6,
-        16.6,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.6, 16.6, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -365,12 +294,7 @@
       "scrollToNewestVisibleMs": 34.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        8.9,
-        16.7,
-        16.6,
-        16.8
-      ],
+      "frameGapsMs": [8.9, 16.7, 16.6, 16.8],
       "longTaskMs": []
     },
     {
@@ -385,12 +309,7 @@
       "scrollToNewestVisibleMs": 33,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.6,
-        16.7,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.6, 16.7, 16.7],
       "longTaskMs": []
     },
     {
@@ -405,12 +324,7 @@
       "scrollToNewestVisibleMs": 34.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.7,
-        16.6,
-        16.8,
-        16.6
-      ],
+      "frameGapsMs": [16.7, 16.6, 16.8, 16.6],
       "longTaskMs": []
     },
     {
@@ -425,12 +339,7 @@
       "scrollToNewestVisibleMs": 34.4,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        1.8,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [1.8, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -445,12 +354,7 @@
       "scrollToNewestVisibleMs": 34.8,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        16.6,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.6, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -465,12 +369,7 @@
       "scrollToNewestVisibleMs": 33.1,
       "newestVisibleRows": 1000,
       "cardDomNodes": 4007,
-      "frameGapsMs": [
-        8.5,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [8.5, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -485,13 +384,7 @@
       "scrollToNewestVisibleMs": 49.9,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.6,
-        16.7,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.6, 16.7, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -506,13 +399,7 @@
       "scrollToNewestVisibleMs": 50,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        0.27,
-        16.63,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [0.27, 16.63, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -527,13 +414,7 @@
       "scrollToNewestVisibleMs": 49.2,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        9.1,
-        16.6,
-        16.7,
-        16.7,
-        16.7
-      ],
+      "frameGapsMs": [9.1, 16.6, 16.7, 16.7, 16.7],
       "longTaskMs": []
     },
     {
@@ -548,13 +429,7 @@
       "scrollToNewestVisibleMs": 48.8,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.7,
-        16.7,
-        16.6,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.7, 16.7, 16.6, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -569,12 +444,7 @@
       "scrollToNewestVisibleMs": 49.7,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.7,
-        16.6,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.6, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -589,13 +459,7 @@
       "scrollToNewestVisibleMs": 49.3,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.6,
-        16.7,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.6, 16.7, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -610,13 +474,7 @@
       "scrollToNewestVisibleMs": 49.2,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        4.2,
-        16.7,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [4.2, 16.7, 16.7, 16.6, 16.7],
       "longTaskMs": []
     },
     {
@@ -631,13 +489,7 @@
       "scrollToNewestVisibleMs": 49.2,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.7,
-        16.7,
-        16.6,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.7, 16.7, 16.6, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -652,13 +504,7 @@
       "scrollToNewestVisibleMs": 49,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.8,
-        16.6,
-        16.7,
-        16.7,
-        16.6
-      ],
+      "frameGapsMs": [16.8, 16.6, 16.7, 16.7, 16.6],
       "longTaskMs": []
     },
     {
@@ -673,13 +519,7 @@
       "scrollToNewestVisibleMs": 49.1,
       "newestVisibleRows": 15,
       "cardDomNodes": 70,
-      "frameGapsMs": [
-        16.7,
-        16.6,
-        16.7,
-        16.6,
-        16.7
-      ],
+      "frameGapsMs": [16.7, 16.6, 16.7, 16.6, 16.7],
       "longTaskMs": []
     }
   ],

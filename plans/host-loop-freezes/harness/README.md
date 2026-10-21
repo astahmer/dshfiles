@@ -33,14 +33,14 @@ benchmarks through `node --experimental-strip-types`.
 
 ## Scenarios
 
-| Id | Shape | Question |
-|----|-------|----------|
-| S1 | the whole live backlog, one search, no abort | what does a single catch-up cost the Host loop today? |
-| S2 | 12 searches aborted after 200 ms, then one settled search | does typing multiply the work? |
-| S3 | warm index plus a live set | what does an ordinary warm search cost? |
-| S4 | warm index with the largest log changed | how bad is one giant session? |
-| S6 | warm index with the newest N logs changed | what does a restart leave behind? |
-| S5 | idle, no search | the plugins' background tax (measured separately, see the plan) |
+| Id  | Shape                                                     | Question                                                        |
+| --- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| S1  | the whole live backlog, one search, no abort              | what does a single catch-up cost the Host loop today?           |
+| S2  | 12 searches aborted after 200 ms, then one settled search | does typing multiply the work?                                  |
+| S3  | warm index plus a live set                                | what does an ordinary warm search cost?                         |
+| S4  | warm index with the largest log changed                   | how bad is one giant session?                                   |
+| S6  | warm index with the newest N logs changed                 | what does a restart leave behind?                               |
+| S5  | idle, no search                                           | the plugins' background tax (measured separately, see the plan) |
 
 ## Metrics
 

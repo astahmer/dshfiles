@@ -561,6 +561,9 @@ importers:
 
   plugins/@dshfiles/agent-communication:
     dependencies:
+      '@dshfiles/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui

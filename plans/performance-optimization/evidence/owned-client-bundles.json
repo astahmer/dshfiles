@@ -1,179 +1,179 @@
 {
- "recordedAt": "2026-10-19",
- "source": "/Users/astahmer/dev/dshfiles (the checkout the live web profile links)",
- "ownedClientBundles": [
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 5664733
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 1646346
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 1595785
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 702121
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 536731
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 499448
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 444640
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 420647
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 259002
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 225899
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 220688
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 218090
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 215338
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 189519
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 181255
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 158412
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 150430
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 115147
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 108422
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 102453
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 101935
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 101860
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 99468
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 98938
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 98151
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 96513
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 91867
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 91635
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 91008
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 84504
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 79993
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 78489
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 77583
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 68072
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 66683
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 66194
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 64051
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 53568
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 49217
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 47925
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 46812
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 36841
-  },
-  {
-   "package": "@dshfiles/@dshfiles",
-   "clientBundleBytes": 33552
-  }
- ],
- "totalBytes": 15379965
+  "recordedAt": "2026-10-19",
+  "source": "/Users/astahmer/dev/dshfiles (the checkout the live web profile links)",
+  "ownedClientBundles": [
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 5664733
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 1646346
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 1595785
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 702121
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 536731
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 499448
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 444640
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 420647
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 259002
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 225899
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 220688
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 218090
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 215338
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 189519
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 181255
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 158412
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 150430
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 115147
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 108422
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 102453
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 101935
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 101860
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 99468
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 98938
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 98151
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 96513
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 91867
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 91635
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 91008
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 84504
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 79993
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 78489
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 77583
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 68072
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 66683
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 66194
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 64051
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 53568
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 49217
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 47925
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 46812
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 36841
+    },
+    {
+      "package": "@dshfiles/@dshfiles",
+      "clientBundleBytes": 33552
+    }
+  ],
+  "totalBytes": 15379965
 }
