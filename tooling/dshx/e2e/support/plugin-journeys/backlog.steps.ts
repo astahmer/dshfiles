@@ -56,6 +56,7 @@ const contextTarget = async (page: Page, id: number, view: string): Promise<Loca
       .getByRole('article', { name: itemName, exact: true })
       .click({ position: { x: 8, y: 8 } })
     await expect(peek(page)).toBeVisible()
+    await peek(page).getByRole('button', { name: 'Edit title', exact: true }).click()
     return peek(page).getByRole('textbox', { name: 'Title', exact: true })
   }
   throw new Error(`Unknown backlog item view: ${view}`)
@@ -239,18 +240,14 @@ const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
-When('backlog card b:{int} is expanded', async ({ page }: { page: Page }, id: number) => {
+When('backlog card b:{int} is clicked', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
-  const card = page.getByRole('article', { name: `Card b:${String(id)}` })
-  await card.click()
-  await expect(card).toHaveAttribute('aria-expanded', 'true')
+  await page.getByRole('article', { name: `Card b:${String(id)}` }).click()
+  await expect(peek(page)).toContainText(`b:${String(id)}`)
 })
 
-When('the Start button on backlog card b:{int} is clicked', async ({ page }: { page: Page }, id: number) => {
-  const card = page.getByRole('article', { name: `Card b:${String(id)}` })
-  await expect(card.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
-  await expect(card.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
-  await card.getByRole('button', { name: 'Start', exact: true }).click()
+When('the Start thread button in the item detail is clicked', async ({ page }: { page: Page }) => {
+  await peek(page).getByRole('button', { name: 'Start thread', exact: true }).click()
 })
 
 When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { page: Page }, id: number) => {

@@ -4,6 +4,8 @@
 
 ![Capture anything and let it sort itself](docs/screenshots/capture-and-triage.png)
 
+![A board card opens the item detail beside the board](docs/screenshots/board-card-detail.png)
+
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
@@ -56,7 +58,8 @@ Freshness is derived on read and never stored:
 
 Dormant and archived items stay in search, filters and backlinks. Any edit, move, link or comment makes
 an item fresh again. The list groups the feed like a chat history (Pinned, Today, Yesterday, This week,
-Earlier). The board shows the same items by status; drag a card to another column, or use its status ring.
+Earlier). The board shows the same items by status; a click opens the item's detail beside the board,
+a drag moves the card to another column, and its status ring changes status in place.
 Status, kind and drops update the view before the Host answers. While you type, chips under the capture
 box show the kind, tags and links triage will derive.
 

@@ -1,22 +1,18 @@
-import { useApi } from '@dshfiles/dshx/client'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 
-import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
+import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import type { StartThreadItem } from './start-thread.js'
-import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
-const RECENT_EVENTS = 4
 /** Cards mounted per column before scrolling near the end reveals another batch. */
 const COLUMN_PAGE = 30
 
@@ -93,86 +89,12 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
   )
 }
 
-/** The expanded half of a card: the latest few events, then the actions that fit its state. */
-const CardDetail = (props: {
-  readonly item: BacklogSummaryView
-  readonly open: (id: number) => void
-  readonly startThread: (item: BacklogSummaryView) => void
-}): JSX.Element => {
-  const api = useApi(backlogApi)
-  const actions = useBacklogActions()
-  const item = props.item
-  const detail = useQuery({
-    queryKey: [BacklogQueries.key, 'item', item.id],
-    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: item.id }, { signal })),
-  })
-  const events = detail.data?.ok === true ? detail.data.value.item.events.slice(-RECENT_EVENTS) : []
-  const agent = item.actors.find(actor => actor.id.startsWith('agent:'))?.id
-  return (
-    <div
-      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border/70 dshx:pt-2 dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-top-1"
-      onPointerDown={event => event.stopPropagation()}
-    >
-      {agent === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.actorName(agent)}</span>}
-      <ol className="dshx:flex dshx:flex-col dshx:gap-1">
-        {events.map((event, index) => (
-          <li key={`${String(event.at)}:${String(index)}`} className="dshx:flex dshx:gap-2 dshx:text-xs">
-            <span
-              aria-hidden
-              className={cn(
-                'dshx:mt-1.5 dshx:size-1 dshx:shrink-0 dshx:rounded-full',
-                index === events.length - 1 ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/50',
-              )}
-            />
-            <span
-              className={cn('dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1', index === events.length - 1 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
-            >
-              {event.kind === 'commented' ? event.detail : `${ItemGlyphs.actorName(event.actor)} ${ItemGlyphs.describeEvent(event, item.attention)}`}
-            </span>
-            <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(event.at)}</span>
-          </li>
-        ))}
-      </ol>
-      <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
-        {item.proposal === null ? null : (
-          <>
-            <Button size="xs" variant="ghost" onClick={() => actions.dismissProposal.mutate(item.id)}>
-              Dismiss
-            </Button>
-            <Button size="xs" onClick={() => actions.applyProposal.mutate(item.id)}>
-              Accept
-            </Button>
-          </>
-        )}
-        {item.attention === 'none' ? null : (
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => {
-              withViewTransition(() => actions.patch({ id: item.id, attention: 'none' }))
-              actions.update.mutate({ id: item.id, attention: 'none' })
-            }}
-          >
-            Resolve
-          </Button>
-        )}
-        <Button size="xs" variant="outline" title="Start a thread for this item" onClick={() => props.startThread(item)}>
-          Start
-        </Button>
-        <Button size="xs" variant="outline" onClick={() => props.open(item.id)}>
-          Open
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 const cardClass =
   'dshx:group/card dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:p-3 dshx:shadow-xs dshx:transition-[border-color,box-shadow,opacity] dshx:duration-150 dshx:select-none'
 
 /**
- * Columns by status. A click opens a card in place (recent activity and actions); dragging moves it, and the View
- * Transition lets it glide into the new column. Every column is a drop target.
+ * Columns by status. A click opens the item's detail beside the board; dragging moves it, and the View Transition
+ * lets it glide into the new column. Every column is a drop target.
  */
 export const BoardView = (props: {
   readonly items: readonly BacklogSummaryView[]
@@ -185,7 +107,6 @@ export const BoardView = (props: {
   const actions = useBacklogActions()
   const [drag, setDrag] = useState<Drag | null>(null)
   const [over, setOver] = useState<BacklogStatus | null>(null)
-  const [expanded, setExpanded] = useState<number | null>(null)
   const [pages, setPages] = useState<Partial<Record<BacklogStatus, number>>>({})
   const dragged = drag === null ? undefined : props.items.find(item => item.id === drag.id)
 
@@ -216,7 +137,7 @@ export const BoardView = (props: {
       setDrag(null)
       setOver(null)
       if (!started) {
-        withViewTransition(() => setExpanded(current => (current === item.id ? null : item.id)))
+        props.open(item.id)
         return
       }
       const target = columnAt(upEvent.clientX, upEvent.clientY)
@@ -283,7 +204,6 @@ export const BoardView = (props: {
                 >
                   <article
                     aria-label={`Card b:${String(item.id)}`}
-                    aria-expanded={expanded === item.id}
                     onPointerDown={event => startDrag(event, item)}
                     style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
                     className={cn(
@@ -294,7 +214,6 @@ export const BoardView = (props: {
                     )}
                   >
                     <CardFace item={item} onPickStatus={status => move(item.id, status)} />
-                    {expanded === item.id ? <CardDetail item={item} open={props.open} startThread={props.startThread} /> : null}
                   </article>
                 </BacklogItemMenu>
               ))}
