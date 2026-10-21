@@ -24,6 +24,7 @@ import {
   PlusIcon,
   Rows3Icon,
   SearchIcon,
+  WandSparklesIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -31,6 +32,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Keyboa
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
+import { BackfillDialog } from './backfill-dialog.js'
 import { BoardView } from './board-view.js'
 import { BacklogFocusModel } from './backlog-focus.js'
 import { Composer, type ComposerThread } from './composer.js'
@@ -49,7 +51,7 @@ import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
 import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
-import { BacklogQueries } from './use-backlog-actions.js'
+import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
 type OpenThread = (sessionId: string) => void
@@ -247,6 +249,7 @@ export const BacklogPanel = (props: {
   readonly startThread: StartThreadPorts
 }): JSX.Element => {
   const api = useApi(backlogApi)
+  const actions = useBacklogActions()
   const stored = preferences.useValue()
   const view = stored.view
   const setPreference = (change: Partial<typeof stored>): void => {
@@ -261,6 +264,7 @@ export const BacklogPanel = (props: {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
   const [startThreadItems, setStartThreadItems] = useState<readonly StartThreadItem[] | null>(null)
+  const [backfillOpen, setBackfillOpen] = useState(false)
   const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
   const captureComposer = useRef<HTMLTextAreaElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
@@ -315,6 +319,7 @@ export const BacklogPanel = (props: {
   }, [storedViews])
   const savedViews = pendingViews ?? storedViews ?? []
   const inboxThreadsMode = settings.value?.inboxThreads ?? 'failures'
+  const triageOff = settings.value !== undefined && !settings.value.jevEnabled && (settings.value.triageProvider === '' || settings.value.triageModel === '')
   const attentionApi = useApi(threadSidebarAttentionApi)
   const attention = useQuery({
     queryKey: [BacklogQueries.key, 'thread-attention'],
@@ -500,6 +505,16 @@ export const BacklogPanel = (props: {
           <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
           <button
             type="button"
+            aria-label="Backfill triage"
+            title="Triage items captured before triage was set up"
+            onClick={() => setBackfillOpen(true)}
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+          >
+            <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
+            <span className="dshx:@max-pane-compact:sr-only">Backfill</span>
+          </button>
+          <button
+            type="button"
             onClick={() => startCapture(null)}
             className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:bg-primary dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-primary-foreground dshx:transition-[opacity,transform] dshx:hover:opacity-90 dshx:active:scale-[0.98]"
           >
@@ -613,6 +628,9 @@ export const BacklogPanel = (props: {
           close={() => setStartThreadItems(null)}
         />
       )}
+      {backfillOpen ? (
+        <BackfillDialog triageOff={triageOff} run={request => actions.backfillTriage.mutateAsync(request)} close={() => setBackfillOpen(false)} />
+      ) : null}
       <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
         <div className="dshx:mx-auto dshx:max-w-4xl">
           <Composer

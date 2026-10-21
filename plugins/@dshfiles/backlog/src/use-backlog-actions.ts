@@ -48,9 +48,13 @@ export const useBacklogActions = () => {
   const attachFile = useMutation({ mutationFn: (input: Parameters<typeof api.attachFile>[0]) => api.attachFile(input), onSuccess: invalidate })
   const removeFile = useMutation({ mutationFn: (input: Parameters<typeof api.removeFile>[0]) => api.removeFile(input), onSuccess: invalidate })
   const triage = useMutation({ mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
+  const backfillTriage = useMutation({
+    mutationFn: (request: { readonly retriage: boolean }) => api.backfillTriage(request),
+    onSuccess: invalidate,
+  })
   const applyProposal = useMutation({ mutationFn: (id: number) => api.applyProposal({ id }), onSuccess: invalidate })
   const dismissProposal = useMutation({ mutationFn: (id: number) => api.dismissProposal({ id }), onSuccess: invalidate })
-  return { patch, update, capture, link, comment, attachFile, removeFile, triage, applyProposal, dismissProposal }
+  return { patch, update, capture, link, comment, attachFile, removeFile, triage, backfillTriage, applyProposal, dismissProposal }
 }
 
 export class BacklogQueries {

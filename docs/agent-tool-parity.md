@@ -349,7 +349,7 @@ Still missing, because they write secrets or need a browser:
   `backlog_projects` and
   `backlog_read_file`; writes `backlog_capture`, `backlog_update`, `backlog_link`,
   `backlog_comment`, `backlog_attach_file`, `backlog_remove_file`, `backlog_triage`,
-  `backlog_accept_proposal` and `backlog_dismiss_proposal`.
+  `backlog_triage_backfill`, `backlog_accept_proposal` and `backlog_dismiss_proposal`.
   Deliberate exception to "write tools say the user asked": the backlog exists
   so agents record and progress their own work, so the write descriptions allow
   that and nothing else. No verb destroys data; `dropped` closes an item and

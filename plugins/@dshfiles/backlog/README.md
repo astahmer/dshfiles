@@ -2,6 +2,8 @@
 
 ![Select items in ranges, batch-edit them and start one thread for the selection](docs/screenshots/multi-select-items.png)
 
+![Backfill triage on items captured before it was set up](docs/screenshots/backfill-triage.png)
+
 ![Preview a referenced item from a conversation](docs/screenshots/reference-preview.png)
 
 ![A chat-sized capture box with files, properties and references](docs/screenshots/rich-capture.png)
@@ -144,6 +146,17 @@ linked, never closed. Below it, the item shows a **Triage suggests** card (and a
 **Accept** and **Dismiss**; accepting makes those values yours. The wand in the peek header runs triage
 on demand. A missing key, model or failing call is skipped and the item simply stays in the Inbox.
 
+### Backfilling items captured before triage
+
+Triage only runs on capture, so items that predate it stay untriaged. The wand in the panel header
+(**Backfill triage**) runs it over them: the oldest open items no triage has looked at yet, 25 per run,
+one at a time so a rate limit or a bad key does not burst. The dialog reports how many it applied, left
+as suggestions, found unchanged and how many items remain, so running it again continues where it
+stopped. `backlog_triage_backfill` is the same pass for an agent; `retriage` includes items triage
+already looked at (after changing the prompt or model) and `includeClosed` reaches done and dropped
+items. An item triage found nothing to change on gets a "found nothing to change" event without being
+bumped to fresh, so the next run skips it instead of reviving old work.
+
 ## Lifecycle signals
 
 On by default (`lifecycleSignals`). Items move without anyone filing them:
@@ -202,6 +215,7 @@ their own scope: no agent row appears and the typed reference is left untouched.
 | `backlog_read_file`        | read: one image or file as a data URL; `save: true` also returns a temp file path     |
 | `backlog_remove_file`      | write: remove one image or file                                                       |
 | `backlog_triage`           | write: run triage on one item now                                                     |
+| `backlog_triage_backfill`  | write: triage items captured before triage was set up, oldest first                   |
 | `backlog_projects`         | read: per-project counts, who needs you, people                                       |
 | `backlog_accept_proposal`  | write                                                                                 |
 | `backlog_dismiss_proposal` | write                                                                                 |

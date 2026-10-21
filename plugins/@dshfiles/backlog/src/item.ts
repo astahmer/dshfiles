@@ -222,6 +222,9 @@ const freshness = (
 
 const appendEvent = (events: readonly BacklogEvent[], event: BacklogEvent): BacklogEvent[] => [...events, event].slice(-MAX_EVENTS)
 
+/** The marker a backfill leaves when triage looked at an item and found nothing to change; not activity of its own. */
+const triageNoChange = 'found nothing to change'
+
 export class BacklogItems {
   static readonly kinds = kinds
   static readonly statuses = statuses
@@ -249,6 +252,7 @@ export class BacklogItems {
   static readonly statusSchema = statusSchema
   static readonly actorIdSchema = actorIdSchema
   static readonly triage = triage
+  static readonly triageNoChange = triageNoChange
   static readonly extractLinks = extractLinks
   static readonly extractTags = extractTags
   static readonly uniqueLinks = uniqueLinks

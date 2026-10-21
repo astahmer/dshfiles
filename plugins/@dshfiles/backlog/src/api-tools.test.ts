@@ -19,6 +19,7 @@ describe('backlog tool exposure', () => {
       'backlog_referencing',
       'backlog_remove_file',
       'backlog_triage',
+      'backlog_triage_backfill',
       'backlog_update',
     ])
   })
@@ -39,7 +40,7 @@ describe('backlog tool exposure', () => {
   })
 
   test('item writes name the bar for acting on their own', () => {
-    for (const name of ['capture', 'update', 'link', 'comment', 'attachFile', 'removeFile', 'applyProposal', 'dismissProposal'] as const) {
+    for (const name of ['capture', 'update', 'link', 'comment', 'attachFile', 'removeFile', 'applyProposal', 'dismissProposal', 'backfillTriage'] as const) {
       expect(backlogApi.methods[name].description ?? '').toMatch(/Use it when the user asked/u)
     }
   })

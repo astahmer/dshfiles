@@ -302,6 +302,63 @@
       ]
     },
     {
+      "id": "backfill-triage",
+      "title": "Backfill triage on items captured before it was set up",
+      "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest open items no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging items triage already looked at or including closed ones.",
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
+      "reach": [
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Backfill triage\"",
+        "expect text \"Runs Jev and the configured triage model*\""
+      ],
+      "failureModes": [
+        "With Jev and the model both off, the run changes nothing and says why.",
+        "An item triage found nothing to change on is marked looked-at without being bumped to fresh, so the next run skips it instead of reviving old work.",
+        "A failing pass on one item is counted and leaves that item for a later run."
+      ],
+      "externalDependencies": [
+        {
+          "id": "typesafe-jev",
+          "boundary": "Optional POST to api.typesafe.ai/v1/systemone with the item text, behind jevEnabled and TYPESAFE_API_KEY; any failure is skipped.",
+          "deterministicFake": "An injected jev function answers fixed probabilities in src/triage.test.ts."
+        },
+        {
+          "id": "dsh-llm",
+          "boundary": "Optional cheap-model call through the DSH llm service on triageProvider/triageModel; the answer is decoded with a schema and invalid fields dropped.",
+          "deterministicFake": "An injected complete function returns fixed text in src/triage.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.backfill-unit-oldest",
+          "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
+          "testName": "takes open items nothing triaged yet, oldest first, and says how many a later run leaves"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.backfill-unit-retriage",
+          "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
+          "testName": "re-triages what triage already looked at, and reaches closed items when no status is scoped"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.backfill-unit-run",
+          "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
+          "testName": "counts what each item became, marks only the unchanged ones, and leaves failures for the next run"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.backfill-host-looked-at",
+          "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
+          "testName": "records that triage looked at an item without making it look recently active"
+        }
+      ]
+    },
+    {
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
       "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",

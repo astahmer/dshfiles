@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { backlogApi } from './api.js'
 import { writeAttachmentFile } from './attachment-file.js'
+import { BacklogBackfill, type TriageOutcome } from './backfill.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
@@ -170,26 +171,84 @@ const jevApiKey = async (ctx: Context, settings: BacklogSettings): Promise<strin
     environmentValue: process.env[JEV_ENV_KEY],
   })
 
-const triageServices = async (ctx: Context, settings: BacklogSettings): Promise<TriageServices> => {
+/** The triage services the settings resolve to, and why they are missing when both are. */
+const triageSetup = async (ctx: Context, settings: BacklogSettings): Promise<{ readonly services: TriageServices; readonly reason: string | null }> => {
   const apiKey = settings.jevEnabled ? await jevApiKey(ctx, settings) : undefined
   const jevReady = settings.jevEnabled && apiKey !== undefined
   const modelReady = settings.triageProvider !== '' && settings.triageModel !== ''
   return {
-    jev: jevReady ? request => askJev({ apiKey, ...request }) : undefined,
-    complete: modelReady ? request => complete(ctx, { provider: settings.triageProvider, model: settings.triageModel, ...request }) : undefined,
+    services: {
+      jev: jevReady ? request => askJev({ apiKey, ...request }) : undefined,
+      complete: modelReady ? request => complete(ctx, { provider: settings.triageProvider, model: settings.triageModel, ...request }) : undefined,
+    },
+    reason:
+      jevReady || modelReady
+        ? null
+        : settings.jevEnabled
+          ? 'Jev is on but its key does not resolve: bind a TypeSafe secret or set TYPESAFE_API_KEY, or pick a triage model.'
+          : 'Triage is off: turn on Jev or pick a triage provider and model in the Backlog settings.',
   }
 }
 
+type TriagePass = { readonly settings: BacklogSettings; readonly services: TriageServices }
+
 /** One pass on one item: a confident proposal applies as `system`, a hesitant one waits on the item. */
-const triageItem = async (ctx: Context, id: number) => {
+const passTriage = async (ctx: Context, id: number, setup: TriagePass): Promise<TriageOutcome> => {
   const store = await backlogFor(ctx)
   const input = store.triageInput(id)
-  if (input === undefined) return store.get(id)
+  if (input === undefined) return 'missing'
+  const proposal = await BacklogTriage.run({ ...input, services: setup.services, now: Date.now() })
+  if (proposal === null) return 'unchanged'
+  if (proposal.confidence >= setup.settings.applyThreshold) {
+    await store.applyProposal({ id, proposal, actor: { kind: 'system' } })
+    return 'applied'
+  }
+  await store.propose({ id, proposal })
+  return 'proposed'
+}
+
+const triageItem = async (ctx: Context, id: number) => {
+  const store = await backlogFor(ctx)
   const settings = currentSettings()
-  const proposal = await BacklogTriage.run({ ...input, services: await triageServices(ctx, settings), now: Date.now() })
-  if (proposal === null) return store.get(id)
-  if (proposal.confidence >= settings.applyThreshold) return store.applyProposal({ id, proposal, actor: { kind: 'system' } })
-  return store.propose({ id, proposal })
+  const setup = await triageSetup(ctx, settings)
+  await passTriage(ctx, id, { settings, services: setup.services })
+  return store.get(id)
+}
+
+/**
+ * Runs triage over the items that existed before it was switched on: oldest open items that no triage looked at yet,
+ * one at a time so a rate limit or a bad key does not burst. Nothing is triaged while both services are missing.
+ */
+const backfillTriage = async (
+  ctx: Context,
+  request: { readonly includeClosed?: boolean | undefined; readonly retriage?: boolean | undefined; readonly limit?: number | undefined },
+) => {
+  const settings = currentSettings()
+  const setup = await triageSetup(ctx, settings)
+  const store = await backlogFor(ctx)
+  const baseScope = { retriage: request.retriage === true, limit: request.limit ?? BacklogBackfill.defaultLimit }
+  const scope = request.includeClosed === true ? baseScope : { ...baseScope, statuses: BacklogBackfill.openStatuses }
+  if (setup.reason !== null)
+    return {
+      configured: false,
+      reason: setup.reason,
+      considered: 0,
+      applied: 0,
+      proposed: 0,
+      unchanged: 0,
+      failed: 0,
+      remaining: store.triageCandidates({ ...scope, limit: 0 }).total,
+    }
+  const report = await BacklogBackfill.run({
+    selection: store.triageCandidates(scope),
+    triage: id =>
+      passTriage(ctx, id, { settings, services: setup.services }).catch(error => {
+        logFailure('Backlog backfill triage failed')(error)
+        return 'failed' as const
+      }),
+    markTriaged: id => store.markTriaged(id),
+  })
+  return { configured: true, reason: null, ...report }
 }
 
 const logFailure = (what: string) => (error: unknown) => console.error(what, { error: error instanceof Error ? error.message.slice(0, 200) : String(error) })
@@ -441,6 +500,7 @@ const backlogApiHost = backlogApi.host({
     return detail
   },
   triage: async ({ ctx, input }) => triageItem(ctx, input.id),
+  backfillTriage: async ({ ctx, input }) => backfillTriage(ctx, input),
   acknowledge: async ({ ctx, input }) => (await backlogFor(ctx)).acknowledge(input),
   applyProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).applyProposal({ id: input.id, actor: actorOf(caller) }),
   dismissProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).dismissProposal({ id: input.id, actor: actorOf(caller) }),

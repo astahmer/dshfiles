@@ -15,6 +15,7 @@ import {
   type BacklogStatus,
 } from './item.js'
 import { z } from 'zod'
+import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogTriage } from './triage.js'
 
@@ -110,6 +111,10 @@ export interface BacklogStore {
   comment(input: { readonly id: number; readonly text: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   /** The item and every other item, for a triage pass to read. */
   triageInput(id: number): { readonly item: BacklogItem; readonly others: readonly BacklogItem[] } | undefined
+  /** What one backfill run should triage, oldest first, and how many eligible items it leaves for a later run. */
+  triageCandidates(scope: BackfillScope): BackfillSelection
+  /** Records that triage looked at an item and found nothing to change, without making the item look recently active. */
+  markTriaged(id: number): Promise<void>
   propose(input: { readonly id: number; readonly proposal: BacklogProposal }): Promise<BacklogResult<BacklogDetail>>
   /**
    * Applies a proposal. For `system` (automatic triage) fields the user set by hand are left alone; for a person or an
@@ -173,7 +178,8 @@ const withActor = (actors: BacklogItem['actors'], id: string, role: 'owner' | 'c
  * touched it: the latest event, how many followed the capture, and how many distinct agents took part.
  */
 const activityOf = (item: BacklogItem): BacklogSummary['activity'] => {
-  const after = item.events.slice(1)
+  // A backfill that found nothing to change is not activity: it must not make an old item look touched.
+  const after = item.events.slice(1).filter(event => !(event.kind === 'triaged' && event.actor === 'system' && event.detail === BacklogItems.triageNoChange))
   const last = after.at(-1)
   return {
     count: after.length,
@@ -490,6 +496,15 @@ const createBacklogStore = ({
     triageInput: id => {
       const item = find(id)
       return item === undefined ? undefined : { item, others: [...records.values()] }
+    },
+    triageCandidates: scope => BacklogBackfill.select([...records.values()], scope),
+    markTriaged: async id => {
+      const item = find(id)
+      if (item === undefined) return
+      await persist({
+        ...item,
+        events: BacklogItems.appendEvent(item.events, { at: now(), actor: 'system', kind: 'triaged', detail: BacklogItems.triageNoChange }),
+      })
     },
     propose: async ({ id, proposal }) => {
       const item = find(id)

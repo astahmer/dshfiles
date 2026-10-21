@@ -102,6 +102,19 @@ const listInputSchema = z
 
 const listOutputSchema = z.object({ revision: z.number(), total: z.number().int().nonnegative(), items: z.array(summarySchema) }).strict()
 
+const backfillOutputSchema = z
+  .object({
+    configured: z.boolean(),
+    reason: z.string().max(500).nullable(),
+    considered: z.number().int().nonnegative(),
+    applied: z.number().int().nonnegative(),
+    proposed: z.number().int().nonnegative(),
+    unchanged: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    remaining: z.number().int().nonnegative(),
+  })
+  .strict()
+
 const writeNote = 'Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.'
 
 /** One backlog every browser and agent shares, owned by the Host. */
@@ -269,6 +282,18 @@ export const backlogApi = defineApi({
         'Run automatic triage on one item now (Jev and the configured cheap model). A confident answer applies, skipping fields the user set by hand; otherwise it is left as a proposal on the item.',
       tool: { name: 'backlog_triage', readOnly: false },
     }),
+    backfillTriage: method({
+      input: z
+        .object({
+          limit: z.number().int().min(1).max(100).optional().describe('How many items one run may triage, oldest first; defaults to 25.'),
+          includeClosed: z.boolean().optional().describe('Also triage done and dropped items; the default covers open ones only.'),
+          retriage: z.boolean().optional().describe('Also triage items triage already looked at, e.g. after changing the prompt or model.'),
+        })
+        .strict(),
+      output: backfillOutputSchema,
+      description: `Triage the backlog items that were captured before triage was set up, oldest first (Jev and the configured cheap model). A confident answer applies; a hesitant one waits on the item as a suggestion. Reports what it did and how many items it leaves for a later run. ${writeNote}`,
+      tool: { name: 'backlog_triage_backfill', readOnly: false },
+    }),
     applyProposal: method({
       input: z.object({ id: idSchema }).strict(),
       output: detailResultSchema,
@@ -294,6 +319,7 @@ export type BacklogSummaryView = z.infer<typeof summarySchema>
 export type BacklogDetailView = z.infer<typeof detailSchema>
 export type BacklogListView = z.infer<typeof listOutputSchema>
 export type BacklogDetailResult = z.infer<typeof detailResultSchema>
+export type BacklogBackfillResult = z.infer<typeof backfillOutputSchema>
 
 export type BacklogSummaryInput = z.input<typeof summarySchema>
 export type BacklogListInput = z.input<typeof listOutputSchema>
