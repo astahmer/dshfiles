@@ -1638,6 +1638,7 @@ const setupHost = (context: Context): Effect<void> => {
     report: reportAutoCleanup,
     activeProjects: activeRepositoryRoots,
     knownProjects: knownRepositoryRoots,
+    onError: error => context.logger.warn('jj-integration: automatic cleanup run failed: %o', error),
   })
   const firstSweep = setTimeout(sweep, 30_000)
   const timer = setInterval(sweep, SWEEP_INTERVAL_MS)

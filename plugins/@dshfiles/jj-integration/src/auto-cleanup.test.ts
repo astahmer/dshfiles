@@ -305,4 +305,26 @@ describe('createAutoCleanupScheduler', () => {
     idle.dispose()
     expect(armed[1]?.cancelled).toBe(true)
   })
+
+  it('logs a timer run whose repository scan rejects instead of leaving an unhandled rejection, and stays armed', async () => {
+    const { armed, schedule } = manualSchedule()
+    const errors: unknown[] = []
+    const scheduler = createAutoCleanupScheduler({
+      runner: createCleanupJobRunner({ execute: async () => emptyResult }),
+      settings: () => settingsWith({}),
+      report: () => undefined,
+      activeProjects: async () => {
+        throw new Error('registry unreadable')
+      },
+      schedule,
+      onError: error => errors.push(error),
+    })
+
+    armed[0]?.run()
+    await settle()
+
+    expect(errors).toEqual([new Error('registry unreadable')])
+    expect(armed).toHaveLength(2)
+    scheduler.dispose()
+  })
 })

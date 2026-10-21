@@ -58,6 +58,8 @@ export const createAutoCleanupScheduler = (options: {
   readonly knownProjects?: () => Promise<readonly string[]>
   readonly firstRunDelayMs?: number
   readonly schedule?: (run: () => void, delayMs: number) => () => void
+  /** A run fires from a timer, so a failure has nobody to reject to; it is reported here instead of crashing the Host. */
+  readonly onError?: (error: unknown) => void
 }) => {
   const schedule = options.schedule ?? scheduleTimeout
   let cancel: (() => void) | undefined
@@ -96,6 +98,7 @@ export const createAutoCleanupScheduler = (options: {
           if (!disposed) options.report(outcome)
         })
         .finally(() => arm(AutoCleanupModel.intervalMs(options.settings())))
+        .catch((error: unknown) => options.onError?.(error))
     }, delayMs)
   }
 
