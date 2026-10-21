@@ -4,7 +4,7 @@ import { CommunicationDelegation, type DelegationSender } from './delegation-gua
 
 const sender = (messaging: 'any' | 'listed' | 'none', handles: readonly string[] = []): DelegationSender => ({
   handle: 'orchestrator',
-  delegation: { messaging, handles: [...handles] },
+  delegation: { messaging, handles: [...handles], subagents: true },
 })
 
 test('a thread no agent started keeps messaging unrestricted', () => {
@@ -29,4 +29,9 @@ test('a topic has no single peer, so listed cannot narrow a broadcast', () => {
   assert.deepEqual(CommunicationDelegation.broadcast({ sender: sender('any') }), { allowed: true })
   assert.deepEqual(CommunicationDelegation.broadcast({ sender: sender('listed', []) }), { allowed: true })
   assert.equal(CommunicationDelegation.broadcast({ sender: sender('none') }).allowed, false)
+})
+
+test('the subagent setting does not widen or narrow direct messaging', () => {
+  const noSubagents = { ...sender('listed', ['reviewer']), delegation: { messaging: 'listed' as const, handles: ['reviewer'], subagents: false } }
+  assert.deepEqual(CommunicationDelegation.direct({ sender: noSubagents, targetHandle: 'reviewer' }), { allowed: true })
 })

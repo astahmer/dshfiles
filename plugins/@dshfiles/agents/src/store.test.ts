@@ -55,7 +55,7 @@ const draftOf = (handle: string): AgentDraft => ({
   route: null,
   memoryScope: null,
   routine: '',
-  delegation: { messaging: 'any', handles: [] } as const,
+  delegation: { messaging: 'any', handles: [], subagents: true },
   enabled: true,
 })
 

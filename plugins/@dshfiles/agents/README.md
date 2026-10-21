@@ -31,8 +31,10 @@ where a thread starts.
 - **Delegation targets are enforced where a message is sent.** An agent declares whether its threads may message any
   peer, only listed handles, or nobody. `@dshfiles/agent-communication` resolves both sides through this plugin's
   contract before it stores a `dshx_comm_send`, and refuses an unlisted peer with a reason naming both handles. A
-  broadcast has no single peer, so `listed` allows it and `none` refuses it. Subagent tools have no Host allowlist (see
-  `plans/dsh-host-gaps.md`), so that half stays advisory.
+  broadcast has no single peer, so `listed` allows it and `none` refuses it. A separate switch allows or forbids the
+  agent's threads from creating subagents or starting a workflow: a synchronous `tools.guard` denies those calls before
+  dispatch. The native delegation tools take no agent target, so only creation can be gated, not which agent a child
+  would be.
 - **Thread history is durable.** A dispatch records its Session in the agent's `threads` table, so
   the panel lists the threads an agent started (and opens one) after a Host restart, and the usage
   counters are read back from storage rather than recomputed per page load.
@@ -52,8 +54,8 @@ where a thread starts.
 - 100 agents, 8 KB of instructions each, 32-character handles (`^[a-z][a-z0-9-]{0,31}$`).
 - A handle is the identity: it cannot be renamed after creation.
 - 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
-- Memory, routines and delegation targets are per agent (see above). Subagent delegation cannot be restricted on
-  stock DSH (no per-Session policy hook); only the messaging path is enforced.
+- Memory, routines and delegation targets are per agent (see above). Delegation target _handles_ apply to messaging;
+  subagents and workflows are allowed or refused as a whole, because the native tools expose no target to filter.
 - A routine is text, not a parsed rule: the thread decides the timing with the schedule tool, so the schedule record
   stays the single source of truth and the panel reads it back from the Host's catalog.
 

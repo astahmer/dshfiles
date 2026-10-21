@@ -18,7 +18,7 @@ const draft = (fields: Partial<AgentDraft> = {}): AgentDraft => ({
   route: { provider: 'codex-alex2', model: 'gpt-6-luna' },
   memoryScope: null,
   routine: '',
-  delegation: { messaging: 'any', handles: [] } as const,
+  delegation: { messaging: 'any', handles: [], subagents: true },
   enabled: true,
   ...fields,
 })
@@ -128,13 +128,15 @@ test('a routine rides the opening message and points at the schedule tools', () 
 })
 
 test('delegation rules decide which peers an agent may message', () => {
-  assert.equal(Agents.mayMessage({ messaging: 'any', handles: [] }, 'planner'), true)
-  assert.equal(Agents.mayMessage({ messaging: 'none', handles: ['planner'] }, 'planner'), false)
-  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'] }, 'planner'), true)
-  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'] }, 'reviewer'), false)
-  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'] }, null), false)
-  assert.equal(Agents.mayBroadcast({ messaging: 'none', handles: [] }), false)
-  assert.equal(Agents.mayBroadcast({ messaging: 'listed', handles: [] }), true)
+  assert.equal(Agents.mayMessage({ messaging: 'any', handles: [], subagents: true }, 'planner'), true)
+  assert.equal(Agents.mayMessage({ messaging: 'none', handles: ['planner'], subagents: true }, 'planner'), false)
+  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'], subagents: true }, 'planner'), true)
+  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'], subagents: true }, 'reviewer'), false)
+  assert.equal(Agents.mayMessage({ messaging: 'listed', handles: ['planner'], subagents: true }, null), false)
+  assert.equal(Agents.mayBroadcast({ messaging: 'none', handles: [], subagents: true }), false)
+  assert.equal(Agents.mayBroadcast({ messaging: 'listed', handles: [], subagents: true }), true)
+  assert.equal(Agents.maySpawnSubagents({ messaging: 'any', handles: [], subagents: true }), true)
+  assert.equal(Agents.maySpawnSubagents({ messaging: 'any', handles: [], subagents: false }), false)
 })
 
 test('thread titles come from the first line of the prompt', () => {

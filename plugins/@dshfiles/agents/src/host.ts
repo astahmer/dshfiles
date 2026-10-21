@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { defineHost } from '@dshfiles/dshx/host'
 import { agentsApi, type AgentPresetRow } from './api.js'
+import { DelegationGuard } from './delegation-guard.js'
 import { AgentRegistry, agentsDomain, type AgentsStore } from './store.js'
 
 interface OpenedAgents {
@@ -85,5 +86,25 @@ export default defineHost({
         await closeAgents()
       }
     }, 'agents: registry store')
+    // The guard is synchronous, so it reads the same in-memory store the API serves: registering a subagent or a
+    // workflow is denied before dispatch when the agent that started the thread set `delegation.subagents: false`.
+    ctx.effect(() => {
+      const tools = ctx.get('tools')
+      if (tools === undefined) return () => undefined
+      let closed = false
+      let dispose: (() => void) | undefined
+      void agentsFor(ctx)
+        .then(store => {
+          if (closed) return
+          dispose = tools.guard(execution =>
+            DelegationGuard.refusal({ toolName: execution.name, agent: execution.agent === undefined ? null : store.threadAgent(execution.agent.id) }),
+          )
+        })
+        .catch(() => undefined)
+      return () => {
+        closed = true
+        dispose?.()
+      }
+    }, 'agents: delegation guard')
   },
 })

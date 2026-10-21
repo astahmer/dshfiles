@@ -60,7 +60,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | editor                                                                                                                                            | 7                    | 1                                                                                                        | 5             | 2         |
 | diff-viewed                                                                                                                                       | 3                    | 0                                                                                                        | 1             | 2         |
 | prompt-stash                                                                                                                                      | 6                    | 0                                                                                                        | 1             | 5         |
-| agents                                                                                                                                            | 8                    | 5 (`agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove`)                        | 0             | 1         |
+| agents                                                                                                                                            | 9                    | 5 (`agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove`)                        | 0             | 1         |
 | backlog                                                                                                                                           | 14                   | 14                                                                                                       | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
@@ -519,12 +519,11 @@ Profile-level plugin install/remove exists in core `plugin_manager`
 
 ## Host gaps (no verb, so no tool today)
 
-- **Per-agent subagent allowlist** (agents, agent-communication): `ctx.subagents`
-  admits children by depth and capacity only, and the native subagent tool takes
-  no allowlist, so an agent's delegation targets can be enforced on the messaging
-  path (`dshx_comm_send`) but not on subagent creation. Recorded as
-  `plans/dsh-host-gaps.md` row 71; the memory-scope lookup and the threads table
-  stay fully tool-covered.
+- **Per-agent subagent target allowlist** (agents, agent-communication): creation
+  is gated through `ctx.tools.guard` (`delegation.subagents`), but the native
+  delegation tools accept a task and no agent target, and `ctx.subagents` has no
+  admission filter, so which agent a child runs as cannot be constrained.
+  Recorded as `plans/dsh-host-gaps.md` row 71.
 - **Thread park/unpark, manual unread, desktop notifications** (thread-sidebar):
   browser-local state, no park verb, no read-state verb, no notify verb.
 - **Open Settings / open a panel / open a thread / open an editor tab**: no Host

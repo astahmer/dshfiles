@@ -9,7 +9,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useState } from 'react'
 
-import { agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute, type AgentThread } from './agent.js'
+import { AGENT_DELEGATION_UNRESTRICTED, agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute, type AgentThread } from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
 import type { AgentCatalog, AgentDispatchRequest, AgentThreadTarget } from './dispatch.js'
 
@@ -55,7 +55,7 @@ const draftOf = (agent: Agent | null): AgentDraft => ({
   route: agent?.route ?? null,
   memoryScope: agent?.memoryScope ?? null,
   routine: agent?.routine ?? '',
-  delegation: agent?.delegation ?? { messaging: 'any', handles: [] },
+  delegation: agent?.delegation ?? AGENT_DELEGATION_UNRESTRICTED,
   enabled: agent?.enabled ?? true,
 })
 
@@ -306,6 +306,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                   delegation: {
                     messaging: event.currentTarget.value === 'none' ? 'none' : event.currentTarget.value === 'listed' ? 'listed' : 'any',
                     handles: draft.delegation.handles,
+                    subagents: draft.delegation.subagents,
                   },
                 })
               }
@@ -325,6 +326,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                 patch({
                   delegation: {
                     messaging: draft.delegation.messaging,
+                    subagents: draft.delegation.subagents,
                     handles: event.currentTarget.value
                       .split(',')
                       .map(handle => handle.trim().replace(/^@/u, ''))
@@ -334,8 +336,16 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
               }
             />
           </label>
+          <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:self-end dshx:pb-1">
+            <Switch
+              aria-label="Subagents and workflows"
+              checked={draft.delegation.subagents}
+              onCheckedChange={subagents => patch({ delegation: { ...draft.delegation, subagents } })}
+            />
+            <span className="dshx:text-[12px]">Subagents and workflows</span>
+          </label>
           <span className="dshx:self-end dshx:text-[11px] dshx:text-muted-foreground">
-            Constrains this agent's <code>dshx_comm_*</code> sends; it does not replace DSH messaging.
+            Constrains this agent's <code>dshx_comm_*</code> sends and its subagent/workflow calls; it does not replace DSH messaging.
           </span>
         </div>
 

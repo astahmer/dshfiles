@@ -49,12 +49,14 @@ export const agentRouteSchema = z
  * `none` keeps the agent's threads out of DSH's messaging tools. It constrains `dshx_comm_*`, it does not replace it.
  */
 /** An agent with no rule messages anyone, broadcasts and delegates, so adding the rule changed no behavior. */
-export const AGENT_DELEGATION_UNRESTRICTED: AgentDelegation = { messaging: 'any', handles: [] }
+export const AGENT_DELEGATION_UNRESTRICTED: AgentDelegation = { messaging: 'any', handles: [], subagents: true }
 
 export const agentDelegationSchema = z
   .object({
     messaging: z.enum(['any', 'listed', 'none']),
     handles: z.array(handleSchema).max(MAX_PEER_HANDLES),
+    /** Whether this agent's threads may create subagents or fan work out through the workflow tool. */
+    subagents: z.boolean().default(true),
   })
   .strict()
   // A row stored before delegation existed must load; a fresh object per parse, so no two records share one.
@@ -176,7 +178,7 @@ export class Agents {
       route: null,
       memoryScope: null,
       routine: '',
-      delegation: { messaging: 'any', handles: [] },
+      delegation: { ...AGENT_DELEGATION_UNRESTRICTED },
       enabled: true,
       builtIn: true,
       createdAt: now,
@@ -196,6 +198,11 @@ export class Agents {
   /** Whether an agent's threads may broadcast to a topic: a topic has no single peer, so `listed` cannot narrow it. */
   static mayBroadcast(delegation: AgentDelegation): boolean {
     return delegation.messaging !== 'none'
+  }
+
+  /** Whether an agent's threads may create subagents or start a workflow; the native tools take no target to narrow. */
+  static maySpawnSubagents(delegation: AgentDelegation): boolean {
+    return delegation.subagents
   }
 
   /** The scope an agent's threads would use if the person leaves the field empty; never stored on its own. */

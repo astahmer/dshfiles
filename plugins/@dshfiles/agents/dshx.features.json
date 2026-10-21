@@ -15,7 +15,8 @@
         "Removing the built-in @dsh agent is refused and reported.",
         "Removing an already-removed agent reports it as missing.",
         "A save past the 100-agent limit is reported and existing agents stay.",
-        "A listed delegation refuses a peer it does not name, with a reason naming both handles."
+        "A listed delegation refuses a peer it does not name, with a reason naming both handles.",
+        "An agent with subagents off is refused a subagent or workflow call before it starts."
       ],
       "externalDependencies": [],
       "verification": [
@@ -88,6 +89,12 @@
           "id": "agents.delegation-rules",
           "file": "plugins/@dshfiles/agents/src/agent.test.ts",
           "testName": "delegation rules decide which peers an agent may message"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.delegation-subagent-gate",
+          "file": "plugins/@dshfiles/agents/src/delegation-guard.test.ts",
+          "testName": "a delegation tool is refused when the agent may not spawn subagents"
         }
       ]
     },
