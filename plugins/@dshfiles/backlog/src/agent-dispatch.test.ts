@@ -25,7 +25,7 @@ test('a leading mention splits the handle from the task', () => {
 })
 
 test('an agent comment starts on the agent preset, route and instructions', () => {
-  const request = AgentComments.request({ item, agent: agent(), task: 'look at b:12', target: { kind: 'default' } })
+  const request = AgentComments.request({ items: [item], agent: agent(), task: 'look at b:12', target: { kind: 'default' } })
   assert.deepEqual(request.agent, {
     handle: 'reviewer',
     name: 'Reviewer',
@@ -37,7 +37,13 @@ test('an agent comment starts on the agent preset, route and instructions', () =
   assert.equal(request.model, null)
   assert.equal(request.send, true)
   assert.match(request.message, /^Work as @reviewer — Reviewer\./u)
+  assert.match(request.message, /Work on b:12: Fix the flaky test/u)
   assert.match(request.message, /look at b:12$/u)
+})
+
+test('an agent comment with no task still names the item it came from', () => {
+  const request = AgentComments.request({ items: [item], agent: agent(), task: '', target: { kind: 'default' } })
+  assert.match(request.message, /Work on b:12: Fix the flaky test\n\nreason: race$/u)
 })
 
 test('a chosen agent composes its identity, instructions and task', () => {
@@ -49,7 +55,7 @@ test('a chosen agent composes its identity, instructions and task', () => {
 
 test('the built-in agent pins no route, so the Host default serves it', () => {
   const request = AgentComments.request({
-    item,
+    items: [item],
     agent: agent({ handle: 'dsh', name: 'DSH', preset: null, route: null }),
     task: 'go',
     target: { kind: 'default' },
@@ -64,7 +70,7 @@ test('the item target follows its project, not the Host default', () => {
     { id: 'ws-dshfiles' as never, title: 'dshfiles', path: '/Users/astahmer/dev/dshfiles' },
     { id: 'ws-other' as never, title: 'other', path: '/Users/astahmer/dev/other' },
   ]
-  assert.deepEqual(defaultTargetFor(item, projects), { kind: 'project', projectId: 'ws-dshfiles' })
-  assert.deepEqual(defaultTargetFor({ ...item, project: '/tmp/bare' }, projects), { kind: 'cwd', path: '/tmp/bare' })
-  assert.deepEqual(defaultTargetFor({ ...item, project: null }, projects), { kind: 'default' })
+  assert.deepEqual(defaultTargetFor([item], projects), { kind: 'project', projectId: 'ws-dshfiles' })
+  assert.deepEqual(defaultTargetFor([{ ...item, project: '/tmp/bare' }], projects), { kind: 'cwd', path: '/tmp/bare' })
+  assert.deepEqual(defaultTargetFor([{ ...item, project: null }], projects), { kind: 'default' })
 })

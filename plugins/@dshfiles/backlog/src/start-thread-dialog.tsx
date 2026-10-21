@@ -25,7 +25,8 @@ type StartOutcome = { readonly ok: true } | { readonly ok: false; readonly reaso
  * Host read, so it loads when the dialog opens instead of with every list refresh.
  */
 export const StartThreadDialog = (props: {
-  readonly item: StartThreadItem
+  /** One item, or the selection the thread works on; every item is linked and named in the opening message. */
+  readonly items: readonly StartThreadItem[]
   readonly projects: readonly StartThreadProject[]
   readonly loadCatalog: () => Promise<StartThreadCatalog>
   /** Every enabled agent, so the thread can start as one with its preset, route and instructions. */
@@ -34,12 +35,12 @@ export const StartThreadDialog = (props: {
   readonly start: (request: StartThreadRequest) => Promise<StartOutcome>
   readonly close: () => void
 }): JSX.Element => {
-  const targets = StartThreadForm.targets(props.item, props.projects)
-  const [targetValue, setTargetValue] = useState(() => StartThreadForm.defaultTargetValue(props.item, props.projects))
+  const targets = StartThreadForm.targets(props.items, props.projects)
+  const [targetValue, setTargetValue] = useState(() => StartThreadForm.defaultTargetValue(props.items, props.projects))
   const [agentHandle, setAgentHandle] = useState('')
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [effort, setEffort] = useState<string | null>(null)
-  const [message, setMessage] = useState(() => StartThreadForm.message(props.item))
+  const [message, setMessage] = useState(() => StartThreadForm.message(props.items))
   const [send, setSend] = useState(props.sendByDefault)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,7 +74,7 @@ export const StartThreadDialog = (props: {
     setBusy(true)
     setError(null)
     try {
-      const outcome = await props.start({ item: props.item, target, ...picked, send })
+      const outcome = await props.start({ items: props.items, target, ...picked, send })
       if (outcome.ok) {
         props.close()
         return
@@ -92,7 +93,9 @@ export const StartThreadDialog = (props: {
         <DialogHeader>
           <DialogTitle>Start thread</DialogTitle>
           <DialogDescription className="dshx:line-clamp-2">
-            b:{props.item.id} · {props.item.title}
+            {props.items.length === 1
+              ? `b:${String(props.items[0]?.id)} · ${props.items[0]?.title ?? ''}`
+              : `${props.items.map(item => `b:${String(item.id)}`).join(', ')} · ${String(props.items.length)} items`}
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3">
@@ -178,11 +181,12 @@ export const StartThreadDialog = (props: {
               Send this message now
             </label>
             <span className="dshx:text-[11px] dshx:text-muted-foreground">
+              {props.items.length > 1 ? `The thread is linked to all ${String(props.items.length)} items. ` : 'The thread is linked to this item. '}
               {message.trim() === ''
-                ? 'The thread is linked to this item and opened as an empty draft.'
+                ? 'It opens as an empty draft.'
                 : send
-                  ? 'The thread is linked to this item, told what to work on and opened.'
-                  : 'The thread is linked to this item and opened with the message as an editable draft.'}
+                  ? 'It is told what to work on and opened.'
+                  : 'It opens with the message as an editable draft.'}
             </span>
           </label>
           {error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{error}</p>}

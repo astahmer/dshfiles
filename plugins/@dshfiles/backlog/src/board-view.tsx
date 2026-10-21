@@ -102,7 +102,7 @@ export const BoardView = (props: {
   readonly openId: number | null
   readonly open: (id: number) => void
   readonly captureInto: (status: BacklogStatus) => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()

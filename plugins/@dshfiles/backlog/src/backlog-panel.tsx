@@ -260,8 +260,8 @@ export const BacklogPanel = (props: {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
-  const [startThreadItem, setStartThreadItem] = useState<StartThreadItem | null>(null)
-  const openStartThread = (item: StartThreadItem): void => setStartThreadItem(item)
+  const [startThreadItems, setStartThreadItems] = useState<readonly StartThreadItem[] | null>(null)
+  const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
   const captureComposer = useRef<HTMLTextAreaElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
@@ -601,16 +601,16 @@ export const BacklogPanel = (props: {
           </>
         )}
       </div>
-      {startThreadItem === null ? null : (
+      {startThreadItems === null ? null : (
         <StartThreadDialog
-          key={startThreadItem.id}
-          item={startThreadItem}
+          key={startThreadItems.map(item => item.id).join('-')}
+          items={startThreadItems}
           projects={props.startThread.listProjects()}
           loadCatalog={props.startThread.loadCatalog}
           listAgents={props.startThread.listAgents}
           sendByDefault={settings.value?.startThreadSendsFirstMessage ?? true}
           start={props.startThread.start}
-          close={() => setStartThreadItem(null)}
+          close={() => setStartThreadItems(null)}
         />
       )}
       <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">

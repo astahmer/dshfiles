@@ -149,20 +149,31 @@
     {
       "id": "multi-select-items",
       "title": "Select items in ranges and batch-edit them",
-      "summary": "The Items table supports click-to-open, Shift-click ranges, Cmd/Ctrl-click additive toggles, select-all-visible, and batch status, kind and pin updates.",
+      "summary": "The Items table supports click-to-open, Shift-click ranges, Cmd/Ctrl-click additive toggles, select-all-visible, batch status, kind and pin updates, and one thread for the whole selection from the action bar or the row's context menu.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"First selection item\"",
         "press Enter",
         "expect text \"First selection item\"",
+        "fill textbox \"Capture\" \"Second selection item\"",
+        "press Enter",
         "click button \"Items\"",
         "click checkbox \"Select b:1\"",
-        "expect text \"1 selected\""
+        "click checkbox \"Select b:2\"",
+        "expect text \"2 selected\"",
+        "expect button \"Start thread\"",
+        "rightclick row \"Item b:2\"",
+        "click menuitem \"Start thread for 2 items…\"",
+        "expect dialog \"Start thread\"",
+        "expect text \"· 2 items*\""
       ],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["unselected", "range-selected", "additive-selection", "batch-updated"],
-      "failureModes": ["A range uses the current visible item order and falls back to the target if its anchor is no longer visible."],
+      "failureModes": [
+        "A range uses the current visible item order and falls back to the target if its anchor is no longer visible.",
+        "A menu opened on one row of a selection starts one thread for every selected item, not just the row it was opened on."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -713,13 +724,14 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; it creates the thread in its own jj workspace of that project, names and links it and opens it, sending immediately unless configured to keep an editable draft.",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named, linked and opened, sending immediately unless configured to keep an editable draft.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
         "fill textbox \"Capture\" \"Start a thread from b:1\"",
         "press Enter",
         "expect text \"Start a thread from b:1\"",
+        "click button \"Feed\"",
         "rightclick article \"Item b:1\"",
         "expect menuitem \"Start thread\u2026\"",
         "expect menuitem \"Status\"",
@@ -732,7 +744,11 @@
         "click article \"Card b:1\"",
         "expect complementary \"Item detail\"",
         "click button \"Start thread\"",
-        "expect dialog \"Start thread\""
+        "expect dialog \"Start thread\"",
+        "click button \"Cancel\"",
+        "fill textbox \"Comment\" \"@dsh fix\"",
+        "click button \"Reply\"",
+        "expect text \"Work on b:1: Start a thread from b:1*\""
       ],
       "surfaces": ["client"],
       "configuration": [],

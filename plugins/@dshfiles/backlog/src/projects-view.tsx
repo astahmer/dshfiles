@@ -74,7 +74,7 @@ const Card = (props: { readonly title: string; readonly action?: ReactNode; read
 const ItemLine = (props: {
   readonly item: BacklogSummaryView
   readonly select: (id: number) => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
   readonly update: (input: BacklogUpdateInput) => void
   readonly triage: (id: number) => void
@@ -107,7 +107,7 @@ const Overview = (props: {
   readonly project: Project
   readonly back: () => void
   readonly select: (id: number) => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)
@@ -285,7 +285,7 @@ export const ProjectsView = (props: {
   readonly setSelectedProject: (project: string | null) => void
   readonly select: (id: number) => void
   readonly now: number
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)

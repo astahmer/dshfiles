@@ -17,7 +17,7 @@ import type { ReactNode } from 'react'
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
-import type { StartThreadItem } from './start-thread.js'
+import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import type { BacklogUpdateInput } from './use-backlog-actions.js'
 
 const NO_PROJECT = 'no-project'
@@ -33,12 +33,15 @@ export const BacklogItemMenu = (props: {
   readonly projectPaths: readonly string[]
   readonly update: (input: BacklogUpdateInput) => void
   readonly triage: (id: number) => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
+  /** The whole selection when this row is part of one, so the menu starts a single thread for all of it. */
+  readonly selection?: readonly StartThreadItem[] | undefined
   readonly openItem?: (id: number) => void
   readonly children: ReactNode
 }): JSX.Element => {
   const item = props.item
   const attention = item.attention ?? 'none'
+  const selection = props.selection !== undefined && props.selection.length > 1 ? props.selection : [startThreadItemOf(item)]
   const update = (change: Omit<BacklogUpdateInput, 'id'>): void => props.update({ id: item.id, ...change })
 
   return (
@@ -48,12 +51,9 @@ export const BacklogItemMenu = (props: {
         <ContextMenuLabel className="dshx:max-w-64 dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
           b:{item.id} · {item.title}
         </ContextMenuLabel>
-        <ContextMenuItem
-          className="dshx:gap-2 dshx:text-[13px]"
-          onSelect={() => props.startThread({ id: item.id, title: item.title, project: item.project, preview: item.preview ?? item.body ?? '' })}
-        >
+        <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
           <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
-          Start thread…
+          {selection.length > 1 ? `Start thread for ${String(selection.length)} items…` : 'Start thread…'}
         </ContextMenuItem>
         {props.openItem === undefined ? null : (
           <ContextMenuItem className="dshx:text-[13px]" onSelect={() => props.openItem?.(item.id)}>

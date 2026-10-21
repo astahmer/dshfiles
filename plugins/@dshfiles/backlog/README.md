@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Select items in ranges, batch-edit them and start one thread for the selection](docs/screenshots/multi-select-items.png)
+
 ![Preview a referenced item from a conversation](docs/screenshots/reference-preview.png)
 
 ![A chat-sized capture box with files, properties and references](docs/screenshots/rich-capture.png)

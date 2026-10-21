@@ -1,6 +1,7 @@
 import { Agents, type Agent, type AgentIdentity } from '@dshfiles/agents/contract'
 
 import type { StartThreadAgent, StartThreadItem, StartThreadRequest, StartThreadTarget } from './start-thread.js'
+import { StartThreadForm } from './start-thread.js'
 
 /** What a leading `@handle` comment box did: started a thread, stayed an ordinary comment, or failed. */
 export type AgentDispatchOutcome =
@@ -54,23 +55,25 @@ export class AgentComments {
   }
 
   /**
-   * The start-thread request for an agent comment: the agent's preset and route, and its instructions in front of the
-   * comment text. The caller supplies the target because only it knows the registered projects.
+   * The start-thread request for an agent comment: the agent's preset and route, its instructions, the item context
+   * the thread must name, and the comment text. The caller supplies the target because only it knows the projects.
    */
   static request(input: {
-    readonly item: StartThreadItem
+    readonly items: readonly StartThreadItem[]
     readonly agent: Agent
     readonly task: string
     readonly target: StartThreadTarget
   }): StartThreadRequest {
+    const task = input.task.trim()
+    const context = StartThreadForm.message(input.items)
     return {
-      item: input.item,
+      items: input.items,
       target: input.target,
       agent: AgentComments.agent(input.agent),
       provider: null,
       model: null,
       reasoningEffort: undefined,
-      message: AgentComments.opening(input.agent, input.task),
+      message: AgentComments.opening(input.agent, task === '' ? context : `${context}\n\n${task}`),
       send: true,
     }
   }

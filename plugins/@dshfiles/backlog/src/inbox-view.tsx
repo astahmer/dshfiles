@@ -65,7 +65,7 @@ export const InboxView = (props: {
   readonly acknowledgeThread: (thread: InboxThread) => void
   readonly inspector: ReactNode
   readonly loaded: boolean
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()

@@ -49,7 +49,7 @@ const FeedEntry = (props: {
   readonly item: BacklogSummaryView
   readonly open: boolean
   readonly select: (id: number) => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -193,7 +193,7 @@ export const FeedView = (props: {
   readonly select: (id: number) => void
   readonly loaded: boolean
   readonly now: number
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const now = props.now

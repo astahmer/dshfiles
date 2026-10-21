@@ -109,7 +109,7 @@ export default defineClient({
           )
           if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
         }
-        const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.item) })
+        const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.items) })
         if (!renamed.ok) console.warn(`backlog: thread ${sessionId} title kept as created: ${renamed.error.message}`)
         if (request.message !== '') {
           const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
@@ -129,8 +129,10 @@ export default defineClient({
             reference.release()
           }
         }
-        const linked = await api.safe.link({ id: request.item.id, link: { type: 'thread', target: sessionId, provenance: 'user' } })
-        if (!linked.ok) console.warn(`backlog: item b:${String(request.item.id)} was not linked to thread ${sessionId}: ${linked.error.message}`)
+        for (const item of request.items) {
+          const linked = await api.safe.link({ id: item.id, link: { type: 'thread', target: sessionId, provenance: 'user' } })
+          if (!linked.ok) console.warn(`backlog: item b:${String(item.id)} was not linked to thread ${sessionId}: ${linked.error.message}`)
+        }
         ctx.uiWorkspace.openSession(sessionId)
         return { ok: true }
       },
@@ -161,7 +163,8 @@ export default defineClient({
         if (agent === null) return { kind: 'skipped', reason: 'unknown-agent' }
         if (!agent.enabled) return { kind: 'skipped', reason: 'disabled-agent' }
         const projects = startThreadPorts.listProjects()
-        const started = await startThreadPorts.start(AgentComments.request({ item, agent, task: mention.task, target: defaultTargetFor(item, projects) }))
+        const items = [item]
+        const started = await startThreadPorts.start(AgentComments.request({ items, agent, task: mention.task, target: defaultTargetFor(items, projects) }))
         if (!started.ok) return { kind: 'failed', reason: started.reason }
         await api.safe.comment({ id: item.id, text })
         return { kind: 'dispatched' }

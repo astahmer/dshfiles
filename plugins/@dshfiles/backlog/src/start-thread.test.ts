@@ -82,10 +82,10 @@ describe('start thread form', () => {
   })
 
   it('preselects the item project, a bare folder for an unregistered path, and the Host default without one', () => {
-    expect(StartThreadForm.defaultTargetValue(item({ project: '/Users/astahmer/dev/dshfiles' }), projects)).toBe('project:ws-dshfiles')
-    expect(StartThreadForm.defaultTargetValue(item({ project: '/Users/astahmer/dev/unregistered' }), projects)).toBe('cwd:/Users/astahmer/dev/unregistered')
-    expect(StartThreadForm.defaultTargetValue(item(), projects)).toBe('default')
-    expect(StartThreadForm.targets(item({ project: '/Users/astahmer/dev/unregistered' }), projects).map(option => option.value)).toEqual([
+    expect(StartThreadForm.defaultTargetValue([item({ project: '/Users/astahmer/dev/dshfiles' })], projects)).toBe('project:ws-dshfiles')
+    expect(StartThreadForm.defaultTargetValue([item({ project: '/Users/astahmer/dev/unregistered' })], projects)).toBe('cwd:/Users/astahmer/dev/unregistered')
+    expect(StartThreadForm.defaultTargetValue([item()], projects)).toBe('default')
+    expect(StartThreadForm.targets([item({ project: '/Users/astahmer/dev/unregistered' })], projects).map(option => option.value)).toEqual([
       'cwd:/Users/astahmer/dev/unregistered',
       'default',
       'project:ws-dshfiles',
@@ -94,8 +94,13 @@ describe('start thread form', () => {
   })
 
   it('offers the registered project target instead of a bare folder for a registered path', () => {
-    const targets = StartThreadForm.targets(item({ project: '/Users/astahmer/dev/dshfiles' }), projects)
+    const targets = StartThreadForm.targets([item({ project: '/Users/astahmer/dev/dshfiles' })], projects)
     expect(targets.map(option => option.value)).toEqual(['default', 'project:ws-dshfiles', 'project:ws-other'])
+  })
+
+  it('follows the first selected item when a selection spans projects', () => {
+    const selection = [item({ project: '/Users/astahmer/dev/dshfiles' }), item({ id: 104, project: '/Users/astahmer/dev/other' })]
+    expect(StartThreadForm.defaultTargetValue(selection, projects)).toBe('project:ws-dshfiles')
   })
 
   it('prefers the model default effort and otherwise the first advertised one', () => {
@@ -111,16 +116,27 @@ describe('start thread form', () => {
   })
 
   it('opens with the item heading and appends the preview once', () => {
-    expect(StartThreadForm.message(item())).toBe('Work on b:103: right click backlog item -> start a thread')
-    expect(StartThreadForm.message(item({ preview: 'pick account and model' }))).toBe(
+    expect(StartThreadForm.message([item()])).toBe('Work on b:103: right click backlog item -> start a thread')
+    expect(StartThreadForm.message([item({ preview: 'pick account and model' })])).toBe(
       'Work on b:103: right click backlog item -> start a thread\n\npick account and model',
     )
-    expect(StartThreadForm.message(item({ preview: 'right click backlog item -> start a thread' }))).toBe(
+    expect(StartThreadForm.message([item({ preview: 'right click backlog item -> start a thread' })])).toBe(
       'Work on b:103: right click backlog item -> start a thread',
     )
   })
 
+  it('names every selected item in one opening message', () => {
+    const selection = [item(), item({ id: 104, title: 'start a thread from the selection' }), item({ id: 105, title: 'with right click' })]
+    expect(StartThreadForm.message(selection)).toBe(
+      'Work on b:103: right click backlog item -> start a thread\n\nAlso b:104: start a thread from the selection\n\nAlso b:105: with right click',
+    )
+  })
+
   it('clips the thread title to the Session title limit', () => {
-    expect(StartThreadForm.title(item({ title: 'x'.repeat(400) }))).toHaveLength(200)
+    expect(StartThreadForm.title([item({ title: 'x'.repeat(400) })])).toHaveLength(200)
+  })
+
+  it('titles a batch with the first item and the number of extras', () => {
+    expect(StartThreadForm.title([item({ title: 'first' }), item({ id: 104 }), item({ id: 105 })])).toBe('first +2')
   })
 })

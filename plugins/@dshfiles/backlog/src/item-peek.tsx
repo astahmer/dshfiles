@@ -51,7 +51,7 @@ import { ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
-import type { StartThreadItem } from './start-thread.js'
+import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
@@ -664,7 +664,7 @@ const PeekBody = (props: {
   readonly openThread: OpenThread
   readonly select: (id: number) => void
   readonly close: () => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -699,7 +699,7 @@ const PeekBody = (props: {
             size="icon-xs"
             aria-label="Start thread"
             title="Start a thread for this item"
-            onClick={() => props.startThread({ id: item.id, title: item.title, project: item.project, preview: item.body })}
+            onClick={() => props.startThread([startThreadItemOf({ id: item.id, title: item.title, project: item.project, preview: item.body })])}
           >
             <MessagesSquareIcon />
           </Button>
@@ -880,7 +880,7 @@ const ItemPeek = (props: {
   readonly select: (id: number) => void
   readonly close: () => void
   readonly embedded?: boolean
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)

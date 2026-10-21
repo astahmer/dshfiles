@@ -51,7 +51,7 @@ export const SearchResults = (props: {
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
   readonly loaded: boolean
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const terms = termsOf(props.query)

@@ -103,9 +103,10 @@ export interface StartThreadAgentChoice extends StartThreadAgent {
   readonly description: string
 }
 
-/** What the panel collects before starting a thread for an item. */
+/** What the panel collects before starting a thread: one opening message for one or several items. */
 export interface StartThreadRequest {
-  readonly item: StartThreadItem
+  /** The item (or the selection) the thread works on; every one of them is linked to the new thread. */
+  readonly items: readonly StartThreadItem[]
   readonly target: StartThreadTarget
   /** The agent picked in the dialog; its preset and route win over the provider/model fields. */
   readonly agent?: StartThreadAgent
@@ -149,14 +150,14 @@ export class StartThreadForm {
     return catalog.providers.flatMap(provider => provider.models.map(model => ({ key: `${provider.id}/${model.id}`, provider, model })))
   }
 
-  /** The item's own project preselects; a project-registered path wins over the same path taken as a bare folder. */
-  static targets(item: StartThreadItem, projects: readonly StartThreadProject[]): StartThreadTargetOption[] {
+  /** One item's own project preselects; a project-registered path wins over the same path taken as a bare folder. */
+  static targets(items: readonly StartThreadItem[], projects: readonly StartThreadProject[]): StartThreadTargetOption[] {
     const registered = projects.map(project => ({
       value: `project:${project.id}`,
       label: project.title,
       target: { kind: 'project', projectId: project.id } as const,
     }))
-    const itemPath = item.project
+    const itemPath = items[0]?.project ?? null
     const bare =
       itemPath === null || projects.some(project => project.path === itemPath)
         ? []
@@ -165,11 +166,12 @@ export class StartThreadForm {
     return [...bare, { value: 'default', label: fallback, target: { kind: 'default' } as const }, ...registered]
   }
 
-  /** The preselected target value: the item's project when it resolves, otherwise the Host default. */
-  static defaultTargetValue(item: StartThreadItem, projects: readonly StartThreadProject[]): string {
-    if (item.project === null) return 'default'
-    const project = projects.find(candidate => candidate.path === item.project)
-    return project === undefined ? `cwd:${item.project}` : `project:${project.id}`
+  /** The preselected target value: the first item's project when it resolves, otherwise the Host default. */
+  static defaultTargetValue(items: readonly StartThreadItem[], projects: readonly StartThreadProject[]): string {
+    const itemPath = items[0]?.project ?? null
+    if (itemPath === null) return 'default'
+    const project = projects.find(candidate => candidate.path === itemPath)
+    return project === undefined ? `cwd:${itemPath}` : `project:${project.id}`
   }
 
   /** The preselected model row key, falling back to the first listed model when the default left the catalog. */
@@ -184,23 +186,39 @@ export class StartThreadForm {
     return row.model.defaultEffort ?? row.model.efforts[0]?.id
   }
 
-  /** The opening message: enough for the agent to find the item without pasting the whole body. */
-  static message(item: StartThreadItem): string {
-    const heading = `Work on b:${String(item.id)}: ${item.title}`
-    const body = item.preview.trim() === '' || item.preview.trim() === item.title ? '' : `\n\n${item.preview}`
-    return `${heading}${body}`.slice(0, MESSAGE_MAX)
+  /** The opening message: enough for the agent to find every item without pasting the whole bodies. */
+  static message(items: readonly StartThreadItem[]): string {
+    const body = items.map((item, index) => {
+      const heading = `${index === 0 ? 'Work on' : 'Also'} b:${String(item.id)}: ${item.title}`
+      const preview = item.preview.trim()
+      // A selection keeps headings only: each preview could be a whole item, and the agent reads them from b: refs.
+      if (items.length > 1 || preview === '' || preview === item.title) return heading
+      return `${heading}\n\n${preview}`
+    })
+    return body.join('\n\n').slice(0, MESSAGE_MAX)
   }
 
-  /** The thread title the sidebar shows, clipped to the Session title limit. */
-  static title(item: StartThreadItem): string {
-    return item.title.slice(0, TITLE_MAX)
+  /** The thread title the sidebar shows: the first item, and how many more the selection carried. */
+  static title(items: readonly StartThreadItem[]): string {
+    const first = items[0]?.title ?? ''
+    const extra = items.length - 1
+    return (extra > 0 ? `${first} +${String(extra)}` : first).slice(0, TITLE_MAX)
   }
 }
 
-/** The item's own target as a `StartThreadTarget`, for a caller that starts a thread without the dialog. */
-export const defaultTargetFor = (item: StartThreadItem, projects: readonly StartThreadProject[]): StartThreadTarget => {
-  const value = StartThreadForm.defaultTargetValue(item, projects)
-  const option = StartThreadForm.targets(item, projects).find(candidate => candidate.value === value)
+/** The item fields a started thread reads, so every list can hand its row straight to the dialog. */
+export const startThreadItemOf = (item: {
+  readonly id: number
+  readonly title: string
+  readonly project: string | null
+  readonly preview?: string | null | undefined
+  readonly body?: string | null | undefined
+}): StartThreadItem => ({ id: item.id, title: item.title, project: item.project, preview: item.preview ?? item.body ?? '' })
+
+/** The items' own target as a `StartThreadTarget`, for a caller that starts a thread without the dialog. */
+export const defaultTargetFor = (items: readonly StartThreadItem[], projects: readonly StartThreadProject[]): StartThreadTarget => {
+  const value = StartThreadForm.defaultTargetValue(items, projects)
+  const option = StartThreadForm.targets(items, projects).find(candidate => candidate.value === value)
   return option?.target ?? { kind: 'default' }
 }
 

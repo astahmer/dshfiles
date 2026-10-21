@@ -12,6 +12,7 @@ import {
   LayersIcon,
   LinkIcon,
   MessageSquareIcon,
+  MessagesSquareIcon,
   PinIcon,
   PlusIcon,
   WandSparklesIcon,
@@ -29,7 +30,7 @@ import { ItemPickers } from './item-pickers.js'
 import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { StatusFilterBar } from './status-filter-bar.js'
-import type { StartThreadItem } from './start-thread.js'
+import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 type GroupBy = 'status' | 'kind' | 'project' | 'attention'
@@ -110,7 +111,9 @@ const Row = (props: {
   readonly selectWithModifiers: (id: number, shiftKey: boolean, additive: boolean) => void
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
+  /** The whole selection when this row belongs to one, so its menu starts one thread for all of it. */
+  readonly startThreadSelection?: readonly StartThreadItem[] | undefined
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -130,6 +133,7 @@ const Row = (props: {
       update={input => actions.update.mutate(input)}
       triage={id => actions.triage.mutate(id)}
       startThread={props.startThread}
+      selection={props.startThreadSelection}
       openItem={props.select}
     >
       <div
@@ -245,7 +249,7 @@ export const ItemsView = (props: {
   readonly statuses: readonly BacklogStatus[]
   readonly toggleStatus: (status: BacklogStatus) => void
   readonly clearStatuses: () => void
-  readonly startThread: (item: StartThreadItem) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -290,6 +294,11 @@ export const ItemsView = (props: {
     }
     selectionAnchor.current = orderedIds[0] ?? null
     setSelected(new Set(orderedIds))
+  }
+  const selectedItems = useMemo(() => props.items.filter(item => selected.has(item.id)).map(startThreadItemOf), [props.items, selected])
+  const startThreadForSelection = (): void => {
+    props.startThread(selectedItems)
+    clearSelection()
   }
   const updateSelected = (fields: { readonly status?: BacklogStatus; readonly kind?: BacklogKind; readonly pinned?: boolean }): void => {
     for (const id of selected) actions.update.mutate({ id, ...fields })
@@ -436,6 +445,7 @@ export const ItemsView = (props: {
                     }}
                     hover={props.hover}
                     startThread={props.startThread}
+                    startThreadSelection={selected.has(entry.item.id) ? selectedItems : undefined}
                     projectPaths={props.projectPaths}
                   />
                 )}
@@ -449,6 +459,13 @@ export const ItemsView = (props: {
           <span title="Shift-click selects a range; Cmd/Ctrl-click toggles items" className="dshx:mr-2 dshx:tabular-nums">
             {selected.size} selected
           </span>
+          <button
+            type="button"
+            onClick={startThreadForSelection}
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent"
+          >
+            <MessagesSquareIcon aria-hidden className="dshx:size-3.5" /> Start thread
+          </button>
           <DropdownMenu>
             <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent">
               Move to <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
