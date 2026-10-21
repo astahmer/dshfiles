@@ -126,8 +126,9 @@ own tests plus its Gherkin journey.
 - [ ] Task 3: durable `threads` table, `agents_threads` tool, panel history with open, usage after restart
 - [x] Task 4: routine field carried into the opening message, panel routine + schedule list
 - [x] Task 5: delegation config, enforcement in the messaging send path, Host gap for subagents
-- [ ] Rebuild `@dshfiles/ui-styles` and the touched plugins; refresh the `agent-registry` screenshot
-- [ ] `DSHX_E2E_ONLY=agents node --run check:e2e` green, then Rebase onto `main`
+- [x] Rebuild `@dshfiles/ui-styles` and the touched plugins; refresh the `agent-registry` screenshot
+- [x] `DSHX_E2E_ONLY=agents node --run check:e2e` green (3 passed, 1 replayed)
+- [ ] Rebase onto `main` and confirm `main..@` empty
 
 ### Phase 1 checklist
 
