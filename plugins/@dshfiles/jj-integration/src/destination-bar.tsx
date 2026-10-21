@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { CheckIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { useQuery, type QueryClient } from '@dshfiles/plugin-ui/query'
@@ -49,26 +50,6 @@ export const HostChipSlot = () => (
   </span>
 )
 
-/**
- * The Host answers a call that registers a workspace before its workspace-list push lands, and the client refuses to
- * open an id it has not seen, so a freshly provisioned workspace is opened only once the list carries it.
- */
-export const workspaceListed = (workspaces: IWorkspaces, workspaceId: string): Promise<void> =>
-  new Promise<void>((resolve, reject) => {
-    const known = (): boolean => workspaces.list.getSnapshot().items.some(item => item.workspaceId === workspaceId)
-    if (known()) return resolve()
-    const timer = setTimeout(() => {
-      unsubscribe()
-      reject(new Error(`Workspace ${workspaceId} never reached the workspace list.`))
-    }, 15_000)
-    const unsubscribe = workspaces.list.subscribe(() => {
-      if (!known()) return
-      clearTimeout(timer)
-      unsubscribe()
-      resolve()
-    })
-  })
-
 const noSpares: Readonly<Record<string, SpareWorkspace>> = {}
 
 const storedSpares = createStoredValue({
@@ -100,7 +81,9 @@ export const startWorkspaceToggle = (input: {
   const { services, t, queryClient } = input
   const client: WorkspaceToggleClient = {
     provision: (provisionInput, signal) => input.provision(provisionInput, { signal }),
-    listed: workspaceId => workspaceListed(services.workspaces, workspaceId),
+    listed: async workspaceId => {
+      await workspaceListed({ workspaces: services.workspaces, workspaceId })
+    },
     open: (workspaceId, signal) => services.openWorkspace(workspaceId, signal),
     findSpare: key => {
       const spare = storedSpares.get()[key]

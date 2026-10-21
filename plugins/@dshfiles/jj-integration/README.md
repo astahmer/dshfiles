@@ -43,6 +43,12 @@ the toggle remembers:
 - `thread_create` (and every caller of the `ownWorkspaceFor` API) pointed at an
   occupied thread workspace starts in a new one branched from that workspace's
   latest revision: its working copy when it holds work, else its parent.
+- A thread started from a backlog item always takes the `provision` path with
+  `isolate: true`, whatever `isolateByDefault` says: backlog work is
+  independent, so `@dshfiles/backlog` never starts it in a checkout another
+  thread is editing. Outside a jj repository `provision` answers the project
+  workspace unchanged, and a Host without this plugin leaves backlog on its own
+  fallback.
 - The Host never reuses a requested workspace name that a folder or jj workspace
   already holds; it silently picks another.
 

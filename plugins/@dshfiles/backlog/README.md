@@ -90,10 +90,18 @@ the item (title plus preview) and can be cleared to open an empty draft instead.
 Starting creates the thread, selects the account/model on it, names it after the item, sends the first message
 when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off opens it as an editable
 draft, and the dialog's _Send this message now_ box overrides the setting for one thread), links the item to the
-thread (provenance `user`) and opens it. A thread with no project joins
-the first registered workspace, the way the composer's New thread does. Failures after creation keep the thread
-and open it: a refused model switch leaves the Host default model, and a failed link is logged rather than
-losing the thread.
+thread (provenance `user`) and opens it.
+
+A thread started from an item always runs in its own jj workspace of the chosen project, whatever the
+isolate-by-default setting says: work captured in the backlog is independent, so it never shares a checkout
+another thread is editing. `@dshfiles/jj-integration` creates that workspace (one `thread-xxxxxx` beside the
+project) and the thread starts in it; outside a jj repository, or with the plugin not installed, the thread
+starts in the project workspace as before. A thread with no project joins the first registered workspace, the
+way the composer's New thread does, and is isolated there too. A workspace that cannot be created is reported
+in the dialog and nothing is started, so a jj failure never falls back to a shared checkout.
+
+Failures after creation keep the thread and open it: a refused model switch leaves the Host default model, and
+a failed link is logged rather than losing the thread.
 
 ## Automatic triage
 

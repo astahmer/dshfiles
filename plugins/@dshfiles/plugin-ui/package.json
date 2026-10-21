@@ -25,6 +25,10 @@
       "types": "./src/lib/host-request.ts",
       "default": "./src/lib/host-request.ts"
     },
+    "./lib/workspace-listed": {
+      "types": "./src/lib/workspace-listed.ts",
+      "default": "./src/lib/workspace-listed.ts"
+    },
     "./icons": {
       "types": "./src/icons.ts",
       "default": "./src/icons.ts"

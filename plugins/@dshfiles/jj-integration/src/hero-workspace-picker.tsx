@@ -1,5 +1,6 @@
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import {
   ProjectFolderPicker,
@@ -13,7 +14,7 @@ import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/dir
 import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
-import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor, workspaceListed } from './destination-bar.js'
+import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { RemoteDestinationChips } from './remote-destination.js'
 import { recentProjectPaths } from './recent-projects.js'
@@ -121,7 +122,7 @@ export const HeroWorkspacePicker = (
           ? (await api.noFolder({})).workspaceId
           : selection.workspaceId
         : (await props.ports.registerWorkspace(selection.canonicalPath)).workspaceId
-    await workspaceListed(props.services.workspaces, workspaceId)
+    await workspaceListed({ workspaces: props.services.workspaces, workspaceId })
     // SAFETY: the id comes from the Host's workspace registry.
     props.onPick(workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
   }

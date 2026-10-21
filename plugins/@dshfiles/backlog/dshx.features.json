@@ -620,7 +620,7 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; it names and links the new thread and opens it, sending immediately unless configured to keep an editable draft.",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; it creates the thread in its own jj workspace of that project, names and links it and opens it, sending immediately unless configured to keep an editable draft.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
@@ -648,7 +648,8 @@
         "A thread the Host refuses is reported in the dialog and no item link is written.",
         "A model switch that the Host rejects keeps the thread on the Host default model and still opens it.",
         "An empty first message opens an empty thread instead of sending anything.",
-        "A blocked draft initialization leaves the thread open with an empty composer."
+        "A blocked draft initialization leaves the thread open with an empty composer.",
+        "A thread workspace that cannot be created is reported in the dialog instead of starting the thread in a checkout another thread edits."
       ],
       "externalDependencies": [],
       "verification": [
@@ -684,6 +685,24 @@
           "id": "backlog-start-thread-message",
           "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
           "testName": "opens with the item heading and appends the preview once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.start-thread-own-workspace",
+          "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
+          "testName": "gives a thread started in a project its own jj workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.start-thread-own-workspace-default",
+          "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
+          "testName": "isolates a thread that has no project from the workspace the composer would use"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.start-thread-own-workspace-failure",
+          "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
+          "testName": "starts nothing in the shared checkout when the thread workspace cannot be created"
         }
       ]
     }

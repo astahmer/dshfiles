@@ -1198,6 +1198,9 @@ importers:
       '@dshfiles/input-trigger':
         specifier: workspace:*
         version: link:../input-trigger
+      '@dshfiles/jj-integration':
+        specifier: workspace:*
+        version: link:../jj-integration
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui

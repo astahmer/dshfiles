@@ -3,11 +3,13 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { agentsApi } from '@dshfiles/agents/contract'
-import type {} from '@dshfiles/input-trigger/client'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import type {} from '@dshfiles/input-trigger/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
@@ -15,14 +17,8 @@ import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
-import {
-  defaultTargetFor,
-  StartThreadForm,
-  type StartThreadCatalog,
-  type StartThreadCreation,
-  type StartThreadRequest,
-  type StartThreadTarget,
-} from './start-thread.js'
+import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadCreation, type StartThreadRequest } from './start-thread.js'
+import { isolateStartThread } from './start-thread-workspace.js'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
 
@@ -61,8 +57,30 @@ export default defineClient({
         }
       },
       start: async (request: StartThreadRequest) => {
-        const base = creationArgsFor(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId)
-        const creation: StartThreadCreation = request.agent?.preset == null ? { ...base } : { ...base, agentPreset: request.agent.preset }
+        const jj = createApiClient(ctx, jjIntegrationApi)
+        let creation: StartThreadCreation
+        try {
+          const placement = await isolateStartThread({
+            target: request.target,
+            defaultWorkspaceId: ctx.workspaces.list.getSnapshot().items[0]?.workspaceId,
+            // jj-integration answers the workspace unchanged outside a jj repository; only a missing plugin is no error.
+            provision: async workspaceId => {
+              const provisioned = await jj.safe.provision({ workspaceId, isolate: true })
+              if (provisioned.ok) return provisioned.value
+              if (isApiOwnerMissing(provisioned.error)) return { workspaceId }
+              throw provisioned.error
+            },
+          })
+          const base: StartThreadCreation =
+            placement.workspaceId === undefined
+              ? placement.cwd === undefined
+                ? {}
+                : { cwd: placement.cwd }
+              : { workspaceId: (await workspaceListed({ workspaces: ctx.workspaces, workspaceId: placement.workspaceId })).workspaceId }
+          creation = request.agent?.preset == null ? base : { ...base, agentPreset: request.agent.preset }
+        } catch (cause) {
+          return { ok: false, reason: `The thread workspace could not be created: ${cause instanceof Error ? cause.message : String(cause)}` }
+        }
         let sessionId
         try {
           sessionId = await ctx.sessions.create(creation)
@@ -165,16 +183,6 @@ export default defineClient({
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
   },
 })
-
-/**
- * A thread with no project joins the first registered workspace, the way the composer's New thread does; a bare path
- * runs in that folder, and a Host with no workspace at all leaves the choice to the composer.
- */
-const creationArgsFor = (target: StartThreadTarget, defaultWorkspaceId: WorkspaceId | undefined) => {
-  if (target.kind === 'project') return { workspaceId: target.projectId }
-  if (target.kind === 'cwd') return { cwd: target.path }
-  return defaultWorkspaceId === undefined ? {} : { workspaceId: defaultWorkspaceId }
-}
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg
