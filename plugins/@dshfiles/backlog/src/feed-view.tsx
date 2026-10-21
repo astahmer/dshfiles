@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
+import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
@@ -57,6 +58,7 @@ const FeedEntry = (props: {
   const author = item.actors.find(actor => actor.role === 'owner')?.id ?? item.actors[0]?.id
   const summary = activityLine(item)
   const closed = item.status === 'done' || item.status === 'dropped'
+  const rename = useBacklogInlineRename(() => props.select(item.id))
   return (
     <BacklogItemMenu
       item={item}
@@ -68,7 +70,10 @@ const FeedEntry = (props: {
     >
       <article
         aria-label={`Item b:${String(item.id)}`}
-        onClick={() => props.select(item.id)}
+        onClick={() => {
+          if (!rename.renaming) rename.openSoon()
+        }}
+        onDoubleClick={rename.renameOnDoubleClick}
         className={cn(
           'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100',
           props.open ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
@@ -86,14 +91,23 @@ const FeedEntry = (props: {
               <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
             </span>
             {item.kind === 'task' ? null : <ItemGlyphs.KindIcon kind={item.kind} />}
-            <BacklogText
-              text={item.title}
-              className={cn(
-                'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:text-sm! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
-                closed &&
-                  'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40 dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
-              )}
-            />
+            {rename.renaming ? (
+              <BacklogInlineTitle
+                id={item.id}
+                title={item.title}
+                cancel={rename.endRename}
+                className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-sm dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
+              />
+            ) : (
+              <BacklogText
+                text={item.title}
+                className={cn(
+                  'dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:truncate dshx:text-sm dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:text-sm! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
+                  closed &&
+                    'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40 dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
+                )}
+              />
+            )}
           </div>
           {item.preview === '' ? null : (
             <BacklogText

@@ -3,7 +3,8 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
-const interactiveTargets = 'a, button, input, select, textarea, [role="button"]'
+/** Markdown and chips put real controls inside an item row; a gesture the reader meant for one of them is not the row's. */
+export const interactiveTargets = 'a, button, input, select, textarea, [role="button"]'
 
 export const BacklogText = (props: { readonly text: string; readonly className?: string; readonly onActivate?: () => void }): JSX.Element => (
   <div

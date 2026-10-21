@@ -80,6 +80,11 @@ box show the kind, tags and links triage will derive.
 Keyboard: `J`/`K` (or arrows) move, `Enter` opens the peek, `Esc` closes it, `C` focuses capture, `/` search,
 `B` toggles list and board; a status or kind menu takes `1`–`5`.
 
+Double-click an item in the feed, an Items row or a board card to rename it where it sits: the title
+becomes an input, Enter or a click away saves it, Escape keeps the old title, and the peek stays closed for
+this one gesture. A double click on a link, chip or button inside the row keeps that control's action
+instead.
+
 ## Item peek
 
 The peek opens beside the list (over it in a narrow pane). Edit the title and the markdown body in place, change kind and status, pin, link and unlink targets, comment, and read every event

@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
+import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
@@ -120,6 +121,7 @@ const Row = (props: {
   const modifiedCheckboxClick = useRef(false)
   const item = props.item
   const closed = item.status === 'done' || item.status === 'dropped'
+  const rename = useBacklogInlineRename(() => props.select(item.id))
   const background = (() => {
     if (props.open) return 'dshx:bg-accent/80'
     if (props.selected) return 'dshx:bg-info/8'
@@ -141,12 +143,14 @@ const Row = (props: {
         aria-label={`Item b:${String(item.id)}`}
         aria-selected={props.selected}
         onClick={event => {
+          if (rename.renaming) return
           if (event.shiftKey || event.metaKey || event.ctrlKey) {
             props.selectWithModifiers(item.id, event.shiftKey, event.metaKey || event.ctrlKey)
             return
           }
-          props.select(item.id)
+          rename.openSoon()
         }}
+        onDoubleClick={rename.renameOnDoubleClick}
         onMouseMove={() => props.hover(item.id)}
         style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
         className={cn(
@@ -181,13 +185,22 @@ const Row = (props: {
         </span>
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
           <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
-          <BacklogText
-            text={item.title}
-            className={cn(
-              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[13px] dshx:[&>div]:truncate dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
-              closed && 'dshx:text-muted-foreground dshx:line-through dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
-            )}
-          />
+          {rename.renaming ? (
+            <BacklogInlineTitle
+              id={item.id}
+              title={item.title}
+              cancel={rename.endRename}
+              className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
+            />
+          ) : (
+            <BacklogText
+              text={item.title}
+              className={cn(
+                'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[13px] dshx:[&>div]:truncate dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
+                closed && 'dshx:text-muted-foreground dshx:line-through dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
+              )}
+            />
+          )}
           {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
           <ItemGlyphs.AttentionBadge attention={item.attention} compact />
           {item.proposal === null ? null : <WandSparklesIcon aria-label="Suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}

@@ -193,6 +193,11 @@ When('the Items view is opened', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('table', { name: 'Backlog items' })).toBeVisible()
 })
 
+When('the Board view is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
+  await expect(page.locator('[data-backlog-column]')).toHaveCount(5)
+})
+
 Then('the Items view lists both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
   await recordAssertion(page, 'backlog-status-items', async () => {
     const items = page.getByRole('table', { name: 'Backlog items' })
@@ -495,4 +500,85 @@ Then('the backlog detail shows {string}', async ({ page }: { page: Page }, text:
   await recordAssertion(page, 'backlog-reference-opened-in-panel', async () => {
     await expect(peek(page).getByText(text, { exact: true })).toBeVisible()
   })
+})
+
+const inlineTitle = (page: Page) => page.getByRole('textbox', { name: 'Item title', exact: true })
+const itemsRow = (page: Page, id: number) => page.getByRole('row', { name: `Item b:${String(id)}`, exact: true })
+const boardCard = (page: Page, id: number) => page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+
+When('backlog item b:{int} is double-clicked in the feed', async ({ page }: { page: Page }, id: number) => {
+  await showFeed(page)
+  // The centre of an entry can land on the status picker or a chip, so aim at the title row under the author line.
+  await feed(page)
+    .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    .dblclick({ position: { x: 160, y: 40 } })
+})
+
+Then('the feed edits item b:{int} inline without opening it', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, 'backlog-inline-edit-open', async () => {
+    await expect(inlineTitle(page)).toHaveValue('Rename me in the feed')
+    // The rename is the quick path, so the gesture must not open the item beside the feed.
+    await expect(peek(page)).toHaveCount(0)
+    await expect(feed(page).getByRole('article', { name: `Item b:${String(id)}`, exact: true })).toBeVisible()
+  })
+})
+
+When('the inline title is replaced with {string}', async ({ page }: { page: Page }, title: string) => {
+  await inlineTitle(page).fill(title)
+  await inlineTitle(page).press('Enter')
+})
+
+Then('the feed titles item b:{int} {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+  await recordAssertion(page, 'backlog-inline-edit-saved', async () => {
+    const article = feed(page).getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    await expect(article).toContainText(title)
+    await expect(inlineTitle(page)).toHaveCount(0)
+    // Leave the peek closed: the Items and board steps below assert the gesture opens nothing.
+    await expect(peek(page)).toHaveCount(0)
+  })
+})
+
+When('backlog row b:{int} is double-clicked in the Items view', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  // The row's right half holds status and kind menus; the title sits just after the id column.
+  await itemsRow(page, id).dblclick({ position: { x: 140, y: 20 } })
+})
+
+Then('the Items view edits b:{int} inline without opening it', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, 'backlog-inline-edit-items-open', async () => {
+    await expect(inlineTitle(page)).toHaveValue('Renamed in the feed')
+    await expect(peek(page)).toHaveCount(0)
+    await expect(itemsRow(page, id)).toBeVisible()
+  })
+})
+
+Then('the Items view titles b:{int} {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+  await recordAssertion(page, 'backlog-inline-edit-items-saved', async () => {
+    await expect(itemsRow(page, id)).toContainText(title)
+    await expect(inlineTitle(page)).toHaveCount(0)
+  })
+})
+
+When('backlog card b:{int} is double-clicked on the board', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
+  // A card's lower half holds its preview and status picker; the title sits under the top padding.
+  await boardCard(page, id).dblclick({ position: { x: 100, y: 20 } })
+})
+
+Then('the board edits b:{int} inline without opening it', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, 'backlog-inline-edit-board-open', async () => {
+    await expect(inlineTitle(page)).toHaveValue('Renamed in the table')
+    await expect(peek(page)).toHaveCount(0)
+    await expect(boardCard(page, id)).toBeVisible()
+  })
+})
+
+Then('the board card for b:{int} is titled {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+  await recordAssertion(page, 'backlog-inline-edit-board-saved', async () => {
+    await expect(boardCard(page, id)).toContainText(title)
+    await expect(inlineTitle(page)).toHaveCount(0)
+    await boardCard(page, id).getByText(`b:${String(id)}`, { exact: true }).click()
+    await expect(peek(page)).toContainText(title)
+  })
+  await finishJourneyAssertions(page)
 })

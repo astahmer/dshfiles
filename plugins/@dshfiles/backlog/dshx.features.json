@@ -99,6 +99,26 @@
       ]
     },
     {
+      "id": "inline-title-edit",
+      "title": "Rename an item in place",
+      "summary": "Double-clicking an item in the feed, an Items row or a board card swaps its title for an inline editor; Enter or a click elsewhere saves, Escape leaves the item untouched, and the quick gesture never opens the peek or card detail.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["reading", "editing", "saved", "cancelled"],
+      "failureModes": [
+        "An unchanged, blank or escape-cancelled draft closes the editor without a Host write.",
+        "A double click on a link, chip or button inside the row keeps that control's own action instead of starting a rename."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.inline-edit",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        }
+      ]
+    },
+    {
       "id": "board-links-and-history",
       "title": "Board, links, backlinks and history",
       "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; fields the user set are recorded as theirs.",

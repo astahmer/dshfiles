@@ -4,6 +4,7 @@ import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
+import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
@@ -38,7 +39,12 @@ const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element =>
   return <span className="dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
 }
 
-const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickStatus?: (status: BacklogStatus) => void }): JSX.Element => {
+const CardFace = (props: {
+  readonly item: BacklogSummaryView
+  readonly onPickStatus?: (status: BacklogStatus) => void
+  readonly renaming?: boolean
+  readonly onRenameDone?: () => void
+}): JSX.Element => {
   const item = props.item
   return (
     <>
@@ -48,10 +54,19 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
             <ItemGlyphs.KindIcon kind={item.kind} />
           </span>
         )}
-        <BacklogText
-          text={item.title}
-          className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium dshx:text-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-snug! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
-        />
+        {props.renaming === true && props.onRenameDone !== undefined ? (
+          <BacklogInlineTitle
+            id={item.id}
+            title={item.title}
+            cancel={props.onRenameDone}
+            className="dshx:h-6 dshx:min-w-0 dshx:flex-1 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:text-[13px] dshx:font-medium dshx:shadow-none dshx:focus-visible:ring-1"
+          />
+        ) : (
+          <BacklogText
+            text={item.title}
+            className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium dshx:text-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-snug! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
+          />
+        )}
         {props.onPickStatus === undefined ? null : (
           <span
             className="dshx:-mt-1 dshx:-mr-1.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/card:opacity-100"
@@ -93,6 +108,46 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
 const cardClass =
   'dshx:group/card dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:p-3 dshx:shadow-xs dshx:transition-[border-color,box-shadow,opacity] dshx:duration-150 dshx:select-none'
 
+const BoardCard = (props: {
+  readonly item: BacklogSummaryView
+  readonly openId: number | null
+  readonly open: (id: number) => void
+  readonly startDrag: (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void) => void
+  readonly pickStatus: (id: number, status: BacklogStatus) => void
+  readonly startThread: (items: readonly StartThreadItem[]) => void
+  readonly projectPaths: readonly string[]
+  readonly dragging: boolean
+}): JSX.Element => {
+  const actions = useBacklogActions()
+  const item = props.item
+  const rename = useBacklogInlineRename(() => props.open(item.id))
+  return (
+    <BacklogItemMenu
+      item={item}
+      projectPaths={props.projectPaths}
+      update={input => actions.update.mutate(input)}
+      triage={id => actions.triage.mutate(id)}
+      startThread={props.startThread}
+      openItem={props.open}
+    >
+      <article
+        aria-label={`Card b:${String(item.id)}`}
+        onPointerDown={event => props.startDrag(event, item, rename.openSoon)}
+        onDoubleClick={rename.renameOnDoubleClick}
+        style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
+        className={cn(
+          cardClass,
+          'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm',
+          item.id === props.openId ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25' : 'dshx:border-border',
+          props.dragging && 'dshx:opacity-30',
+        )}
+      >
+        <CardFace item={item} renaming={rename.renaming} onRenameDone={rename.endRename} onPickStatus={status => props.pickStatus(item.id, status)} />
+      </article>
+    </BacklogItemMenu>
+  )
+}
+
 /**
  * Columns by status. A click opens the item's detail beside the board; dragging moves it, and the View Transition
  * lets it glide into the new column. Every column is a drop target.
@@ -121,7 +176,7 @@ export const BoardView = (props: {
     return boardStatuses.find(status => status === value) ?? null
   }
 
-  const startDrag = (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView): void => {
+  const startDrag = (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void): void => {
     if (event.button !== 0 || (event.target instanceof HTMLElement && event.target.closest('button') !== null)) return
     const card = event.currentTarget.getBoundingClientRect()
     const origin = { x: event.clientX, y: event.clientY }
@@ -138,7 +193,7 @@ export const BoardView = (props: {
       setDrag(null)
       setOver(null)
       if (!started) {
-        props.open(item.id)
+        open()
         return
       }
       const target = columnAt(upEvent.clientX, upEvent.clientY)
@@ -194,29 +249,17 @@ export const BoardView = (props: {
             >
               {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
               {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
-                <BacklogItemMenu
+                <BoardCard
                   key={item.id}
                   item={item}
-                  projectPaths={props.projectPaths}
-                  update={input => actions.update.mutate(input)}
-                  triage={id => actions.triage.mutate(id)}
+                  openId={props.openId}
+                  open={props.open}
+                  startDrag={startDrag}
+                  pickStatus={move}
                   startThread={props.startThread}
-                  openItem={props.open}
-                >
-                  <article
-                    aria-label={`Card b:${String(item.id)}`}
-                    onPointerDown={event => startDrag(event, item)}
-                    style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
-                    className={cn(
-                      cardClass,
-                      'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm',
-                      item.id === props.openId ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25' : 'dshx:border-border',
-                      drag?.id === item.id && 'dshx:opacity-30',
-                    )}
-                  >
-                    <CardFace item={item} onPickStatus={status => move(item.id, status)} />
-                  </article>
-                </BacklogItemMenu>
+                  projectPaths={props.projectPaths}
+                  dragging={drag?.id === item.id}
+                />
               ))}
             </div>
           </section>

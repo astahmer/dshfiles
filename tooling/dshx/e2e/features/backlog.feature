@@ -45,6 +45,26 @@ Feature: Backlog
     And the "Inbox" status filter is cleared
     Then the feed narrows back to "composer drops chips on paste"
 
+  @scenario:backlog.inline-edit
+  Scenario: Rename an item in place from the feed, the Items table and the board
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Rename me in the feed" is captured
+    When backlog item b:1 is double-clicked in the feed
+    Then the feed edits item b:1 inline without opening it
+    When the inline title is replaced with "Renamed in the feed"
+    Then the feed titles item b:1 "Renamed in the feed"
+    When the Items view is opened
+    And backlog row b:1 is double-clicked in the Items view
+    Then the Items view edits b:1 inline without opening it
+    When the inline title is replaced with "Renamed in the table"
+    Then the Items view titles b:1 "Renamed in the table"
+    When the Board view is opened
+    And backlog card b:1 is double-clicked on the board
+    Then the board edits b:1 inline without opening it
+    When the inline title is replaced with "Renamed on the board"
+    Then the board card for b:1 is titled "Renamed on the board"
+
   @scenario:backlog.start-thread
   Scenario: Start a thread from a board card
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
