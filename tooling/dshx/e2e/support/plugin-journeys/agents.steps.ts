@@ -23,9 +23,11 @@ Then('the agent thread {string} opens with its instructions for {string}', async
 
 Then('the start thread dialog offers the agent {string}', async ({ page }: { page: Page }, handle: string) => {
   await peek(page).getByRole('button', { name: 'Start thread', exact: true }).click()
-  const agents = page.getByLabel('Thread agent', { exact: true })
+  const agents = page.getByRole('combobox', { name: 'Thread agent', exact: true })
   await expect(agents).toBeVisible()
-  await expect(agents.locator('option', { hasText: handle })).toHaveCount(1)
+  await agents.click()
+  await expect(page.getByRole('option', { name: new RegExp(handle, 'u') })).toHaveCount(1)
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await finishJourneyAssertions(page)
 })
@@ -60,7 +62,8 @@ Then('the agent {string} is saved with instructions {string}', async ({ page }: 
 })
 
 Then('the agent {string} may only message {string}', async ({ page }: { page: Page }, _name: string, peer: string) => {
-  await page.getByRole('combobox', { name: 'Delegation (messages)', exact: true }).selectOption({ label: 'Listed peers only' })
+  await page.getByRole('combobox', { name: 'Delegation (messages)', exact: true }).click()
+  await page.getByRole('option', { name: 'Listed peers only', exact: true }).click()
   await page.getByRole('textbox', { name: 'Peers (handles)', exact: true }).fill(peer)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
@@ -73,7 +76,7 @@ Then('the Agents panel lists {string} with those instructions', async ({ page }:
     await row.click()
     await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
     await expect(instructionsField(page)).toHaveValue('Prefer small findings.')
-    await expect(page.getByRole('combobox', { name: 'Delegation (messages)', exact: true })).toHaveValue('listed')
+    await expect(page.getByRole('combobox', { name: 'Delegation (messages)', exact: true })).toContainText('Listed peers only')
     await expect(page.getByRole('textbox', { name: 'Peers (handles)', exact: true })).toHaveValue('dsh')
   })
   await finishJourneyAssertions(page)

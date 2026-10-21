@@ -1,6 +1,7 @@
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
@@ -41,8 +42,6 @@ export interface AgentsPanelProps {
 
 type Outcome = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
-const fieldClass =
-  'dshx:h-8 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
 const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
 
 const draftOf = (agent: Agent | null): AgentDraft => ({
@@ -155,6 +154,32 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const patch = (next: Partial<AgentDraft>): void => setDraft(currentDraft => ({ ...currentDraft, ...next }))
   const routeKey = draft.route === null ? '' : `${draft.route.provider}/${draft.route.model}`
   const routeOption = catalog.data?.options.find(option => option.key === routeKey)
+  const delegationOptions: readonly ComboboxOption[] = [
+    { value: 'any', label: 'Any peer' },
+    { value: 'listed', label: 'Listed peers only' },
+    { value: 'none', label: 'No messaging' },
+  ]
+  const presetOptions: readonly ComboboxOption[] = [
+    { value: '', label: 'Host default' },
+    ...(presets.data ?? []).map(preset => ({ value: preset.id, label: preset.name ?? preset.id, disabled: preset.broken !== undefined })),
+  ]
+  const routeOptions: readonly ComboboxOption[] = [
+    { value: '', label: 'Harness default' },
+    ...(catalog.data?.options ?? []).map(option => ({
+      value: option.key,
+      label: `${option.providerName} · ${option.modelName}`,
+      keywords: [option.provider, option.model],
+      group: option.providerName,
+    })),
+  ]
+  const effortOptions: readonly ComboboxOption[] = [
+    { value: '', label: 'Model default' },
+    ...(routeOption?.efforts ?? []).map(effort => ({ value: effort, label: effort })),
+  ]
+  const targetOptions: readonly ComboboxOption[] = [
+    { value: 'default', label: 'Host default workspace' },
+    ...projects.map(project => ({ value: `project:${project.id}`, label: project.title })),
+  ]
 
   return (
     <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:bg-background dshx:text-foreground">
@@ -298,23 +323,21 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
         <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Delegation (messages)</span>
-            <select
-              className={fieldClass}
-              value={draft.delegation.messaging}
-              onChange={event =>
+            <Combobox
+              label="Delegation (messages)"
+              matchTriggerWidth
+              onValueChange={value =>
                 patch({
                   delegation: {
-                    messaging: event.currentTarget.value === 'none' ? 'none' : event.currentTarget.value === 'listed' ? 'listed' : 'any',
+                    messaging: value === 'none' ? 'none' : value === 'listed' ? 'listed' : 'any',
                     handles: draft.delegation.handles,
                     subagents: draft.delegation.subagents,
                   },
                 })
               }
-            >
-              <option value="any">Any peer</option>
-              <option value="listed">Listed peers only</option>
-              <option value="none">No messaging</option>
-            </select>
+              options={delegationOptions}
+              value={draft.delegation.messaging}
+            />
           </label>
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Peers (handles)</span>
@@ -352,26 +375,23 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
         <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Tools (preset)</span>
-            <select
-              className={fieldClass}
+            <Combobox
+              label="Tools (preset)"
+              matchTriggerWidth
+              onValueChange={value => patch({ preset: value === '' ? null : value })}
+              options={presetOptions}
+              searchAbove={0}
+              searchPlaceholder="Search presets…"
               value={draft.preset ?? ''}
-              onChange={event => patch({ preset: event.currentTarget.value === '' ? null : event.currentTarget.value })}
-            >
-              <option value="">Host default</option>
-              {(presets.data ?? []).map(preset => (
-                <option key={preset.id} value={preset.id} disabled={preset.broken !== undefined}>
-                  {preset.name ?? preset.id}
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Model route</span>
-            <select
-              className={fieldClass}
-              value={routeKey}
-              onChange={event => {
-                const option = catalog.data?.options.find(candidate => candidate.key === event.currentTarget.value)
+            <Combobox
+              label="Model route"
+              matchTriggerWidth
+              onValueChange={value => {
+                const option = catalog.data?.options.find(candidate => candidate.key === value)
                 if (option === undefined) {
                   patch({ route: null })
                   return
@@ -380,39 +400,31 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                 if (option.defaultEffort !== undefined) route.reasoningEffort = option.defaultEffort
                 patch({ route })
               }}
-            >
-              <option value="">Harness default</option>
-              {(catalog.data?.options ?? []).map(option => (
-                <option key={option.key} value={option.key}>
-                  {option.providerName} · {option.modelName}
-                </option>
-              ))}
-            </select>
+              options={routeOptions}
+              searchAbove={0}
+              searchPlaceholder="Search models…"
+              value={routeKey}
+            />
           </label>
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Reasoning</span>
-            <select
-              className={fieldClass}
-              value={draft.route?.reasoningEffort ?? ''}
+            <Combobox
               disabled={routeOption === undefined}
-              onChange={event =>
+              label="Reasoning"
+              matchTriggerWidth
+              onValueChange={value =>
                 patch({
                   route:
                     draft.route === null
                       ? null
-                      : event.currentTarget.value === ''
+                      : value === ''
                         ? { provider: draft.route.provider, model: draft.route.model }
-                        : { provider: draft.route.provider, model: draft.route.model, reasoningEffort: event.currentTarget.value },
+                        : { provider: draft.route.provider, model: draft.route.model, reasoningEffort: value },
                 })
               }
-            >
-              <option value="">Model default</option>
-              {(routeOption?.efforts ?? []).map(effort => (
-                <option key={effort} value={effort}>
-                  {effort}
-                </option>
-              ))}
-            </select>
+              options={effortOptions}
+              value={draft.route?.reasoningEffort ?? ''}
+            />
           </label>
         </div>
 
@@ -444,14 +456,16 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
               onChange={event => setPrompt(event.currentTarget.value)}
             />
             <div className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <select className={cn(fieldClass, 'dshx:flex-1')} value={target} onChange={event => setTarget(event.currentTarget.value)}>
-                <option value="default">Host default workspace</option>
-                {projects.map(project => (
-                  <option key={project.id} value={`project:${project.id}`}>
-                    {project.title}
-                  </option>
-                ))}
-              </select>
+              <Combobox
+                label="Thread workspace"
+                matchTriggerWidth
+                onValueChange={setTarget}
+                options={targetOptions}
+                searchAbove={0}
+                searchPlaceholder="Search workspaces…"
+                triggerClassName="dshx:flex-1"
+                value={target}
+              />
               <Button size="sm" onClick={() => dispatch.mutate()} disabled={dispatch.isPending}>
                 <SendIcon />
                 Start
