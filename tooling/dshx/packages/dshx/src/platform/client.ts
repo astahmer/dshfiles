@@ -448,7 +448,8 @@ export interface DshPlatformTransport {
 
 export interface DshPlatformClient {
   readonly sessions: {
-    list(): Promise<readonly SessionSummary[]>
+    /** Omit `projections` for the historical full read; an empty list asks for no projection columns. */
+    list(projections?: readonly string[]): Promise<readonly SessionSummary[]>
     search(query: string): Promise<{
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
@@ -751,8 +752,21 @@ function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
 }
 
 function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
-  const listSessions = async (): Promise<readonly SessionSummary[]> => {
-    const result = z.object({ items: z.array(sessionSummarySchema) }).parse(await transport.rpc('session', 'list', { _request: {} }))
+  const readSessionList = async (projections?: readonly string[]) => {
+    const request = projections === undefined ? {} : { projections: [...projections] }
+    return z.object({ items: z.array(sessionSummarySchema) }).parse(await transport.rpc('session', 'list', { _request: request }))
+  }
+  const listSessions = async (projections?: readonly string[]): Promise<readonly SessionSummary[]> => {
+    const read = async () => {
+      try {
+        return await readSessionList(projections)
+      } catch (error) {
+        if (projections === undefined) throw error
+        // A Host older than the selector rejects the unknown field; fall back to the historical full read.
+        return await readSessionList()
+      }
+    }
+    const result = await read()
     const sessionIds = result.items.map(item => item.sessionId)
     const archivedSessionIds = await transport.archivedSessionIds?.(sessionIds)
     const archivedSessionIdSet = archivedSessionIds === undefined ? undefined : new Set(archivedSessionIds)

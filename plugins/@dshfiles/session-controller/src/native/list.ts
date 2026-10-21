@@ -6,7 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type { ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
-import type { ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionSnapshot, SessionProjectionMap } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
@@ -16,13 +16,23 @@ import {
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
 } from './types.ts'
 import type {
-  SessionListMetadata, SessionProjectionHints, SessionProjectionValues, SessionSearchItem,
-  SessionSearchValue, SessionSummary,
+  SessionListMetadata, SessionListRequest, SessionProjectionHints, SessionProjectionValues,
+  SessionSearchItem, SessionSearchValue, SessionSummary,
 } from './types.ts'
 
 const SEARCH_PROVIDER_CALL_LIMIT = 100
 const SESSION_SEARCH_QUERY_MAX_CHARS = 500
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
+const LIST_METADATA_KEY = 'sessionListMetadata'
+
+/** A caller's projection allowlist; `undefined` reads every registered column. */
+type ProjectionSelection = ReadonlySet<string> | undefined
+
+/** Projection columns read for one row, split into the caller's values and the row's own metadata. */
+interface ProjectionRead {
+  readonly projections?: SessionProjectionHints
+  readonly metadata?: SessionListMetadata
+}
 
 const sessionListMetadataSchema: z.ZodType<SessionListMetadata> = z.object({
   blank: z.boolean(),
@@ -120,9 +130,9 @@ export class ApiSessionList {
    * @param session - attached Session to summarize.
    * @returns current list metadata and available projections.
    */
-  summaryFor(session: Session): SessionSummary {
-    const projections = this.projectionsFor(session.header, session)
-    const metadata = projections?.values.sessionListMetadata
+  summaryFor(session: Session, selection?: ProjectionSelection): SessionSummary {
+    const read = this.projectionsFor(session.header, session, selection)
+    const metadata = read.metadata
     return {
       sessionId: session.id,
       updatedAt: updatedAt(session.header, metadata),
@@ -131,16 +141,18 @@ export class ApiSessionList {
       running: this.ctx.agents.get(session.id)?.status === 'running',
       blank: metadata?.blank ?? session.seq === 0,
       ...listFields(session.header),
-      ...(projections === undefined ? {} : { projections }),
+      ...(read.projections === undefined ? {} : { projections: read.projections }),
     }
   }
 
   /**
    * Read every visible attached and persisted Session without activating an Agent.
+   * @param request - optional projection allowlist; omitted reads every column.
    * @param signal - optional cancellation for persistence reads and summary generation.
    * @returns visible Session summaries ordered by activity.
    */
-  async list(signal?: AbortSignal): Promise<SessionSummary[]> {
+  async list(request: SessionListRequest = {}, signal?: AbortSignal): Promise<SessionSummary[]> {
+    const selection = projectionSelectionOf(request.projections)
     signal?.throwIfAborted()
     const records = await this.ctx.sessionQuery.listSessions(signal)
     signal?.throwIfAborted()
@@ -151,7 +163,7 @@ export class ApiSessionList {
       signal?.throwIfAborted()
       const live = this.ctx.sessions.get(record.header.id)
       if (live !== undefined) {
-        items.push(this.summaryFor(live))
+        items.push(this.summaryFor(live, selection))
       } else if (record.header.cwd !== undefined) {
         cold.push(record)
       }
@@ -163,7 +175,7 @@ export class ApiSessionList {
     }
     for (const record of cold) {
       signal?.throwIfAborted()
-      items.push(this.summarizeCold(record))
+      items.push(this.summarizeCold(record, selection))
       if (performance.now() >= yieldDeadline) {
         await scheduler.yield()
         signal?.throwIfAborted()
@@ -175,11 +187,17 @@ export class ApiSessionList {
     return items
   }
 
-  private summarizeCold({ header, formatStatus }: SessionRecord): SessionSummary {
-    const projections = this.coldProjections.get(header.id) ?? this.projectionsFor(header, undefined)
-    // A miss stays unmemoized: the persisted cache can gain this Session's record later.
-    if (projections !== undefined) this.coldProjections.set(header.id, projections)
-    const metadata = projections?.values.sessionListMetadata
+  private summarizeCold({ header, formatStatus }: SessionRecord, selection?: ProjectionSelection): SessionSummary {
+    const cached = this.coldProjections.get(header.id)
+    const read = cached === undefined
+      ? this.projectionsFor(header, undefined, selection)
+      : projectionReadOf(cached, selection, cached.values[LIST_METADATA_KEY])
+    // Only a full read is memoized: a filtered read must never answer a later full read with missing columns. A miss
+    // stays unmemoized so the persisted cache can gain this Session's record later.
+    if (cached === undefined && selection === undefined && read.projections !== undefined) {
+      this.coldProjections.set(header.id, read.projections)
+    }
+    const metadata = read.metadata
     return {
       sessionId: header.id,
       updatedAt: updatedAt(header, metadata),
@@ -189,7 +207,7 @@ export class ApiSessionList {
       // A large, metadata-less, or inaccessible cache miss remains unknown and visible.
       blank: metadata?.blank ?? false,
       ...listFields(header),
-      ...(projections === undefined ? {} : { projections }),
+      ...(read.projections === undefined ? {} : { projections: read.projections }),
     }
   }
 
@@ -304,25 +322,84 @@ export class ApiSessionList {
   private projectionsFor(
     header: SessionHeader,
     session: Session | undefined,
-  ): SessionProjectionHints | undefined {
+    selection?: ProjectionSelection,
+  ): ProjectionRead {
     try {
-      if (session !== undefined) {
-        // The live registry computed the block for this Session: its watermark
-        // shares the sequence space of the Session's baselines and frames.
-        return hintsOf('sequenced', this.ctx.sessionProjections.cachedSnapshot(session))
+      const kind = session === undefined ? 'cached' : 'sequenced'
+      if (selection === undefined) {
+        const hints = hintsOf(kind, this.readBlock(header, session))
+        return hints === undefined ? {} : projectionReadOf(hints, undefined, hints.values[LIST_METADATA_KEY])
       }
-      // A cold row reads the persisted cache by header alone; the cache serves
-      // seeded and unseeded lifecycles alike because a listing never seeds a
-      // fold. The watermark is the stored record's own.
-      const cache = this.ctx.get('sessionProjectionCache')
-      return hintsOf('cached', cache?.cachedSnapshot(header) ?? cache?.cachedPredecessorTitle(header))
+      const keys = [...selection]
+      const hints = keys.length === 0 ? undefined : hintsOf(kind, this.readBlock(header, session, keys))
+      // Metadata is the row's own state, never part of a filtered column block: a
+      // separate read keeps the block's watermark scoped to the caller's values.
+      const metadata = hints?.values[LIST_METADATA_KEY]
+        ?? hintsOf(kind, this.readBlock(header, session, [LIST_METADATA_KEY]))?.values[LIST_METADATA_KEY]
+      return projectionReadOf(hints, selection, metadata)
     } catch (error) {
       this.ctx.logger.warn(
         `api-session.list: projection column for "${header.id}" failed; serving the row without it: ${String(error)}`,
       )
-      return undefined
+      return {}
     }
   }
+
+  private readBlock(header: SessionHeader, session: Session | undefined, keys?: readonly string[]): ProjectionSnapshot | undefined {
+    if (session !== undefined) {
+      // The live registry computed the block for this Session: its watermark
+      // shares the sequence space of the Session's baselines and frames.
+      return this.ctx.sessionProjections.cachedSnapshot(session, projectionKeyList(keys))
+    }
+    // A cold row reads the persisted cache by header alone; the cache serves
+    // seeded and unseeded lifecycles alike because a listing never seeds a
+    // fold. The watermark is the stored record's own.
+    const cache = this.ctx.get('sessionProjectionCache')
+    return cache?.cachedSnapshot(header, projectionKeyList(keys))
+      ?? (wantsTitle(keys) ? cache?.cachedPredecessorTitle(header) : undefined)
+  }
+}
+
+/** Decode the wire selector once: `undefined` keeps the full read, and non-string entries are ignored. */
+function projectionSelectionOf(projections: unknown): ProjectionSelection {
+  if (!Array.isArray(projections)) return undefined
+  return new Set(projections.filter((key): key is string => typeof key === 'string'))
+}
+
+function projectionKeyList(keys: readonly string[] | undefined): readonly Extract<keyof SessionProjectionMap, string>[] | undefined {
+  // The wire selector is intentionally wider than the typed key union: unknown keys are ignored by the registry.
+  return keys as readonly Extract<keyof SessionProjectionMap, string>[] | undefined
+}
+
+function wantsTitle(keys: readonly string[] | undefined): boolean {
+  return keys === undefined || keys.includes('title')
+}
+
+/** Keep only the caller's columns, with the row's metadata supplied separately. */
+function projectionReadOf(
+  hints: SessionProjectionHints | undefined,
+  selection?: ProjectionSelection,
+  metadata?: SessionListMetadata,
+): ProjectionRead {
+  const values = hints === undefined
+    ? undefined
+    : selection === undefined
+      ? hints.values
+      : pickValues(hints.values, selection)
+  return {
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(hints === undefined || values === undefined || Object.keys(values).length === 0
+      ? {}
+      : { projections: { kind: hints.kind, asOfSeq: hints.asOfSeq, values } }),
+  }
+}
+
+function pickValues(values: SessionProjectionValues, selection: ReadonlySet<string>): SessionProjectionValues {
+  const picked: Record<string, SessionProjectionValues[string]> = {}
+  for (const key of selection) {
+    if (Object.hasOwn(values, key)) picked[key] = values[key]
+  }
+  return picked
 }
 
 /**

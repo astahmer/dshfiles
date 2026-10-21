@@ -9,6 +9,9 @@ export interface ThreadSessionActivity {
   readonly title?: string | undefined
 }
 
+/** Projection columns the activity fold reads from the Session list; the rest is paid per row for nothing. */
+export const SESSION_ACTIVITY_PROJECTIONS = ['title', 'userQuestions'] as const
+
 /** One Session that keeps a workspace out of a rebase, with the reason a message can state. */
 export interface ThreadActivityBlocker {
   readonly sessionId: string

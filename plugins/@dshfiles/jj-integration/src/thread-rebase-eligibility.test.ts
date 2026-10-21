@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { SESSION_ACTIVITY_PROJECTIONS, ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 
 describe('thread rebase eligibility', () => {
+  it('asks the Session list only for the columns the activity fold reads', () => {
+    expect([...SESSION_ACTIVITY_PROJECTIONS]).toEqual(['title', 'userQuestions'])
+  })
+
   it('allows a thread with no sessions', () => {
     expect(ThreadRebaseEligibilityModel.canRebase([], () => undefined)).toBe(true)
   })

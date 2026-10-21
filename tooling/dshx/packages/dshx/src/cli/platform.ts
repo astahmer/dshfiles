@@ -745,7 +745,8 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
   try {
     if (args.command === 'sessions') {
       if (action === 'list') {
-        const items = await client.sessions.list()
+        // The table and JSON rows need only Session identity and state: no projection column is read.
+        const items = await client.sessions.list([])
         emitSessionResult({ items }, sessionRows(items))
         return 0
       }

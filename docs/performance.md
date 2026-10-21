@@ -95,10 +95,46 @@ same machine, not the code: the identical call is **0.56–0.79 s** on the reboo
 preview then resolved every Session (`Skipped 43: 35 too-recent, 4 has-work, 4 busy` — no `activity-unknown`), because
 it reads activity in-process with no 3.7 MB payload behind it. A 190x swing follows the load, not the code.
 
-The payload is still worth knowing: 1140 Sessions, 3.7 MB compact (7.3 MB pretty), of which 3.4 MB is projections no
+The payload was worth fixing: 1140 Sessions, 3.7 MB compact (7.3 MB pretty), of which 3.4 MB is projections no
 list consumer needs to fold for every row — `aiAccountsCost` 1.0 MB, `turnOutline` 666 KB, `imageLimits` 224 KB,
-`modelSelection` 145 KB, `sessionStats` 131 KB. `SessionListRequest` has no projection selector, so every caller pays
-for all of them: a per-consumer selector is the next real win here, not a different list algorithm.
+`modelSelection` 145 KB, `sessionStats` 131 KB.
+
+### Projection selector for the Session list (2026-10-21)
+
+`SessionListRequest` now carries an optional `projections` allowlist
+([`@dshfiles/session-controller`](../plugins/@dshfiles/session-controller)). Omitted reads every registered column,
+exactly as before; an empty array asks for no projection block; unknown keys are ignored deliberately, so a client can
+ask a newer Host for a key an older Host does not project. The Host passes the selector into
+`sessionProjections.cachedSnapshot` / `sessionProjectionCache.cachedSnapshot`, which view only the selected rows, so an
+unasked column is never decoded or put in the response. `sessionListMetadata` is still read internally for `blank` and
+`updatedAt`, and a filtered cold read is never memoized in `coldProjections` (only a full read is), so it cannot poison
+a later full read.
+
+Callers ask for what they consume: jj-integration's activity fold requests `title` and `userQuestions`; `dshx sessions
+list` requests no projection columns (its `sessions digest` and search still use the full list); the client catalog
+requests eight columns it reads from list rows — `title`, `sessionListMetadata`, `turnOutline`, `userQuestions`,
+`subagentTiming`, `threadSidebarModelRoute`, `subagent`, `tokenUsage` (the sidebar lineage and the jj panel read the
+last six) — and leaves the rest to the opened Session's baseline. That client set is still broad, and `turnOutline`
+remains its largest cost.
+
+Measured on the same 1184-Session corpus, compact JSON of the response value unless stated. The old Host is the live
+`:3080`; the fork ran on a scratch `:3199` Host cloned from the same `~/.dsh`. The machine was starved throughout
+(`uptime` load average 38–68 on 10 cores, from Chrome, VisualJJ and other agents), so wall times are inflated; the
+payload numbers are the meaningful comparison.
+
+| Read (1184 Sessions)                               | Before (live, load 38.17) | After (fork, load 38–42)                  |
+| -------------------------------------------------- | ------------------------- | ----------------------------------------- |
+| `dshx sessions list --json`, pretty                | 7.80 s, 7 567 023 B       | 12.05 s, 386 975 B                        |
+| same, compact                                      | 3 895 882 B               | 279 447 B                                 |
+| full list, selector omitted (the remaining cost)   | 3 895 882 B               | 3 902 067 B compact, 33.08 s (load 38.50) |
+| selector `[]` (dshx)                               | full list                 | 289 415 B compact, 3.39 s                 |
+| selector `['title','userQuestions']` (jj activity) | full list                 | 482 848 B compact, 2.81 s                 |
+| client catalog's eight columns                     | full list                 | 1 551 500 B compact, 6.74 s               |
+
+The command's payload dropped 92.8% compact (94.9% pretty). The remaining 279 KB is ids, times, flags and `cwd` for
+1184 rows; the client still pays 1.55 MB because `turnOutline` (666 KB), `userQuestions` (62 KB) and `tokenUsage`
+(106 KB) are rendered per row in the sidebar, and jj-integration pays 483 KB for `userQuestions`. Removing those needs
+the sidebar to compute per-row facts from a narrower field, not another list algorithm.
 
 ## Still open
 

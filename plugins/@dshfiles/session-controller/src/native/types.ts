@@ -267,6 +267,13 @@ export interface SkillListValue {
 /** Session list request. */
 export interface SessionListRequest {
   readonly cursor?: string
+  /**
+   * Optional projection keys to include in each row. Omitted reads every
+   * registered projection (the historical response); an empty array reads no
+   * projection columns at all. Unknown keys are ignored deliberately so a
+   * client can ask a newer host for a key an older host does not project.
+   */
+  readonly projections?: readonly string[]
 }
 
 /** Session list response value. */

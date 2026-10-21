@@ -519,6 +519,7 @@ const _deepseek_ai_dsh_api_session_controller_session_initializeDefaultModel_res
 let _deepseek_ai_dsh_api_session_controller_session_list_parameter_0$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_list_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_session_list_parameter_0$schema$value ??= z.object({
   'cursor': z.string().readonly().optional(),
+  'projections': z.array(z.string()).readonly().optional(),
 }))
 let _deepseek_ai_dsh_api_session_controller_session_list_result$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_list_result$schema = () => (_deepseek_ai_dsh_api_session_controller_session_list_result$schema$value ??= z.object({
@@ -1275,6 +1276,7 @@ const _deepseek_ai_dsh_api_session_controller_session_fork_parameter_0_strict$sc
 let _deepseek_ai_dsh_api_session_controller_session_list_parameter_0_strict$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_list_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_list_parameter_0_strict$schema$value ??= z.strictObject({
   'cursor': z.string().readonly().optional(),
+  'projections': z.array(z.string()).readonly().optional(),
 }))
 let _deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0_strict$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0_strict$schema$value ??= z.strictObject({
@@ -1646,13 +1648,13 @@ const $remote = createTypertRemoteInfo({
             mode: 'strict',
             typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionListRequest',
             create: _deepseek_ai_dsh_api_session_controller_session_list_parameter_0$schema,
-            jsonSchema: {"type":"object","properties":{"cursor":{"type":"string"}},"required":[],"additionalProperties":true},
+            jsonSchema: {"type":"object","properties":{"cursor":{"type":"string"},"projections":{"type":"array","items":{"type":"string"}}},"required":[],"additionalProperties":true},
           },
           strictCodec: {
             mode: 'strict',
             typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionListRequest',
             create: _deepseek_ai_dsh_api_session_controller_session_list_parameter_0_strict$schema,
-            jsonSchema: {"type":"object","properties":{"cursor":{"type":"string"}},"required":[],"additionalProperties":false},
+            jsonSchema: {"type":"object","properties":{"cursor":{"type":"string"},"projections":{"type":"array","items":{"type":"string"}}},"required":[],"additionalProperties":false},
           },
         },
       ],

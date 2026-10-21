@@ -5,7 +5,20 @@ const sessionRequest = <Schema extends z.ZodType>(schema: Schema) => z.object({ 
 const sessionAddressSchema = z.object({ kind: z.literal('session'), sessionId: sessionIdSchema }).strict()
 
 export const nativeRpcRequestSchema = z.union([
-  z.object({ namespace: z.literal('session'), method: z.literal('list'), args: z.object({ _request: z.object({}).strict().optional() }).strict() }).strict(),
+  z
+    .object({
+      namespace: z.literal('session'),
+      method: z.literal('list'),
+      args: z
+        .object({
+          _request: z
+            .object({ projections: z.array(z.string()).optional() })
+            .strict()
+            .optional(),
+        })
+        .strict(),
+    })
+    .strict(),
   z.object({ namespace: z.literal('session'), method: z.literal('search'), args: sessionRequest(z.object({ query: z.string().max(4000) }).strict()) }).strict(),
   z
     .object({

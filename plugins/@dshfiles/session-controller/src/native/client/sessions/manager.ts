@@ -32,6 +32,38 @@ function sessionSeqCursor(value: number): SessionSeqCursor {
 }
 
 /**
+ * Projection columns the list surface itself consumes: `title` and
+ * `sessionListMetadata` build each row, while the sidebar's lineage and the jj
+ * panel read turn outlines, questions, subagent facts and token totals from
+ * `projectionValues`. Everything else (cost estimates, image limits, model
+ * selection, todos, goal, inbox) is read from the opened Session's baseline.
+ */
+const LIST_PROJECTIONS = [
+  'title',
+  'sessionListMetadata',
+  'turnOutline',
+  'userQuestions',
+  'subagentTiming',
+  'threadSidebarModelRoute',
+  'subagent',
+  'tokenUsage',
+] as const
+
+/**
+ * The generated Remote client type still describes the native list request.
+ * The fork's Host accepts the selector, so this boundary adapter widens only
+ * that one call.
+ */
+const listSessions = (
+  remote: SessionRemotes['session'],
+  projections?: readonly string[],
+): ReturnType<SessionRemotes['session']['list']> =>
+  // SAFETY: the Host descriptor accepts the optional selector after this fork's typert patch.
+  (remote.list as unknown as (request: { readonly projections?: readonly string[] }) => ReturnType<SessionRemotes['session']['list']>)(
+    projections === undefined ? {} : { projections },
+  )
+
+/**
  * List arrival lifecycle, orthogonal to the pull-activity `state` axis:
  * `pending` (no successful pull yet — an empty items array means "nothing
  * arrived", not "nothing exists") → `ready` (at least one pull landed).
@@ -420,7 +452,9 @@ export class SessionManager {
     this.notifier.markDirty()
     this.listInflight = (async () => {
       try {
-        const result = await this.remote.session.list({})
+        let result = await listSessions(this.remote.session, LIST_PROJECTIONS)
+        // A Host older than this fork rejects the unknown field; retry the historical full read.
+        if (!result.ok) result = await listSessions(this.remote.session)
         if (this.listMutations !== mutations) return
         if (result.ok) {
           const baseline: SessionSummary[] = this.listPhase === 'pending'

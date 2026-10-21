@@ -42,7 +42,12 @@ import {
   mayAutoIntegrateWorkspace,
   type JjIntegrationSettings,
 } from './settings.js'
-import { ThreadRebaseEligibilityModel, type ThreadActivityBlocker, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import {
+  SESSION_ACTIVITY_PROJECTIONS,
+  ThreadRebaseEligibilityModel,
+  type ThreadActivityBlocker,
+  type ThreadSessionActivity,
+} from './thread-rebase-eligibility.js'
 import { createSessionActivityCache } from './session-activity-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
 import { IntegrationAttribution } from './integration-attribution.js'
@@ -226,7 +231,7 @@ const readSessionActivity = (budgetMs: number): Promise<ReadonlyMap<string, Thre
   const controller = requireContext().get('sessionController')
   if (controller === undefined) return Promise.resolve(undefined)
   return controller
-    .list({}, AbortSignal.timeout(budgetMs))
+    .list({ projections: SESSION_ACTIVITY_PROJECTIONS }, AbortSignal.timeout(budgetMs))
     .then(result => {
       const activity = new Map<string, ThreadSessionActivity>()
       for (const item of result.items) {
@@ -1291,7 +1296,7 @@ const rebaseCommand = defineCommand({
     if (hostContext === undefined) return { kind: 'error', text: 'jj-integration is not active.' }
     const controller = hostContext.get('sessionController')
     if (controller === undefined) return { kind: 'error', text: 'The Session controller is unavailable.' }
-    const sessions = await controller.list({}, invocation.signal)
+    const sessions = await controller.list({ projections: [] }, invocation.signal)
     const path = sessions.items.find(session => session.sessionId === invocation.agent.id)?.cwd
     if (path === undefined || path.length === 0) return { kind: 'error', text: 'This Session has no working directory; there is nothing to rebase.' }
     const location = await requireThreads().locate(path)

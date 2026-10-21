@@ -24,6 +24,7 @@
     "src/native/types.ts",
     "src/native/client/sessions/session.ts",
     "src/native/client/index.ts",
-    "src/native/list.ts"
+    "src/native/list.ts",
+    "src/native/client/sessions/manager.ts"
   ]
 }
