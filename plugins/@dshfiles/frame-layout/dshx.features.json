@@ -24,12 +24,12 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "workbench.global-dock",
+          "id": "frame-layout.global-dock",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
           "kind": "gherkin",
-          "id": "workbench.bottom-panel",
+          "id": "frame-layout.bottom-panel",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
