@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { receiptExecutorSchema, receiptRemoteFailureSchema } from './api.js'
 import type { StoredReceipt } from './store.js'
 
 const revisionSchema = z
@@ -17,7 +18,9 @@ export const projectChecksActivitySummarySchema = z
       .max(80)
       .regex(/^[^\p{Cc}]+$/u),
     status: z.enum(['passed', 'failed', 'cancelled', 'timed-out']),
-    failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed']).nullable(),
+    failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']).nullable(),
+    executor: receiptExecutorSchema.optional(),
+    remoteFailure: receiptRemoteFailureSchema.nullable().optional(),
     startedAt: z.number().int().nonnegative(),
     finishedAt: z.number().int().nonnegative(),
     durationMs: z.number().int().nonnegative(),
@@ -40,33 +43,33 @@ export const projectChecksActivityEventSchema = z
 
 export type ProjectChecksActivityEvent = z.infer<typeof projectChecksActivityEventSchema>
 
-const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent =>
-  projectChecksActivityEventSchema.parse({
-    kind: 'verification-receipt',
-    version: 1,
-    value: {
-      receiptId: receipt.id,
-      sessionId: receipt.sessionId,
-      actionId: receipt.actionId,
-      label:
-        receipt.label
-          .replace(/\p{Cc}/gu, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 80) || receipt.actionId,
-      status: receipt.status,
-      failure: receipt.failure,
-      startedAt: receipt.startedAt,
-      finishedAt: receipt.finishedAt,
-      durationMs: receipt.durationMs,
-      exitCode: receipt.exitCode,
-      automatic: receipt.automatic,
-      verificationTurn: receipt.verificationTurn,
-      attempt: receipt.attempt,
-      sourceRevisionBefore: receipt.sourceRevisionBefore ?? null,
-      sourceRevisionAfter: receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter,
-    },
-  })
+const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent => {
+  const summary: z.infer<typeof projectChecksActivitySummarySchema> = {
+    receiptId: receipt.id,
+    sessionId: receipt.sessionId,
+    actionId: receipt.actionId,
+    label:
+      receipt.label
+        .replace(/\p{Cc}/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80) || receipt.actionId,
+    status: receipt.status,
+    failure: receipt.failure,
+    startedAt: receipt.startedAt,
+    finishedAt: receipt.finishedAt,
+    durationMs: receipt.durationMs,
+    exitCode: receipt.exitCode,
+    automatic: receipt.automatic,
+    verificationTurn: receipt.verificationTurn,
+    attempt: receipt.attempt,
+    sourceRevisionBefore: receipt.sourceRevisionBefore ?? null,
+    sourceRevisionAfter: receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter,
+  }
+  if (receipt.executor !== undefined) summary.executor = receipt.executor
+  if (receipt.remoteFailure !== undefined) summary.remoteFailure = receipt.remoteFailure
+  return projectChecksActivityEventSchema.parse({ kind: 'verification-receipt', version: 1, value: summary })
+}
 
 const emitProjectChecksActivity = (receipt: StoredReceipt, emit: (event: ProjectChecksActivityEvent) => void): void => {
   try {

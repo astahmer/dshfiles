@@ -68,18 +68,130 @@
           "defaultValue": "2",
           "constraints": "Integer from 1 to 2 attempts.",
           "coveredBy": ["project-checks.verify-retry"]
+        },
+        {
+          "key": "actions[].execution.target",
+          "defaultValue": "local",
+          "constraints": "One of local, remote, or auto (least busy eligible endpoint).",
+          "choices": ["local", "remote", "auto"],
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "actions[].execution.remote",
+          "defaultValue": "unset",
+          "constraints": "Optional id of a configured remote; unknown ids are rejected.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "actions[].execution.onRemoteFailure",
+          "defaultValue": "local",
+          "constraints": "One of local (run here and record why) or fail.",
+          "choices": ["local", "fail"],
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes",
+          "defaultValue": "[]",
+          "constraints": "At most 8 uniquely named peer hosts.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].id",
+          "defaultValue": "required",
+          "constraints": "Lowercase letters, digits or hyphens, 1 to 32 characters, unique.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].sshTarget",
+          "defaultValue": "required",
+          "constraints": "An ssh destination such as user@host; other characters are rejected.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].gitRemote",
+          "defaultValue": "required",
+          "constraints": "Name of the local jj remote pointing at the peer snapshot repository.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].peerRemote",
+          "defaultValue": "origin",
+          "constraints": "Name of the peer repository remote pointing back at the snapshot repository.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].workspace",
+          "defaultValue": "required",
+          "constraints": "Absolute peer checker workspace path.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].toolchain",
+          "defaultValue": "[]",
+          "constraints": "At most 8 argv words prefixed to action and install commands, e.g. mise exec node@22.23.3 --.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].install.command",
+          "defaultValue": "unset",
+          "constraints": "At most 16 argv words; the peer runs it before the action when a tracked path changed.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].install.whenPaths",
+          "defaultValue": "[\"pnpm-lock.yaml\",\"pnpm-workspace.yaml\"]",
+          "constraints": "At most 16 repository-relative paths compared between peer checkouts.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].install.timeoutMs",
+          "defaultValue": "300000",
+          "constraints": "Integer from 1000 to 900000 milliseconds.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].priority",
+          "defaultValue": "1",
+          "constraints": "Integer from 1 to 99; lower runs first.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "remotes[].enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; disabled remotes are skipped.",
+          "choices": ["true", "false"],
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "load.localMemoryFloorMb",
+          "defaultValue": "4096",
+          "constraints": "Free-memory floor in MiB for the laptop to join auto execution.",
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "load.remoteCooldownMs",
+          "defaultValue": "60000",
+          "constraints": "Integer from 1000 to 600000 milliseconds; skips a peer that just failed.",
+          "coveredBy": ["project-checks.trusted-root"]
         }
       ],
       "states": ["ready", "running", "passed", "failed", "timed-out", "cancelled", "stale-revision"],
       "failureModes": [
         "A sibling or traversal path is rejected before spawn.",
-        "Subprocess timeout, cancellation, or storage failure yields a bounded failure receipt."
+        "Subprocess timeout, cancellation, or storage failure yields a bounded failure receipt.",
+        "A peer that cannot publish, check out, install or run falls back to local execution unless the policy asks for failure.",
+        "A peer revision that differs from the local working copy is reported, never trusted."
       ],
       "externalDependencies": [
         {
           "id": "project-process",
           "boundary": "Host-managed child process execution within the configured root.",
           "deterministicFake": "Use a fake subprocess provider with a temporary project root and harmless argv; never run commands in a user project."
+        },
+        {
+          "id": "peer-ssh-transport",
+          "boundary": "Outbound ssh to a configured peer host that runs the same profile-trusted action on an exact snapshot.",
+          "deterministicFake": "Run the same protocol against a temporary local bare git repository, jj repositories and a local shell runner; ssh command construction is asserted separately."
         }
       ],
       "verification": [
@@ -127,6 +239,24 @@
           "id": "project-checks.trusted-actions-unit-completion-feedback",
           "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
           "testName": "bounds completion feedback and names the attempt limit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-execution-policy",
+          "file": "plugins/@dshfiles/project-checks/src/execution.test.ts",
+          "testName": "balances auto work onto the least busy endpoint and prefers a peer on a tie"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-peer-protocol",
+          "file": "plugins/@dshfiles/project-checks/src/remote.test.ts",
+          "testName": "pushes one named snapshot, materializes it and runs the action there"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-peer-install",
+          "file": "plugins/@dshfiles/project-checks/src/remote.test.ts",
+          "testName": "installs on the first run and whenever the tracked paths changed"
         }
       ]
     },

@@ -115,8 +115,24 @@ const revisionEvidenceLabel = (receipt: ProjectCheckReceipt): string => {
   return `Recorded revisions · before ${before} · after ${after}`
 }
 
-const executionModeLabel = (receipt: ProjectCheckReceipt): string =>
-  receipt.automatic ? `Automatic · attempt ${receipt.attempt} · turn ${receipt.verificationTurn ?? 'unknown'}` : 'Manual'
+const executorLabel = (receipt: ProjectCheckReceipt): string => {
+  const executor = receipt.executor
+  if (executor === undefined) return 'Executor not recorded'
+  return executor.kind === 'local' ? 'Local' : `Remote · ${executor.remoteId}`
+}
+
+const executionModeLabel = (receipt: ProjectCheckReceipt): string => {
+  const mode = receipt.automatic ? `Automatic · attempt ${receipt.attempt} · turn ${receipt.verificationTurn ?? 'unknown'}` : 'Manual'
+  return `${mode} · ${executorLabel(receipt)}`
+}
+
+const remoteFallbackLabel = (receipt: ProjectCheckReceipt): string => {
+  if (receipt.remoteFailure == null) return ''
+  const detail = `${receipt.remoteFailure.remoteId} (${receipt.remoteFailure.code}): ${receipt.remoteFailure.message}`
+  return receipt.failure === 'remote-failed' || receipt.failure === 'remote-unavailable'
+    ? `Remote execution failed — ${detail}`
+    : `Ran locally after — ${detail}`
+}
 
 function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel: SessionPanel }): JSX.Element | null {
   const api = useApi(projectChecksApi)
@@ -248,6 +264,9 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
                 <ItemDescription className={receipt.freshness === 'stale' ? 'dshx:text-xs dshx:text-warning' : 'dshx:text-xs'}>
                   {freshnessLabel(receipt)}
                 </ItemDescription>
+                {receipt.remoteFailure != null ? (
+                  <ItemDescription className="dshx:text-xs dshx:text-warning">{remoteFallbackLabel(receipt)}</ItemDescription>
+                ) : null}
                 {receipt.failure !== null ? (
                   <ItemDescription className="dshx:text-xs dshx:text-destructive">Runner state: {receipt.failure}</ItemDescription>
                 ) : null}

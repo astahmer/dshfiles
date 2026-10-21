@@ -26,6 +26,8 @@ Actions belong in the profile's `cordis.patch.yml`, never in project-controlled 
         timeoutMs: 120000
 ```
 
+An action also accepts an `execution` policy: `target` `local` (default), `remote` or `auto`, an optional `remote` pin, and `onRemoteFailure` `local` (run it on this machine and record why) or `fail`. A peer is configured once with a bare snapshot repository, a checker workspace, a toolchain prefix and an install command; the run then publishes the working-copy revision, materializes it there, runs the action, and verifies the peer stayed on that exact revision. See [remote project checks](../../../docs/remote-project-checks.md) for the config reference, peer setup and failure codes.
+
 The process uses direct argv, the session directory as `cwd`, and DSH's scrubbed child environment. It does not evaluate shell text, read repository command config, forward credentials, or display raw command output. A session must resolve inside the configured root. One-shot actions have a 1–300 second timeout. Long-running development servers remain in DSH's owner-scoped terminal.
 
 Actions marked `verifyBeforeComplete` run at the native awaited `agent/turn-stopping` event. Failed checks steer the same turn once, then the configured attempt limit (maximum two) stops that turn with a failure. Cancellation aborts and cleans up the subprocess. Receipts record before/after working-copy revisions when available; old receipts remain readable. Current source freshness is recalculated from the working copy when the Project Checks API is queried. Configuration equivalence is always `unknown`: no command/argument fingerprint is persisted.

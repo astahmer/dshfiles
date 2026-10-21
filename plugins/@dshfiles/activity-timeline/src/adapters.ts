@@ -219,7 +219,9 @@ export class ActivityTimelineAdapters {
 
 export const verificationReceiptActivity = (receipt: VerificationReceiptSummary): ActivityIngest => {
   const statusLabel = receipt.status === 'timed-out' ? 'timed out' : receipt.status
-  const modeLabel = receipt.automatic ? `automatic · attempt ${receipt.attempt} · verification turn ${receipt.verificationTurn ?? 'unknown'}` : 'manual'
+  const executorLabel =
+    receipt.executor === undefined ? 'executor unknown' : receipt.executor.kind === 'local' ? 'local' : `remote ${receipt.executor.remoteId}`
+  const modeLabel = `${receipt.automatic ? `automatic · attempt ${receipt.attempt} · verification turn ${receipt.verificationTurn ?? 'unknown'}` : 'manual'} · ${executorLabel}`
   const revisionLabel = (revision: string | null): string => (revision === null ? 'unavailable' : revision)
   const level: ActivityLevel =
     receipt.status === 'failed' || receipt.status === 'timed-out' ? 'attention' : receipt.status === 'cancelled' ? 'notable' : 'routine'
@@ -233,12 +235,14 @@ export const verificationReceiptActivity = (receipt: VerificationReceiptSummary)
     sessionId: receipt.sessionId,
     correlationId: receipt.receiptId,
     summary: `${receipt.label} ${statusLabel} · ${modeLabel} · ${receipt.durationMs} ms`,
-    detail: `Recorded source revision before ${revisionLabel(receipt.sourceRevisionBefore)} and after ${revisionLabel(receipt.sourceRevisionAfter)}. Current source freshness is not asserted here; action-configuration equivalence is unknown. This bounded Project Checks receipt may have expired, so this Activity item is only a historical summary. Open the Session and Project Checks for current freshness.`,
+    detail: `${receipt.remoteFailure == null ? '' : `Remote ${receipt.remoteFailure.remoteId} could not run this check (${receipt.remoteFailure.code}: ${receipt.remoteFailure.message})${receipt.failure === 'remote-failed' || receipt.failure === 'remote-unavailable' ? '.' : ', so it ran locally.'} `}Recorded source revision before ${revisionLabel(receipt.sourceRevisionBefore)} and after ${revisionLabel(receipt.sourceRevisionAfter)}. Current source freshness is not asserted here; action-configuration equivalence is unknown. This bounded Project Checks receipt may have expired, so this Activity item is only a historical summary. Open the Session and Project Checks for current freshness.`,
     metadata: {
       receiptId: receipt.receiptId,
       actionId: receipt.actionId,
       status: receipt.status,
       failure: receipt.failure,
+      executor: receipt.executor === undefined ? null : receipt.executor.kind === 'local' ? 'local' : `remote:${receipt.executor.remoteId}`,
+      remoteFallback: receipt.remoteFailure == null ? null : `${receipt.remoteFailure.remoteId}:${receipt.remoteFailure.code}`,
       startedAt: receipt.startedAt,
       finishedAt: receipt.finishedAt,
       durationMs: receipt.durationMs,

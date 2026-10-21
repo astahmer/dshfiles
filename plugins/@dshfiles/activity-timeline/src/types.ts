@@ -16,7 +16,29 @@ export const verificationReceiptSummarySchema = z
       .max(80)
       .regex(/^[^\p{Cc}]+$/u),
     status: z.enum(['passed', 'failed', 'cancelled', 'timed-out']),
-    failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed']).nullable(),
+    failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']).nullable(),
+    executor: z
+      .discriminatedUnion('kind', [
+        z.object({ kind: z.literal('local') }).strict(),
+        z
+          .object({
+            kind: z.literal('remote'),
+            remoteId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
+            sshTarget: z.string().max(255),
+            workspace: z.string().max(2048),
+          })
+          .strict(),
+      ])
+      .optional(),
+    remoteFailure: z
+      .object({
+        remoteId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
+        code: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+        message: z.string().max(240),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     startedAt: z.number().int().nonnegative(),
     finishedAt: z.number().int().nonnegative(),
     durationMs: z.number().int().nonnegative(),

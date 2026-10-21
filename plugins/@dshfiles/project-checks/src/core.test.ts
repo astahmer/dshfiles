@@ -100,4 +100,55 @@ describe('trusted project actions', () => {
     expect(prompt).toContain('Attempt 2 of 2')
     expect(prompt).not.toContain('check-9')
   })
+
+  describe('peer execution configuration', () => {
+    const action = { id: 'test', label: 'Test', command: 'pnpm', args: ['test'], root: '/work/project' }
+    const remote = {
+      id: 'm1',
+      sshTarget: 'm1-perso',
+      gitRemote: 'm1',
+      workspace: '/Users/peer/dev/project-check',
+    }
+
+    it('defaults every action to local execution and keeps the load floor', () => {
+      const config = projectChecksConfigSchema.parse({ actions: [action] })
+      expect(config.actions[0]?.execution).toEqual({ target: 'local', onRemoteFailure: 'local' })
+      expect(config.remotes).toEqual([])
+      expect(config.load).toEqual({ localMemoryFloorMb: 4_096, remoteCooldownMs: 60_000 })
+      expect(projectChecksConfigSchema.parse({ remotes: [remote] }).remotes[0]?.peerRemote).toBe('origin')
+    })
+
+    it('rejects duplicate remote ids, relative workspaces and unknown remote references', () => {
+      expect(projectChecksConfigSchema.safeParse({ remotes: [remote, remote] }).success).toBe(false)
+      expect(projectChecksConfigSchema.safeParse({ remotes: [{ ...remote, workspace: 'relative/path' }] }).success).toBe(false)
+      expect(projectChecksConfigSchema.safeParse({ remotes: [{ ...remote, sshTarget: '-o ProxyCommand=evil' }] }).success).toBe(false)
+      expect(
+        projectChecksConfigSchema.safeParse({
+          actions: [{ ...action, execution: { target: 'remote', remote: 'missing' } }],
+          remotes: [remote],
+        }).success,
+      ).toBe(false)
+    })
+
+    it('requires an enabled remote for a hard remote target but allows auto without one', () => {
+      expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'remote' } }] }).success).toBe(false)
+      expect(
+        projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] }).success,
+      ).toBe(false)
+      expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [remote] }).success).toBe(true)
+      expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, execution: { target: 'auto' } }] }).success).toBe(true)
+    })
+
+    it('keeps install detection configurable per remote', () => {
+      const parsed = projectChecksConfigSchema.parse({
+        remotes: [{ ...remote, install: { command: ['pnpm', 'install', '--frozen-lockfile'] } }],
+      })
+      expect(parsed.remotes[0]?.install).toEqual({
+        command: ['pnpm', 'install', '--frozen-lockfile'],
+        whenPaths: ['pnpm-lock.yaml', 'pnpm-workspace.yaml'],
+        timeoutMs: 300_000,
+      })
+      expect(projectChecksConfigSchema.safeParse({ remotes: [{ ...remote, install: { command: [] } }] }).success).toBe(false)
+    })
+  })
 })

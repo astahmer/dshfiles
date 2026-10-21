@@ -16,8 +16,10 @@ import { isAbsolute, normalize } from 'node:path'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
-import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction } from './core.js'
+import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type RemoteHost } from './core.js'
+import { ExecutionModel, LOCAL_ENDPOINT_KEY, type RemoteEndpointState } from './execution.js'
 import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './receipt-activity.js'
+import { PeerSnapshotModel, type PeerFailureCode, type StepResult } from './remote.js'
 import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, type StoredReceipt } from './store.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -69,6 +71,7 @@ const reportApiFailure = (operation: ApiDiagnosticOperation, diagnosticId: strin
 interface ProcessResult {
   readonly exitCode: number | null
   readonly stdout: string
+  readonly stderr: string
   readonly failure: ProcessFailure | null
 }
 
@@ -221,9 +224,9 @@ const runManaged = async (
   if (signal?.aborted === true) abortFromCaller()
 
   try {
-    if (controller.signal.aborted) return { exitCode: null, stdout: '', failure: 'cancelled' }
+    if (controller.signal.aborted) return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
     const executable = await ctx.subprocess.resolveExecutable(command, undefined, controller.signal)
-    if (!isAbsolute(executable) || executable.includes('\0')) return { exitCode: null, stdout: '', failure: 'spawn-failed' }
+    if (!isAbsolute(executable) || executable.includes('\0')) return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
 
     handle = ctx.subprocess.spawn({
       argv: [executable, ...args],
@@ -239,23 +242,24 @@ const runManaged = async (
     const outcome = await handle.done
     if (controller.signal.aborted) {
       handle.terminate()
-      if (timedOut) return { exitCode: null, stdout: '', failure: 'timed-out' }
-      return { exitCode: null, stdout: '', failure: 'cancelled' }
+      if (timedOut) return { exitCode: null, stdout: '', stderr: '', failure: 'timed-out' }
+      return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
     }
 
     managedExit = await waitForManagedExit({ handle, timeoutMs, signal: controller.signal })
     if (!managedExit) {
       handle.terminate()
-      return { exitCode: outcome.exitCode, stdout: '', failure: 'process-group-failed' }
+      return { exitCode: outcome.exitCode, stdout: '', stderr: '', failure: 'process-group-failed' }
     }
 
     const stdout = handle.collected.stdout?.readFrom(0)
-    return { exitCode: outcome.exitCode, stdout: stdout?.text ?? '', failure: null }
+    const stderr = handle.collected.stderr?.readFrom(0)
+    return { exitCode: outcome.exitCode, stdout: stdout?.text ?? '', stderr: stderr?.text ?? '', failure: null }
   } catch {
     if (controller.signal.aborted) {
-      return { exitCode: null, stdout: '', failure: timedOut ? 'timed-out' : 'cancelled' }
+      return { exitCode: null, stdout: '', stderr: '', failure: timedOut ? 'timed-out' : 'cancelled' }
     }
-    return { exitCode: null, stdout: '', failure: 'spawn-failed' }
+    return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
   } finally {
     clearTimeout(timeout)
     signal?.removeEventListener('abort', abortFromCaller)
@@ -266,11 +270,147 @@ const runManaged = async (
   }
 }
 
+/** Free plus reclaimable memory: the signal that says the laptop has headroom to join `auto`. */
+const availableMemoryMb = (): number => Math.floor(process.availableMemory() / 1_048_576)
+
 const sourceRevision = async (ctx: Context, cwd: string, signal?: AbortSignal): Promise<string | null> => {
   const result = await runManaged(ctx, 'jj', ['log', '--no-graph', '-r', '@', '--template', 'commit_id'], cwd, REVISION_TIMEOUT_MS, signal)
   if (result.failure !== null || result.exitCode !== 0) return null
   const revision = result.stdout.trim()
   return REVISION_PATTERN.test(revision) ? revision : null
+}
+
+const sourceChangeId = async (ctx: Context, cwd: string, signal?: AbortSignal): Promise<string | null> => {
+  const result = await runManaged(ctx, 'jj', ['log', '--no-graph', '-r', '@', '--template', 'change_id'], cwd, REVISION_TIMEOUT_MS, signal)
+  if (result.failure !== null || result.exitCode !== 0) return null
+  return PeerSnapshotModel.changeId(result.stdout)
+}
+
+interface EndpointBudget {
+  readonly inFlight: number
+  readonly coolingDownUntil: number
+}
+
+const endpointBudgets = new WeakMap<Context, Map<string, EndpointBudget>>()
+
+const budgetsFor = (ctx: Context): Map<string, EndpointBudget> => {
+  const existing = endpointBudgets.get(ctx)
+  if (existing !== undefined) return existing
+  const budgets = new Map<string, EndpointBudget>()
+  endpointBudgets.set(ctx, budgets)
+  return budgets
+}
+
+const budgetSnapshot = (ctx: Context): ReadonlyMap<string, RemoteEndpointState> => new Map(budgetsFor(ctx))
+
+const withEndpoint = async <Result>(ctx: Context, key: string, work: () => Promise<Result>): Promise<Result> => {
+  const budgets = budgetsFor(ctx)
+  const current = budgets.get(key) ?? { inFlight: 0, coolingDownUntil: 0 }
+  budgets.set(key, { coolingDownUntil: current.coolingDownUntil, inFlight: current.inFlight + 1 })
+  try {
+    return await work()
+  } finally {
+    const settled = budgets.get(key) ?? { inFlight: 1, coolingDownUntil: 0 }
+    budgets.set(key, { coolingDownUntil: settled.coolingDownUntil, inFlight: Math.max(0, settled.inFlight - 1) })
+  }
+}
+
+const coolDownEndpoint = (ctx: Context, key: string, durationMs: number): void => {
+  const budgets = budgetsFor(ctx)
+  const current = budgets.get(key) ?? { inFlight: 0, coolingDownUntil: 0 }
+  budgets.set(key, { coolingDownUntil: Date.now() + durationMs, inFlight: current.inFlight })
+}
+
+const toStepResult = (result: ProcessResult): StepResult => ({
+  code: result.exitCode,
+  stdout: result.stdout,
+  stderr: result.stderr,
+  failure: result.failure === 'cancelled' ? 'cancelled' : result.failure === 'timed-out' ? 'timed-out' : result.failure === null ? null : 'spawn-failed',
+})
+
+const localGitRunner =
+  (ctx: Context, cwd: string, signal: AbortSignal | undefined) =>
+  async ({ args, timeoutMs }: { readonly args: readonly string[]; readonly timeoutMs: number }): Promise<StepResult> =>
+    toStepResult(await runManaged(ctx, 'jj', args, cwd, timeoutMs, signal))
+
+const peerShellRunner =
+  (ctx: Context, sshTarget: string, cwd: string, signal: AbortSignal | undefined) =>
+  async ({ command, timeoutMs }: { readonly command: string; readonly timeoutMs: number }): Promise<StepResult> =>
+    toStepResult(await runManaged(ctx, 'ssh', [...PeerSnapshotModel.sshOptions, sshTarget, command], cwd, timeoutMs, signal))
+
+interface AttemptRun {
+  readonly status: StoredReceipt['status']
+  readonly failure: StoredReceipt['failure']
+  readonly exitCode: number | null
+  readonly executor: NonNullable<StoredReceipt['executor']>
+  readonly remoteFailure: StoredReceipt['remoteFailure']
+}
+
+const runLocalAction = async ({
+  ctx,
+  action,
+  cwd,
+  signal,
+}: {
+  readonly ctx: Context
+  readonly action: ProjectAction
+  readonly cwd: string
+  readonly signal: AbortSignal | undefined
+}): Promise<AttemptRun> => {
+  const result = await runManaged(ctx, action.command, action.args, cwd, action.timeoutMs, signal)
+  return {
+    status: result.failure === 'cancelled' ? 'cancelled' : result.failure === 'timed-out' ? 'timed-out' : result.exitCode === 0 ? 'passed' : 'failed',
+    failure: result.failure === 'process-group-failed' ? 'process-group-failed' : result.failure === 'spawn-failed' ? 'spawn-failed' : null,
+    exitCode: result.exitCode,
+    executor: { kind: 'local' },
+    remoteFailure: null,
+  }
+}
+
+const remoteExecutor = (remote: RemoteHost): NonNullable<StoredReceipt['executor']> => ({
+  kind: 'remote',
+  remoteId: remote.id,
+  sshTarget: remote.sshTarget,
+  workspace: remote.workspace,
+})
+
+const runRemoteAttempt = async ({
+  ctx,
+  remote,
+  action,
+  paths,
+  revision,
+  signal,
+}: {
+  readonly ctx: Context
+  readonly remote: RemoteHost
+  readonly action: ProjectAction
+  readonly paths: ProjectPaths
+  readonly revision: string
+  readonly signal: AbortSignal | undefined
+}): Promise<{ readonly ok: true; readonly run: AttemptRun } | { readonly ok: false; readonly code: PeerFailureCode; readonly message: string }> => {
+  const changeId = await sourceChangeId(ctx, paths.cwd, signal)
+  if (changeId === null) return { ok: false, code: 'peer-snapshot-unavailable', message: 'The working-copy change id is unavailable.' }
+  const outcome = await PeerSnapshotModel.run({
+    remote,
+    revision,
+    changeId,
+    action: { command: action.command, args: action.args, timeoutMs: action.timeoutMs },
+    signal,
+    runLocalGit: localGitRunner(ctx, paths.cwd, signal),
+    runPeerShell: peerShellRunner(ctx, remote.sshTarget, paths.cwd, signal),
+  })
+  if (!outcome.ok) return outcome
+  return {
+    ok: true,
+    run: {
+      status: outcome.exitCode === 0 ? 'passed' : 'failed',
+      failure: null,
+      exitCode: outcome.exitCode,
+      executor: remoteExecutor(remote),
+      remoteFailure: null,
+    },
+  }
 }
 
 const runAction = async (ctx: Context, sessionId: string, action: ProjectAction, options: ReceiptOptions): Promise<StoredReceipt> => {
@@ -285,6 +425,8 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
     let failure: StoredReceipt['failure'] = null
     let exitCode: number | null = null
     let afterRevision: string | null = beforeRevision
+    let executor: NonNullable<StoredReceipt['executor']> | undefined
+    let remoteFailure: StoredReceipt['remoteFailure'] = null
 
     if (options.requireRevision && beforeRevision === null) {
       failure = 'revision-unavailable'
@@ -292,13 +434,64 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       failure = 'source-changed'
     } else {
       stage = 'run-command'
-      const result = await runManaged(ctx, action.command, action.args, paths.cwd, action.timeoutMs, options.signal)
-      exitCode = result.exitCode
-      if (result.failure === 'cancelled') status = 'cancelled'
-      else if (result.failure === 'timed-out') status = 'timed-out'
-      else if (result.failure === 'process-group-failed') failure = 'process-group-failed'
-      else if (result.failure === 'spawn-failed') failure = 'spawn-failed'
-      else status = result.exitCode === 0 ? 'passed' : 'failed'
+      const config = configFor(ctx)
+      const choice = ExecutionModel.choose({
+        policy: action.execution,
+        remotes: config.remotes,
+        localMemoryFloorMb: config.load.localMemoryFloorMb,
+        freeMemoryMb: availableMemoryMb(),
+        now: Date.now(),
+        states: budgetSnapshot(ctx),
+      })
+      const remote = choice.endpoint.kind === 'remote' && beforeRevision !== null ? choice.endpoint.remote : undefined
+
+      if (remote !== undefined && beforeRevision !== null) {
+        const outcome = await withEndpoint(ctx, remote.id, () =>
+          runRemoteAttempt({ ctx, remote, action, paths, revision: beforeRevision, signal: options.signal }),
+        )
+        if (outcome.ok) {
+          status = outcome.run.status
+          failure = outcome.run.failure
+          exitCode = outcome.run.exitCode
+          executor = outcome.run.executor
+        } else {
+          const plan = ExecutionModel.planRemoteFailure({
+            policy: action.execution,
+            remoteId: remote.id,
+            code: outcome.code,
+            message: outcome.message,
+          })
+          if (plan.decision !== 'cancelled') coolDownEndpoint(ctx, remote.id, config.load.remoteCooldownMs)
+          remoteFailure = plan.remoteFailure
+          if (plan.decision === 'cancelled') {
+            status = 'cancelled'
+          } else if (plan.decision === 'fail') {
+            status = 'failed'
+            failure = plan.failure
+            executor = remoteExecutor(remote)
+          } else {
+            const local = await withEndpoint(ctx, LOCAL_ENDPOINT_KEY, () => runLocalAction({ ctx, action, cwd: paths.cwd, signal: options.signal }))
+            status = local.status
+            failure = local.failure
+            exitCode = local.exitCode
+            executor = local.executor
+          }
+        }
+      } else if (choice.reason === 'remote-unavailable' && action.execution.onRemoteFailure === 'fail') {
+        status = 'failed'
+        failure = 'remote-unavailable'
+        remoteFailure = {
+          remoteId: action.execution.remote ?? 'remote',
+          code: 'peer-unavailable',
+          message: 'No configured remote can run this action.',
+        }
+      } else {
+        const local = await withEndpoint(ctx, LOCAL_ENDPOINT_KEY, () => runLocalAction({ ctx, action, cwd: paths.cwd, signal: options.signal }))
+        status = local.status
+        failure = local.failure
+        exitCode = local.exitCode
+        executor = local.executor
+      }
 
       stage = 'capture-source-revision-after'
       afterRevision = await sourceRevision(ctx, paths.cwd, options.signal)
@@ -327,6 +520,8 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       automatic: options.automatic,
       attempt: options.attempt,
     }
+    if (executor !== undefined) receipt.executor = executor
+    if (remoteFailure !== null) receipt.remoteFailure = remoteFailure
     if (options.verificationStage !== undefined) receipt.verificationStage = options.verificationStage
     stage = 'persist-receipt'
     await ProjectChecksActivityModel.persistAndEmit({
@@ -429,7 +624,14 @@ const verifyRebasedCandidate = async (ctx: Context, input: CandidateVerification
 
 const apiActions = async (ctx: Context, sessionId: string) => {
   const config = configFor(ctx)
-  const visible: Array<{ id: string; label: string; description: string; timeoutMs: number; verifyBeforeComplete: boolean }> = []
+  const visible: Array<{
+    id: string
+    label: string
+    description: string
+    timeoutMs: number
+    verifyBeforeComplete: boolean
+    execution: { target: 'local' | 'remote' | 'auto'; remoteId: string | null; onRemoteFailure: 'local' | 'fail' }
+  }> = []
   for (const action of config.actions) {
     try {
       await sessionPaths(ctx, sessionId, action)
@@ -439,6 +641,11 @@ const apiActions = async (ctx: Context, sessionId: string) => {
         description: action.description,
         timeoutMs: action.timeoutMs,
         verifyBeforeComplete: action.verifyBeforeComplete,
+        execution: {
+          target: action.execution.target,
+          remoteId: action.execution.remote ?? null,
+          onRemoteFailure: action.execution.onRemoteFailure,
+        },
       })
     } catch {
       continue

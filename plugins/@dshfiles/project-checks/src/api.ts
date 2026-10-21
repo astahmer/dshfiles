@@ -29,12 +29,39 @@ export const candidateVerificationResultSchema = z
 
 export const mayVerifyCandidate = (caller: ApiCaller): boolean => caller.kind === 'plugin' && caller.packageId === '@dshfiles/jj-integration'
 
+export const receiptExecutorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('local') }).strict(),
+  z
+    .object({
+      kind: z.literal('remote'),
+      remoteId: actionIdSchema,
+      sshTarget: z.string().max(255),
+      workspace: z.string().max(2048),
+    })
+    .strict(),
+])
+
+export const receiptRemoteFailureSchema = z
+  .object({
+    remoteId: actionIdSchema,
+    code: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+    message: z.string().max(240),
+  })
+  .strict()
+
 export const actionViewSchema = z.object({
   id: actionIdSchema,
   label: z.string().max(80),
   description: z.string().max(240),
   timeoutMs: z.number().int().min(1_000).max(300_000),
   verifyBeforeComplete: z.boolean(),
+  execution: z
+    .object({
+      target: z.enum(['local', 'remote', 'auto']),
+      remoteId: z.string().max(32).nullable(),
+      onRemoteFailure: z.enum(['local', 'fail']),
+    })
+    .strict(),
 })
 
 export const receiptSchema = z.object({
@@ -43,7 +70,9 @@ export const receiptSchema = z.object({
   actionId: actionIdSchema,
   label: z.string().max(80),
   status: z.enum(['passed', 'failed', 'cancelled', 'timed-out']),
-  failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed']).nullable(),
+  failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']).nullable(),
+  executor: receiptExecutorSchema.optional(),
+  remoteFailure: receiptRemoteFailureSchema.nullable().optional(),
   startedAt: z.number().int().nonnegative(),
   finishedAt: z.number().int().nonnegative(),
   durationMs: z.number().int().nonnegative(),
@@ -116,7 +145,7 @@ export const projectChecksApi = defineApi({
       input: z.object({ sessionId: sessionIdSchema.optional(), actionId: actionIdSchema }),
       output: receiptSchema,
       description:
-        'Run one configured project action in its thread directory and return the receipt. The action must be configured and visible for that directory. Defaults to the calling thread. Call only when the user asked to run that check.',
+        'Run one configured project action and return the receipt. The action may execute on a configured peer host; the receipt records the executor and any local fallback. It must be configured and visible for the thread directory. Defaults to the calling thread. Call only when the user asked to run that check.',
       tool: { name: 'project_checks_run', render: compactJson },
     }),
     assertVerifiedCompletion: method({

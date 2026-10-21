@@ -39,10 +39,12 @@ describe('verification receipt activity contract', () => {
       'automatic',
       'configurationFreshness',
       'durationMs',
+      'executor',
       'exitCode',
       'failure',
       'finishedAt',
       'receiptId',
+      'remoteFallback',
       'sourceRevisionAfter',
       'sourceRevisionBefore',
       'startedAt',
@@ -51,6 +53,15 @@ describe('verification receipt activity contract', () => {
     ])
     expect(verificationReceiptEventSchema.safeParse({ ...event, version: 2 }).success).toBe(false)
     expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, argv: ['/secret'] } }).success).toBe(false)
+    expect(
+      verificationReceiptEventSchema.safeParse({
+        ...event,
+        value: { ...value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: 'm1-perso', workspace: '/peer/check' } },
+      }).success,
+    ).toBe(true)
+    expect(
+      verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: 'm1-perso' } } }).success,
+    ).toBe(false)
     expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, label: 'bad\nlabel' } }).success).toBe(false)
     expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, label: 'bad\u0085label' } }).success).toBe(false)
   })
