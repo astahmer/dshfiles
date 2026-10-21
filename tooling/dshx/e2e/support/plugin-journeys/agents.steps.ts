@@ -13,10 +13,11 @@ When('{string} is commented on the open item', async ({ page }: { page: Page }, 
 Then('the agent thread {string} opens with its instructions for {string}', async ({ page }: { page: Page }, title: string, task: string) => {
   await recordAssertion(page, 'agents-comment-dispatch-starts-a-thread', async () => {
     await expect(page.getByRole('treeitem', { name: new RegExp(`^${title}\\b`, 'u') })).toHaveAttribute('aria-selected', 'true')
-    // The sent message renders the agent mention as a chip, then the agent's instructions and the user's task.
+    // The sent message renders the agent mention as a chip, then its instructions, then the item heading the backlog
+    // adds before the task, so the thread can find the item it was started for.
     await expect(page.getByText('Work as', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'dsh', exact: true })).toBeVisible()
-    await expect(page.getByText(new RegExp(`---\\s*${task}`, 'u'))).toBeVisible()
+    await expect(page.getByText(new RegExp(`---\\s*Work on b:\\d+: ${title}[\\s\\S]*${task}`, 'u'))).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
