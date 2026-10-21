@@ -28,13 +28,14 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
 import { BoardView } from './board-view.js'
 import { BacklogFocusModel } from './backlog-focus.js'
+import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
 import { inboxThreadsFrom } from './inbox-threads.js'
@@ -55,7 +56,7 @@ import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
 type OpenThread = (sessionId: string) => void
-type View = 'feed' | 'inbox' | 'items' | 'board' | 'projects'
+type View = BacklogView
 
 /** Agents write from other threads; a short poll keeps the open panel current without a push channel. */
 const REFRESH_MS = 5_000
@@ -257,8 +258,12 @@ export const BacklogPanel = (props: {
   }
   const [query, setQuery] = useState('')
   const [kinds, setKinds] = useState<BacklogKind[]>([])
-  const [openId, setOpenId] = useState<number | null>(null)
-  const [cursorId, setCursorId] = useState<number | null>(null)
+  const [openIds, setOpenIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null })
+  const [cursorIds, setCursorIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null })
+  const openId = openIds[view]
+  const cursorId = cursorIds[view]
+  const setOpenId = useCallback((id: number | null): void => setOpenIds(selection => setBacklogViewSelection(selection, view, id)), [view])
+  const setCursorId = useCallback((id: number | null): void => setCursorIds(selection => setBacklogViewSelection(selection, view, id)), [view])
   const [expanded, setExpanded] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
@@ -292,7 +297,7 @@ export const BacklogPanel = (props: {
     setExpanded(false)
     const timer = window.setTimeout(BacklogFocusModel.clear, 0)
     return () => window.clearTimeout(timer)
-  }, [focus])
+  }, [focus, setCursorId, setOpenId])
   const projectFilter = stored.project
   // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
   const scoped = projectFilter === null ? {} : { project: projectFilter === '' ? null : projectFilter }
