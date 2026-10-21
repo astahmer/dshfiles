@@ -69,7 +69,7 @@ const dragRowToSectionHeader = async (page: Page, row: Locator, header: Locator)
   const startY = from.y + 12
   await page.mouse.move(startX, startY)
   await page.mouse.down()
-  // The first travel starts the drag; the sidebar then reveals every empty section, which moves the header.
+  // The first travel starts the row's own drag; the drop lands on the section under the pointer.
   await page.mouse.move(startX + 12, startY + 12, { steps: 4 })
   const to = await header.boundingBox()
   if (to === null) throw new Error('A section header has no layout box to drop on.')
@@ -772,6 +772,10 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await expect(archiveItem).toBeEnabled()
   await archiveItem.click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
+  // Opening an archived thread restores it, so the reload below must not reopen the one just archived: leave the
+  // archived thread (its id is in the URL) for a fresh blank thread first, or the refresh unarchives it and the
+  // Archived filter would find nothing.
+  await startBlankThread(page)
 
   await selectThreadViewValue(page, 'Group: Status', 'Date')
   await selectThreadViewValue(page, 'Filter: None', 'Archived')
@@ -807,7 +811,12 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: displayTitle })
   await recordAssertion(page, 'thread-sidebar-grouping-and-filter-preferences-survive-reload', async () => {
     // The group was collapsed before the reload; a Host-synced preference is still collapsed, and expanding restores it.
+    // Wait for the reloaded sidebar to render the synced view before touching a header: while Host settings load, a
+    // header it shows can still be replaced, and a click on that detached node never reaches the page.
+    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true })).toBeVisible()
     const todayHeader = threadSidebar(page).getByRole('button', { name: /^Today/u })
+    await expect(todayHeader).toBeVisible()
     await expect(todayHeader).toHaveAttribute('aria-expanded', 'false')
     await expect(targetRow).toHaveCount(0)
     await todayHeader.click()
