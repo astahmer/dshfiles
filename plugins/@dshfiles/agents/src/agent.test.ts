@@ -17,6 +17,7 @@ const draft = (fields: Partial<AgentDraft> = {}): AgentDraft => ({
   preset: 'standard',
   route: { provider: 'codex-alex2', model: 'gpt-6-luna' },
   memoryScope: null,
+  routine: '',
   enabled: true,
   ...fields,
 })
@@ -89,6 +90,18 @@ test('a memory scope is the agent’s own note scope, absent by default', () => 
   assert.equal(Agents.defaultMemoryScope('reviewer'), 'agent:reviewer')
   assert.equal(Agents.normalizeDraft(draft({ memoryScope: '  agent:reviewer  ' }), { creating: false }).memoryScope, 'agent:reviewer')
   assert.equal(Agents.normalizeDraft(draft({ memoryScope: '   ' }), { creating: false }).memoryScope, null)
+})
+
+test('a routine rides the opening message and points at the schedule tools', () => {
+  const message = Agents.openingMessage({
+    agent: agent({ routine: 'Every weekday at 09:00, summarise open reviews.' }),
+    text: 'start the routine',
+    fallback: 'ignored',
+  })
+  assert.match(message, /Routine: Every weekday at 09:00, summarise open reviews\./u)
+  assert.match(message, /schedule_create/u)
+  assert.match(message, /---\n\nstart the routine$/u)
+  assert.equal(Agents.routineSection('   '), '')
 })
 
 test('thread titles come from the first line of the prompt', () => {

@@ -82,3 +82,18 @@ test('the title falls back to the agent name', () => {
   assert.equal(AgentDispatch.title({ agent: agent({ name: 'Reviewer' }), prompt: '', target: { kind: 'default' } }), 'Reviewer')
   assert.equal(AgentDispatch.title({ agent: agent({ name: 'Reviewer' }), prompt: 'Fix nav\nmore', target: { kind: 'default' } }), 'Fix nav')
 })
+
+test('narrows the schedule catalog to one agent’s threads', () => {
+  const rows = AgentDispatch.schedules(
+    [
+      { id: 'schedule-1', sessionId: 'session-a', title: 'Daily review', status: 'active' },
+      { id: 'schedule-2', sessionId: 'session-b', title: 'Someone else', status: 'active' },
+      { id: 'schedule-3', sessionId: 'session-a', status: 'inactive' },
+    ],
+    ['session-a'],
+  )
+  assert.deepEqual(rows, [
+    { id: 'schedule-1', sessionId: 'session-a', title: 'Daily review', status: 'active' },
+    { id: 'schedule-3', sessionId: 'session-a', title: 'Reminder', status: 'inactive' },
+  ])
+})

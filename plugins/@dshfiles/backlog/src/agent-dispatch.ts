@@ -32,7 +32,14 @@ export class AgentComments {
 
   /** The request fields an agent contributes to a start-thread call. */
   static agent(agent: Agent): StartThreadAgent {
-    return { handle: agent.handle, name: agent.name, instructions: agent.instructions, preset: agent.preset, route: agent.route }
+    return {
+      handle: agent.handle,
+      name: agent.name,
+      instructions: agent.instructions,
+      preset: agent.preset,
+      route: agent.route,
+      ...(agent.routine === undefined || agent.routine === '' ? {} : { routine: agent.routine }),
+    }
   }
 
   /** The opening message for a chosen agent: identity, then its instructions, then the task. */

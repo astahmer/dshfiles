@@ -92,6 +92,8 @@ export interface StartThreadAgent {
   readonly handle: string
   readonly name: string
   readonly instructions: string
+  /** The agent's standing routine, carried into the opening message; absent when it has none. */
+  readonly routine?: string
   readonly preset: string | null
   readonly route: { readonly provider: string; readonly model: string; readonly reasoningEffort?: string | undefined } | null
 }

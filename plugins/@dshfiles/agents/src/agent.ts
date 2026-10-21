@@ -14,6 +14,7 @@ export const MAX_MODEL_CHARS = 256
 export const MAX_EFFORT_CHARS = 64
 export const MAX_SESSION_CHARS = 256
 export const MAX_MEMORY_SCOPE_CHARS = 80
+export const MAX_ROUTINE_CHARS = 400
 /** Newest threads kept per agent; an older row is pruned so one agent cannot grow the table without bound. */
 export const MAX_THREADS_PER_AGENT = 50
 /** Matches the backlog start-thread limit, so a dispatch prompt travels the same path as a typed one. */
@@ -52,6 +53,8 @@ export const agentDraftSchema = z
     route: agentRouteSchema.nullable(),
     /** The memory note scope this agent's threads read, or null for the project block only. */
     memoryScope: agentMemoryScopeSchema,
+    /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
+    routine: z.string().max(MAX_ROUTINE_CHARS),
     enabled: z.boolean(),
   })
   .strict()
@@ -91,6 +94,8 @@ export interface AgentIdentity {
   readonly name: string
   readonly description: string
   readonly instructions: string
+  /** A standing routine; when present the thread is told to keep it with its own `schedule_*` tools. */
+  readonly routine?: string | undefined
 }
 
 export interface AgentMention {
@@ -149,6 +154,7 @@ export class Agents {
       preset: null,
       route: null,
       memoryScope: null,
+      routine: '',
       enabled: true,
       builtIn: true,
       createdAt: now,
@@ -179,11 +185,23 @@ export class Agents {
     const task = input.text.trim() === '' ? input.fallback : input.text.trim()
     const header = [`Work as @${input.agent.handle} — ${input.agent.name}.`, input.agent.description].filter(line => line.trim() !== '').join('\n')
     const instructions = input.agent.instructions.trim()
+    const routine = Agents.routineSection(input.agent.routine ?? '')
     const separator = '\n\n---\n\n'
-    if (instructions === '') return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
+    const preamble = [instructions, routine].filter(section => section !== '').join('\n\n')
+    if (preamble === '') return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
     const room = MAX_MESSAGE_CHARS - header.length - '\n\n'.length - separator.length - task.length
     if (room <= 0) return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
-    return `${header}\n\n${clip(instructions, room)}${separator}${task}`
+    return `${header}\n\n${clip(preamble, room)}${separator}${task}`
+  }
+
+  /**
+   * A routine is a standing instruction, not a scheduler: the thread keeps it with the `schedule_*` tools it already
+   * has, so the reminder lives in DSH's session-scoped schedule store and dies with that Session.
+   */
+  static routineSection(routine: string): string {
+    const text = routine.trim()
+    if (text === '') return ''
+    return `Routine: ${clip(text, MAX_ROUTINE_CHARS)}\nKeep it with this thread's own schedule tools (schedule_create, then schedule_update or schedule_delete); do not build a timer.`
   }
 
   /** The thread title a dispatch opens with, clipped to the Session title limit. */
@@ -205,5 +223,6 @@ export const agentLimits = {
   name: MAX_NAME_CHARS,
   description: MAX_DESCRIPTION_CHARS,
   instructions: MAX_INSTRUCTIONS_CHARS,
+  routine: MAX_ROUTINE_CHARS,
   message: MAX_MESSAGE_CHARS,
 } as const

@@ -93,6 +93,11 @@ export default defineClient({
       },
       loadPresets: async () => (await api.presets()).presets,
       loadThreads: async handle => (await api.threads({ handle })).threads,
+      loadSchedules: async sessionIds => {
+        const catalog = await ctx.remote.schedule.catalog()
+        if (!catalog.ok) throw new Error(catalog.error.message)
+        return AgentDispatch.schedules(catalog.value, sessionIds)
+      },
       openThread: sessionId => ctx.uiWorkspace.openSession(asSessionId(sessionId)),
       startThread,
     }

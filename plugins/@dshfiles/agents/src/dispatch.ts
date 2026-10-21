@@ -10,6 +10,14 @@ const modelSchema = z.object({
   name: z.string(),
   reasoning: z.object({ efforts: z.array(effortSchema), defaultEffort: z.string().optional() }).optional(),
 })
+const scheduleEntrySchema = z.object({
+  id: z.string().min(1),
+  sessionId: z.string().min(1),
+  title: z.string().optional(),
+  status: z.enum(['active', 'inactive']),
+})
+const scheduleCatalogSchema = z.array(scheduleEntrySchema)
+
 const catalogSchema = z.object({
   default: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }),
   groups: z.array(z.object({ id: z.string(), name: z.string(), models: z.array(modelSchema) })),
@@ -52,6 +60,14 @@ export interface AgentModelOption {
 export interface AgentCatalog {
   readonly defaultKey: string | null
   readonly options: readonly AgentModelOption[]
+}
+
+/** One Host reminder that belongs to a thread an agent started. */
+export interface AgentScheduleRow {
+  readonly id: string
+  readonly sessionId: string
+  readonly title: string
+  readonly status: 'active' | 'inactive'
 }
 
 /** A dispatch request as the panel or a backlog comment builds it. */
@@ -104,6 +120,15 @@ export class AgentDispatch {
       text: request.prompt,
       fallback: `Work as @${request.agent.handle}. Inspect the current workspace and wait for the next instruction if the task is unclear.`,
     })
+  }
+
+  /** The schedules catalog, narrowed to the threads one agent started; decoded once at the client boundary. */
+  static schedules(value: unknown, sessionIds: readonly string[]): AgentScheduleRow[] {
+    const wanted = new Set(sessionIds)
+    return scheduleCatalogSchema
+      .parse(value)
+      .filter(entry => wanted.has(entry.sessionId))
+      .map(entry => ({ id: entry.id, sessionId: entry.sessionId, title: entry.title ?? 'Reminder', status: entry.status }))
   }
 
   static title(request: AgentDispatchRequest): string {

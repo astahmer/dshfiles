@@ -21,11 +21,20 @@ export interface AgentsPanelProject {
   readonly path: string
 }
 
+/** One reminder that belongs to a thread the agent started, read from the Host's schedule catalog. */
+export interface AgentsPanelSchedule {
+  readonly id: string
+  readonly sessionId: string
+  readonly title: string
+  readonly status: 'active' | 'inactive'
+}
+
 export interface AgentsPanelProps {
   readonly listProjects: () => readonly AgentsPanelProject[]
   readonly loadCatalog: () => Promise<AgentCatalog>
   readonly loadPresets: () => Promise<readonly AgentPresetRow[]>
   readonly loadThreads: (handle: string) => Promise<readonly AgentThread[]>
+  readonly loadSchedules: (sessionIds: readonly string[]) => Promise<readonly AgentsPanelSchedule[]>
   readonly openThread: (sessionId: string) => void
   readonly startThread: (request: AgentDispatchRequest) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
 }
@@ -45,6 +54,7 @@ const draftOf = (agent: Agent | null): AgentDraft => ({
   preset: agent?.preset ?? null,
   route: agent?.route ?? null,
   memoryScope: agent?.memoryScope ?? null,
+  routine: agent?.routine ?? '',
   enabled: agent?.enabled ?? true,
 })
 
@@ -77,6 +87,12 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     queryKey: [QUERY_ROOT, 'threads', selected ?? ''],
     queryFn: () => props.loadThreads(selected ?? ''),
     enabled: selected !== null,
+  })
+  const agentThreadIds = (threads.data ?? []).map(thread => thread.sessionId)
+  const schedules = useQuery({
+    queryKey: [QUERY_ROOT, 'schedules', ...agentThreadIds],
+    queryFn: () => props.loadSchedules(agentThreadIds),
+    enabled: agentThreadIds.length > 0,
   })
   const editing = creating || current === null
   useEffect(() => {
@@ -264,6 +280,20 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
           </span>
         </label>
 
+        <label className="dshx:flex dshx:flex-col dshx:gap-1">
+          <span className={labelClass}>Routine</span>
+          <Textarea
+            value={draft.routine}
+            maxLength={agentLimits.routine}
+            rows={2}
+            placeholder="Every weekday at 09:00, summarise open reviews."
+            onChange={event => patch({ routine: event.currentTarget.value })}
+          />
+          <span className="dshx:text-[11px] dshx:text-muted-foreground">
+            Carried into the opening message; the thread keeps it with its own schedule tools, not a timer.
+          </span>
+        </label>
+
         <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Tools (preset)</span>
@@ -393,6 +423,18 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                 <span className="dshx:shrink-0 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
                   {new Date(thread.startedAt).toISOString().slice(0, 10)}
                 </span>
+              </button>
+            ))}
+            {(schedules.data ?? []).length === 0 ? null : <span className={cn(labelClass, 'dshx:pt-1')}>Routines</span>}
+            {(schedules.data ?? []).map(schedule => (
+              <button
+                key={schedule.id}
+                type="button"
+                onClick={() => props.openThread(schedule.sessionId)}
+                className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
+              >
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{schedule.title}</span>
+                <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{schedule.status}</span>
               </button>
             ))}
           </div>

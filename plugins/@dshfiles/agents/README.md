@@ -24,6 +24,10 @@ where a thread starts.
 - **A memory scope of its own.** An agent may name a memory scope (`agent:<handle>` by default). `@dshfiles/memory`
   reads it through this plugin's contract for every thread the agent started, so those threads carry the project block
   plus that scope's notes; memory keeps one store and one scope column.
+- **Routines ride DSH's schedules.** An agent may carry a routine line (“Every weekday at 09:00, summarise open
+  reviews.”). It is part of the opening message, which tells the thread to keep it with its own `schedule_*` tools, so
+  the reminder lives in DSH's session-scoped schedule store. The panel lists the schedules that belong to the agent's
+  threads and opens one. There is no scheduler, timer or delivery path in this plugin.
 - **Thread history is durable.** A dispatch records its Session in the agent's `threads` table, so
   the panel lists the threads an agent started (and opens one) after a Host restart, and the usage
   counters are read back from storage rather than recomputed per page load.
@@ -43,8 +47,10 @@ where a thread starts.
 - 100 agents, 8 KB of instructions each, 32-character handles (`^[a-z][a-z0-9-]{0,31}$`).
 - A handle is the identity: it cannot be renamed after creation.
 - 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
-- Memory is scoped per agent (see above); routines and delegation rules are the remaining Phase 3 slices — see
+- Memory and routines are per agent (see above); delegation targets are the remaining Phase 3 slice — see
   `plans/persistent-agents/README.md`.
+- A routine is text, not a parsed rule: the thread decides the timing with the schedule tool, so the schedule record
+  stays the single source of truth and the panel reads it back from the Host's catalog.
 
 ## Development
 
