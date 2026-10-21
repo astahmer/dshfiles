@@ -10,7 +10,6 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   ArrowUpIcon,
@@ -36,11 +35,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
+import { CaptureProject } from './capture-project.js'
 import { fileInput, readComposerFile, type ComposerFile } from './composer-files.js'
+import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { BacklogProjectCommand } from './project-command.js'
+import { BacklogProjects, ProjectPicker } from './project-picker.js'
 import { useBacklogActions } from './use-backlog-actions.js'
-import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 
 export interface ComposerThread {
   readonly id: string
@@ -49,12 +51,17 @@ export interface ComposerThread {
   readonly cwd?: string
 }
 
-type Suggestion = { readonly key: string; readonly insert: string; readonly label: ReactNode; readonly hint: string }
-type ReferenceMode = 'item' | 'thread' | 'project'
+type Suggestion = { readonly key: string; readonly insert: string; readonly label: ReactNode; readonly hint: string; readonly project?: string }
+type ReferenceMode = 'item' | 'thread'
 
 const draftsSchema = z.record(z.string(), z.string().max(20_000))
 const noDrafts: z.infer<typeof draftsSchema> = {}
 const drafts = createStoredValue({ key: 'dshfiles.backlog.draft.v1', schema: draftsSchema, fallback: noDrafts })
+const captureProject = createStoredValue({
+  key: 'dshfiles.backlog.capture-project.v1',
+  schema: z.string().max(BacklogItems.maxTargetChars).nullable(),
+  fallback: null,
+})
 
 const chipClass =
   'dshx:inline-flex dshx:h-5 dshx:max-w-56 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:truncate dshx:rounded-full dshx:border dshx:border-border dshx:px-2 dshx:text-[11px] dshx:text-muted-foreground'
@@ -106,7 +113,6 @@ const ReferenceDialog = (props: {
   readonly onClose: () => void
   readonly onPickItem: (item: { readonly id: number; readonly title: string }) => void
   readonly onPickThread: (thread: ComposerThread) => void
-  readonly onPickProject: (project: string) => void
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const [query, setQuery] = useState('')
@@ -120,29 +126,11 @@ const ReferenceDialog = (props: {
     queryFn: async ({ signal }) => BacklogViews.list(await api.list({ query: debounced, freshness: 'all', limit: 8 }, { signal })),
     enabled: open && props.mode === 'item',
   })
-  const projects = useQuery({
-    queryKey: ['dshfiles-backlog-composer-projects'],
-    queryFn: ({ signal }) => api.projects(undefined, { signal }),
-    enabled: open && props.mode === 'project',
-  })
-  const projectPaths = useMemo(
-    () =>
-      [
-        ...new Set([
-          ...(projects.data ?? []).flatMap(entry => (entry.project === null ? [] : [entry.project])),
-          // A thread running in a jj workspace still works on its project, so the workspace path is never offered.
-          ...props.threads.flatMap(thread => (thread.cwd === undefined ? [] : [EntityLabels.repositoryPath(thread.cwd)])),
-        ]),
-      ]
-        .filter(path => path.toLowerCase().includes(query.trim().toLowerCase()))
-        .slice(0, 8),
-    [projects.data, props.threads, query],
-  )
-  const title = props.mode === 'item' ? 'Link a backlog item' : props.mode === 'thread' ? 'Link a thread' : 'Set a project'
+  const title = props.mode === 'item' ? 'Link a backlog item' : 'Link a thread'
   return (
     <CommandDialog open={open} onOpenChange={next => (next ? undefined : props.onClose())} title={title} description="Search by name">
       <CommandInput
-        placeholder={props.mode === 'project' ? 'Search projects…' : 'Search by title…'}
+        placeholder="Search by title…"
         value={query}
         onValueChange={setQuery}
         onKeyDown={event => {
@@ -152,9 +140,7 @@ const ReferenceDialog = (props: {
         }}
       />
       <CommandList>
-        <CommandEmpty>
-          {props.mode === 'item' ? 'No backlog item matches.' : props.mode === 'thread' ? 'No thread matches.' : 'No project matches.'}
-        </CommandEmpty>
+        <CommandEmpty>{props.mode === 'item' ? 'No backlog item matches.' : 'No thread matches.'}</CommandEmpty>
         {props.mode === 'thread' ? (
           <CommandGroup heading="Threads">
             {props.threads
@@ -167,17 +153,6 @@ const ReferenceDialog = (props: {
                   {thread.running ? <span className="dshx:ml-auto dshx:text-[11px] dshx:text-info">running</span> : null}
                 </CommandItem>
               ))}
-          </CommandGroup>
-        ) : null}
-        {props.mode === 'project' ? (
-          <CommandGroup heading="Projects">
-            {projectPaths.map(path => (
-              <CommandItem key={path} value={path} onSelect={() => props.onPickProject(path)}>
-                <FolderIcon aria-hidden />
-                <span className="dshx:truncate">{ItemGlyphs.projectName(path)}</span>
-                <span className="dshx:ml-auto dshx:max-w-48 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{path}</span>
-              </CommandItem>
-            ))}
           </CommandGroup>
         ) : null}
         {props.mode === 'item' ? (
@@ -205,6 +180,9 @@ export const Composer = (props: {
   readonly placeholder: string
   readonly tags: readonly string[]
   readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
+  readonly projectFilter?: string | null
+  readonly reuseProject?: boolean
   readonly status?: BacklogStatus | null
   readonly onClearStatus?: () => void
   readonly inputRef?: RefObject<HTMLTextAreaElement>
@@ -220,6 +198,8 @@ export const Composer = (props: {
     staleTime: 10_000,
   })
   const storedDrafts = drafts.useValue()
+  const storedProject = captureProject.useValue()
+  const reuseProject = props.reuseProject ?? true
   const [text, setTextState] = useState(() => storedDrafts[props.draftKey] ?? '')
   const [caret, setCaret] = useState(0)
   const [failed, setFailed] = useState<string | null>(null)
@@ -230,7 +210,10 @@ export const Composer = (props: {
   const [status, setStatus] = useState<BacklogStatus>(props.status ?? 'inbox')
   const [statusTouched, setStatusTouched] = useState(false)
   const [kind, setKind] = useState<BacklogKind | null>(null)
-  const [project, setProject] = useState<string | null>(null)
+  const [project, setProject] = useState<string | null>(() =>
+    CaptureProject.initial({ filter: props.projectFilter ?? null, remembered: storedProject, reuse: reuseProject }),
+  )
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
@@ -263,6 +246,11 @@ export const Composer = (props: {
     if (props.status !== undefined && props.status !== null) setStatus(props.status)
   }, [props.status])
 
+  useEffect(() => {
+    if (props.projectFilter === undefined) return
+    setProject(CaptureProject.initial({ filter: props.projectFilter, remembered: captureProject.get(), reuse: reuseProject }))
+  }, [props.projectFilter, reuseProject])
+
   useEffect(
     () => () => {
       if (stopTimerRef.current !== null) clearTimeout(stopTimerRef.current)
@@ -272,6 +260,7 @@ export const Composer = (props: {
   )
 
   const token = tokenAt(text, caret)
+  const projectCommand = BacklogProjectCommand.at(text, caret)
   useEffect(() => {
     if (token?.trigger !== '@') {
       setItemSuggestions([])
@@ -300,6 +289,25 @@ export const Composer = (props: {
   }, [api, token?.trigger, token?.query])
 
   const suggestions = useMemo((): readonly Suggestion[] => {
+    if (projectCommand !== null) {
+      const query = projectCommand.query.trim().toLowerCase()
+      return props.projects
+        .filter(path => path.toLowerCase().includes(query))
+        .slice(0, 8)
+        .map(path => ({
+          key: path,
+          insert: '',
+          project: path,
+          label: (
+            <>
+              <ItemGlyphs.ProjectDot project={path} />
+              <span className="dshx:truncate">{ItemGlyphs.projectName(path)}</span>
+              <span className="dshx:ml-auto dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{path}</span>
+            </>
+          ),
+          hint: 'project',
+        }))
+    }
     if (token === null) return []
     const query = token.query.toLowerCase()
     if (token.trigger === '#') {
@@ -324,14 +332,27 @@ export const Composer = (props: {
         hint: 'thread',
       }))
     return [...itemSuggestions, ...threads]
-  }, [token, props.tags, props.threads, itemSuggestions])
+  }, [projectCommand, token, props.tags, props.threads, props.projects, itemSuggestions])
 
   useEffect(() => {
     setHighlight(0)
     setNavigated(false)
-  }, [token?.trigger, token?.query])
+  }, [token?.trigger, token?.query, projectCommand?.query])
 
   const pick = (suggestion: Suggestion): void => {
+    if (suggestion.project !== undefined) {
+      if (projectCommand === null) return
+      const next = BacklogProjectCommand.strip(text, projectCommand)
+      setNavigated(false)
+      setText(next)
+      setProject(suggestion.project)
+      requestAnimationFrame(() => {
+        input.current?.focus()
+        input.current?.setSelectionRange(next.length, next.length)
+        setCaret(next.length)
+      })
+      return
+    }
     if (token === null) return
     const next = `${text.slice(0, token.start)}${suggestion.insert}${text.slice(caret)}`
     const position = token.start + suggestion.insert.length
@@ -430,7 +451,7 @@ export const Composer = (props: {
     setText('')
     setFiles([])
     setKind(null)
-    setProject(null)
+    setProject(CaptureProject.next({ sent: project, filter: props.projectFilter ?? null, reuse: reuseProject }))
     setStatusTouched(false)
     setStatus('inbox')
     setFailed(null)
@@ -441,6 +462,7 @@ export const Composer = (props: {
     if (project !== null) payload.project = project
     if (files.length > 0) payload.files = files.map(fileInput)
     actions.capture.mutate(payload, {
+      onSuccess: () => captureProject.set(CaptureProject.remembered({ sent: submitted.project, reuse: reuseProject })),
       onError: error => {
         setFailed(errorMessage(error, 'The item was not saved.'))
         setTextState((current: string) => (current === '' ? submitted.text : current))
@@ -650,7 +672,7 @@ export const Composer = (props: {
             <DropdownMenuItem onSelect={() => setReferenceMode('thread')} className="dshx:gap-2 dshx:text-[13px]">
               <MessageSquareIcon aria-hidden /> Link a thread
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setReferenceMode('project')} className="dshx:gap-2 dshx:text-[13px]">
+            <DropdownMenuItem onSelect={() => setProjectPickerOpen(true)} className="dshx:gap-2 dshx:text-[13px]">
               <FolderIcon aria-hidden /> Set a project
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -707,15 +729,29 @@ export const Composer = (props: {
           )}
         />
 
-        {project === null ? null : (
-          <span className={cn(propertyClass, 'dshx:bg-accent/60 dshx:text-foreground')}>
-            <FolderIcon aria-hidden className="dshx:size-3" />
-            <span className="dshx:max-w-40 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
-            <button type="button" aria-label="Clear project" onClick={() => setProject(null)} className="dshx:hover:text-foreground">
-              <XIcon className="dshx:size-3" />
-            </button>
-          </span>
-        )}
+        <ProjectPicker
+          label="Project of the new item"
+          value={project ?? BacklogProjects.none}
+          projects={props.projects}
+          side="top"
+          open={projectPickerOpen}
+          onOpenChange={setProjectPickerOpen}
+          onPick={value => setProject(value === BacklogProjects.none ? null : value)}
+          triggerClassName={cn(propertyClass, 'dshx:max-w-48', project === null && 'dshx:text-muted-foreground')}
+          trigger={
+            project === null ? (
+              <>
+                <FolderIcon aria-hidden className="dshx:size-3" />
+                <span>Project</span>
+              </>
+            ) : (
+              <>
+                <ItemGlyphs.ProjectDot project={project} className="dshx:size-2" />
+                <span className="dshx:max-w-40 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
+              </>
+            )
+          }
+        />
 
         {preview === null ? null : (
           <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
@@ -779,7 +815,7 @@ export const Composer = (props: {
             <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
           </span>
           <span>
-            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items and threads · paste or drop a file
+            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items and threads · <code>/project</code> · paste or drop a file
           </span>
         </p>
       ) : null}
@@ -795,10 +831,6 @@ export const Composer = (props: {
         onPickThread={thread => {
           setReferenceMode(null)
           insert(`${thread.id} `)
-        }}
-        onPickProject={value => {
-          setReferenceMode(null)
-          setProject(value)
         }}
       />
     </form>

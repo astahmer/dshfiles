@@ -6,6 +6,8 @@
 
 ![A board card opens the item detail beside the board](docs/screenshots/board-card-detail.png)
 
+![File and scope items by project](docs/screenshots/project-scope.png)
+
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
@@ -18,9 +20,11 @@ The **Backlog** sidebar panel has one capture box pinned to the bottom of every 
 Shift+Enter breaks the line); agents use `backlog_capture`. It is a chat-sized card with a Linear-style
 toolbar:
 
-- `+` picks images or any files, links a backlog item or a thread, or sets a project by searching the same
-  index the panel uses. Picked references land in the text as `b:<n>` or a `session-…` id; a project becomes
-  a chip.
+- The project chip opens a searchable combobox of the projects items are already filed under plus every
+  registered workspace (`All projects` in the header, the project on the item). Typing `/project` in the
+  text opens the same list inline; picking one removes the command and sets the chip.
+- `+` picks images or any files, or links a backlog item or a thread. Picked references land in the text as
+  `b:<n>` or a `session-…` id.
 - Status and kind chips are editable before sending; the kind chip otherwise follows the text prefix.
 - Files can be picked, pasted or dropped. Images are scaled to 1600 px and re-encoded as WebP; other files
   keep their bytes. The Host keeps the bytes in their own storage domain, never in the item row. An item
@@ -40,7 +44,9 @@ Structure comes from the text:
 - An agent capture links the calling thread, names the agent as owner and takes its working directory as
   the project.
 
-New items land in `inbox`.
+New items land in `inbox`, in the project the header filters by when there is one, otherwise in the project
+of the previous capture (`reuseCaptureProject`, on by default; off starts each capture with no project).
+Picking a project the header does not show keeps that chip until you clear it.
 
 ## Feed, board and freshness
 
@@ -165,6 +171,15 @@ items. Words must all match; `"quoted phrases"` stay whole. Operators combine fr
 
 **Views** saves the current view and search under a name in the plugin's settings (`savedViews`), so every
 browser lists the same views.
+
+## Project scope
+
+The header's project combobox narrows the feed, Inbox, Items, Board and search to one project, to `No
+project`, or to everything; it persists like the status chips and presets the capture box to the same
+project. Candidates are the projects items already name plus every registered workspace, with isolated
+thread workspaces (`…/threads/thread-…`) left out, so the picker offers `dshfiles` and not the checkout a
+thread runs in. The same combobox sits on the item's details line and in every right-click menu's
+**Project** submenu.
 
 ## Inbox and the rest of the ADE
 

@@ -7,12 +7,13 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { CheckIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
 import { BacklogItems, type BacklogAttention, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { BacklogProjects, ProjectPicker } from './project-picker.js'
 
 const triggerClass =
   'dshx:inline-flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
@@ -108,6 +109,34 @@ const KindPicker = (props: { readonly id: number; readonly kind: BacklogKind; re
   />
 )
 
+const ProjectPickerField = (props: {
+  readonly id: number
+  readonly project: string | null
+  readonly projects: readonly string[]
+  readonly onPick: (project: string | null) => void
+}): JSX.Element => (
+  <ProjectPicker
+    label={`Project of b:${String(props.id)}`}
+    value={props.project ?? BacklogProjects.none}
+    projects={props.projects}
+    onPick={value => props.onPick(value === BacklogProjects.none ? null : value)}
+    triggerClassName="dshx:h-7 dshx:px-1.5 dshx:text-[13px]"
+    trigger={
+      props.project === null ? (
+        <>
+          <FolderIcon aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground/60" />
+          <span className="dshx:text-muted-foreground">Project</span>
+        </>
+      ) : (
+        <>
+          <ItemGlyphs.ProjectDot project={props.project} />
+          <span className="dshx:max-w-48 dshx:truncate">{ItemGlyphs.projectName(props.project)}</span>
+        </>
+      )
+    }
+  />
+)
+
 const AttentionPicker = (props: {
   readonly id: number
   readonly attention: BacklogAttention
@@ -132,4 +161,5 @@ export class ItemPickers {
   static readonly Status = StatusPicker
   static readonly Kind = KindPicker
   static readonly Attention = AttentionPicker
+  static readonly Project = ProjectPickerField
 }

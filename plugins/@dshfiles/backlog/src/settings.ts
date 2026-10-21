@@ -31,6 +31,11 @@ export const backlogSettings = defineSettings({
       .description(
         'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it. Never overrides a status you set by hand.',
       ),
+    reuseCaptureProject: Schema.boolean()
+      .default(true)
+      .description(
+        'Remember the project of the last capture, so the next item lands in the same project. Off starts every capture with no project unless the header filters by one.',
+      ),
     startThreadSendsFirstMessage: Schema.boolean()
       .default(true)
       .description(

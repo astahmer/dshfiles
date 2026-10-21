@@ -658,6 +658,12 @@ const PeekBody = (props: {
               <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
                 <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
                 <ItemPickers.Kind id={item.id} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
+                <ItemPickers.Project
+                  id={item.id}
+                  project={item.project}
+                  projects={props.projectPaths}
+                  onPick={project => actions.update.mutate({ id: item.id, project })}
+                />
                 <ItemPickers.Attention
                   id={item.id}
                   attention={item.attention ?? 'none'}

@@ -454,7 +454,7 @@
     {
       "id": "rich-capture",
       "title": "A chat-sized capture box with files, properties and references",
-      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, links a backlog item or a thread, or sets a project; status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
+      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
@@ -510,6 +510,50 @@
       ]
     },
     {
+      "id": "project-scope",
+      "title": "File and scope items by project",
+      "summary": "One searchable project combobox scopes every view from the header and presets the capture box to the same project; the same picker sets the project on the capture chip, on the item's details line, and in each right-click menu. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
+      "reach": [
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "expect button \"Filter by project\"",
+        "expect button \"Project of the new item\"",
+        "click button \"Project of the new item\"",
+        "expect combobox \"Search projects\"",
+        "press Escape",
+        "click button \"Filter by project\"",
+        "expect option \"All projects\""
+      ],
+      "surfaces": ["client", "host", "settings"],
+      "configuration": [],
+      "states": ["all-projects", "one-project", "no-project", "remembered"],
+      "failureModes": [
+        "With no project candidates the combobox lists No project only; capture still adds the item without one.",
+        "Clearing the header scope leaves the capture chip on the project it last used while reuseCaptureProject is on."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.project-scope-command",
+          "file": "plugins/@dshfiles/backlog/src/project-command.test.ts",
+          "testName": "removes the whole command and joins the surrounding text once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.project-scope-candidates",
+          "file": "plugins/@dshfiles/backlog/src/project-paths.test.ts",
+          "testName": "drops isolated thread workspaces so the picker offers projects, not checkouts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.project-scope-remember",
+          "file": "plugins/@dshfiles/backlog/src/capture-project.test.ts",
+          "testName": "keeps the project it just used, and forgets it when remembering is off"
+        }
+      ]
+    },
+    {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
       "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; it names and links the new thread and opens it, sending immediately unless configured to keep an editable draft.",
@@ -520,10 +564,10 @@
         "press Enter",
         "expect text \"Start a thread from b:1\"",
         "rightclick article \"Item b:1\"",
-        "expect menuitem \"Start thread…\"",
+        "expect menuitem \"Start thread\u2026\"",
         "expect menuitem \"Status\"",
         "expect menuitem \"Project\"",
-        "click menuitem \"Start thread…\"",
+        "click menuitem \"Start thread\u2026\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
         "click button \"Board\"",

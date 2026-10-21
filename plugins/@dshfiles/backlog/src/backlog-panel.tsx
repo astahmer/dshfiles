@@ -14,6 +14,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   BookmarkIcon,
+  FolderIcon,
   FolderKanbanIcon,
   XIcon,
   InboxIcon,
@@ -39,7 +40,9 @@ import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogPeek } from './item-peek.js'
 import { ItemsView, itemsOrder } from './items-view.js'
+import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
+import { BacklogProjects, ProjectPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
@@ -65,8 +68,9 @@ const preferences = createStoredValue({
     groupBy: z.enum(['status', 'kind', 'project', 'attention']),
     showDormant: z.boolean(),
     statuses: z.array(BacklogItems.statusSchema).default([]),
+    project: z.string().nullable().default(null),
   }),
-  fallback: { view: 'feed' as const, groupBy: 'status' as const, showDormant: false, statuses: [] },
+  fallback: { view: 'feed' as const, groupBy: 'status' as const, showDormant: false, statuses: [], project: null },
 })
 
 const isTyping = (target: EventTarget | null): boolean =>
@@ -74,6 +78,36 @@ const isTyping = (target: EventTarget | null): boolean =>
 
 const isVisible = (item: BacklogSummaryView, now: number): boolean =>
   (item.freshness === 'fresh' || item.freshness === 'stale') && (item.snoozedUntil ?? 0) <= now
+
+/** The header's project scope: one searchable combobox that narrows every view to a project, or to no project. */
+const ProjectFilter = (props: {
+  readonly project: string | null
+  readonly projects: readonly string[]
+  readonly onPick: (project: string | null) => void
+}): JSX.Element => {
+  const label = props.project === null ? 'All projects' : props.project === '' ? 'No project' : ItemGlyphs.projectName(props.project)
+  return (
+    <ProjectPicker
+      label="Filter by project"
+      value={props.project ?? BacklogProjects.all}
+      projects={props.projects}
+      allLabel="All projects"
+      align="end"
+      onPick={value => props.onPick(value === BacklogProjects.all ? null : value === BacklogProjects.none ? '' : value)}
+      triggerClassName={cn('dshx:h-7 dshx:max-w-44 dshx:px-2 dshx:text-xs', props.project === null ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}
+      trigger={
+        <>
+          {props.project === null || props.project === '' ? (
+            <FolderIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+          ) : (
+            <ItemGlyphs.ProjectDot project={props.project} />
+          )}
+          <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-compact:sr-only">{label}</span>
+        </>
+      }
+    />
+  )
+}
 
 const FilterMenu = (props: {
   readonly kinds: readonly BacklogKind[]
@@ -244,15 +278,18 @@ export const BacklogPanel = (props: {
     if (lastRevision.current !== undefined && lastRevision.current !== revision.data) void queryClient.invalidateQueries({ queryKey: [BacklogQueries.key] })
     lastRevision.current = revision.data
   }, [revision.data, queryClient])
+  const projectFilter = stored.project
+  // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
+  const scoped = projectFilter === null ? {} : { project: projectFilter === '' ? null : projectFilter }
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', debounced, kinds],
+    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilter],
     queryFn: async ({ signal }) =>
-      BacklogViews.list(await api.list({ query: debounced, kinds, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }, { signal })),
+      BacklogViews.list(await api.list({ query: debounced, kinds, ...scoped, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }, { signal })),
     placeholderData: keepPreviousData,
   })
   const inbox = useQuery({
-    queryKey: [BacklogQueries.key, 'list', 'inbox'],
-    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, freshness: 'all', limit: 200 }, { signal })),
+    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilter],
+    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, ...scoped, freshness: 'all', limit: 200 }, { signal })),
   })
   const projectCatalog = useQuery({
     queryKey: [BacklogQueries.key, 'projects'],
@@ -302,7 +339,7 @@ export const BacklogPanel = (props: {
   const projectPaths = useMemo(() => {
     const backlogProjects = (projectCatalog.data ?? []).flatMap(project => (project.project === null ? [] : [project.project]))
     const workspaceProjects = props.startThread.listProjects().map(project => project.path)
-    return [...new Set([...backlogProjects, ...workspaceProjects])].sort((left, right) =>
+    return [...BacklogProjectPaths.candidates([backlogProjects, workspaceProjects])].sort((left, right) =>
       ItemGlyphs.projectName(left).localeCompare(ItemGlyphs.projectName(right)),
     )
   }, [projectCatalog.data, props.startThread])
@@ -448,6 +485,7 @@ export const BacklogPanel = (props: {
               switchView(saved.view)
             }}
           />
+          <ProjectFilter project={projectFilter} projects={projectPaths} onPick={project => setPreference({ project })} />
           <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
           <button
             type="button"
@@ -572,6 +610,9 @@ export const BacklogPanel = (props: {
             placeholder="Capture a thought, a task, a bug… like sending a message"
             tags={tags}
             threads={threads}
+            projects={projectPaths}
+            projectFilter={projectFilter === '' ? null : projectFilter}
+            reuseProject={settings.value?.reuseCaptureProject ?? true}
             status={captureStatus}
             onClearStatus={() => setCaptureStatus(null)}
             inputRef={captureComposer}
