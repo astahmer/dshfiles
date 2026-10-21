@@ -19,7 +19,7 @@ const statusBar = {
   inbox: 'dshx:bg-muted-foreground/40',
   todo: 'dshx:bg-muted-foreground/70',
   doing: 'dshx:bg-warning',
-  done: 'dshx:bg-violet',
+  done: 'dshx:bg-success',
   dropped: 'dshx:bg-muted',
 } satisfies Record<BacklogStatus, string>
 

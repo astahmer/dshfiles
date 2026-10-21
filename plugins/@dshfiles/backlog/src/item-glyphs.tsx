@@ -24,11 +24,12 @@ const statusTone = {
   inbox: 'dshx:text-muted-foreground',
   todo: 'dshx:text-muted-foreground',
   doing: 'dshx:text-warning',
-  done: 'dshx:text-violet',
-  dropped: 'dshx:text-muted-foreground',
+  done: 'dshx:text-success',
+  dropped: 'dshx:text-destructive',
 } satisfies Record<BacklogStatus, string>
 
-/** Linear-style progress rings: dashed for untriaged, empty, half, full with a check, full with a cross. */
+/** Linear-style progress rings: dashed for untriaged, empty, half, then a green check or a red cross, since a filled
+ * dot is what a project's own colour dot looks like. */
 const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?: string }): JSX.Element => (
   <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:shrink-0', statusTone[props.status], props.className)}>
     {props.status === 'inbox' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.2 1.8" /> : null}
@@ -41,14 +42,14 @@ const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?
     ) : null}
     {props.status === 'done' ? (
       <>
-        <circle cx="7" cy="7" r="6.25" fill="currentColor" />
-        <path d="m4.4 7.2 1.8 1.8 3.5-3.6" fill="none" stroke="var(--color-background)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="m4.2 7.2 1.9 1.9 3.7-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </>
     ) : null}
     {props.status === 'dropped' ? (
       <>
-        <circle cx="7" cy="7" r="6.25" fill="currentColor" />
-        <path d="m5 5 4 4m0-4-4 4" fill="none" stroke="var(--color-background)" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="m4.9 4.9 4.2 4.2m0-4.2-4.2 4.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </>
     ) : null}
   </svg>
