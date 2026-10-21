@@ -365,13 +365,15 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, nextId => {
         if (sessionId === undefined || nextId === sessionId) return
         const from = inputHub.shell(sessionId)
+        const carriesDraft = from.snapshot.draft !== '' || from.snapshot.attachmentIds.length > 0
+        if (!carriesDraft) return
         const destinationSessionReady = sessions.binding(nextId) !== undefined
         if (!destinationSessionReady) {
-          from.notify('error', t('workspace.draftTransferRefused'))
-          throw new Error('Composer draft handoff refused; source draft remains unchanged.')
+          from.notify('info', t('workspace.draftTransferRefused'))
+          return
         }
         const next = inputHub.shell(nextId)
-        transferComposerDraft({
+        const handoff = transferComposerDraft({
           source: from,
           destination: next,
           sourceSessionId: sessionId,
@@ -379,8 +381,8 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           destinationSessionReady,
           rebindAttachments: (targetSessionId, attachmentIds) =>
             concreteConversation(ctx).rebindDraftFiles(SessionId(targetSessionId), attachmentIds),
-          onRefused: () => from.notify('error', t('workspace.draftTransferRefused')),
         })
+        if (handoff === 'kept') from.notify('info', t('workspace.draftTransferRefused'))
       }),
     }),
   }, ConversationContent)

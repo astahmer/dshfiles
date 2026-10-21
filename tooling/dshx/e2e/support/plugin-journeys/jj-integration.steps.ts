@@ -21,6 +21,8 @@ interface ThreadRepository {
 const repositories = new WeakMap<Page, ThreadRepository>()
 /** The thread workspace the New thread screen last provisioned; a started thread's header no longer names it. */
 const provisionedThreads = new WeakMap<Page, string>()
+/** A blank thread whose next visit must find a draft persisted by a previous one. */
+const rememberedBlankThreads = new WeakMap<Page, string>()
 const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
 const threadComposerName = 'Message or run a task, / commands, @ files or sessions'
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
@@ -308,8 +310,10 @@ When('the {string} bookmark is picked in the destination bar', async ({ page }: 
 When('No folder is chosen as the New thread project', async ({ page }: { page: Page }) => {
   await projectButton(page).click()
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+  await expect(picker).toBeVisible()
   await picker.getByRole('option', { name: /^No folder/ }).click()
   await expect(picker).toBeHidden()
+  await expect(projectButton(page)).toHaveText('No folder')
 })
 
 When('a message is sent in the thread workspace', async ({ page }: { page: Page }) => {
@@ -386,6 +390,41 @@ Then('the New thread composer is empty and no consumed draft remains stored', as
           .some(key => localStorage.getItem(key)?.includes('Draft handoff regression')),
       ),
     ).toBe(false)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the blank thread is remembered for a saved draft', async ({ page }: { page: Page }) => {
+  await expect(workspaceToggle(page)).toBeEnabled()
+  const sessionId = new URL(page.url()).searchParams.get('thread')
+  if (sessionId === null) throw new Error('The New thread session is not in the URL yet.')
+  rememberedBlankThreads.set(page, sessionId)
+})
+
+Then('the remembered blank thread is no longer current', async ({ page }: { page: Page }) => {
+  const remembered = rememberedBlankThreads.get(page)
+  if (remembered === undefined) throw new Error('No blank thread was remembered.')
+  await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBe(remembered)
+})
+
+When('the saved draft {string} is restored to the remembered thread', async ({ page }: { page: Page }, text: string) => {
+  const sessionId = rememberedBlankThreads.get(page)
+  if (sessionId === undefined) throw new Error('No blank thread was remembered for the saved draft.')
+  await page.evaluate(({ sessionId, text }) => {
+    localStorage.setItem(`dsh.conversation.${sessionId}`, JSON.stringify({ draft: text }))
+  }, { sessionId, text })
+})
+
+When('the disposable jj repository is chosen again as the New thread project', async ({ page }: { page: Page }) => {
+  await chooseProjectPath(page, repositoryFor(page).repositoryPath)
+})
+
+Then('the project opens with its saved draft {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'jj-integration-project-switch-keeps-saved-draft', async () => {
+    await expect(projectButton(page)).toHaveText('repo')
+    await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(rememberedBlankThreads.get(page))
+    await expect(newThreadComposer(page)).toHaveText(text)
+    await expect(page.getByText(/your draft stays in the previous thread/u)).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

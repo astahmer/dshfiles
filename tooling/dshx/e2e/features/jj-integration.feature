@@ -102,6 +102,17 @@ Feature: jj thread workspaces
     And New thread is clicked in the sidebar
     Then the New thread composer is empty and no consumed draft remains stored
 
+  @scenario:jj-integration.project-switch-with-saved-draft-browser-journey
+  Scenario: Returning to a project whose blank thread holds a saved draft opens it
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the blank thread is remembered for a saved draft
+    And No folder is chosen as the New thread project
+    Then the remembered blank thread is no longer current
+    When the saved draft "Parked draft" is restored to the remembered thread
+    When the disposable jj repository is chosen again as the New thread project
+    Then the project opens with its saved draft "Parked draft"
+
   @scenario:jj-integration.structured-reference-handoff-browser-journey
   Scenario: Switching the thread destination preserves structured composer references
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/mentions, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted

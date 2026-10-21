@@ -13,6 +13,8 @@ export interface DraftHandoffPort<AttachmentId extends string = string> {
   readonly setDraft: (draft: DraftDocument | '') => void
 }
 
+export type ComposerDraftHandoff = 'transferred' | 'kept'
+
 export const transferComposerDraft = <AttachmentId extends string>(input: {
   readonly source: DraftHandoffPort<AttachmentId>
   readonly destination: DraftHandoffPort<AttachmentId>
@@ -20,8 +22,7 @@ export const transferComposerDraft = <AttachmentId extends string>(input: {
   readonly destinationSessionId: string
   readonly destinationSessionReady: boolean
   readonly rebindAttachments: (sessionId: string, attachmentIds: readonly AttachmentId[]) => void
-  readonly onRefused: () => void
-}): void => {
+}): ComposerDraftHandoff => {
   const source = input.source.snapshot
   const destination = input.destination.snapshot
   if (
@@ -32,21 +33,23 @@ export const transferComposerDraft = <AttachmentId extends string>(input: {
     destination.attachmentIds.length > 0 ||
     input.source === input.destination
   ) {
-    input.onRefused()
-    throw new Error('Composer draft handoff refused; source draft remains unchanged.')
+    return 'kept'
   }
 
   if (source.attachmentIds.length > 0 && !input.destination.addAttachments(source.attachmentIds)) {
-    input.onRefused()
-    throw new Error('Composer draft handoff refused; source draft remains unchanged.')
+    return 'kept'
   }
 
   try {
     input.rebindAttachments(input.destinationSessionId, source.attachmentIds)
-  } catch (error) {
+  } catch {
     for (const id of source.attachmentIds) input.destination.removeAttachment(id)
-    input.rebindAttachments(input.sourceSessionId, source.attachmentIds)
-    throw error
+    try {
+      input.rebindAttachments(input.sourceSessionId, source.attachmentIds)
+    } catch {
+      // The source keeps its attachment ids; navigation must not be blocked by the handoff.
+    }
+    return 'kept'
   }
 
   const document = input.source.draftSnapshot
@@ -55,4 +58,5 @@ export const transferComposerDraft = <AttachmentId extends string>(input: {
     input.source.setDraft('')
   }
   for (const id of source.attachmentIds) input.source.removeAttachment(id)
+  return 'transferred'
 }
