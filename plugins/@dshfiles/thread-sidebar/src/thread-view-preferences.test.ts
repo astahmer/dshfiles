@@ -47,6 +47,25 @@ describe('thread view preferences', () => {
     expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[1], entries)).toBe('threadSidebarInputNeeded')
   })
 
+  it('counts unread threads on saved views but never on All threads', () => {
+    const doneView: ThreadViewPreset = {
+      id: 'done',
+      name: 'Done',
+      enabled: true,
+      groupBy: 'status',
+      statusFilters: ['not-working'],
+      sourceFilter: 'all',
+    }
+    const entries = [
+      { thread: {}, attentionLabel: 'threadSidebarTurnFinished', unread: true, running: false, archived: false, settled: false, muted: false },
+      { thread: {}, attentionLabel: undefined, unread: true, running: false, archived: false, settled: true, muted: false },
+      { thread: {}, attentionLabel: undefined, unread: false, running: false, archived: false, settled: false, muted: false },
+    ] as const
+
+    expect(ThreadViewPreferencesModel.unreadCountForPreset(DEFAULT_THREAD_VIEW_PRESETS[0], entries)).toBe(0)
+    expect(ThreadViewPreferencesModel.unreadCountForPreset(doneView, entries)).toBe(1)
+  })
+
   it('decodes individual group and filter presets', () => {
     expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ groupBy: 'date' })).toEqual({
       groupBy: 'date',

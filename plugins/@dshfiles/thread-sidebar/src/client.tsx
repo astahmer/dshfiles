@@ -2742,6 +2742,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return {
         thread: entry.session,
         attentionLabel,
+        unread: attention.records.has(entry.session.id),
         running: entry.activity.running,
         archived: archivedSessionIds.has(entry.session.id),
         settled: settledSessionIds.has(entry.session.id),
@@ -2753,9 +2754,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ...childThreadEntries.map(entry => entryFor(entry, false)),
       ...detachedThreadEntries.map(entry => entryFor(entry, false)),
     ]
-  }, [archivedSessionIds, attentionLabelsBySession, childThreadEntries, detachedThreadEntries, mutedSessionIds, sectionEntries, settledSessionIds, threadTree])
+  }, [
+    archivedSessionIds,
+    attention.records,
+    attentionLabelsBySession,
+    childThreadEntries,
+    detachedThreadEntries,
+    mutedSessionIds,
+    sectionEntries,
+    settledSessionIds,
+    threadTree,
+  ])
   const attentionLabelByViewId = useMemo(
     () => new Map(threadViewSettings.views.map(view => [view.id, ThreadViewPreferencesModel.attentionLabelForPreset(view, threadViewAttentionEntries)])),
+    [threadViewAttentionEntries, threadViewSettings.views],
+  )
+  const unreadCountByViewId = useMemo(
+    () => new Map(threadViewSettings.views.map(view => [view.id, ThreadViewPreferencesModel.unreadCountForPreset(view, threadViewAttentionEntries)])),
     [threadViewAttentionEntries, threadViewSettings.views],
   )
   const visibleThreadEntries = useMemo(
@@ -3733,8 +3748,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 const attentionLabel = attentionLabelByViewId.get(view.id)
                 const workingCount =
                   view.statusFilters.length === 1 && view.statusFilters[0] === 'working' ? workingThreadCountsBySource[view.sourceFilter] : null
+                const unreadCount = unreadCountByViewId.get(view.id) ?? 0
+                const visibleCount = workingCount ?? (unreadCount > 0 ? unreadCount : null)
+                const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
                 const accessibleLabel =
-                  attentionLabel === undefined ? undefined : `${label}${workingCount === null ? '' : ` (${workingCount})`}, ${props.tSidebar(attentionLabel)}`
+                  attentionLabel === undefined && visibleCount === null
+                    ? undefined
+                    : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
                 return (
                   <Button
                     key={view.id}
@@ -3762,7 +3782,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         )}
                       />
                     )}
-                    {workingCount === null ? null : <span className="dshx:shrink-0">({workingCount})</span>}
+                    {visibleCount === null ? null : <span className="dshx:shrink-0">({visibleCount})</span>}
                   </Button>
                 )
               })}

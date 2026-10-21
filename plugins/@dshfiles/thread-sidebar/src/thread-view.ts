@@ -29,6 +29,8 @@ export interface ThreadViewEntry<Thread extends Pick<SessionSummary, 'updatedAt'
 export interface ThreadViewAttentionEntry {
   readonly thread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>>
   readonly attentionLabel: ThreadAttentionLabel | undefined
+  /** The Host still holds an unacknowledged finish (or a hand unread mark) for this thread. */
+  readonly unread?: boolean
   readonly running: boolean
   readonly archived: boolean
   readonly settled: boolean
@@ -115,6 +117,33 @@ const attentionLabelForView = (input: {
   return mostUrgentAttentionLabel(labels)
 }
 
+/** How many threads the view lists that still hold an unacknowledged finish on the Host. */
+const unreadCountForView = (input: {
+  readonly filters: ThreadStatusFilters
+  readonly sourceFilter: ThreadSourceFilter
+  readonly entries: readonly ThreadViewAttentionEntry[]
+}): number => {
+  let count = 0
+  for (const entry of input.entries) {
+    if (entry.unread !== true || !matchesThreadSourceFilter(entry.thread, input.sourceFilter)) continue
+    if (entry.muted && !input.filters.includes('muted')) continue
+    if (
+      !matchesThreadStatusFilter({
+        filters: input.filters,
+        running: entry.running,
+        needsAttention: true,
+        archived: entry.archived,
+        settled: entry.settled,
+        muted: entry.muted,
+      })
+    ) {
+      continue
+    }
+    count += 1
+  }
+  return count
+}
+
 const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
   if (!Number.isFinite(updatedAt)) return 'older'
   const date = new Date(updatedAt)
@@ -179,6 +208,7 @@ export class ThreadViewModel {
   static readonly matchesStatusFilter = matchesThreadStatusFilter
   static readonly mostUrgentAttentionLabel = mostUrgentAttentionLabel
   static readonly attentionLabelForView = attentionLabelForView
+  static readonly unreadCountForView = unreadCountForView
   static readonly dateGroup = threadDateGroup
   static readonly groupEntries = groupThreadEntries
 }

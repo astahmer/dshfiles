@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { ThreadViewModel } from './thread-view.js'
+import { ThreadViewModel, type ThreadViewAttentionEntry } from './thread-view.js'
 
 describe('thread view grouping', () => {
   it('groups repositories alphabetically and keeps newest threads first', () => {
@@ -119,6 +119,42 @@ describe('thread view attention markers', () => {
     expect(ThreadViewModel.attentionLabelForView({ filters: ['working'], sourceFilter: 'subagents', entries })).toBeUndefined()
     expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'main', entries })).toBeUndefined()
     expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'subagents', entries })).toBe('threadSidebarInputNeeded')
+  })
+})
+
+describe('thread view unread counts', () => {
+  const entry = (overrides: Partial<ThreadViewAttentionEntry> = {}): ThreadViewAttentionEntry => ({
+    thread: {},
+    attentionLabel: undefined,
+    unread: false,
+    running: false,
+    archived: false,
+    settled: false,
+    muted: false,
+    ...overrides,
+  })
+
+  it('counts only unread threads the view lists', () => {
+    const entries = [
+      entry({ unread: true }),
+      entry({ unread: false }),
+      entry({ unread: true, archived: true }),
+      entry({ unread: true, settled: true }),
+      entry({ unread: true, running: true }),
+    ]
+
+    expect(ThreadViewModel.unreadCountForView({ filters: [], sourceFilter: 'all', entries })).toBe(4)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries })).toBe(2)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['settled'], sourceFilter: 'all', entries })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['archived'], sourceFilter: 'all', entries })).toBe(1)
+  })
+
+  it('follows the view source filter and leaves muted threads out unless the view asks for them', () => {
+    const entries = [entry({ unread: true }), entry({ unread: true, thread: { origin: 'subagent' } }), entry({ unread: true, muted: true })]
+
+    expect(ThreadViewModel.unreadCountForView({ filters: [], sourceFilter: 'main', entries })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: [], sourceFilter: 'subagents', entries })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['muted'], sourceFilter: 'all', entries })).toBe(1)
   })
 })
 

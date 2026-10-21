@@ -119,7 +119,11 @@ v1 browser copy this plugin wrote migrates into it once. Stored v1 view
 preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
-without opening the manager. **Not working** includes non-running threads even
+without opening the manager. A preset that is not All threads shows `(N)` beside
+its name: the Working view counts running threads, and every other view counts
+the unread threads it lists, so a Done view says how many finished threads still
+hold an unacknowledged turn on the Host (opening one clears it everywhere).
+**Not working** includes non-running threads even
 after their completion was seen, and threads waiting for attention; muted,
 archived, and settled threads are omitted, because all three are storage rather
 than work in progress. **Group headers collapse their rows** in the Project and
