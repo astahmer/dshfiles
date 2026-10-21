@@ -5,28 +5,39 @@ import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsI
 import { useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
-import { hostState, HostsDialog, StatusDot } from './hosts-dialog.js'
+import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
-import { hostDestination, setHostDestination } from './state.js'
+import { hostDestination, openHostsPage, setHostDestination } from './state.js'
 
 const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
 
 /**
- * The first chip of the new-thread destination bar: where the thread runs. Local, or a registered host with its live
- * status; "Add host…" and "Manage hosts…" open the hosts dialog. A started thread keeps its host, so the bar only
- * appears on a blank thread.
+ * The first chip of the new-thread destination bar: where the thread runs. Local, or a visible registered host with
+ * its live status; "Add host…" opens the add dialog and "Manage hosts…" the dedicated Hosts page. A started thread
+ * keeps its host, so the bar only appears on a blank thread.
  */
 export const HostChip = (props: { readonly api: MultiHostClient; readonly unavailable?: boolean }) => {
   const { api } = props
   const [open, setOpen] = useState(false)
-  const [dialog, setDialog] = useState<'closed' | 'manage' | 'add'>('closed')
+  const [dialog, setDialog] = useState<'closed' | 'add'>('closed')
   const destination = hostDestination.useValue()
   const directory = useQuery({ ...multiHostQueries.directory(api, open ? 4_000 : 30_000), enabled: props.unavailable !== true })
+  const hosts = directory.data?.hosts ?? []
   const runtimes = directory.data?.runtimes ?? []
+  const selected: RuntimeSummary | undefined = destination.kind === 'runtime' ? runtimes.find(runtime => runtime.id === destination.runtimeId) : undefined
+  // Hidden hosts leave the picker; the one already selected stays so the chip never loses its own destination.
+  // The page's host order wins over the directory's runtime-id order.
+  const hostOrder = new Map(hosts.map((host, index) => [host.id, index]))
+  const pickable = runtimes
+    .filter(runtime => {
+      if (selected !== undefined && runtime.id === selected.id) return true
+      return hosts.find(host => host.id === runtime.hostId)?.hidden !== true
+    })
+    .sort((left, right) => (hostOrder.get(left.hostId) ?? 0) - (hostOrder.get(right.hostId) ?? 0))
   // Opening the menu connects each host once, so its status is live rather than whatever the last call left behind.
   const pings = useQueries({
-    queries: runtimes.map(runtime => ({
+    queries: pickable.map(runtime => ({
       queryKey: ['multi-host', 'ping', runtime.id],
       queryFn: ({ signal }: { readonly signal: AbortSignal }) => api.runtimePing({ runtimeId: runtime.id }, { signal }),
       enabled: open || (destination.kind === 'runtime' && destination.runtimeId === runtime.id),
@@ -35,12 +46,11 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
     })),
   })
   const liveState = (runtime: RuntimeSummary | undefined) => {
-    const ping = pings[runtimes.findIndex(item => item.id === runtime?.id)]?.data
+    const ping = pings[pickable.findIndex(item => item.id === runtime?.id)]?.data
     if (ping === undefined) return hostState(runtime)
     return ping.ok ? { tone: 'online' as const, label: `Connected · ${ping.ms} ms` } : { tone: 'error' as const, label: ping.message }
   }
-  const selected: RuntimeSummary | undefined = destination.kind === 'runtime' ? runtimes.find(runtime => runtime.id === destination.runtimeId) : undefined
-  const selectedHost = directory.data?.hosts.find(host => host.id === selected?.hostId)
+  const selectedHost = hosts.find(host => host.id === selected?.hostId)
   const label = destination.kind === 'local' ? 'Local' : (selectedHost?.name ?? selected?.name ?? 'Unknown host')
   const state = destination.kind === 'runtime' ? liveState(selected) : undefined
   if (isApiOwnerMissing(directory.error)) return null
@@ -71,8 +81,8 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
                   <span className="dshx:flex-1">Local</span>
                   {destination.kind === 'local' ? <CheckIcon className="dshx:size-3.5" /> : null}
                 </CommandItem>
-                {runtimes.map(runtime => {
-                  const host = directory.data?.hosts.find(item => item.id === runtime.hostId)
+                {pickable.map(runtime => {
+                  const host = hosts.find(item => item.id === runtime.hostId)
                   const runtimeState = liveState(runtime)
                   return (
                     <CommandItem
@@ -112,7 +122,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
                   value="manage-hosts"
                   onSelect={() => {
                     setOpen(false)
-                    setDialog('manage')
+                    openHostsPage()
                   }}
                 >
                   <SettingsIcon className="dshx:size-3.5" />
@@ -126,7 +136,11 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
           ) : null}
         </PopoverContent>
       </Popover>
-      <HostsDialog api={api} open={dialog !== 'closed'} adding={dialog === 'add'} onOpenChange={next => setDialog(next ? dialog : 'closed')} />
+      <HostDialog
+        api={api}
+        draft={dialog === 'add' ? { name: '', sshTarget: '', remoteHome: '' } : null}
+        onOpenChange={open => setDialog(open ? 'add' : 'closed')}
+      />
     </>
   )
 }

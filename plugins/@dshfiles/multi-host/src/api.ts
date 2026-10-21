@@ -20,6 +20,7 @@ const hostSummarySchema = z.object({
   name: z.string(),
   connector: hostConnectorSchema,
   runtimeCount: z.number().int().nonnegative(),
+  hidden: z.boolean(),
 })
 
 const failureSchema = z.object({ code: z.string().max(128), message: z.string().max(2048) })
@@ -296,6 +297,20 @@ export const multiHostApi = defineApi({
       description:
         'Remove one host record, optionally deleting its directory on that machine; its threads are kept. Call only when the user asked to remove that host.',
       tool: { name: 'multi_host_remove_host', render: compactJson },
+    }),
+    hostSetHidden: method({
+      input: z.object({ id: idSchema, hidden: z.boolean() }).strict(),
+      output: hostSummarySchema,
+      description:
+        'Hide or show one host in the destination picker without removing it: its runtimes, threads and remote data stay. Call only when the user asked to hide or show that host.',
+      tool: { name: 'multi_host_set_host_hidden', render: compactJson },
+    }),
+    hostReorder: method({
+      input: z.object({ ids: z.array(idSchema).min(1).max(64) }).strict(),
+      output: z.object({ hosts: z.array(hostSummarySchema) }),
+      description:
+        'Reorder the hosts: pass every host id exactly once, in the order the picker page should list them. Call only when the user asked to reorder hosts.',
+      tool: { name: 'multi_host_reorder_hosts', render: compactJson },
     }),
     sshConfigHosts: method({
       input: z.void(),

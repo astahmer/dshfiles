@@ -47,7 +47,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | agent-communication                                                                                                                               | 10                   | 14                                                                                                       | 0             | 0         |
 | agent-questions                                                                                                                                   | 12                   | 11                                                                                                       | 0             | 1         |
 | activity-timeline                                                                                                                                 | 7                    | 5                                                                                                        | 0             | 0         |
-| multi-host                                                                                                                                        | 24                   | 27                                                                                                       | 0             | 1         |
+| multi-host                                                                                                                                        | 26                   | 29                                                                                                       | 0             | 1         |
 | goal-stall-guard                                                                                                                                  | 4                    | 3                                                                                                        | 1             | 0         |
 | agent-toolkit                                                                                                                                     | 9                    | 1                                                                                                        | 6             | 3         |
 | tool-meta                                                                                                                                         | 3                    | 0                                                                                                        | 2             | 1         |
@@ -251,8 +251,10 @@ agent tools`): read-only `multi_host_identity`, `multi_host_status`,
 `multi_host_list`), and the writes `multi_host_save_ssh_host`,
 `multi_host_remove_host`, `multi_host_remove_runtime`, `multi_host_reconnect`,
 `multi_host_find_homes`, `multi_host_test`, `multi_host_mkdir`,
-`multi_host_open_folder`, `multi_host_start_thread` and
-`multi_host_forget_thread`. Every write names the user request it needs.
+`multi_host_open_folder`, `multi_host_start_thread`,
+`multi_host_forget_thread`, `multi_host_set_host_hidden` (hide a host from the
+picker without removing it) and `multi_host_reorder_hosts` (every host id once,
+in the destination picker's order). Every write names the user request it needs.
 
 Remote administration has its own tools, each bound to one dshx method and one
 SSH-bounded verb: `multi_host_exec` (one command, exit code and both streams,

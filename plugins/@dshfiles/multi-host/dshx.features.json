@@ -4,7 +4,7 @@
     {
       "id": "runtime-directory",
       "title": "Register and identify local DSH runtimes",
-      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, edit, test, reconnect and remove them from the host chip.",
+      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.",
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
@@ -39,6 +39,39 @@
           "id": "multi-host.directory-safety",
           "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
           "testName": "corrupt directory stays untouched and rejects writes instead of replacing user data"
+        }
+      ]
+    },
+    {
+      "id": "host-management",
+      "title": "Manage hosts on a dedicated page",
+      "summary": "A Hosts page lists every registered host in the destination picker's order: hide a host without deleting it, drag rows or use the arrows to reorder, and reconnect, edit or remove from the same row.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["empty", "listed", "hidden", "reordered"],
+      "failureModes": [
+        "A partial or duplicate order is refused and the stored order stays.",
+        "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker."
+      ],
+      "externalDependencies": [],
+      "reach": ["seed multi-host-hosts", "click button \"Hosts\"", "expect heading \"Hosts\"", "expect text \"3 registered*\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.host-order",
+          "file": "plugins/@dshfiles/multi-host/src/destination/host-order.test.ts",
+          "testName": "moves one id to the drop index and keeps the rest in order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.host-hidden",
+          "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
+          "testName": "hides a host without touching its runtimes, and a later edit keeps it hidden"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.host-page-browser",
+          "reason": "The Hosts page needs registered hosts, which the loopback SSH journey does not seed. The catalog reach drives the real page with the multi-host-hosts scratch seed (dshx dev open multi-host/host-management), and the store/order unit tests prove hide, reorder and order persistence."
         }
       ]
     },

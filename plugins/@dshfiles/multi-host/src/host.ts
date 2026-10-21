@@ -294,6 +294,7 @@ const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => 
   name: record.name,
   connector: record.connector,
   runtimeCount: runtimes.filter(runtime => runtime.hostId === record.id).length,
+  hidden: record.hidden,
 })
 
 const collectWorkspaces = (frames: readonly unknown[]): ReturnType<typeof workspaceRowSchema.parse>[] => {
@@ -566,7 +567,14 @@ const multiHostHandlers = multiHostApi.host({
   },
   testConnection: async ({ input, signal }) => {
     const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
-    const host: HostRecord = { schemaVersion: 2, id: sshHostId(input.sshTarget), name: input.name, connector, createdAt: new Date().toISOString() }
+    const host: HostRecord = {
+      schemaVersion: 2,
+      id: sshHostId(input.sshTarget),
+      name: input.name,
+      connector,
+      hidden: false,
+      createdAt: new Date().toISOString(),
+    }
     const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
     try {
       const { identity, steps } = await qualifyRuntime({ host, locator, name: input.name, signal })
@@ -584,6 +592,8 @@ const multiHostHandlers = multiHostApi.host({
         id: previous?.id ?? sshHostId(input.sshTarget),
         name: input.name.trim(),
         connector,
+        hidden: previous?.hidden ?? false,
+        ...(previous?.position === undefined ? {} : { position: previous.position }),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
       const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
@@ -607,10 +617,18 @@ const multiHostHandlers = multiHostApi.host({
       id: input.id.trim(),
       name: input.name.trim(),
       connector,
+      hidden: previous?.hidden ?? false,
+      ...(previous?.position === undefined ? {} : { position: previous.position }),
       createdAt: previous?.createdAt ?? new Date().toISOString(),
     }
     await HostDirectoryStore.upsertHost(record)
     return hostSummary(record, await HostDirectoryStore.listRuntimes())
+  },
+  hostSetHidden: async ({ input }) => hostSummary(await HostDirectoryStore.setHostHidden(input), await HostDirectoryStore.listRuntimes()),
+  hostReorder: async ({ input }) => {
+    const runtimes = await HostDirectoryStore.listRuntimes()
+    const hosts = await HostDirectoryStore.reorderHosts(input.ids)
+    return { hosts: hosts.map(record => hostSummary(record, runtimes)) }
   },
   hostRemove: async ({ input }) => {
     const runtimes = input.removeDirectory ? await HostDirectoryStore.listRuntimes(input.id) : []

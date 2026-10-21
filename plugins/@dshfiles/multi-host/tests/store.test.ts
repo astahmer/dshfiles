@@ -31,6 +31,7 @@ const buildHost = (id: string, connector: HostRecord['connector'] = { kind: 'loc
   id,
   name: `host ${id}`,
   connector,
+  hidden: false,
   createdAt: '2026-10-05T00:00:00.000Z',
 })
 
@@ -60,7 +61,10 @@ describe('multi-host directory store', () => {
     await HostDirectoryStore.upsertHost(buildHost('alpha'))
     await HostDirectoryStore.upsertHost({ ...buildHost('alpha'), name: 'renamed alpha' })
 
-    await expect(HostDirectoryStore.listHosts()).resolves.toEqual([{ ...buildHost('alpha'), name: 'renamed alpha' }, buildHost('beta')])
+    await expect(HostDirectoryStore.listHosts()).resolves.toEqual([
+      { ...buildHost('beta'), position: 0 },
+      { ...buildHost('alpha'), name: 'renamed alpha', position: 1 },
+    ])
     await expect(HostDirectoryStore.findHost('missing')).resolves.toBeUndefined()
   })
 
@@ -69,7 +73,62 @@ describe('multi-host directory store', () => {
     await Promise.all(Array.from({ length: 24 }, (_, index) => HostDirectoryStore.upsertHost(buildHost(`host-${index}`))))
     const hosts = await HostDirectoryStore.listHosts()
     expect(hosts).toHaveLength(24)
-    expect(hosts.map(host => host.id)).toEqual([...hosts.map(host => host.id)].sort())
+    expect(hosts.flatMap(host => (host.position === undefined ? [] : [host.position])).sort((left, right) => left - right)).toEqual(
+      Array.from({ length: 24 }, (_, index) => index),
+    )
+  })
+
+  test('hides a host without touching its runtimes, and a later edit keeps it hidden', async () => {
+    await inHome()
+    await HostDirectoryStore.upsertHost(buildHost('machine'))
+    await HostDirectoryStore.upsertRuntime(buildRuntime('machine'))
+
+    await expect(HostDirectoryStore.setHostHidden({ id: 'machine', hidden: true })).resolves.toMatchObject({ hidden: true })
+    const edited = await HostDirectoryStore.upsertHost({ ...buildHost('machine'), name: 'renamed machine' })
+    expect(edited.hidden).toBe(true)
+    await expect(HostDirectoryStore.listRuntimes('machine')).resolves.toHaveLength(1)
+    await expect(HostDirectoryStore.setHostHidden({ id: 'machine', hidden: false })).resolves.toMatchObject({ hidden: false })
+    await expect(HostDirectoryStore.setHostHidden({ id: 'missing', hidden: true })).rejects.toMatchObject({ code: 'host-not-found' })
+  })
+
+  test('reorders hosts by every id exactly once and refuses a partial order', async () => {
+    await inHome()
+    await HostDirectoryStore.upsertHost(buildHost('alpha'))
+    await HostDirectoryStore.upsertHost(buildHost('beta'))
+    await HostDirectoryStore.upsertHost(buildHost('gamma'))
+
+    await expect(HostDirectoryStore.reorderHosts(['gamma', 'alpha', 'beta'])).resolves.toMatchObject([
+      { id: 'gamma', position: 0 },
+      { id: 'alpha', position: 1 },
+      { id: 'beta', position: 2 },
+    ])
+    await expect(HostDirectoryStore.listHosts()).resolves.toMatchObject([{ id: 'gamma' }, { id: 'alpha' }, { id: 'beta' }])
+    await expect(HostDirectoryStore.reorderHosts(['gamma', 'alpha'])).rejects.toMatchObject({ code: 'host-order-incomplete' })
+    await expect(HostDirectoryStore.reorderHosts(['gamma', 'alpha', 'alpha'])).rejects.toMatchObject({ code: 'host-order-incomplete' })
+    await expect(HostDirectoryStore.reorderHosts(['gamma', 'alpha', 'unknown'])).rejects.toMatchObject({ code: 'host-order-incomplete' })
+  })
+
+  test('fills a missing host order when reading a directory written before positions existed', async () => {
+    const home = await inHome()
+    await mkdir(dataPath(home, ''), { recursive: true })
+    await writeFile(
+      dataPath(home, 'directory.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        hosts: [
+          { schemaVersion: 2, id: 'second', name: 'Second', connector: { kind: 'local' }, createdAt: '2026-10-05T00:00:00.000Z' },
+          { schemaVersion: 2, id: 'first', name: 'First', connector: { kind: 'local' }, createdAt: '2026-10-05T00:00:00.000Z' },
+        ],
+        runtimes: [],
+        retiredPorts: [],
+      }),
+      'utf8',
+    )
+
+    await expect(HostDirectoryStore.listHosts()).resolves.toMatchObject([
+      { id: 'second', position: 0, hidden: false },
+      { id: 'first', position: 1, hidden: false },
+    ])
   })
 
   test('keeps a runtime browser origin port stable across directory updates', async () => {
@@ -119,7 +178,7 @@ describe('multi-host directory store', () => {
     )
 
     const migrated = await HostDirectoryStore.readDirectory()
-    expect(migrated.hosts).toEqual([{ ...buildHost('old-local'), name: 'Old local' }])
+    expect(migrated.hosts).toEqual([{ ...buildHost('old-local'), name: 'Old local', position: 0 }])
     expect(migrated.runtimes).toHaveLength(1)
     const legacy = await readFile(dataPath(home, 'hosts.json'), 'utf8')
     expect(legacy).toContain('old_token_value123')
@@ -128,7 +187,7 @@ describe('multi-host directory store', () => {
     await expect(readFile(dataPath(home, 'hosts.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
     const current = await HostDirectoryStore.readDirectory()
     expect(current.schemaVersion).toBe(2)
-    expect(current.hosts.map(host => host.id)).toEqual(['new-local', 'old-local'])
+    expect(current.hosts.map(host => host.id)).toEqual(['old-local', 'new-local'])
   })
 
   test('corrupt directory stays untouched and rejects writes instead of replacing user data', async () => {

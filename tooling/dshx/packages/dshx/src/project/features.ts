@@ -38,7 +38,8 @@ const externalDependencySchema = z
  * `quota-blocked-thread` is a thread whose exhausted fake-provider turn is stored for the Usage limit group;
  * `chat-reference-thread` is a thread in the scratch jj project whose transcript holds an explicit `` `jj:main` ``
  * reference, so the chat link is really rendered before the walk clicks it;
- * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`.
+ * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`;
+ * `multi-host-hosts` writes a synthetic host directory (one hidden host, one SSH host) for the Hosts page.
  */
 export const REACH_SEEDS = [
   'rebase-ready-thread',
@@ -48,6 +49,7 @@ export const REACH_SEEDS = [
   'chat-reference-thread',
   'credential-recovery',
   'fake-secret-cli',
+  'multi-host-hosts',
 ] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 

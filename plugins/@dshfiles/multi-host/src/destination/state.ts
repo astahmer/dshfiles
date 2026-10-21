@@ -22,6 +22,16 @@ export type RemoteThreadRef = z.infer<typeof remoteThreadRefSchema>
 /** The `main` panel key of the remote thread view, selected with `layout.selectPanel`. */
 export const REMOTE_THREAD_PANEL = 'dshfiles-multi-host-thread'
 
+/** The `main` panel key of the dedicated Hosts page, selected with `layout.selectPanel`. */
+export const HOSTS_PANEL_ID = 'dshfiles-multi-host-hosts'
+
+/** Asks the multi-host bundle to open its Hosts page; dispatch it from anywhere, e.g. the host chip. */
+export const OPEN_HOSTS_EVENT = 'dshfiles:open-hosts'
+
+export const openHostsPage = (): void => {
+  globalThis.dispatchEvent?.(new Event(OPEN_HOSTS_EVENT))
+}
+
 const changedEvent = 'dshfiles:multi-host:destination-changed'
 
 const local: HostDestination = { kind: 'local' }

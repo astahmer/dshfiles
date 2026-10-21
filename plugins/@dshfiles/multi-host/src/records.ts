@@ -91,6 +91,10 @@ export const hostRecordSchema = z
     id: idSchema,
     name: z.string().trim().min(1).max(120),
     connector: hostConnectorSchema,
+    /** Hidden hosts stay registered and keep their threads; only the destination picker leaves them out. */
+    hidden: z.boolean().default(false),
+    /** Directory order, lowest first; the store fills it in for records written before it existed. */
+    position: z.number().int().nonnegative().optional(),
     createdAt: z.string().datetime(),
   })
   .strict()

@@ -1,11 +1,15 @@
 export { multiHostApi } from '../api.js'
 export type { RemoteThreadSummary, RuntimeSummary } from '../api.js'
 export { HostChip } from './host-chip.js'
+export { HostsPage } from './hosts-page.js'
 export { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 export { RemoteComposer } from './remote-composer.js'
 export { remoteDirectoryPicker } from './remote-folders.js'
 export {
+  HOSTS_PANEL_ID,
   hostDestination,
+  OPEN_HOSTS_EVENT,
+  openHostsPage,
   openRemoteThreadRef,
   RemoteThreadSelection,
   REMOTE_THREAD_PANEL,

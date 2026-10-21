@@ -183,3 +183,19 @@ Screenshots and JSON summaries lived in `$TMPDIR/dshx-dev/rthux2-local/evidence`
 launch tokens were deleted. The generic tool-call wait (`kind: 'tool'`, shown
 only after 60 s) was not driven live: it needs a remote tool call kept open for
 a minute, and the log cannot distinguish it from a pending approval.
+
+## Hosts page (2026-10-21)
+
+Editor workspace `thread-23482a`, scratch instance `hosts` with
+`@dshfiles/multi-host`, `@dshfiles/jj-integration`,
+`@dshfiles/workspace-folder-picker` and `@dshfiles/home`. The
+`multi-host-hosts` seed wrote a synthetic directory (Studio, hidden Laptop,
+Build box) so no user host data reached the capture.
+
+| Check                   | Result                                                                                                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Catalog reach           | `dshx dev open multi-host/host-management` seeded the directory, opened the sidebar **Hosts** entry, found the heading and `3 registered · 1 hidden`; zero console, page, request or HTTP errors in the capture summary.                                                      |
+| Broken dialog           | The old Manage hosts dialog reproduced the report: its grid track was 893 px inside a 512 px dialog because a host status row's nowrap text set the grid item's min-content. The list moved to the page; the add/edit dialog now carries `min-w-0` and a bounded scroll area. |
+| Hide and reorder        | Hiding `host beta` added the Hidden badge and removed it from the chip's destination menu; dragging its handle onto `renamed alpha` and the up/down arrows both changed the visible order and rewrote `position` in `directory.json`.                                         |
+| Narrow layouts          | At 360 px and 480 px the page had no horizontal overflow (304 px pane, `scrollWidth === clientWidth`); rows put their actions on their own line and the header stacks. The add-host dialog at 360 px measured 328 px wide with no horizontal overflow.                        |
+| Deliberately not driven | A real SSH host was not contacted; its offline row and reconnect path were exercised by the existing SSH journey.                                                                                                                                                             |

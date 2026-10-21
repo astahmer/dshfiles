@@ -1,19 +1,18 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { CheckIcon, ChevronDownIcon, PencilIcon, PlusIcon, RefreshCwIcon, SearchIcon, ServerIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, PlusIcon, SearchIcon, ServerIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
-import type { ConnectionTestStep, HostSummary, RuntimeSummary } from '../api.js'
-import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
-import { hostDestination, setHostDestination } from './state.js'
+import type { ConnectionTestStep, RuntimeSummary } from '../api.js'
+import { multiHostKeys, type MultiHostClient } from './queries.js'
+import { setHostDestination } from './state.js'
 
-type Draft = { readonly hostId?: string; readonly name: string; readonly sshTarget: string; readonly remoteHome: string }
+export type HostDraft = { readonly hostId?: string; readonly name: string; readonly sshTarget: string; readonly remoteHome: string }
 
 const stepLabels: Record<ConnectionTestStep['step'], string> = { ssh: 'SSH login', runtime: 'DSH runtime', identity: 'multi-host identity' }
 
@@ -41,10 +40,10 @@ export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' })
   />
 )
 
-const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draft; readonly onDone: () => void; readonly onCancel: () => void }) => {
+const HostForm = (props: { readonly api: MultiHostClient; readonly initial: HostDraft; readonly onDone: () => void; readonly onCancel: () => void }) => {
   const { api } = props
   const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<Draft>(props.initial)
+  const [draft, setDraft] = useState<HostDraft>(props.initial)
   const [targetPickerOpen, setTargetPickerOpen] = useState(false)
   const [customTargetSelected, setCustomTargetSelected] = useState(false)
   const suggestions = useQuery({
@@ -102,7 +101,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draf
 
   return (
     <form
-      className="dshx:flex dshx:flex-col dshx:gap-3"
+      className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3"
       onSubmit={event => {
         event.preventDefault()
         if (ready) save.mutate()
@@ -256,7 +255,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draf
           </Alert>
         ) : null,
       )}
-      <DialogFooter>
+      <DialogFooter className="dshx:flex-wrap">
         <Button type="button" variant="ghost" onClick={props.onCancel} disabled={save.isPending}>
           Cancel
         </Button>
@@ -273,149 +272,26 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draf
   )
 }
 
-const HostRow = (props: {
-  readonly api: MultiHostClient
-  readonly host: HostSummary
-  readonly runtime: RuntimeSummary | undefined
-  readonly onEdit: () => void
-}) => {
-  const { api, host, runtime } = props
-  const queryClient = useQueryClient()
-  const state = hostState(runtime)
-  const reconnect = useMutation({
-    mutationFn: async () => {
-      if (runtime === undefined) throw new Error('This host has no runtime.')
-      const result = await api.runtimeReconnect({ runtimeId: runtime.id })
-      if (!result.ok) throw failure(result)
-    },
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: multiHostKeys.all }),
-  })
-  const remove = useMutation({
-    mutationFn: () => api.hostRemove({ id: host.id, removeDirectory: true }),
-    onSuccess: () => {
-      const current = hostDestination.get()
-      if (current.kind === 'runtime' && current.runtimeId === runtime?.id) setHostDestination({ kind: 'local' })
-      void queryClient.invalidateQueries({ queryKey: multiHostKeys.all })
-    },
-  })
-  const [confirming, setConfirming] = useState(false)
+/** Add or edit one host. Management (hide, reorder, reconnect, remove) lives on the Hosts page. */
+export const HostDialog = (props: { readonly api: MultiHostClient; readonly draft: HostDraft | null; readonly onOpenChange: (open: boolean) => void }) => {
+  const draft = props.draft
   return (
-    <li className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:p-2">
-      <div className="dshx:flex dshx:items-center dshx:gap-2">
-        <ServerIcon className="dshx:size-4 dshx:text-muted-foreground" />
-        <span className="dshx:font-medium">{host.name}</span>
-        <Badge variant="outline" className="dshx:font-mono dshx:text-[11px]">
-          {host.connector.kind === 'ssh' ? host.connector.sshTarget : 'this machine'}
-        </Badge>
-        <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
-          <Button size="icon" variant="ghost" className="dshx:size-7" title="Reconnect" disabled={reconnect.isPending} onClick={() => reconnect.mutate()}>
-            {reconnect.isPending ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
-          </Button>
-          {host.connector.kind === 'ssh' ? (
-            <Button size="icon" variant="ghost" className="dshx:size-7" title="Edit" onClick={props.onEdit}>
-              <PencilIcon className="dshx:size-3.5" />
-            </Button>
-          ) : null}
-          <Button
-            size="icon"
-            variant={confirming ? 'destructive' : 'ghost'}
-            className="dshx:size-7"
-            title={confirming ? 'Click again to remove; remote data stays' : 'Remove'}
-            disabled={remove.isPending}
-            onClick={() => (confirming ? remove.mutate() : setConfirming(true))}
-          >
-            <Trash2Icon className="dshx:size-3.5" />
-          </Button>
-        </span>
-      </div>
-      <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-        <StatusDot tone={state.tone} />
-        <span className="dshx:min-w-0 dshx:truncate" title={state.label}>
-          {state.label}
-        </span>
-        {runtime?.remoteHome === undefined ? null : <span className="dshx:ml-auto dshx:shrink-0 dshx:font-mono">{runtime.remoteHome}</span>}
-      </div>
-      {reconnect.isError ? <span className="dshx:text-xs dshx:text-destructive">{errorMessage(reconnect.error, 'Reconnect failed.')}</span> : null}
-    </li>
-  )
-}
-
-/** Add, edit, test, reconnect and remove hosts. Opened from the host chip ("Add host…" / "Manage hosts…"). */
-export const HostsDialog = (props: {
-  readonly api: MultiHostClient
-  readonly open: boolean
-  readonly adding: boolean
-  readonly onOpenChange: (open: boolean) => void
-}) => {
-  const { api } = props
-  const directory = useQuery({ ...multiHostQueries.directory(api, props.open ? 5_000 : false), enabled: props.open })
-  const [editing, setEditing] = useState<Draft | null>(null)
-  const form = editing ?? (props.adding ? { name: '', sshTarget: '', remoteHome: '' } : null)
-  return (
-    <Dialog
-      open={props.open}
-      onOpenChange={open => {
-        if (!open) setEditing(null)
-        props.onOpenChange(open)
-      }}
-    >
-      <DialogContent className="dshx-root dshx:sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{form === null ? 'Hosts' : form.hostId === undefined ? 'Add host' : 'Edit host'}</DialogTitle>
-          <DialogDescription>
+    <Dialog open={draft !== null} onOpenChange={props.onOpenChange}>
+      <DialogContent className="dshx-root dshx:max-h-[calc(100dvh-2rem)] dshx:overflow-x-hidden dshx:overflow-y-auto dshx:sm:max-w-lg">
+        <DialogHeader className="dshx:min-w-0">
+          <DialogTitle>{draft?.hostId === undefined ? 'Add host' : 'Edit host'}</DialogTitle>
+          <DialogDescription className="dshx:min-w-0">
             A host is another machine running DSH that this one reaches over SSH. New threads can start there from the host chip.
           </DialogDescription>
         </DialogHeader>
-        {form !== null ? (
+        {draft === null ? null : (
           <HostForm
-            key={form.hostId ?? 'new'}
-            api={api}
-            initial={form}
-            onDone={() => {
-              setEditing(null)
-              props.onOpenChange(false)
-            }}
-            onCancel={() => {
-              setEditing(null)
-              if (props.adding) props.onOpenChange(false)
-            }}
+            key={draft.hostId ?? 'new'}
+            api={props.api}
+            initial={draft}
+            onDone={() => props.onOpenChange(false)}
+            onCancel={() => props.onOpenChange(false)}
           />
-        ) : (
-          <div className="dshx:flex dshx:flex-col dshx:gap-3">
-            {directory.isError ? (
-              <Alert variant="destructive">
-                <AlertDescription>{errorMessage(directory.error, 'Hosts are unavailable.')}</AlertDescription>
-              </Alert>
-            ) : null}
-            <ul className="dshx:flex dshx:flex-col dshx:gap-2">
-              {(directory.data?.hosts ?? []).map(host => {
-                const runtime = directory.data?.runtimes.find(item => item.hostId === host.id)
-                return (
-                  <HostRow
-                    key={host.id}
-                    api={api}
-                    host={host}
-                    runtime={runtime}
-                    onEdit={() =>
-                      setEditing({
-                        hostId: host.id,
-                        name: host.name,
-                        sshTarget: host.connector.kind === 'ssh' ? host.connector.sshTarget : '',
-                        remoteHome: runtime?.remoteHome ?? '',
-                      })
-                    }
-                  />
-                )
-              })}
-              {directory.data?.hosts.length === 0 ? <li className="dshx:text-sm dshx:text-muted-foreground">No hosts yet.</li> : null}
-            </ul>
-            <DialogFooter>
-              <Button onClick={() => setEditing({ name: '', sshTarget: '', remoteHome: '' })}>
-                <PlusIcon className="dshx:size-3.5" />
-                Add host
-              </Button>
-            </DialogFooter>
-          </div>
         )}
       </DialogContent>
     </Dialog>

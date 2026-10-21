@@ -504,6 +504,70 @@ const seedFakeSecretCli = async (state: ScratchState): Promise<void> => {
   await writeFile(join(state.fakeSecretCli, 'store.json'), fakeSecretStore(state.project.path), { mode: 0o600 })
 }
 
+const seedMultiHostHosts = async (state: ScratchState): Promise<void> => {
+  if (!state.bundles.includes('@dshfiles/multi-host')) {
+    throw new ScratchError(
+      'seed-needs-plugin',
+      'Seed multi-host-hosts needs @dshfiles/multi-host.',
+      'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/multi-host ...".',
+    )
+  }
+  const createdAt = '2026-10-05T00:00:00.000Z'
+  const launchUrl = 'http://127.0.0.1:1/?token=dshx-seed-token'
+  const directory = {
+    schemaVersion: 2,
+    hosts: [
+      { schemaVersion: 2, id: 'studio', name: 'Studio', connector: { kind: 'local' }, hidden: false, position: 0, createdAt },
+      { schemaVersion: 2, id: 'laptop', name: 'Laptop', connector: { kind: 'local' }, hidden: true, position: 1, createdAt },
+      {
+        schemaVersion: 2,
+        id: 'build-box',
+        name: 'Build box',
+        connector: { kind: 'ssh', sshTarget: 'build@192.0.2.10' },
+        hidden: false,
+        position: 2,
+        createdAt,
+      },
+    ],
+    runtimes: [
+      {
+        schemaVersion: 2,
+        id: '10000000-0000-4000-8000-000000000001',
+        hostId: 'studio',
+        name: 'Studio',
+        locator: { kind: 'local', launchUrl },
+        identity: null,
+        originPort: 41_001,
+        createdAt,
+      },
+      {
+        schemaVersion: 2,
+        id: '10000000-0000-4000-8000-000000000002',
+        hostId: 'laptop',
+        name: 'Laptop',
+        locator: { kind: 'local', launchUrl },
+        identity: null,
+        originPort: 41_002,
+        createdAt,
+      },
+      {
+        schemaVersion: 2,
+        id: '10000000-0000-4000-8000-000000000003',
+        hostId: 'build-box',
+        name: 'Build box',
+        locator: { kind: 'ssh', remoteHome: '/home/build/.dsh' },
+        identity: null,
+        originPort: 41_003,
+        createdAt,
+      },
+    ],
+    retiredPorts: [],
+  }
+  const path = join(state.home, 'plugins', 'multi-host', 'directory.json')
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  await writeFile(path, `${JSON.stringify(directory, null, 2)}\n`, { mode: 0o600 })
+}
+
 /** Apply one seed: the checkout file it changed and the process it started, if any. */
 const applySeed = async (input: {
   readonly state: ScratchState
@@ -514,6 +578,10 @@ const applySeed = async (input: {
   if (input.seed === 'pending-restart') return { changedFile: await seedPendingRestart(input.state) }
   if (input.seed === 'fake-secret-cli') {
     await seedFakeSecretCli(input.state)
+    return {}
+  }
+  if (input.seed === 'multi-host-hosts') {
+    await seedMultiHostHosts(input.state)
     return {}
   }
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }

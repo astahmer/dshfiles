@@ -30,6 +30,21 @@ const completeRuntimePorts = (directory: HostDirectory): HostDirectory => {
   return { ...directory, runtimes }
 }
 
+const completeHostOrder = (directory: HostDirectory): HostDirectory => {
+  const positions = new Set(directory.hosts.flatMap(host => (host.position === undefined ? [] : [host.position])))
+  let nextPosition = 0
+  const hosts = directory.hosts.map(host => {
+    if (host.position !== undefined) return host
+    while (positions.has(nextPosition)) nextPosition += 1
+    positions.add(nextPosition)
+    return { ...host, position: nextPosition }
+  })
+  return {
+    ...directory,
+    hosts: hosts.sort((left, right) => (left.position ?? 0) - (right.position ?? 0) || left.id.localeCompare(right.id)),
+  }
+}
+
 const secureDataPath = async (filePath: string): Promise<void> => {
   const parent = dirname(filePath)
   try {
@@ -110,7 +125,7 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
   }
 
   const current = hostDirectorySchema.safeParse(parsed)
-  if (current.success) return completeRuntimePorts(current.data)
+  if (current.success) return completeHostOrder(completeRuntimePorts(current.data))
 
   const legacy = legacyDirectorySchema.safeParse(parsed)
   if (legacy.success) {
@@ -142,7 +157,7 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
         }),
       )
     }
-    return completeRuntimePorts(hostDirectorySchema.parse({ schemaVersion: 2, hosts, runtimes }))
+    return completeHostOrder(completeRuntimePorts(hostDirectorySchema.parse({ schemaVersion: 2, hosts, runtimes })))
   }
 
   throw new DirectoryStoreError('directory-version-unsupported', 'The multi-host directory has an unsupported schema and was left untouched.')
@@ -176,11 +191,19 @@ const transact = async <Result>(update: (current: HostDirectory) => { readonly n
   return operation
 }
 
+const nextHostPosition = (hosts: readonly HostRecord[]): number => hosts.reduce((next, host) => Math.max(next, (host.position ?? -1) + 1), 0)
+
 const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
   const record = hostRecordSchema.parse(input)
   return transact(current => {
+    const previous = current.hosts.find(host => host.id === record.id)
+    const stored: HostRecord = {
+      ...record,
+      hidden: record.hidden || previous?.hidden === true,
+      position: record.position ?? previous?.position ?? nextHostPosition(current.hosts),
+    }
     const hosts = current.hosts.filter(host => host.id !== record.id)
-    hosts.push(record)
+    hosts.push(stored)
     for (const runtime of current.runtimes.filter(item => item.hostId === record.id)) {
       if (runtime.locator.kind !== record.connector.kind) {
         throw new DirectoryStoreError('host-connector-in-use', 'The host connector cannot change while registered runtimes use it.')
@@ -188,13 +211,40 @@ const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
     }
     const next = hostDirectorySchema.parse({
       schemaVersion: 2,
-      hosts: hosts.sort((left, right) => left.id.localeCompare(right.id)),
+      hosts: hosts.sort((left, right) => (left.position ?? 0) - (right.position ?? 0) || left.id.localeCompare(right.id)),
       runtimes: current.runtimes,
       retiredPorts: current.retiredPorts,
     })
-    return { next, result: record }
+    return { next, result: stored }
   })
 }
+
+const setHostHidden = async ({ id, hidden }: { readonly id: string; readonly hidden: boolean }): Promise<HostRecord> =>
+  transact(current => {
+    const previous = current.hosts.find(host => host.id === id)
+    if (previous === undefined) throw new DirectoryStoreError('host-not-found', `No recorded host ${id}.`)
+    const record: HostRecord = { ...previous, hidden }
+    const next = hostDirectorySchema.parse({
+      ...current,
+      hosts: current.hosts.map(host => (host.id === id ? record : host)),
+    })
+    return { next: previous.hidden === hidden ? current : next, result: record }
+  })
+
+const reorderHosts = async (ids: readonly string[]): Promise<readonly HostRecord[]> =>
+  transact(current => {
+    const byId = new Map(current.hosts.map(host => [host.id, host]))
+    const unique = new Set(ids)
+    if (unique.size !== ids.length || ids.length !== current.hosts.length || ids.some(id => !byId.has(id))) {
+      throw new DirectoryStoreError('host-order-incomplete', 'A host order names every recorded host exactly once.')
+    }
+    const hosts = ids.flatMap((id, position) => {
+      const host = byId.get(id)
+      return host === undefined ? [] : [{ ...host, position }]
+    })
+    const next = hostDirectorySchema.parse({ ...current, hosts })
+    return { next, result: hosts }
+  })
 
 const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
   const record = runtimeRecordSchema.parse(input)
@@ -296,6 +346,8 @@ export class HostDirectoryStore {
   static readonly findHost = findHost
   static readonly findRuntime = findRuntime
   static readonly upsertHost = upsertHost
+  static readonly setHostHidden = setHostHidden
+  static readonly reorderHosts = reorderHosts
   static readonly upsertRuntime = upsertRuntime
   static readonly removeRuntime = removeRuntime
   static readonly removeHost = removeHost

@@ -3,7 +3,6 @@
   "diff-viewed": "Adds a Viewed toggle to the deliverables review pane. The pane only exists for a turn that produced reviewable files, and the scratch seeds create none.",
   "goal-stall-guard": "Host-side goal policy. It renders nothing itself: the pause, continue or close it decides appears in the native goal controls.",
   "main-tabs": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
-  "multi-host": "The runtime directory sits behind the host picker's menus and needs a registered second runtime or SSH host; a scratch instance seeds neither, and its own reach assumes a host already exists.",
   "project-checks": "The panel only opens from its composer command, which the command palette does not list, and the overlay renders no surface until a session directory has trusted actions.",
   "prompt-stash": "Its catalog path seeds a tool-call thread, and the tool-call-thread scratch seed stops in the AI Accounts panel before any turn runs.",
   "pulls-review": "Its catalog path seeds a rebase-ready thread and then drives the /pulls command, but the seeded thread cannot be selected from the sidebar the way the reach expects.",

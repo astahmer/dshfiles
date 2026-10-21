@@ -43,6 +43,7 @@ const primaryFeatures = {
   'command-palette': ['action-registry'],
   'input-trigger': ['multiword-at-queries'],
   'jj-integration': ['thread-workspaces-panel'],
+  'multi-host': ['host-management'],
 }
 
 const { values } = parseArgs({
@@ -241,7 +242,8 @@ for (const plugin of scope) {
   for (const failure of outcome.failures) console.error(`FAIL ${plugin.name} ${failure}`)
 }
 
-if (values.json === true) console.log(JSON.stringify({ schemaVersion: 1, command: 'screenshots', ok: results.every(result => result.failures.length === 0), data: results }, null, 2))
+if (values.json === true)
+  console.log(JSON.stringify({ schemaVersion: 1, command: 'screenshots', ok: results.every(result => result.failures.length === 0), data: results }, null, 2))
 
 const failures = results.flatMap(result => result.failures)
 const missingReach = scope.filter(plugin => plugin.reachable.length === 0).map(plugin => plugin.name)
