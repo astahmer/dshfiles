@@ -15,13 +15,13 @@ secret:ALIAS@ENV          the same alias in another environment
 `secret:ALIAS` is ordinary text, which is the point: a settings string, a backlog
 body or an item link can carry it without becoming a secret.
 
-| Piece                       | Owner                                        | Where                                                                    |
-| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
-| Grammar and schemas         | `@dshfiles/credential-port`                  | `secret-reference.ts`                                                    |
-| Host resolver               | `@dshfiles/credential-port`                  | `SecretReferenceResolver.resolve({ referenceText, values, environmentValue })` |
-| Value port (CLI access)     | `@dshfiles/secret-catalog`                   | `secretCatalogValues.resolve({ reference, cwd })`                         |
-| Reference → control mapping | `@dshfiles/settings-shell`                   | `Schema.string().role('secret-ref')`                                     |
-| Vault picker                | `@dshfiles/secret-catalog`                   | `shell.overlay` on `[data-secret-input="reference"]`                     |
+| Piece                       | Owner                       | Where                                                                          |
+| --------------------------- | --------------------------- | ------------------------------------------------------------------------------ |
+| Grammar and schemas         | `@dshfiles/credential-port` | `secret-reference.ts`                                                          |
+| Host resolver               | `@dshfiles/credential-port` | `SecretReferenceResolver.resolve({ referenceText, values, environmentValue })` |
+| Value port (CLI access)     | `@dshfiles/secret-catalog`  | `secretCatalogValues.resolve({ reference, cwd })`                              |
+| Reference → control mapping | `@dshfiles/settings-shell`  | `Schema.string().role('secret-ref')`                                           |
+| Vault picker                | `@dshfiles/secret-catalog`  | `shell.overlay` on `[data-secret-input="reference"]`                           |
 
 ## Consuming a reference on the Host
 
@@ -59,12 +59,17 @@ never guessed.
 - The picker appears on focus as a key button, lists the global aliases with
   search, and writes the reference through the field's own value setter plus an
   `input` event, so React-controlled state updates. It is portaled into the
-  field's own dialog: a modal layer makes everything outside it inert.
+  field's own dialog: a modal layer makes everything outside it inert. The
+  panel opens below the field, flips above when that side has more room, and
+  caps its height to the room left, so it never leaves the viewport.
 
 ## What is deliberately not here
 
 - No plaintext in settings, backlog items or chat. DSH redacts secret values, so
   a field could not round-trip one anyway.
+- No vault button on a general capture or chat field. Those hold prose; an item
+  stores a `secret:ALIAS` reference typed as ordinary text, while only a field
+  whose whole value is a credential carries the attribute.
 - No implicit fill on focus: revealing stays an explicit click in the Secret
   Catalog (with its timeout and blur rules).
 - No second vault: the `secret` CLI and Bitwarden remain the only store.

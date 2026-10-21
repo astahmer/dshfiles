@@ -140,4 +140,6 @@ button while focused: the `shell.overlay` picker lists the global aliases,
 searches them, and writes the reference through the field's own value setter so a
 controlled input's `onChange` sees it. `SecretInputBinding` in this package holds
 the attribute names and the write helper for code that wants to name them. The
-Settings form uses it for `Schema.string().role('secret-ref')` fields.
+Settings form uses it for `Schema.string().role('secret-ref')` fields. The panel
+opens below the field, flips above when that side has more room, and caps its
+height to the room left, so it stays inside the viewport.

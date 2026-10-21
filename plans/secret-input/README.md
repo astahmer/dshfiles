@@ -57,27 +57,30 @@ Settled with the user (2026-10-20):
    resolves it when it consumes the credential. No plaintext in settings, items
    or browser state.
 2. **Backlog first, generic mechanism underneath.** The Jev triage key binds to
-   an alias, and the Backlog composer carries the same attribute every other
-   plugin can use.
+   an alias, and `data-secret-input` stays a generic contract any field can opt
+   into. A general capture composer does not: it holds prose, so the vault offer
+   sits on top of the text there and was removed.
 3. **Attribute first, overlay ships it.** `data-secret-input="reference"` is the
    contract; the Secret Catalog registers the `shell.overlay` picker, so native
    and third-party fields get it without importing anything.
 
 ## Phases
 
-| Phase | Work                                                                                                                            | State                                                                                            |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| 1     | Grammar, `secretReferenceSchema`, and the `secretCatalogValues` port in `credential-port`                                       | Shipped                                                                                          |
-| 2     | `createSecretCatalogValues` in the Catalog: one unique row per alias+environment, revealed through the CLI                      | Shipped                                                                                          |
-| 3     | `role('secret-ref')` control in settings-shell, rendered with `data-secret-input`                                               | Shipped                                                                                          |
-| 4     | `SecretInputBinding` + the `shell.overlay` picker: key button on a focused field, alias search, controlled writes               | Shipped; portaled into the field's dialog because a modal layer makes the rest of the page inert |
-| 5     | Backlog: `jevSecret` setting, `BacklogTriageKey` resolution, environment fallback, `secret` link extraction, composer attribute | Shipped                                                                                          |
+| Phase | Work                                                                                                              | State                                                                                            |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1     | Grammar, `secretReferenceSchema`, and the `secretCatalogValues` port in `credential-port`                         | Shipped                                                                                          |
+| 2     | `createSecretCatalogValues` in the Catalog: one unique row per alias+environment, revealed through the CLI        | Shipped                                                                                          |
+| 3     | `role('secret-ref')` control in settings-shell, rendered with `data-secret-input`                                 | Shipped                                                                                          |
+| 4     | `SecretInputBinding` + the `shell.overlay` picker: key button on a focused field, alias search, controlled writes | Shipped; portaled into the field's dialog because a modal layer makes the rest of the page inert |
+| 5     | Backlog: `jevSecret` setting, `BacklogTriageKey` resolution, environment fallback, `secret` link extraction       | Shipped                                                                                          |
 
 Verified end to end in a scratch DSH with the fake secret CLI: Settings → "jev secret" → key
 button → `GITHUB_TOKEN@prod` → the field holds `secret:GITHUB_TOKEN`. Modals needed two fixes the
 unit tests cannot catch: the affordance was portaled below the dialog (so its clicks were inert), and
 the alias panel closes on pick only when it is unmounted rather than `hidden` (a `dshflex` class beats
-the `hidden` attribute).
+the `hidden` attribute). The panel now places itself from its measured content height: it flips above a
+field near the bottom, caps its height to the room left and scrolls, and keeps the key button on screen;
+`secret-input-placement.test.ts` pins those three cases.
 
 Still open: reveal a bound reference inline from an item's `secret` link (the
 Catalog row's own reveal covers it today), and adopting the attribute on

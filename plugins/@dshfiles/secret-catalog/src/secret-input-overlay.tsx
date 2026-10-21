@@ -4,16 +4,19 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { KeyRoundIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { secretCatalogApi } from './api.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import { SecretInputBinding } from './secret-input-bind.js'
+import { placeSecretButton, placeSecretPanel } from './secret-input-placement.js'
 
 interface FieldAnchor {
   readonly element: HTMLInputElement | HTMLTextAreaElement
   readonly rect: DOMRect
 }
+
+const panelWidth = 320
 
 const measure = (element: HTMLInputElement | HTMLTextAreaElement): FieldAnchor | null => {
   if (!element.isConnected || !SecretInputBinding.accepts(element)) return null
@@ -33,6 +36,7 @@ export const SecretInputOverlay = (): JSX.Element | null => {
   const [anchor, setAnchor] = useState<FieldAnchor | null>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [panelSize, setPanelSize] = useState({ width: panelWidth, height: 0 })
   const panelRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<HTMLSpanElement | null>(null)
 
@@ -73,6 +77,18 @@ export const SecretInputOverlay = (): JSX.Element | null => {
     }
   }, [track])
 
+  // The panel flips on the room it needs, so its unclipped content height and its boxed width are the placement inputs.
+  useLayoutEffect(() => {
+    if (!open) return
+    const panel = panelRef.current
+    if (panel === null) return
+    const remeasure = (): void => setPanelSize({ width: panel.offsetWidth, height: panel.scrollHeight })
+    remeasure()
+    const observer = new ResizeObserver(remeasure)
+    observer.observe(panel)
+    return () => observer.disconnect()
+  }, [open])
+
   const listQuery = useQuery({
     queryKey: ['secret-catalog', 'list', null],
     enabled: anchor !== null,
@@ -96,14 +112,12 @@ export const SecretInputOverlay = (): JSX.Element | null => {
   if (anchor === null) return null
   // A modal layer makes everything outside it inert, so the affordance is portaled into the field's own dialog.
   const layer = anchor.element.closest('[role="dialog"]') ?? document.body
-  const panelTop = anchor.rect.bottom + 4
+  const viewport = { width: window.innerWidth, height: window.innerHeight }
+  const button = placeSecretButton({ anchor: anchor.rect, viewport })
+  const placement = placeSecretPanel({ anchor: anchor.rect, panel: { width: panelSize.width, height: panelSize.height || 1 }, viewport })
   return createPortal(
     <>
-      <span
-        className="dshx:pointer-events-auto"
-        ref={toggleRef}
-        style={{ position: 'fixed', left: anchor.rect.right - 30, top: anchor.rect.top + (anchor.rect.height - 24) / 2, zIndex: 61 }}
-      >
+      <span className="dshx:pointer-events-auto" ref={toggleRef} style={{ position: 'fixed', left: button.left, top: button.top, zIndex: 61 }}>
         <Button
           aria-expanded={open}
           aria-label="Bind a secret"
@@ -122,9 +136,10 @@ export const SecretInputOverlay = (): JSX.Element | null => {
         <div
           ref={panelRef}
           aria-label="Bind a secret"
-          className="dshx:pointer-events-auto dshx:flex dshx:w-80 dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:text-popover-foreground dshx:shadow-md"
+          className="dshx-root dshx:pointer-events-auto dshx:flex dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:text-popover-foreground dshx:shadow-md"
+          data-side={placement.side}
           role="group"
-          style={{ position: 'fixed', left: Math.max(8, Math.min(anchor.rect.right - 320, window.innerWidth - 328)), top: panelTop, zIndex: 61 }}
+          style={{ position: 'fixed', left: placement.left, top: placement.top, maxHeight: placement.maxHeight, zIndex: 61 }}
         >
           <p className="dshx:px-1 dshx:text-xs dshx:font-medium">Bind a secret</p>
           <div className="dshx:relative">
@@ -144,7 +159,7 @@ export const SecretInputOverlay = (): JSX.Element | null => {
           ) : null}
           {listQuery.isError ? <p className="dshx:px-1 dshx:text-xs dshx:text-destructive">Secrets could not be loaded. Check the secret CLI.</p> : null}
           {!listQuery.isPending && listQuery.isError !== true ? (
-            <ul aria-label="Secret aliases" className="dshx:flex dshx:max-h-64 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto">
+            <ul aria-label="Secret aliases" className="dshx:flex dshx:flex-col dshx:gap-0.5">
               {rows.map(row => (
                 <li key={row.id}>
                   <button
