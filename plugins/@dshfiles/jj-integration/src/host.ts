@@ -162,16 +162,17 @@ const emitActivity = (input: {
   readonly type: string
   readonly summary: string
   readonly detail?: string | undefined
-  readonly path: string
+  readonly path: string | null
   readonly sessionId?: string | null | undefined
   readonly correlationId?: string | undefined
   readonly level?: ActivityLevel | undefined
 }): void => {
   const at = Date.now()
+  const path = input.path === null || input.path.length === 0 ? null : input.path
   hostContext?.emit('dshfiles/activity/event', {
     kind: 'workspace',
     value: {
-      id: `workspace:${input.type}:${input.path}:${String(at)}`,
+      id: `workspace:${input.type}:${path ?? 'repository'}:${String(at)}`,
       at,
       type: input.type,
       level: input.level ?? 'notable',
@@ -179,8 +180,8 @@ const emitActivity = (input: {
       detail: input.detail ?? null,
       sessionId: input.sessionId ?? null,
       correlationId: input.correlationId ?? null,
-      workspaceId: input.path,
-      workspaceName: basename(input.path),
+      workspaceId: path,
+      workspaceName: path === null ? null : basename(path),
     },
   })
 }
@@ -967,7 +968,7 @@ const applyCleanup = async (input: {
     type: 'workspace.cleaned',
     summary: `${input.trigger === 'automatic' ? 'Automatic cleanup removed' : 'Cleaned up'} ${String(removedCount.workspaces)} thread workspace(s), ${String(removedCount.untracked)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
     detail: CleanupJobModel.skippedSummary(result),
-    path: scan.scopedRepoRoot ?? '',
+    path: scan.scopedRepoRoot ?? null,
     level: input.trigger === 'automatic' && removedCount.workspaces + removedCount.untracked + emptyRevisions.length === 0 ? 'routine' : 'notable',
   })
   return result
@@ -1031,7 +1032,7 @@ const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
     type: 'workspace.cleanup-failed',
     summary: 'Automatic thread-workspace cleanup failed',
     detail: outcome.message,
-    path: '',
+    path: null,
     level: 'attention',
   })
 }

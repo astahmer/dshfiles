@@ -2,6 +2,15 @@ import type { ActivityIngest, ActivityLevel, ActivityReference, BacklogActivityI
 
 const clamp = (value: string, max: number): string => (value.length <= max ? value : `${value.slice(0, max - 1)}…`)
 
+const identifier = (value: string | null): string | null => (value === null || value.length === 0 ? null : value)
+
+const referencesOf = (
+  candidates: readonly { readonly kind: ActivityReference['kind']; readonly id: string | null; readonly label: string | null }[],
+): ActivityReference[] =>
+  candidates.flatMap(candidate =>
+    candidate.id === null || candidate.id.length === 0 ? [] : [{ kind: candidate.kind, id: candidate.id, label: candidate.label }],
+  )
+
 export class ActivityTimelineAdapters {
   static sessionActivity = (input: {
     readonly kind: 'created' | 'disposed' | 'status' | 'error' | 'input'
@@ -77,13 +86,13 @@ export class ActivityTimelineAdapters {
     source: 'communication',
     type: 'communication.activity',
     level: input.outcome === 'failure' ? 'attention' : 'routine',
-    sessionId: input.sessionId,
+    sessionId: identifier(input.sessionId),
     correlationId: input.correlationId ?? null,
     causationId: input.rootCallId,
     summary: `${input.operation} ${input.outcome === 'failure' ? 'failed' : 'succeeded'}`,
     detail: input.errorCode === undefined || input.errorCode === null ? null : `error: ${input.errorCode}`,
     metadata: { operation: input.operation, outcome: input.outcome, callId: input.callId },
-    references: input.sessionId === null ? [] : [{ kind: 'session', id: input.sessionId, label: null }],
+    references: referencesOf([{ kind: 'session', id: input.sessionId, label: null }]),
     provenance: 'observed',
   })
 
@@ -102,14 +111,14 @@ export class ActivityTimelineAdapters {
     source: 'communication',
     type: 'communication.message',
     level: input.intent === 'request' ? 'notable' : 'routine',
-    sessionId: input.sessionId ?? null,
+    sessionId: identifier(input.sessionId ?? null),
     correlationId: input.correlationId ?? null,
     summary:
       input.topic === null
         ? `Direct message from ${input.senderId} to ${String(input.recipientCount)} agent(s)`
         : `Message from ${input.senderId} on ${input.topic}`,
     metadata: { intent: input.intent, topic: input.topic, recipientCount: input.recipientCount, senderId: input.senderId },
-    references: [{ kind: 'message', id: input.messageId, label: input.topic }],
+    references: referencesOf([{ kind: 'message', id: input.messageId, label: input.topic }]),
     provenance: 'observed',
   })
 
@@ -133,17 +142,18 @@ export class ActivityTimelineAdapters {
         : input.type === 'integration.queued' || input.type === 'integration.started'
           ? 'notable'
           : 'routine'
-    const references: ActivityReference[] = []
-    if (input.candidateId !== null) references.push({ kind: 'integration-candidate', id: input.candidateId, label: null })
-    if (input.workspaceId !== null) references.push({ kind: 'workspace', id: input.workspaceId, label: null })
+    const references = referencesOf([
+      { kind: 'integration-candidate', id: input.candidateId, label: null },
+      { kind: 'workspace', id: input.workspaceId, label: null },
+    ])
     return {
       id: `integration:${input.id}`,
       at: input.at,
       source: 'integration',
       type: input.type,
       level,
-      sessionId: input.sessionId,
-      workspaceId: input.workspaceId,
+      sessionId: identifier(input.sessionId),
+      workspaceId: identifier(input.workspaceId),
       correlationId: input.correlationId,
       summary: input.detail ?? input.outcome ?? input.type,
       detail: input.detail,
@@ -158,9 +168,10 @@ export class ActivityTimelineAdapters {
    * the item's full history; the timeline gets one event per change so the shared activity room shows backlog work.
    */
   static backlogActivity = (input: BacklogActivityInput): ActivityIngest => {
-    const references: ActivityReference[] = []
-    if (input.sessionId !== null) references.push({ kind: 'session', id: input.sessionId, label: null })
-    if (input.revision !== null) references.push({ kind: 'revision', id: input.revision, label: null })
+    const references = referencesOf([
+      { kind: 'session', id: input.sessionId, label: null },
+      { kind: 'revision', id: input.revision, label: null },
+    ])
     return {
       id: input.id,
       at: input.at,
@@ -179,18 +190,7 @@ export class ActivityTimelineAdapters {
   static workspaceActivity = (input: {
     readonly id: string
     readonly at: number
-    readonly type:
-      | 'workspace.provisioned'
-      | 'workspace.provision_refused'
-      | 'workspace.writer_acquired'
-      | 'workspace.writer_reclaimed'
-      | 'workspace.writer_released'
-      | 'workspace.writer_transferred'
-      | 'workspace.writer_fenced'
-      | 'workspace.observer_added'
-      | 'workspace.observer_removed'
-      | 'workspace.quarantined'
-      | 'workspace.refused'
+    readonly type: string
     readonly level: ActivityLevel
     readonly summary: string
     readonly detail: string | null
@@ -198,19 +198,20 @@ export class ActivityTimelineAdapters {
     readonly workspaceId: string | null
     readonly workspaceName: string | null
   }): ActivityIngest => {
-    const references: ActivityReference[] = []
-    if (input.sessionId !== null) references.push({ kind: 'session', id: input.sessionId, label: null })
-    if (input.workspaceId !== null) references.push({ kind: 'workspace', id: input.workspaceId, label: input.workspaceName })
+    const references = referencesOf([
+      { kind: 'session', id: input.sessionId, label: null },
+      { kind: 'workspace', id: input.workspaceId, label: input.workspaceName },
+    ])
     return {
       id: input.id,
       at: input.at,
       source: 'workspace',
       type: input.type,
       level: input.level,
-      sessionId: input.sessionId,
+      sessionId: identifier(input.sessionId),
       summary: clamp(input.summary, 200),
       detail: input.detail === null ? null : clamp(input.detail, 2000),
-      metadata: { workspaceId: input.workspaceId, workspaceName: input.workspaceName },
+      metadata: { workspaceId: identifier(input.workspaceId), workspaceName: input.workspaceName },
       references,
       provenance: 'observed',
     }
@@ -254,7 +255,7 @@ export const verificationReceiptActivity = (receipt: VerificationReceiptSummary)
       sourceRevisionAfter: receipt.sourceRevisionAfter,
       configurationFreshness: 'unknown',
     },
-    references: [{ kind: 'session', id: receipt.sessionId, label: null }],
+    references: referencesOf([{ kind: 'session', id: receipt.sessionId, label: null }]),
     provenance: 'observed',
   }
 }

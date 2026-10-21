@@ -124,7 +124,12 @@ export class ActivityTimelineService {
    * @returns its stored event and whether it was a duplicate.
    */
   enqueue(input: ActivityIngest): Promise<{ readonly event: ActivityEvent; readonly duplicate: boolean }> {
-    const event = normalize(input)
+    let event: ActivityEvent
+    try {
+      event = normalize(input)
+    } catch (error) {
+      return Promise.reject(error)
+    }
     return new Promise((resolve, reject) => {
       this.#queued.push({ event, settle: resolve, reject })
       if (this.#queued.length >= INGEST_BATCH_LIMIT) {
