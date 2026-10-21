@@ -1,7 +1,8 @@
 # Persistent agents
 
-Resume here: Phases 1 and 2 shipped in `plugins/@dshfiles/agents` and `@dshfiles/backlog`; Phase 3 is not
-started. Research and verified DSH facts live in [research.md](research.md).
+Resume here: Phases 1 and 2 shipped in `plugins/@dshfiles/agents` and `@dshfiles/backlog`; Phase 3 is
+in progress — see the [Phase 3 task table](#phase-3-tasks) and check off a row only after its
+verification commands are green. Research and verified DSH facts live in [research.md](research.md).
 
 ## Why
 
@@ -96,12 +97,37 @@ flowchart LR
 
 ## Phases
 
-| Phase | Scope                                                                                                                  | State   |
-| ----- | ---------------------------------------------------------------------------------------------------------------------- | ------- |
-| 0     | Research: reference products, existing DSH capabilities, gaps                                                          | done    |
-| 1     | `@dshfiles/agents`: contract, storage, API, tools, panel UI, seeded `@dsh`, `@` source; mentions scope hand-off; tests | done    |
-| 2     | Backlog dispatch from the item comment box, agent fields on the start-thread request, docs, reach steps                | done    |
-| 3     | Comment-box autocomplete, agent thread history + usage, per-agent memory scope, routines/schedules, delegation targets | pending |
+| Phase | Scope                                                                                                                  | State       |
+| ----- | ---------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 0     | Research: reference products, existing DSH capabilities, gaps                                                          | done        |
+| 1     | `@dshfiles/agents`: contract, storage, API, tools, panel UI, seeded `@dsh`, `@` source; mentions scope hand-off; tests | done        |
+| 2     | Backlog dispatch from the item comment box, agent fields on the start-thread request, docs, reach steps                | done        |
+| 3     | Memory scope, comment-box autocomplete, thread history + durable usage, routines bridge, delegation targets            | in progress |
+
+### Phase 3 tasks
+
+Five independent slices. Each lands as one described revision, and each keeps a rule: no new
+runtime, no copied schema, an agent tool for every human verb, and verification in the plugin's
+own tests plus its Gherkin journey.
+
+| #   | Task                     | Owner plugins                                      | Scope of the slice                                                                                                                                                                                                                                                | Verify                                                        | State |
+| --- | ------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----- |
+| 1   | Per-agent memory scope   | `@dshfiles/agents`, `@dshfiles/memory`             | An agent owns a memory scope (`agent:<handle>`); a thread it started renders the project start block **plus** notes filed under that scope. Memory keeps one store and one `notes.scope` column, no new schema; the scope is resolved through the agents contract. | memory + agents unit tests, `memory_start_block` reach step   | todo  |
+| 2   | Comment-box autocomplete | `@dshfiles/backlog`                                | Typing `@` in an item's comment box completes agent handles inline, and the capture/reply composer lists agents next to items and threads; `@b:`/`@t:`/`@f:` keep their own scope and picking inserts `@handle `.                                                | backlog unit tests, the `agents.comment-autocomplete` journey | todo  |
+| 3   | Agent history + usage    | `@dshfiles/agents`                                 | A dispatch records its Session in the agent's `threads` table; the panel lists those threads and opens one; usage counters are read from storage so they survive a Host restart.                                                                                     | agents store/API tests, the `agents.thread-history` journey   | todo  |
+| 4   | Routines bridge          | `@dshfiles/agents`                                 | An optional routine line per agent is carried into the opening message (the thread's own `schedule_*` tools create the reminder) and the panel lists the Host's session-scoped schedules for that agent's threads. No scheduler, no new timer.                     | agents tests, schedule catalog read in the panel              | todo  |
+| 5   | Delegation targets       | `@dshfiles/agents`, `@dshfiles/agent-communication` | Each agent declares which agent handles it may message and whether it may delegate at all; the messaging send path refuses an unlisted target. Subagent-tool enforcement has no Host hook, so it is recorded in `plans/dsh-host-gaps.md`.                         | agents contract tests, agent-communication guard test         | todo  |
+
+### Phase 3 checklist
+
+- [x] `plans/persistent-agents/README.md` carries this table and the resume line (its own revision)
+- [ ] Task 1: agent `memoryScope` + memory start block scoped to the thread's agent, one store, tests
+- [ ] Task 2: inline `@` agent completion in the backlog comment box and composer, scope prefixes preserved
+- [ ] Task 3: durable `threads` table, `agents_threads` tool, panel history with open, usage after restart
+- [ ] Task 4: routine field carried into the opening message, panel routine + schedule list
+- [ ] Task 5: delegation config, enforcement in the messaging send path, Host gap for subagents
+- [ ] Rebuild `@dshfiles/ui-styles` and the touched plugins; refresh the `agent-registry` screenshot
+- [ ] `DSHX_E2E_ONLY=agents node --run check:e2e` green, then Rebase onto `main`
 
 ### Phase 1 checklist
 
@@ -126,10 +152,13 @@ flowchart LR
 
 ## Out of scope (deliberate)
 
-- Per-agent memory and routines (Phase 3): memory stays project-scoped, schedules stay session-scoped.
-- Agent-to-agent delegation rules and DMs (Phase 3); `dshx_comm_*` already covers messaging.
 - Re-composing a live Session's preset or system prompt — impossible on stock DSH (gaps 1 and 3).
 - Any second agent loop, tool registry or conversation store.
+- A scheduler, a cron evaluator or a delivery timer of our own: routines ride DSH's `schedule_*`
+  tools and session-scoped schedules.
+- A messaging runtime: delegation rules constrain `dshx_comm_*`, they do not replace it.
+- Restating memory's schemas or forking its store for an agent: the agent owns a scope name,
+  memory still owns every table.
 
 ## Acceptance
 
