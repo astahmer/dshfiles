@@ -22,8 +22,9 @@ where a thread starts.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
 - **A memory scope of its own.** An agent may name a memory scope (`agent:<handle>` by default). `@dshfiles/memory`
-  reads it through this plugin's contract for every thread the agent started, so those threads carry the project block
-  plus that scope's notes; memory keeps one store and one scope column.
+  reads it through this plugin's contract for every thread the agent started, and a subagent inherits it from the
+  thread that spawned it, so those threads carry the project block plus that scope's notes; memory keeps one store and
+  one scope column.
 - **Routines ride DSH's schedules.** An agent may carry a routine line (“Every weekday at 09:00, summarise open
   reviews.”). It is part of the opening message, which tells the thread to keep it with its own `schedule_*` tools, so
   the reminder lives in DSH's session-scoped schedule store. The panel lists the schedules that belong to the agent's

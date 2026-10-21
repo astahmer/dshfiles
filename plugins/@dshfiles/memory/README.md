@@ -29,8 +29,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   Code: `user`, `feedback`, `project`, `reference`, with `scope`, `confidence` and the source thread and message.
 - **An agent's own scope.** When `@dshfiles/agents` is installed and the thread was started by an agent with a
   `memoryScope`, the block also carries the notes filed under that scope (`agent:<handle>` by default), and only those
-  threads see them. Memory keeps one store and one `notes.scope` column: the agents contract answers which agent owns
-  the Session, and `startBlock({ cwd, scope })` previews it. A note with any other scope stays out of every block and
+  threads see them, and a subagent inherits its spawning thread's scope through up to four parent hops. Memory keeps one
+  store and one `notes.scope` column: the agents contract answers which agent owns the Session, and
+  `startBlock({ cwd, scope })` previews it. A note with any other scope stays out of every block and
   remains searchable, so a scope is an agent's own without a second table. Absent agents bundle: project block only.
 - **One registry.** The agent tools are `dshfiles-memory` API methods (`search`, `read`, `note`) opted into dshx's
   agent registry, so the agent, other Host plugins and Clients call the same handlers; `preview` serves the UI without

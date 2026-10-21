@@ -204,6 +204,12 @@
           "id": "memory.block-scale",
           "file": "plugins/@dshfiles/memory/src/scale.test.ts",
           "testName": "keeps the start block within its byte budget once a project outgrows it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.start-block-agent-scope-inheritance",
+          "file": "plugins/@dshfiles/memory/src/agent-scope.test.ts",
+          "testName": "a subagent inherits the scope of the agent whose thread spawned it"
         }
       ]
     },
@@ -335,7 +341,7 @@
         "press Enter",
         "expect link \"Preview memory n:1\"",
         "click link \"Preview memory n:1\"",
-        "expect text \"Memory · n:1\"",
+        "expect text \"Memory \u00b7 n:1\"",
         "expect text \"No valid note n:1*\"",
         "click button \"Open in Memory\"",
         "expect heading \"Memory\""

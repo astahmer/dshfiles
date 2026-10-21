@@ -21,6 +21,7 @@ import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from '.
 import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@dshfiles/ai-accounts/pricing-catalog'
 
+import { AgentScope } from './agent-scope.ts'
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryEvent, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { projectPathFor } from './project-path.ts'
 import { MemoryGuidance } from './guidance.ts'
@@ -75,8 +76,25 @@ const workspaceScriptsFor = async (cwd: string | undefined): Promise<WorkspaceSc
 
 const TYPESAFE_ENV_KEY = 'TYPESAFE_API_KEY'
 
-/** Session id → the memory scope of the agent that started it; a null answer is cached too, so a plain thread costs one lookup. */
+/** Session id → the memory scope it reads; a null answer is cached too, so a plain thread costs one lookup. */
 const agentScopes = new Map<string, Promise<string | null>>()
+
+/**
+ * A subagent's parent: the live Agent registry first (no I/O), then its Session log, which is the only source once the
+ * parent went cold. Cached with the scope, so a thread pays this at most once.
+ */
+const parentOf = async (ctx: Context, sessionId: string): Promise<string | undefined> => {
+  const live = ctx
+    .get('agents')
+    ?.list()
+    .find(agent => agent.id === sessionId)
+  if (live !== undefined) return live.session.header.parentSession
+  const log = await ctx
+    .get('sessionQuery')
+    ?.readSession(SessionId(sessionId))
+    .catch(() => undefined)
+  return log?.session.parentSession
+}
 
 const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> => {
   const cached = agentScopes.get(sessionId)
@@ -85,8 +103,17 @@ const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> =
     const { agentsApi } = await import('@dshfiles/agents/contract')
     if (!isApiServed(ctx, agentsApi, '@dshfiles/memory')) return null
     const client = createHostApiClient(ctx, agentsApi, '@dshfiles/memory')
-    const result = await client.safe.threadAgent({ sessionId })
-    return result.ok ? (result.value.agent?.memoryScope ?? null) : null
+    return AgentScope.resolve({
+      sessionId,
+      lookup: {
+        threadAgent: async id => {
+          const result = await client.safe.threadAgent({ sessionId: id })
+          const agent = result.ok ? result.value.agent : null
+          return agent === null ? null : { memoryScope: agent.memoryScope }
+        },
+        parentOf: id => parentOf(ctx, id),
+      },
+    })
   })().catch(() => null)
   agentScopes.set(sessionId, pending)
   return pending
