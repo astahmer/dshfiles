@@ -18,6 +18,7 @@ describe('jujutsu tool exposure', () => {
       'jj_revision_files',
       'jj_revision_relationship',
       'jj_working_diff',
+      'jj_workspaces',
     ])
   })
 
@@ -38,6 +39,7 @@ describe('jujutsu tool exposure', () => {
       'jj_revision_files',
       'jj_revision_relationship',
       'jj_working_diff',
+      'jj_workspaces',
     ])
     for (const name of ['prepare', 'confirm'] as const) {
       expect(jujutsuApi.methods[name].description ?? '').toMatch(/Call only when the user asked/u)

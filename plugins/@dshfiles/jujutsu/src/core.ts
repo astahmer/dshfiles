@@ -14,6 +14,8 @@ export interface PreparedMutation {
   readonly identity: string
   readonly fingerprint: string
   readonly action: Mutation
+  /** The folder `workspace-forget` resolves at preview time, snapshotted before the workspace is unregistered. */
+  readonly workspaceRoot?: string
   readonly workspaceParentIdentity?: { readonly device: string; readonly inode: string }
   readonly argv: readonly string[]
   readonly title: string
@@ -101,6 +103,10 @@ const buildMutationArgv = (action: Mutation): readonly string[] => {
       if (!isCommitId(action.commitId) || !workspaceNameSchema.safeParse(action.name).success)
         throw new Error('Choose a valid workspace name and visible revision.')
       return ['workspace', 'add', '--name', action.name, '--revision', action.commitId, join(validatedRepositoryPath(action.parentPath), action.name)]
+    case 'workspace-forget':
+      if (!workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name.')
+      if (action.name === 'default') throw new Error('Workspace default cannot be removed; it is the repository main workspace.')
+      return ['workspace', 'forget', action.name]
     case 'edit':
       return ['edit', checkedCommitId(action.commitId)]
     case 'new':

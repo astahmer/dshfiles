@@ -56,6 +56,7 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('fetch'), remote: remoteNameSchema }),
   z.object({ kind: z.literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
   z.object({ kind: z.literal('workspace-add'), parentPath: z.string().min(1).max(2048), name: workspaceNameSchema, commitId: commitIdSchema }),
+  z.object({ kind: z.literal('workspace-forget'), name: workspaceNameSchema }),
   z.object({ kind: z.literal('edit'), commitId: commitIdSchema }),
   z.object({ kind: z.literal('new'), commitId: commitIdSchema }),
   z.object({ kind: z.literal('commit'), commitId: commitIdSchema, message: z.string().min(1).max(4000) }),
@@ -78,6 +79,7 @@ export const previewSchema = z.object({
     'fetch',
     'push',
     'workspace-add',
+    'workspace-forget',
     'edit',
     'new',
     'commit',
@@ -229,6 +231,16 @@ export const jujutsuApi = defineApi({
           'revisions' in output ? `${String(output.revisions.length)} revision(s)${output.hasMore ? ' (more)' : ''}` : readFailureText(output),
       },
     }),
+    workspaces: method({
+      input: z.object({ repoId: repoIdSchema }),
+      output: z.object({ workspaces: z.array(z.object({ name: workspaceNameSchema, path: z.string().min(1).max(2048) })).max(64) }),
+      description: 'Every Jujutsu workspace of this repository with its folder, including workspaces no DSH project is registered for. Read-only.',
+      tool: {
+        name: 'jj_workspaces',
+        readOnly: true,
+        render: output => output.workspaces.map(workspace => `${workspace.name} · ${workspace.path}`).join('\n') || 'No workspaces.',
+      },
+    }),
     graphNavigation: method({
       input: z.object({ repoId: repoIdSchema }),
       output: z.union([graphNavigationSchema, readFailureSchema]),
@@ -314,7 +326,7 @@ export const jujutsuApi = defineApi({
       input: z.object({ repoId: repoIdSchema, action: mutationSchema }),
       output: previewSchema,
       description:
-        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, edit, new, commit, duplicate, abandon, revert, restore.',
+        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, edit, new, commit, duplicate, abandon, revert, restore.',
       tool: {
         name: 'jj_prepare_action',
         render: output => `${output.title} · ${output.summary}\n${output.detail}\npreviewId ${output.id} (expires ${new Date(output.expiresAt).toISOString()})`,

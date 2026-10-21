@@ -144,6 +144,20 @@ const runAt = async (
   }
 }
 
+/** Every registered workspace and its folder, so a name can be turned into the folder jj owns. */
+const readWorkspaces = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  signal: AbortSignal | undefined,
+): Promise<readonly { readonly name: string; readonly path: string }[]> => {
+  const listing = await runAt(ctx, repo.root, repo.identity, ['workspace', 'list', '-T', 'name ++ "\\t" ++ root ++ "\\n"'], signal, { outputLimit: 64_000 })
+  return listing.stdout
+    .split('\n')
+    .map(line => line.split('\t'))
+    .filter(([name = '', path = '']) => name.length > 0 && path.length > 0)
+    .map(([name = '', path = '']) => ({ name, path }))
+}
+
 const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSignal | undefined): Promise<RegisteredRepo> => {
   const selected = JujutsuPathModel.validatedRepositoryPath(selectedPath)
   let canonicalSelection: string
@@ -497,6 +511,16 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
           '\nThe current workspace and its working files remain in place.',
       }
     }
+    case 'workspace-forget': {
+      return {
+        title: 'Remove workspace',
+        summary: 'Forget workspace ' + action.name,
+        detail:
+          'Folder: ' +
+          (workspacePath ?? '(unknown)') +
+          '\n\nUncommitted edits in that folder are recorded first. The workspace is unregistered from this repository; its folder, its files and every commit stay on disk. Delete the folder afterward with Clean up thread workspaces… if it is a thread workspace.',
+      }
+    }
     case 'bookmark-set': {
       const destination = findRevision(revisions, action.destinationId)
       const current = revisions.find(revision => revision.localBookmarks.includes(action.bookmark))
@@ -604,12 +628,21 @@ const prepareMutation = async (
 ): Promise<PreparedMutation> => {
   let preparedAction = action
   let workspacePath: string | undefined
+  let workspaceRoot: string | undefined
   let workspaceParentIdentity: { readonly device: string; readonly inode: string } | undefined
   if (action.kind === 'workspace-add') {
     const destination = await resolveWorkspaceDestination(repo.root, action.parentPath, action.name)
     preparedAction = { ...action, parentPath: destination.parentPath }
     workspacePath = destination.path
     workspaceParentIdentity = destination.parentIdentity
+  }
+  if (action.kind === 'workspace-forget') {
+    const workspaces = await readWorkspaces(ctx, repo, signal)
+    const target = workspaces.find(workspace => workspace.name === action.name)
+    if (target === undefined) throw new Error('Workspace is no longer present. Refresh and try again.')
+    if (workspaces.length <= 1) throw new Error('Workspace removal refused: this is the repository’s only workspace.')
+    workspaceRoot = target.path
+    workspacePath = target.path
   }
   const pathsRevision =
     preparedAction.kind === 'split' || preparedAction.kind === 'restore'
@@ -658,7 +691,18 @@ const prepareMutation = async (
     expiresAt: Date.now() + PREVIEW_TTL,
   }
   if (workspaceParentIdentity !== undefined) return { ...mutation, workspaceParentIdentity }
+  if (workspaceRoot !== undefined) return { ...mutation, workspaceRoot }
   return mutation
+}
+
+/** Record a workspace's uncommitted edits before unregistering it; a folder that is already gone has none. */
+const snapshotWorkspace = async (ctx: Context, workspaceRoot: string | undefined, signal: AbortSignal | undefined): Promise<void> => {
+  if (workspaceRoot === undefined) return
+  try {
+    await runAt(ctx, workspaceRoot, undefined, ['status'], signal, { outputLimit: 8_000 })
+  } catch {
+    if (signal?.aborted === true) throw new Error('Jujutsu request was cancelled.')
+  }
 }
 
 /** Hands the user-written failure messages to the Client; others stay generic and are logged on the Host. */
@@ -676,6 +720,10 @@ const jujutsuHostApi = jujutsuApi.host({
   registerRepository: userFacing(async ({ input, ctx, signal }) => {
     const repo = await registerRepo(ctx, input.path, signal)
     return { repoId: repo.id, root: repo.root }
+  }),
+  workspaces: userFacing(async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    return { workspaces: [...(await readWorkspaces(ctx, repo, signal))] }
   }),
   load: async ({ input, ctx, signal }) => {
     try {
@@ -778,6 +826,7 @@ const jujutsuHostApi = jujutsuApi.host({
       }
       workspacePath = destination.path
     }
+    if (prepared.action.kind === 'workspace-forget') await snapshotWorkspace(ctx, prepared.workspaceRoot, signal)
     const result = await runAt(ctx, repo.root, repo.identity, prepared.argv, signal, {
       timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
     })

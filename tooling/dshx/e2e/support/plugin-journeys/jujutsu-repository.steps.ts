@@ -113,7 +113,7 @@ When('a workspace {string} is provisioned at the Feature revision under the fixt
   const repository = repositoryFor(page)
   await revisionRow(page, 'Feature work by Ada').getByRole('button').first().click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'New workspace here…', exact: true }).click()
-  const provision = page.getByRole('dialog', { name: 'New workspace', exact: true })
+  const provision = page.getByRole('group', { name: 'Create workspace at this revision', exact: true })
   await provision.getByRole('textbox', { name: 'Workspace name', exact: true }).fill(name)
   await provision.getByRole('button', { name: 'Choose parent directory', exact: true }).click()
   const picker = page.getByRole('dialog', { name: 'Choose the parent directory', exact: true })
@@ -244,7 +244,7 @@ Then('its changed files keep literal paths and track review progress', async ({ 
   })
   await row.getByRole('button', { name: 'Full diff', exact: true }).click()
   await recordAssertion(page, 'jujutsu-full-diff-shows-every-changed-file', async () => {
-    const diff = page.getByRole('dialog', { name: /^Feature work by Ada · \w+ · 2 files$/ })
+    const diff = page.getByRole('group', { name: /^Full diff of Feature work by Ada · \w+ · 2 files$/ })
     await expect(diff.getByText(UNICODE_PATH, { exact: true })).toBeVisible()
     await expect(diff.getByRole('code').filter({ hasText: 'feature' })).toBeVisible()
   })

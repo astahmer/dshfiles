@@ -326,7 +326,7 @@
     {
       "id": "workspace-at-revision",
       "title": "Create a workspace at a revision",
-      "summary": "Right-click a revision and choose New workspace here\u2026 to add an isolated JJ workspace checked out at it, then launch a session there only after explicit confirmation. Forking a session moved to the native Branch action.",
+      "summary": "Right-click a revision and choose New workspace here\u2026 to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
         "click button \"Jujutsu\"",
         "click button \"Choose repository\"",
@@ -336,7 +336,7 @@
         "expect button \"Sample project*\"",
         "rightclick button \"Sample project*\"",
         "click menuitem \"New workspace here\u2026\"",
-        "expect dialog \"New workspace\""
+        "expect group \"Create workspace at this revision\""
       ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [
@@ -478,6 +478,46 @@
           "kind": "gherkin",
           "id": "jujutsu.workspace-cleanup",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        }
+      ]
+    },
+    {
+      "id": "workspace-removal",
+      "title": "Remove a workspace from the graph",
+      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace\u2026: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Jujutsu\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Sample project*\"",
+        "rightclick title \"Workspace thread-*\"",
+        "click menuitem \"Remove workspace\u2026\"",
+        "expect group \"Confirm removing workspace*\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["thread-workspace", "plain-workspace", "removed", "refused"],
+      "failureModes": [
+        "The default workspace is never offered, and a repository keeps at least one workspace.",
+        "A thread workspace that gained revisions after the confirmation opened is kept instead of being removed unseen.",
+        "A plain workspace is only forgotten: its folder, files and commits stay on disk."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-workspace",
+          "boundary": "Local jj workspace removal and jj-integration thread discard.",
+          "deterministicFake": "A disposable local JJ repository with a seeded thread workspace."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.workspace-forget",
+          "file": "plugins/@dshfiles/jujutsu/src/fileset.integration.test.ts",
+          "testName": "workspace-forget unregisters a secondary workspace and leaves its folder and files in place"
         }
       ]
     }

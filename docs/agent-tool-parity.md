@@ -40,7 +40,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | btw                                                                                                                                               | 8                    | 0                                                                                                        | 3             | 1         |
 | shortcuts                                                                                                                                         | 4                    | 0                                                                                                        | 2             | 1         |
 | jj-integration                                                                                                                                    | 23                   | 10                                                                                                       | 5             | 3         |
-| jujutsu                                                                                                                                           | 29                   | 12                                                                                                       | 0             | 3         |
+| jujutsu                                                                                                                                           | 30                   | 13                                                                                                       | 0             | 3         |
 | project-checks                                                                                                                                    | 8                    | 4                                                                                                        | 1             | 2         |
 | project-folder-picker / workspace-folder-picker                                                                                                   | 9                    | 0                                                                                                        | 4             | 2         |
 | workbench                                                                                                                                         | 8                    | 0                                                                                                        | 2             | 6         |
@@ -187,16 +187,17 @@ Still missing:
 ### jujutsu
 
 Bound now (sibling revision `feat(jujutsu): expose the revision graph and Source
-Control as agent tools`), with thirteen tools covering all 30 capabilities: the eleven
+Control as agent tools`), with fourteen tools covering all 30 capabilities: the twelve
 read-only ones are `jj_register_repository`, `jj_load`, `jj_graph_page`,
-`jj_graph_navigation`, `jj_revision_relationship`, `jj_graph_slice`,
-`jj_reference_graph`, `jj_details`, `jj_revision_files`, `jj_edit_times` and
-`jj_working_diff`.
+`jj_workspaces`, `jj_graph_navigation`, `jj_revision_relationship`,
+`jj_graph_slice`, `jj_reference_graph`, `jj_details`, `jj_revision_files`,
+`jj_edit_times` and `jj_working_diff`.
 
 The writes keep the product's two-step shape rather than one tool per action:
-`jj_prepare_action` prepares one of the seventeen mutation kinds (describe, split,
-squash, rebase, bookmark-move/set/delete, fetch, push, workspace-add, edit, new,
-commit, duplicate, abandon, revert, restore) and returns its preview, and
+`jj_prepare_action` prepares one of the eighteen mutation kinds (describe, split,
+squash, rebase, bookmark-move/set/delete, fetch, push, workspace-add,
+workspace-forget, edit, new, commit, duplicate, abandon, revert, restore) and
+returns its preview, and
 `jj_confirm_action` applies a `previewId`. Both say to act only when the user
 asked, so the plan a human would confirm in the UI is still shown first. Settings
 are not separate tools: `settings_set` writes the `dshfiles-jujutsu` namespace.

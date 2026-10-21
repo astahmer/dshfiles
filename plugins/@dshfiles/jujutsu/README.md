@@ -1,5 +1,7 @@
 # @dshfiles/jujutsu
 
+![Remove a workspace from the graph](docs/screenshots/workspace-removal.png)
+
 ![Locate landmarks and compare revision ancestry](docs/screenshots/graph-navigation.png)
 
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
@@ -42,11 +44,16 @@ contracts.
 - Expanded revisions show the description, Describe / Full diff / Edit This
   Change / Squash into parent, and changed files as a Flat or Tree list with
   M/A/D status (a conflicted file gets a red ✗ and red name), +/- counts, folder counts, and per-file review marks.
-- Full diff opens every file of a revision with numbered rows and collapsed
-  "N unmodified lines" separators, rendered from `jj diff --git`.
+- Full diff expands every file of a revision in its own row, with numbered rows
+  and collapsed "N unmodified lines" separators, rendered from `jj diff --git`.
 - Right-click a revision for full diff, describe, edit, new change, squash,
   duplicate, revert onto @, rebase onto main, set or move a bookmark, create a
-  workspace there, copy the full displayed revision ID, and abandon; right-click a local bookmark to push or delete it.
+  workspace there, remove a workspace it holds, copy the full displayed
+  revision ID, and abandon; right-click a local bookmark to push or delete it.
+  Every one of these opens **inside the revision row it acts on** — no modal —
+  and Escape or Cancel collapses it; only the shared folder picker for a new
+  workspace parent is still a dialog. A panel whose row the current filter
+  hides stays reachable above the list.
 - A Source Control view modelled on jj-view: a message box that describes or
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
   discard (`jj restore`), move to parent/child (`jj squash` with literal
@@ -83,10 +90,17 @@ contracts.
   panel moves there, through the cancelable `dshfiles:move-panel-aside` request
   this entry answers by opening its right-pane tab. That tab's own menu row, _Move
   to main area_, closes it and selects the main panel again.
-- Right-click a revision → New workspace here… to create an isolated JJ
-  workspace checked out at it, then explicitly open a DSH Session in that
-  directory. Forking a Session is left to DSH's native Branch action, and
-  thread workspaces to `@dshfiles/jj-integration`.
+- Right-click a revision → New workspace here… names and places an isolated JJ
+  workspace checked out at it in that row, previews the setup, then explicitly
+  opens a DSH Session in that directory. Forking a Session is left to DSH's
+  native Branch action, and thread workspaces to `@dshfiles/jj-integration`.
+- Right-click a workspace pill (or that revision) → Remove workspace… to
+  unregister it, with the confirmation expanding in that row. A managed thread
+  workspace is removed whole — jj workspace forgotten, DSH project entry
+  removed, folder deleted, unlanded revisions abandoned only after the panel
+  names them — while any other workspace is only forgotten: its folder, files
+  and commits stay on disk. `default` is never offered, and a repository keeps
+  at least one workspace.
 
 ## Graph landmarks and temporary views
 

@@ -129,6 +129,53 @@ test('workspace-add creates a sibling at the chosen revision and preserves dirty
   assert.match(sourceStatus, /draft\.txt/)
 })
 
+test('workspace-forget unregisters a secondary workspace and leaves its folder and files in place', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-forget-'))
+  const repo = join(home, 'repo')
+  const parent = join(home, 'workspaces')
+  const destination = join(parent, 'review-at-base')
+  await mkdir(repo)
+  await mkdir(parent)
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+
+  runJj(repo, home, ['git', 'init', '--no-colocate'])
+  await writeFile(join(repo, 'base.txt'), 'base\n')
+  const commitId = runJj(repo, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-add', parentPath: parent, name: 'review-at-base', commitId }))
+  await writeFile(join(destination, 'note.txt'), 'kept on disk\n')
+  runJj(destination, home, ['status'])
+
+  runJj(repo, home, JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'review-at-base' }))
+
+  assert.doesNotMatch(runJj(repo, home, ['workspace', 'list']), /review-at-base/)
+  assert.equal(await readFile(join(destination, 'note.txt'), 'utf8'), 'kept on disk\n')
+  assert.match(runJj(destination, home, ['root']), new RegExp(destination.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+}, 20_000)
+
+test('the workspace list template names every workspace and its folder', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-workspace-paths-'))
+  const repo = join(home, 'repo')
+  const destination = join(home, 'review-ws')
+  await mkdir(repo)
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+
+  runJj(repo, home, ['git', 'init', '--no-colocate'])
+  runJj(repo, home, ['workspace', 'add', destination, '--name', 'review-ws', '-r', '@'])
+
+  const listing = runJj(repo, home, ['workspace', 'list', '-T', 'name ++ "\\t" ++ root ++ "\\n"'])
+  const workspaces = new Map(
+    listing
+      .split('\n')
+      .filter(line => line.length > 0)
+      .map(line => {
+        const [name = '', path = ''] = line.split('\t')
+        return [name, path] as const
+      }),
+  )
+  assert.equal(await realpath(workspaces.get('default') ?? ''), await realpath(repo))
+  assert.equal(await realpath(workspaces.get('review-ws') ?? ''), await realpath(destination))
+}, 20_000)
+
 test('file stats template, file moves, and restore act on exact listed files', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-moves-'))
   const repo = join(home, 'repo')

@@ -18,7 +18,6 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -69,7 +68,6 @@ import { z } from 'zod'
 import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
 import { ChatReferenceModel } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
-import { FullDiffDialog } from './full-diff-dialog.js'
 import { RevisionGraphModel, reverseHexChangeId, type GraphLane, type RevisionGraphRow } from './graph.js'
 import { GraphPagingModel } from './graph-paging.js'
 import { jujutsuApi } from './api.js'
@@ -87,7 +85,11 @@ import { ReviewProgressMigration, type ReviewProgressMigrationClient } from './r
 import { latestReviewProgressSnapshot } from './review-progress-queries.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
-import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
+import { InlineActionConfirm } from './inline-action-confirm.js'
+import { InlineBookmarkSet } from './inline-bookmark-set.js'
+import { InlineRevisionDiff } from './inline-revision-diff.js'
+import { InlineWorkspaceProvisioner } from './inline-workspace-provisioner.js'
+import { InlineWorkspaceRemoval } from './inline-workspace-removal.js'
 import { WorkspaceCleanupDialog } from './workspace-cleanup-dialog.js'
 import { WorkspaceCleanupTrail } from './workspace-cleanup-trail.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
@@ -332,8 +334,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [bookmark, setBookmark] = useState('')
   const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
   const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
+  const [workspaceRemoval, setWorkspaceRemoval] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
-  const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
+  const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string } | null>(null)
   const [cleanupOpen, setCleanupOpen] = useState(false)
   const [moveSource, setMoveSource] = useState<Revision | null>(null)
   const [copyNotice, setCopyNotice] = useState<{ readonly copied: boolean; readonly label: string } | null>(null)
@@ -380,6 +383,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setSelection(null)
       setComparisonSelection(null)
       setMoveSource(null)
+      setWorkspaceRemoval(null)
       setDescribeDrafts({})
       setFullDiff(null)
       const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
@@ -838,6 +842,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         return pendingAction.destinationId
       case 'bookmark-delete':
         return state?.revisions.find(revision => revision.localBookmarks.includes(pendingAction.bookmark))?.commitId ?? null
+      case 'workspace-forget':
+        return null
       default:
         return pendingAction.commitId
     }
@@ -847,6 +853,63 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     actionPreview === undefined ? null : (
       <InlineActionConfirm busy={actionBusy} onCancel={() => sendAction({ type: 'cancel' })} onConfirm={confirmPreview} preview={actionPreview} />
     )
+
+  const inlineRemoval =
+    workspaceRemoval === null || repoId === null || state === undefined ? null : (
+      <InlineWorkspaceRemoval
+        name={workspaceRemoval.name}
+        onCancel={() => setWorkspaceRemoval(null)}
+        onRemoved={() => setWorkspaceRemoval(null)}
+        repoId={repoId}
+        repoRoot={state.root}
+      />
+    )
+  const removalHidden = workspaceRemoval !== null && !visibleRevisions.some(revision => revision.commitId === workspaceRemoval.commitId)
+
+  const inlineProvisioner =
+    workspaceBase === null ? null : (
+      <InlineWorkspaceProvisioner
+        directoryPicker={props.directoryPicker}
+        onCancel={() => setWorkspaceBase(null)}
+        onPreview={action => {
+          setWorkspaceBase(null)
+          askForConfirmation(action)
+        }}
+        registerWorkspace={props.registerWorkspace}
+        revision={workspaceBase}
+      />
+    )
+  const provisionerHidden = workspaceBase !== null && !visibleRevisions.some(revision => revision.commitId === workspaceBase.commitId)
+
+  const inlineBookmark =
+    bookmarkDraft === null ? null : (
+      <InlineBookmarkSet
+        onCancel={() => setBookmarkDraft(null)}
+        onPreview={name => {
+          const commitId = bookmarkDraft.commitId
+          setBookmarkDraft(null)
+          askForConfirmation({ kind: 'bookmark-set', bookmark: name, destinationId: commitId })
+        }}
+        shortestChangeId={revisionsByCommitId.get(bookmarkDraft.commitId)?.shortestChangeId ?? 'the selected revision'}
+      />
+    )
+  const bookmarkHidden = bookmarkDraft !== null && !visibleRevisions.some(revision => revision.commitId === bookmarkDraft.commitId)
+
+  const inlineDiff =
+    fullDiff === null ? null : (
+      <InlineRevisionDiff
+        error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
+        focusPath={fullDiff.focusPath}
+        layout={diffLayout}
+        onCancel={() => setFullDiff(null)}
+        onOpenInEditor={path => {
+          if (state !== undefined && openInEditor({ path, cwd: state.root })) setFullDiff(null)
+        }}
+        patch={fullDiffQuery.data?.patch}
+        title={fullDiff.title}
+      />
+    )
+  const diffHidden = fullDiff !== null && !visibleRevisions.some(revision => revision.commitId === fullDiff.commitId)
 
   const refreshRepository = (): void => {
     if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
@@ -992,6 +1055,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         )}
         <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'new', commitId: revision.commitId })}>New change here</ContextMenuItem>
         <ContextMenuItem onSelect={() => setWorkspaceBase(revision)}>New workspace here…</ContextMenuItem>
+        {revision.workspaces
+          .filter(name => name !== 'default')
+          .map(name => (
+            <ContextMenuItem key={name} onSelect={() => setWorkspaceRemoval({ commitId: revision.commitId, name })} variant="destructive">
+              Remove workspace {name}…
+            </ContextMenuItem>
+          ))}
         <ContextMenuSeparator />
         {!revision.immutable && parent !== undefined && !parent.immutable && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'squash', sourceId: revision.commitId, destinationId: parent.commitId })}>
@@ -1010,7 +1080,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             Rebase onto main
           </ContextMenuItem>
         )}
-        <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId, name: '' })}>Set bookmark…</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId })}>Set bookmark…</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => void copyText(fullRevisionId(revision), 'Revision ID')}>Copy revision ID</ContextMenuItem>
         {!revision.immutable && (
@@ -1036,6 +1106,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       <ContextMenuItem disabled={!local} onSelect={() => askForConfirmation({ kind: 'bookmark-delete', bookmark: name })} variant="destructive">
         Delete bookmark…
       </ContextMenuItem>
+    </ContextMenuContent>
+  )
+
+  const workspaceMenu = (name: string, commitId: string): ReactNode => (
+    <ContextMenuContent className="dshx-root dshx:w-52">
+      <ContextMenuLabel className="dshx:truncate dshx:font-mono dshx:text-xs">{name}</ContextMenuLabel>
+      <ContextMenuItem onSelect={() => void copyText(name, 'Workspace name')}>Copy name</ContextMenuItem>
+      {name === 'default' ? null : (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => setWorkspaceRemoval({ commitId, name })} variant="destructive">
+            Remove workspace…
+          </ContextMenuItem>
+        </>
+      )}
     </ContextMenuContent>
   )
 
@@ -1466,12 +1551,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   ) : (
                     <RevisionRow
                       bookmarkMenu={bookmarkMenu}
+                      workspaceMenu={workspaceMenu}
                       connectionDimmed={connectionIds !== null && !connectionIds.has(item.revision.commitId)}
                       highlighted={locatedId === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
                       expanded={
-                        selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null || rowConfirmAnchorId === item.revision.commitId
+                        selectedRevision?.commitId === item.revision.commitId ||
+                        rowDropPresentation !== null ||
+                        rowConfirmAnchorId === item.revision.commitId ||
+                        workspaceRemoval?.commitId === item.revision.commitId ||
+                        workspaceBase?.commitId === item.revision.commitId ||
+                        bookmarkDraft?.commitId === item.revision.commitId ||
+                        fullDiff?.commitId === item.revision.commitId
                       }
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
@@ -1497,6 +1589,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
                       {rowDropPresentation !== null && dropPreviewAt(item.revision)}
                       {rowConfirmAnchorId === item.revision.commitId && inlineConfirm}
+                      {workspaceRemoval?.commitId === item.revision.commitId && inlineRemoval}
+                      {workspaceBase?.commitId === item.revision.commitId && inlineProvisioner}
+                      {bookmarkDraft?.commitId === item.revision.commitId && inlineBookmark}
+                      {fullDiff?.commitId === item.revision.commitId && inlineDiff}
                     </RevisionRow>
                   )}
                 </div>
@@ -1721,6 +1817,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <WorkspaceCleanupTrail onFinished={refreshRepository} />
 
           {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
+          {removalHidden && inlineRemoval !== null && <div className="dshx:border-b dshx:p-2">{inlineRemoval}</div>}
+          {(provisionerHidden || bookmarkHidden || diffHidden) && (
+            <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:p-2">
+              {provisionerHidden && inlineProvisioner}
+              {bookmarkHidden && inlineBookmark}
+              {diffHidden && inlineDiff}
+            </div>
+          )}
 
           {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
@@ -1779,15 +1883,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           {tabsContent}
         </Tabs>
 
-        {workspaceBase !== null && (
-          <WorkspaceProvisionerDialog
-            directoryPicker={props.directoryPicker}
-            onClose={() => setWorkspaceBase(null)}
-            onPreview={askForConfirmation}
-            registerWorkspace={props.registerWorkspace}
-            revision={workspaceBase}
-          />
-        )}
         {pickerOpen && (
           <ProjectFolderPicker
             directoryPicker={props.directoryPicker}
@@ -1806,63 +1901,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           />
         )}
 
-        {fullDiff !== null && (
-          <FullDiffDialog
-            error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
-            focusPath={fullDiff.focusPath}
-            layout={diffLayout}
-            onClose={() => setFullDiff(null)}
-            onOpenInEditor={path => {
-              if (state !== undefined && openInEditor({ path, cwd: state.root })) setFullDiff(null)
-            }}
-            patch={fullDiffQuery.data?.patch}
-            title={fullDiff.title}
-            truncated={fullDiffQuery.data?.truncated ?? false}
-          />
-        )}
-
         {state !== undefined && <WorkspaceCleanupDialog onCleaned={refreshRepository} onOpenChange={setCleanupOpen} open={cleanupOpen} path={state.root} />}
-
-        <Dialog
-          onOpenChange={open => {
-            if (!open) setBookmarkDraft(null)
-          }}
-          open={bookmarkDraft !== null}
-        >
-          {bookmarkDraft !== null && (
-            <DialogContent className="dshx-root dshx:sm:max-w-sm">
-              <form
-                className="dshx:flex dshx:flex-col dshx:gap-3"
-                onSubmit={event => {
-                  event.preventDefault()
-                  const name = bookmarkDraft.name.trim()
-                  if (name.length === 0) return
-                  setBookmarkDraft(null)
-                  askForConfirmation({ kind: 'bookmark-set', bookmark: name, destinationId: bookmarkDraft.commitId })
-                }}
-              >
-                <DialogHeader>
-                  <DialogTitle className="dshx:text-base">Set bookmark</DialogTitle>
-                  <DialogDescription>At {revisionsByCommitId.get(bookmarkDraft.commitId)?.shortestChangeId ?? 'the selected revision'}.</DialogDescription>
-                </DialogHeader>
-                <Input
-                  aria-label="Bookmark name"
-                  autoFocus
-                  className="dshx:font-mono!"
-                  onChange={event => setBookmarkDraft({ commitId: bookmarkDraft.commitId, name: event.target.value })}
-                  pattern="[A-Za-z0-9][A-Za-z0-9._/+:\-]*"
-                  placeholder="feature/name"
-                  value={bookmarkDraft.name}
-                />
-                <DialogFooter>
-                  <Button disabled={bookmarkDraft.name.trim().length === 0} size="sm" type="submit">
-                    Preview
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          )}
-        </Dialog>
       </TooltipProvider>
     </main>
   )
@@ -2267,52 +2306,6 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
   </section>
 )
 
-const DESTRUCTIVE_ACTIONS: ReadonlySet<ActionPreview['kind']> = new Set(['abandon', 'restore', 'bookmark-delete'])
-
-interface InlineActionConfirmProps {
-  readonly preview: ActionPreview
-  readonly busy: boolean
-  readonly onCancel: () => void
-  readonly onConfirm: () => void
-}
-
-const InlineActionConfirm = (props: InlineActionConfirmProps): JSX.Element => (
-  <section
-    aria-label={`Confirm ${props.preview.title.toLocaleLowerCase()}`}
-    className="dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-primary/40 dshx:bg-primary/5 dshx:p-3"
-    onKeyDown={event => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      props.onCancel()
-    }}
-    role="group"
-  >
-    <p className="dshx:text-xs dshx:font-medium" role="status">
-      {props.preview.summary}
-    </p>
-    {props.preview.detail.length > 0 && (
-      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">
-        {props.preview.detail}
-      </pre>
-    )}
-    <div className="dshx:flex dshx:justify-end dshx:gap-2">
-      <Button onClick={props.onCancel} size="sm" type="button" variant="outline">
-        Cancel
-      </Button>
-      <Button
-        autoFocus
-        disabled={props.busy}
-        onClick={props.onConfirm}
-        size="sm"
-        type="button"
-        variant={DESTRUCTIVE_ACTIONS.has(props.preview.kind) ? 'destructive' : 'default'}
-      >
-        {props.preview.title}
-      </Button>
-    </div>
-  </section>
-)
-
 interface RevisionRowProps {
   readonly revision: Revision
   readonly expanded: boolean
@@ -2328,6 +2321,7 @@ interface RevisionRowProps {
   readonly revisionDate: RevisionDate
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
+  readonly workspaceMenu: (name: string, commitId: string) => ReactNode
   readonly onToggle: () => void
   readonly onDescribe: () => void
   readonly onDragStart: (origin: DragOrigin) => void
@@ -2344,21 +2338,31 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const described = revision.description.trim().length > 0
   const changeId = reverseHexChangeId(revision.changeId, Math.max(3, revision.shortestChangeId.length))
   const workspaceLabels = revision.workingCopy && revision.workspaces.length === 0 ? ['default'] : revision.workspaces
+  const workspaceLabel = (workspace: string): JSX.Element => (
+    <span
+      className={cn(
+        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:text-background',
+        revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
+      )}
+      onContextMenu={event => event.stopPropagation()}
+      title={`${revision.workingCopy ? `Working copy of workspace ${workspace}` : `Workspace ${workspace}`} · right-click for actions`}
+    >
+      <MonitorIcon aria-hidden className="dshx:size-3 dshx:flex-none" />
+      <span className="dshx:truncate">{workspace}</span>
+    </span>
+  )
   const labels = (
     <>
-      {workspaceLabels.map(workspace => (
-        <span
-          className={cn(
-            'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:text-background',
-            revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
-          )}
-          key={workspace}
-          title={revision.workingCopy ? `Working copy of workspace ${workspace}` : `Workspace ${workspace}`}
-        >
-          <MonitorIcon aria-hidden className="dshx:size-3 dshx:flex-none" />
-          <span className="dshx:truncate">{workspace}</span>
-        </span>
-      ))}
+      {workspaceLabels.map(workspace =>
+        workspace === 'default' ? (
+          <span key={workspace}>{workspaceLabel(workspace)}</span>
+        ) : (
+          <ContextMenu key={workspace}>
+            <ContextMenuTrigger asChild>{workspaceLabel(workspace)}</ContextMenuTrigger>
+            {props.workspaceMenu(workspace, revision.commitId)}
+          </ContextMenu>
+        ),
+      )}
       {revision.bookmarks.map(name => {
         const local = revision.localBookmarks.includes(name)
         return (

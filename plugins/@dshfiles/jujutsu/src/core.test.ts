@@ -68,6 +68,12 @@ test('workspace-add uses a listed revision and one literal isolated destination 
   assert.throws(() => JujutsuMutationModel.buildMutationArgv({ ...action, commitId: 'not-a-revision' }), /visible revision/)
 })
 
+test('workspace-forget names exactly one workspace and never the default one', () => {
+  assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'thread-8fac71' }), ['workspace', 'forget', 'thread-8fac71'])
+  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: 'default' }), /Workspace default cannot be removed/)
+  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-forget', name: '../outside' }), /valid workspace name/)
+})
+
 test('revision text search includes full IDs and all requested labels', () => {
   const revision = {
     description: 'Improve sorting',
