@@ -233,8 +233,7 @@ export const InboxView = (props: {
                     ))}
                     {item.project === null ? null : (
                       <>
-                        <ItemGlyphs.ProjectDot project={item.project} />
-                        <span className="dshx:truncate">{ItemGlyphs.projectName(item.project)}</span>·
+                        <ItemGlyphs.ProjectLabel project={item.project} />·
                       </>
                     )}
                     <span className="dshx:font-mono!">b:{item.id}</span>· {ItemGlyphs.ago(item.lastActivityAt)}

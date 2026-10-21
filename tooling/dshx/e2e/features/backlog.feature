@@ -97,7 +97,8 @@ Feature: Backlog
     Then backlog item b:1 exposes all context actions in the "inbox" view
     And backlog item b:1 exposes all context actions in the "projects" view
     When backlog item b:1 is assigned to a registered project from its feed context menu
-    Then backlog item b:1 exposes all context actions in the "details" view
+    Then the board card for b:1 names the project it is filed under
+    And backlog item b:1 exposes all context actions in the "details" view
 
   @scenario:backlog.item-text-links
   Scenario: Follow links in an item title and description

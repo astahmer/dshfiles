@@ -303,6 +303,25 @@ When('backlog item b:{int} is assigned to a registered project from its feed con
   await page.keyboard.press('Escape')
 })
 
+Then('the board card for b:{int} names the project it is filed under', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, 'backlog-board-project-label', async () => {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await page.getByRole('button', { name: 'Board', exact: true }).click()
+    const card = page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+    await expect(card).toBeVisible()
+    await card.click({ button: 'right' })
+    await contextMenu(page).getByRole('menuitem', { name: 'Project', exact: true }).hover()
+    const chosen = page.getByRole('menu').last().getByRole('menuitemradio', { checked: true })
+    await expect(chosen).toHaveCount(1)
+    const projectName = (await chosen.innerText()).trim()
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    expect(projectName).not.toBe('No project')
+    await expect(card).toContainText(projectName)
+  })
+})
+
 Then('the start thread dialog offers the account model and the Host default folder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-start-thread-dialog', async () => {
     await expect(startThreadDialog(page)).toBeVisible()

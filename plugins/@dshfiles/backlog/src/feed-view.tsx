@@ -110,8 +110,7 @@ const FeedEntry = (props: {
             )}
             {item.project === null ? null : (
               <Chip>
-                <ItemGlyphs.ProjectDot project={item.project} />
-                {ItemGlyphs.projectName(item.project)}
+                <ItemGlyphs.ProjectLabel project={item.project} />
               </Chip>
             )}
             {item.tags.map(tag => (

@@ -125,6 +125,14 @@ const ProjectDot = (props: { readonly project: string; readonly className?: stri
   <span aria-hidden className={cn('dshx:inline-block dshx:size-2 dshx:shrink-0 dshx:rounded-full', projectTone(props.project), props.className)} />
 )
 
+/** A project as its dot and short name; the full path stays in the tooltip. */
+const ProjectLabel = (props: { readonly project: string; readonly className?: string }): JSX.Element => (
+  <span title={props.project} className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', props.className)}>
+    <ProjectDot project={props.project} />
+    <span className="dshx:truncate">{projectName(props.project)}</span>
+  </span>
+)
+
 const actorName = (id: string | undefined): string => {
   if (id === undefined || id === 'user') return 'You'
   if (id === 'system') return 'Automatic'
@@ -201,6 +209,7 @@ export class ItemGlyphs {
   static readonly KindIcon = KindIcon
   static readonly AttentionBadge = AttentionBadge
   static readonly ProjectDot = ProjectDot
+  static readonly ProjectLabel = ProjectLabel
   static readonly ActorAvatar = ActorAvatar
   static readonly ActorStack = ActorStack
   static readonly projectName = projectName

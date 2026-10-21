@@ -110,6 +110,9 @@
         "click text \"b:1\"",
         "expect link \"description\"",
         "click button \"Board\"",
+        "rightclick article \"Card b:1\"",
+        "hover menuitem \"Project\"",
+        "click menuitemradio \"sample\"",
         "click article \"Card b:1\"",
         "expect complementary \"Item detail\""
       ],
@@ -576,7 +579,7 @@
     {
       "id": "project-scope",
       "title": "File and scope items by project",
-      "summary": "One searchable project combobox scopes every view from the header and presets the capture box to the same project; the same picker sets the project on the capture chip, on the item's details line, and in each right-click menu. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
+      "summary": "One searchable project combobox scopes every view from the header and presets the capture box to the same project; the same picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project, with the full path in its tooltip. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",

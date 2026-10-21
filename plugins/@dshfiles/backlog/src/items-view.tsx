@@ -218,16 +218,7 @@ const Row = (props: {
           {ItemGlyphs.kindLabels[item.kind]}
         </span>
         <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', wideOnly)}>
-          {item.project === null ? (
-            <span className="dshx:text-muted-foreground/60">—</span>
-          ) : (
-            <>
-              <ItemGlyphs.ProjectDot project={item.project} />
-              <span className="dshx:truncate" title={item.project}>
-                {ItemGlyphs.projectName(item.project)}
-              </span>
-            </>
-          )}
+          {item.project === null ? <span className="dshx:text-muted-foreground/60">—</span> : <ItemGlyphs.ProjectLabel project={item.project} />}
         </span>
         <span className={roomyOnly}>
           <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} max={2} />

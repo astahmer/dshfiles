@@ -686,10 +686,7 @@ const PeekBody = (props: {
         <nav aria-label="Breadcrumb" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
           {item.project === null ? null : (
             <>
-              <ItemGlyphs.ProjectDot project={item.project} />
-              <span className="dshx:truncate" title={item.project}>
-                {ItemGlyphs.projectName(item.project)}
-              </span>
+              <ItemGlyphs.ProjectLabel project={item.project} />
               <span>/</span>
             </>
           )}

@@ -70,6 +70,7 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
       <div className="dshx:flex dshx:items-center dshx:gap-2">
         <StateLine item={item} />
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+          {item.project === null ? null : <ItemGlyphs.ProjectLabel project={item.project} className="dshx:max-w-24" />}
           {item.links.length === 0 ? null : (
             <span className="dshx:flex dshx:items-center dshx:gap-0.5">
               <LinkIcon aria-hidden className="dshx:size-3" />

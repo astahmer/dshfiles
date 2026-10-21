@@ -67,8 +67,9 @@ Freshness is derived on read and never stored:
 
 Dormant and archived items stay in search, filters and backlinks. Any edit, move, link or comment makes
 an item fresh again. The list groups the feed like a chat history (Pinned, Today, Yesterday, This week,
-Earlier). The board shows the same items by status; a click opens the item's detail beside the board,
-a drag moves the card to another column, and its status ring changes status in place.
+Earlier). The board shows the same items by status; each card names its project beside the item id,
+a click opens the item's detail beside the board, a drag moves the card to another column, and its
+status ring changes status in place.
 Status, kind and drops update the view before the Host answers. While you type, chips under the capture
 box show the kind, tags and links triage will derive.
 
@@ -212,7 +213,8 @@ project`, or to everything; it persists like the status chips and presets the ca
 project. Candidates are the projects items already name plus every registered workspace, with isolated
 thread workspaces (`…/threads/thread-…`) left out, so the picker offers `dshfiles` and not the checkout a
 thread runs in. The same combobox sits on the item's details line and in every right-click menu's
-**Project** submenu.
+**Project** submenu, and every feed entry, Inbox row, Items row, board card and search result labels the
+item's project, with the full path in its tooltip.
 
 ## Inbox and the rest of the ADE
 

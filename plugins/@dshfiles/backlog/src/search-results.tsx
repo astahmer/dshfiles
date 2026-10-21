@@ -110,8 +110,7 @@ export const SearchResults = (props: {
                 <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
                   {item.project === null ? null : (
                     <>
-                      <ItemGlyphs.ProjectDot project={item.project} />
-                      {ItemGlyphs.projectName(item.project)} ·
+                      <ItemGlyphs.ProjectLabel project={item.project} />·
                     </>
                   )}
                   {ItemGlyphs.ago(item.lastActivityAt)}
