@@ -611,10 +611,14 @@ export default defineHost({
     )
     ctx.effect(() => {
       const timer = setInterval(() => {
-        if (!serversFor(ctx).some(usesOAuth)) return
-        void runtime.reconcile().catch(() => {
-          ctx.logger.warn('MCP manager could not refresh OAuth tokens.')
-        })
+        try {
+          if (!serversFor(ctx).some(usesOAuth)) return
+          void runtime.reconcile().catch(() => {
+            ctx.logger.warn('MCP manager could not refresh OAuth tokens.')
+          })
+        } catch (error) {
+          ctx.logger.warn('MCP manager could not read its servers for the OAuth refresh: %s', error instanceof Error ? error.message : String(error))
+        }
       }, TOKEN_REFRESH_INTERVAL_MS)
       return () => clearInterval(timer)
     }, 'MCP servers OAuth refresh')

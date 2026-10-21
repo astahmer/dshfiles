@@ -67,16 +67,21 @@ const restartWhenIdle = (ctx: Context): void => {
   if (pendingRestart !== undefined) return
   const since = Date.now()
   let idlePolls = 0
+  const reportFailure = (error: unknown): void => {
+    ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error))
+  }
   const timer = setInterval(() => {
-    idlePolls = runningTurns(ctx) === 0 ? idlePolls + 1 : 0
-    if (idlePolls < 2 && Date.now() - since < DRAIN_LIMIT_MS) return
-    clearInterval(timer)
-    pendingRestart = undefined
-    void restartController(ctx)
-      .request()
-      .catch((error: unknown) => {
-        ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error))
-      })
+    try {
+      idlePolls = runningTurns(ctx) === 0 ? idlePolls + 1 : 0
+      if (idlePolls < 2 && Date.now() - since < DRAIN_LIMIT_MS) return
+      clearInterval(timer)
+      pendingRestart = undefined
+      void restartController(ctx).request().catch(reportFailure)
+    } catch (error) {
+      clearInterval(timer)
+      pendingRestart = undefined
+      reportFailure(error)
+    }
   }, DRAIN_POLL_MS)
   timer.unref()
   pendingRestart = { since, timer }

@@ -66,7 +66,7 @@ export default definePlugin({
     const ctx = api.raw.ctx
     const run = createJjRun(ctx)
 
-    void api.rpc.register(
+    const registration = api.rpc.register(
       pullsReviewApi.host({
         review: ({ input, signal }) => ReviewWorkspaceModel.review({ run, path: input.path, base: input.base, signal }),
         summarize: async ({ input, signal }): Promise<SummarizeResult> => {
@@ -92,6 +92,9 @@ export default definePlugin({
           }
         },
       }),
+    )
+    void registration.catch((error: unknown) =>
+      ctx.logger.warn('pulls-review: API registration failed: %s', error instanceof Error ? error.message : String(error)),
     )
 
     api.commands.register({

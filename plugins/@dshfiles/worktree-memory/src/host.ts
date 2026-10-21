@@ -221,10 +221,14 @@ const stop = async (active: MemoryRuntime, targets: readonly StopTarget[]): Prom
   if (signalled.length > 0) {
     // Escalate only on the exact identities signalled: a pid recycled during the grace period is left alone.
     const timer = setTimeout(() => {
-      void readProcessTable(active.context).then(current => {
-        const alive = new Map(current.map(row => [row.pid, row.startedAt]))
-        for (const row of signalled) if (alive.get(row.pid) === row.startedAt) signal(row.pid, 'SIGKILL')
-      })
+      void readProcessTable(active.context)
+        .then(current => {
+          const alive = new Map(current.map(row => [row.pid, row.startedAt]))
+          for (const row of signalled) if (alive.get(row.pid) === row.startedAt) signal(row.pid, 'SIGKILL')
+        })
+        .catch((error: unknown) =>
+          active.context.logger.warn('worktree-memory: SIGKILL escalation skipped: %s', error instanceof Error ? error.message : String(error)),
+        )
     }, KILL_GRACE_MS)
     timer.unref()
   }

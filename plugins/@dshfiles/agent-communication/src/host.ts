@@ -540,6 +540,8 @@ const refreshUnreadCounts = (): Promise<void> => {
     try {
       if (hostContext === undefined || communicationService === undefined) return
       unreadCounts = await collectUnreadCounts({ context: hostContext, service: communicationService })
+    } catch (error) {
+      hostContext?.logger.warn('agent-communication: unread count refresh failed: %s', error instanceof Error ? error.message : String(error))
     } finally {
       unreadRefresh = undefined
     }

@@ -774,7 +774,10 @@ const setup = (ctx: Context): void => {
     // Catch-up waits for boot to settle, then digests a bounded batch of sessions never seen before.
     const catchUp = setTimeout(() => {
       maintain()
-      void active.catchUp(25).then(count => count > 0 && logger.info('memory: caught up %d earlier session(s)', count))
+      void active
+        .catchUp(25)
+        .then(count => count > 0 && logger.info('memory: caught up %d earlier session(s)', count))
+        .catch((error: unknown) => logger.warn('memory: catch-up failed: %s', error instanceof Error ? error.message : String(error)))
     }, 30_000)
     const daily = setInterval(maintain, dayMs)
     return () => {
@@ -784,7 +787,9 @@ const setup = (ctx: Context): void => {
       if (runtime === active) runtime = undefined
       if (store === opened) store = undefined
       if (projectNormalization === normalization) projectNormalization = Promise.resolve()
-      void normalization.finally(() => opened.close())
+      void normalization
+        .finally(() => opened.close())
+        .catch((error: unknown) => logger.warn('memory: closing the store failed: %s', error instanceof Error ? error.message : String(error)))
     }
   }, 'memory runtime')
 }

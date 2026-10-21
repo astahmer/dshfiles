@@ -76,13 +76,19 @@ const setupHost = (context: Context): Effect<void> => {
       return () => active.board.detachLive()
     }, 'background-jobs: live job tracking')
   })
+  const reportStepFailure = (error: unknown): void => {
+    context.logger.warn('background-jobs: history indexing step failed: %s', error instanceof Error ? error.message : String(error))
+  }
   const step = async (): Promise<void> => {
     if (active.stopped) return
     await runPass(active)
     if (active.stopped) return
-    active.timer = setTimeout(() => void step(), active.board.indexing().caughtUp ? INDEX_INTERVAL_MS : CATCH_UP_DELAY_MS)
+    active.timer = setTimeout(() => void step().catch(reportStepFailure), active.board.indexing().caughtUp ? INDEX_INTERVAL_MS : CATCH_UP_DELAY_MS)
   }
-  void history.load().then(() => step())
+  void history
+    .load()
+    .then(() => step())
+    .catch(reportStepFailure)
   return {
     async *[Symbol.asyncIterator]() {
       yield async () => {

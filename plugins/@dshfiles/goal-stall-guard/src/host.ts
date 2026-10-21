@@ -94,9 +94,11 @@ export default definePlugin({
           // Pausing appends a goal change to this session, which it refuses while it is still publishing this
           // turn/end ("session append cannot reenter"), so the pause runs once the publish has returned.
           setTimeout(() => {
-            const goal = ctx.goals.get(agent)
-            if (goal === undefined || goal.phase !== 'active') return
+            let goalId: string | undefined
             try {
+              const goal = ctx.goals.get(agent)
+              if (goal === undefined || goal.phase !== 'active') return
+              goalId = goal.id
               ctx.goals.pause(agent, { id: goal.id, revision: goal.revision })
               ctx.logger.warn(
                 'goal-stall-guard: paused goal "%s" after %d consecutive rounds produced no output (round %d)',
@@ -105,7 +107,7 @@ export default definePlugin({
                 decision.round ?? 0,
               )
             } catch (error) {
-              ctx.logger.warn('goal-stall-guard: could not pause stalled goal "%s": %o', goal.id, error)
+              ctx.logger.warn('goal-stall-guard: could not pause stalled goal "%s": %o', goalId ?? 'unknown', error)
             }
           }, 0)
           return
