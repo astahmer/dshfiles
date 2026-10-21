@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
@@ -196,18 +197,13 @@ const NoteEditorForm = (props: { readonly note: PanelNote; readonly editor: Retu
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:p-3">
       <div className="dshx:flex dshx:flex-wrap items-center dshx:gap-2">
-        <select
-          aria-label="Edit note type"
-          className="dshx:h-8 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm"
+        <Combobox
+          label="Edit note type"
+          matchTriggerWidth
+          onValueChange={value => send({ type: 'type.change', value: noteTypeOf(value) || 'project' })}
+          options={PanelFormat.noteToneList().map(tone => ({ value: tone.value, label: tone.label }))}
           value={draft.type}
-          onChange={event => send({ type: 'type.change', value: noteTypeOf(event.currentTarget.value) || 'project' })}
-        >
-          {PanelFormat.noteToneList().map(tone => (
-            <option key={tone.value} value={tone.value}>
-              {tone.label}
-            </option>
-          ))}
-        </select>
+        />
         <Input
           aria-label="Edit note scope"
           value={draft.scope}

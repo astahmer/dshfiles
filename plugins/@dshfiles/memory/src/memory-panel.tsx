@@ -1,6 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
@@ -68,35 +69,28 @@ const AddMemoryDialog = (props: {
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
           <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs">
             <span className="dshx:text-muted-foreground">Project</span>
-            <select
-              aria-label="Note project"
-              className="dshx:h-8 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm"
+            <Combobox
+              label="Note project"
+              matchTriggerWidth
+              onValueChange={setProject}
+              options={[
+                { value: '', label: 'Choose a project…' },
+                ...props.projects.map(item => ({ value: item.project, label: `${PanelFormat.projectName(item.project)} (${item.notes} notes)` })),
+              ]}
+              searchAbove={0}
               value={project}
-              onChange={event => setProject(event.currentTarget.value)}
-            >
-              <option value="">Choose a project…</option>
-              {props.projects.map(item => (
-                <option key={item.project} value={item.project}>
-                  {PanelFormat.projectName(item.project)} ({item.notes} notes)
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <div className="dshx:flex dshx:gap-2">
             <label className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:text-xs">
               <span className="dshx:text-muted-foreground">Type</span>
-              <select
-                aria-label="New note type"
-                className="dshx:h-8 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm"
+              <Combobox
+                label="New note type"
+                matchTriggerWidth
+                onValueChange={value => setType(PanelFormat.noteToneList().find(tone => tone.value === value)?.value ?? 'project')}
+                options={PanelFormat.noteToneList().map(tone => ({ value: tone.value, label: tone.label }))}
                 value={type}
-                onChange={event => setType(PanelFormat.noteToneList().find(tone => tone.value === event.currentTarget.value)?.value ?? 'project')}
-              >
-                {PanelFormat.noteToneList().map(tone => (
-                  <option key={tone.value} value={tone.value}>
-                    {tone.label}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:text-xs">
               <span className="dshx:text-muted-foreground">Scope</span>
@@ -105,15 +99,16 @@ const AddMemoryDialog = (props: {
           </div>
           <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs">
             <span className="dshx:text-muted-foreground">Confidence</span>
-            <select
-              aria-label="New note confidence"
-              className="dshx:h-8 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm"
+            <Combobox
+              label="New note confidence"
+              matchTriggerWidth
+              onValueChange={value => setConfidence(value === 'inferred' ? 'inferred' : 'stated')}
+              options={[
+                { value: 'stated', label: 'Stated' },
+                { value: 'inferred', label: 'Inferred' },
+              ]}
               value={confidence}
-              onChange={event => setConfidence(event.currentTarget.value === 'inferred' ? 'inferred' : 'stated')}
-            >
-              <option value="stated">Stated</option>
-              <option value="inferred">Inferred</option>
-            </select>
+            />
           </label>
           <Textarea
             aria-label="New note text"

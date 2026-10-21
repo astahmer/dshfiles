@@ -2,6 +2,7 @@ import { MarkdownText, writeClipboard, type MarkdownLabels } from '@deepseek-ai/
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +15,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/co
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import {
   ArrowUpRightIcon,
-  ChevronDownIcon,
   CopyIcon,
   MessageSquareIcon,
   MoreHorizontalIcon,
@@ -394,34 +394,39 @@ export const ThreadsTab = (props: {
             <kbd className="dshx:rounded dshx:border dshx:border-border dshx:px-1 dshx:text-[10px] dshx:text-muted-foreground">/</kbd>
           </div>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
-            <select
-              aria-label="Filter by digest status"
-              className={filterTrigger}
+            <Combobox
+              label="Filter by digest status"
+              onValueChange={value => setStatus(threadStatusOf(value))}
+              options={[
+                { value: 'all', label: 'All statuses' },
+                { value: 'digested', label: 'Digested' },
+                { value: 'undigested', label: 'Not digested' },
+              ]}
+              triggerClassName={cn(filterTrigger, 'dshx:w-auto')}
               value={status}
-              onChange={event => setStatus(threadStatusOf(event.currentTarget.value))}
-            >
-              <option value="all">All statuses</option>
-              <option value="digested">Digested</option>
-              <option value="undigested">Not digested</option>
-            </select>
-            <span className="dshx:relative dshx:flex dshx:items-center">
-              <select
-                aria-label="Filter by source"
-                className={cn(filterTrigger, 'dshx:appearance-none dshx:pr-6')}
-                value={source}
-                onChange={event => setSource(threadSourceOf(event.currentTarget.value))}
-              >
-                <option value="">All sources</option>
-                <option value="trail">Thread record</option>
-                <option value="model">Cheap model</option>
-              </select>
-              <ChevronDownIcon className="dshx:pointer-events-none dshx:absolute dshx:right-2 dshx:size-3 dshx:opacity-60" />
-            </span>
-            <select aria-label="Sort threads" className={filterTrigger} value={sort} onChange={event => setSort(threadSortOf(event.currentTarget.value))}>
-              <option value="activity">Last activity</option>
-              <option value="digested">Digested first</option>
-              <option value="cited">Most cited</option>
-            </select>
+            />
+            <Combobox
+              label="Filter by source"
+              onValueChange={value => setSource(threadSourceOf(value))}
+              options={[
+                { value: '', label: 'All sources' },
+                { value: 'trail', label: 'Thread record' },
+                { value: 'model', label: 'Cheap model' },
+              ]}
+              triggerClassName={cn(filterTrigger, 'dshx:w-auto')}
+              value={source}
+            />
+            <Combobox
+              label="Sort threads"
+              onValueChange={value => setSort(threadSortOf(value))}
+              options={[
+                { value: 'activity', label: 'Last activity' },
+                { value: 'digested', label: 'Digested first' },
+                { value: 'cited', label: 'Most cited' },
+              ]}
+              triggerClassName={cn(filterTrigger, 'dshx:w-auto')}
+              value={sort}
+            />
           </div>
           <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2 dshx:pt-0.5">
             <span className="dshx:text-[13px] dshx:font-semibold">{PanelFormat.formatCount(visible.length)} threads</span>
