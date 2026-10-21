@@ -133,7 +133,7 @@ export const AgentToolkitPanel = (props: {
   const project = startBlock.data?.project
   const notes = useQuery({
     queryKey: [...QUERY_ROOT, 'memory', 'notes', project ?? null],
-    queryFn: ({ signal }) => memory.notes({ project: project ?? '', scope: '', type: '', query: '', includeInvalid: false }, { signal }),
+    queryFn: ({ signal }) => memory.notes({ project: project ?? '', scope: '', type: '', query: '', thread: '', includeInvalid: false }, { signal }),
     enabled: project !== undefined,
     retry: false,
   })
