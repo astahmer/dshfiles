@@ -42,7 +42,10 @@ Structure comes from the text:
 - `#tag` adds a tag; `b:<n>` links another item; `jj:<rev>` a revision; `branch:<name>`, `workspace:<path>`,
   a `session-…` id and URLs become typed links.
 - An agent capture links the calling thread, names the agent as owner and takes its working directory as
-  the project.
+  the project. A thread running in its own jj workspace files under the project that workspace was cut from:
+  the Host asks `@dshfiles/jj-integration` which project owns the workspace, so a custom threads directory
+  folds the same way, and an item read back from an older row folds to its project too. Without
+  jj-integration the captured path stays as it is.
 
 New items land in `inbox`, in the project the header filters by when there is one, otherwise in the project
 of the previous capture (`reuseCaptureProject`, on by default; off starts each capture with no project).

@@ -1,20 +1,24 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-workspace'
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
-import type { ApiCaller } from '@dshfiles/dshx/api'
+import { isApiOwnerMissing, type ApiCaller } from '@dshfiles/dshx/api'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
+import { createHostApiClient } from '@dshfiles/dshx/host'
 import { backlogApi } from './api.js'
 import { writeAttachmentFile } from './attachment-file.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
+import { BacklogProjectTarget } from './project-target.js'
 import { BacklogSignals } from './signals.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
@@ -341,6 +345,37 @@ const pollRevisions = async (ctx: Context): Promise<void> => {
 const actorOf = (caller: ApiCaller): BacklogActor =>
   caller.kind === 'agent' ? { kind: 'agent', sessionId: caller.sessionId, cwd: caller.cwd } : { kind: 'user' }
 
+/**
+ * The project a capture made in `cwd` belongs to. A thread workspace is whatever jj says was cut from a project, so a
+ * custom threads directory or a legacy workspace name still files the item under its project; without jj-integration,
+ * or for a folder no workspace claims, the path stays as the caller gave it.
+ */
+const captureProjectOf = async (ctx: Context, cwd: string): Promise<string> => {
+  const registry = ctx.get('workspaceRegistry')
+  if (registry === undefined) return cwd
+  const workspaces = registry.list()
+  const jj = createHostApiClient(ctx, jjIntegrationApi, '@dshfiles/backlog')
+  return BacklogProjectTarget.of(cwd, {
+    workspaceAt: async path => {
+      // A session may run in a subdirectory, so the deepest workspace holding the path owns it.
+      const holder = workspaces
+        .filter(candidate => path === candidate.path || path.startsWith(`${candidate.path}/`))
+        .sort((left, right) => right.path.length - left.path.length)[0]
+      return holder === undefined ? undefined : { id: holder.id, path: holder.path }
+    },
+    projectOf: async workspaceId => {
+      const destination = await jj.safe.destination({ workspaceId })
+      if (!destination.ok) {
+        if (!isApiOwnerMissing(destination.error)) logFailure('Backlog project target failed')(destination.error)
+        return null
+      }
+      const projectId = destination.value.projectWorkspaceId
+      const project = projectId === null ? undefined : workspaces.find(candidate => candidate.id === projectId)
+      return project === undefined ? null : { path: project.path }
+    },
+  })
+}
+
 const speechStatusOf = (ctx: Context) => {
   const speech = ctx.get('speechToText')
   if (speech === undefined) {
@@ -399,7 +434,9 @@ const backlogApiHost = backlogApi.host({
   projects: async ({ ctx }) => (await backlogFor(ctx)).projects().map(entry => ({ ...entry, counts: { ...entry.counts }, actors: [...entry.actors] })),
   referencing: async ({ ctx, input }) => (await backlogFor(ctx)).referencing(input),
   capture: async ({ ctx, input, caller }) => {
-    const detail = await (await backlogFor(ctx)).capture({ ...input, actor: actorOf(caller) })
+    const actor = actorOf(caller)
+    const project = input.project === undefined && actor.kind === 'agent' && actor.cwd !== undefined ? await captureProjectOf(ctx, actor.cwd) : input.project
+    const detail = await (await backlogFor(ctx)).capture({ ...input, ...(project === undefined ? {} : { project }), actor })
     scheduleTriage(ctx, detail.item.id)
     return detail
   },

@@ -618,6 +618,45 @@
       ]
     },
     {
+      "id": "capture-project-target",
+      "title": "File a thread capture under its project",
+      "summary": "A capture made from a jj thread workspace is filed under the project checkout that workspace was cut from, not under the workspace folder. The Host asks jj-integration which project owns the workspace, so a custom threads directory or a legacy workspace name folds the same way; without jj-integration the path stays as given.",
+      "surfaces": ["host", "storage", "integration"],
+      "configuration": [],
+      "states": ["project-workspace", "thread-workspace", "unregistered-folder"],
+      "failureModes": [
+        "Without jj-integration loaded, or for a folder no registered workspace claims, the item keeps the captured path.",
+        "A jj-integration call that fails for another reason is logged and leaves the project as captured."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/jj-integration",
+          "boundary": "Host API call to `destination` for the workspace holding the capture cwd; an owner-missing error falls back silently.",
+          "deterministicFake": "src/project-target.test.ts injects the two ports the Host wires from the workspace registry and jj-integration."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-project-target-thread",
+          "file": "plugins/@dshfiles/backlog/src/project-target.test.ts",
+          "testName": "files a workspace cut from a project under the project, whatever the folder is called"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-project-target-plain",
+          "file": "plugins/@dshfiles/backlog/src/project-target.test.ts",
+          "testName": "keeps a registered project and a folder no workspace claims as they are"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-project-target-missing",
+          "file": "plugins/@dshfiles/backlog/src/project-target.test.ts",
+          "testName": "keeps the workspace when jj cannot say which project it came from"
+        }
+      ]
+    },
+    {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
       "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; it creates the thread in its own jj workspace of that project, names and links it and opens it, sending immediately unless configured to keep an editable draft.",
