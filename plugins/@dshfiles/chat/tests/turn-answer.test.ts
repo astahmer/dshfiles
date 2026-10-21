@@ -17,18 +17,26 @@ describe('selectAnswerBoundary', () => {
   })
 
   it('adopts a later answer after a tool call', () => {
-    expect(selectAnswerBoundary(answers(2, 4), 3)?.step).toBe(4)
+    expect(selectAnswerBoundary(answers(2, 4), [3])?.step).toBe(4)
   })
 
   it('adopts the answer after work resumed twice', () => {
-    expect(selectAnswerBoundary(answers(2, 4, 6), 5)?.step).toBe(6)
+    expect(selectAnswerBoundary(answers(2, 4, 6), [3, 5])?.step).toBe(6)
   })
 
-  it('keeps a notice reply when work happened after it', () => {
-    expect(selectAnswerBoundary(answers(2, 3), 4)?.step).toBe(3)
+  it('adopts only the answer a tool call introduced', () => {
+    expect(selectAnswerBoundary(answers(2, 4, 6, 8), [3])?.step).toBe(4)
+  })
+
+  it('keeps the earlier answer when work resumes after the last reply', () => {
+    expect(selectAnswerBoundary(answers(2, 3), [4])?.step).toBe(2)
+  })
+
+  it('keeps the answer while a later tool call runs', () => {
+    expect(selectAnswerBoundary(answers(2, 3), [4, 5])?.step).toBe(2)
   })
 
   it('returns undefined without answers', () => {
-    expect(selectAnswerBoundary([], 3)).toBeUndefined()
+    expect(selectAnswerBoundary([], [3])).toBeUndefined()
   })
 })

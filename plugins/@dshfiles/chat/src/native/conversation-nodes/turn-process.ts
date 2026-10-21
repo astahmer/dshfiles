@@ -36,7 +36,7 @@ interface TurnProcessState {
   readonly messageCount: number
   readonly toolCallCount: number
   readonly subagentCount: number
-  readonly lastToolCallStep?: number
+  readonly toolCallSteps: readonly number[]
 }
 
 type ConversationEvent = Parameters<ConversationNodeDefinition['match']>[0]
@@ -104,6 +104,7 @@ function fallbackState(context: ConversationNodeContext<TurnProcessState>): Turn
     messageCount: 0,
     toolCallCount: 0,
     subagentCount: 0,
+    toolCallSteps: [],
   }
   for (const match of context.matches) state = updateProcessState(state, match.event)
   return state
@@ -121,20 +122,27 @@ export interface AnswerBoundary {
 }
 
 /**
- * Pick the answer a completed Turn folds around. A later answer replaces the
- * current one only after a tool call, so a notice-triggered acknowledgement
- * does not displace the answer the user asked for.
+ * Pick the answer a completed Turn folds around: the earliest settled reply of
+ * the trailing run, where a tool call between two replies starts a new run. A
+ * notice-triggered acknowledgement after the answer therefore stays visible
+ * instead of replacing it, and a tool call that arrives later never moves the
+ * boundary on its own.
  * @param answers - settled answer candidates in step order.
- * @param lastToolCallStep - latest Step that recorded a tool call.
+ * @param toolCallSteps - Steps that recorded a tool call, ascending.
  * @returns the chosen answer, or undefined when none is eligible.
  */
 export const selectAnswerBoundary = <Answer extends AnswerBoundary>(
   answers: readonly Answer[],
-  lastToolCallStep?: number,
+  toolCallSteps: readonly number[] = [],
 ): Answer | undefined => {
   let selected: Answer | undefined
   for (const answer of answers) {
-    if (selected === undefined || (lastToolCallStep !== undefined && lastToolCallStep > selected.step)) selected = answer
+    if (selected === undefined) {
+      selected = answer
+      continue
+    }
+    const previous = selected.step
+    if (toolCallSteps.some(step => step > previous && step < answer.step)) selected = answer
   }
   return selected
 }
@@ -147,7 +155,7 @@ function latestAnswer(
     .map(step => step.data.get('assistant-step'))
     .filter((data): data is Readonly<FinalAssistantChatData> => isFinalAssistant(data) && hasAssistantReplyContent(data.blocks))
     .filter(data => !data.blocks.some(block => block.kind === 'tool-call'))
-  return selectAnswerBoundary(answers, state.lastToolCallStep) ?? null
+  return selectAnswerBoundary(answers, state.toolCallSteps) ?? null
 }
 
 function processSpec(state: TurnProcessState, turn: TurnLocation): TurnProcessSpec | null {
@@ -211,7 +219,9 @@ function updateProcessState(state: TurnProcessState, event: ConversationEvent): 
       ...current,
       toolCallCount: current.toolCallCount + (subagent ? 0 : 1),
       subagentCount: current.subagentCount + (subagent ? 1 : 0),
-      lastToolCallStep: Math.max(current.lastToolCallStep ?? event.data.step, event.data.step),
+      toolCallSteps: current.toolCallSteps.at(-1) === event.data.step
+        ? current.toolCallSteps
+        : [...current.toolCallSteps, event.data.step],
     }
   }
   const evidence = processEvidence(event)
@@ -264,6 +274,7 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
       messageCount: 0,
       toolCallCount: 0,
       subagentCount: 0,
+      toolCallSteps: [],
     }
   },
   update: (context, match) => updateProcessState(context.state, match.event),
