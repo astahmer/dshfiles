@@ -153,6 +153,16 @@ describe('store', () => {
     expect(unlinked.ok && unlinked.value.backlinks).toEqual([])
   })
 
+  it('reads several items in one call, in order, and reports unknown ids separately', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 1 })
+    await store.capture({ text: 'one', actor: user })
+    await store.capture({ text: 'two', actor: user })
+
+    const many = store.getMany([2, 99, 1, 2])
+    expect(many.items.map(detail => detail.item.id)).toEqual([2, 1])
+    expect(many.missing).toEqual([99])
+  })
+
   it('continues ids after a Host restart', async () => {
     const items = memoryTable<BacklogItem>()
     const first = BacklogModel.createStore({ files: memoryFiles(), items, now: () => 1 })

@@ -349,6 +349,7 @@ const transcribeSpeech = async (
 const backlogApiHost = backlogApi.host({
   list: async ({ ctx, input }) => (await backlogFor(ctx)).list(input),
   get: async ({ ctx, input }) => (await backlogFor(ctx)).get(input.id),
+  getMany: async ({ ctx, input }) => (await backlogFor(ctx)).getMany(input.ids),
   revision: async ({ ctx }) => (await backlogFor(ctx)).revision(),
   projects: async ({ ctx }) => (await backlogFor(ctx)).projects().map(entry => ({ ...entry, counts: { ...entry.counts }, actors: [...entry.actors] })),
   referencing: async ({ ctx, input }) => (await backlogFor(ctx)).referencing(input),

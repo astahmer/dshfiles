@@ -143,6 +143,8 @@ export interface BacklogStore {
   }[]
   list(query: BacklogListQuery): { readonly revision: number; readonly items: BacklogSummary[]; readonly total: number }
   get(id: number): BacklogResult<BacklogDetail>
+  /** Several items in one call, in the order asked, with the ids that do not exist kept separate. */
+  getMany(ids: readonly number[]): { readonly items: BacklogDetail[]; readonly missing: number[] }
   referencing(link: BacklogLink): BacklogSummary[]
   flush(): Promise<void>
 }
@@ -566,6 +568,16 @@ const createBacklogStore = ({
     get: id => {
       const item = find(id)
       return item === undefined ? { ok: false, reason: 'not-found' } : { ok: true, value: detailOf(item) }
+    },
+    getMany: ids => {
+      const items: BacklogDetail[] = []
+      const missing: number[] = []
+      for (const id of new Set(ids)) {
+        const item = find(id)
+        if (item === undefined) missing.push(id)
+        else items.push(detailOf(item))
+      }
+      return { items, missing }
     },
     referencing,
     flush: () => writes,

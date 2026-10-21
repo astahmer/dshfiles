@@ -337,7 +337,8 @@ Still missing, because they write secrets or need a browser:
 ### backlog
 
 - `backlog`: every panel verb is its API method bound as a tool — read-only
-  `backlog_list`, `backlog_get`, `backlog_referencing`, `backlog_projects` and
+  `backlog_list`, `backlog_get`, `backlog_get_many`, `backlog_referencing`,
+  `backlog_projects` and
   `backlog_read_file`; writes `backlog_capture`, `backlog_update`, `backlog_link`,
   `backlog_comment`, `backlog_attach_file`, `backlog_remove_file`, `backlog_triage`,
   `backlog_accept_proposal` and `backlog_dismiss_proposal`.

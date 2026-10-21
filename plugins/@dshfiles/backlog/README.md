@@ -132,6 +132,7 @@ thread and starts the item, just as typing `b:12` does.
 | -------------------------- | ------------------------------------------------------------------------------------- |
 | `backlog_list`             | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`) |
 | `backlog_get`              | read: one item with history and backlinks                                             |
+| `backlog_get_many`         | read: up to 50 items at once, unknown ids listed separately                           |
 | `backlog_referencing`      | read: items linking to a thread, revision, branch, workspace, URL or item             |
 | `backlog_capture`          | write                                                                                 |
 | `backlog_update`           | write: edit or move                                                                   |

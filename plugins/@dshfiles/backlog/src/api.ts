@@ -70,6 +70,13 @@ const detailResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), reason: z.literal('not-found') }).strict(),
 ])
 
+const detailManySchema = z
+  .object({
+    items: z.array(detailSchema),
+    missing: z.array(idSchema),
+  })
+  .strict()
+
 const listInputSchema = z
   .object({
     query: z
@@ -134,8 +141,20 @@ export const backlogApi = defineApi({
     get: method({
       input: z.object({ id: idSchema }).strict(),
       output: detailResultSchema,
-      description: 'One backlog item `b:<id>` with its body, links, event history and the items that link to it. Read-only.',
+      description:
+        'One backlog item `b:<id>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.',
       tool: { name: 'backlog_get', readOnly: true },
+    }),
+    getMany: method({
+      input: z
+        .object({
+          ids: z.array(idSchema).min(1).max(50).describe('Item ids (`b:<id>` numbers). Duplicates are read once; unknown ids are reported, not failed.'),
+        })
+        .strict(),
+      output: detailManySchema,
+      description:
+        'Several backlog items in one call, each with its body, links, event history and backlinks, in the order asked; ids that do not exist come back in `missing`. Read-only. Prefer it over repeated `backlog_get` calls.',
+      tool: { name: 'backlog_get_many', readOnly: true },
     }),
     referencing: method({
       input: BacklogItems.linkSchema,
