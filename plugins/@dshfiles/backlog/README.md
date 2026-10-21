@@ -295,6 +295,6 @@ and returns that absolute path so an agent can read an image instead of a base64
 An item may name a credential without holding one: `secret:ALIAS` or
 `secret:ALIAS@env` in the title or body becomes a `secret` link (the target is
 `ALIAS` or `ALIAS@env`). Nothing is resolved there — the Secret Catalog owns the
-value, and its own reveal covers the read. The capture composer carries
-`data-secret-input="reference"`, so the Catalog's picker can write a reference
-into it.
+value, and its own reveal covers the read. The capture composer deliberately
+does not carry `data-secret-input`: an item holds prose, so its references are
+typed as text, and the vault offer belongs on the `jevSecret` setting alone.

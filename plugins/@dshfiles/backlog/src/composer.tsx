@@ -624,7 +624,6 @@ export const Composer = (props: {
       <textarea
         ref={input}
         aria-label="Capture"
-        data-secret-input="reference"
         rows={3}
         autoFocus={props.autoFocus}
         placeholder={props.placeholder}
