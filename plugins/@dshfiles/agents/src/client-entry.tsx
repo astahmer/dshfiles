@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { AgentMentions } from './agent-mentions.js'
@@ -71,8 +72,13 @@ export default defineClient({
     ctx.effect(() => ctx.inputTriggers.registerSource(mentions), 'dshfiles-agents: @ mentions')
 
     const panelProps: AgentsPanelProps = {
+      // A dispatch target is a project: the jj workspaces cut from one are where threads run, not places to start in.
       listProjects: () =>
-        ctx.workspaces.list.getSnapshot().items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title, path: workspace.path })),
+        EntityLabels.projectsOf(ctx.workspaces.list.getSnapshot().items).map(workspace => ({
+          id: workspace.workspaceId,
+          title: workspace.title,
+          path: workspace.path,
+        })),
       loadCatalog: async () => {
         const result = await ctx.remote.session.modelCatalog()
         if (!result.ok) throw new Error(result.error.message)

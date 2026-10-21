@@ -7,6 +7,7 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { agentsApi } from '@dshfiles/agents/contract'
 import type {} from '@dshfiles/input-trigger/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
@@ -39,8 +40,13 @@ export default defineClient({
     const api = createApiClient(ctx, backlogApi)
     const agents = createApiClient(ctx, agentsApi)
     const startThreadPorts: StartThreadPorts = {
+      // The chooser sets an item's project: a registered jj workspace is work in progress, not a project to file into.
       listProjects: () =>
-        ctx.workspaces.list.getSnapshot().items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title, path: workspace.path })),
+        EntityLabels.projectsOf(ctx.workspaces.list.getSnapshot().items).map(workspace => ({
+          id: workspace.workspaceId,
+          title: workspace.title,
+          path: workspace.path,
+        })),
       loadCatalog: async (): Promise<StartThreadCatalog> => {
         const result = await ctx.remote.session.modelCatalog()
         if (!result.ok) throw new Error(result.error.message)

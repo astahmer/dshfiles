@@ -183,6 +183,24 @@ const defaultDormantDays = { note: 14, idea: 30, question: 30, task: 30, bug: 30
 const STALE_DOING_DAYS = 14
 const ARCHIVE_CLOSED_DAYS = 7
 
+// jj-integration cuts a thread workspace at `<repository>-threads/<name>`; older ones are `<repository>-<hash>`.
+const THREADS_DIRECTORY_SUFFIX = '-threads'
+
+/**
+ * The project an item belongs to: a capture made in a jj workspace is work on the project that workspace was cut
+ * from, so the workspace path is folded to its repository and never listed as a project of its own.
+ */
+const projectPath = (path: string): string => {
+  const normalized = path.replace(/\/+$/u, '')
+  const separator = normalized.lastIndexOf('/')
+  if (separator < 0) return normalized
+  const parent = normalized.slice(0, separator)
+  if (parent.length <= THREADS_DIRECTORY_SUFFIX.length || !parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return normalized
+  return parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)
+}
+
+const projectOf = (project: string | null): string | null => (project === null ? null : projectPath(project))
+
 /**
  * Visibility, derived on read and never stored: any activity revives an item and nothing sweeps the store. An item
  * asking for attention never sinks; `dormantDays` of 0 keeps a kind visible forever.
@@ -233,6 +251,8 @@ export class BacklogItems {
   static readonly extractTags = extractTags
   static readonly uniqueLinks = uniqueLinks
   static readonly sameLink = sameLink
+  static readonly projectPath = projectPath
+  static readonly projectOf = projectOf
   static readonly freshness = freshness
   static readonly appendEvent = appendEvent
 }

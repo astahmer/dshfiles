@@ -3,6 +3,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
+import { WorkspacePaths } from './workspace-paths.js'
 
 /** The subset of a Host Session summary these actions read. */
 export interface ThreadSummary {
@@ -509,7 +510,8 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   },
 
   projectList: async () => ({
-    projects: deps.projects().map(project => ({
+    // A project list names projects: the jj workspaces threads run in are workspaces of one, so they stay out.
+    projects: WorkspacePaths.projects(deps.projects()).map(project => ({
       projectId: project.projectId,
       title: project.title,
       path: project.path,

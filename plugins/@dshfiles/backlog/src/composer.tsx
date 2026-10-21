@@ -10,6 +10,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   ArrowUpIcon,
@@ -129,7 +130,8 @@ const ReferenceDialog = (props: {
       [
         ...new Set([
           ...(projects.data ?? []).flatMap(entry => (entry.project === null ? [] : [entry.project])),
-          ...props.threads.flatMap(thread => thread.cwd ?? []),
+          // A thread running in a jj workspace still works on its project, so the workspace path is never offered.
+          ...props.threads.flatMap(thread => (thread.cwd === undefined ? [] : [EntityLabels.repositoryPath(thread.cwd)])),
         ]),
       ]
         .filter(path => path.toLowerCase().includes(query.trim().toLowerCase()))

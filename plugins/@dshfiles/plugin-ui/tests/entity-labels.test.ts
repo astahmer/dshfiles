@@ -13,6 +13,27 @@ const workspaces = store({
 })
 
 describe('EntityLabels', () => {
+  it('treats every workspace under a `-threads` directory as a workspace of that project, whatever its name', () => {
+    expect(EntityLabels.isThreadWorkspace('/dev/dshfiles-threads/thread-4c91b5')).toBe(true)
+    expect(EntityLabels.isThreadWorkspace('/dev/dshfiles-threads/dshfiles-94a9c92d')).toBe(true)
+    expect(EntityLabels.isThreadWorkspace('/dev/dshfiles-threads/thread-4c91b5/')).toBe(true)
+    expect(EntityLabels.isThreadWorkspace('/dev/dshfiles')).toBe(false)
+    expect(EntityLabels.isThreadWorkspace('/dev/nixfiles/')).toBe(false)
+    expect(EntityLabels.isThreadWorkspace(null)).toBe(false)
+    expect(EntityLabels.isThreadWorkspace('/dev/-threads/thread-4c91b5')).toBe(true)
+    expect(EntityLabels.repositoryPath('/dev/dshfiles-threads/dshfiles-94a9c92d')).toBe('/dev/dshfiles')
+  })
+
+  it('lists projects without the jj workspaces cut from them', () => {
+    const rows = [
+      { path: '/dev/dshfiles' },
+      { path: '/dev/dshfiles-threads/thread-4c91b5' },
+      { path: '/dev/dshfiles-threads/dshfiles-94a9c92d' },
+      { path: '/dev/nixfiles' },
+    ]
+    expect(EntityLabels.projectsOf(rows).map(row => row.path)).toEqual(['/dev/dshfiles', '/dev/nixfiles'])
+  })
+
   it('folds jj thread workspaces under the repository they were cut from', () => {
     const groups = EntityLabels.groupByRepository([
       { path: '/dev/dshfiles-threads/thread-4c91b5', id: 'thread' },

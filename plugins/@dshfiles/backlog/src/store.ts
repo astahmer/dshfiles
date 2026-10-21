@@ -225,7 +225,12 @@ const createBacklogStore = ({
   readonly onEvent?: (item: BacklogItem, event: BacklogEvent) => void
   readonly reportError?: (error: unknown) => void
 }): BacklogStore => {
-  const records = new Map<number, BacklogItem>([...items.entries()].map(([, item]) => [item.id, item]))
+  /** A project is where the work happens, so one recorded in a jj workspace reads as the checkout it was cut from. */
+  const withProject = (item: BacklogItem): BacklogItem => {
+    const project = BacklogItems.projectOf(item.project)
+    return project === item.project ? item : { ...item, project }
+  }
+  const records = new Map<number, BacklogItem>([...items.entries()].map(([, item]) => [item.id, withProject(item)]))
   let nextId = Math.max(0, ...records.keys()) + 1
   let revision = now()
   let writes: Promise<void> = Promise.resolve()
@@ -302,10 +307,12 @@ const createBacklogStore = ({
   const list: BacklogStore['list'] = query => {
     const at = now()
     const freshnessFilter = query.freshness ?? 'active'
+    // A caller may still ask for the workspace an item was captured in; the item is filed under its project.
+    const project = query.project === undefined ? undefined : BacklogItems.projectOf(query.project)
     const matching = [...records.values()]
       .filter(item => query.statuses === undefined || query.statuses.length === 0 || query.statuses.includes(item.status))
       .filter(item => query.kinds === undefined || query.kinds.length === 0 || query.kinds.includes(item.kind))
-      .filter(item => query.project === undefined || item.project === query.project)
+      .filter(item => project === undefined || item.project === project)
       .filter(item => query.tag === undefined || item.tags.includes(query.tag.toLowerCase().replace(/^#/, '')))
       .filter(item => query.actor === undefined || item.actors.some(actor => actor.id === query.actor))
       .filter(item => query.inbox !== true || wantsUser(item, at))
@@ -335,7 +342,7 @@ const createBacklogStore = ({
       const attachments = await storeFiles(nextId, pendingFiles, at)
       const chosenKind = kind ?? triaged.kind
       const chosenStatus = status ?? 'inbox'
-      const chosenProject = project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null)
+      const chosenProject = BacklogItems.projectOf(project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null))
       const item: BacklogItem = {
         id: nextId,
         title: triaged.title,
@@ -421,9 +428,12 @@ const createBacklogStore = ({
         change.status = fields.status
         changed.push('status')
       }
-      if (fields.project !== undefined && fields.project !== item.project) {
-        change.project = fields.project
-        changed.push('project')
+      if (fields.project !== undefined) {
+        const project = BacklogItems.projectOf(fields.project)
+        if (project !== item.project) {
+          change.project = project
+          changed.push('project')
+        }
       }
       if (fields.tags !== undefined) {
         const tags = [...new Set(fields.tags.map(tag => tag.toLowerCase().replace(/^#/, '')).filter(Boolean))]

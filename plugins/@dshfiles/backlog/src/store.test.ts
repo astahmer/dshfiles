@@ -70,6 +70,16 @@ describe('triage', () => {
   })
 })
 
+describe('project paths', () => {
+  it('folds a jj workspace to the project it was cut from and leaves a project path alone', () => {
+    expect(BacklogItems.projectOf('/work/dshfiles-threads/thread-1b7a8c')).toBe('/work/dshfiles')
+    expect(BacklogItems.projectOf('/work/dshfiles-threads/dshfiles-94a9c92d/')).toBe('/work/dshfiles')
+    expect(BacklogItems.projectOf('/work/dshfiles')).toBe('/work/dshfiles')
+    expect(BacklogItems.projectOf('/work/-threads')).toBe('/work/-threads')
+    expect(BacklogItems.projectOf(null)).toBeNull()
+  })
+})
+
 describe('freshness', () => {
   const base = { kind: 'note', status: 'inbox', pinned: false, lastActivityAt: 0 } as const
 
@@ -89,6 +99,29 @@ describe('freshness', () => {
 })
 
 describe('store', () => {
+  it('files a capture made in a jj workspace under the project it was cut from', async () => {
+    const time = clock(2_000)
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: time.now })
+
+    const fromWorkspace = await store.capture({
+      text: 'fix the revision graph',
+      actor: { kind: 'agent', sessionId: 'session-1b7a8c', cwd: '/work/dshfiles-threads/thread-1b7a8c' },
+    })
+    const fromProject = await store.capture({ text: 'ship the board', actor: agent })
+    await store.flush()
+
+    expect(fromWorkspace.item.project).toBe('/work/dshfiles')
+    expect(store.projects()).toEqual([expect.objectContaining({ project: '/work/dshfiles', counts: expect.objectContaining({ inbox: 2 }) })])
+    expect(
+      store
+        .list({ project: '/work/dshfiles-threads/thread-1b7a8c' })
+        .items.map(item => item.id)
+        .sort(),
+    ).toEqual([1, 2])
+    expect(store.list({ project: '/work/dshfiles' }).total).toBe(2)
+    expect(fromProject.item.project).toBe('/work/dshfiles')
+  })
+
   it('links an agent capture to its thread and project, and lists newest activity first', async () => {
     const time = clock(1_000)
     const items = memoryTable<BacklogItem>()

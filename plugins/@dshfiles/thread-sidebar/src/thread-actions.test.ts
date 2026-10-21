@@ -370,6 +370,22 @@ describe('thread actions: projects', () => {
     })
   })
 
+  test('lists projects without the jj workspaces cut from them', async () => {
+    const workspace = (projectId: string, path: string): ProjectRow => ({ projectId, title: path.split('/').at(-1) ?? path, path, sessionIds: [] })
+    const actions = createThreadActions(
+      createDeps({
+        projects: () => [
+          workspace('project-1', '/work/dshfiles'),
+          workspace('workspace-1', '/work/dshfiles-threads/thread-1b7a8c'),
+          workspace('workspace-2', '/work/dshfiles-threads/dshfiles-94a9c92d'),
+          workspace('project-2', '/work/nixfiles'),
+        ],
+      }),
+    )
+
+    expect((await actions.projectList()).projects.map(project => project.projectId)).toEqual(['project-1', 'project-2'])
+  })
+
   test('moves a thread into a project', async () => {
     const moves: Array<{ projectId: string; sessionId: string; before: string | undefined }> = []
     const actions = createThreadActions(

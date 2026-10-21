@@ -6,6 +6,7 @@ import type { ThreadDelay } from './thread-delays.js'
 import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
+import { WorkspacePaths } from './workspace-paths.js'
 
 /** Render order: settled sits right before archived, since both are storage rather than places to work. */
 export const SIDEBAR_SECTIONS = ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'] as const
@@ -282,11 +283,9 @@ const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: 
   }
 }
 
-const THREADS_DIRECTORY_SUFFIX = '-threads'
-
 const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<string, WorkspaceView>): WorkspaceView | undefined => {
-  const parent = workspace.path.slice(0, workspace.path.lastIndexOf('/'))
-  return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) : undefined
+  const projectPath = WorkspacePaths.projectPathOf(workspace.path)
+  return projectPath === workspace.path ? undefined : byPath.get(projectPath)
 }
 
 /**
@@ -297,11 +296,9 @@ const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<
 const projectIdForPath = (path: string, byPath: ReadonlyMap<string, WorkspaceView>): string | undefined => {
   const registered = byPath.get(path)
   if (registered !== undefined) return (projectOfThreadWorkspace(registered, byPath) ?? registered).workspaceId
-  const separator = path.lastIndexOf('/')
-  if (separator < 0) return undefined
-  const parent = path.slice(0, separator)
-  if (!parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return undefined
-  const owner = byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length))
+  const projectPath = WorkspacePaths.projectPathOf(path)
+  if (projectPath === path) return undefined
+  const owner = byPath.get(projectPath)
   return owner === undefined ? undefined : (projectOfThreadWorkspace(owner, byPath) ?? owner).workspaceId
 }
 
@@ -335,10 +332,9 @@ const sessionWorkspaceIds = (workspaces: readonly WorkspaceView[]): Map<string, 
   return map
 }
 
-const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
-  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
-  return workspaces.filter(workspace => projectOfThreadWorkspace(workspace, byPath) === undefined)
-}
+/** The registered workspaces that are projects; a jj workspace of one is never listed as a project. */
+const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] =>
+  workspaces.filter(workspace => !WorkspacePaths.isJjWorkspace(workspace.path))
 
 /** Resolve a workspace from the session or its nearest known ancestor. */
 const workspaceForLineage = (

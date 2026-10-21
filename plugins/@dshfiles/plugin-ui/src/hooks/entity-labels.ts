@@ -28,10 +28,14 @@ interface ProjectGroup<Item> {
   readonly threads: readonly Item[]
 }
 
-// jj-integration names thread workspaces `thread-<6 hex>` inside a `<repository>-threads` sibling directory.
+// jj-integration cuts a thread workspace at `<repository>-threads/<name>`; older ones are `<repository>-<hash>`.
+const THREADS_DIRECTORY_SUFFIX = '-threads'
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 
 const segments = (path: string): readonly string[] => path.replace(/\/+$/u, '').split('/')
+
+const hasThreadsDirectory = (name: string | undefined): boolean =>
+  name !== undefined && name.length > THREADS_DIRECTORY_SUFFIX.length && name.endsWith(THREADS_DIRECTORY_SUFFIX)
 
 const useListSnapshot = <Snapshot>(store: ListStore<Snapshot>): Snapshot => {
   const subscribe = useCallback((listener: () => void) => store.list.subscribe(listener), [store])
@@ -48,15 +52,26 @@ export class EntityLabels {
     return id.replace(/^session-/u, '').slice(0, 8)
   }
 
+  /** A jj workspace a project was cut from: it belongs to that project and is never a project of its own. */
   static isThreadWorkspace(path: string | null): boolean {
-    return path !== null && THREAD_WORKSPACE_NAME.test(segments(path).at(-1) ?? '')
+    if (path === null) return false
+    const parts = segments(path)
+    return THREAD_WORKSPACE_NAME.test(parts.at(-1) ?? '') || hasThreadsDirectory(parts.at(-2))
   }
 
   /** The repository checkout a thread workspace belongs to; the path itself for anything else. */
   static repositoryPath(path: string): string {
     if (!EntityLabels.isThreadWorkspace(path)) return path.replace(/\/+$/u, '')
     const parent = segments(path).slice(0, -1).join('/')
-    return parent.endsWith('-threads') ? parent.slice(0, -'-threads'.length) : parent
+    return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length) : parent
+  }
+
+  /**
+   * Registered rows that are projects: a jj workspace cut from one is a workspace of it, so a project list, a project
+   * filter or a project chooser leaves those out and shows the checkout they belong to instead.
+   */
+  static projectsOf<Item extends { readonly path: string }>(items: readonly Item[]): readonly Item[] {
+    return items.filter(item => !EntityLabels.isThreadWorkspace(item.path))
   }
 
   /** Projects in their original order, each with the thread workspaces cut from it; orphan threads get a group with no project. */
