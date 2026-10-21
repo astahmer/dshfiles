@@ -50,6 +50,25 @@ where a thread starts.
 | `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                     |
 | Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                     |
 
+## Decisions
+
+- **One handle namespace; a model is a property of an agent.** `@reviewer` may pin `codex/gpt-6-luna`, and the built-in
+  `@dsh` pins nothing, so it means "the harness itself". Rejected: a separate raw `@model`/`@account` mention type —
+  two mention kinds for one concept make the `@` menu ambiguous and double the parser.
+- **An agent is configuration, not a runtime.** Dispatch creates an ordinary Session and reuses the existing
+  create → select model → rename → prompt → link sequence. No new loop, tools or storage of conversation state.
+- **Dispatch belongs to thread-creation surfaces.** A preset is chosen only at `sessions.create` and no supported verb
+  re-composes a live Session, so `@handle` dispatches from a backlog comment, the start-thread dialog and the panel;
+  inside a running thread the same text stays a mention the Agent reads.
+- **Instructions and routines ride the opening message.** There is no mid-thread system-prompt injection, so the
+  preamble is part of the first message and bounded by the 4,000-character limit; the task always survives truncation.
+- **One Host contract, imported.** `@dshfiles/agents/contract` exports the schemas, mention parsing and dispatch
+  composition; backlog, memory and agent-communication call it instead of restating it.
+- **Every verb is a tool.** The agent tools are the panel's verbs: `agents_list`/`agents_get`/`agents_threads` are
+  read-only, `agents_save` runs only when the user asked, and `agents_remove` takes an explicit `confirm: true`.
+
+See [research.md](docs/research.md) for the reference-product comparison and the Host boundaries (ledger rows 71–74).
+
 ## Limits
 
 - 100 agents, 8 KB of instructions each, 32-character handles (`^[a-z][a-z0-9-]{0,31}$`).
@@ -66,4 +85,9 @@ where a thread starts.
 pnpm test
 pnpm typecheck
 pnpm build
+DSHX_E2E_ONLY=agents node --run check:e2e    # from the repository root
+node --run screenshots -- --only agents       # refresh docs/screenshots/agent-registry.png
 ```
+
+The journeys live in `tooling/dshx/e2e/features/agents.feature`: mention dispatch from a backlog comment, creating an
+agent and keeping its settings, thread history after a reload, and inline `@` completion in the comment box.
