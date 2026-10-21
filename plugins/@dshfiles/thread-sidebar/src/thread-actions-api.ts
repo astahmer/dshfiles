@@ -186,6 +186,21 @@ export const threadActionsApi = defineApi({
         },
       },
     }),
+    prompt: method({
+      input: z
+        .object({
+          sessionId: sessionIdSchema.optional(),
+          text: z.string().min(1).max(20_000),
+          mode: z.enum(['queue', 'steer']).optional(),
+        })
+        .strict(),
+      output: z.object({ sessionId: z.string(), mode: z.enum(['queue', 'steer']), accepted: z.literal(true) }).strict(),
+      description: `Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
+      tool: {
+        name: 'thread_prompt',
+        render: output => `${output.mode === 'steer' ? 'Steered' : 'Queued a message for'} thread ${output.sessionId}.`,
+      },
+    }),
     stop: method({
       input: z.object({ sessionId: sessionIdSchema }).strict(),
       output: z.object({ sessionId: z.string(), accepted: z.literal(true) }).strict(),

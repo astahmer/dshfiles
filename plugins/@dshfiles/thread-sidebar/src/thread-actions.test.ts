@@ -367,9 +367,7 @@ describe('thread actions: lifecycle', () => {
         signal,
       }),
     ).toEqual({ sessionId: 'session-new', title: 'Delegated brief', prompt: 'accepted' })
-    expect(prompts).toEqual([
-      { sessionId: 'session-new', text: 'Investigate the flaky checkout test.\nDo not touch main.', mode: 'queue' },
-    ])
+    expect(prompts).toEqual([{ sessionId: 'session-new', text: 'Investigate the flaky checkout test.\nDo not touch main.', mode: 'queue' }])
     expect(order).toEqual(['rename', 'prompt'])
   })
 
@@ -420,6 +418,60 @@ describe('thread actions: lifecycle', () => {
     })
   })
 
+  test('queues a follow-up message by default and steers when asked', async () => {
+    const prompts: Array<{ sessionId: string; text: string; mode: 'queue' | 'steer' }> = []
+    const actions = createThreadActions(
+      createDeps({
+        prompt: async input => {
+          prompts.push(input)
+        },
+      }),
+    )
+
+    expect(await actions.prompt({ input: { sessionId: 'session-b', text: 'First follow-up' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-b',
+      mode: 'queue',
+      accepted: true,
+    })
+    expect(await actions.prompt({ input: { sessionId: 'session-b', text: 'Change of plan', mode: 'steer' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-b',
+      mode: 'steer',
+      accepted: true,
+    })
+    expect(prompts).toEqual([
+      { sessionId: 'session-b', text: 'First follow-up', mode: 'queue' },
+      { sessionId: 'session-b', text: 'Change of plan', mode: 'steer' },
+    ])
+  })
+
+  test('prompts the calling thread when no sessionId is given, and refuses without one', async () => {
+    const prompts: string[] = []
+    const actions = createThreadActions(
+      createDeps({
+        prompt: async input => {
+          prompts.push(input.sessionId)
+        },
+      }),
+    )
+
+    await actions.prompt({ input: { text: 'Keep going' }, caller: agent('session-self'), signal })
+    expect(prompts).toEqual(['session-self'])
+    await expect(actions.prompt({ input: { text: 'Keep going' }, caller: { kind: 'plugin', packageId: '@dshfiles/x' }, signal })).rejects.toMatchObject({
+      code: 'thread-target-unknown',
+    })
+  })
+
+  test('reports a refused prompt as a plugin error naming the thread', async () => {
+    const actions = createThreadActions(
+      createDeps({
+        prompt: async () => Promise.reject(Object.assign(new Error('current turn no longer accepts steering'), { code: 'session/agent-busy' })),
+      }),
+    )
+
+    await expect(actions.prompt({ input: { sessionId: 'session-b', text: 'x', mode: 'steer' }, caller: agent('session-a'), signal })).rejects.toThrow(
+      'current turn no longer accepts steering',
+    )
+  })
 })
 
 describe('thread actions: projects', () => {
@@ -613,6 +665,7 @@ describe('thread actions: tool exposure', () => {
       'thread_rename',
       'thread_fork',
       'thread_create',
+      'thread_prompt',
       'thread_stop',
       'thread_select_model',
       'thread_references',

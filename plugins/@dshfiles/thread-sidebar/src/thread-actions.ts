@@ -106,6 +106,11 @@ export interface ThreadCreateInput {
   readonly agentPreset?: string | undefined
   readonly text?: string | undefined
 }
+export interface ThreadPromptInput {
+  readonly sessionId?: string | undefined
+  readonly text: string
+  readonly mode?: 'queue' | 'steer' | undefined
+}
 export interface ThreadSelectModelInput {
   readonly sessionId?: string | undefined
   readonly provider: string
@@ -485,6 +490,17 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
         prompt: 'refused' as const,
         promptError: failure(error, 'Could not send its first message.').message,
       }
+    }
+  },
+
+  prompt: async ({ input, caller }: ThreadActionContext<ThreadPromptInput>) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    const mode = input.mode ?? 'queue'
+    try {
+      await deps.prompt({ sessionId, text: input.text, mode })
+      return { sessionId, mode, accepted: true as const }
+    } catch (error) {
+      throw failure(error, `Could not send a message to thread ${sessionId}.`)
     }
   },
 

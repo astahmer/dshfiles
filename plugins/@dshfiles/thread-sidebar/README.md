@@ -534,18 +534,31 @@ plugin's `react-compiler-runtime` dependency are gone.
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
-the Agent as nineteen native tools: `thread_list`, `thread_archive`,
+the Agent as twenty native tools: `thread_list`, `thread_archive`,
 `thread_unarchive`, `thread_settle`, `thread_unsettle`, `thread_pin`,
 `thread_unpin`, `thread_rename`,
-`thread_fork`, `thread_create`, `thread_stop`, `thread_select_model`,
-`thread_references`, `project_list`, `project_register`, `project_rename`,
-`project_delete`, `project_reorder`, and `thread_move`. `src/thread-actions.ts`
+`thread_fork`, `thread_create`, `thread_prompt`, `thread_stop`,
+`thread_select_model`, `thread_references`, `project_list`,
+`project_register`, `project_rename`, `project_delete`, `project_reorder`, and
+`thread_move`. `src/thread-actions.ts`
 holds the decoded logic over plain ids and `src/thread-actions-host.ts` resolves
 the live Host services on each call (`sessionController`,
 `workspaceController`, `workspaceRegistry`, `sessionQuery`, and this plugin's own
 `thread-sidebar` settings scope for the settled set). `thread_settle` and
 `thread_unsettle` write `settledSessionIds` through that scope, so the Agent and
 every browser see one status.
+
+`thread_create` starts the thread's turn when it is given `text`: the same call
+creates, names and briefs a new thread, so an Agent never leaves one idle
+between a create and a prompt. `title` stays optional — with only `text` the
+Host's automatic title stands, derived from that first message — and a refused
+first message still returns the new id, reporting `prompt: 'refused'` and the
+reason. `thread_prompt` is the follow-up verb over the same
+`sessionController.prompt` the composer uses: `mode: 'queue'` (the default)
+starts the thread's next turn or appends to a running one, `mode: 'steer'`
+folds the text into the live turn, which the Host refuses when the thread is
+idle. Both take an explicit `sessionId` to reach another thread and default to
+the calling one.
 
 `thread_references` answers which other threads point back at one thread: its
 forked and subagent children (`header.parentSession`), plus the threads whose

@@ -31,7 +31,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 
 | Owner                                                                                                                                             | Capabilities audited | Agent tools today                                                                                        | Missing tools | Host gaps |
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------- | ------------- | --------- |
-| thread-sidebar                                                                                                                                    | 42                   | 21 (new)                                                                                                 | 12            | 5         |
+| thread-sidebar                                                                                                                                    | 43                   | 22 (new)                                                                                                 | 12            | 5         |
 | main-tabs                                                                                                                                         | 8                    | 0                                                                                                        | 2             | 2         |
 | home                                                                                                                                              | 4                    | 0                                                                                                        | 3             | 0         |
 | sidebar-commands                                                                                                                                  | 2                    | 0                                                                                                        | 1             | 0         |
@@ -94,7 +94,7 @@ Each row is a tool worth building today: the backing verb already exists.
 | `remote_thread_list`             | Threads on other hosts                                                                      | `multi-host.threadList` (no `tool` binding)                                                                                                                 |
 | `dsh_restart`                    | Restart DSH / copy launch URL                                                               | own `requestRestart` host service (`src/host.ts:18-28`)                                                                                                     |
 
-Already tool-served (this change): the 21 `thread_*` / `project_*` tools below, including
+Already tool-served (this change): the 22 `thread_*` / `project_*` tools below, including
 `thread_settle` / `thread_unsettle` (move one thread into or out of the plugin's own
 settled status, which the Host `agent/pre-step` gate enforces) and
 `thread_recoveries` (list the threads whose turn a restart or a crash interrupted) and
@@ -103,6 +103,11 @@ settled status, which the Host `agent/pre-step` gate enforces) and
 `thread_references` (a sibling revision) lists the threads that point back at one
 thread — forked and subagent children plus the threads that mention it — and the
 same Host verb backs the **Referenced by** submenu in both thread menus.
+`thread_create` takes the first message and starts the new thread's turn, so
+delegating does not need a create/rename/prompt sequence; `thread_prompt` is the
+matching follow-up verb over `session/prompt` (`mode` `queue` or `steer`, the
+calling thread by default), which is the proposed `session_prompt` capability
+under *Native DSH session, workspace, model* served from here instead.
 
 ### main-tabs
 
@@ -398,18 +403,21 @@ the guarded save as an agent tool`) — the sha256-guarded save, with `sessionId
   rows, plus the existing `queue_move`. Its two queue edits are bound where the
   Session controller lives — `thread_queue_remove` and `thread_queue_steer` in
   `thread-sidebar` (sibling revision `feat(thread-sidebar): let an Agent remove and
-steer a queued message`). Still missing: `queue_move_to_thread` (it needs a
-  cross-thread prompt, which no Host verb offers) and `queue_list_attachments`;
+steer a queued message`). Still missing: `queue_move_to_thread` (the prompt half is
+  `thread_prompt`; `session/updateQueue` still cannot retarget a queued item to
+  another Session) and `queue_list_attachments`;
   `queue_reorder_set_preferences` is a settings write. `queue_edit` cannot preserve
   attachments because `QueueAction.edit` is text-only (a recorded Host gap).
 - `attachment-gallery`: `session_attach_file` (session attachment + upload),
   `session_read_attachment` (`session/attachment`).
-- `send-after-upload`: `session_queue_message` (queue-mode prompt).
+- `send-after-upload`: `session_queue_message` (queue-mode prompt, reachable as
+  `thread_prompt` with `mode: 'queue'`).
 
 ### Native DSH session, workspace, model
 
-Already covered by the new `thread_*` / `project_*` tools: session list, create,
-fork, rename, cancel, archive/unarchive, pin/unpin, reorder, model selection,
+Already covered by the new `thread_*` / `project_*` tools: session list, create
+(with its first message), prompt (queue or steer), fork, rename, cancel,
+archive/unarchive, pin/unpin, reorder, model selection,
 workspace create/rename/delete/reorder.
 
 The owned Chat's inline **Resume** beside the latest restart-interrupted task
@@ -424,7 +432,7 @@ through normal prompt admission, not a replay of unfinished tool calls.
 | `session_history`                                       | Page a Session's history                     | `session/page`, `session/follow`                                         |
 | `session_watch`                                         | Live control/projection stream               | `session/control`, `session/projections`                                 |
 | `session_models`                                        | Read the model catalog                       | `session/modelCatalog`                                                   |
-| `session_prompt`                                        | Send a prompt to another live root thread    | `session/prompt`                                                         |
+| ~~`session_prompt`~~                                    | Send a prompt to another live root thread    | served as `thread_prompt` (thread-sidebar)                               |
 | `queue_update`                                          | Edit/remove/steer a queued item              | `session/updateQueue`                                                    |
 | `session_attachment`                                    | Read a Session image attachment              | `session/attachment`                                                     |
 | `open_path`                                             | Open/reveal a path in its app                | `session/openWorkspacePath`                                              |
