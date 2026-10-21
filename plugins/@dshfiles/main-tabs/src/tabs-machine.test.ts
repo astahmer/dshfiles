@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_TAB_PREFERENCES, tabsMachine, type HostTarget, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
 
 const thread = (sessionId: string): HostTarget => ({ kind: 'thread', sessionId })
-const panel = (panelId: string): HostTarget => ({ kind: 'panel', panelId })
+const panel = (panelId: string, scope?: string): HostTarget => (scope === undefined ? { kind: 'panel', panelId } : { kind: 'panel', panelId, scope })
 
 const start = (options: { readonly preferences?: Partial<TabPreferences>; readonly persisted?: PersistedTabs | null; readonly navigates?: boolean } = {}) => {
   const navigated: HostTarget[] = []
@@ -43,6 +43,55 @@ describe('tabsMachine', () => {
     tabs.host(thread('a'))
     expect(tabs.ids()).toEqual(['thread:a', 'panel:jujutsu'])
     expect(tabs.set().activeTabId).toBe('thread:a')
+  })
+
+  it('keeps one tab per panel scope, each naming the scope it asks the Host to show', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'one'), newTab: true, title: 'Jujutsu · welii' })
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'two'), newTab: true, title: 'Jujutsu · dshfiles' })
+
+    expect(tabs.ids()).toEqual(['panel:jujutsu#one', 'panel:jujutsu#two'])
+    expect(tabs.navigated.at(-1)).toEqual({ kind: 'panel', panelId: 'jujutsu', scope: 'two' })
+    expect(tabs.set().tabs.map(tab => tab.title)).toEqual(['Jujutsu · welii', 'Jujutsu · dshfiles'])
+  })
+
+  it('focuses an existing scoped tab instead of opening a duplicate, and keeps its scope on the way back', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'one'), newTab: true })
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'two'), newTab: true })
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'one'), newTab: true })
+
+    expect(tabs.ids()).toEqual(['thread:a', 'panel:jujutsu#one', 'panel:jujutsu#two'])
+    expect(tabs.navigated.at(-1)).toEqual({ kind: 'panel', panelId: 'jujutsu', scope: 'one' })
+  })
+
+  it('retitles a scoped tab wherever its set is, and saves the title and scope for a reload', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'one'), newTab: true, title: 'Jujutsu' })
+    tabs.actor.send({ type: 'tab.title', tabId: 'panel:jujutsu#one', title: 'Jujutsu · welii' })
+
+    expect(tabs.set().tabs[0]?.title).toBe('Jujutsu · welii')
+    const savedTab = Object.values(tabs.saved.at(-1)?.sets ?? {})
+      .flatMap(saved => saved.tabs)
+      .find(tab => tab.id === 'panel:jujutsu#one')
+    expect(savedTab).toMatchObject({ title: 'Jujutsu · welii', target: { kind: 'panel', panelId: 'jujutsu', scope: 'one' } })
+  })
+
+  it('navigates back to the plain tab even when the Host last reported that same panel, because its scope differs', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(panel('jujutsu'))
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu', 'one'), newTab: true })
+    tabs.actor.send({ type: 'tab.select', tabId: 'panel:jujutsu' })
+
+    expect(tabs.navigated).toEqual([
+      { kind: 'panel', panelId: 'jujutsu', scope: 'one' },
+      { kind: 'panel', panelId: 'jujutsu' },
+    ])
   })
 
   it('waits for the settings before following, then adopts what the Host already shows', () => {

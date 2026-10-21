@@ -4,7 +4,7 @@ import type { PersistedTabs } from './tabs-machine.js'
 
 const idSchema = z.string().min(1).max(512)
 const targetSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('panel'), panelId: idSchema }),
+  z.object({ kind: z.literal('panel'), panelId: idSchema, scope: idSchema.optional() }),
   z.object({ kind: z.literal('thread'), sessionId: idSchema }),
 ])
 const tabSchema = z.object({
@@ -13,6 +13,7 @@ const tabSchema = z.object({
   pinned: z.boolean(),
   preview: z.boolean(),
   usedAt: z.number().int().nonnegative(),
+  title: idSchema.optional(),
 })
 const setSchema = z.object({ tabs: z.array(tabSchema).max(200), activeTabId: idSchema.nullable() })
 

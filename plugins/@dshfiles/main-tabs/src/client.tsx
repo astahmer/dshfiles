@@ -18,6 +18,7 @@ import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
 import { PanelIcon, StartPage, type StartSection } from './start-page.js'
+import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-tabs.js'
 import { panelShortcut, recentThreads } from './start-suggestions.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type HostTarget, type TabPreferences, type TabsEvent } from './tabs-machine.js'
@@ -104,6 +105,8 @@ export default defineClient({
     const navigate = (target: HostTarget): boolean => {
       if (target.kind === 'panel') {
         if (!isMainPanelId(target.panelId)) return false
+        // The Host shows one panel per key, so the scope is announced to the panel before it is selected.
+        PanelTabs.announce(target)
         ctx.layout.selectPanel(target.panelId)
         return true
       }
@@ -149,6 +152,27 @@ export default defineClient({
     }, 'main-tabs: keep double-clicked sidebar threads')
 
     ctx.effect(() => {
+      const openPanelTab = (event: Event): void => {
+        const request = PanelTabs.readRequest(event)
+        if (request === undefined || !actor.getSnapshot().matches('on')) return
+        const target: HostTarget = { kind: 'panel', panelId: request.panelId, scope: request.scope }
+        const opened = { type: 'tab.open' as const, target, newTab: true, title: request.title }
+        actor.send(request.title === undefined ? { type: 'tab.open', target, newTab: true } : opened)
+      }
+      const retitle = (event: Event): void => {
+        const request = PanelTabs.readTitle(event)
+        if (request === undefined) return
+        actor.send({ type: 'tab.title', tabId: PanelTabs.tabId(request.panelId, request.scope), title: request.title })
+      }
+      window.addEventListener(OPEN_PANEL_TAB_EVENT, openPanelTab)
+      window.addEventListener(PANEL_TAB_TITLE_EVENT, retitle)
+      return () => {
+        window.removeEventListener(OPEN_PANEL_TAB_EVENT, openPanelTab)
+        window.removeEventListener(PANEL_TAB_TITLE_EVENT, retitle)
+      }
+    }, 'main-tabs: panel tabs with their own scope')
+
+    ctx.effect(() => {
       let reported = ''
       const report = (): void => {
         const sessions = ctx.sessions.list.getSnapshot()
@@ -159,10 +183,15 @@ export default defineClient({
           sessions: sessions.ids.flatMap(id => sessions.byId[id] ?? []),
           workspaces: ctx.workspaces.list.getSnapshot().items,
         })
-        const key = `${view.target === null ? '' : tabIdOf(view.target)}|${view.projectId ?? ''}`
+        // The Host cannot name a scope, so a scoped tab on screen reports itself; otherwise the panel is bare.
+        const snapshot = actor.getSnapshot()
+        const activeSet = snapshot.context.sets[snapshot.context.scopeKey]
+        const activeTab = activeSet?.tabs.find(tab => tab.id === activeSet.activeTabId)
+        const target = PanelTabs.visibleTarget(view.target, activeTab?.target ?? null)
+        const key = `${target === null ? '' : tabIdOf(target)}|${view.projectId ?? ''}`
         if (key !== reported) {
           reported = key
-          actor.send({ type: 'host.navigated', target: view.target, projectId: view.projectId })
+          actor.send({ type: 'host.navigated', target, projectId: view.projectId })
         }
         const known = new Set(Object.keys(sessions.byId))
         const missing = Object.values(actor.getSnapshot().context.sets)
@@ -250,7 +279,7 @@ export default defineClient({
                 ...base,
                 kind: 'panel',
                 panelId,
-                title: panelLabels.get(panelId) ?? panelTitleFallback(panelId),
+                title: tab.title ?? panelLabels.get(panelId) ?? panelTitleFallback(panelId),
                 available: registeredPanels.has(panelId),
                 status: null,
               }

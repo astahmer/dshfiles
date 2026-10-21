@@ -1,7 +1,12 @@
 import { and, assign, raise, setup } from '@dshfiles/plugin-ui/machine'
 
-/** What the Host's main view can show. */
-export type HostTarget = { readonly kind: 'panel'; readonly panelId: string } | { readonly kind: 'thread'; readonly sessionId: string }
+/**
+ * What the Host's main view can show. A panel target may also name a scope: the same panel key showing a different
+ * subject (Jujutsu on two repositories) in two tabs; the Host only ever sees the panel id.
+ */
+export type HostTarget =
+  | { readonly kind: 'panel'; readonly panelId: string; readonly scope?: string | undefined }
+  | { readonly kind: 'thread'; readonly sessionId: string }
 
 /** A tab shows a Host target, or the new-tab page (suggestions of what to open), which only the strip renders. */
 export type TabTarget = HostTarget | { readonly kind: 'start' }
@@ -14,6 +19,8 @@ export interface Tab {
   readonly preview: boolean
   /** Activation order, for least-recently-used eviction past the tab limit. */
   readonly usedAt: number
+  /** A scoped panel tab's live title (its subject); unscoped panels are named by their sidebar entry. */
+  readonly title?: string | undefined
 }
 
 export interface TabSet {
@@ -55,7 +62,9 @@ export type TabsEvent =
   | { readonly type: 'start.pick'; readonly target: HostTarget | null }
   | { readonly type: 'tab.select'; readonly tabId: string }
   /** Open a target from outside the main view; `newTab` keeps every existing tab, whatever `openMode` says (Mod-click). */
-  | { readonly type: 'tab.open'; readonly target: TabTarget; readonly newTab: boolean }
+  | { readonly type: 'tab.open'; readonly target: TabTarget; readonly newTab: boolean; readonly title?: string | undefined }
+  /** A scoped panel published the title of its subject; the tab shows it from now on. */
+  | { readonly type: 'tab.title'; readonly tabId: string; readonly title: string }
   | { readonly type: 'tab.close'; readonly tabId: string }
   | { readonly type: 'tab.closeActive' }
   | { readonly type: 'tab.closeOthers'; readonly tabId: string }
@@ -87,6 +96,11 @@ interface TabsContext {
   readonly pendingTarget: HostTarget | null
   /** The first Host report after load either restores the saved active tab or opens what the Host shows. */
   readonly restored: boolean
+  /**
+   * The tab whose target the main view was last navigated to. A tab can differ from its Host target (two Jujutsu tabs
+   * share one panel, each with its own scope), so picking the tab that is visibly active must still announce its scope.
+   */
+  readonly shownTabId: string | null
 }
 
 interface TabsInput {
@@ -106,7 +120,8 @@ export const START_TAB_ID = 'start'
 
 export const tabIdOf = (target: TabTarget): string => {
   if (target.kind === 'start') return START_TAB_ID
-  return target.kind === 'panel' ? `panel:${target.panelId}` : `thread:${target.sessionId}`
+  if (target.kind === 'thread') return `thread:${target.sessionId}`
+  return target.scope === undefined ? `panel:${target.panelId}` : `panel:${target.panelId}#${target.scope}`
 }
 
 const sameTarget = (left: HostTarget | null, right: HostTarget | null): boolean =>
@@ -138,12 +153,13 @@ const keepThreadTab = (set: TabSet, sessionId: string): TabSet => {
   return { ...set, tabs: set.tabs.map(tab => (tab.id === id ? { ...tab, preview: false } : tab)) }
 }
 
-const openTarget = (set: TabSet, target: TabTarget, preferences: TabPreferences, usedAt: number): TabSet => {
+const openTarget = (set: TabSet, target: TabTarget, preferences: TabPreferences, usedAt: number, title?: string): TabSet => {
   const id = tabIdOf(target)
   if (set.tabs.some(tab => tab.id === id)) {
-    return { tabs: set.tabs.map(tab => (tab.id === id ? { ...tab, usedAt } : tab)), activeTabId: id }
+    return { tabs: set.tabs.map(tab => (tab.id === id ? (title === undefined ? { ...tab, usedAt } : { ...tab, usedAt, title }) : tab)), activeTabId: id }
   }
-  const opened: Tab = { id, target, pinned: false, preview: preferences.openMode === 'preview', usedAt }
+  const candidate: Tab = { id, target, pinned: false, preview: preferences.openMode === 'preview', usedAt }
+  const opened: Tab = title === undefined ? candidate : { ...candidate, title }
   const replaced =
     preferences.openMode === 'preview'
       ? set.tabs.find(tab => tab.preview && !tab.pinned)
@@ -178,12 +194,13 @@ const removeTabs = (set: TabSet, removed: (tab: Tab) => boolean): TabSet => {
  * The new-tab page gives its place to what was opened from it, or from anywhere else while it was shown; a target that
  * already has a tab is focused there instead.
  */
-const replaceStart = (set: TabSet, target: HostTarget, usedAt: number): TabSet => {
+const replaceStart = (set: TabSet, target: HostTarget, usedAt: number, title?: string): TabSet => {
   const id = tabIdOf(target)
   if (set.tabs.some(tab => tab.id === id)) {
     return { tabs: set.tabs.flatMap(tab => (tab.id === START_TAB_ID ? [] : [tab.id === id ? { ...tab, usedAt } : tab])), activeTabId: id }
   }
-  const opened: Tab = { id, target, pinned: false, preview: false, usedAt }
+  const candidate: Tab = { id, target, pinned: false, preview: false, usedAt }
+  const opened: Tab = title === undefined ? candidate : { ...candidate, title }
   return { tabs: set.tabs.map(tab => (tab.id === START_TAB_ID ? opened : tab)), activeTabId: id }
 }
 
@@ -207,6 +224,10 @@ const moveTab = (set: TabSet, tabId: string, toIndex: number): TabSet => {
 }
 
 const withSet = (context: TabsContext, set: TabSet): Pick<TabsContext, 'sets'> => ({ sets: { ...context.sets, [context.scopeKey]: set } })
+
+/** One title for every set holding that tab id; a scoped panel keeps its tab across projects. */
+const withTitle = (sets: TabsContext['sets'], tabId: string, title: string): TabsContext['sets'] =>
+  Object.fromEntries(Object.entries(sets).map(([key, set]) => [key, { ...set, tabs: set.tabs.map(tab => (tab.id === tabId ? { ...tab, title } : tab)) }]))
 
 const activeTarget = (context: TabsContext): TabTarget | null =>
   currentSet(context).tabs.find(tab => tab.id === currentSet(context).activeTabId)?.target ?? null
@@ -240,8 +261,10 @@ export const tabsMachine = setup({
     persist: ({ context }) => context.ports.save(persisted(context)),
     navigateToActive: assign(({ context }) => {
       const target = activeTarget(context)
-      if (target === null || target.kind === 'start' || sameTarget(target, context.hostTarget)) return { pendingTarget: null }
-      return { pendingTarget: context.ports.navigate(target) ? target : null }
+      if (target === null || target.kind === 'start') return { pendingTarget: null }
+      const tabId = tabIdOf(target)
+      if (tabId === context.shownTabId) return { pendingTarget: null }
+      return context.ports.navigate(target) ? { pendingTarget: target, shownTabId: tabId } : { pendingTarget: null }
     }),
     followHost: assign(({ context, event }) => {
       if (event.type !== 'host.navigated') return {}
@@ -268,7 +291,11 @@ export const tabsMachine = setup({
       if (event.target === null) {
         // Nothing is shown (the New thread screen): no tab is active, unless this is the first report and a tab waits.
         const shown = startShown ? removeTabs(set, tab => tab.id === START_TAB_ID) : set
-        return { ...scoped, ...withSet(scoped, { ...shown, activeTabId: context.restored || projectChanged || startShown ? null : set.activeTabId }) }
+        return {
+          ...scoped,
+          shownTabId: null,
+          ...withSet(scoped, { ...shown, activeTabId: context.restored || projectChanged || startShown ? null : set.activeTabId }),
+        }
       }
       const clock = context.clock + 1
       const opened = startShown ? replaceStart(set, event.target, clock) : openTarget(set, event.target, context.preferences, clock)
@@ -277,6 +304,7 @@ export const tabsMachine = setup({
         ...scoped,
         pendingKeptSessionId: keptSessionId === null ? context.pendingKeptSessionId : null,
         clock,
+        shownTabId: tabIdOf(event.target),
         ...withSet(scoped, keptSessionId === null ? opened : keepThreadTab(opened, keptSessionId)),
       }
     }),
@@ -328,6 +356,7 @@ export const tabsMachine = setup({
       pendingKeptSessionId: null,
       pendingTarget: null,
       restored: false,
+      shownTabId: null,
     }
   },
   // Settings are read by a component after boot; until the first read the machine only records what the Host shows.
@@ -336,6 +365,7 @@ export const tabsMachine = setup({
     gate: {
       on: {
         'host.navigated': { actions: 'recordHost' },
+        'tab.title': { actions: assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })) },
         'thread.keep': { actions: assign(({ event }) => ({ pendingKeptSessionId: event.sessionId })) },
         'preferences.changed': [
           { guard: and(['enabled', 'hostSeen']), target: 'on', actions: ['applyPreferences', 'adoptHost'] },
@@ -347,6 +377,7 @@ export const tabsMachine = setup({
     off: {
       on: {
         'host.navigated': { actions: 'recordHost' },
+        'tab.title': { actions: assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })) },
         'preferences.changed': [
           { guard: and(['enabled', 'hostSeen']), target: 'on', actions: ['applyPreferences', assign({ restored: true }), 'adoptHost'] },
           { guard: 'enabled', target: 'on', actions: ['applyPreferences', assign({ restored: true })] },
@@ -416,7 +447,7 @@ export const tabsMachine = setup({
             assign(({ context, event }) => {
               const clock = context.clock + 1
               const preferences: TabPreferences = event.newTab ? { ...context.preferences, openMode: 'new' } : context.preferences
-              return { clock, ...withSet(context, openTarget(currentSet(context), event.target, preferences, clock)) }
+              return { clock, ...withSet(context, openTarget(currentSet(context), event.target, preferences, clock, event.title)) }
             }),
             'navigateToActive',
             'persist',
@@ -491,6 +522,9 @@ export const tabsMachine = setup({
             'navigateToActive',
             'persist',
           ],
+        },
+        'tab.title': {
+          actions: [assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })), 'persist'],
         },
         'tab.togglePin': {
           actions: [
