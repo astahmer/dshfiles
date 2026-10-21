@@ -1,6 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { AGENT_HANDLE_PATTERN, agentDraftSchema, agentSchema } from './agent.js'
+import { AGENT_HANDLE_PATTERN, agentDraftSchema, agentSchema, agentThreadSchema, MAX_SESSION_CHARS } from './agent.js'
 
 const handleSchema = z.string().regex(AGENT_HANDLE_PATTERN)
 const writeNote = 'May run only when the user asked for that change.'
@@ -23,6 +23,14 @@ export const agentRemoveResultSchema = z
     kind: z.enum(['applied', 'built-in', 'missing']),
     revision: z.number().int().positive(),
     agents: z.array(agentSchema),
+  })
+  .strict()
+
+/** The Session a dispatch just opened, as the client reports it back to the registry. */
+export const agentThreadInputSchema = z
+  .object({
+    sessionId: z.string().min(1).max(MAX_SESSION_CHARS),
+    title: z.string().max(200),
   })
   .strict()
 
@@ -76,9 +84,22 @@ export const agentsApi = defineApi({
       tool: { name: 'agents_remove', readOnly: false },
     }),
     recordUse: method({
-      input: z.object({ handle: handleSchema }).strict(),
+      input: z.object({ handle: handleSchema, thread: agentThreadInputSchema.optional() }).strict(),
       output: agentSnapshotSchema,
-      description: 'Bump one agent’s last-used time and thread count after a dispatch. Not an agent tool.',
+      description:
+        'Record a dispatch: bump last-used time and count, and keep the thread it opened so the panel can list it after a Host restart. Not an agent tool.',
+    }),
+    threads: method({
+      input: z.object({ handle: handleSchema }).strict(),
+      output: z.object({ threads: z.array(agentThreadSchema) }).strict(),
+      description: 'The threads one agent started, newest first, with their titles and start times. Read-only.',
+      tool: { name: 'agents_threads', readOnly: true },
+    }),
+    threadAgent: method({
+      input: z.object({ sessionId: z.string().min(1).max(MAX_SESSION_CHARS) }).strict(),
+      output: z.object({ agent: agentSchema.nullable() }).strict(),
+      description:
+        'The agent that started one thread, by Session id, or null for a thread no agent started. Read-only; a cross-plugin lookup, not an agent tool.',
     }),
   },
 })

@@ -9,7 +9,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useState } from 'react'
 
-import { agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute } from './agent.js'
+import { agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute, type AgentThread } from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
 import type { AgentCatalog, AgentDispatchRequest, AgentThreadTarget } from './dispatch.js'
 
@@ -25,6 +25,8 @@ export interface AgentsPanelProps {
   readonly listProjects: () => readonly AgentsPanelProject[]
   readonly loadCatalog: () => Promise<AgentCatalog>
   readonly loadPresets: () => Promise<readonly AgentPresetRow[]>
+  readonly loadThreads: (handle: string) => Promise<readonly AgentThread[]>
+  readonly openThread: (sessionId: string) => void
   readonly startThread: (request: AgentDispatchRequest) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
 }
 
@@ -70,6 +72,11 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
 
   const projects = props.listProjects()
   const current = useMemo(() => agents.find(agent => agent.handle === selected) ?? null, [agents, selected])
+  const threads = useQuery({
+    queryKey: [QUERY_ROOT, 'threads', selected ?? ''],
+    queryFn: () => props.loadThreads(selected ?? ''),
+    enabled: selected !== null,
+  })
   const editing = creating || current === null
   useEffect(() => {
     if (creating) return
@@ -355,6 +362,29 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                 Start
               </Button>
             </div>
+          </div>
+        )}
+
+        {current === null ? null : (
+          <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:p-2">
+            <h3 className={labelClass}>Threads started</h3>
+            {threads.isPending ? <p className="dshx:text-[11px] dshx:text-muted-foreground">Loading…</p> : null}
+            {!threads.isPending && (threads.data ?? []).length === 0 ? (
+              <p className="dshx:text-[11px] dshx:text-muted-foreground">No thread yet. Start one above; it stays listed here after a restart.</p>
+            ) : null}
+            {(threads.data ?? []).map(thread => (
+              <button
+                key={thread.sessionId}
+                type="button"
+                onClick={() => props.openThread(thread.sessionId)}
+                className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:py-1 dshx:text-left dshx:text-[12px] dshx:transition-colors dshx:hover:bg-accent"
+              >
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{thread.title}</span>
+                <span className="dshx:shrink-0 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
+                  {new Date(thread.startedAt).toISOString().slice(0, 10)}
+                </span>
+              </button>
+            ))}
           </div>
         )}
 

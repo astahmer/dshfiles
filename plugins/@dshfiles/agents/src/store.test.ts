@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import type { AgentTable } from './store.js'
-import type { Agent } from './agent.js'
+import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
+import type { AgentTable, AgentThreadTable } from './store.js'
+import type { Agent, AgentThread } from './agent.js'
 import { AgentRegistry } from './store.js'
 
-const memoryTable = (initial: readonly Agent[] = []) => {
-  const rows = new Map<string, Agent>(initial.map(agent => [agent.handle, agent]))
-  const table: AgentTable = {
+const memoryTable = <Key extends string, Value>(
+  initial: readonly Value[] = [],
+  keyOf: (value: Value) => Key,
+): { readonly rows: Map<Key, Value>; readonly table: KvTable<Key, Value> } => {
+  const rows = new Map<Key, Value>(initial.map(value => [keyOf(value), value]))
+  const table: KvTable<Key, Value> = {
     get: key => rows.get(key),
     entries: () => rows.entries(),
     keys: () => rows.keys(),
@@ -29,8 +33,16 @@ const memoryTable = (initial: readonly Agent[] = []) => {
 }
 
 const storeOf = (now: () => number, initial: readonly Agent[] = []) => {
-  const { rows, table } = memoryTable(initial)
-  return { rows, store: AgentRegistry.createStore({ table, now, reportError: () => undefined }) }
+  const agents = memoryTable<string, Agent>(initial, agent => agent.handle)
+  const threads = memoryTable<string, AgentThread>([], thread => thread.sessionId)
+  const registry = (agentTable: AgentTable, threadTable: AgentThreadTable) =>
+    AgentRegistry.createStore({ table: agentTable, threads: threadTable, now, reportError: () => undefined })
+  return {
+    rows: agents.rows,
+    threadRows: threads.rows,
+    store: registry(agents.table, threads.table),
+    reopen: () => registry(agents.table, threads.table),
+  }
 }
 
 const draftOf = (handle: string) => ({
@@ -91,6 +103,50 @@ test('refuses past the agent limit without dropping existing rows', async () => 
   const full = await store.save(draftOf('one-more'))
   assert.equal(full.kind, 'limit')
   assert.equal(store.resolve('agent-98')?.handle, 'agent-98')
+})
+
+test('keeps a dispatched thread and its usage across a restart', async () => {
+  const { store, threadRows, reopen } = storeOf(() => 6_000)
+  await store.save(draftOf('reviewer'))
+  const used = await store.recordUse('reviewer', { sessionId: 'session-a', title: 'Review the pull request' })
+  assert.equal(used.agents.find(agent => agent.handle === 'reviewer')?.threadCount, 1)
+  assert.equal(threadRows.size, 1)
+
+  // The same dispatch retried is idempotent: one row, one count, one last-used time.
+  await store.recordUse('reviewer', { sessionId: 'session-a', title: 'Review the pull request' })
+  const restored = reopen()
+  const agent = restored.resolve('reviewer')
+  assert.equal(agent?.threadCount, 1)
+  assert.equal(agent?.lastUsedAt, 6_000)
+  assert.deepEqual(
+    restored.threads('reviewer').map(thread => thread.sessionId),
+    ['session-a'],
+  )
+  assert.equal(restored.threadAgent('session-a')?.handle, 'reviewer')
+  assert.equal(restored.threadAgent('session-b'), null)
+})
+
+test('lists an agent’s threads newest first and drops one when the agent goes', async () => {
+  let clock = 7_000
+  const { store, threadRows } = storeOf(() => clock)
+  await store.save(draftOf('reviewer'))
+  await store.save(draftOf('planner'))
+  await store.recordUse('reviewer', { sessionId: 'session-old', title: 'Older' })
+  clock = 8_000
+  await store.recordUse('reviewer', { sessionId: 'session-new', title: 'Newer' })
+  await store.recordUse('planner', { sessionId: 'session-plan', title: 'Plan' })
+  assert.deepEqual(
+    store.threads('reviewer').map(thread => thread.title),
+    ['Newer', 'Older'],
+  )
+  assert.deepEqual(
+    store.threads('planner').map(thread => thread.title),
+    ['Plan'],
+  )
+  await store.remove('reviewer')
+  assert.equal(threadRows.has('session-old'), false)
+  assert.equal(threadRows.has('session-plan'), true)
+  assert.equal(store.threadAgent('session-old'), null)
 })
 
 test('an unchanged agent keeps revision monotonic across restarts', async () => {

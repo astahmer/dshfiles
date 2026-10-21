@@ -1,6 +1,7 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
@@ -13,6 +14,11 @@ import { agentsApi } from './api.js'
 import { AgentDispatch, type AgentDispatchRequest, type AgentModelSelection, type AgentThreadCreation } from './dispatch.js'
 
 const PANEL_ID = 'dshfiles-agents'
+
+/** Thread ids cross the Host boundary as plain JSON strings; the workspace API brands them. */
+// SAFETY: the value is a Session id the agents API returned for a thread this Host created, and uiWorkspace
+// re-resolves it against its own reference before navigating; an unknown id fails the same way a stale one does.
+const asSessionId = (sessionId: string): SessionId => sessionId as SessionId
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -45,7 +51,8 @@ export default defineClient({
         const selected = await ctx.remote.session.selectModel(selection)
         if (!selected.ok) console.warn(`agents: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
       }
-      const renamed = await ctx.remote.session.rename({ sessionId, title: AgentDispatch.title(request) })
+      const title = AgentDispatch.title(request)
+      const renamed = await ctx.remote.session.rename({ sessionId, title })
       if (!renamed.ok) console.warn(`agents: thread ${sessionId} title kept as created: ${renamed.error.message}`)
       const reference = ctx.sessions.retain(sessionId, { source: 'agentDispatch' })
       try {
@@ -60,7 +67,7 @@ export default defineClient({
       } finally {
         reference.release()
       }
-      await api.safe.recordUse({ handle: request.agent.handle })
+      await api.safe.recordUse({ handle: request.agent.handle, thread: { sessionId: String(sessionId), title } })
       ctx.uiWorkspace.openSession(sessionId)
       return { ok: true }
     }
@@ -85,6 +92,8 @@ export default defineClient({
         return AgentDispatch.catalog(result.value)
       },
       loadPresets: async () => (await api.presets()).presets,
+      loadThreads: async handle => (await api.threads({ handle })).threads,
+      openThread: sessionId => ctx.uiWorkspace.openSession(asSessionId(sessionId)),
       startThread,
     }
 

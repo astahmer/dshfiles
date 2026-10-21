@@ -21,7 +21,7 @@ const openAgents = async (ctx: Context): Promise<OpenedAgents> => {
   if (storage === undefined) throw new Error('Agent registry storage is unavailable.')
   const domain = await storage.open(agentsDomain)
   return {
-    store: AgentRegistry.createStore({ table: domain.table('agents') }),
+    store: AgentRegistry.createStore({ table: domain.table('agents'), threads: domain.table('threads') }),
     close: () => domain.close(),
   }
 }
@@ -68,7 +68,9 @@ const agentsApiHost = agentsApi.host({
   },
   save: async ({ ctx, input }) => (await agentsFor(ctx)).save(input.agent),
   remove: async ({ ctx, input }) => (await agentsFor(ctx)).remove(input.handle),
-  recordUse: async ({ ctx, input }) => (await agentsFor(ctx)).recordUse(input.handle),
+  recordUse: async ({ ctx, input }) => (await agentsFor(ctx)).recordUse(input.handle, input.thread),
+  threads: async ({ ctx, input }) => ({ threads: (await agentsFor(ctx)).threads(input.handle) }),
+  threadAgent: async ({ ctx, input }) => ({ agent: (await agentsFor(ctx)).threadAgent(input.sessionId) }),
 })
 
 export default defineHost({

@@ -21,23 +21,27 @@ where a thread starts.
   reads, because a preset and system prompt are fixed when the thread is created.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
+- **Thread history is durable.** A dispatch records its Session in the agent's `threads` table, so
+  the panel lists the threads an agent started (and opens one) after a Host restart, and the usage
+  counters are read back from storage rather than recomputed per page load.
 - **One Host contract.** `@dshfiles/agents/contract` exports the schemas, mention parsing and
   dispatch composition so the backlog links a thread with the same rules instead of restating them.
 
 ## Surfaces
 
-| Surface              | Behavior                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Agents sidebar panel | List, create, edit, enable/disable and remove agents (the built-in `@dsh` is not removable), and start a thread. |
-| `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.    |
-| Agent tools          | `agents_list`, `agents_get`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                      |
+| Surface              | Behavior                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agents sidebar panel | List, create, edit, enable/disable and remove agents (the built-in `@dsh` is not removable), start a thread, and open a thread the agent started. |
+| `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                     |
+| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                     |
 
 ## Limits
 
 - 100 agents, 8 KB of instructions each, 32-character handles (`^[a-z][a-z0-9-]{0,31}$`).
 - A handle is the identity: it cannot be renamed after creation.
-- No per-agent memory, routines or delegation rules yet; memory stays project-scoped and schedules
-  stay Session-scoped. See `plans/persistent-agents/README.md`.
+- 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
+- Memory, routines and delegation rules are Phase 3 slices; see
+  `plans/persistent-agents/README.md`.
 
 ## Development
 

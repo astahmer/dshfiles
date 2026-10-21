@@ -22,3 +22,11 @@ Feature: Persistent agents
     Given the isolated plugin profile "@dshfiles/agents" is booted
     Then the agent "Reviewer" is saved with instructions "Prefer small findings."
     And the Agents panel lists "Reviewer" with those instructions
+
+  @scenario:agents.thread-history
+  Scenario: An agent keeps the threads it started
+    Given the isolated plugin profile "@dshfiles/agents" is booted
+    Then the agent "Reviewer" is saved with instructions "Prefer small findings."
+    When a thread is started from the agent "reviewer" with "Review the open pull requests"
+    And the browser page is reloaded with the Agents panel open
+    Then the agent "reviewer" lists "Review the open pull requests" and counts 1 thread

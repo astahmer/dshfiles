@@ -69,3 +69,25 @@ Then('the Agents panel lists {string} with those instructions', async ({ page }:
   })
   await finishJourneyAssertions(page)
 })
+
+When('a thread is started from the agent {string} with {string}', async ({ page }: { page: Page }, handle: string, prompt: string) => {
+  await openAgentsPanel(page)
+  await page.getByRole('button', { name: new RegExp(`@${handle}$`, 'u') }).click()
+  await page.getByRole('textbox', { name: 'Prompt', exact: true }).fill(prompt)
+  await page.getByRole('button', { name: 'Start', exact: true }).click()
+  await expect(page.getByRole('treeitem', { name: new RegExp(`^${prompt}\\b`, 'u') })).toHaveAttribute('aria-selected', 'true')
+})
+
+When('the browser page is reloaded with the Agents panel open', async ({ page }: { page: Page }) => {
+  await page.reload()
+  await openAgentsPanel(page)
+})
+
+Then('the agent {string} lists {string} and counts {int} thread', async ({ page }: { page: Page }, handle: string, title: string, count: number) => {
+  await recordAssertion(page, 'agents-thread-history-survives-a-reload', async () => {
+    await page.getByRole('button', { name: new RegExp(`@${handle}$`, 'u') }).click()
+    await expect(page.getByText(new RegExp(`@${handle} · ${String(count)} thread\\b`, 'u'))).toBeVisible()
+    await expect(page.getByRole('button', { name: new RegExp(`^${title}$`, 'u') })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

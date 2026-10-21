@@ -5,11 +5,11 @@
     {
       "id": "agent-registry",
       "title": "Manage persistent agents",
-      "summary": "Create, edit, enable and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
+      "summary": "Create, edit, enable and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. An agent keeps the threads it started, so its history and usage survive a Host restart. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
       "reach": ["click button \"Agents\"", "expect textbox \"Name\""],
       "surfaces": ["client", "host", "storage", "tool"],
       "configuration": [],
-      "states": ["empty", "built-in-only", "editing", "enabled", "disabled"],
+      "states": ["empty", "built-in-only", "editing", "enabled", "disabled", "thread-history"],
       "failureModes": [
         "A handle is a slug; a name alone is enough to create one.",
         "Removing the built-in @dsh agent is refused and reported.",
@@ -51,6 +51,23 @@
         {
           "kind": "gherkin",
           "id": "agents.create-agent",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "agents.registry-thread-history",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "keeps a dispatched thread and its usage across a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.registry-thread-prune",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "lists an agent\u2019s threads newest first and drops one when the agent goes"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agents.thread-history",
           "featureFile": "tooling/dshx/e2e/features/agents.feature"
         }
       ]

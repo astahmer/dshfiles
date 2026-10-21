@@ -12,6 +12,9 @@ export const MAX_PRESET_CHARS = 64
 export const MAX_PROVIDER_CHARS = 128
 export const MAX_MODEL_CHARS = 256
 export const MAX_EFFORT_CHARS = 64
+export const MAX_SESSION_CHARS = 256
+/** Newest threads kept per agent; an older row is pruned so one agent cannot grow the table without bound. */
+export const MAX_THREADS_PER_AGENT = 50
 /** Matches the backlog start-thread limit, so a dispatch prompt travels the same path as a typed one. */
 export const MAX_MESSAGE_CHARS = 4_000
 /** `agent:` and `a:` scope the shared `@` menu to agents; the other sources stay empty for them. */
@@ -51,6 +54,21 @@ export const agentSchema = agentDraftSchema
     threadCount: z.number().int().nonnegative(),
   })
   .strict()
+
+/**
+ * One thread an agent started. It is a real row, not a counter: the panel lists the threads, opens one, and a Host
+ * restart keeps the history because it reads the same table the dispatch wrote.
+ */
+export const agentThreadSchema = z
+  .object({
+    sessionId: z.string().min(1).max(MAX_SESSION_CHARS),
+    handle: handleSchema,
+    title: z.string().max(200),
+    startedAt: timestampSchema,
+  })
+  .strict()
+
+export type AgentThread = z.infer<typeof agentThreadSchema>
 
 export type AgentRoute = z.infer<typeof agentRouteSchema>
 export type AgentDraft = z.infer<typeof agentDraftSchema>
