@@ -96,7 +96,6 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -294,8 +293,6 @@ const ALL_PROJECTS = '__all__'
 const INVENTORY_REFRESH_INTERVAL_MS = 60_000
 /** Pointer travel before a press on a section header becomes a reorder drag instead of a fold. */
 const SECTION_DRAG_THRESHOLD_PX = 5
-/** Pointer travel before a press on a thread row becomes a move-between-sections drag instead of a click. */
-const ROW_DRAG_THRESHOLD_PX = 5
 const UNASSIGNED_PROJECT = '__unassigned__'
 
 const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0]> = {
@@ -3009,33 +3006,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const sectionDragRef = useRef<{ pointerId: number; from: number; startY: number; centers: number[] | null } | null>(null)
   const suppressSectionClick = useRef(false)
   const [sectionDrag, setSectionDrag] = useState<{ from: number; to: number } | null>(null)
-  // A row drag opens every section, including the empty ones, so there is always a header to drop on.
   const [rowDrag, setRowDrag] = useState<{ sessionId: SessionSummary['id']; section: SidebarSection } | null>(null)
   const [rowDropSection, setRowDropSection] = useState<SidebarSection | null>(null)
-  const rowDragRef = useRef<{
-    pointerId: number
-    sessionId: SessionSummary['id']
-    section: SidebarSection
-    startX: number
-    startY: number
-    active: boolean
-  } | null>(null)
+  const rowDragRef = useRef<{ sessionId: SessionSummary['id']; section: SidebarSection } | null>(null)
   const rowDropSectionRef = useRef<SidebarSection | null>(null)
   const suppressRowClick = useRef(false)
   const moveThreadsToSectionRef = useRef(moveThreadsToSection)
   moveThreadsToSectionRef.current = moveThreadsToSection
-  const dropSections = rowDrag === null ? shownSections : orderedSections
+  // A dropped row lands in a section that is already on screen: revealing the empty ones during the gesture would
+  // re-parent the dragged row, and the browser cancels a native drag whose source node moves.
   const renderedSections = useMemo(
     () =>
       sectionDrag === null
-        ? dropSections
+        ? shownSections
         : SidebarOrganization.reorderSections({
             savedOrder: orderedSections,
-            shownSections: dropSections,
+            shownSections,
             fromShownIndex: sectionDrag.from,
             toShownIndex: sectionDrag.to,
-          }).filter(section => dropSections.includes(section)),
-    [dropSections, orderedSections, sectionDrag],
+          }).filter(section => shownSections.includes(section)),
+    [shownSections, orderedSections, sectionDrag],
   )
   const endSectionDrag = (): void => {
     sectionDragRef.current = null
@@ -3048,64 +3038,74 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     })
   }
   /**
-   * One window-level pointer gesture for row moves: a press on a row is a candidate, the first few pixels turn it
-   * into a drag (so a plain click still opens the thread), the section under the pointer is the target, and the
-   * release applies the move. Pointer capture is not needed because the listeners outlive the row.
+   * A thread row is `draggable` so it can be dropped into the composer as a mention, and the browser's own drag
+   * suppresses pointer events for the gesture, so moving a row between sections rides the same native
+   * dragstart/dragover/drop stream instead of a pointer gesture that never sees the move.
    */
   useEffect(() => {
-    const sectionUnderPointer = (event: PointerEvent): SidebarSection | null => {
-      const element = document.elementFromPoint(event.clientX, event.clientY)
+    const sectionAt = (clientX: number, clientY: number): SidebarSection | null => {
+      const element = document.elementFromPoint(clientX, clientY)
       const section = element instanceof Element ? element.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection : undefined
       return isSidebarSection(section) ? section : null
     }
-    const handlePointerMove = (event: PointerEvent): void => {
+    const onDragStart = (event: DragEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const row = target.closest<HTMLElement>('article[data-thread-id][data-thread-section-row]')
+      if (row === null) return
+      const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
+      const threadId = row.dataset.threadId
+      if (!isSidebarSection(section) || threadId === undefined) return
+      const sessionId = SessionId(threadId)
+      rowDragRef.current = { sessionId, section }
+      setRowDrag({ sessionId, section })
+    }
+    const onDragOver = (event: DragEvent): void => {
+      if (rowDragRef.current === null) return
+      const next = sectionAt(event.clientX, event.clientY)
+      if (next === null) {
+        rowDropSectionRef.current = null
+        setRowDropSection(current => (current === null ? current : null))
+        return
+      }
+      // Without preventDefault the browser refuses the drop and no `drop` event ever fires.
+      event.preventDefault()
+      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move'
+      rowDropSectionRef.current = next
+      setRowDropSection(current => (current === next ? current : next))
+    }
+    const endRowDrag = (): void => {
+      rowDragRef.current = null
+      rowDropSectionRef.current = null
+      setRowDrag(null)
+      setRowDropSection(null)
+    }
+    const onDrop = (event: DragEvent): void => {
       const current = rowDragRef.current
-      if (current === null || current.pointerId !== event.pointerId) return
-      if (!current.active) {
-        if (Math.abs(event.clientX - current.startX) < ROW_DRAG_THRESHOLD_PX && Math.abs(event.clientY - current.startY) < ROW_DRAG_THRESHOLD_PX) return
-        current.active = true
-        window.getSelection()?.removeAllRanges()
-        setRowDrag({ sessionId: current.sessionId, section: current.section })
+      if (current === null) return
+      const droppedOn = sectionAt(event.clientX, event.clientY)
+      if (droppedOn === null) {
+        endRowDrag()
+        return
       }
       event.preventDefault()
-      const next = sectionUnderPointer(event)
-      rowDropSectionRef.current = next
-      setRowDropSection(currentDrop => (currentDrop === next ? currentDrop : next))
-      const list = scrollAreaRef.current
-      if (list === null) return
-      const rect = list.getBoundingClientRect()
-      if (event.clientY < rect.top + 36) list.scrollBy({ top: -14 })
-      else if (event.clientY > rect.bottom - 36) list.scrollBy({ top: 14 })
-    }
-    const handlePointerUp = (event: PointerEvent): void => {
-      const current = rowDragRef.current
-      if (current === null || current.pointerId !== event.pointerId) return
-      rowDragRef.current = null
-      const droppedOn = rowDropSectionRef.current
-      rowDropSectionRef.current = null
-      setRowDropSection(null)
-      if (!current.active) return
-      setRowDrag(null)
+      endRowDrag()
+      // The click that ends a drop belongs to the drag, not to the row it started on.
       suppressRowClick.current = true
       window.setTimeout(() => {
         suppressRowClick.current = false
       }, 0)
-      if (droppedOn !== null && droppedOn !== current.section) void moveThreadsToSectionRef.current(current.sessionId, droppedOn)
+      if (droppedOn !== current.section) void moveThreadsToSectionRef.current(current.sessionId, droppedOn)
     }
-    const handlePointerCancel = (event: PointerEvent): void => {
-      if (rowDragRef.current?.pointerId !== event.pointerId) return
-      rowDragRef.current = null
-      rowDropSectionRef.current = null
-      setRowDrag(null)
-      setRowDropSection(null)
-    }
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    window.addEventListener('pointercancel', handlePointerCancel)
+    window.addEventListener('dragstart', onDragStart, true)
+    window.addEventListener('dragover', onDragOver, true)
+    window.addEventListener('drop', onDrop, true)
+    window.addEventListener('dragend', endRowDrag, true)
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', handlePointerCancel)
+      window.removeEventListener('dragstart', onDragStart, true)
+      window.removeEventListener('dragover', onDragOver, true)
+      window.removeEventListener('drop', onDrop, true)
+      window.removeEventListener('dragend', endRowDrag, true)
     }
   }, [])
   const groupedThreadEntries = useMemo(() => {
@@ -3446,28 +3446,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [threadSelection.sessionIds])
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
-
-  const startRowDragCandidate = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if (event.button !== 0 || event.pointerType === 'touch') return
-    const target = event.target
-    if (!(target instanceof Element)) return
-    const row = target.closest<HTMLElement>('article[data-thread-id]')
-    if (row === null || !event.currentTarget.contains(row) || !row.hasAttribute('data-thread-section-row')) return
-    // Hover actions keep their clicks: only the row's main button starts a move.
-    const button = target.closest('button')
-    if (button !== null && button.dataset.threadMainAction === undefined) return
-    const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
-    const threadId = row.dataset.threadId
-    if (!isSidebarSection(section) || threadId === undefined) return
-    rowDragRef.current = {
-      pointerId: event.pointerId,
-      sessionId: SessionId(threadId),
-      section,
-      startX: event.clientX,
-      startY: event.clientY,
-      active: false,
-    }
-  }
 
   const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
     // The click a pointer drag produces on release belongs to the drag, not to the row it started on.
@@ -4082,7 +4060,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
           onClickCapture={handleSelectionClickCapture}
           onContextMenuCapture={handleSelectionContextMenuCapture}
-          onPointerDown={startRowDragCandidate}
           onKeyDown={event =>
             ThreadListNavigationModel.navigate({
               event: event.nativeEvent,
