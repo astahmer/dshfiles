@@ -355,6 +355,11 @@ Then('the board card for b:{int} names the project it is filed under', async ({ 
     await expect(page.getByRole('menu')).toHaveCount(0)
     expect(projectName).not.toBe('No project')
     await expect(card).toContainText(projectName)
+
+    await page.getByRole('button', { name: 'Projects', exact: true }).click()
+    const projectCard = page.getByRole('button').filter({ has: page.getByText(projectName, { exact: true }) })
+    await expect(projectCard).toHaveCount(1)
+    await expect(projectCard).not.toContainText('/')
   })
 })
 

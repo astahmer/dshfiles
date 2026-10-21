@@ -332,9 +332,9 @@ export const ProjectsView = (props: {
                       <p className="dshx:text-sm dshx:font-semibold">
                         <ProjectTitle projectKey={project.key} />
                       </p>
-                      <p className="dshx:truncate dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">
-                        {project.key === NO_PROJECT ? 'Captured outside a repository' : project.key}
-                      </p>
+                      {project.key === NO_PROJECT ? (
+                        <p className="dshx:truncate dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">Captured outside a repository</p>
+                      ) : null}
                     </div>
                     <span
                       className={cn(
