@@ -144,9 +144,23 @@ describe('thread view unread counts', () => {
     ]
 
     expect(ThreadViewModel.unreadCountForView({ filters: [], sourceFilter: 'all', entries })).toBe(4)
-    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries })).toBe(2)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries })).toBe(1)
     expect(ThreadViewModel.unreadCountForView({ filters: ['settled'], sourceFilter: 'all', entries })).toBe(1)
     expect(ThreadViewModel.unreadCountForView({ filters: ['archived'], sourceFilter: 'all', entries })).toBe(1)
+  })
+
+  it('does not count an unread running thread that the view would hide', () => {
+    const manuallyUnread = entry({ unread: true, running: true })
+
+    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
+  })
+
+  it('counts an unread running thread when its attention makes it visible', () => {
+    const unreadAttention = entry({ attentionLabel: 'threadSidebarInputNeeded', unread: true, running: true })
+
+    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(1)
   })
 
   it('follows the view source filter and leaves muted threads out unless the view asks for them', () => {

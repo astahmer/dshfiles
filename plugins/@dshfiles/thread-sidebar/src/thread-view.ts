@@ -131,7 +131,7 @@ const unreadCountForView = (input: {
       !matchesThreadStatusFilter({
         filters: input.filters,
         running: entry.running,
-        needsAttention: true,
+        needsAttention: entry.attentionLabel !== undefined,
         archived: entry.archived,
         settled: entry.settled,
         muted: entry.muted,
