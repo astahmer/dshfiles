@@ -235,19 +235,14 @@ function CatalogRows({
             : entry.mode === 'one-shot'
               ? t('mode.oneShot')
               : t('mode.continuable')
-        const completed = !external && entry.activity === 'inactive' && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
-        const activity = external
-          ? undefined
-          : entry.activity === 'running'
-            ? t('activity.running')
-            : completed
-              ? t('activity.completed')
-              : t('activity.inactive')
+        const runningEntry = entry.activity === 'running'
+        const completed = !external && !runningEntry && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
+        const activity = external ? undefined : runningEntry ? t('activity.running') : completed ? t('activity.completed') : t('activity.inactive')
         const agentRoute = SubagentRouteLabelModel.displayedAgentRouteLabel(
           summary?.projectionValues?.threadSidebarModelRoute,
           summary?.projectionValues?.subagent,
         )
-        const secondary = [summary?.title, mode, agentRoute, activity].filter(value => value !== undefined).join(' · ')
+        const secondary = [summary?.title, mode, agentRoute, runningEntry ? undefined : activity].filter(value => value !== undefined).join(' · ')
         const totalTokens = tokenTotal(summary?.projectionValues?.tokenUsage)
         const durationMs = activityDuration(summary, entry.activity, now)
         const tokenMetric = totalTokens === undefined ? undefined : t('tokens.total', { value: formatTokens(totalTokens, t) })
@@ -301,7 +296,7 @@ function CatalogRows({
               aria-level={level}
               aria-current={isCurrent || undefined}
               aria-disabled={external || undefined}
-              aria-label={[label, secondary, metrics].filter(value => value !== '').join(' ')}
+              aria-label={[label, secondary, runningEntry ? activity : undefined, metrics].filter(value => value !== undefined && value !== '').join(' ')}
               {...(knownLeaf ? {} : { 'aria-expanded': isExpanded })}
               className={css.row}
               onClick={open}
@@ -327,6 +322,11 @@ function CatalogRows({
                 <span className={css.content}>
                   <span className={`${css.label} ${isCurrent ? css.currentLabel : ''}`}>{label}</span>
                   <span className={css.summary}>{secondary}</span>
+                  {runningEntry && activity !== undefined && (
+                    <span className={css.activityStatus} role="status">
+                      {activity}
+                    </span>
+                  )}
                 </span>
                 {metrics !== '' && (
                   <span className={css.metrics}>
@@ -684,7 +684,7 @@ function CatalogDropdown({
                 <StateDot state="ongoing" />
               </span>
             )}
-            <span className={css.count}>{t(totalCountKey, { count: directCount })}</span>
+            <span className={css.count}>{t(totalCountKey, { count: runningCount > 0 ? `${runningCount}/${directCount}` : directCount })}</span>
           </>
         )}
         {variant === 'switcher' ? <SubagentSwitcherIcon /> : <IconChevronDownOutlineRegular className={open ? css.triggerOpen : undefined} />}

@@ -258,6 +258,19 @@
   line-height: 15px;
 }
 
+.activityStatus {
+  align-self: flex-start;
+  flex: none;
+  padding: 0 5px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
 .metrics {
   display: grid;
   grid-template-rows: 17px 15px;

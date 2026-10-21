@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { SessionListState, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
-import { SubagentHeaderLineage, type SubagentHeaderLineageProps } from './SubagentHeaderLineage.js'
+import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentHeaderLineageProps } from './SubagentHeaderLineage.js'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconChevronDownOutlineRegular: () => null,
@@ -22,7 +22,13 @@ const CHILD = 'child' as SessionId
 const unavailable = (): never => {
   throw new Error('Unexpected dependency use in lineage fixture')
 }
-const translate: SubagentHeaderLineageProps['t'] = key => key
+const translate: SubagentHeaderLineageProps['t'] = (key, params) => {
+  if (key === 'activity.running') return 'Running'
+  if (key === 'count.total.one') return `${String(params?.count ?? '')} subagent`
+  if (key === 'count.total.other') return `${String(params?.count ?? '')} subagents`
+  if (key === 'count.running.one' || key === 'count.running.other') return `${String(params?.count ?? '')} running`
+  return key
+}
 
 const childSummary: SessionSummary = {
   id: CHILD,
@@ -49,6 +55,38 @@ const sessionList: SessionListState = {
       },
     },
   },
+}
+
+const sessionListWithRunningSubagents = (): SessionListState => {
+  // SAFETY: synthetic fixture ids only need SessionId's brand; no Host validates them.
+  const entries = Array.from({ length: 34 }, (_, index) => ({
+    id: `child-${index + 1}` as SessionId,
+    mode: 'continuable' as const,
+    label: `worker-${index + 1}`,
+    createdAt: index + 1,
+  }))
+  const byId = entries.reduce<Record<string, SessionSummary>>((summaries, entry, index) => {
+    summaries[entry.id] = {
+      ...childSummary,
+      id: entry.id,
+      displayTitle: entry.label,
+      running: index < 2,
+    }
+    return summaries
+  }, {})
+
+  return {
+    ids: entries.map(entry => entry.id),
+    byId,
+    phase: 'ready',
+    projectionsBySession: {
+      [PARENT]: {
+        state: 'ready',
+        error: null,
+        values: { subagentCatalog: entries },
+      },
+    },
+  }
 }
 
 const session: SessionSnapshot = {
@@ -112,5 +150,19 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(screen.getByText('openai/gpt-6.1-luna')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'switcher.aria' }))
     expect(screen.getAllByText(/openai\/gpt-6\.1-luna/)).toHaveLength(2)
+  })
+
+  it('shows active subagents over the total and labels each working row', () => {
+    const state = sessionListWithRunningSubagents()
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
+
+    const trigger = screen.getByRole('button', { name: '2 running' })
+    expect(trigger.textContent).toContain('2/34 subagents')
+
+    fireEvent.click(trigger)
+    const activeRow = screen.getByRole('treeitem', { name: /^worker-1 / })
+    const inactiveRow = screen.getByRole('treeitem', { name: /^worker-3 / })
+    expect(within(activeRow).getByRole('status').textContent).toBe('Running')
+    expect(within(inactiveRow).queryByRole('status')).toBeNull()
   })
 })
