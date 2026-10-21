@@ -1,8 +1,8 @@
 import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
-import { DEFAULT_IDLE_TIMEOUT_MINUTES, ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
+import { DEFAULT_IDLE_TIMEOUT_MINUTES, DEFAULT_WARN_MINUTES, ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
 
-export const SCRATCH_ACTIONS: ReadonlySet<string> = new Set(['up', 'doctor', 'open', 'shot', 'down'])
+export const SCRATCH_ACTIONS: ReadonlySet<string> = new Set(['up', 'doctor', 'open', 'shot', 'keep', 'down'])
 
 const COMMON_HELP = `Common options:
   --name <name>        Scratch instance name (default "default"); several can run side by side.
@@ -11,18 +11,20 @@ const COMMON_HELP = `Common options:
   -h, --help           Show help for the action.`
 
 const HELP: Readonly<Record<string, string>> = {
-  overview: `dshx dev <up|doctor|open|shot|down> — drive a scratch DSH for verification.
+  overview: `dshx dev <up|doctor|open|shot|keep|down> — drive a scratch DSH for verification.
 
 A scratch DSH has its own temp DSH_HOME, a free port, the owned plugins under test, a registered
 project, and a headless Chromium that keeps its page between commands. It never touches the live
 DSH on 127.0.0.1:3080 or ~/.dsh. The launch URL is a secret: it stays in the mode-600 state file.
 A watchdog stops a forgotten instance ${DEFAULT_IDLE_TIMEOUT_MINUTES} min after its last dshx dev command (up
---idle-timeout) or as soon as its dsh exits. Still run "dshx dev down" when done.
+--idle-timeout), after a ${DEFAULT_WARN_MINUTES} min warning grace (up --warn-minutes) that any dshx dev command answers,
+or as soon as its dsh exits. Still run "dshx dev down" when done.
 
   dshx dev up [--plugin @dshfiles/<name>]...   start it (builds the plugins, seeds a jj project)
   dshx dev doctor                              read-only health check
   dshx dev open <feature>                      walk a catalog feature's "reach" steps in the browser
   dshx dev shot [--label <label>]              screenshot + console/network error summary
+  dshx dev keep [--forever]                    answer a stop warning, or pin the instance
   dshx dev down [--dry-run]                    stop what up started, delete the scratch home
 
 Run "dshx dev <action> --help" for details.
@@ -46,10 +48,14 @@ from ~/.dsh/profiles/web's registry dependencies, seeds a jj project with a "mai
 registers --project) in the scratch workspace storage, starts dsh on a free port and a headless
 Chromium, and records pids, origin and paths in <state-dir>/state.json (mode 600).
 
-Auto-stop: up also starts a detached watchdog that runs "down" once the instance went
---idle-timeout minutes without a dshx dev command (doctor, open and shot renew the lease; it is the
-state file's mtime) or once its dsh process is gone. Before starting, up runs "down" on every other
-instance under the state root whose lease expired or whose dsh exited, and reports each one.
+Auto-stop: up also starts a detached watchdog that warns once the instance went --idle-timeout
+minutes without a dshx dev command (doctor, open, shot and keep renew the lease; it is the state
+file's mtime), then runs "down" when the --warn-minutes grace ends with no keep, and runs "down" as
+soon as its dsh process is gone. Any dshx dev command that reaches the instance cancels a pending
+warning; "dshx dev keep --name <name> [--forever]" answers it on purpose and --forever pins the
+instance so it never stops on its own. Total lifetime without a command: idle + grace (40 min by
+default). Before starting, up runs "down" on every other instance under the state root whose lease
+and grace expired or whose dsh exited, and lists the ones waiting in their warning grace.
 
 Options:
   --plugin <id>        Owned bundle to load, repeatable (default: every bundle under plugins/@dshfiles).
@@ -59,7 +65,8 @@ Options:
   --skip-build         Use each plugin's existing dist/.
   --fake-secret-cli    Put the e2e fake secret CLI (synthetic aliases, no vault) first on the Host's PATH.
   --timeout <ms>       Boot timeout (default 120000).
-  --idle-timeout <min> Minutes without a dshx dev command before the watchdog runs down (default ${DEFAULT_IDLE_TIMEOUT_MINUTES}; 0 = never).
+  --idle-timeout <min> Minutes without a dshx dev command before the watchdog warns (default ${DEFAULT_IDLE_TIMEOUT_MINUTES}; 0 = never).
+  --warn-minutes <min> Warning grace before the automatic down (default ${DEFAULT_WARN_MINUTES}; 0 = stop at once, no warning).
 
 Example:
   dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
@@ -69,7 +76,10 @@ ${COMMON_HELP}`,
 
 Checks: isolated from the live DSH, dsh and Chromium still running (and still ours), the auto-stop
 watchdog running, the URL answers and authenticates, every plugin entry is active and every bundle
-under test loaded, and the host log has no error lines. Like open and shot, it renews the idle lease. Exit code 1 when any check fails; each failure carries a "fix".
+under test loaded, and the host log has no error lines. It also reports the lease and any pending
+warning (its start time and remaining grace) and how to keep the instance. Like open, shot and
+keep, it answers a pending warning and renews the idle lease. Exit code 1 when any check fails;
+each failure carries a "fix".
 
 ${COMMON_HELP}`,
   open: `dshx dev open <feature> — drive the scratch browser to a catalog feature.
@@ -110,6 +120,17 @@ requests and HTTP >= 400 responses recorded since up (launch tokens redacted).
 Options:
   --label <label>      File name label (default "shot").
   --out <dir>          Evidence directory (default <state-dir>/evidence; down keeps it).
+
+${COMMON_HELP}`,
+  keep: `dshx dev keep — answer a stop warning, or pin the scratch DSH.
+
+Cancels a pending warning for this instance and renews its idle lease, so the watchdog's countdown
+starts again; doctor, open and shot do the same implicitly. With --forever the instance is pinned:
+its idle timeout drops to 0 and no warning or automatic "down" ever runs until "dshx dev down".
+The watchdog's warning line and this cancellation both land in <state-dir>/watchdog.log.
+
+Options:
+  --forever            Pin the instance: no idle stop, no warning (still stopped by "dshx dev down").
 
 ${COMMON_HELP}`,
   down: `dshx dev down — stop exactly what up started.
@@ -166,6 +187,8 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         'fake-secret-cli': { type: 'boolean' },
         timeout: { type: 'string' },
         'idle-timeout': { type: 'string' },
+        'warn-minutes': { type: 'string' },
+        forever: { type: 'boolean' },
         label: { type: 'string' },
         out: { type: 'string' },
         'dry-run': { type: 'boolean' },
@@ -179,10 +202,11 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     return 0
   }
   const allowed: Readonly<Record<string, readonly string[]>> = {
-    up: ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout', 'idle-timeout'],
+    up: ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout', 'idle-timeout', 'warn-minutes'],
     doctor: [],
     open: ['timeout'],
     shot: ['label', 'out'],
+    keep: ['forever'],
     down: ['dry-run'],
   }
   const common = ['name', 'state-dir', 'json', 'help']
@@ -222,8 +246,11 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       const idleTimeoutMinutes = Number(values['idle-timeout'] ?? DEFAULT_IDLE_TIMEOUT_MINUTES)
       if (!Number.isSafeInteger(idleTimeoutMinutes) || idleTimeoutMinutes < 0)
         return fail(new ScratchError('usage', '--idle-timeout requires a whole number of minutes (0 = never).', 'Run "dshx dev up --help".'))
+      const warnMinutes = Number(values['warn-minutes'] ?? DEFAULT_WARN_MINUTES)
+      if (!Number.isSafeInteger(warnMinutes) || warnMinutes < 0)
+        return fail(new ScratchError('usage', '--warn-minutes requires a whole number of minutes (0 = stop at once).', 'Run "dshx dev up --help".'))
       const { scratchUp } = await import('../scratch/up.js')
-      const { state, swept } = await scratchUp({
+      const { state, swept, warned } = await scratchUp({
         name: name.data,
         stateDir,
         plugins: Array.isArray(values.plugin) ? values.plugin : [],
@@ -233,22 +260,57 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         skipBuild: values['skip-build'] === true,
         fakeSecretCli: values['fake-secret-cli'] === true,
         idleTimeoutMinutes,
+        warnMinutes,
         timeoutMs,
         onProgress: message => write(io.stderr, `dshx dev up: ${message}\n`),
       })
       const shown = ScratchStateRuntime.publicState(state)
       const sweptLines = swept.map(reaped => `stopped stale scratch "${reaped.name}" (${reaped.reason})\n`).join('')
-      const autoStop = shown.idleTimeoutMinutes === 0 ? 'when its dsh exits' : `after ${shown.idleTimeoutMinutes} idle min or when its dsh exits`
+      const warnedLines = warned
+        .map(
+          entry =>
+            `scratch "${entry.name}" waits in its warning grace (${ScratchStateRuntime.formatMinutes(entry.warning.minutesLeft)} left); keep it with "dshx dev keep --name ${entry.name}"\n`,
+        )
+        .join('')
+      const autoStop =
+        shown.idleTimeoutMinutes === 0
+          ? 'when its dsh exits'
+          : `after ${shown.idleTimeoutMinutes} idle min + a ${shown.warnMinutes} min warning grace, or when its dsh exits`
       return succeed(
-        { ...shown, swept: swept.map(reaped => ({ name: reaped.name, stateDir: reaped.stateDir, reason: reaped.reason, leftRunning: reaped.leftRunning })) },
-        `${sweptLines}Scratch DSH "${shown.name}" up at ${shown.origin} (dsh pid ${shown.hostPid}, chromium pid ${shown.browserPid}).\n  home     ${shown.home}\n  project  ${shown.project}\n  state    ${shown.stateDir}\n  stops    ${autoStop} (watchdog pid ${shown.watchdogPid ?? 'none'})\nNext: dshx dev doctor\n`,
+        {
+          ...shown,
+          swept: swept.map(reaped => ({ name: reaped.name, stateDir: reaped.stateDir, reason: reaped.reason, leftRunning: reaped.leftRunning })),
+          warned: warned.map(entry => ({
+            name: entry.name,
+            stateDir: entry.stateDir,
+            warnedAt: entry.warning.warnedAt,
+            graceEndsAt: entry.warning.graceEndsAt,
+          })),
+        },
+        `${sweptLines}${warnedLines}Scratch DSH "${shown.name}" up at ${shown.origin} (dsh pid ${shown.hostPid}, chromium pid ${shown.browserPid}).\n  home     ${shown.home}\n  project  ${shown.project}\n  state    ${shown.stateDir}\n  stops    ${autoStop} (watchdog pid ${shown.watchdogPid ?? 'none'})\n  keep     dshx dev keep --name ${shown.name} [--forever]\nNext: dshx dev doctor\n`,
       )
     }
-    const state = await ScratchStateRuntime.read(stateDir, name.data)
+    const readState = await ScratchStateRuntime.read(stateDir, name.data)
+    if (action === 'keep') {
+      const result = await ScratchStateRuntime.keepScratch({ state: readState, forever: values.forever === true })
+      const kept = ScratchStateRuntime.publicState(result.state)
+      const stops =
+        kept.idleTimeoutMinutes === 0
+          ? 'pinned: no idle stop until "dshx dev down"'
+          : `after ${kept.idleTimeoutMinutes} idle min + a ${kept.warnMinutes} min warning grace, or when its dsh exits`
+      return succeed(
+        { ...kept, cancelledWarning: result.cancelledWarning },
+        `Scratch DSH "${kept.name}" kept: ${result.cancelledWarning ? 'warning cancelled, ' : ''}lease renewed.\n  stops  ${stops}\n  state  ${kept.stateDir}\n`,
+      )
+    }
+    // Every command that reaches an instance answers its warning; doctor reports the one it answered. `down` stops it anyway.
+    const answeredWarning = ScratchStateRuntime.scratchWarning(readState, Date.now())
+    const cancelled = action === 'down' ? { state: readState } : await ScratchStateRuntime.cancelWarning(readState)
+    const state = cancelled.state
     if (action !== 'down') await ScratchStateRuntime.renewLease(stateDir)
     if (action === 'doctor') {
       const { scratchDoctor } = await import('../scratch/lifecycle.js')
-      const checks = await scratchDoctor(state)
+      const checks = await scratchDoctor({ state, ...(answeredWarning === undefined ? {} : { answeredWarning }) })
       const ok = checks.every(check => check.ok)
       return succeed(
         { name: state.name, origin: state.origin, checks },

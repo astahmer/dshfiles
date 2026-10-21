@@ -3,7 +3,15 @@ import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { connectDshPlatformClient } from '../platform/client.js'
 import { ScratchSeedRuntime } from './seed.js'
-import { DEFAULT_IDLE_TIMEOUT_MINUTES, LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchStateRuntime, type ScratchState } from './state.js'
+import {
+  DEFAULT_IDLE_TIMEOUT_MINUTES,
+  DEFAULT_WARN_MINUTES,
+  LIVE_DSH_HOME,
+  LIVE_DSH_PORT,
+  ScratchStateRuntime,
+  type ScratchState,
+  type ScratchWarning,
+} from './state.js'
 
 export interface DoctorCheck {
   readonly id: string
@@ -14,8 +22,12 @@ export interface DoctorCheck {
 
 const HOST_ERROR_LINE = /did not activate|\berror\b|\bfailed\b|EADDRINUSE|unhandled/i
 
-/** Read-only: never restarts, navigates or writes anything. */
-export const scratchDoctor = async (state: ScratchState): Promise<readonly DoctorCheck[]> => {
+/**
+ * Read-only: never restarts, navigates or writes anything. Any command that touches an instance answers its pending
+ * warning first, so the doctor is handed what it answered to report instead of printing an already-cancelled warning.
+ */
+export const scratchDoctor = async (options: { readonly state: ScratchState; readonly answeredWarning?: ScratchWarning }): Promise<readonly DoctorCheck[]> => {
+  const state = options.state
   const checks: DoctorCheck[] = []
   const isolated = state.port !== LIVE_DSH_PORT && !ScratchStateRuntime.isWithin(LIVE_DSH_HOME, state.home)
   checks.push({
@@ -39,8 +51,14 @@ export const scratchDoctor = async (state: ScratchState): Promise<readonly Docto
     ...(browser === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
   })
   const idleTimeoutMinutes = state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES
+  const warnMinutes = state.warnMinutes ?? DEFAULT_WARN_MINUTES
   const watchdog = state.watchdog === undefined ? 'not recorded' : ScratchStateRuntime.ownedProcessStatus(state.watchdog)
-  const lease = idleTimeoutMinutes === 0 ? 'no idle timeout' : `stops after ${idleTimeoutMinutes} min without a dshx dev command`
+  const lease =
+    state.kept === true
+      ? 'pinned by "dshx dev keep --forever": no idle stop'
+      : idleTimeoutMinutes === 0
+        ? 'no idle timeout'
+        : `warns after ${idleTimeoutMinutes} min without a dshx dev command, then stops after a ${warnMinutes} min grace`
   const autoStopDetail = `watchdog ${state.watchdog === undefined ? '' : `pid ${state.watchdog.pid} `}${watchdog}; ${lease}`
   checks.push(
     watchdog === 'running'
@@ -50,6 +68,19 @@ export const scratchDoctor = async (state: ScratchState): Promise<readonly Docto
           ok: false,
           detail: autoStopDetail,
           fix: 'Nothing stops this instance on its own: run "dshx dev down" when done, then "dshx dev up" again.',
+        },
+  )
+
+  const keepHint = `"dshx dev keep --name ${state.name}" cancels a warning and renews the lease; add --forever to pin it`
+  const warning = options.answeredWarning
+  checks.push(
+    warning === undefined
+      ? { id: 'warning', ok: true, detail: `no warning pending; ${keepHint}` }
+      : {
+          id: 'warning',
+          ok: true,
+          detail: `answered a pending warning (started ${warning.warnedAt}, ${ScratchStateRuntime.formatMinutes(warning.minutesLeft)} of its ${warnMinutes} min grace left)`,
+          fix: `Answered by this command; ${keepHint}.`,
         },
   )
 

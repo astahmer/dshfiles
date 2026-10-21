@@ -12,7 +12,7 @@ import { runCli } from '../src/cli/run.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { ScratchReaperRuntime } from '../src/scratch/reaper.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
-import { ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
+import { DEFAULT_WARN_MINUTES, ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 
 const run = async (argv: readonly string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> => {
   const stdout = new PassThrough()
@@ -65,7 +65,7 @@ describe('dshx dev scratch commands', () => {
     for (const flag of ['--help', '-h']) {
       const help = await run(['dev', flag])
       expect(help.code).toBe(0)
-      for (const action of ['up', 'doctor', 'open', 'shot', 'down']) expect(help.stdout).toMatch(new RegExp(`dshx dev ${action}\\b`))
+      for (const action of ['up', 'doctor', 'open', 'shot', 'keep', 'down']) expect(help.stdout).toMatch(new RegExp(`dshx dev ${action}\\b`))
       expect(help.stdout).toContain('dshx dev [--cwd <path>] [--port <port>] [--open]')
     }
   })
@@ -399,6 +399,7 @@ describe('dshx dev scratch commands', () => {
       readonly port: number
       readonly hostRunning: boolean
       readonly idleTimeoutMinutes?: number
+      readonly warnMinutes?: number
       readonly idleMinutes: number
       readonly watched?: boolean
     }): Promise<{ readonly state: ScratchState; readonly hostPid: number; readonly watchdogPid: number }> => {
@@ -427,6 +428,7 @@ describe('dshx dev scratch commands', () => {
         evidenceDir: join(stateDir, 'evidence'),
       }
       if (options.idleTimeoutMinutes !== undefined) state.idleTimeoutMinutes = options.idleTimeoutMinutes
+      if (options.warnMinutes !== undefined) state.warnMinutes = options.warnMinutes
       await ScratchStateRuntime.write(state)
       const watchdogPid = options.watched === true ? await startWatchdog(state) : 0
       const lastUsed = new Date(Date.now() - options.idleMinutes * 60_000)
@@ -455,35 +457,44 @@ describe('dshx dev scratch commands', () => {
       return root
     }
 
-    it('sweeps instances whose lease expired or whose dsh exited, and keeps the ones in use', async () => {
+    it('sweeps instances past their warning grace or whose dsh exited, warns the ones just expired, and keeps the ones in use', async () => {
       const root = await stateRoot()
       const fresh = await recordInstance({ root, name: 'fresh', port: 45201, hostRunning: true, idleMinutes: 5 })
-      const expired = await recordInstance({ root, name: 'expired', port: 45203, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
-      const legacy = await recordInstance({ root, name: 'legacy', port: 45205, hostRunning: true, idleMinutes: 31 })
+      const expired = await recordInstance({ root, name: 'expired', port: 45203, hostRunning: true, idleTimeoutMinutes: 10, warnMinutes: 0, idleMinutes: 11 })
+      const legacy = await recordInstance({ root, name: 'legacy', port: 45205, hostRunning: true, warnMinutes: 0, idleMinutes: 31 })
       const forever = await recordInstance({ root, name: 'forever', port: 45207, hostRunning: true, idleTimeoutMinutes: 0, idleMinutes: 600 })
+      const waiting = await recordInstance({ root, name: 'waiting', port: 45208, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
       const dead = await recordInstance({ root, name: 'dead', port: 45209, hostRunning: false, idleMinutes: 1 })
       await mkdir(join(root, 'not-a-scratch'))
 
       const swept = await ScratchReaperRuntime.sweepStaleScratches({ root })
-      expect(Object.fromEntries(swept.map(reaped => [reaped.name, reaped.reason]))).toEqual({
+      expect(Object.fromEntries(swept.reaped.map(reaped => [reaped.name, reaped.reason]))).toEqual({
         expired: 'idle 11 min, past its 10 min idle timeout',
         legacy: 'idle 31 min, past its 30 min idle timeout',
         dead: 'dsh pid 999997 exited',
       })
+      expect(swept.warned.map(entry => entry.name)).toEqual(['waiting'])
+      expect(swept.warned[0]?.warning.minutesLeft).toBeGreaterThan(9.9)
       expect(alive(expired.hostPid)).toBe(false)
       expect(alive(legacy.hostPid)).toBe(false)
       expect(alive(fresh.hostPid)).toBe(true)
       expect(alive(forever.hostPid)).toBe(true)
+      expect(alive(waiting.hostPid)).toBe(true)
       await expect(stat(dead.state.home)).rejects.toThrow()
       await expect(stat(join(dead.state.stateDir, 'state.json'))).rejects.toThrow()
       expect((await stat(join(fresh.state.stateDir, 'state.json'))).isFile()).toBe(true)
+      const warnedState = await ScratchStateRuntime.read(waiting.state.stateDir, 'waiting')
+      expect(warnedState.warnedAt).toBeDefined()
+      expect(await readFile(join(waiting.state.stateDir, 'watchdog.log'), 'utf8')).toContain('warning for "waiting"')
     })
 
     it('renews the lease on every dshx dev command', async () => {
       const root = await stateRoot()
       const used = await recordInstance({ root, name: 'used', port: 45211, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
       await run(['dev', 'doctor', '--state-dir', used.state.stateDir, '--json'])
-      expect(await ScratchReaperRuntime.sweepStaleScratches({ root })).toEqual([])
+      const swept = await ScratchReaperRuntime.sweepStaleScratches({ root })
+      expect(swept.reaped).toEqual([])
+      expect(swept.warned).toEqual([])
       expect(alive(used.hostPid)).toBe(true)
     })
 
@@ -494,21 +505,110 @@ describe('dshx dev scratch commands', () => {
       expect(alive(expired.hostPid)).toBe(true)
     })
 
-    it('rejects a negative or fractional idle timeout before building anything', async () => {
+    it('rejects a negative or fractional idle timeout or warning grace before building anything', async () => {
       const result = await run(['dev', 'up', '--idle-timeout', '1.5', '--json'])
       expect(result.code).toBe(2)
       expect(envelope(result.stdout).error?.code).toBe('usage')
-      expect((await run(['dev', 'up', '--help'])).stdout).toContain('--idle-timeout <min>')
+      const grace = await run(['dev', 'up', '--warn-minutes', '1.5', '--json'])
+      expect(grace.code).toBe(2)
+      expect(envelope(grace.stdout).error?.code).toBe('usage')
+      const help = (await run(['dev', 'up', '--help'])).stdout
+      expect(help).toContain('--idle-timeout <min>')
+      expect(help).toContain('--warn-minutes <min>')
+      expect(help).toContain(`${DEFAULT_WARN_MINUTES}`)
     })
 
-    it('runs down from the watchdog process once the lease expires', async () => {
+    it('runs down from the watchdog process once the lease expires with no warning grace', async () => {
       const root = await stateRoot()
-      const instance = await recordInstance({ root, name: 'forgotten', port: 45213, hostRunning: true, idleTimeoutMinutes: 1, idleMinutes: 2, watched: true })
+      const instance = await recordInstance({
+        root,
+        name: 'forgotten',
+        port: 45213,
+        hostRunning: true,
+        idleTimeoutMinutes: 1,
+        warnMinutes: 0,
+        idleMinutes: 2,
+        watched: true,
+      })
       const watchdogPid = instance.watchdogPid
       await vi.waitFor(() => expect(alive(watchdogPid)).toBe(false), { timeout: 15_000, interval: 100 })
       expect(alive(instance.hostPid)).toBe(false)
       await expect(stat(instance.state.home)).rejects.toThrow()
       await expect(stat(join(instance.state.stateDir, 'state.json'))).rejects.toThrow()
+    })
+
+    it('warns from the watchdog process, keeps the instance running through the grace, then stops it', async () => {
+      const root = await stateRoot()
+      // A spec-sized grace (3 s) so the real watchdog walks warning -> grace expiry instead of waiting 10 min.
+      const instance = await recordInstance({
+        root,
+        name: 'warn-grace',
+        port: 45221,
+        hostRunning: true,
+        idleTimeoutMinutes: 1,
+        warnMinutes: 0.05,
+        idleMinutes: 2,
+        watched: true,
+      })
+      const { hostPid, watchdogPid, state } = instance
+      const warningLog = () => readFile(join(state.stateDir, 'watchdog.log'), 'utf8')
+      await vi.waitFor(async () => expect(await warningLog()).toContain('warning for "warn-grace"'), { timeout: 15_000, interval: 100 })
+      expect(alive(hostPid)).toBe(true)
+      expect(alive(watchdogPid)).toBe(true)
+      expect((await ScratchStateRuntime.read(state.stateDir, 'warn-grace')).warnedAt).toBeDefined()
+      await vi.waitFor(() => expect(alive(watchdogPid)).toBe(false), { timeout: 20_000, interval: 100 })
+      expect(alive(hostPid)).toBe(false)
+      await expect(stat(state.home)).rejects.toThrow()
+    })
+
+    it('lets a keep during the grace cancel the stop, clear the warning and renew the lease', async () => {
+      const root = await stateRoot()
+      const instance = await recordInstance({ root, name: 'kept', port: 45223, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
+      const warned = await ScratchReaperRuntime.sweepStaleScratches({ root })
+      expect(warned.warned.map(entry => entry.name)).toEqual(['kept'])
+
+      const doctor = await run(['dev', 'doctor', '--state-dir', instance.state.stateDir])
+      expect(doctor.stdout).toContain('answered a pending warning')
+      expect(doctor.stdout).toContain('dshx dev keep --name kept')
+      expect(doctor.stdout).toContain('of its 10 min grace left')
+      expect((await ScratchStateRuntime.read(instance.state.stateDir, 'kept')).warnedAt).toBeUndefined()
+
+      const kept = await run(['dev', 'keep', '--state-dir', instance.state.stateDir, '--json'])
+      expect(kept.code).toBe(0)
+      expect(JSON.parse(kept.stdout).data.cancelledWarning).toBe(false)
+      expect(await readFile(join(instance.state.stateDir, 'watchdog.log'), 'utf8')).toContain('keep cancelled the warning for "kept"')
+
+      // Past the old grace, but the keep renewed the lease: the instance must still be here.
+      const later = await ScratchReaperRuntime.sweepStaleScratches({ root, now: Date.now() + 11 * 60_000 })
+      expect(later.reaped).toEqual([])
+      expect(alive(instance.hostPid)).toBe(true)
+    })
+
+    it('pins an instance with keep --forever so no idle stop ever runs', async () => {
+      const root = await stateRoot()
+      const instance = await recordInstance({ root, name: 'pinned', port: 45225, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
+      await ScratchReaperRuntime.sweepStaleScratches({ root })
+      const keep = await run(['dev', 'keep', '--state-dir', instance.state.stateDir, '--forever', '--json'])
+      expect(keep.code).toBe(0)
+      expect(JSON.parse(keep.stdout).data.cancelledWarning).toBe(true)
+      expect(JSON.parse(keep.stdout).data.kept).toBe(true)
+      const swept = await ScratchReaperRuntime.sweepStaleScratches({ root, now: Date.now() + 30 * 24 * 60 * 60_000 })
+      expect(swept.reaped).toEqual([])
+      expect(swept.warned).toEqual([])
+      expect(alive(instance.hostPid)).toBe(true)
+    })
+
+    it('stops an instance once its warning grace ends with no keep', async () => {
+      const root = await stateRoot()
+      const now = Date.now()
+      const instance = await recordInstance({ root, name: 'ignored', port: 45227, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
+      const warned = await ScratchReaperRuntime.sweepStaleScratches({ root, now })
+      expect(warned.warned.map(entry => entry.name)).toEqual(['ignored'])
+      const stopped = await ScratchReaperRuntime.sweepStaleScratches({ root, now: now + 11 * 60_000 })
+      expect(stopped.reaped.map(entry => entry.name)).toEqual(['ignored'])
+      expect(stopped.reaped[0]?.reason).toContain('no keep during its 10 min warning grace')
+      expect(alive(instance.hostPid)).toBe(false)
+      await expect(stat(instance.state.home)).rejects.toThrow()
     })
 
     it('cleans up from the watchdog process once dsh is gone', async () => {

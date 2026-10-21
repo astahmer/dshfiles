@@ -96,10 +96,15 @@ dshx dev down
 pgrep -fl 'dshx-boot-profile|browser-host.js|scratch/watchdog.js' || echo clean
 ```
 
-Always `down` when done. As a backstop, a detached watchdog runs `down` once the
+Always `down` when done. As a backstop, a detached watchdog warns once the
 instance went 30 min without a `dshx dev` command (each one renews the lease,
-the state file's mtime) or once its `dsh` exits. `up --idle-timeout <min>`
-changes it; `0` disables only the idle stop.
+the state file's mtime), then runs `down` when a 10 min warning grace ends with
+no keep; its `dsh` exiting stops it at once. `up --idle-timeout <min>` and
+`up --warn-minutes <min>` change both (`0` disables the idle stop / stops
+without warning). `dshx dev keep --name <name> [--forever]` answers the
+warning and renews the lease — `--forever` pins it — and so does any `dshx dev`
+command that reaches the instance; `doctor` lists a pending warning with its
+remaining grace.
 
 ## Journeys
 
@@ -166,6 +171,8 @@ dsh-our-free-model` loads the web profile's keyless free-model bundle (its
   pass `--name <topic>` to every command.
 - `not-up` after a long pause means the watchdog stopped the idle instance
   (evidence stays): `up` again, or pass a longer `--idle-timeout` for long gaps.
+  A pending warning shows in `doctor`; `dshx dev keep --forever` pins an
+  instance the job must not lose.
 
 ## Safety
 

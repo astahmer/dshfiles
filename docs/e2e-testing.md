@@ -245,8 +245,9 @@ signature — a reused pid or an unrecorded lookalike is dropped, never killed.
 shell (`--dry-run`, `--workspace`, `--min-age-seconds`), and its `--patterns`
 mode is the blunt instrument for a one-off cleanup: that one does match a live
 `dshx dev up` Host. A `dshx dev up` instance stops itself instead: its watchdog
-runs `down` after 30 idle minutes or once its Host exits, and the next `up`
-sweeps any state left behind.
+warns after 30 idle minutes, runs `down` once a 10 min grace ends with no keep
+(`dshx dev keep`, or any dshx command that reaches it), or as soon as its Host
+exits, and the next `up` sweeps any state left behind.
 
 ### What one change re-runs
 

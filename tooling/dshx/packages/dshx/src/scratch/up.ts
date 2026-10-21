@@ -6,7 +6,7 @@ import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
-import { ScratchReaperRuntime, type ReapedScratch } from './reaper.js'
+import { ScratchReaperRuntime, type ReapedScratch, type WarnedScratch } from './reaper.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
@@ -21,8 +21,10 @@ export interface ScratchUpOptions {
   readonly skipBuild: boolean
   /** Put the e2e fake `secret` CLI first on the Host's PATH, with synthetic aliases for the project. */
   readonly fakeSecretCli: boolean
-  /** Minutes without a `dshx dev` command before the watchdog runs `down`; 0 keeps it up until `down`. */
+  /** Minutes without a `dshx dev` command before the watchdog warns; 0 keeps it up until `down`. */
   readonly idleTimeoutMinutes: number
+  /** Minutes of warning grace before the automatic `down`; 0 stops as soon as the lease expires. */
+  readonly warnMinutes: number
   readonly timeoutMs: number
   readonly onProgress: (message: string) => void
 }
@@ -81,7 +83,9 @@ const stopGroup = async (pid: number): Promise<void> => {
   }
 }
 
-export const scratchUp = async (options: ScratchUpOptions): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[] }> => {
+export const scratchUp = async (
+  options: ScratchUpOptions,
+): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[]; readonly warned: readonly WarnedScratch[] }> => {
   if (options.port === LIVE_DSH_PORT) {
     throw new ScratchError('live-port', `Port ${LIVE_DSH_PORT} belongs to the live DSH.`, 'Omit --port to take a free port.')
   }
@@ -101,9 +105,18 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<{ readonly s
       'Pass an existing folder to --project, or omit it to seed a sample jj project.',
     )
   }
-  const swept = await ScratchReaperRuntime.sweepStaleScratches({ root: ScratchStateRuntime.stateRoot(), extraStateDirs: [options.stateDir] })
+  const { reaped: swept, warned } = await ScratchReaperRuntime.sweepStaleScratches({
+    root: ScratchStateRuntime.stateRoot(),
+    extraStateDirs: [options.stateDir],
+  })
   for (const reaped of swept) options.onProgress(`stopped stale scratch "${reaped.name}" (${reaped.reason})`)
+  for (const warning of warned)
+    options.onProgress(
+      `scratch "${warning.name}" is in its warning grace (${ScratchStateRuntime.formatMinutes(warning.warning.minutesLeft)} left); keep it with "dshx dev keep --name ${warning.name}"`,
+    )
   const existing = await ScratchStateRuntime.read(options.stateDir, options.name).catch(() => undefined)
+  // Reaching for an instance answers its warning, even when up then refuses to start a second one beside it.
+  if (existing !== undefined && existing.warnedAt !== undefined) await ScratchStateRuntime.cancelWarning(existing)
   if (existing !== undefined && ScratchStateRuntime.ownedProcessStatus(existing.host) === 'running') {
     throw new ScratchError(
       'already-up',
@@ -221,6 +234,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<{ readonly s
     }
     if (fakeSecretCli !== undefined) state.fakeSecretCli = fakeSecretCli
     state.idleTimeoutMinutes = options.idleTimeoutMinutes
+    state.warnMinutes = options.warnMinutes
     await ScratchStateRuntime.write(state)
     const watchdogPid = ScratchStateRuntime.spawnDetached(process.execPath, [watchdogScript, '--state-dir', options.stateDir], {
       cwd: options.stateDir,
@@ -229,7 +243,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<{ readonly s
     })
     state.watchdog = { pid: watchdogPid, signature: [watchdogScript, options.stateDir] }
     await ScratchStateRuntime.write(state)
-    return { state, swept }
+    return { state, swept, warned }
   } catch (error) {
     if (browserPid !== undefined) await stopGroup(browserPid)
     if (hostPid !== undefined) await stopGroup(hostPid)

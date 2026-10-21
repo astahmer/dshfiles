@@ -3,9 +3,10 @@ import { ScratchReaperRuntime } from './reaper.js'
 import { ScratchStateRuntime } from './state.js'
 
 /**
- * `node watchdog.js --state-dir <dir>`: started detached by `dshx dev up`, it runs `down` on that instance once its
- * idle lease expires or its dsh process is gone, so a forgotten scratch DSH does not keep a Host and Chromium running.
- * It exits when the state is gone (a manual `down`) or names another watchdog (a later `up`).
+ * `node watchdog.js --state-dir <dir>`: started detached by `dshx dev up`, it warns once the idle lease expires, then
+ * runs `down` when that warning's grace ends with no keep, or as soon as its dsh process is gone, so a forgotten
+ * scratch DSH does not keep a Host and Chromium running. It exits when the state is gone (a manual `down`) or names
+ * another watchdog (a later `up`).
  */
 const { values } = parseArgs({ options: { 'state-dir': { type: 'string' }, 'interval-ms': { type: 'string' } } })
 const stateDir = values['state-dir']
@@ -26,9 +27,12 @@ const keepWatching = async (): Promise<boolean> => {
     log(`watchdog pid ${state.watchdog.pid} owns this instance now; exiting`)
     return false
   }
-  const reaped = await ScratchReaperRuntime.reapIfStale({ stateDir, now: Date.now() })
-  if (reaped === undefined) return true
-  log(`stopped "${reaped.name}": ${reaped.reason}${reaped.leftRunning.length > 0 ? `; still running: ${reaped.leftRunning.join(', ')}` : ''}`)
+  const outcome = await ScratchReaperRuntime.reapIfStale({ stateDir, now: Date.now() })
+  if (outcome.kind === 'in-use') return true
+  // The warning phase leaves its own line in watchdog.log; this process keeps watching for the grace to end.
+  if (outcome.kind === 'warned') return true
+  const stopped = outcome.stopped
+  log(`stopped "${stopped.name}": ${stopped.reason}${stopped.leftRunning.length > 0 ? `; still running: ${stopped.leftRunning.join(', ')}` : ''}`)
   return false
 }
 
