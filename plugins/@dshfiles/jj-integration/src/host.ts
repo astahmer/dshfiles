@@ -221,17 +221,20 @@ const isolatedSessionIdsAt = (path: string): readonly string[] =>
   [...isolatedSessionWorkspaces].flatMap(([sessionId, workspace]) => (workspace.path === path ? [sessionId] : []))
 
 /**
- * The Session activity fold costs seconds on a large store, so a repository scan waits no more than this while a
- * rebase's guard keeps the longer budget it needs to answer authoritatively.
+ * The Session activity fold costs seconds on a large store — measured at ~18 s cold on this one — so a repository scan
+ * waits no more than this while a rebase's guard keeps as many budgets as its fold needs to answer authoritatively.
  */
 const SESSION_ACTIVITY_TTL_MS = 30_000
 const SESSION_ACTIVITY_DISPLAY_BUDGET_MS = 2_500
 const SESSION_ACTIVITY_GUARD_BUDGET_MS = 15_000
-const readSessionActivity = (budgetMs: number): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
+/** Budgets one guard spends on the same fold before it reports unknown, instead of restarting it and refusing. */
+const SESSION_ACTIVITY_GUARD_ATTEMPTS = 3
+const SESSION_ACTIVITY_GUARD_CEILING_MS = 60_000
+const readSessionActivity = (signal: AbortSignal): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
   const controller = requireContext().get('sessionController')
   if (controller === undefined) return Promise.resolve(undefined)
   return controller
-    .list({ projections: SESSION_ACTIVITY_PROJECTIONS }, AbortSignal.timeout(budgetMs))
+    .list({ projections: SESSION_ACTIVITY_PROJECTIONS }, signal)
     .then(result => {
       const activity = new Map<string, ThreadSessionActivity>()
       for (const item of result.items) {
@@ -256,6 +259,8 @@ const sessionActivity = createSessionActivityCache({
   ttlMs: SESSION_ACTIVITY_TTL_MS,
   displayBudgetMs: SESSION_ACTIVITY_DISPLAY_BUDGET_MS,
   guardBudgetMs: SESSION_ACTIVITY_GUARD_BUDGET_MS,
+  guardAttempts: SESSION_ACTIVITY_GUARD_ATTEMPTS,
+  guardCeilingMs: SESSION_ACTIVITY_GUARD_CEILING_MS,
 })
 
 type ThreadIntegrationView = NonNullable<ThreadView['integrations']>[number]

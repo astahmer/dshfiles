@@ -242,6 +242,14 @@ keeping it busy, with their titles, so "this thread is idle" never disagrees
 with the message: another thread in the same workspace is what blocks it. The
 queued integration drains once those Sessions fall idle too.
 
+That idle check reads the Host's Session list, which folds every stored
+Session's projections and can take longer than one budget on a large store or a
+busy Host (~18 s cold on a store with a thousand Sessions). It reads with a 15 s
+budget per attempt and keeps waiting on the same read for up to three attempts
+instead of restarting it, so a fold that was nearly done still answers and the
+rebase proceeds; only a read that stays unreadable for 45 s refuses with "refresh
+and retry", and by then its work has warmed the next attempt.
+
 Each successful rebase adds a row to the conversation, after the turn it
 followed, with the target bookmark and 12-character tip change ID; a thread that
 keeps working and lands again gets one row per land. The latest row's actions are
@@ -358,9 +366,10 @@ directory mtimes plus the workspace registry timestamps — never the Session
 list — so it stays cheap on a store with a thousand Sessions. `activeWithinHours:
 0` restores the old behaviour of one job over every registered repository.
 
-The activity read is the same bounded Session list a Rebase guard uses (15 s).
-When the Host's Session list takes longer, every Session reads as
-`activity-unknown` and the run removes nothing; the skip counts say so.
+The activity read is the same Session list a Rebase guard uses (15 s per
+attempt, all waiting on the same read). When the Host's Session list stays
+unreadable, every Session reads as `activity-unknown` and the run removes
+nothing; the skip counts say so.
 
 This replaces `jjc` and `jjw cleanup` from nixfiles for thread workspaces: both
 are terminal tools (an fzf picker, day-granularity ages, no knowledge of DSH
