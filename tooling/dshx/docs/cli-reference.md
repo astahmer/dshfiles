@@ -92,20 +92,21 @@ All add commands accept `--file`, `--dry-run`, and `--json`. They generate sourc
 
 ## Shared options
 
-| Option                | Commands                                   | Effect                                                             |
-| --------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
-| `--cwd <path>`        | project commands; sessions create          | Resolve another project or create a Session in a working directory |
-| `--verbose`           | all                                        | Include underlying provider/process causes                         |
-| `--json`              | check, inspect, add, DSH platform commands | Stable machine-readable output                                     |
-| `--quiet`             | all                                        | Suppress human success output; preserve JSON and errors            |
-| `--no-color`          | all                                        | Disable terminal styling                                           |
-| `--url <launch-url>`  | DSH platform commands                      | Override `DSHX_URL` for this invocation                            |
-| `--runtime`           | check                                      | Enable Profile/Composition/runtime validation                      |
-| `--fix`               | check                                      | Apply deterministic manifest repairs                               |
-| `--dry-run`           | check --fix, add                           | Produce a plan/diff without writing                                |
-| `--open`              | dev                                        | Open the development URL                                           |
-| `--port <0-65535>`    | dev                                        | Select the DSH Web port; `0` allocates one                         |
-| `--help`, `--version` | all                                        | Print CLI metadata                                                 |
+| Option                | Commands                                   | Effect                                                                    |
+| --------------------- | ------------------------------------------ | ------------------------------------------------------------------------- |
+| `--cwd <path>`        | project commands; sessions create/start    | Resolve another project or create a Session in a working directory        |
+| `--verbose`           | all                                        | Include underlying provider/process causes                                |
+| `--json`              | check, inspect, add, DSH platform commands | Stable machine-readable output                                            |
+| `--quiet`             | all                                        | Suppress human success output; preserve JSON and errors                   |
+| `--no-color`          | all                                        | Disable terminal styling                                                  |
+| `--url <launch-url>`  | DSH platform commands                      | Override `DSHX_URL` for this invocation                                   |
+| `--title <title>`     | sessions start                             | Name the new Session; otherwise the Host titles it from its first message |
+| `--runtime`           | check                                      | Enable Profile/Composition/runtime validation                             |
+| `--fix`               | check                                      | Apply deterministic manifest repairs                                      |
+| `--dry-run`           | check --fix, add                           | Produce a plan/diff without writing                                       |
+| `--open`              | dev                                        | Open the development URL                                                  |
+| `--port <0-65535>`    | dev                                        | Select the DSH Web port; `0` allocates one                                |
+| `--help`, `--version` | all                                        | Print CLI metadata                                                        |
 
 ## DSH platform control plane
 
@@ -126,6 +127,7 @@ dshx sessions search <query...> [--limit <count>]
 dshx sessions show <session-id>
 dshx sessions history <session-id> [--max <count>]
 dshx sessions create [--cwd <path>] [--agent-preset <id>]
+dshx sessions start [--cwd <path>] [--title <title>] [--agent-preset <id>] [message...]
 dshx sessions fork <session-id> [--at-seq <sequence>]
 dshx sessions cancel <session-id>
 dshx sessions rename <session-id> <title...>
@@ -206,6 +208,8 @@ inspected Remote APIs; `status` and `doctor` read the profile from the process
 command line and label the rest unknown.
 
 `sessions show` preserves Session metadata and projection hints returned by DSH.
+
+`sessions start` is the one-command path for delegating to a new thread: it creates the Session, renames it when `--title` is given, and queues the positional text as its first message, so the thread never sits idle between three calls. A refused title or first message is reported in the JSON (`title`, `prompt: "refused"`, `promptError`) while the new `sessionId` is still printed: the Session exists, and `sessions prompt` can send the text again.
 Search prefers the composed finder from `@dshfiles/memory` when the installed
 Host serves it: titles, Session ids, cwd/workspace paths, message text, digests
 and notes in one ranked page with per-hit provenance (`[session-title+session-content:

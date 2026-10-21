@@ -582,6 +582,14 @@ describe('DSH platform CLI', () => {
       platformArgs: ['prompt', 'session-1', 'review', 'this'],
       mode: 'steer',
     })
+    expect(parseCliArgs(['sessions', 'start', '--cwd', '/work/app', '--title', 'Fresh', 'review', 'this'])).toMatchObject({
+      command: 'sessions',
+      platformArgs: ['start', 'review', 'this'],
+      cwd: '/work/app',
+      title: 'Fresh',
+    })
+    expect(() => parseCliArgs(['sessions', 'create', '--title', 'Fresh'])).toThrow('--title is only valid with sessions start')
+    expect(() => parseCliArgs(['sessions', 'start', '--mode', 'steer'])).toThrow('--mode is only valid with sessions prompt')
     expect(parseCliArgs(['bundles', 'install', '@sample/bundle'])).toMatchObject({
       command: 'bundles',
       platformArgs: ['install', '@sample/bundle'],
@@ -794,6 +802,60 @@ describe('DSH platform CLI', () => {
       namespace: 'pluginManager',
       method: 'cancelInstall',
       args: { requestId },
+    })
+  })
+
+  it('starts a Session with a title and its first message in one command', async () => {
+    const streams = io()
+    const stdout = capture(streams.out)
+    const calls: {
+      readonly namespace: string
+      readonly method: string
+      readonly args: Parameters<DshPlatformTransport['rpc']>[2]
+    }[] = []
+    const client = clientWith(async (namespace, method, args) => {
+      calls.push({ namespace, method, args })
+      if (namespace === 'session' && method === 'create') return { sessionId: 'session-new', agentPreset: 'standard' }
+      if (namespace === 'session' && method === 'rename') return { title: 'Fresh thread', seq: 3 }
+      if (namespace === 'session' && method === 'prompt') return { accepted: true }
+      throw new Error(`Unexpected RPC ${namespace}/${method}`)
+    })
+    const exitCode = await runCli(['sessions', 'start', '--cwd', '/work/app', '--title', 'Fresh thread', 'do', 'the', 'work', '--json'], {
+      io: streams,
+      version: 'test-version',
+      runtime: { connectPlatform: async () => client },
+    })
+
+    expect(exitCode).toBe(0)
+    expect(decodeCliEnvelope(stdout())).toMatchObject({
+      ok: true,
+      data: { sessionId: 'session-new', title: 'Fresh thread', agentPreset: 'standard', prompt: 'accepted' },
+    })
+    expect(calls.map(call => `${call.namespace}/${call.method}`)).toEqual(['session/create', 'session/rename', 'session/prompt'])
+    expect(calls[0]).toMatchObject({ args: { request: { cwd: '/work/app' } } })
+    expect(calls[2]).toMatchObject({
+      args: { request: { sessionId: 'session-new', content: [{ type: 'text', text: 'do the work' }] } },
+    })
+  })
+
+  it('keeps the new Session when its first message is refused', async () => {
+    const streams = io()
+    const stdout = capture(streams.out)
+    const client = clientWith(async (namespace, method) => {
+      if (namespace === 'session' && method === 'create') return { sessionId: 'session-new' }
+      if (namespace === 'session' && method === 'prompt') throw new Error('prompt rejected')
+      throw new Error(`Unexpected RPC ${namespace}/${method}`)
+    })
+    const exitCode = await runCli(['sessions', 'start', 'do', 'the', 'work', '--json'], {
+      io: streams,
+      version: 'test-version',
+      runtime: { connectPlatform: async () => client },
+    })
+
+    expect(exitCode).toBe(0)
+    expect(decodeCliEnvelope(stdout())).toMatchObject({
+      ok: true,
+      data: { sessionId: 'session-new', prompt: 'refused', promptError: 'prompt rejected' },
     })
   })
 

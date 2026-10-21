@@ -811,6 +811,52 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         emitSessionResult(result, `Created Session ${result.sessionId}`)
         return 0
       }
+      if (action === 'start') {
+        // One command for the three RPCs a human otherwise chains: create, optional title, first message.
+        const text = parameters.join(' ').trim()
+        const created = await client.sessions.create({
+          ...(args.cwd === undefined ? {} : { cwd: args.cwd }),
+          ...(args.agentPreset === undefined ? {} : { agentPreset: args.agentPreset }),
+        })
+        let title: string | undefined
+        if (args.title !== undefined) {
+          try {
+            title = (await client.sessions.rename(created.sessionId, args.title)).title
+          } catch {
+            // A refused title must not hide the Session that now exists, exactly like its refused first message.
+            title = undefined
+          }
+        }
+        let delivery: 'accepted' | 'refused' | undefined
+        let promptError: string | undefined
+        if (text.length > 0) {
+          try {
+            await promptSessionWithInterrupt(client, created.sessionId, text, 'queue')
+            delivery = 'accepted'
+          } catch (error) {
+            delivery = 'refused'
+            promptError = safeMessage(error).message
+          }
+        }
+        const data = {
+          sessionId: created.sessionId,
+          ...(title === undefined ? {} : { title }),
+          ...(created.agentPreset === undefined ? {} : { agentPreset: created.agentPreset }),
+          ...(delivery === undefined ? {} : { prompt: delivery }),
+          ...(promptError === undefined ? {} : { promptError }),
+        }
+        emitSessionResult(
+          data,
+          `Started Session ${created.sessionId}${title === undefined ? '' : ` named “${title}”`}${
+            delivery === 'accepted'
+              ? ' with its first message'
+              : delivery === 'refused'
+                ? ` but its first message was refused: ${promptError ?? 'unknown reason'}`
+                : ''
+          }`,
+        )
+        return 0
+      }
       if (action === 'fork') {
         const result = await client.sessions.fork(parameters[0] ?? '', args.atSeq)
         emitSessionResult(result, `Forked Session ${parameters[0]} as ${result.sessionId}`)

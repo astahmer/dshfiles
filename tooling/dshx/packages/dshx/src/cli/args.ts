@@ -45,6 +45,7 @@ export interface CliArgs {
   readonly line?: string
   readonly output?: string
   readonly agentPreset?: string
+  readonly title?: string
   readonly mode?: 'queue' | 'steer'
   readonly reasoningEffort?: string
   readonly max?: number
@@ -111,6 +112,11 @@ const sharedArgs = {
     type: 'string',
     description: 'Name a generated Tool or Command.',
     valueHint: 'name',
+  },
+  title: {
+    type: 'string',
+    description: 'Set the new Session title; without it the Host titles the Session from its first message.',
+    valueHint: 'title',
   },
   description: {
     type: 'string',
@@ -385,8 +391,8 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
     usage: '--url is not used by this DSH platform command.',
   },
   cwd: {
-    allows: context => !isPlatformCommand(context.command) || platformAction('sessions', 'create')(context),
-    usage: '--cwd is only valid with sessions create among DSH platform commands.',
+    allows: context => !isPlatformCommand(context.command) || platformAction('sessions', 'create', 'start')(context),
+    usage: '--cwd is only valid with sessions create or sessions start among DSH platform commands.',
   },
   session: {
     allows: context => context.command === 'commands' || context.command === 'skills' || platformAction('models', 'select')(context),
@@ -400,6 +406,7 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
       'show',
       'history',
       'create',
+      'start',
       'fork',
       'cancel',
       'rename',
@@ -424,7 +431,8 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
     usage: '--file is only valid with test or add ui, tool, command, or hook.',
   },
   output: { allows: platformAction('sessions', 'export'), usage: '--output is only valid with sessions export.' },
-  agentPreset: { allows: platformAction('sessions', 'create'), usage: '--agent-preset is only valid with sessions create.' },
+  agentPreset: { allows: platformAction('sessions', 'create', 'start'), usage: '--agent-preset is only valid with sessions create or sessions start.' },
+  title: { allows: platformAction('sessions', 'start'), usage: '--title is only valid with sessions start.' },
   mode: { allows: platformAction('sessions', 'prompt'), usage: '--mode is only valid with sessions prompt.' },
   reasoningEffort: { allows: platformAction('models', 'select'), usage: '--reasoning-effort is only valid with models select.' },
   max: { allows: platformAction('sessions', 'history'), usage: '--max is only valid with sessions history.' },
@@ -582,6 +590,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   const line = parsed.line
   const output = parsed.output
   const agentPreset = parsed.agentPreset
+  const title = parsed.title
   const mode = parsed.mode
   if (mode !== undefined && mode !== 'queue' && mode !== 'steer') throw new CliUsageError('--mode requires queue or steer.')
   const reasoningEffort = parsed.reasoningEffort
@@ -665,6 +674,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       line,
       output,
       agentPreset,
+      title,
       mode,
       reasoningEffort,
       max,
@@ -713,14 +723,30 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   }
   if (command === 'sessions' && !help) {
     const [action, sessionId, ...extra] = platformArgs
-    const actions = ['list', 'search', 'show', 'history', 'create', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export', 'digest', 'tail']
+    const actions = [
+      'list',
+      'search',
+      'show',
+      'history',
+      'create',
+      'start',
+      'fork',
+      'cancel',
+      'rename',
+      'archive',
+      'unarchive',
+      'prompt',
+      'export',
+      'digest',
+      'tail',
+    ]
     if (!actions.includes(action ?? '')) throw new CliUsageError(`sessions requires ${actions.join(', ')}.`)
     if (['show', 'history', 'fork', 'cancel', 'rename', 'archive', 'unarchive', 'prompt', 'export', 'digest', 'tail'].includes(action ?? '') && !sessionId)
       throw new CliUsageError(`sessions ${action} requires a Session id.`)
     if (action === 'search' && !sessionId) throw new CliUsageError('sessions search requires a query.')
     if (action === 'prompt' && extra.join(' ').trim().length === 0) throw new CliUsageError('sessions prompt requires message text.')
     if (action === 'rename' && extra.join(' ').trim().length === 0) throw new CliUsageError('sessions rename requires a title.')
-    if (!['search', 'prompt', 'rename'].includes(action ?? '') && extra.length > 0)
+    if (!['search', 'prompt', 'rename', 'start'].includes(action ?? '') && extra.length > 0)
       throw new CliUsageError(`sessions ${action} accepts no extra positional arguments.`)
     if (['list', 'create'].includes(action ?? '') && sessionId !== undefined) throw new CliUsageError(`sessions ${action} accepts no positional argument.`)
   }
@@ -905,6 +931,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(line === undefined ? {} : { line }),
     ...(output === undefined ? {} : { output }),
     ...(agentPreset === undefined ? {} : { agentPreset }),
+    ...(title === undefined ? {} : { title }),
     ...(mode === undefined ? {} : { mode }),
     ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
     ...(max === undefined ? {} : { max }),

@@ -89,6 +89,10 @@ const sessionsHelp = actionHelpGroup('sessions', {
   create: {
     description: 'Create a Session on the selected execution runtime.',
   },
+  start: {
+    description: 'Create a Session, optionally name it, and send its first message in one command; omit the text for a blank Session.',
+    positionals: { 'message...': positional('Text to send as the new Session first message.', false) },
+  },
   fork: {
     description: 'Fork a Session, optionally from a sequence number.',
     positionals: { 'session-id': positional('Session identifier.') },
