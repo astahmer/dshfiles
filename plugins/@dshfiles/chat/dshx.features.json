@@ -39,6 +39,29 @@
           "testName": "mounts the latest rows first and widens toward older rows"
         }
       ]
+    },
+    {
+      "id": "image-links",
+      "title": "Open image links in the gallery",
+      "summary": "Opening a local or HTTP(S) image link from Chat shows it in the shared image gallery; other links keep their existing destination.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["link-idle", "gallery-open"],
+      "failureModes": ["A supported image link opens the side panel instead of the gallery."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.markdown-image-links",
+          "file": "plugins/@dshfiles/chat/tests/markdown-image-links.test.ts",
+          "testName": "opens a resolvable local image link in the gallery"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.image-links",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ]
     }
   ]
 }

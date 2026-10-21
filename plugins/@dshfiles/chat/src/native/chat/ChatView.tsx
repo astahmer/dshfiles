@@ -8,8 +8,9 @@ import type {
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  Button, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal,
+  Button, classifyLinkPath, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { isAtOrOutside } from '../contract/group-tree.ts'
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
@@ -17,6 +18,7 @@ import { TurnNavigator } from './TurnNavigator.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
+import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import css from './ChatView.module.css'
 
@@ -92,6 +94,16 @@ export function ChatView({
       dialog: t('image.dialog'), close: t('image.close'),
     },
   }), [cwd, t])
+  const [imagePreview, setImagePreview] = useState<LightboxImage | null>(null)
+  const imageLightboxLabels = useMemo<ImageLightboxLabels>(() => ({
+    dialog: t('image.dialog'),
+    close: t('image.close'),
+    previous: t('image.previous'),
+    next: t('image.next'),
+    thumbnail: (position, total) => t('image.thumbnail', { position, total }),
+    loading: t('image.loading'),
+  }), [t])
+  const closeImagePreview = useCallback(() => { setImagePreview(null) }, [])
   const running = useSession(s => s.running)
   // Fold transitions run while a Turn is live, while an input is pending, and briefly after settling.
   const [motionTail, setMotionTail] = useState(false)
@@ -164,6 +176,29 @@ export function ChatView({
       },
     )
   }, [openFile, t])
+
+  const requestOpenMarkdownFile = useCallback((path: string, options?: OpenFileOptions) => {
+    openMarkdownFileLink({
+      path,
+      kind: classifyLinkPath(path),
+      options,
+      resolveImage: fileImages.resolve,
+      openImage: setImagePreview,
+      openFile: requestOpenFile,
+    })
+  }, [fileImages, requestOpenFile])
+
+  const requestOpenMarkdownExternalLink = useCallback((href: string) => {
+    const kind = (() => {
+      try {
+        const url = new URL(href)
+        return url.protocol === 'http:' || url.protocol === 'https:' ? classifyLinkPath(url.pathname) : undefined
+      } catch {
+        return undefined
+      }
+    })()
+    openMarkdownExternalLink({ href, kind, openImage: setImagePreview, openExternalLink })
+  }, [openExternalLink])
 
   const closeFileOpenError = useCallback(() => {
     fileOpenRequest.current += 1
@@ -248,7 +283,7 @@ export function ChatView({
               <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
-            <MarkdownDelegateProvider openFile={requestOpenFile} openExternalLink={openExternalLink} fileImages={fileImages}>
+            <MarkdownDelegateProvider openFile={requestOpenMarkdownFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
               {renderSlot('conversation.chat.flow', {
                 entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
                 cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
@@ -273,6 +308,9 @@ export function ChatView({
             <IconChevronDownOutlineRegular />
           </button>
         </div>
+      )}
+      {imagePreview !== null && (
+        <ImageLightbox images={[imagePreview]} initialIndex={0} labels={imageLightboxLabels} onClose={closeImagePreview} />
       )}
       {fileOpenError !== null && (
         <FileOpenErrorDialog
