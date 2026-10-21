@@ -10,11 +10,17 @@ interface Harness {
   readonly stdin: () => string
 }
 
-const harness = (options: { readonly exitCode?: number | null; readonly lossy?: boolean; readonly output?: string } = {}): Harness => {
+const harness = (
+  options: { readonly exitCode?: number | null; readonly lossy?: boolean; readonly output?: string; readonly stdinClosed?: boolean } = {},
+): Harness => {
   let spec: SubprocessSpawnSpec | undefined
   let input = ''
   const stdin = new Writable({
     write(chunk, _encoding, done) {
+      if (options.stdinClosed === true) {
+        done(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+        return
+      }
       input += Buffer.from(chunk).toString('utf8')
       done()
     },
@@ -99,5 +105,14 @@ describe('managed secret CLI runner', () => {
       'Secret CLI command failed.',
     )
     expect(oversized.handle.terminate).toHaveBeenCalledOnce()
+  })
+
+  it('reports a CLI that exits before reading its stdin as a failure without an unhandled stream error', async () => {
+    const test = harness({ exitCode: 1, stdinClosed: true })
+
+    await expect(
+      runSecretCli(test.runtime, { args: ['set', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: false, stdin: 'synthetic-secret-value' }, {}),
+    ).rejects.toThrow('Secret CLI command failed.')
+    await new Promise(resolve => setTimeout(resolve, 0))
   })
 })

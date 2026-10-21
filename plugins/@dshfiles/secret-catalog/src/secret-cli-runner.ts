@@ -49,6 +49,8 @@ export const runSecretCli = async (
     })
     if (request.stdin !== undefined) {
       if (handle.stdin === undefined) throw new Error('Secret CLI stdin was unavailable.')
+      // A CLI that exits before reading stdin fails the write with EPIPE; the exit status reports it, an unheard stream 'error' would crash the Host.
+      handle.stdin.on('error', () => undefined)
       handle.stdin.end(request.stdin)
     }
     const outcome = await handle.done
