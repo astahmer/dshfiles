@@ -71,6 +71,15 @@ createInterface({ input: process.stdin }).on('line', line => {
 })
 `
 
+/** One line the CLI or the bridge wrote, decoded; a non-JSON line (a warning, a stray log) fails like a malformed one. */
+const decodeJsonLine = <Output>(schema: z.ZodType<Output>, line: string): z.ZodSafeParseResult<Output> => {
+  try {
+    return schema.safeParse(JSON.parse(line))
+  } catch {
+    return schema.safeParse(undefined)
+  }
+}
+
 /** A tool_use block's streamed input: JSON text holding an object. */
 const toolInputSchema = z
   .string()
@@ -416,13 +425,14 @@ export class ClaudeCliSessions {
       dead: false,
     }
     session.server.on('connection', socket => {
+      socket.on('error', () => undefined)
       socket.setEncoding('utf8')
       let buffer = ''
       socket.on('data', (chunk: string) => {
         buffer += chunk
         let newline = buffer.indexOf('\n')
         while (newline >= 0) {
-          const parsed = bridgeCallSchema.safeParse(JSON.parse(buffer.slice(0, newline)))
+          const parsed = decodeJsonLine(bridgeCallSchema, buffer.slice(0, newline))
           buffer = buffer.slice(newline + 1)
           if (parsed.success)
             this.matchCall(session, {
@@ -447,7 +457,7 @@ export class ClaudeCliSessions {
     })
     createInterface({ input: child.stdout }).on('line', line => {
       if (line.trim() === '') return
-      const parsed = cliLineSchema.safeParse(JSON.parse(line))
+      const parsed = decodeJsonLine(cliLineSchema, line)
       if (!parsed.success) return
       const value = parsed.data
       if (value.type === 'stream_event' && 'event' in value) {
@@ -468,6 +478,13 @@ export class ClaudeCliSessions {
     child.on('error', error => {
       session.dead = true
       emit({ kind: 'failed', message: `could not start claude: ${error.message}` })
+      this.cleanup(session)
+    })
+    // A write after the process exited fails with EPIPE; the exit handler already reports the failure.
+    child.stdin.on('error', () => undefined)
+    session.server.on('error', error => {
+      session.dead = true
+      emit({ kind: 'failed', message: `could not open the Claude tool bridge: ${error.message}` })
       this.cleanup(session)
     })
     return session

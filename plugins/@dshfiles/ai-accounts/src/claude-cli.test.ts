@@ -108,3 +108,37 @@ it('holds a tool call until DSH answers it, then continues the same claude proce
   expect(textOf(third)).toMatch(/: hello again$/)
   expect(processOf(fourth)).toBe(processOf(third))
 })
+
+/** A `claude` that writes a stray non-JSON line before every answer, as a CLI warning would. */
+const NOISY_CLAUDE = `#!/usr/bin/env node
+const { createInterface } = require('node:readline')
+const out = value => process.stdout.write(JSON.stringify(value) + '\\n')
+const event = value => out({ type: 'stream_event', event: value })
+createInterface({ input: process.stdin }).on('line', () => {
+  process.stdout.write('Warning: this is not JSON\\n')
+  event({ type: 'message_start', message: { usage: { input_tokens: 1, output_tokens: 0 } } })
+  event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+  event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'still here' } })
+  event({ type: 'content_block_stop', index: 0 })
+  event({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } })
+  event({ type: 'message_stop' })
+  out({ type: 'result', subtype: 'success', is_error: false })
+})
+`
+
+it('skips a non-JSON line from the CLI instead of throwing out of its stdout handler', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-noisy-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(executable, NOISY_CLAUDE)
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => join(directory, '.claude'), executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const context = normalizeContext({ systemPrompt: 'You are inside DSH.', messages: [{ role: 'user', content: 'hello', timestamp: 1 }] })
+
+  const message = await finished(cli.stream(model, context, { sessionId: 'session-noisy' }))
+
+  expect(textOf(message)).toBe('still here')
+})
