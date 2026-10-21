@@ -506,6 +506,12 @@
           "id": "backlog.rich-capture-properties",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "takes the kind, status and project the composer set, and records them as the user owns them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.rich-capture-attachment-file",
+          "file": "plugins/@dshfiles/backlog/src/attachment-file.test.ts",
+          "testName": "writes the bytes under the two ids with an extension from the media type"
         }
       ]
     },

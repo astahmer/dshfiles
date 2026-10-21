@@ -148,7 +148,7 @@ thread and starts the item, just as typing `b:12` does.
 | `backlog_link`             | write: link or unlink                                                                 |
 | `backlog_comment`          | write                                                                                 |
 | `backlog_attach_file`      | write: keep one base64 image or file with an item                                     |
-| `backlog_read_file`        | read: one image or file as a data URL                                                 |
+| `backlog_read_file`        | read: one image or file as a data URL; `save: true` also returns a temp file path     |
 | `backlog_remove_file`      | write: remove one image or file                                                       |
 | `backlog_triage`           | write: run triage on one item now                                                     |
 | `backlog_projects`         | read: per-project counts, who needs you, people                                       |
@@ -215,7 +215,10 @@ Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms
 ## Storage
 
 Host-owned storage-domain `backlog`, table `items` keyed by id, so every browser and agent reads the same
-rows. Search is an in-memory token match over title, body, tags, project and link targets.
+rows. Search is an in-memory token match over title, body, tags, project and link targets. Attachment bytes
+live in the separate `backlog_files` domain, keyed by item and attachment; `backlog_read_file` returns a
+data URL for the UI, and `save: true` writes a copy under `$TMPDIR/dsh-backlog-attachments/<item>-<attachment>.<ext>`
+and returns that absolute path so an agent can read an image instead of a base64 string.
 
 ## Secret references
 

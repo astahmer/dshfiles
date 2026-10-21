@@ -6,7 +6,7 @@ const idSchema = z.number().int().positive()
 const freshnessSchema = z.enum(BacklogItems.freshnessStates)
 const fileInputSchema = BacklogItems.attachmentSchema.omit({ createdAt: true }).extend({ data: z.string().min(1).max(24_000_000) })
 const fileOutputSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: z.object({ dataUrl: z.string().min(1) }).strict() }).strict(),
+  z.object({ ok: z.literal(true), value: z.object({ dataUrl: z.string().min(1), path: z.string().min(1).optional() }).strict() }).strict(),
   z.object({ ok: z.literal(false), reason: z.literal('not-found') }).strict(),
 ])
 const speechStatusSchema = z
@@ -198,9 +198,18 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_attach_file', readOnly: false },
     }),
     readFile: method({
-      input: z.object({ id: idSchema, attachmentId: z.string().min(1).max(64) }).strict(),
+      input: z
+        .object({
+          id: idSchema,
+          attachmentId: z.string().min(1).max(64),
+          save: z
+            .boolean()
+            .optional()
+            .describe('Also write the bytes to a temporary file and return its absolute path, for an image or file reader that needs a path.'),
+        })
+        .strict(),
       output: fileOutputSchema,
-      description: 'Read one image or file kept with a backlog item as a data URL. Read-only.',
+      description: 'Read one image or file kept with a backlog item as a data URL, optionally also written to a temporary file. Read-only.',
       tool: { name: 'backlog_read_file', readOnly: true },
     }),
     removeFile: method({

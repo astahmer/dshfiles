@@ -10,6 +10,7 @@ import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { backlogApi } from './api.js'
+import { writeAttachmentFile } from './attachment-file.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
@@ -363,7 +364,12 @@ const backlogApiHost = backlogApi.host({
   applyProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).applyProposal({ id: input.id, actor: actorOf(caller) }),
   dismissProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).dismissProposal({ id: input.id, actor: actorOf(caller) }),
   attachFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).attachFile({ id: input.id, file: input.file, actor: actorOf(caller) }),
-  readFile: async ({ ctx, input }) => (await backlogFor(ctx)).readFile(input),
+  readFile: async ({ ctx, input }) => {
+    const result = await (await backlogFor(ctx)).readFile(input)
+    if (!result.ok || input.save !== true) return result
+    const path = await writeAttachmentFile({ id: input.id, attachmentId: input.attachmentId, dataUrl: result.value.dataUrl })
+    return { ok: true, value: { dataUrl: result.value.dataUrl, path } }
+  },
   removeFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).removeFile({ ...input, actor: actorOf(caller) }),
   speechStatus: ({ ctx }) => speechStatusOf(ctx),
   transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),
