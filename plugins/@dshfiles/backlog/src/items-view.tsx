@@ -124,6 +124,7 @@ const Row = (props: {
   readonly selection?: readonly StartThreadItem[] | undefined
   readonly clearSelection?: () => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const modifiedCheckboxClick = useRef(false)
@@ -140,6 +141,7 @@ const Row = (props: {
     <BacklogItemMenu
       item={item}
       projectPaths={props.projectPaths}
+      triageOff={props.triageOff}
       update={input => actions.update.mutate(input)}
       triage={id => actions.triage.mutate(id)}
       startThread={props.startThread}
@@ -148,6 +150,7 @@ const Row = (props: {
       openItem={props.select}
     >
       <div
+        tabIndex={-1}
         role="row"
         aria-label={`Item b:${String(item.id)}`}
         aria-selected={props.selected}
@@ -164,7 +167,7 @@ const Row = (props: {
         style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
         className={cn(
           columns,
-          'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75',
+          'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
           background,
         )}
       >
@@ -276,6 +279,7 @@ export const ItemsView = (props: {
   readonly clearStatuses: () => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
@@ -477,6 +481,7 @@ export const ItemsView = (props: {
                     selection={selected.has(entry.item.id) ? selectedItems : undefined}
                     clearSelection={clearSelection}
                     projectPaths={props.projectPaths}
+                    triageOff={props.triageOff}
                   />
                 )}
               </div>

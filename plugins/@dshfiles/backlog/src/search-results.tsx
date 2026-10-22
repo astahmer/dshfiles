@@ -59,6 +59,7 @@ export const SearchResults = (props: {
   readonly loaded: boolean
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const terms = termsOf(props.query)
   const actions = useBacklogActions()
@@ -90,15 +91,17 @@ export const SearchResults = (props: {
             projectPaths={props.projectPaths}
             update={input => actions.update.mutate(input)}
             triage={id => actions.triage.mutate(id)}
+            triageOff={props.triageOff}
             startThread={props.startThread}
             openItem={props.select}
           >
             <li
+              tabIndex={-1}
               aria-label={`Item b:${String(item.id)}`}
               onClick={() => props.select(item.id)}
               onMouseMove={() => props.hover(item.id)}
               className={cn(
-                'dshx:flex dshx:cursor-default dshx:flex-col dshx:gap-1 dshx:border-b dshx:border-border/50 dshx:px-4 dshx:py-2.5 dshx:transition-colors',
+                'dshx:flex dshx:cursor-default dshx:flex-col dshx:gap-1 dshx:border-b dshx:border-border/50 dshx:px-4 dshx:py-2.5 dshx:transition-colors dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
                 item.id === props.openId ? 'dshx:bg-accent/80' : item.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/30',
               )}
             >

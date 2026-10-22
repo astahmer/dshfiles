@@ -78,16 +78,22 @@ const ItemLine = (props: {
   readonly projectPaths: readonly string[]
   readonly update: (input: BacklogUpdateInput) => void
   readonly triage: (id: number) => void
+  readonly triageOff: boolean
 }): JSX.Element => (
   <BacklogItemMenu
     item={props.item}
     projectPaths={props.projectPaths}
     update={props.update}
     triage={props.triage}
+    triageOff={props.triageOff}
     startThread={props.startThread}
     openItem={props.select}
   >
-    <li aria-label={`Item b:${String(props.item.id)}`}>
+    <li
+      tabIndex={-1}
+      aria-label={`Item b:${String(props.item.id)}`}
+      className="dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
+    >
       <button
         type="button"
         onClick={() => props.select(props.item.id)}
@@ -109,6 +115,7 @@ const Overview = (props: {
   readonly select: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
@@ -194,6 +201,7 @@ const Overview = (props: {
                     projectPaths={props.projectPaths}
                     update={input => actions.update.mutate(input)}
                     triage={id => actions.triage.mutate(id)}
+                    triageOff={props.triageOff}
                   />
                 ))}
               </ul>
@@ -211,6 +219,7 @@ const Overview = (props: {
                   projectPaths={props.projectPaths}
                   update={input => actions.update.mutate(input)}
                   triage={id => actions.triage.mutate(id)}
+                  triageOff={props.triageOff}
                 />
               ))}
             </ul>
@@ -253,10 +262,15 @@ const Overview = (props: {
                   projectPaths={props.projectPaths}
                   update={input => actions.update.mutate(input)}
                   triage={id => actions.triage.mutate(id)}
+                  triageOff={props.triageOff}
                   startThread={props.startThread}
                   openItem={props.select}
                 >
-                  <li aria-label={`Item b:${String(item.id)}`} className="dshx:flex dshx:gap-2.5 dshx:text-xs">
+                  <li
+                    tabIndex={-1}
+                    aria-label={`Item b:${String(item.id)}`}
+                    className="dshx:flex dshx:gap-2.5 dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
+                  >
                     <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor} className="dshx:mt-0.5" />
                     <button
                       type="button"
@@ -287,6 +301,7 @@ export const ProjectsView = (props: {
   readonly now: number
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const query = useQuery({ queryKey: [BacklogQueries.key, 'projects'], queryFn: ({ signal }) => api.projects(undefined, { signal }) })
@@ -303,6 +318,7 @@ export const ProjectsView = (props: {
       {selected !== undefined ? (
         <Overview
           project={selected}
+          triageOff={props.triageOff}
           back={() => props.setSelectedProject(null)}
           select={props.select}
           startThread={props.startThread}

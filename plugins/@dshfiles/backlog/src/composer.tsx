@@ -173,6 +173,7 @@ export const Composer = (props: {
   readonly reuseProject?: boolean
   readonly status?: BacklogStatus | null
   readonly onClearStatus?: () => void
+  readonly onNavigateUp?: () => boolean
   readonly inputRef?: RefObject<HTMLTextAreaElement>
   readonly variant: 'chat' | 'compact'
   readonly autoFocus?: boolean
@@ -467,6 +468,10 @@ export const Composer = (props: {
                 return
               }
             }
+          }
+          if (event.key === 'ArrowUp' && text === '' && props.onNavigateUp?.()) {
+            event.preventDefault()
+            return
           }
           if (event.key === 'Escape') {
             event.currentTarget.blur()

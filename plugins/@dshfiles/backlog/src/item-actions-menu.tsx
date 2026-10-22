@@ -11,9 +11,10 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { FolderIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CopyIcon, FolderIcon, LinkIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
@@ -36,6 +37,7 @@ export const BacklogItemMenu = (props: {
   readonly projectPaths: readonly string[]
   readonly update: (input: BacklogUpdateInput) => void
   readonly triage: (id: number) => void
+  readonly triageOff: boolean
   readonly startThread: (items: readonly StartThreadItem[]) => void
   /** The whole selection when this row is part of one, so repeatable actions apply to every item. */
   readonly selection?: readonly StartThreadItem[] | undefined
@@ -57,7 +59,9 @@ export const BacklogItemMenu = (props: {
   return (
     <>
       <ContextMenu>
-        <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
+        <ContextMenuTrigger asChild data-backlog-item-id={String(item.id)}>
+          {props.children}
+        </ContextMenuTrigger>
         <ContextMenuContent className="dshx-root dshx:min-w-52">
           <ContextMenuLabel className="dshx:max-w-64 dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
             {selection.length > 1 ? `${String(selection.length)} selected · ` : null}b:{item.id} · {item.title}
@@ -72,6 +76,14 @@ export const BacklogItemMenu = (props: {
               Open item
             </ContextMenuItem>
           )}
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(String(item.id))}>
+            <CopyIcon aria-hidden className="dshx:size-3.5" />
+            Copy item ID
+          </ContextMenuItem>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(`b:${String(item.id)}`)}>
+            <LinkIcon aria-hidden className="dshx:size-3.5" />
+            Copy item link
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuSub>
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
@@ -167,10 +179,12 @@ export const BacklogItemMenu = (props: {
             <PinIcon aria-hidden className="dshx:size-3.5" />
             {item.pinned ? 'Unpin item' : 'Pin item'}
           </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
-            <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-            Run triage
-          </ContextMenuItem>
+          {props.triageOff ? null : (
+            <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
+              <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
+              Run triage
+            </ContextMenuItem>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px] dshx:text-destructive" onSelect={() => setDeleteOpen(true)}>
             <Trash2Icon aria-hidden className="dshx:size-3.5" />

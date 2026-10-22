@@ -60,7 +60,7 @@
     {
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
-      "summary": "The feed lists pinned items, then newest activity first. Status chips narrow the feed and the Items list to one status or several at once. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
+      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Feed item to close\"",
@@ -77,7 +77,10 @@
         "click menuitemradio \"Dropped\"",
         "click button \"Done, 1 item\"",
         "click button \"Dropped, 1 item\"",
-        "expect text \"Feed item to close\""
+        "expect text \"Feed item to close\"",
+        "click textbox \"Capture\"",
+        "press ArrowUp",
+        "expect article \"Item b:2\""
       ],
       "surfaces": ["client", "host"],
       "configuration": [],
@@ -1000,10 +1003,12 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked, sending its first message immediately when one is present. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID or its clickable `b:<id>` reference; change status, kind, attention or project; pin or unpin; run triage when Jev or a triage model is configured; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked, sending its first message immediately when one is present. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
+        "click button \"Feed\"",
+        "click button \"All statuses*\"",
         "fill textbox \"Capture\" \"Start a thread from b:1\"",
         "press Enter",
         "expect text \"Start a thread from b:1\"",
@@ -1012,6 +1017,8 @@
         "expect menuitem \"Start thread…\"",
         "expect menuitem \"Status\"",
         "expect menuitem \"Project\"",
+        "expect menuitem \"Copy item ID\"",
+        "expect menuitem \"Copy item link\"",
         "click menuitem \"Start thread…\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",

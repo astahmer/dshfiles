@@ -324,6 +324,7 @@ export const BacklogPanel = (props: {
   const [backfillOpen, setBackfillOpen] = useState(false)
   const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
   const captureComposer = useRef<HTMLTextAreaElement>(null)
+  const panelRoot = useRef<HTMLElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
 
@@ -479,6 +480,29 @@ export const BacklogPanel = (props: {
     if (openId !== null || view === 'inbox') select(next.id)
   }
 
+  const navigateToNearestItem = (): boolean => {
+    const root = panelRoot.current
+    const composer = captureComposer.current
+    if (root === null || composer === null) return false
+    const composerTop = composer.getBoundingClientRect().top
+    const nearest = Array.from(root.querySelectorAll<HTMLElement>('[data-backlog-item-id]'))
+      .map(element => {
+        const bounds = element.getBoundingClientRect()
+        return { element, id: Number(element.dataset.backlogItemId), bounds }
+      })
+      .filter(candidate => Number.isSafeInteger(candidate.id) && candidate.bounds.height > 0 && candidate.bounds.bottom <= composerTop)
+      .sort((left, right) => right.bounds.bottom - left.bounds.bottom)
+      .at(0)
+    if (nearest === undefined) return false
+    const focusTarget = nearest.element.matches('button, a[href], input, select, textarea, [tabindex]')
+      ? nearest.element
+      : nearest.element.querySelector<HTMLElement>('button, a[href], input, select, textarea, [tabindex]')
+    if (focusTarget === null) return false
+    setCursorId(nearest.id)
+    focusTarget.focus({ preventScroll: true })
+    return true
+  }
+
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
     const viewKey = views[Number(event.key) - 1]
@@ -500,6 +524,7 @@ export const BacklogPanel = (props: {
       <BacklogPeek.Panel
         key={openId}
         id={openId}
+        triageOff={triageOff}
         threads={threads}
         summary={openSummary}
         expanded={expanded}
@@ -523,6 +548,7 @@ export const BacklogPanel = (props: {
 
   return (
     <main
+      ref={panelRoot}
       tabIndex={-1}
       onKeyDown={onKeyDown}
       className="dshx-root dshx:@container dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground dshx:outline-none"
@@ -658,6 +684,7 @@ export const BacklogPanel = (props: {
                 toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
                 clearStatuses={() => setPreference({ statuses: [] })}
                 query={debounced}
+                triageOff={triageOff}
                 openId={openId}
                 cursorId={cursorId}
                 select={select}
@@ -671,7 +698,9 @@ export const BacklogPanel = (props: {
           </>
         ) : view === 'inbox' ? (
           <InboxView
+            triageOff={triageOff}
             items={inboxItems}
+            cursorId={cursorId}
             threads={inboxThreads}
             openId={openId}
             select={select}
@@ -690,6 +719,8 @@ export const BacklogPanel = (props: {
             <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
               {view === 'feed' && (
                 <FeedView
+                  cursorId={cursorId}
+                  triageOff={triageOff}
                   items={filteredItems}
                   sort={stored.sort.feed}
                   counts={statusTotals}
@@ -717,6 +748,7 @@ export const BacklogPanel = (props: {
                   select={select}
                   hover={setCursorId}
                   groupBy={stored.groupBy}
+                  triageOff={triageOff}
                   setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
                   collapsed={collapsed}
                   setCollapsed={next => withViewTransition(() => setCollapsed(next))}
@@ -726,10 +758,20 @@ export const BacklogPanel = (props: {
                 />
               )}
               {view === 'board' && (
-                <BoardView items={items} openId={openId} open={select} captureInto={startCapture} projectPaths={projectPaths} startThread={openStartThread} />
+                <BoardView
+                  triageOff={triageOff}
+                  items={items}
+                  openId={openId}
+                  cursorId={cursorId}
+                  open={select}
+                  captureInto={startCapture}
+                  projectPaths={projectPaths}
+                  startThread={openStartThread}
+                />
               )}
               {view === 'projects' && (
                 <ProjectsView
+                  triageOff={triageOff}
                   selectedProject={selectedProject}
                   setSelectedProject={setSelectedProject}
                   select={select}
@@ -796,6 +838,7 @@ export const BacklogPanel = (props: {
             status={captureStatus}
             onClearStatus={() => setCaptureStatus(null)}
             inputRef={captureComposer}
+            onNavigateUp={navigateToNearestItem}
           />
         </div>
       </div>

@@ -85,7 +85,7 @@ const menuItemTextPosition = async (item: Locator, label: string): Promise<numbe
   }, label)
 
 const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
-  const labels = ['Start thread…', 'Status', 'Kind', 'Project', 'Pin item', 'Run triage']
+  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Status', 'Kind', 'Project', 'Pin item']
   if (includeOpenItem) labels.push('Open item')
   const attention = menu.getByRole('menuitem', { name: 'Attention', exact: true })
   if ((await attention.locator('span[title]').count()) === 0) labels.push('Attention')
@@ -106,7 +106,9 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
   await expect(menu.getByRole('menuitem', { name: 'Attention', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Project', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: /^(Unpin item|Pin item)$/ })).toBeVisible()
-  await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Copy item ID', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Copy item link', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toHaveCount(0)
   if (includeOpenItem) await expect(menu.getByRole('menuitem', { name: 'Open item', exact: true })).toBeVisible()
   await expectContextMenuLabelsAligned(menu, includeOpenItem)
   await menu.getByRole('menuitem', { name: 'Project', exact: true }).hover()
@@ -360,9 +362,41 @@ Then('backlog item b:{int} exposes all context actions in the {string} view', as
     await target.click({ button: 'right' })
     await expect(contextMenu(page)).toBeVisible()
     await expectItemActions(page, view !== 'details')
+    if (view === 'feed') await expect(target.getByRole('button', { name: 'Run triage', exact: true })).toHaveCount(0)
     await page.keyboard.press('Escape')
   })
-  if (view === 'details') await finishJourneyAssertions(page)
+  if (view === 'details') {
+    await expect(peek(page).getByRole('button', { name: 'Run triage', exact: true })).toHaveCount(0)
+    await finishJourneyAssertions(page)
+  }
+})
+
+When('ArrowUp is pressed from the empty backlog composer', async ({ page }: { page: Page }) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  await capture.fill('')
+  await capture.press('ArrowUp')
+})
+
+Then('backlog item b:{int} receives composer keyboard focus', async ({ page }: { page: Page }, id: number) => {
+  await expect(feed(page).getByRole('article', { name: `Item b:${String(id)}`, exact: true })).toBeFocused()
+})
+
+When('backlog item b:{int} copies its ID and link from the context menu', async ({ page }: { page: Page }, id: number) => {
+  const origin = new URL(page.url()).origin
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+  const target = await contextTarget(page, id, 'feed')
+
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Copy item ID', exact: true }).click()
+  await recordAssertion(page, 'backlog-copy-item-id', async () => {
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(String(id))
+  })
+
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Copy item link', exact: true }).click()
+  await recordAssertion(page, 'backlog-copy-item-link', async () => {
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`b:${String(id)}`)
+  })
 })
 
 When('backlog item b:{int} is moved to {string} from its feed context menu', async ({ page }: { page: Page }, id: number, status: string) => {
@@ -419,6 +453,7 @@ Then('the board card for b:{int} names the project it is filed under', async ({ 
     await expect(card).toContainText(projectName)
 
     await page.getByRole('button', { name: 'Projects', exact: true }).click()
+    await page.getByRole('button', { name: 'All projects', exact: true }).click()
     const projectCard = page.getByRole('button').filter({ has: page.getByText(projectName, { exact: true }) })
     await expect(projectCard).toHaveCount(1)
     await expect(projectCard).not.toContainText('/')

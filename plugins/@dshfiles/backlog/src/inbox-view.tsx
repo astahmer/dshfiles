@@ -65,6 +65,7 @@ export const InboxView = (props: {
   readonly sort: BacklogSort
   readonly threads: readonly InboxThread[]
   readonly openId: number | null
+  readonly cursorId: number | null
   readonly select: (id: number) => void
   readonly openThread: (sessionId: string) => void
   readonly acknowledgeThread: (thread: InboxThread) => void
@@ -72,6 +73,7 @@ export const InboxView = (props: {
   readonly loaded: boolean
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [filter, setFilter] = useState<InboxFilter>('all')
@@ -121,7 +123,7 @@ export const InboxView = (props: {
                 aria-label={`Thread ${thread.title}`}
                 onClick={() => (first === undefined ? undefined : props.select(first.id))}
                 className={cn(
-                  'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors',
+                  'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
                   thread.items.some(item => item.id === props.openId) ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
                 )}
               >
@@ -182,16 +184,18 @@ export const InboxView = (props: {
               projectPaths={props.projectPaths}
               update={input => actions.update.mutate(input)}
               triage={id => actions.triage.mutate(id)}
+              triageOff={props.triageOff}
               startThread={props.startThread}
               openItem={props.select}
             >
               <li
+                tabIndex={-1}
                 aria-label={`Item b:${String(item.id)}`}
                 aria-current={item.id === props.openId ? 'true' : undefined}
                 onClick={() => props.select(item.id)}
                 className={cn(
-                  'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors',
-                  item.id === props.openId ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
+                  'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+                  item.id === props.openId ? 'dshx:bg-accent/70' : item.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
                 )}
               >
                 {isUnread(item) ? (

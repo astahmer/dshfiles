@@ -50,9 +50,11 @@ const Chip = (props: { readonly children: ReactNode; readonly className?: string
 const FeedEntry = (props: {
   readonly item: BacklogSummaryView
   readonly open: boolean
+  readonly cursor: boolean
   readonly select: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -66,18 +68,20 @@ const FeedEntry = (props: {
       projectPaths={props.projectPaths}
       update={input => actions.update.mutate(input)}
       triage={id => actions.triage.mutate(id)}
+      triageOff={props.triageOff}
       startThread={props.startThread}
       openItem={props.select}
     >
       <article
+        tabIndex={-1}
         aria-label={`Item b:${String(item.id)}`}
         onClick={() => {
           if (!rename.renaming) rename.openSoon()
         }}
         onDoubleClick={rename.renameOnDoubleClick}
         className={cn(
-          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100',
-          props.open ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
+          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+          props.open ? 'dshx:bg-accent/70' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
         )}
       >
         <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-[11px] dshx:ring-0" />
@@ -174,14 +178,16 @@ const FeedEntry = (props: {
           >
             <PinIcon className={cn('dshx:size-3.5', item.pinned && 'dshx:fill-current')} />
           </button>
-          <button
-            type="button"
-            aria-label="Run triage"
-            onClick={() => actions.triage.mutate(item.id)}
-            className="dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
-          >
-            <WandSparklesIcon className="dshx:size-3.5" />
-          </button>
+          {props.triageOff ? null : (
+            <button
+              type="button"
+              aria-label="Run triage"
+              onClick={() => actions.triage.mutate(item.id)}
+              className="dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
+            >
+              <WandSparklesIcon className="dshx:size-3.5" />
+            </button>
+          )}
         </div>
       </article>
     </BacklogItemMenu>
@@ -206,11 +212,13 @@ export const FeedView = (props: {
   readonly toggleStatus: (status: BacklogStatus) => void
   readonly clearStatuses: () => void
   readonly openId: number | null
+  readonly cursorId: number | null
   readonly select: (id: number) => void
   readonly loaded: boolean
   readonly now: number
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const now = props.now
   const menuActions = useBacklogActions()
@@ -265,7 +273,15 @@ export const FeedView = (props: {
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
           </div>
         ) : null}
-        <FeedEntry item={item} open={item.id === props.openId} select={props.select} startThread={props.startThread} projectPaths={props.projectPaths} />
+        <FeedEntry
+          item={item}
+          open={item.id === props.openId}
+          cursor={item.id === props.cursorId}
+          select={props.select}
+          startThread={props.startThread}
+          projectPaths={props.projectPaths}
+          triageOff={props.triageOff}
+        />
       </div>
     )
   }
@@ -283,6 +299,7 @@ export const FeedView = (props: {
               projectPaths={props.projectPaths}
               update={input => menuActions.update.mutate(input)}
               triage={id => menuActions.triage.mutate(id)}
+              triageOff={props.triageOff}
               startThread={props.startThread}
               openItem={props.select}
             >

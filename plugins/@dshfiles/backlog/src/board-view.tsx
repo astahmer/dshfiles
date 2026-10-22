@@ -111,12 +111,14 @@ const cardClass =
 const BoardCard = (props: {
   readonly item: BacklogSummaryView
   readonly openId: number | null
+  readonly cursor: boolean
   readonly open: (id: number) => void
   readonly startDrag: (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void) => void
   readonly pickStatus: (id: number, status: BacklogStatus) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
   readonly dragging: boolean
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -127,18 +129,24 @@ const BoardCard = (props: {
       projectPaths={props.projectPaths}
       update={input => actions.update.mutate(input)}
       triage={id => actions.triage.mutate(id)}
+      triageOff={props.triageOff}
       startThread={props.startThread}
       openItem={props.open}
     >
       <article
+        tabIndex={-1}
         aria-label={`Card b:${String(item.id)}`}
         onPointerDown={event => props.startDrag(event, item, rename.openSoon)}
         onDoubleClick={rename.renameOnDoubleClick}
         style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
         className={cn(
           cardClass,
-          'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm',
-          item.id === props.openId ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25' : 'dshx:border-border',
+          'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+          item.id === props.openId
+            ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25'
+            : props.cursor
+              ? 'dshx:border-info/50 dshx:ring-1 dshx:ring-info/15'
+              : 'dshx:border-border',
           props.dragging && 'dshx:opacity-30',
         )}
       >
@@ -155,10 +163,12 @@ const BoardCard = (props: {
 export const BoardView = (props: {
   readonly items: readonly BacklogSummaryView[]
   readonly openId: number | null
+  readonly cursorId: number | null
   readonly open: (id: number) => void
   readonly captureInto: (status: BacklogStatus) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -253,12 +263,14 @@ export const BoardView = (props: {
                   key={item.id}
                   item={item}
                   openId={props.openId}
+                  cursor={item.id === props.cursorId}
                   open={props.open}
                   startDrag={startDrag}
                   pickStatus={move}
                   startThread={props.startThread}
                   projectPaths={props.projectPaths}
                   dragging={drag?.id === item.id}
+                  triageOff={props.triageOff}
                 />
               ))}
             </div>

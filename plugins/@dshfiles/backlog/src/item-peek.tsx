@@ -757,6 +757,7 @@ const PeekBody = (props: {
   readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.detail.item
@@ -810,17 +811,19 @@ const PeekBody = (props: {
           >
             <MessagesSquareIcon />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Run triage"
-            title="Run triage"
-            disabled={actions.triage.isPending}
-            onClick={() => actions.triage.mutate(item.id)}
-            className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
-          >
-            <WandSparklesIcon />
-          </Button>
+          {props.triageOff ? null : (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Run triage"
+              title="Run triage"
+              disabled={actions.triage.isPending}
+              onClick={() => actions.triage.mutate(item.id)}
+              className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
+            >
+              <WandSparklesIcon />
+            </Button>
+          )}
           <SnoozeMenu id={item.id} snoozedUntil={item.snoozedUntil ?? null} />
           <Button
             variant="ghost"
@@ -847,9 +850,14 @@ const PeekBody = (props: {
             projectPaths={props.projectPaths}
             update={input => actions.update.mutate(input)}
             triage={id => actions.triage.mutate(id)}
+            triageOff={props.triageOff}
             startThread={props.startThread}
           >
-            <div className="dshx:flex dshx:flex-col dshx:gap-3">
+            <div
+              tabIndex={-1}
+              aria-label={`Item b:${String(item.id)}`}
+              className="dshx:flex dshx:flex-col dshx:gap-3 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
+            >
               <TitleField id={item.id} title={item.title} />
               <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
                 <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
@@ -955,6 +963,7 @@ const PeekBody = (props: {
                       projectPaths={props.projectPaths}
                       update={input => actions.update.mutate(input)}
                       triage={id => actions.triage.mutate(id)}
+                      triageOff={props.triageOff}
                       startThread={props.startThread}
                       openItem={props.select}
                     >
@@ -1018,6 +1027,7 @@ const ItemPeek = (props: {
   readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
   readonly projectPaths: readonly string[]
+  readonly triageOff: boolean
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const summary = props.summary
@@ -1058,6 +1068,7 @@ const ItemPeek = (props: {
           smartReplyAnswers={props.smartReplyAnswers}
           threadStartNotifications={props.threadStartNotifications}
           projectPaths={props.projectPaths}
+          triageOff={props.triageOff}
         />
       ) : (
         <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">b:{props.id} does not exist.</p>
