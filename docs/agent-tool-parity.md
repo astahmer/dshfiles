@@ -586,8 +586,9 @@ Owned plugins: `dshx_comm_*` (11), agent-questions' question and feedback tools
 `ai_accounts`, `ai_accounts_quota`, `memory_search|read|note`,
 `secret_list|get`, `usage_requests|report` (not installed), `queue_move` (not
 installed), optmem's four tools (not installed), `extend_goal_budget`,
-`complete_blocked_goal`, `dshx_capabilities`, `agent-toolkit.versions`, and the
-16 thread/project tools added here.
+`complete_blocked_goal`, `dshx_capabilities`, `agent-toolkit.versions`,
+`apply_patch` (atomic, read-first editing that does not need a native `read`
+receipt), and the 16 thread/project tools added here.
 
 ## Pick the tool before inspecting
 

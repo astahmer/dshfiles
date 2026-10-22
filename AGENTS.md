@@ -338,6 +338,13 @@ the revisions above `main` in one process. Prefer it over four or five separate
 invocations, p50 1s each. Add `--read-only` (implies `--ignore-working-copy`)
 before inspecting another workspace, and `--repo <path>` to target one.
 
+## Editing after inspection
+
+`edit` refuses a file the native `read` never read; bash `cat`/`rg`, `grep` and
+`ast-outline` do not register that receipt. After inspecting that way, use
+`apply_patch` (atomic write, reads first, whitespace-tolerant anchors) or read
+the file first.
+
 ## Waiting
 
 Never `sleep` and never loop a discovery tool to pass time; both hold the turn

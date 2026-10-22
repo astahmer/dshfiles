@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-apply-patch
+      name: '@dshfiles/apply-patch'
