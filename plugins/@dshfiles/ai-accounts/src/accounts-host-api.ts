@@ -187,8 +187,20 @@ export const accountsHostApi = aiAccountsApi.host({
     instanceId: input.instanceId,
     points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000, input.bucketMinutes))],
   }),
+  fastModeHistory: async ({ input, ctx }) => ({
+    instanceId: input.instanceId,
+    ...((await accountRuntime(ctx)?.fastModeUsageHistory?.read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000)) ?? { points: [] }),
+  }),
   historySettings: async ({ ctx }) => createUsageHistoryService(ctx).readSettings(),
-  saveHistorySettings: async ({ input, ctx }) => createUsageHistoryService(ctx).saveSettings(input),
+  saveHistorySettings: async ({ input, ctx }) => {
+    const settings = await createUsageHistoryService(ctx).saveSettings(input)
+    try {
+      await accountRuntime(ctx)?.fastModeUsageHistory?.prune(settings.retentionDays)
+    } catch (error) {
+      ctx.logger.warn('ai-accounts: Fast mode usage retention pruning failed (%s)', error instanceof Error ? error.name : 'unknown error')
+    }
+    return settings
+  },
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
   pricingStatus: async ({ ctx }) => pricingFor(ctx).status(),
   refreshPricing: async ({ ctx }) => pricingFor(ctx).refresh(),

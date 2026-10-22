@@ -4,6 +4,7 @@ import { normalizeContext } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { describe, expect, it } from 'vitest'
 import { FastModeService, isCodexFastModeModel, withCodexFastMode } from './codex-fast-mode.js'
+import type { FastModeUsageObservation } from './fast-mode-usage-model.js'
 
 const providerId = 'codex-primary'
 const sessionId = 'session-fast-mode'
@@ -126,5 +127,71 @@ describe('Codex Fast mode', () => {
     const defaultTier = await runRequest({ enabled: false })
     expect(defaultTier.body).not.toHaveProperty('service_tier')
     expect(defaultTier.payloadCallbackCalls).toBe(1)
+  })
+
+  it('records only provider-reported tier and token usage for Fast-mode responses', async () => {
+    const upstream = openaiCodexProvider()
+    const catalogModel = upstream.getModels().find(model => model.id === modelId)
+    if (catalogModel === undefined) throw new Error(`The installed Codex catalog does not include ${modelId}.`)
+    const model = { ...catalogModel, provider: providerId }
+    const recorded: FastModeUsageObservation[] = []
+    const fastMode = new FastModeService({
+      isAvailable: route => route.provider === providerId && isCodexFastModeModel(model),
+      isLiveSession: session => session === sessionId,
+      recordUsage: async observation => {
+        recorded.push(observation)
+      },
+    })
+    fastMode.set({ sessionId, provider: providerId, model: modelId, enabled: true })
+    const provider = withCodexFastMode({ upstream, fastMode })
+    const event = {
+      type: 'response.completed',
+      response: {
+        id: 'resp_fast_mode_test',
+        object: 'response',
+        created_at: 1_700_000_000,
+        status: 'completed',
+        model: modelId,
+        service_tier: 'priority',
+        usage: { input_tokens: 19, output_tokens: 7, total_tokens: 26, input_tokens_details: { cached_tokens: 5 } },
+        output: [
+          {
+            id: 'msg_fast_mode_test',
+            type: 'message',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'output_text', text: 'ok', annotations: [] }],
+          },
+        ],
+      },
+    }
+    const fetch: typeof globalThis.fetch = async () => new Response(`data: ${JSON.stringify(event)}\n\n`, { headers: { 'content-type': 'text/event-stream' } })
+    const stream: AsyncIterable<StreamChunk> = {
+      [Symbol.asyncIterator]: async function* () {
+        for await (const chunk of provider.streamSimple(model, normalizeContext({ messages: [{ role: 'user', content: 'hello', timestamp: 0 }] }), {
+          apiKey: `header.${btoa(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'fast-mode-test-account' } }))}.signature`,
+          fetch,
+          transport: 'sse',
+        })) {
+          if (chunk.type === 'error') throw new Error(chunk.error.errorMessage ?? 'Codex stream failed.')
+        }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      },
+    }
+
+    for await (const _chunk of fastMode.withRequest({ sessionId, selectedProvider: providerId, wireProvider: providerId, model: modelId }, stream)) {
+    }
+
+    expect(recorded).toEqual([
+      {
+        instanceId: providerId,
+        model: modelId,
+        serviceTier: 'priority',
+        responseStatus: 'completed',
+        inputTokens: 19,
+        outputTokens: 7,
+        cacheReadTokens: 5,
+      },
+    ])
   })
 })

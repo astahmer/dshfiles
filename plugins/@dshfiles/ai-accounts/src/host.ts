@@ -17,6 +17,7 @@ import { readCommandCodeKey } from './commandcode-usage.js'
 import { AccountSettingsModel, aiAccountsHostSettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { FastModeService, isCodexFastModeModel, withCodexFastMode } from './codex-fast-mode.js'
+import { createFastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import { modelFastModeHostApi } from './model-fast-mode-host.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
@@ -99,6 +100,10 @@ export default definePlugin({
     const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
     const usageHistory = createUsageHistoryService(ctx)
+    const fastModeUsageHistory = createFastModeUsageHistoryService(ctx, {
+      readRetentionDays: async () => (await usageHistory.readSettings()).retentionDays,
+    })
+    runtime.fastModeUsageHistory = fastModeUsageHistory
     runtime.scheduler = usageHistory.createScheduler(
       async () => {
         const file = await AccountsHostApiModel.accountsFile(ctx)
@@ -110,7 +115,9 @@ export default definePlugin({
     // short enough that a manual reload still feels live.
     ctx.effect(() => () => {
       runtime.scheduler?.dispose()
+      if (runtime.fastModeUsageHistory === fastModeUsageHistory) delete runtime.fastModeUsageHistory
       void usageHistory.close().catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
+      void fastModeUsageHistory.close().catch(() => ctx.logger.warn('ai-accounts: Fast mode usage storage could not close cleanly'))
     })
     runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => AccountsHostApiModel.readAccountsUsage(ctx) })
     ctx.on('credentials/reference-updated', ref => {
@@ -170,6 +177,8 @@ export default definePlugin({
         return model !== undefined && isCodexFastModeModel(model)
       },
       isLiveSession: sessionId => ctx.agents.get(SessionId(sessionId)) !== undefined,
+      recordUsage: fastModeUsageHistory.record,
+      onUsageError: error => ctx.logger.warn('ai-accounts: Fast mode usage could not be persisted (%s)', error instanceof Error ? error.name : 'unknown error'),
     })
     runtime.fastMode = fastMode
     const registerFastModeCleanup = (agent: Agent): void => {

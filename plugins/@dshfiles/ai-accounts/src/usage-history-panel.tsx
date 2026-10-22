@@ -294,14 +294,15 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
                 />
                 <LabelledSelect
                   disabled={saveSettings.isPending || settings === null}
-                  label="Keep quota snapshots"
+                  label="Keep usage history"
                   onChange={value => changeSettings({ retentionDays: Number(value) })}
                   options={RETENTION_OPTIONS.map(value => ({ value: String(value), label: `${String(value)} days` }))}
                   value={String(settings?.retentionDays ?? 90)}
                 />
               </div>
               <p className="dshx:text-xs dshx:text-muted-foreground">
-                Snapshots contain quota percentages, reset times, and reset-bank expiry metadata. They do not store provider credentials or response bodies.
+                Quota snapshots contain percentages, reset times, and reset-bank expiry metadata. Fast-mode history stores provider-reported tiers and token
+                counts only; no credentials, prompts, or response text are stored.
               </p>
               <p className="dshx:text-xs dshx:text-muted-foreground">
                 Last successful read: {formatTimestamp(settings?.lastReadAt)} · Last attempt: {formatTimestamp(settings?.lastAttemptAt)}

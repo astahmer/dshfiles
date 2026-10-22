@@ -3,9 +3,24 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Model, SimpleStreamOptions } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { z } from 'zod'
+import type { FastModeUsageObservation } from './fast-mode-usage-history.js'
 import type { FastModeStatus } from './model-fast-mode-api.js'
 
 const fastModeRequestBodySchema = z.record(z.string(), z.json().optional())
+const codexResponseEventSchema = z.object({
+  type: z.enum(['response.completed', 'response.incomplete']),
+  response: z.object({
+    status: z.string().max(64).optional(),
+    service_tier: z.string().min(1).max(32).nullable().optional(),
+    usage: z
+      .object({
+        input_tokens: z.number().int().min(0).optional().catch(0),
+        output_tokens: z.number().int().min(0).optional().catch(0),
+        input_tokens_details: z.object({ cached_tokens: z.number().int().min(0).catch(0) }).optional(),
+      })
+      .optional(),
+  }),
+})
 
 const CODEX_FAST_MODE_MODEL_IDS = new Set(['gpt-6-astra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.5'])
 
@@ -21,6 +36,7 @@ interface FastModeRoute {
 }
 
 interface FastModeRequest {
+  sessionId: string
   provider: string
   model: string
 }
@@ -35,6 +51,8 @@ interface FastModeCall {
 interface FastModeDependencies {
   isAvailable: (route: Omit<FastModeRoute, 'sessionId'>) => boolean
   isLiveSession: (sessionId: string) => boolean
+  recordUsage?: (observation: FastModeUsageObservation) => Promise<void>
+  onUsageError?: (error: unknown) => void
 }
 
 export class FastModeService {
@@ -91,7 +109,7 @@ export class FastModeService {
       return stream
     }
 
-    return this.withRequestContext({ provider: call.wireProvider, model: call.model }, stream)
+    return this.withRequestContext({ sessionId: call.sessionId, provider: call.wireProvider, model: call.model }, stream)
   }
 
   decorateOptions(options: SimpleStreamOptions | undefined, model: Model<'openai-codex-responses'>): SimpleStreamOptions | undefined {
@@ -113,6 +131,25 @@ export class FastModeService {
         const body = fastModeRequestBodySchema.safeParse(transformed)
         if (!body.success) throw new Error('ai-accounts: Fast mode request payload must be a JSON object.')
         return { ...body.data, service_tier: 'fast' }
+      },
+      onProviderStreamEvent: async (event, eventModel) => {
+        await options?.onProviderStreamEvent?.(event, eventModel)
+        const parsed = codexResponseEventSchema.safeParse(event)
+        if (!parsed.success) return
+        const response = parsed.data.response
+        try {
+          await this.dependencies.recordUsage?.({
+            instanceId: request.provider,
+            model: request.model,
+            serviceTier: response.service_tier ?? null,
+            responseStatus: parsed.data.type === 'response.incomplete' || response.status === 'incomplete' ? 'incomplete' : 'completed',
+            inputTokens: response.usage?.input_tokens ?? 0,
+            outputTokens: response.usage?.output_tokens ?? 0,
+            cacheReadTokens: response.usage?.input_tokens_details?.cached_tokens ?? 0,
+          })
+        } catch (error) {
+          this.dependencies.onUsageError?.(error)
+        }
       },
     }
   }

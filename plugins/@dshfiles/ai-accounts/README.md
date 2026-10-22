@@ -263,3 +263,12 @@ The **Usage history** panel shows current limits, quota history split at
 reset boundaries, banked-reset changes, and a linear depletion estimate based
 on the observed pace. It does not import local token logs from Codex CLI or
 OpenCode.
+
+For requests where Fast mode is enabled, AI Accounts records the terminal
+Codex Responses event's reported service tier, response status, model, and token
+counts. These bounded records use the same retention setting in the separate
+`ai_accounts_fastmode` storage domain. Prompts, response text, credential data,
+and Session IDs are not stored. The read-only `ai_accounts_fast_mode_history`
+tool returns time-bucketed totals for provider-confirmed Fast, default, other,
+and unreported tiers. It is a usage signal, not an invoice estimate; calls that
+fail before a terminal response event are not counted.

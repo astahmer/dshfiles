@@ -2,6 +2,7 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { routeQuoteSchema } from './cost-estimate.js'
 import { quotaContinuationSummarySchema } from './quota-continuation-model.js'
+import { fastModeUsageHistorySchema } from './fast-mode-usage-model.js'
 import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
 
 /**
@@ -11,8 +12,8 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
  * the view. The page and the agent's `ai_accounts` tool read the same file
  * through the same Host method, so they can never disagree.
  *
- * No token and no `auth.json` content ever crosses: an account reports whether
- * it holds a login, the identity it presents, and the command that creates one.
+ * No credential token or `auth.json` content ever crosses: an account reports
+ * whether it holds a login, the identity it presents, and the command that creates one.
  */
 
 export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
@@ -463,6 +464,29 @@ export const aiAccountsApi = defineApi({
           output.points.length === 0
             ? `No stored quota readings for ${output.instanceId} in that window.`
             : `${String(output.points.length)} reading(s) for ${output.instanceId}: ${compactJson(output.points)}`,
+      },
+    }),
+    fastModeHistory: method({
+      input: z.object({ instanceId: z.string().min(1).max(64), days: z.number().int().min(1).max(365).default(30) }),
+      output: fastModeUsageHistorySchema.extend({ instanceId: z.string().min(1).max(64) }),
+      description: 'Provider-reported service tiers and token counts for completed Fast-mode requests; excludes prompts and response text. Read-only.',
+      tool: {
+        name: 'ai_accounts_fast_mode_history',
+        readOnly: true,
+        render: output => {
+          const totals = output.points.reduce(
+            (result, point) => ({
+              confirmedFast: result.confirmedFast + point.confirmedFast,
+              returnedDefault: result.returnedDefault + point.returnedDefault,
+              otherTier: result.otherTier + point.otherTier,
+              unreportedTier: result.unreportedTier + point.unreportedTier,
+              inputTokens: result.inputTokens + point.inputTokens,
+              outputTokens: result.outputTokens + point.outputTokens,
+            }),
+            { confirmedFast: 0, returnedDefault: 0, otherTier: 0, unreportedTier: 0, inputTokens: 0, outputTokens: 0 },
+          )
+          return `Fast mode for ${output.instanceId}: ${String(totals.confirmedFast)} provider-confirmed Fast, ${String(totals.returnedDefault)} default, ${String(totals.otherTier)} other-tier, ${String(totals.unreportedTier)} unreported responses; ${String(totals.inputTokens)} input and ${String(totals.outputTokens)} output tokens across ${String(output.points.length)} time buckets.`
+        },
       },
     }),
     /** Schedule and retention are persisted with the history domain. */

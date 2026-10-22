@@ -51,7 +51,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | goal-stall-guard                                                                                                                                  | 4                    | 3                                                                                                        | 1             | 0         |
 | agent-toolkit                                                                                                                                     | 9                    | 1                                                                                                        | 6             | 3         |
 | tool-meta                                                                                                                                         | 3                    | 0                                                                                                        | 2             | 1         |
-| ai-accounts                                                                                                                                       | 21                   | 18                                                                                                       | 7             | 1         |
+| ai-accounts                                                                                                                                       | 22                   | 19                                                                                                       | 7             | 1         |
 | model-effort-picker                                                                                                                               | 3                    | 0                                                                                                        | 1             | 0         |
 | usage                                                                                                                                             | 5                    | 2 (not installed)                                                                                        | 2             | 1         |
 | background-jobs                                                                                                                                   | 4                    | 4                                                                                                        | 0             | 0         |
@@ -314,7 +314,7 @@ clear action.
 
 Bound now (sibling revision `feat(ai-accounts): expose account and quota control
 as agent tools`): read-only `ai_accounts_identity`, `ai_accounts_catalog`,
-`ai_accounts_history`, `ai_accounts_continuations`,
+`ai_accounts_history`, `ai_accounts_fast_mode_history`, `ai_accounts_continuations`,
 `ai_accounts_pricing_status`, `ai_accounts_native_providers` (plus the existing
 `ai_accounts` and `ai_accounts_quota`), and the writes
 `ai_accounts_refresh_quota`, `ai_accounts_collect_usage`,
@@ -327,7 +327,9 @@ The Fast mode API (`ai-accounts-model-fast-mode`, imported by the composer model
 picker) binds read-only `ai_accounts_fast_mode_status` and the user-requested
 write `ai_accounts_set_fast_mode`. It is session-scoped, Agent callers are
 restricted to their own Session, and only explicitly supported AI Accounts
-Codex routes/models are accepted.
+Codex routes/models are accepted. `ai_accounts_fast_mode_history` exposes bounded,
+provider-reported tiers and token counts from completed/incomplete Fast-mode
+responses; it stores no prompts or response text and is not an invoice estimate.
 
 The model fallback chain (`ai-accounts-model-fallback` API, imported by the
 composer picker through the `model-fallback-api` module) binds every verb the
