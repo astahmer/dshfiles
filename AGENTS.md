@@ -345,6 +345,18 @@ before inspecting another workspace, and `--repo <path>` to target one.
 `apply_patch` (atomic write, reads first, whitespace-tolerant anchors) or read
 the file first.
 
+## Delegation and recovery
+
+- For substantial work, consider whether independent, bounded parts would benefit
+  from subagents. Delegate when it improves coverage or speed; do not optimize for
+  agent count. Integrate and verify their results.
+- After a DSH restart or failed model request, inspect the persisted transcript and
+  current workspace before resuming. Check which subagents and jobs completed, remain
+  active, or failed, and what work they left behind. Continue surviving work;
+  re-dispatch only unfinished work that was actually stopped or lost, with
+  non-overlapping scope. Do not repeat a task just because the parent turn was
+  interrupted.
+
 ## Waiting
 
 Never `sleep` and never loop a discovery tool to pass time; both hold the turn
