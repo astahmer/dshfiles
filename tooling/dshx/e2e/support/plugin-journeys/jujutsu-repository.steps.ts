@@ -15,6 +15,8 @@ interface Repository {
 
 const repositories = new WeakMap<Page, Repository>()
 const UNICODE_PATH = 'dir with space/ünïcode file.txt'
+const SHORT_REFERENCE_TITLE = 'Jujutsu reference chips size to title'
+const LONG_REFERENCE_TITLE = 'Jujutsu reference chips size to their own title length'
 
 const jj = (
   repository: Repository,
@@ -76,6 +78,14 @@ When('a disposable Jujutsu repository with two authors is opened in the Jujutsu 
   await page.reload()
   await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
   await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible({ timeout: 30_000 })
+})
+
+When('two Jujutsu bookmarks have long titles', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  jj(repository, ['new', 'main', '-m', SHORT_REFERENCE_TITLE])
+  jj(repository, ['bookmark', 'create', 'short-ref'])
+  jj(repository, ['new', 'main', '-m', LONG_REFERENCE_TITLE])
+  jj(repository, ['bookmark', 'create', 'long-ref'])
 })
 
 When('a revision {string} is committed outside DSH', async ({ page }: { page: Page }, description: string) => {
@@ -301,6 +311,20 @@ When('the repository is registered and its thread answers {string}', async ({ pa
   await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
   await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
   await sendMessage(page, prompt)
+})
+
+Then('the two long-title JJ references use content-driven widths', async ({ page }: { page: Page }) => {
+  const shortReference = page.getByRole('link', { name: `Jujutsu bookmark: ${SHORT_REFERENCE_TITLE} (short-ref)`, exact: true })
+  const longReference = page.getByRole('link', { name: `Jujutsu bookmark: ${LONG_REFERENCE_TITLE} (long-ref)`, exact: true })
+  await recordAssertion(page, 'jujutsu-chat-reference-width-follows-title-length', async () => {
+    expect(SHORT_REFERENCE_TITLE.length).toBeGreaterThan(32)
+    expect(LONG_REFERENCE_TITLE.length).toBeGreaterThan(32)
+    await expect(shortReference).toHaveAttribute('title', SHORT_REFERENCE_TITLE)
+    await expect(longReference).toHaveAttribute('title', LONG_REFERENCE_TITLE)
+    const shortWidth = await shortReference.evaluate(element => element.getBoundingClientRect().width)
+    const longWidth = await longReference.evaluate(element => element.getBoundingClientRect().width)
+    expect(longWidth).toBeGreaterThan(shortWidth + 24)
+  })
 })
 
 Then('hovering the reference previews the revision graph around it', async ({ page }: { page: Page }) => {

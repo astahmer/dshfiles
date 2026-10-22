@@ -89,9 +89,11 @@ Feature: Jujutsu revision interactions
   Scenario: An explicit reference in an answer opens its revision
     Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And two Jujutsu bookmarks have long titles
     And a Command Code account backed by a local fake provider is added
-    And the repository is registered and its thread answers "[[answer Trunk is `jj:main` here]]"
-    Then hovering the reference previews the revision graph around it
+    And the repository is registered and its thread answers "[[answer Trunk is `jj:main` here; `jj:short-ref`; `jj:long-ref`]]"
+    Then the two long-title JJ references use content-driven widths
+    And hovering the reference previews the revision graph around it
     And clicking the reference opens the panel focused on that revision
     And the Agent prompt tells it to write Jujutsu references with the jj: prefix
 

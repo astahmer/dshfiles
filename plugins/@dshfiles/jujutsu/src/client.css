@@ -16,7 +16,7 @@ code[data-dshfiles-jj-reference-owner] {
   font: inherit;
   font-weight: 500;
   margin: 0 2px;
-  max-width: min(32ch, 100%);
+  max-width: 100%;
   width: auto;
   overflow-wrap: anywhere;
   text-align: inherit;
@@ -25,7 +25,7 @@ code[data-dshfiles-jj-reference-owner] {
 
 [data-dshfiles-jj-reference-label] {
   display: inline-block;
-  max-width: min(32ch, 100%);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: bottom;
