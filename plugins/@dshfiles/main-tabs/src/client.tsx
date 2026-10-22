@@ -395,6 +395,9 @@ export default defineClient({
           }
 
           const sendStripEvent = (event: TabsEvent): void => {
+            // Opening the Start page is a view choice of its own: a New thread still being created must not replace it
+            // when the Host answers, so that pending navigation is cancelled here rather than landing over the page.
+            if (event.type === 'tab.new') ctx.layout.beginNavigation()
             actor.send(event)
             if (event.type !== 'tab.select' || !focusThreadInSidebar) return
             const selected = set?.tabs.find(tab => tab.id === event.tabId)
@@ -501,7 +504,13 @@ export default defineClient({
                 const activeTabId = snapshot.context.sets[snapshot.context.scopeKey]?.activeTabId
                 if (activeTabId === undefined || activeTabId === null) return { status: 'pass' }
               }
-              return { status: 'handled', run: () => actor.send(command.event) }
+              return {
+                status: 'handled',
+                run: () => {
+                  if (command.event.type === 'tab.new') ctx.layout.beginNavigation()
+                  actor.send(command.event)
+                },
+              }
             },
           })
         try {
