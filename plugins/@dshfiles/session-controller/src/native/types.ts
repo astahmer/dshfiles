@@ -348,6 +348,16 @@ export interface SessionForkValue {
   readonly sessionId: SessionId
 }
 
+/**
+ * dshfiles: where a Host-only fork continues the conversation. Not part of the Remote surface: a thread that
+ * continues in another project gets that project's directory as its own header cwd and is accounted to it.
+ */
+export interface SessionForkDestination {
+  readonly workspaceId: WorkspaceId
+  /** Cut after the source's newest event, closing its running turn, instead of at the latest completed turn. */
+  readonly includeOpenTurn: boolean
+}
+
 /** Session prompt request. */
 export interface SessionPromptRequest {
   /** Client-minted identity persisted on the exact accepted user message. */

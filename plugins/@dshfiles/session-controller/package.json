@@ -22,6 +22,10 @@
       "types": "./src/interruption-api.ts",
       "default": "./dist/interruption-api.js"
     },
+    "./continuation-api": {
+      "types": "./src/continuation-api.ts",
+      "default": "./dist/continuation-api.js"
+    },
     "./typert": "./typert/host.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"

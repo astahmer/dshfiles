@@ -23,7 +23,8 @@ import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-ses
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
-import type { Workspace } from '@deepseek-ai/dsh-workspace'
+import type {} from '@deepseek-ai/dsh-working-directory'
+import type { Workspace, WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import {
   ApiSessionAgentController,
   ApiSessionCwdConflict,
@@ -42,6 +43,7 @@ import type {
   SessionCancelValue,
   SessionCreateRequest,
   SessionCreateValue,
+  SessionForkDestination,
   SessionForkRequest,
   SessionForkValue,
   SessionPromptRequest,
@@ -223,9 +225,10 @@ export class SessionCommandController {
    * `atSeq` is the inclusive cut; an omitted value selects the latest
    * completed-turn prefix. An open cut receives synthetic fork closers.
    * @param request - source Session and optional exact event boundary.
+   * @param destination - dshfiles: Host-only target Workspace the fork runs in instead of the source's own.
    * @returns the new Session identity.
    */
-  async fork(request: SessionForkRequest): Promise<SessionForkValue> {
+  async fork(request: SessionForkRequest, destination?: SessionForkDestination): Promise<SessionForkValue> {
     let atSeq: ReturnType<typeof SessionSeq> | undefined
     try {
       atSeq = request.atSeq === undefined ? undefined : SessionSeq(request.atSeq)
@@ -249,7 +252,8 @@ export class SessionCommandController {
       )
     }
     using source = observed
-    const boundary = atSeq ?? latestCompletedPrefixBoundary(source.events)
+    const boundary = atSeq
+      ?? (destination?.includeOpenTurn === true ? source.events.at(-1)?.seq : latestCompletedPrefixBoundary(source.events))
     if (boundary === undefined || source.events[boundary]?.seq !== boundary) {
       throw new RemoteError(
         'session/fork-unavailable',
@@ -262,8 +266,11 @@ export class SessionCommandController {
     const seed = buildForkSeed(source.events, boundary)
     let workspace: Workspace | undefined
     try {
-      workspace = await this.forkWorkspace(source.header)
+      workspace = destination === undefined
+        ? await this.forkWorkspace(source.header)
+        : this.destinationWorkspace(destination.workspaceId)
     } catch (error) {
+      if (remoteErrorOf(error) !== undefined) throw error
       throw new RemoteError(
         'gateway/internal',
         `failed to resolve fork workspace for session "${request.sessionId}": ${String(error)}`,
@@ -272,14 +279,16 @@ export class SessionCommandController {
     }
     const childId = brandString<SessionId>(`session-${randomUUID()}`)
     const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
+    const cwd = destination === undefined ? source.header.cwd : workspace?.path
+    let child: Agent
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
-      await this.ctx.agents.create({
+      child = (await this.ctx.agents.create({
         sessionId: childId,
         seed,
         inheritedEventCount: SessionLogOffset(boundary + 1),
         meta: {
-          ...(source.header.cwd === undefined ? {} : { cwd: source.header.cwd }),
+          ...(cwd === undefined ? {} : { cwd }),
           parentSession: source.header.id,
           isSeeded: true,
           ...(composition.agentPreset === undefined
@@ -288,13 +297,16 @@ export class SessionCommandController {
         },
         agentOptions: { provider, model },
         setup: composition.setup,
-      })
+      })).agent
     } catch (error) {
       throw new RemoteError(
         'gateway/internal',
         `failed to fork session "${request.sessionId}": ${String(error)}`,
         {},
       )
+    }
+    if (destination !== undefined && cwd !== undefined) {
+      await this.announceDestination({ child, cwd, source: source.header })
     }
     if (workspace !== undefined) {
       try {
@@ -552,6 +564,30 @@ export class SessionCommandController {
     }
     const inspected = await inspectApiSession(this.ctx, sessionId)
     return { id: inspected.meta.id, header: inspected.meta, events: inspected.events }
+  }
+
+  private destinationWorkspace(workspaceId: WorkspaceId): Workspace {
+    const workspace = this.ctx.workspaceRegistry.get(workspaceId)
+    if (workspace === undefined) {
+      throw new RemoteError('workspace/not-found', `workspace "${workspaceId}" not found`, { workspaceId })
+    }
+    return workspace
+  }
+
+  /**
+   * A seeded `working-directory/change` would put the child back in the source's folder, so the destination is
+   * committed again, and the model learns where the conversation came from before its next request.
+   */
+  private async announceDestination(input: { readonly child: Agent; readonly cwd: string; readonly source: SessionHeader }): Promise<void> {
+    await this.ctx.get('workingDirectory')?.set(input.child, input.cwd)
+    const origin = input.source.cwd === undefined ? '' : ` in ${JSON.stringify(input.source.cwd)}`
+    input.child.inject(createUserMessage({
+      content: [{
+        type: 'text',
+        text: `This thread continues thread ${input.source.id}, which ran${origin}. It now runs in ${JSON.stringify(input.cwd)}: use that directory for every file, command and project check from here on.`,
+      }],
+      source: { kind: 'working-directory' },
+    }))
   }
 
   private async forkWorkspace(source: SessionHeader): Promise<Workspace | undefined> {

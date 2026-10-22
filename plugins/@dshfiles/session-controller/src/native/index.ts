@@ -47,6 +47,7 @@ import type {
   SessionCreateValue,
   SessionFollowFrame,
   SessionFollowRequest,
+  SessionForkDestination,
   SessionForkRequest,
   SessionForkValue,
   SessionListRequest,
@@ -269,6 +270,17 @@ export class SessionController extends TypertRemoteService {
       })
     }
     return inspectApiSession(this.ctx, sessionId, signal)
+  }
+
+  /**
+   * dshfiles: fork one Session into another Workspace, whose directory becomes the child's own cwd. Host-only: the
+   * continuation API is its only caller and checks access first.
+   * @param request - source Session and optional exact inclusive event boundary.
+   * @param destination - the Workspace the child runs in and where the source is cut.
+   * @returns the new Session identity.
+   */
+  continueIn(request: SessionForkRequest, destination: SessionForkDestination): Promise<SessionForkValue> {
+    return this.commands.fork(request, destination)
   }
 
   async interruptedTurn(sessionId: SessionId): Promise<number | undefined> {
