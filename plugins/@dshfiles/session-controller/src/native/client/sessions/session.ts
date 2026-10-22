@@ -91,6 +91,12 @@ export interface SessionOptions {
    * private store (bare object-layer construction).
    */
   projections?: ProjectionValueStore
+  /**
+   * Host creation still settling for a provisional identity (see
+   * ClientSessions.createOptimistic); history and RPCs wait on it, because the
+   * Host refuses a Session it has not created yet.
+   */
+  creation?: Promise<SessionId>
 }
 
 /**
@@ -273,6 +279,7 @@ export class Session implements SessionFace {
     this.notifier.markDirty()
     let result: RemoteResult<{ accepted: true }>
     if (this.address === undefined) {
+      await this.whenCreated()
       const clientTimeZone = resolvedClientTimeZone()
       result = await this.remote.session.prompt({
         requestId: requestId ?? randomUUID() as SessionRequestId,
@@ -328,6 +335,7 @@ export class Session implements SessionFace {
   async readAttachment(
     attachmentId: AttachmentIdType,
   ): Promise<RemoteResult<{ attachment: ImageAttachmentRef; data: Uint8Array }>> {
+    await this.whenCreated()
     const result = await this.remote.session.attachment({
       sessionId: this.sessionId,
       attachmentId,
@@ -340,6 +348,7 @@ export class Session implements SessionFace {
 
   /** Apply one operation to a still-pending queue occurrence. */
   async updateQueue(itemId: MessageId, action: QueueAction): Promise<RemoteResult<{ accepted: true }>> {
+    await this.whenCreated()
     return this.remote.session.updateQueue({ sessionId: this.sessionId, itemId, action })
   }
 
@@ -351,6 +360,7 @@ export class Session implements SessionFace {
    * @returns the cancel result.
    */
   async cancel(): Promise<RemoteResult<{ accepted: true }>> {
+    await this.whenCreated()
     const address = this.address
     const result = address !== undefined
       ? await this.remote.subagents.interruptByParent(
@@ -376,6 +386,7 @@ export class Session implements SessionFace {
    * @returns the rename result (normalized accepted title + title event seq).
    */
   async rename(title: string): Promise<RemoteResult<{ title: string; seq: SessionSeq }>> {
+    await this.whenCreated()
     const result = await this.remote.session.rename({ sessionId: this.sessionId, title })
     if (!result.ok) return result
     const seq = SessionSeq(result.value.seq)
@@ -619,7 +630,22 @@ export class Session implements SessionFace {
   // ---- Private ----
 
   /** @param generation - openGeneration at launch; stale passes cannot publish after replacement. */
+  /**
+   * Wait for a provisional Session's Host creation before addressing it.
+   * A refused creation is swallowed here: the RPC that follows reports it, and
+   * navigation owns the notice.
+   */
+  private async whenCreated(): Promise<void> {
+    if (this.options.creation === undefined) return
+    try {
+      await this.options.creation
+    } catch {
+      // The refused identity no longer exists; the next RPC surfaces the failure.
+    }
+  }
+
   private async doOpen(generation: number): Promise<void> {
+    await this.whenCreated()
     this.openState = 'loading'
     this.openError = null
     this.notifier.markDirty()

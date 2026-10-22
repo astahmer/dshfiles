@@ -13,6 +13,8 @@ import type {
 } from '../../types.ts'
 import { mergeOrderedBaseline } from '../ordered-baseline.ts'
 import { isRemoteFailure } from '@deepseek-ai/dsh-api-gateway/client'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { RemoteFailure, RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionListEntry, TitledSessionSummary } from './lineage.ts'
@@ -142,6 +144,14 @@ export class SessionManager {
   private readonly addresses = new Map<SessionId, SubagentAddress>()
   private readonly projectionLoads = new Map<SessionId, ProjectionLoad>()
   private readonly projectionInflight = new Map<SessionId, ProjectionInflight>()
+  /**
+   * Rows whose Host creation is still in flight: they must survive a list pull
+   * (the Host cannot list a Session it has not created yet) and disappear when
+   * the creation is refused.
+   */
+  private readonly provisional = new Map<SessionId, SessionSummary>()
+  /** Creation still settling per provisional identity; history and RPCs wait on it. */
+  private readonly pendingCreations = new Map<SessionId, Promise<SessionId>>()
 
 
   private listSnapshotCache: SessionListSnapshot
@@ -306,6 +316,7 @@ export class SessionManager {
     const parentAvailable = address === undefined
       ? undefined
       : this.agentAvailable(address.parentSessionId)
+    const creation = this.pendingCreations.get(sessionId)
     return new Session(sessionId, this.remote, {
       ...(address === undefined ? {} : {
         address,
@@ -322,6 +333,9 @@ export class SessionManager {
         }
         this.sessions.get(engaged.sessionId)?.handleBlank(false)
       },
+      ...(creation === undefined
+        ? {}
+        : { creation }),
       projections: this.projectionStore(sessionId),
     })
   }
@@ -468,7 +482,10 @@ export class SessionManager {
           for (const s of baseline) {
             if (s.running && !removedSincePull.has(s.sessionId)) this.engagedSessions.add(s.sessionId)
           }
-          const summaries = mutations.reduce(applyMutation, baseline)
+          const summaries = [...this.provisional.values()].reduce(
+            (rows, summary) => applyMutation(rows, { kind: 'placeholder', summary }),
+            mutations.reduce(applyMutation, baseline),
+          )
           this.summaries = summaries
           // A full list can remove identities without a removal frame.
           const retained = this.retainedIds(summaries)
@@ -575,6 +592,67 @@ export class SessionManager {
       }
     }
     return result
+  }
+
+  /**
+   * Record the row a Session will occupy before the Host answers, so a caller
+   * may navigate to, retain and type into it immediately.
+   * @param opts - the blank Session to reuse, or nothing to mint a fresh identity.
+   * @returns the identity now addressable through the list.
+   */
+  beginProvisional(opts: { readonly cwd?: string; readonly sessionId?: SessionId } = {}): SessionId {
+    const sessionId = opts.sessionId ?? brandString<SessionId>(`session-${randomUUID()}`)
+    const summary: SessionSummary = {
+      agentAvailable: true,
+      sessionId,
+      updatedAt: Date.now(),
+      running: false,
+      blank: true,
+      ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
+    }
+    this.provisional.set(sessionId, summary)
+    this.recordMutation({ kind: 'placeholder', summary })
+    return sessionId
+  }
+
+  /**
+   * Settle a provisional row through `create`, dropping it on refusal, and keep
+   * its creation promise addressable until it settles.
+   * @param sessionId - the provisional identity.
+   * @param opts - the creation request; its `sessionId` is the provisional identity.
+   * @returns the Host's create result.
+   */
+  settleProvisional(
+    sessionId: SessionId,
+    opts: { workspaceId?: WorkspaceId; cwd?: string; agentPreset?: string },
+  ): Promise<RemoteResult<{ sessionId: SessionId }>> {
+    const settled = this.create({ ...opts, sessionId }).then((result) => {
+      this.provisional.delete(sessionId)
+      const created = result.ok ? result.value.sessionId : undefined
+      if (created !== sessionId) this.recordMutation({ kind: 'remove', sessionId })
+      return result
+    }, (error: unknown) => {
+      this.provisional.delete(sessionId)
+      this.recordMutation({ kind: 'remove', sessionId })
+      throw error
+    })
+    const observable = settled.then(result => result.ok
+      ? result.value.sessionId
+      : Promise.reject(new Error(`session create failed: ${result.error.code}: ${result.error.message}`)))
+      .finally(() => { this.pendingCreations.delete(sessionId) })
+    this.pendingCreations.set(sessionId, observable)
+    // The caller may not await the handle; an unobserved rejection must not surface as unhandled.
+    void observable.catch(() => undefined)
+    return settled
+  }
+
+  /**
+   * Creation still in flight for a provisional identity.
+   * @param sessionId - any identity; non-provisional ones report undefined.
+   * @returns the settling identity, or undefined once creation finished.
+   */
+  creationFor(sessionId: SessionId): Promise<SessionId> | undefined {
+    return this.pendingCreations.get(sessionId)
   }
 
   /**

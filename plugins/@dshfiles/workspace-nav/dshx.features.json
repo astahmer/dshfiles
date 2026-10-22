@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "new-thread-composer",
+      "title": "Open a New thread's composer before the Host creates its Session",
+      "summary": "Every New thread entry point (the sidebar's +, the main-tabs +, the command palette, \u2318N, the hero project picker and the schedule dialog) switches the main view to a provisional blank Session immediately, so the composer accepts text while session/create is in flight. The Session Controller mints the identity, the Host creates or reuses it under that id, and the view follows the Host's identity if it declines the reuse. A refused creation shows the create-failed notice, drops the provisional row and returns the view to where it was.",
+      "reach": ["click button \"New session\"", "expect button \"Send message\"", "expect text \"sample\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["instant-composer", "created", "declined-reuse", "create-failed"],
+      "failureModes": [
+        "A Host that refuses session/create removes the provisional row, keeps the draft and shows the create-failed notice instead of leaving a dead composer.",
+        "A Host that returns another identity (declined blank reuse) moves the view, draft and references to that identity.",
+        "A navigation superseded before the Host answers keeps the created Session without replacing what the user chose."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "The fork's createOptimistic publishes the provisional list row, holds history and Session RPCs until creation settles, and drops the row on refusal.",
+          "deterministicFake": "The provisional row and its removal are exercised by the session-controller unit tests; the scratch journey drives the delayed create through the real Host."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workspace-nav.new-thread-request-unit",
+          "file": "plugins/@dshfiles/workspace-nav/tests/new-thread-request.test.ts",
+          "testName": "asks for a fresh Session when the New thread carries no draft options"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-nav.new-thread-request-reuse-unit",
+          "file": "plugins/@dshfiles/workspace-nav/tests/new-thread-request.test.ts",
+          "testName": "reuses the first listed blank of the workspace when draft options allow reuse"
+        }
+      ]
+    }
+  ]
+}

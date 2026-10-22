@@ -32,6 +32,14 @@ export interface SessionReference extends Disposable {
   release(): void
 }
 
+/** One optimistic creation: the addressable row now, and the identity the Host settles on. */
+export interface SessionCreateHandle {
+  /** Identity the caller may navigate to and retain before the Host answers. */
+  readonly sessionId: SessionId
+  /** Final identity once the Host answers; rejects with SessionCreateError after removing the provisional row. */
+  readonly settled: Promise<SessionId>
+}
+
 /** Consumer identity and optional cancellation of one acquisition waiter. */
 export interface SessionRetainOptions {
   readonly source: SessionReferenceSource
@@ -91,6 +99,19 @@ export interface ISessions {
     sessionId?: SessionId
     agentPreset?: string
   }): Promise<SessionId>
+  /**
+   * Create a Session without waiting for the Host: a provisional blank row lands
+   * synchronously, so navigation, retention and the composer may address it at
+   * once while `session/create` is in flight.
+   * @param opts - target workspace or directory, an optional blank Session to reuse, and an optional Agent preset.
+   * @returns the addressable identity now, and the promise settling on the Host's identity.
+   */
+  createOptimistic(opts?: {
+    workspaceId?: WorkspaceId
+    cwd?: string
+    sessionId?: SessionId
+    agentPreset?: string
+  }): SessionCreateHandle
   /**
    * Resolve an already discovered direct-parent address without opening it.
    * @param id - possible addressed child id.

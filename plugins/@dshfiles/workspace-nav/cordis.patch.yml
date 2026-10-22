@@ -1,0 +1,5 @@
+- id: ui-workspace
+  disabled: true
+- insert:
+    - id: dshfiles-workspace-nav
+      name: '@dshfiles/workspace-nav'

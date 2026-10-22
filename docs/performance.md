@@ -168,6 +168,41 @@ existing deferred-submit journey. Wall-clock before/after on the live Host is no
 reaches `:3080` after the profile restarts, and the probe cannot create threads on the user's Host, so the evidence here
 is the removed awaits (three RPC chains off the send path) and the journeys, not a re-measured send latency.
 
+## A New thread's click opens the composer before `session/create` (2026-10-22)
+
+The first-send work above left the click itself blocking: `UiWorkspace.startSession` awaited `connectBlank` →
+`sessions.create` (`session/create`, the same 1.7 s quiet / 9.5 s loaded RPC) before `replaceMain` revealed the
+composer, so the New thread button did nothing visible for the whole round trip, and text typed in that window landed
+in the previous Session's draft.
+
+[`@dshfiles/workspace-nav`](../plugins/@dshfiles/workspace-nav) is the owned fork of
+`@deepseek-ai/dsh-client-ui-workspace` that removes the wait at its owner (the native package's `connecting` and
+`mainReference` state is private, so no slot could reach it):
+
+- `startSession`/`openWorkspace` ask `ctx.sessions.createOptimistic` for the identity: the
+  [`@dshfiles/session-controller`](../plugins/@dshfiles/session-controller) fork records a provisional blank list row
+  synchronously, then sends `session/create` in the background and keeps the row alive across a list pull.
+- `replaceMain` runs at the click: the composer binds to the provisional Session, `beforeOpen` moves the draft and
+  references, and the saved selection records it. The hero renders from the provisional row's `blank` flag
+  (`rich-composer`'s `ConversationMainPanel` gate), so it no longer waits for a Session row at all.
+- The Session's history opening and its Session RPCs (prompt, queue, cancel, rename, attachment read) wait for the
+  creation to settle, because the Host refuses a Session it has not created yet. A refused creation removes the
+  provisional row, shows the create-failed notice and returns the view; a Host that declines a blank reuse returns
+  another identity and the view follows it.
+- `connectWorkspace` stays waiting on purpose: jj-integration's thread warmup resolves a thread workspace's blank
+  Session before sending into it.
+
+Every entry point goes through that one service, so the sidebar `+`, the main-tabs `+`, the command palette, ⌘N
+(`session.new`), the hero project picker and the schedule dialog all open their composer at the click.
+
+Verification: `tests/new-thread-request.test.ts` (the reuse and fresh-Session choice), the session-controller suite,
+`node scripts/native-fork-diff.mjs workspace-nav session-controller`, and a scratch DSH
+(`dshx dev up --plugin @dshfiles/workspace-nav --plugin @dshfiles/session-controller --plugin @dshfiles/rich-composer`)
+where `dshx dev open workspace-nav/new-thread-composer` clicks New session, finds the composer and the project chip with
+zero console errors, and the Host creates the Session afterwards. Wall clock on the live Host is not in this table yet:
+the change only reaches `:3080` after the profile restarts, so the click-to-composer number is still the RPC's 1.7–9.5 s
+budget removed from the click path, not a re-measured latency.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the

@@ -13,7 +13,7 @@ import type { RemoteFailure, RemoteResult } from '@deepseek-ai/dsh-typert-protoc
 import type { SessionEventSource } from '../contract/events.ts'
 import type { SessionFace } from '../contract/session.ts'
 import type {
-  AgentContext, ISessions, SessionReference, SessionRetainInfo, SessionRetainOptions, SessionTarget,
+  AgentContext, ISessions, SessionCreateHandle, SessionReference, SessionRetainInfo, SessionRetainOptions, SessionTarget,
 } from '../contract/sessions.ts'
 import type { SessionReferenceSource } from '../index.ts'
 import { createScope, scopeIdentityOf, scopeOf as scopeTagOf } from '../scope.ts'
@@ -441,6 +441,35 @@ export class ClientSessions implements ISessions {
     if (!result.ok) throw new SessionCreateError(result.error, opts.sessionId)
     this.projectList()
     return result.value.sessionId
+  }
+
+  /**
+   * Create a Host Session without waiting for it: the provisional blank row is
+   * published synchronously, so a caller may navigate to, retain and type into
+   * the identity before `session/create` answers.
+   * @param opts - target workspace or directory, an optional blank Session to reuse, and an optional Agent preset.
+   * @returns the addressable identity and the promise settling on the Host's identity.
+   */
+  createOptimistic(opts: {
+    workspaceId?: WorkspaceId
+    cwd?: string
+    sessionId?: SessionId
+    agentPreset?: string
+  } = {}): SessionCreateHandle {
+    const sessionId = this.manager.beginProvisional({
+      ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
+      ...(opts.sessionId === undefined ? {} : { sessionId: opts.sessionId }),
+    })
+    const settled = this.manager.settleProvisional(sessionId, {
+      ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
+      ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
+      ...(opts.agentPreset === undefined ? {} : { agentPreset: opts.agentPreset }),
+    }).then((result) => {
+      if (!result.ok) throw new SessionCreateError(result.error, sessionId)
+      return result.value.sessionId
+    })
+    this.projectList()
+    return { sessionId, settled }
   }
 
   /**
