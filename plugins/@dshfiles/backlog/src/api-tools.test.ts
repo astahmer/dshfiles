@@ -69,7 +69,7 @@ describe('backlog tool exposure', () => {
   })
 
   test('presentation and transport methods stay untooled on purpose', () => {
-    for (const name of ['revision', 'speechStatus', 'jevSetupStatus', 'transcribeSpeech', 'acknowledge'] as const) {
+    for (const name of ['revision', 'speechStatus', 'jevSetupStatus', 'classifyReply', 'transcribeSpeech', 'acknowledge'] as const) {
       expect(backlogApi.methods[name].tool).toBeUndefined()
     }
   })

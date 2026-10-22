@@ -753,6 +753,54 @@ Then('the Inbox lists {string} under {string}', async ({ page }: { page: Page },
   await finishJourneyAssertions(page)
 })
 
+When('Backlog smart thread routing is enabled', async ({ page }: { page: Page }) => {
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
+  const routing = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="smartThreadRouting"]')
+  const enabled = routing.getByRole('switch')
+  await expect(enabled).toBeVisible()
+  if (!(await enabled.isChecked())) await enabled.click()
+  await expect(enabled).toBeChecked()
+})
+
+When('Backlog notifications use both channels', async ({ page }: { page: Page }) => {
+  const notificationSetting = page.getByRole('radiogroup', { name: 'Thread start notifications' })
+  const bothChannels = notificationSetting.getByRole('radio', { name: 'both' })
+  await bothChannels.click()
+  await expect(bothChannels).toBeChecked()
+  await page.evaluate(() => {
+    class TestNotification {
+      static permission = 'granted'
+      onclick: ((this: Notification, event: Event) => void) | null = null
+
+      constructor(title: string, options?: NotificationOptions) {
+        document.body.dataset.testNotification = `${title}|${options?.body ?? ''}`
+      }
+
+      close(): void {}
+    }
+
+    Object.defineProperty(window, 'Notification', { configurable: true, value: TestNotification })
+  })
+})
+
+Then('the reply starts a linked work thread with an in-app and browser notice', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-smart-reply-routing', async () => {
+    await expect(page.getByRole('alert')).toContainText('Thread started for b:1', { timeout: 30_000 })
+    await expect(page.locator('body')).toHaveAttribute('data-test-notification', 'Backlog thread started|b:1 · Improve the flaky test')
+    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Please fix the flaky test')
+    await expect(peek(page).getByRole('list', { name: 'Related' }).getByRole('listitem')).toHaveCount(1)
+  })
+})
+
+Then('the discussion reply stays a comment without starting another thread', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-smart-reply-discussion', async () => {
+    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Why is this flaky?')
+    await expect(peek(page).getByRole('list', { name: 'Related' }).getByRole('listitem')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('Backlog automatic triage is configured to use the local fake model', async ({ page }: { page: Page }) => {
   await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
   await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()

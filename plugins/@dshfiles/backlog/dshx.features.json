@@ -795,7 +795,7 @@
     {
       "id": "rich-item-text",
       "title": "Write descriptions and replies like a capture",
-      "summary": "An item's description and reply boxes share the capture composer's text box: `@` completes agents, backlog items, threads and projects, images and files can be picked, pasted or dropped, Enter sends a reply and ⌘↵ saves a description, and Markdown stays Markdown. A project completion inserts a workspace reference without assigning the item. A description's files are kept with the item; a reply's images are kept on that comment and open in the same gallery.",
+      "summary": "An item's description and reply boxes share the capture composer's text box: `@` completes agents, backlog items, threads and projects, images and files can be picked, pasted or dropped, Enter sends a reply and ⌘↵ saves a description, and Markdown stays Markdown. Project completion inserts a workspace reference without assigning the item. With smart routing enabled, Jev classifies text replies as work for a linked @dsh thread or discussion; reply attachments stay ordinary comments and thread-start notifications are configurable. Description files stay with the item; reply images stay on their comment and open in the same gallery.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Describe me with a screenshot\"",
@@ -813,12 +813,36 @@
         "expect text \"workspace:%2F*\""
       ],
       "surfaces": ["client", "host", "storage"],
-      "configuration": [],
-      "states": ["reading", "editing", "mentioning", "attached", "saved"],
+      "states": ["reading", "editing", "mentioning", "attached", "saved", "routing"],
+      "configuration": [
+        {
+          "key": "smartThreadRouting",
+          "defaultValue": "true",
+          "constraints": "Boolean; classify plain replies before saving.",
+          "choices": ["true", "false"],
+          "coveredBy": ["backlog.smart-reply-routing"]
+        },
+        {
+          "key": "threadStartNotifications",
+          "defaultValue": "in-app",
+          "constraints": "One of off, in-app, system, or both.",
+          "choices": ["off", "in-app", "system", "both"],
+          "coveredBy": ["backlog.smart-reply-routing"]
+        },
+        {
+          "key": "replyThreadThreshold",
+          "defaultValue": "0.7",
+          "constraints": "Number from 0 to 1 in steps of 0.05.",
+          "coveredBy": ["backlog.smart-reply-routing"]
+        }
+      ],
       "failureModes": [
         "A file that cannot be read reports why above the box and the rest of the draft stays.",
         "A description keeps the files it saved with an attachment failure; the failure is reported instead of losing the text.",
-        "A reply that starts with @agent dispatches a thread and keeps its images with the item."
+        "A reply that starts with @agent dispatches a thread and keeps its images with the item.",
+        "With smartThreadRouting enabled, Jev routes high-confidence work requests to a linked @dsh thread; other replies stay comments. If Jev is disabled or unavailable, a conservative keyword fallback is used.",
+        "System notifications are sent only when the setting requests them and the browser already grants notification permission.",
+        "If the thread-sidebar API owner is not loaded, linked thread rows are omitted and the Inbox query stops polling."
       ],
       "externalDependencies": [],
       "verification": [
@@ -826,6 +850,17 @@
           "kind": "gherkin",
           "id": "backlog.rich-item-text",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.smart-reply-routing",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reply-routing-decision",
+          "file": "plugins/@dshfiles/backlog/src/reply-routing.test.ts",
+          "testName": "routes work requests and keeps questions and discussion as replies with keyword fallback"
         },
         {
           "kind": "host-test",

@@ -19,6 +19,7 @@ const speechStatusSchema = z
   })
   .strict()
 const jevSetupStatusSchema = z.object({ needsSetup: z.boolean() }).strict()
+const replyRouteSchema = z.object({ route: z.enum(['reply', 'thread']), confidence: z.number().min(0).max(1), source: z.enum(['jev', 'keywords']) }).strict()
 const transcriptionSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), text: z.string() }).strict(),
   z.object({ ok: z.literal(false), reason: z.string().max(500) }).strict(),
@@ -262,6 +263,12 @@ export const backlogApi = defineApi({
       output: jevSetupStatusSchema,
       description:
         'Whether enabled Backlog Jev lacks a resolvable key, returning setup state only and never any credential. Presentation-only status for the inline setup offer.',
+    }),
+    classifyReply: method({
+      input: z.object({ text: z.string().min(1).max(BacklogItems.maxBodyChars) }).strict(),
+      output: replyRouteSchema,
+      description:
+        'Classify one submitted item reply as discussion or a separate work thread. Uses Jev when configured and keyword fallback otherwise; presentation-only.',
     }),
     transcribeSpeech: method({
       input: z.object({ audioBase64: z.string().min(1).max(24_000_000) }).strict(),

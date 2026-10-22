@@ -152,6 +152,20 @@ in the toast and nothing is started, so a jj failure never falls back to a share
 Failures after creation keep the thread and the toast still offers it: a refused model switch leaves the Host default
 model, and a failed link is logged rather than losing the thread.
 
+### Smart reply routing
+
+On by default (Settings → `dshfiles-backlog` → _Smart thread routing_); turn it off to keep every plain reply as a comment. When enabled, a plain reply is classified
+before it is saved; when configured Jev receives that submitted text using the same Host-held TypeSafe credential as
+triage. Jev starts a linked `@dsh` thread when confidence meets _Reply thread threshold_; questions, acknowledgements and
+discussion remain comments. If Jev is off, its key is unavailable, or the request fails, a conservative leading-verb
+keyword fallback routes explicit work requests and leaves other text as a reply. A leading `@agent` remains an explicit,
+deterministic dispatch and does not need Jev. The submitted text becomes both the item reply and the work-thread task;
+attachments stay with the item.
+
+_Thread start notifications_ selects off, in-app, browser system, or both. The in-app notice offers **Open**. Browser
+system notices are sent only if this browser already grants notification permission; Backlog never prompts or enables it
+without an explicit browser action. The notice contains only the item id and title, not the submitted message.
+
 ## Automatic triage
 
 Off by default (Settings → `dshfiles-backlog`). With `autoTriage` on, every capture is triaged in the

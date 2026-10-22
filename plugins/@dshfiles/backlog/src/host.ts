@@ -31,7 +31,8 @@ import { BacklogProjectTarget } from './project-target.js'
 import { BacklogSignals } from './signals.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { JevClient } from './jev-client.js'
-import { BacklogTriage, type TriageServices } from './triage.js'
+import { ReplyRouting } from './reply-routing.js'
+import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
 
 interface OpenedBacklog {
   readonly store: BacklogStore
@@ -734,6 +735,12 @@ const backlogApiHost = backlogApi.host({
     return {
       needsSetup: await jevNeedsSecretSetup({ enabled: settings.jevEnabled, resolveKey: async () => (await jevCredential(ctx, settings))?.value }),
     }
+  },
+  classifyReply: async ({ ctx, input }) => {
+    const settings = currentSettings()
+    if (!settings.smartThreadRouting) return { route: 'reply', confidence: 1, source: 'keywords' }
+    const setup = await triageSetup(ctx, settings)
+    return ReplyRouting.classify({ text: input.text, jev: setup.services.jev, threshold: settings.replyThreadThreshold })
   },
   transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),
   update: async ({ ctx, input, caller }) => (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) }),

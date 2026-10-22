@@ -510,6 +510,8 @@ const CommentBox = (props: {
   readonly threads: readonly ComposerThread[]
   readonly projects: readonly string[]
   readonly openCreatedByDefault: boolean
+  readonly smartThreadRouting: boolean
+  readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
 }): JSX.Element => {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
@@ -544,12 +546,19 @@ const CommentBox = (props: {
     try {
       setText('')
       attachments.clear()
-      const outcome = await dispatch.dispatch({ item: props.item, text, files: files.map(fileInput), open: props.openCreatedByDefault })
+      const outcome = await dispatch.dispatch({
+        item: props.item,
+        text,
+        files: files.map(fileInput),
+        open: props.openCreatedByDefault,
+        smartThreadRouting: props.smartThreadRouting,
+        notificationDelivery: props.threadStartNotifications,
+      })
       if (outcome.kind === 'failed') {
         setText(current => (current === '' ? text : current))
         attachments.restore(files)
         setFailed(outcome.reason)
-      } else comment(files)
+      } else if (outcome.kind === 'skipped') comment(files)
     } catch (error) {
       setText(current => (current === '' ? text : current))
       attachments.restore(files)
@@ -727,6 +736,8 @@ const PeekBody = (props: {
   readonly close: () => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly openCreatedByDefault: boolean
+  readonly smartThreadRouting: boolean
+  readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -960,6 +971,8 @@ const PeekBody = (props: {
               threads={props.threads}
               projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}
+              smartThreadRouting={props.smartThreadRouting}
+              threadStartNotifications={props.threadStartNotifications}
             />
           </Section>
         </div>
@@ -982,6 +995,8 @@ const ItemPeek = (props: {
   readonly embedded?: boolean
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly openCreatedByDefault: boolean
+  readonly smartThreadRouting: boolean
+  readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)
@@ -1019,6 +1034,8 @@ const ItemPeek = (props: {
           close={props.close}
           startThread={props.startThread}
           openCreatedByDefault={props.openCreatedByDefault}
+          smartThreadRouting={props.smartThreadRouting}
+          threadStartNotifications={props.threadStartNotifications}
           projectPaths={props.projectPaths}
         />
       ) : (

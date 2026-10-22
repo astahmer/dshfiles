@@ -7,7 +7,7 @@ import { StartThreadForm } from './start-thread.js'
 /** What a leading `@handle` comment box did: started a thread, stayed an ordinary comment, or failed. */
 export type AgentDispatchOutcome =
   | { readonly kind: 'dispatched' }
-  | { readonly kind: 'skipped'; readonly reason: 'no-mention' | 'unknown-agent' | 'disabled-agent' | 'agents-unavailable' }
+  | { readonly kind: 'skipped'; readonly reason: 'no-mention' | 'reply-only' | 'unknown-agent' | 'disabled-agent' | 'agents-unavailable' }
   | { readonly kind: 'failed'; readonly reason: string }
 
 /** One enabled agent as the comment box offers it, without the instructions a dispatch does not need to show. */
@@ -25,6 +25,8 @@ export interface AgentDispatchPort {
     readonly text: string
     readonly files: readonly BacklogFileInput[]
     readonly open: boolean
+    readonly smartThreadRouting?: boolean
+    readonly notificationDelivery?: 'off' | 'in-app' | 'system' | 'both'
   }): Promise<AgentDispatchOutcome>
   /** Enabled agents, loaded once when an `@` is typed; an unavailable agents bundle answers an empty list. */
   choices(): Promise<readonly AgentChoice[]>
@@ -73,6 +75,7 @@ export class AgentComments {
     readonly task: string
     readonly target: StartThreadTarget
     readonly open?: boolean
+    readonly notifyInApp?: boolean
   }): StartThreadRequest {
     const task = input.task.trim()
     const context = StartThreadForm.message(input.items)
@@ -85,6 +88,7 @@ export class AgentComments {
       reasoningEffort: undefined,
       message: task === '' ? context : `${context}\n\n${task}`,
       open: input.open ?? false,
+      notifyInApp: input.notifyInApp ?? true,
     }
   }
 }

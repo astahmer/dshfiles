@@ -14,6 +14,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
 import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
+import { ReplyRouting } from './reply-routing.js'
 import { BacklogFocusModel } from './backlog-focus.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
@@ -84,9 +85,10 @@ export default defineClient({
       },
       start: async (request: StartThreadRequest): Promise<StartThreadOutcome> => {
         const requests = StartThreadForm.requests(request)
-        if (requests.length === 1) return startOne(requests[0]!, true)
+        const report = request.notifyInApp ?? true
+        if (requests.length === 1) return startOne(requests[0]!, report)
 
-        BacklogNotices.show({ text: `Starting ${String(requests.length)} threads…`, kind: 'progress', sessionId: null })
+        if (report) BacklogNotices.show({ text: `Starting ${String(requests.length)} threads…`, kind: 'progress', sessionId: null })
         const outcomes: StartThreadOutcome[] = []
         for (const oneRequest of requests) outcomes.push(await startOne(oneRequest, false))
         const started = outcomes.filter((outcome): outcome is Extract<StartThreadOutcome, { readonly ok: true }> => outcome.ok)
@@ -95,7 +97,7 @@ export default defineClient({
           failed.length === 0
             ? `Started ${String(started.length)} threads for ${StartThreadForm.refs(request.items)}`
             : `Started ${String(started.length)} of ${String(requests.length)} threads; ${String(failed.length)} failed.`
-        BacklogNotices.show({ text, kind: failed.length === 0 ? 'success' : 'failure', sessionId: null })
+        if (report) BacklogNotices.show({ text, kind: failed.length === 0 ? 'success' : 'failure', sessionId: null })
         const last = started.at(-1)
         return failed.length === 0 && last !== undefined ? { ok: true, sessionId: last.sessionId } : { ok: false, reason: text }
       },
@@ -113,24 +115,74 @@ export default defineClient({
           return []
         }
       },
-      dispatch: async ({ item, text, open }) => {
+      dispatch: async ({ item, text, files, open, smartThreadRouting = true, notificationDelivery = 'in-app' }) => {
         const mention = AgentComments.mention(text)
-        if (mention === null) return { kind: 'skipped', reason: 'no-mention' }
+        const automatic = mention === null && files.length === 0 && smartThreadRouting
+        let task = ''
+        let handle = ''
+        if (mention !== null) {
+          task = mention.task
+          handle = mention.handle
+        } else {
+          if (!automatic) return { kind: 'skipped', reason: 'no-mention' }
+          let route: 'reply' | 'thread'
+          try {
+            const classified = await api.safe.classifyReply({ text })
+            route = !classified.ok ? ReplyRouting.keywords(text).route : classified.value.route
+          } catch {
+            route = ReplyRouting.keywords(text).route
+          }
+          if (route !== 'thread') return { kind: 'skipped', reason: 'reply-only' }
+          task = text
+          handle = 'dsh'
+        }
         let agent
         try {
-          const found = await agents.get({ handle: mention.handle })
+          const found = await agents.get({ handle })
           agent = found.agent
         } catch {
-          return { kind: 'skipped', reason: 'agents-unavailable' }
+          return automatic
+            ? { kind: 'failed', reason: 'The agent list is unavailable, so the reply was not routed.' }
+            : { kind: 'skipped', reason: 'agents-unavailable' }
         }
-        if (agent === null) return { kind: 'skipped', reason: 'unknown-agent' }
-        if (!agent.enabled) return { kind: 'skipped', reason: 'disabled-agent' }
+        if (agent === null)
+          return automatic
+            ? { kind: 'failed', reason: 'The @dsh agent is unavailable, so the reply was not routed.' }
+            : { kind: 'skipped', reason: 'unknown-agent' }
+        if (!agent.enabled)
+          return automatic
+            ? { kind: 'failed', reason: 'The @dsh agent is disabled, so the reply was not routed.' }
+            : { kind: 'skipped', reason: 'disabled-agent' }
         const projects = startThreadPorts.listProjects()
         const items = [item]
+        const systemNotification = notificationDelivery === 'system' || notificationDelivery === 'both'
+        const inAppNotification = notificationDelivery === 'in-app' || notificationDelivery === 'both'
         const started = await startThreadPorts.start(
-          AgentComments.request({ items, agent, task: mention.task, target: defaultTargetFor(items, projects), open }),
+          AgentComments.request({
+            items,
+            agent,
+            task,
+            target: defaultTargetFor(items, projects),
+            open,
+            notifyInApp: inAppNotification,
+          }),
         )
         if (!started.ok) return { kind: 'failed', reason: started.reason }
+        if (files.length === 0) await api.safe.comment({ id: item.id, text })
+        else await api.safe.comment({ id: item.id, text, files })
+        if (systemNotification && 'Notification' in window && window.Notification.permission === 'granted') {
+          try {
+            const notification = new Notification('Backlog thread started', { body: `b:${item.id} · ${item.title}` })
+            notification.onclick = () => {
+              window.focus()
+              // SAFETY: startThread returns a Host-minted Session id, type-only branded by the session controller.
+              ctx.uiWorkspace.openSession(started.sessionId as SessionId)
+              notification.close()
+            }
+          } catch {
+            // Browser notification support can disappear between permission checks and delivery.
+          }
+        }
         return { kind: 'dispatched' }
       },
     }

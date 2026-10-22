@@ -1,3 +1,4 @@
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import {
@@ -403,13 +404,12 @@ export const BacklogPanel = (props: {
   const attentionApi = useApi(threadSidebarAttentionApi)
   const attention = useQuery({
     queryKey: [BacklogQueries.key, 'thread-attention'],
-    queryFn: async ({ signal }) => {
-      const result = await attentionApi.safe.state(undefined, { signal })
-      return result.ok ? result.value.sessions : []
-    },
-    refetchInterval: 10_000,
+    queryFn: async ({ signal }) => (await attentionApi.state(undefined, { signal })).sessions,
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 10_000),
+    retry: false,
     enabled: inboxThreadsMode !== 'off',
   })
+  const attentionOwnerMissing = isApiOwnerMissing(attention.error)
   const now = list.dataUpdatedAt
   const all = useMemo(() => list.data?.items ?? [], [list.data])
   const items = useMemo(
@@ -423,11 +423,11 @@ export const BacklogPanel = (props: {
     () =>
       inboxThreadsFrom({
         mode: inboxThreadsMode,
-        records: attention.data ?? [],
+        records: attentionOwnerMissing ? [] : (attention.data ?? []),
         items: all,
         titles: new Map(props.listThreads().map(thread => [thread.id, thread.title])),
       }),
-    [attention.data, all, inboxThreadsMode, props],
+    [attention.data, attentionOwnerMissing, all, inboxThreadsMode, props],
   )
   const unread = inboxItems.filter(item => item.acknowledgedAt === null || item.acknowledgedAt < item.lastActivityAt).length
   const tags = useMemo(() => [...new Set(all.flatMap(item => item.tags))].sort(), [all])
@@ -511,6 +511,8 @@ export const BacklogPanel = (props: {
         projectPaths={projectPaths}
         startThread={openStartThread}
         openCreatedByDefault={settings.value?.startThreadOpensCreated ?? false}
+        smartThreadRouting={settings.value?.smartThreadRouting ?? true}
+        threadStartNotifications={settings.value?.threadStartNotifications ?? 'in-app'}
         close={() => {
           setOpenId(null)
           setExpanded(false)

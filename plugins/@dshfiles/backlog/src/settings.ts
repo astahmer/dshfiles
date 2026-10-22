@@ -53,6 +53,22 @@ export const backlogSettings = defineSettings({
       .description(
         'Open threads started from a backlog item as soon as they exist, including threads started by an @agent comment. Off leaves you where you were and the report offers to open the thread; the dialog checkbox overrides this setting for one thread.',
       ),
+    smartThreadRouting: Schema.boolean()
+      .default(true)
+      .description(
+        'Classify plain item replies as discussion or work requests. Work requests start a linked @dsh thread; other messages remain replies. Uses Jev when enabled and conservative keyword matching otherwise.',
+      ),
+    threadStartNotifications: Schema.union([Schema.const('off'), Schema.const('in-app'), Schema.const('system'), Schema.const('both')])
+      .default('in-app')
+      .description(
+        'Deliver a notice when a reply starts a thread. System delivery uses this browser’s notification permission; in-app notices include an Open action.',
+      ),
+    replyThreadThreshold: Schema.number()
+      .min(0)
+      .max(1)
+      .step(0.05)
+      .default(0.7)
+      .description('Minimum Jev confidence for automatically starting a thread from an item reply. Keyword fallback is used if Jev is off or unavailable.'),
     revisionRepositories: Schema.array(Schema.string())
       .default([])
       .description('Repositories whose main bookmark is read for "Closes b:<n>", besides every project an open item names.'),

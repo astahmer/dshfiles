@@ -119,6 +119,8 @@ export interface StartThreadRequest {
   readonly message: string
   /** Open the created thread once it exists; false leaves the panel where it is. */
   readonly open: boolean
+  /** Whether this request reports progress and success in the in-app notice center. */
+  readonly notifyInApp?: boolean
 }
 
 /** What a start-thread run answered: the Session it created, or why nothing was started. */
