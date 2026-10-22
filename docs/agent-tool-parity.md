@@ -589,6 +589,26 @@ installed), optmem's four tools (not installed), `extend_goal_budget`,
 `complete_blocked_goal`, `dshx_capabilities`, `agent-toolkit.versions`, and the
 16 thread/project tools added here.
 
+## Pick the tool before inspecting
+
+Tool discovery is a measured cost: the 2026-10-15…22 corpus logged 651
+`cordis_inspect_query` calls, 611 `list_agents`, 436 `dshx_comm_agents`, 224
+`dshx_capabilities` and dozens of MCP listings while looking for a surface one of
+them already answers. Start from the intent:
+
+| You want                                       | Call                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| Which plugin APIs exist, and their schemas     | `dshx_capabilities`, optionally with `owner`                             |
+| Who else is live, and their sessions           | `dshx_comm_agents` once, then `dshx_comm_send` / `dshx_comm_inbox`       |
+| One thread's state, or pending questions       | `thread_list`, or `list_thread_questions` with `sessionId`               |
+| A background job's result                      | `background_jobs_wait`, then `background_jobs_output`                    |
+| Repository state, conflicts, what landed       | `node scripts/jj-state.mjs`; `jj_thread_status` for one thread workspace |
+| MCP servers and the tools they registered      | `mcp_list_servers` (not `cordis_inspect_query`)                          |
+| What this build loads, and whether it is fresh | `dshx status` / `dshx plugins list` from a shell                         |
+
+Prefer the narrowest owned tool over a generic service inspection, and never loop
+a listing to pass time — see the waiting table in [`AGENTS.md`](../AGENTS.md).
+
 ## Landed: thread and project tools
 
 The sibling revision `feat(thread-sidebar): let an Agent drive thread and project
