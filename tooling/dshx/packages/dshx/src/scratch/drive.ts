@@ -148,12 +148,14 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         if (parsed === undefined) throw new Error('step does not match the reach grammar')
         await StartupDialogs.dismissProviderSetupIfShown(page)
         if (parsed.action === 'seed') {
-          if (!seeded.some(applied => applied.seed === parsed.seed)) {
+          const alreadySeeded = seeded.some(applied => applied.seed === parsed.seed)
+          // Thread-scoped state can drift between reaches, so these seeds recreate and select a fresh target each time.
+          if (!alreadySeeded || parsed.seed === 'tool-call-thread' || parsed.seed === 'rebase-ready-thread') {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
             const outcome = await ScratchSeedRuntime.applySeed({ state, seed: parsed.seed, page, timeoutMs })
             if (outcome.changedFile !== undefined) applied.changedFile = outcome.changedFile
             if (outcome.fakeProvider !== undefined) fakeProvider = outcome.fakeProvider
-            seeded = [...seeded, applied]
+            if (!alreadySeeded) seeded = [...seeded, applied]
             const next: ScratchState = { ...state, seeds: seeded }
             if (fakeProvider !== undefined) next.fakeProvider = fakeProvider
             await ScratchStateRuntime.write(next)

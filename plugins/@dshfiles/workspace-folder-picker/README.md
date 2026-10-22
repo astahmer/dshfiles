@@ -1,5 +1,7 @@
 # Workspace Folder Picker
 
+![Add workspaces from the folder browser](docs/screenshots/workspace-folder-add-flow.png)
+
 Replaces the Add workspace directory flow in the header workspace menu and the
 sidebar browser with the shared `ProjectFolderPicker` opened directly in
 directory-browsing mode. It also exports the same Host API for the New-thread

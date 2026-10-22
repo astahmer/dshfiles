@@ -8,8 +8,8 @@
       "surfaces": ["client", "host", "command", "settings", "integration"],
       "reach": [
         "click button \"New thread\"",
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Project checks\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"/project-checks\"",
+        "expect option \"Project checks*\"",
         "click option \"Project checks*\"",
         "expect heading \"Project checks\""
       ],

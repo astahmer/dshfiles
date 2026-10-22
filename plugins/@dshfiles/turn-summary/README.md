@@ -1,5 +1,7 @@
 # @dshfiles/turn-summary
 
+![A summary line under each finished turn](docs/screenshots/turn-summary-line.png)
+
 One line under each finished turn that says what the agent did with tools:
 
 > Ran 6 commands · edited 3 files · read 4 files · 2 searches · **1 failed ›**

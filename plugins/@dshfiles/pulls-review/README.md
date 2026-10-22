@@ -1,5 +1,7 @@
 # pulls.review
 
+![Group a thread workspace's changes into review scopes](docs/screenshots/thread-review-scopes.png)
+
 Review this thread's changes the way [pulls.review](https://pulls.review) does:
 changed files grouped into scopes, one scope at a time, with review progress —
 inside DSH, for the thread's own jj workspace.

@@ -1,5 +1,7 @@
 # Prompt Stash
 
+![Keep draft attachments across thread navigation](docs/screenshots/draft-attachment-retention.png)
+
 Prompt Stash provides two composer actions. Both keep prompt text in this browser and use DSH's revision-guarded insertion API; neither submits a message. Prompt data stays in this browser and is not sent to the Host or synced across devices.
 
 ## Prompts

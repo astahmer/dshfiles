@@ -7,6 +7,7 @@
  *   node scripts/plugin-screenshots.mjs --check           gate: every UI plugin has one and its README embeds it
  *   node scripts/plugin-screenshots.mjs --missing         the same list, without failing
  *   node scripts/plugin-screenshots.mjs [--only a,b]      capture from a running scratch DSH (pnpm screenshots)
+ *   node scripts/plugin-screenshots.mjs --missing-only    capture only UI plugins without a screenshot
  *   node scripts/plugin-screenshots.mjs --only backlog --feature backlog-mentions
  *
  * A "UI plugin" is a bundle whose catalog in `plugins/@dshfiles/<name>/dshx.features.json` lists a feature with the
@@ -25,7 +26,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { DshxFeatureCatalogSchema } from '../tooling/dshx/packages/dshx/src/project/features.ts'
-import { embedScreenshot, gatedPlugins, screenshotProblems, targetFeatures } from './plugin-screenshots-core.mjs'
+import { embedScreenshot, gatedPlugins, missingScreenshotPlugins, screenshotProblems, targetFeatures } from './plugin-screenshots-core.mjs'
 
 const repositoryRoot = resolve(import.meta.dirname, '..')
 const pluginsRoot = join(repositoryRoot, 'plugins', '@dshfiles')
@@ -44,6 +45,7 @@ const primaryFeatures = {
   'input-trigger': ['multiword-at-queries'],
   'jj-integration': ['thread-workspaces-panel'],
   'multi-host': ['host-management'],
+  'queue-reorder': ['queued-attachment-previews'],
 }
 
 const { values } = parseArgs({
@@ -51,6 +53,7 @@ const { values } = parseArgs({
   options: {
     check: { type: 'boolean' },
     missing: { type: 'boolean' },
+    'missing-only': { type: 'boolean' },
     only: { type: 'string' },
     feature: { type: 'string', multiple: true },
     name: { type: 'string', default: 'shots' },
@@ -187,6 +190,11 @@ if (unknown.length > 0) {
   console.error(`not a UI plugin: ${unknown.join(', ')}\nOne of: ${plugins.map(plugin => plugin.name).join(', ')}`)
   process.exit(2)
 }
+if (values['missing-only'] === true && (values.check === true || values.missing === true)) {
+  console.error('--missing-only selects capture targets and cannot be combined with --check or --missing.')
+  process.exit(2)
+}
+const captureScope = values['missing-only'] === true ? missingScreenshotPlugins({ plugins: scope, screenshotsOf }) : scope
 
 if (values.check === true || values.missing === true) {
   const rows = scope.map(plugin => ({ plugin, problems: problemsOf(plugin) }))
@@ -234,7 +242,7 @@ if (doctor.ok !== true) {
 }
 
 const results = []
-for (const plugin of scope) {
+for (const plugin of captureScope) {
   const outcome = capture(plugin)
   results.push(outcome)
   for (const screenshot of outcome.screenshots)
@@ -246,7 +254,7 @@ if (values.json === true)
   console.log(JSON.stringify({ schemaVersion: 1, command: 'screenshots', ok: results.every(result => result.failures.length === 0), data: results }, null, 2))
 
 const failures = results.flatMap(result => result.failures)
-const missingReach = scope.filter(plugin => plugin.reachable.length === 0).map(plugin => plugin.name)
+const missingReach = captureScope.filter(plugin => plugin.reachable.length === 0).map(plugin => plugin.name)
 if (missingReach.length > 0)
   console.error(`no reach steps, so no screenshot path: ${missingReach.join(', ')}\nAdd "reach" to the plugin's catalog feature (skill maintain-verify-dsh).`)
 process.exit(failures.length === 0 && missingReach.length === 0 ? 0 : 1)

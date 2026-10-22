@@ -268,7 +268,7 @@
       "id": "queued-attachment-previews",
       "title": "Preview queued attachments",
       "summary": "Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.",
-      "reach": ["click text \"Queue source\"", "expect group \"2 attachments\"", "expect img \"red.png\"", "expect text \"note.txt\""],
+      "reach": ["seed queue-preview-thread", "expect group \"2 attachments\"", "expect img \"red.png\"", "expect text \"note.txt\""],
       "surfaces": ["client", "settings"],
       "configuration": [
         {

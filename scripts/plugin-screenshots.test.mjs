@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { embedScreenshot, gatedPlugins, isUiBundle, reachableFeatures, screenshotProblems, targetFeatures } from './plugin-screenshots-core.mjs'
+import {
+  embedScreenshot,
+  gatedPlugins,
+  isUiBundle,
+  missingScreenshotPlugins,
+  reachableFeatures,
+  screenshotProblems,
+  targetFeatures,
+} from './plugin-screenshots-core.mjs'
 
 const feature = (id, surfaces = ['client'], reach) => ({
   id,
@@ -91,6 +99,15 @@ describe('embedding a capture', () => {
   it('leaves a README that already embeds it untouched', () => {
     const readme = '# Plugin\n\n![A screen](docs/screenshots/a.png)\n\nWhat it does.\n'
     assert.equal(embedScreenshot({ readme, imagePath: 'docs/screenshots/a.png', alt: 'A screen' }), readme)
+  })
+})
+
+describe('missing screenshot selection', () => {
+  it('selects only UI plugins without an existing screenshot', () => {
+    const plugins = [{ name: 'already-covered' }, { name: 'needs-capture' }]
+    assert.deepEqual(missingScreenshotPlugins({ plugins, screenshotsOf: plugin => (plugin.name === 'already-covered' ? ['capture.png'] : []) }), [
+      { name: 'needs-capture' },
+    ])
   })
 })
 

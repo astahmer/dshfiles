@@ -1,5 +1,7 @@
 # @dshfiles/test-runs
 
+![Vitest runs as a test-results card](docs/screenshots/test-run-card.png)
+
 A `bash` call that runs Vitest renders as a test-results card in the chat transcript instead of a terminal block:
 
 - a header with the tally (`2 failed · 40 passed · 1 skipped`) and the run's duration, over a pass/fail/skip bar;

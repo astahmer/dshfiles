@@ -41,7 +41,8 @@ const externalDependencySchema = z
  * reference, so the chat link is really rendered before the walk clicks it;
  * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`;
  * `backlog-jev-enabled` turns on Backlog Jev in scratch Settings only when off, without supplying a credential;
- * `multi-host-hosts` writes a synthetic host directory (one hidden host, one SSH host) for the Hosts page.
+ * `multi-host-hosts` writes a synthetic host directory (one hidden host, one SSH host) for the Hosts page;
+ * `queue-preview-thread` holds a fake-provider turn while queuing an image and file, for queue preview UI.
  */
 export const REACH_SEEDS = [
   'rebase-ready-thread',
@@ -54,6 +55,7 @@ export const REACH_SEEDS = [
   'fake-secret-cli',
   'backlog-jev-enabled',
   'multi-host-hosts',
+  'queue-preview-thread',
 ] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 

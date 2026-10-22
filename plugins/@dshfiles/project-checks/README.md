@@ -1,5 +1,7 @@
 # Project Checks
 
+![Run trusted project checks](docs/screenshots/trusted-actions.png)
+
 Project Checks adds a session-scoped action in the native composer command menu. It runs profile-trusted, named commands in the active session's directory, stores bounded authoritative receipts in DSH storage, can verify configured actions before a turn closes, shows native hook invocation/result records, and optionally publishes safe summaries to Activity Timeline.
 
 ## Configure trusted actions

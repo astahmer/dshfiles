@@ -1,5 +1,7 @@
 # @dshfiles/main-tabs
 
+![Browser-like tabs above the main view](docs/screenshots/main-view-tabs.png)
+
 Browser-like tabs above DSH's main view. Every thread or global panel the main view shows (Plugins, Jujutsu, AI Accounts, Usage analytics, Memory, Thread workspaces, Workbench, …) opens or focuses a tab; picking a tab shows it again. The strip looks like DSH's own right-panel tabs (`dsh-client-ui-dockkit`): same 28px pills, typography, hover and active colors, hairline separators and close cross, built from the same `--dsw-*` tokens.
 
 This is an owned DSH bundle built with dshx (no port: nothing upstream does this). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.

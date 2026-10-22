@@ -43,6 +43,8 @@ export const embedScreenshot = ({ readme, imagePath, alt }) => {
 }
 
 /** `--feature` picks specific features; otherwise a plugin's own picks, or its first reachable feature. */
+export const missingScreenshotPlugins = ({ plugins, screenshotsOf }) => plugins.filter(plugin => screenshotsOf(plugin).length === 0)
+
 export const targetFeatures = ({ catalog, picked, primary }) => {
   const reachable = reachableFeatures(catalog).map(feature => feature.id)
   const named = picked.filter(feature => reachable.includes(feature))

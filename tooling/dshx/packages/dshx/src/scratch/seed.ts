@@ -422,6 +422,32 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
   return process
 }
 
+const seedQueuePreviewThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  const process = await configureFakeProviderThread({ state, page, seed: 'queue-preview-thread', timeoutMs })
+  await sendFakeProviderTurn(page, '[[title Queue source]] [[hold]]', timeoutMs)
+  await page.getByText('Queue source', { exact: true }).first().waitFor({ state: 'visible', timeout: timeoutMs })
+  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  await composer.fill('first queued, with an image and a file', { timeout: timeoutMs })
+  await page
+    .locator('[data-composer-card] input[type="file"]')
+    .first()
+    .setInputFiles([
+      join(DSHFILES_ROOT, 'tooling/dshx/e2e/fixtures/attachments/red.png'),
+      join(DSHFILES_ROOT, 'tooling/dshx/e2e/fixtures/attachments/note.txt'),
+    ])
+  await page.getByRole('button', { name: 'Remove image red.png', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
+  await page.getByRole('button', { name: 'Remove file note.txt', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    await composer.press('Enter', { timeout: timeoutMs })
+    if ((await composer.textContent())?.trim() === '') break
+    if (Date.now() > deadline) throw new ScratchError('seed-failed', 'The queue preview message did not submit.', 'Check the scratch composer upload state.')
+    await page.waitForTimeout(250)
+  }
+  await page.getByRole('group', { name: '2 attachments', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
+  return process
+}
+
 const seedJevSetupChatThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
   const process = await configureFakeProviderThread({ state, page, seed: 'jev-setup-chat-thread', timeoutMs })
   await sendFakeProviderTurn(page, JEV_SETUP_CHAT_PROMPT, timeoutMs)
@@ -644,6 +670,7 @@ const applySeed = async (input: {
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'credential-recovery') return { fakeProvider: await seedCredentialRecovery(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
+  if (input.seed === 'queue-preview-thread') return { fakeProvider: await seedQueuePreviewThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'jev-setup-chat-thread') return { fakeProvider: await seedJevSetupChatThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)

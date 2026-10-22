@@ -38,8 +38,8 @@ pnpm --dir plugins run build
 
 dshx() { fnm exec --using="$(cat .node-version)" node "$PWD/tooling/dshx/packages/dshx/dist/cli/bin.js" "$@"; }
 dshx dev up --name shots                    # every owned bundle, headless Chromium
-node --run screenshots                      # capture everything missing
-node --run screenshots -- --only backlog    # or several: thread-sidebar,jj-integration
+node --run screenshots -- --missing-only     # capture only plugins still missing one
+node --run screenshots -- --only backlog     # or several: thread-sidebar,jj-integration
 node --run screenshots -- --only backlog --feature backlog-mentions   # a second screen
 dshx dev shot --label ad-hoc                # an ad-hoc capture while the instance runs
 dshx dev down --name shots
@@ -47,10 +47,11 @@ dshx dev down --name shots
 
 `node --run screenshots` drives each target's `reach` steps with `dshx dev
 open`, captures the resulting page with `dshx dev shot`, writes
-`docs/screenshots/<feature-id>.png` and embeds it in the README. A plugin is
-targeted by its first reachable feature unless it appears in the script's
-`primaryFeatures` map (the surface that shows the plugin best) or `--feature`
-names others.
+`docs/screenshots/<feature-id>.png` and embeds it in the README. Add
+`--missing-only` to capture only UI plugins that currently lack a screenshot;
+combine it with `--only` to scope the batch. A plugin is targeted by its first
+reachable feature unless it appears in the script's `primaryFeatures` map (the
+surface that shows the plugin best) or `--feature` names others.
 
 `pnpm screenshots` is the same script without `node --run`'s argument
 forwarding rules, so `pnpm screenshots --only backlog` reads naturally there;
