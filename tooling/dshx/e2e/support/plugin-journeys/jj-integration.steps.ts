@@ -980,7 +980,7 @@ Then('the New thread picker shows its Projects and JJ workspace listings for a d
 })
 
 /** Long enough to queue, undo and queue again while the turn still runs, even on a loaded machine. */
-const BUSY_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 60 && echo queued-integration', description: 'Keep the thread busy' })}]]`
+const BUSY_BASH_DIRECTIVE = `[[once call bash ${JSON.stringify({ command: 'sleep 60 && echo queued-integration', description: 'Keep the thread busy' })}]]`
 const queueIntegrationButton = (page: Page) => page.getByRole('button', { name: 'Queue integration into main', exact: true })
 const undoQueuedIntegrationButton = (page: Page) => workspaceMenu(page).getByRole('button', { name: 'Cancel the queued integration into main', exact: true })
 
