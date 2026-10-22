@@ -58,6 +58,8 @@ describe('classifyFailure', () => {
     expect(FailureRecoveryModel.classifyFailure({ message: 'bad gateway', code: 'PI_AI_ERROR', status: 502 })).toBe('transport')
     expect(FailureRecoveryModel.classifyFailure(codexRetryHint)).toBe('transport')
     expect(FailureRecoveryModel.classifyFailure({ message: 'unsupported parameter', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure({ message: 'upstream returned 503', code: 'SERVER' })).toBe('transport')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'idle stream closed', code: 'STREAM_CLOSED' })).toBe('transport')
     expect(FailureRecoveryModel.classifyFailure(rateLimit)).toBe('rateLimit')
     expect(FailureRecoveryModel.classifyFailure(quota)).toBe('exhausted')
     expect(FailureRecoveryModel.classifyFailure({ message: 'token expired', code: 'AUTH', status: 401 })).toBe('auth')
@@ -158,6 +160,30 @@ describe('failure recovery through the account pool', () => {
       failureKind: 'transport',
       step: { kind: 'retry', delayMs: 1_000 },
     })
+  })
+
+  it('cools a spent plan until the reset its failure text declares', () => {
+    const { pool, fail } = setup()
+    expect(fail({ message: 'You have hit your ChatGPT usage limit (plus plan). Try again in ~151 min.', code: 'PI_AI_ERROR' })).toMatchObject({
+      kind: 'retry',
+      failureKind: 'exhausted',
+      step: { kind: 'failover', to: 'codex_work' },
+    })
+
+    expect(pool.isHealthy('codex', NOW + 150 * 60_000)).toBe(false)
+    expect(pool.isHealthy('codex', NOW + 152 * 60_000)).toBe(true)
+  })
+
+  it('cools an account after consecutive transport failures', () => {
+    const { pool, fail } = setup()
+
+    expect(fail(transport, 1)).toMatchObject({ kind: 'retry', step: { kind: 'retry' } })
+    expect(pool.isHealthy('codex', NOW)).toBe(true)
+    expect(fail(transport, 2)).toMatchObject({ kind: 'retry', step: { kind: 'retry' } })
+    expect(fail(transport, 3)).toMatchObject({ kind: 'retry', step: { kind: 'retry' } })
+
+    expect(pool.isHealthy('codex', NOW)).toBe(false)
+    expect(pool.isHealthy('codex', NOW + 61_000)).toBe(true)
   })
 
   it('retries transport failures in place first and numbers every attempt of one chain under one retry id', () => {

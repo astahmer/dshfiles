@@ -2,6 +2,7 @@ import { isContextWindowExceededError, isQuotaExceededError, type LlmCallConfig,
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { AccountPool } from './account-pool.js'
 import { decideRecovery, NO_PROGRESS, type FailureKind, type RecoveryPolicy, type RecoveryProgress, type RecoveryStep } from './failure-policy.js'
+import { declaredResetWaitMs } from './reset-hint.js'
 
 const EXHAUSTED_CODES: ReadonlySet<string> = new Set([
   'QUOTA',
@@ -13,7 +14,9 @@ const EXHAUSTED_CODES: ReadonlySet<string> = new Set([
 ])
 const RATE_LIMIT_CODES: ReadonlySet<string> = new Set(['RATE_LIMIT', 'RATE_LIMIT_EXCEEDED'])
 const AUTH_CODES: ReadonlySet<string> = new Set(['AUTH', 'MISSING_CREDENTIAL', 'INVALID_CREDENTIAL', 'ACCOUNT_SIGNED_OUT', 'ACCOUNT_SIGN_IN_REQUIRED'])
-const TRANSPORT_CODES: ReadonlySet<string> = new Set(['TRANSPORT', 'TIMEOUT', 'OVERLOADED', 'LLM_STREAM_IDLE_TIMEOUT'])
+const TRANSPORT_CODES: ReadonlySet<string> = new Set(['TRANSPORT', 'TIMEOUT', 'OVERLOADED', 'LLM_STREAM_IDLE_TIMEOUT', 'SERVER', 'STREAM_CLOSED'])
+/** Consecutive transport failures on one account before it cools like a rate-limited one. */
+export const TRANSPORT_FAILURE_LIMIT = 3
 const OPENAI_RETRY_HINT = /An error occurred while processing your request\.\s+You can retry your request\b/i
 const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large\b/i
 /**
@@ -122,7 +125,7 @@ interface StepState {
  * conversation, reset whenever a new step fails.
  */
 const createFailureRecovery = (deps: {
-  readonly pool: Pick<AccountPool, 'isHealthy' | 'noteRateLimited' | 'bindRoute' | 'routeFor' | 'unbind'>
+  readonly pool: Pick<AccountPool, 'isHealthy' | 'noteDeclaredReset' | 'noteRateLimited' | 'bindRoute' | 'routeFor' | 'unbind'>
   readonly isAccountRoute: (provider: string) => boolean
   readonly readPolicy: () => RecoveryPolicy
   /** Ordered, compatible, visible accounts that could take over from `from` for `model`; health is checked here. */
@@ -143,6 +146,18 @@ const createFailureRecovery = (deps: {
   readonly newRetryId: () => string
 }) => {
   const steps = new Map<string, StepState>()
+  /** Account → consecutive transport failures, so an account that keeps dropping connections cools down. */
+  const transportFailures = new Map<string, number>()
+
+  /** Cool until the reset the failure text declares, or for the configured cooldown when it names none. */
+  const cool = (account: string, failure: Pick<LlmFailure, 'message' | 'providerRetryAfterMs'>, now: number): void => {
+    const declared = declaredResetWaitMs(failure.message, now)
+    if (declared === undefined) {
+      deps.pool.noteRateLimited(account, failure.providerRetryAfterMs, now)
+      return
+    }
+    deps.pool.noteDeclaredReset(account, Math.max(declared, failure.providerRetryAfterMs ?? 0), now)
+  }
 
   const stateFor = (conversationKey: string, turn: number, step: number): StepState => {
     const existing = steps.get(conversationKey)
@@ -182,11 +197,23 @@ const createFailureRecovery = (deps: {
       readonly now?: number
     }): RecoveryAction => {
       const now = input.now ?? Date.now()
-      const chainCandidates = deps.chain?.candidates({ conversationKey: input.conversationKey, current: { provider: input.provider, model: input.model }, now })
-      if (!deps.isAccountRoute(input.provider) && chainCandidates === undefined) return { kind: 'pass' }
       const failureKind = classifyFailure(input.failure)
       if (failureKind === undefined) return { kind: 'pass' }
       const account = input.routedAccountId ?? deps.pool.routeFor(input.conversationKey, input.provider, now)
+      if (failureKind === 'transport') {
+        const consecutive = (transportFailures.get(account) ?? 0) + 1
+        if (consecutive >= TRANSPORT_FAILURE_LIMIT) {
+          deps.pool.noteRateLimited(account, undefined, now)
+          transportFailures.delete(account)
+        } else {
+          transportFailures.set(account, consecutive)
+        }
+      } else {
+        transportFailures.delete(account)
+      }
+      // Asked after cooling an account, so a chain never proposes the account that just failed.
+      const chainCandidates = deps.chain?.candidates({ conversationKey: input.conversationKey, current: { provider: input.provider, model: input.model }, now })
+      if (!deps.isAccountRoute(input.provider) && chainCandidates === undefined) return { kind: 'pass' }
       const policy = deps.readPolicy()[failureKind]
       const state = stateFor(input.conversationKey, input.turn, input.step)
       const candidates = !policy.failover
@@ -205,12 +232,13 @@ const createFailureRecovery = (deps: {
       const step = decision.step
 
       if (step.kind === 'give-up') {
-        if (failureKind === 'rateLimit' || failureKind === 'exhausted') deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
+        if (failureKind === 'rateLimit' || failureKind === 'exhausted') cool(account, input.failure, now)
         return { kind: 'give-up', then: step.then, failureKind, account }
       }
       if (step.kind === 'luna-reserve') deps.lunaReserve.engage(account)
       if (step.kind === 'failover') {
-        deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
+        if (failureKind === 'rateLimit' || failureKind === 'exhausted') cool(account, input.failure, now)
+        else deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
         if (chainCandidates === undefined) deps.pool.bindRoute(input.conversationKey, input.provider, step.to, account)
         else deps.chain?.bind({ conversationKey: input.conversationKey, to: step.to })
       }

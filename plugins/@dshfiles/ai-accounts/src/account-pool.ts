@@ -1,4 +1,5 @@
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { MAX_RESET_WAIT_MS } from './reset-hint.js'
 /**
  * Account pool and distribution, after `dsh-workbuddy-xdpool`.
  *
@@ -68,6 +69,8 @@ export interface AccountPool {
   }): PoolAccount | undefined
   noteServed(accountId: string): void
   noteRateLimited(accountId: string, retryAfterMs: number | undefined, now?: number): void
+  /** Cool an account until the reset its provider declared, floored at the configured cooldown and capped at a day. */
+  noteDeclaredReset(accountId: string, waitMs: number, now?: number): void
   isHealthy(accountId: string, now?: number): boolean
   bindRoute(conversationKey: string, from: string, to: string, failedAccountId?: string): void
   routeFor(conversationKey: string | undefined, provider: string, now?: number): string
@@ -214,6 +217,20 @@ export const createAccountPool = (options: AccountPoolOptions = {}): AccountPool
       const account = accounts.get(accountId)
       if (account === undefined) return
       const wait = retryAfterMs !== undefined && Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : defaultCooldownMs
+      account.cooldownUntil = now + wait
+      account.cooldownMs = wait
+    },
+
+    /**
+     * A reset the provider declared in its failure text ("Try again in ~242 min", "resets 2:10am").
+     * The configured cooldown is the floor, so a short hint never shortens a normal cooldown, and a
+     * plan is never cooled for more than a day.
+     */
+    noteDeclaredReset(accountId, waitMs, now = Date.now()) {
+      const account = accounts.get(accountId)
+      if (account === undefined) return
+      const requested = Number.isFinite(waitMs) && waitMs > 0 ? waitMs : defaultCooldownMs
+      const wait = Math.min(Math.max(requested, defaultCooldownMs), MAX_RESET_WAIT_MS)
       account.cooldownUntil = now + wait
       account.cooldownMs = wait
     },

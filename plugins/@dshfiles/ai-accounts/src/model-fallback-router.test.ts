@@ -125,3 +125,64 @@ describe('model fallback router', () => {
     expect(restarted.router.active('thread')).toEqual(claude)
   })
 })
+
+describe('per-provider family chain', () => {
+  const familyRouter = (
+    options: {
+      readonly distribution?: Distribution
+      readonly siblings?: (input: { readonly provider: string; readonly model: string | undefined }) => readonly FallbackRoute[] | undefined
+    } = {},
+  ) => {
+    const store = createModelFallbackStore({
+      tables: { chains: memoryTable(), active: memoryTable(), preferences: memoryTable() },
+      now: () => 1_000,
+    })
+    const router = createModelFallbackRouter({
+      store: () => store,
+      distribution: () => options.distribution ?? 'priority',
+      available: () => true,
+      siblings: options.siblings ?? (() => undefined),
+      onError: message => {
+        throw new Error(message)
+      },
+    })
+    return { router, store }
+  }
+
+  const codexFamily = ({ provider, model }: { readonly provider: string; readonly model: string | undefined }) =>
+    provider.startsWith('codex') && model !== undefined
+      ? [
+          { provider: 'codex-alex2', model },
+          { provider: 'opencode-go-alex', model },
+        ]
+      : undefined
+
+  it('walks one rung per sibling account when the thread has no stored chain', () => {
+    const { router } = familyRouter({ siblings: codexFamily })
+    const from = { provider: 'codex-emialex', model: 'gpt-6' }
+
+    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: from })).toBeUndefined()
+    expect(router.candidates({ sessionId: 'thread', current: from, now: 1_000 })).toEqual(['codex-alex2/gpt-6', 'opencode-go-alex/gpt-6'])
+
+    router.bind({ sessionId: 'thread', to: 'codex-alex2/gpt-6' })
+    expect(router.active('thread')).toEqual({ provider: 'codex-alex2', model: 'gpt-6' })
+    expect(router.routeRequest({ sessionId: 'thread', turn: 1, request: from })).toEqual({ provider: 'codex-alex2', model: 'gpt-6' })
+  })
+
+  it('leaves Sticky threads and kinds without siblings on account fail-over', () => {
+    const sticky = familyRouter({ distribution: 'sticky', siblings: codexFamily })
+    expect(sticky.router.candidates({ sessionId: 'thread', current: { provider: 'codex-emialex', model: 'gpt-6' }, now: 1_000 })).toBeUndefined()
+
+    const claude = familyRouter({
+      siblings: ({ provider, model }) => (provider === 'claude_work' ? undefined : model === undefined ? undefined : codexFamily({ provider, model })),
+    })
+    expect(claude.router.candidates({ sessionId: 'thread', current: { provider: 'claude_work', model: 'claude-opus-5-5' }, now: 1_000 })).toBeUndefined()
+  })
+
+  it('keeps a stored chain ahead of the derived family chain', async () => {
+    const { router, store } = familyRouter({ siblings: codexFamily })
+    await store.setChain({ sessionId: 'thread', chain: [{ provider: 'deepseek', model: 'deepseek-chat' }] })
+
+    expect(router.candidates({ sessionId: 'thread', current: { provider: 'codex-emialex', model: 'gpt-6' }, now: 1_000 })).toEqual(['deepseek/deepseek-chat'])
+  })
+})

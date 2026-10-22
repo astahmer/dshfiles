@@ -56,6 +56,40 @@ describe('account pool route reconciliation', () => {
   })
 })
 
+describe('declared reset cooldown', () => {
+  const poolWith = (cooldownMs: number) => {
+    const pool = createAccountPool({ cooldownMs })
+    pool.put({ id: 'codex-a', kind: 'codex', label: 'Codex A' })
+    return pool
+  }
+
+  it('cools until the reset the provider declared', () => {
+    const pool = poolWith(60_000)
+    const now = 1_000_000
+    pool.noteDeclaredReset('codex-a', 151 * 60_000, now)
+
+    expect(pool.isHealthy('codex-a', now + 150 * 60_000)).toBe(false)
+    expect(pool.isHealthy('codex-a', now + 152 * 60_000)).toBe(true)
+    expect(pool.describe()[0]?.cooldownMs).toBe(151 * 60_000)
+  })
+
+  it('floors a short hint at the configured cooldown', () => {
+    const pool = poolWith(60_000)
+    pool.noteDeclaredReset('codex-a', 5_000, 1_000)
+
+    expect(pool.describe()[0]?.cooldownMs).toBe(60_000)
+    expect(pool.isHealthy('codex-a', 60_000)).toBe(false)
+    expect(pool.isHealthy('codex-a', 61_001)).toBe(true)
+  })
+
+  it('caps a distant reset at a day', () => {
+    const pool = poolWith(60_000)
+    pool.noteDeclaredReset('codex-a', 7 * 24 * 3_600_000, 1_000)
+
+    expect(pool.describe()[0]?.cooldownMs).toBe(24 * 3_600_000)
+  })
+})
+
 describe('creditServedAttempt', () => {
   const drain = async (chunks: readonly StreamChunk[], accountId: string | undefined) => {
     const served: string[] = []

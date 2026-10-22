@@ -355,10 +355,27 @@ export default definePlugin({
             .get('llm')
             ?.listProviders()
             .some(provider => provider.id === route.provider) ?? false)
+    // A Codex or OpenCode Go account fails over to its sibling accounts with the same model, one rung each.
+    // Claude never joins a family: it neither falls back nor is a fail-over target.
+    const familySiblings = (input: { readonly provider: string; readonly model: string | undefined }): readonly FallbackRoute[] | undefined => {
+      const model = input.model
+      if (model === undefined || model === '') return undefined
+      const settings = AccountSettingsModel.readRecoverySettings()
+      return RequestAccountRouting.failoverAccountIds({
+        from: input.provider,
+        model,
+        routes,
+        distribution: pool.distribution(),
+        usageOrder: settings.usageOrder,
+        hiddenAccountIds: settings.hiddenUsageAccounts,
+        modelsCompatible,
+      }).map(provider => ({ provider, model }))
+    }
     const fallbackRouter = createModelFallbackRouter({
       store: () => fallbackStore,
       distribution: () => pool.distribution(),
       available: fallbackAvailable,
+      siblings: familySiblings,
       onError: message => ctx.logger.warn(`ai-accounts: ${message}`),
     })
     runtime.modelFallbackRouter = fallbackRouter
@@ -682,24 +699,40 @@ export default definePlugin({
                   request = { ...proposedRest, provider: fallback.provider, model: fallback.model }
                   if (fallback.reasoningEffort !== undefined) request = { ...request, reasoningEffort: ReasoningEffortId(fallback.reasoningEffort) }
                 }
+                const preflight = RequestAccountRouting.selectionPreflight({
+                  provider: request.provider,
+                  model: request.model,
+                  routes,
+                  nativeProviders: (llm?.listProviders() ?? []).map(provider => provider.id),
+                  offersModel: (provider, model) => modelForRoute(provider, model) !== undefined,
+                  pool,
+                })
+                if (preflight.kind === 'unserved') throw RequestAccountRouting.unservedProviderError(request.provider)
+                if (preflight.kind === 'route') {
+                  ctx.logger.warn(
+                    `ai-accounts: selection names provider "${request.provider}" with no adapter; serving this request from ${preflight.provider}`,
+                  )
+                  request = { ...request, provider: preflight.provider }
+                }
                 if (!routes.has(request.provider)) {
                   activeAccountRoutes.delete(id)
                   return request
                 }
                 const distribution = pool.distribution()
                 if (distribution !== 'sticky') pool.bindRoute(id, request.provider, request.provider)
+                const recoverySettings = AccountSettingsModel.readRecoverySettings()
                 // A fallback chain is the whole fail-over order, so its routes are not spread across accounts.
-                const accountId =
-                  distribution === 'sticky' || fallbackRouter.walksChain(id)
-                    ? recovery.routeFor(id, request.provider)
-                    : RequestAccountRouting.selectRequestAccount({
-                        provider: request.provider,
-                        model: request.model,
-                        conversationKey: id,
-                        routes,
-                        pool,
-                        modelsCompatible,
-                      })
+                const accountId = RequestAccountRouting.selectTurnAccount({
+                  provider: request.provider,
+                  model: request.model,
+                  conversationKey: id,
+                  routes,
+                  pool,
+                  modelsCompatible,
+                  chainWalking: fallbackRouter.walksChain(id),
+                  usageOrder: recoverySettings.usageOrder,
+                  hiddenAccountIds: recoverySettings.hiddenUsageAccounts,
+                })
                 activeAccountRoutes.set(id, { turn, step, provider: request.provider, model: request.model, accountId })
                 return request
               },

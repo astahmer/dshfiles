@@ -23,6 +23,8 @@ interface TurnState {
   readonly turn: number
   readonly tried: Set<string>
   last: RequestRoute | undefined
+  /** A family chain derived on the fly, so `bind` can find the route the candidates named. */
+  derivedChain: readonly FallbackRoute[] | undefined
 }
 
 const asRoute = (route: RequestRoute): FallbackRoute =>
@@ -31,8 +33,10 @@ const asRoute = (route: RequestRoute): FallbackRoute =>
     : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort }
 
 /**
- * Walks a thread's model fallback chain. It only runs under Priority distribution and only for a thread whose chain
- * has routes; every other thread keeps the account-level fail-over.
+ * Walks a thread's model fallback chain. It only runs under Priority distribution; a thread whose stored chain is
+ * empty walks its provider family's sibling accounts instead (one rung per account), so a Codex or OpenCode Go
+ * account fails over to its own siblings without any stored chain. Every other thread keeps the account-level
+ * fail-over, and a kind that must never fall back (Claude) has no siblings to walk.
  *
  * The Host moves the Session selection to the fallback after a fail-over, so the picker names it and later turns
  * stay on it. The router remembers which selection the fallback stands in for, so the thread can return to it (on
@@ -44,6 +48,11 @@ export const createModelFallbackRouter = (deps: {
   readonly distribution: () => Distribution
   /** Whether a route can take a request now: an enabled, healthy account, or a provider this Host serves. */
   readonly available: (route: FallbackRoute, now: number) => boolean
+  /**
+   * The sibling accounts `provider` may fall over to, one rung each, in the order they should be tried.
+   * `undefined` when this provider kind has no fallback family.
+   */
+  readonly siblings?: (input: { readonly provider: string; readonly model: string | undefined }) => readonly FallbackRoute[] | undefined
   readonly onError: (message: string) => void
 }) => {
   const standings = new Map<string, Standing | null>()
@@ -73,15 +82,18 @@ export const createModelFallbackRouter = (deps: {
     return standing.from
   }
 
-  const chainFor = (sessionId: string): readonly FallbackRoute[] => {
+  /** The stored chain when the thread has one, else the family siblings of the route now being sent. */
+  const chainFor = (sessionId: string, current?: { readonly provider: string; readonly model: string | undefined }): readonly FallbackRoute[] => {
     if (deps.distribution() !== 'priority') return []
-    return deps.store()?.chainFor(sessionId) ?? []
+    const stored = deps.store()?.chainFor(sessionId) ?? []
+    if (stored.length > 0 || current?.model === undefined || current.model === '') return stored
+    return deps.siblings?.({ provider: current.provider, model: current.model }) ?? []
   }
 
   const turnFor = (sessionId: string, turn: number): TurnState => {
     const existing = turns.get(sessionId)
     if (existing?.turn === turn) return existing
-    const fresh: TurnState = { turn, tried: new Set(), last: undefined }
+    const fresh: TurnState = { turn, tried: new Set(), last: undefined, derivedChain: undefined }
     turns.set(sessionId, fresh)
     return fresh
   }
@@ -102,7 +114,7 @@ export const createModelFallbackRouter = (deps: {
       const proposesFailed =
         ModelFallbackModel.sameRoute(input.request, standing.from) ||
         (standing.replaced !== undefined && ModelFallbackModel.sameRoute(input.request, standing.replaced))
-      if (proposesFailed && standing.turn === input.turn && chainFor(input.sessionId).length > 0) return decide(standing.route)
+      if (proposesFailed && standing.turn === input.turn && chainFor(input.sessionId, input.request).length > 0) return decide(standing.route)
       // The user picked a model again, or the chain stopped applying: the fallback no longer stands in for anything.
       stand(input.sessionId, null)
       return decide(undefined)
@@ -114,9 +126,10 @@ export const createModelFallbackRouter = (deps: {
       readonly current: { readonly provider: string; readonly model: string | undefined }
       readonly now: number
     }): string[] | undefined => {
-      const chain = chainFor(input.sessionId)
+      const chain = chainFor(input.sessionId, { provider: input.current.provider, model: input.current.model })
       if (chain.length === 0) return undefined
       const state = turns.get(input.sessionId)
+      if (state !== undefined) state.derivedChain = chain
       const current = { provider: input.current.provider, model: input.current.model ?? '' }
       state?.tried.add(ModelFallbackModel.routeKey(current))
       return ModelFallbackModel.remainingFallbacks({
@@ -128,8 +141,9 @@ export const createModelFallbackRouter = (deps: {
     },
 
     bind: (input: { readonly sessionId: string; readonly to: string }): FallbackRoute | undefined => {
-      const route = chainFor(input.sessionId).find(candidate => ModelFallbackModel.routeKey(candidate) === input.to)
       const state = turns.get(input.sessionId)
+      const chain = state?.derivedChain ?? chainFor(input.sessionId)
+      const route = chain.find(candidate => ModelFallbackModel.routeKey(candidate) === input.to)
       if (route === undefined || state?.last === undefined) return undefined
       const replaced = asRoute(state.last)
       stand(input.sessionId, { route, from: standingFor(input.sessionId)?.from ?? replaced, replaced, turn: state.turn })
