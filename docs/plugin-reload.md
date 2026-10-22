@@ -6,13 +6,20 @@ helps. `AGENTS.md` keeps the short version; this page is the detail.
 `@deepseek-ai/dsh-client-hmr` polls each bundle every 500 ms and pushes a graph
 frame, so a rebuilt `dist/client.js` reaches the browser without a restart.
 
-The Host's `hmr` entry is on in `web` too — it is disabled only when the launcher
-supplies no `profileContext` — with `root: []`: it watches the profile manifest
-and both user patch files, so ordinary plugin enable/disable and
+The stock Host's `hmr` entry would be on in `web` — it is disabled only when the
+launcher supplies no `profileContext` — with `root: []`: it watches the profile
+manifest and both user patch files, so ordinary plugin enable/disable and
 `cordis.patch.yml` edits recompose the running Host, and a recomposition also
 replaces the plugins whose linked-package files changed on disk — our
-`link:`-installed bundles included. What needs a restart, which is the user's
-call:
+`link:`-installed bundles included.
+
+This repository turns it **off**: `- id: hmr` / `disabled: true` in the seed's
+NIX-MANAGED region and, until that row reaches the live file, as a local row.
+A replacement dropped `sessionQuery` and took `session-controller` down twice on
+2026-10-19, so nothing recomposes a live `web` Host today and every plugin
+rebuild waits for a restart (see [recovery](recovery.md) and the
+[HMR gate plan](../plans/hmr-compat-gate/README.md)). What a stock Host reports
+when it does need a restart, which is the user's call:
 
 - a failed or unavailable module comparison, logged as
   `restart required: module-comparison`
