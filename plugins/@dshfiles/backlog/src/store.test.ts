@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BacklogItem } from './item.js'
+import type { BacklogItem, BacklogLink } from './item.js'
 import { BacklogItems } from './item.js'
 import { BacklogModel, type BacklogFileRecord } from './store.js'
 
@@ -38,6 +38,16 @@ const clock = (start: number) => {
 
 const user = { kind: 'user' } as const
 const agent = { kind: 'agent', sessionId: 'session-abc123', cwd: '/work/dshfiles' } as const
+
+describe('relationship identity', () => {
+  it('deduplicates identical targets even when their provenance differs', () => {
+    const first: BacklogLink = { type: 'thread', target: 'session-abc123', provenance: 'user' }
+    const duplicate: BacklogLink = { type: 'thread', target: 'session-abc123', provenance: 'agent' }
+    const other: BacklogLink = { type: 'thread', target: 'session-def456', provenance: 'user' }
+
+    expect(BacklogItems.uniqueLinks([first, duplicate, other])).toEqual([first, other])
+  })
+})
 
 describe('triage', () => {
   it('derives kind, title, body, tags and links from free text', () => {
@@ -270,7 +280,13 @@ describe('lifecycle signals', () => {
 
     const started = await store.applySignal({ id: 1, status: 'doing', link: { type: 'thread', target: 'session-abc123' }, reason: 'mentioned in a thread' })
     expect(started.ok && started.value.item.status).toBe('doing')
-    expect(started.ok && started.value.item.events.at(-1)).toEqual({ at: 9, actor: 'system', kind: 'moved', detail: 'inbox → doing (mentioned in a thread)' })
+    expect(started.ok && started.value.item.events.at(-1)).toEqual({
+      at: 9,
+      actor: 'system',
+      kind: 'moved',
+      detail: 'inbox → doing (mentioned in a thread)',
+      threadId: 'session-abc123',
+    })
 
     await store.update({ id: 1, attention: 'blocked', actor: agent })
     const closed = await store.applySignal({ id: 1, status: 'done', link: { type: 'revision', target: 'kvyxrlmkptyv' }, reason: 'closed by jj:kvyxrlmkptyv' })
@@ -307,25 +323,27 @@ describe('thread turn signals', () => {
 
   it('flags an open item when its thread stopped and clears only that flag when the thread finishes', async () => {
     const store = await workingItem()
-    const flagged = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'the thread failed: RATE_LIMIT' })
+    const flagged = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'blocked', reason: 'the thread failed: RATE_LIMIT' })
     expect(flagged.ok && flagged.value.item.attention).toBe('blocked')
     expect(flagged.ok && flagged.value.item.events.at(-1)?.detail).toBe('attention: blocked (the thread failed: RATE_LIMIT)')
+    expect(flagged.ok && flagged.value.item.events.at(-1)?.threadId).toBe('session-abc123')
     expect(store.list({ inbox: true }).items.map(item => item.id)).toEqual([1])
 
-    const cleared = await store.applyThreadAttention({ id: 1, attention: 'none', reason: 'the thread works again' })
+    const cleared = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'none', reason: 'the thread works again' })
     expect(cleared.ok && cleared.value.item.attention).toBe('none')
     expect(cleared.ok && cleared.value.item.events.at(-1)?.detail).toBe('attention: none (the thread works again)')
+    expect(cleared.ok && cleared.value.item.events.at(-1)?.threadId).toBe('session-abc123')
     expect(store.list({ inbox: true }).total).toBe(0)
   })
 
   it('leaves an attention the user set by hand, and a closed item, alone', async () => {
     const store = await workingItem()
     await store.update({ id: 1, attention: 'needs-input', actor: user })
-    const flagged = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'the thread stopped on a block' })
+    const flagged = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'blocked', reason: 'the thread stopped on a block' })
     expect(flagged.ok && flagged.value.item.attention).toBe('needs-input')
 
     await store.update({ id: 1, attention: 'none', status: 'done', actor: user })
-    const late = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'the thread stopped on a block' })
+    const late = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'blocked', reason: 'the thread stopped on a block' })
     expect(late.ok && late.value.item.attention).toBe('none')
     expect(late.ok && late.value.item.status).toBe('done')
   })
@@ -333,7 +351,7 @@ describe('thread turn signals', () => {
   it('keeps a block an agent flagged itself when a later turn finishes', async () => {
     const store = await workingItem()
     await store.update({ id: 1, attention: 'blocked', actor: agent })
-    const cleared = await store.applyThreadAttention({ id: 1, attention: 'none', reason: 'the thread works again' })
+    const cleared = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'none', reason: 'the thread works again' })
     expect(cleared.ok && cleared.value.item.attention).toBe('blocked')
   })
 })

@@ -39,6 +39,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 import { useComposerFiles } from './composer-attachments.js'
@@ -56,6 +57,7 @@ import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
 type OpenThread = (sessionId: string) => void
+type ThreadLabel = (sessionId: string) => string
 
 const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 const HOUR_MS = 3_600_000
@@ -83,9 +85,11 @@ const relationLabels = {
 
 const provenanceLabels = { user: 'you', agent: 'agent', extracted: 'from text', inferred: 'suggested' } as const
 
+const shortSessionId = (sessionId: string): string => sessionId.replace(/^session-/, '').slice(0, 8)
+
 const linkLabel = (link: BacklogLink): string => {
   if (link.type === 'item') return `b:${link.target}`
-  if (link.type === 'thread') return `Thread ${link.target.replace(/^session-/, '').slice(0, 8)}`
+  if (link.type === 'thread') return `Thread ${shortSessionId(link.target)}`
   if (link.type === 'revision') return `jj:${link.target}`
   if (link.type === 'url') return link.target.replace(/^https?:\/\//, '').replace(/\/$/, '')
   if (link.type === 'secret') return `secret:${link.target}`
@@ -373,10 +377,55 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
 
 type ConversationRun = { readonly kind: 'comment'; readonly event: BacklogEvent } | { readonly kind: 'changes'; readonly events: BacklogEvent[] }
 
+const ActivityDescription = (props: {
+  readonly event: BacklogEvent
+  readonly attention: BacklogAttention
+  readonly threadId: string | undefined
+  readonly threadLabel: ThreadLabel
+  readonly openThread: OpenThread
+}): JSX.Element => {
+  const description = ItemGlyphs.describeEvent(props.event, props.attention)
+  const threadId = props.threadId
+  if (threadId === undefined) return <>{description}</>
+  const reference = BacklogActivityReferences.threadReferenceRange(description, threadId)
+  if (reference === undefined) return <>{description}</>
+  const label = props.threadLabel(threadId)
+  const text = reference.text.startsWith('thread:')
+    ? `the thread “${label}”`
+    : `${reference.text.toLowerCase().startsWith('a ') ? 'a' : 'the'} thread “${label}”`
+  return (
+    <>
+      {description.slice(0, reference.start)}
+      <button
+        type="button"
+        aria-label={`Open thread ${label}`}
+        title={`Open thread ${label}`}
+        className="dshx:inline dshx:appearance-none dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:font-medium dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground"
+        onClick={() => props.openThread(threadId)}
+      >
+        {text}
+      </button>
+      {description.slice(reference.end)}
+    </>
+  )
+}
+
 /** Comments read as messages; every other event folds into one "made N changes" line per actor run, opened on demand. */
-const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonly attention: BacklogAttention; readonly itemId: number }): JSX.Element => {
+const Conversation = (props: {
+  readonly events: readonly BacklogEvent[]
+  readonly links: readonly BacklogLink[]
+  readonly attention: BacklogAttention
+  readonly itemId: number
+  readonly threadLabel: ThreadLabel
+  readonly openThread: OpenThread
+}): JSX.Element => {
   const attention = props.attention
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
+  const threadIdsByEvent = new Map<BacklogEvent, string>()
+  for (const [eventIndex, event] of props.events.entries()) {
+    const threadId = BacklogActivityReferences.threadIdOf({ event, eventIndex, events: props.events, links: props.links })
+    if (threadId !== undefined) threadIdsByEvent.set(event, threadId)
+  }
   const runs: ConversationRun[] = []
   for (const event of props.events) {
     const last = runs.at(-1)
@@ -414,12 +463,22 @@ const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonl
             </span>
             <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:pt-0.5 dshx:text-xs dshx:text-muted-foreground">
               {expanded ? (
-                run.events.map((event, position) => (
-                  <p key={String(position)}>
-                    <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
-                    {ItemGlyphs.describeEvent(event, attention)} · {ItemGlyphs.ago(event.at)}
-                  </p>
-                ))
+                run.events.map((event, position) => {
+                  const threadId = threadIdsByEvent.get(event)
+                  return (
+                    <p key={String(position)}>
+                      <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
+                      <ActivityDescription
+                        event={event}
+                        attention={attention}
+                        threadId={threadId}
+                        threadLabel={props.threadLabel}
+                        openThread={props.openThread}
+                      />{' '}
+                      · {ItemGlyphs.ago(event.at)}
+                    </p>
+                  )
+                })
               ) : (
                 <button
                   type="button"
@@ -539,6 +598,7 @@ const LinkRow = (props: {
   readonly itemId: number
   readonly link: BacklogLink
   readonly thread: ComposerThread | undefined
+  readonly threadLabel: string
   readonly openThread: OpenThread
   readonly select: (id: number) => void
 }): JSX.Element => {
@@ -559,7 +619,7 @@ const LinkRow = (props: {
         <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
       ) : (
         <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
-          {props.thread?.title ?? linkLabel(link)}
+          {link.type === 'thread' ? props.threadLabel : linkLabel(link)}
         </button>
       )}
       {props.thread === undefined ? null : (
@@ -619,9 +679,25 @@ const PeekBody = (props: {
   }, [item.id])
   const captured = item.events.find(event => event.kind === 'created')?.detail.trim() ?? ''
   const showCapture = captured !== '' && captured !== `${item.title}\n${item.body}`.trim() && captured !== item.title.trim()
-  const running = props.threads.filter(thread => thread.running && item.links.some(link => link.type === 'thread' && link.target === thread.id))
+  const relationshipLinks = BacklogItems.uniqueLinks(item.links)
+  const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
+  const threadTitleCounts = new Map<string, number>()
+  for (const link of relationshipLinks) {
+    if (link.type !== 'thread') continue
+    const title = threadsById.get(link.target)?.title
+    if (title !== undefined) threadTitleCounts.set(title, (threadTitleCounts.get(title) ?? 0) + 1)
+  }
+  const threadLabel: ThreadLabel = sessionId => {
+    const thread = threadsById.get(sessionId)
+    return BacklogActivityReferences.threadLabelOf({
+      title: thread?.title,
+      sessionId,
+      duplicateTitle: thread !== undefined && (threadTitleCounts.get(thread.title) ?? 0) > 1,
+    })
+  }
+  const running = props.threads.filter(thread => thread.running && relationshipLinks.some(link => link.type === 'thread' && link.target === thread.id))
   const groups = BacklogItems.relations
-    .map(relation => ({ relation, links: item.links.filter(link => (link.relation ?? 'related') === relation) }))
+    .map(relation => ({ relation, links: relationshipLinks.filter(link => (link.relation ?? 'related') === relation) }))
     .filter(group => group.links.length > 0)
   return (
     <>
@@ -763,7 +839,8 @@ const PeekBody = (props: {
                       key={`${link.type}:${link.target}`}
                       itemId={item.id}
                       link={link}
-                      thread={link.type === 'thread' ? props.threads.find(thread => thread.id === link.target) : undefined}
+                      thread={link.type === 'thread' ? threadsById.get(link.target) : undefined}
+                      threadLabel={link.type === 'thread' ? threadLabel(link.target) : linkLabel(link)}
                       openThread={props.openThread}
                       select={props.select}
                     />
@@ -803,7 +880,14 @@ const PeekBody = (props: {
             )}
           </Section>
           <Section title="Activity">
-            <Conversation events={item.events} attention={item.attention ?? 'none'} itemId={item.id} />
+            <Conversation
+              events={item.events}
+              links={relationshipLinks}
+              attention={item.attention ?? 'none'}
+              itemId={item.id}
+              threadLabel={threadLabel}
+              openThread={props.openThread}
+            />
             <CommentBox item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }} threads={props.threads} />
           </Section>
         </div>

@@ -59,6 +59,7 @@ const eventSchema = z
     actor: actorIdSchema,
     kind: z.enum(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
     detail: z.string().max(MAX_BODY_CHARS),
+    threadId: z.string().min(1).max(MAX_TARGET_CHARS).optional(),
     attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).optional(),
   })
   .strict()

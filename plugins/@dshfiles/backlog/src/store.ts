@@ -144,7 +144,12 @@ export interface BacklogStore {
    * A thread signal about one item: a thread that stopped flags its open items so they reach the Inbox, and a later
    * finished turn clears only that same flag. A status or attention you set by hand always wins.
    */
-  applyThreadAttention(input: { readonly id: number; readonly attention: 'blocked' | 'none'; readonly reason: string }): Promise<BacklogResult<BacklogDetail>>
+  applyThreadAttention(input: {
+    readonly id: number
+    readonly threadId: string
+    readonly attention: 'blocked' | 'none'
+    readonly reason: string
+  }): Promise<BacklogResult<BacklogDetail>>
   /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
   acknowledge(input: { readonly ids: readonly number[] }): Promise<void>
   dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
@@ -295,7 +300,7 @@ const createBacklogStore = ({
   const touch = async (
     item: BacklogItem,
     actor: BacklogActor,
-    event: { readonly kind: BacklogEvent['kind']; readonly detail: string; readonly attachments?: BacklogEvent['attachments'] },
+    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments'>,
     change: Partial<BacklogItem>,
   ): Promise<BacklogDetail> => {
     const at = now()
@@ -383,6 +388,8 @@ const createBacklogStore = ({
       const chosenKind = kind ?? triaged.kind
       const chosenStatus = status ?? 'inbox'
       const chosenProject = BacklogItems.projectOf(project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null))
+      const createdEvent: BacklogEvent = { at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }
+      if (actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '') createdEvent.threadId = actor.sessionId
       const item: BacklogItem = {
         id: nextId,
         title: triaged.title,
@@ -402,7 +409,7 @@ const createBacklogStore = ({
         ],
         createdAt: at,
         lastActivityAt: at,
-        events: [{ at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }],
+        events: [createdEvent],
       }
       nextId += 1
       await persist(item)
@@ -529,7 +536,8 @@ const createBacklogStore = ({
       const links =
         remove === true ? item.links.filter(candidate => !BacklogItems.sameLink(candidate, link)) : BacklogItems.uniqueLinks([...item.links, stamped])
       const label = `${link.relation === undefined || link.relation === 'related' ? '' : `${link.relation} `}${link.type}:${link.target}`
-      return { ok: true, value: await touch(item, actor, { kind: remove === true ? 'unlinked' : 'linked', detail: label }, { links }) }
+      const sourceThread = link.type === 'thread' ? { threadId: link.target } : {}
+      return { ok: true, value: await touch(item, actor, { kind: remove === true ? 'unlinked' : 'linked', detail: label, ...sourceThread }, { links }) }
     },
     comment: async ({ id, text, files: commentFiles = [], actor }) => {
       const item = find(id)
@@ -537,7 +545,8 @@ const createBacklogStore = ({
       const at = now()
       const attachments = commentFiles.length === 0 ? [] : await storeFiles(id, commentFiles, at)
       const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(text), ...callerLinks(actor)])
-      const event = { kind: 'commented' as const, detail: text.slice(0, BacklogItems.maxBodyChars) }
+      const sourceThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? { threadId: actor.sessionId } : {}
+      const event = { kind: 'commented' as const, detail: text.slice(0, BacklogItems.maxBodyChars), ...sourceThread }
       if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, attachments }, { links }) }
       return { ok: true, value: await touch(item, actor, event, { links }) }
     },
@@ -620,9 +629,10 @@ const createBacklogStore = ({
       const change: Partial<BacklogItem> = { links: BacklogItems.uniqueLinks([...item.links, link]), ...closedChange }
       if (moves) change.status = status
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
-      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail }, change) }
+      const sourceThread = link.type === 'thread' ? { threadId: link.target } : {}
+      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail, ...sourceThread }, change) }
     },
-    applyThreadAttention: async ({ id, attention, reason }) => {
+    applyThreadAttention: async ({ id, threadId, attention, reason }) => {
       const item = find(id)
       if (item === undefined) return { ok: false, reason: 'not-found' }
       if (item.humanFields.includes('attention')) return { ok: true, value: detailOf(item) }
@@ -633,7 +643,7 @@ const createBacklogStore = ({
           value: await touch(
             item,
             { kind: 'system' },
-            { kind: 'edited', detail: `attention: blocked (${reason})` },
+            { kind: 'edited', detail: `attention: blocked (${reason})`, threadId },
             { attention: 'blocked', acknowledgedAt: null },
           ),
         }
@@ -641,7 +651,10 @@ const createBacklogStore = ({
       const last = item.events.at(-1)
       const stalledHere = last?.actor === 'system' && last.kind === 'edited' && last.detail.startsWith('attention: blocked (')
       if ((item.attention ?? 'none') !== 'blocked' || stalledHere !== true) return { ok: true, value: detailOf(item) }
-      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})` }, { attention: 'none' }) }
+      return {
+        ok: true,
+        value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})`, threadId }, { attention: 'none' }),
+      }
     },
     acknowledge: async ({ ids }) => {
       for (const id of ids) {

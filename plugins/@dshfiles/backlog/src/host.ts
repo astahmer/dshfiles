@@ -345,7 +345,7 @@ const onThreadTurn = (ctx: Context, session: Session, reason: TurnEndReason): vo
   void backlogFor(ctx)
     .then(async store => {
       for (const item of store.referencing({ type: 'thread', target: session.id }))
-        await store.applyThreadAttention({ id: item.id, attention: outcome.stalled ? 'blocked' : 'none', reason: outcome.reason })
+        await store.applyThreadAttention({ id: item.id, threadId: session.id, attention: outcome.stalled ? 'blocked' : 'none', reason: outcome.reason })
     })
     .catch(logFailure('Backlog thread lifecycle signal failed'))
   if (!outcome.stalled) scheduleResolution(ctx, session, currentSettings())
@@ -622,7 +622,9 @@ const backlogApiHost = backlogApi.host({
   capture: async ({ ctx, input, caller }) => {
     const actor = actorOf(caller)
     const project = input.project === undefined && actor.kind === 'agent' && actor.cwd !== undefined ? await captureProjectOf(ctx, actor.cwd) : input.project
-    const detail = await (await backlogFor(ctx)).capture({ ...input, ...(project === undefined ? {} : { project }), actor })
+    const captureInput = { ...input, actor }
+    if (project !== undefined) captureInput.project = project
+    const detail = await (await backlogFor(ctx)).capture(captureInput)
     scheduleTriage(ctx, detail.item.id)
     return detail
   },
