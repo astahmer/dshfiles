@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, SIDEBAR_SECTIONS, THREAD_ROW_ACTIONS } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, SIDEBAR_ORDER_SECTIONS, SIDEBAR_SECTIONS, THREAD_ROW_ACTIONS } from './organization.js'
 import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import { threadNotificationCategoriesSchema } from './thread-notifications.js'
@@ -143,7 +143,7 @@ export const threadSidebarSettings = defineSettings({
       .default({})
       .hidden(),
     collapsedSections: Schema.array(Schema.union(SIDEBAR_SECTIONS)).default(DEFAULT_PREFERENCES.collapsedSections).hidden(),
-    sectionOrder: Schema.array(Schema.union(SIDEBAR_SECTIONS))
+    sectionOrder: Schema.array(Schema.union(SIDEBAR_ORDER_SECTIONS))
       .default([...DEFAULT_PREFERENCES.sectionOrder])
       .hidden(),
     collapsedGroups: Schema.array(Schema.string()).default(DEFAULT_PREFERENCES.collapsedGroups).hidden(),

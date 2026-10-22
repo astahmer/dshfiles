@@ -3205,7 +3205,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const orderedSections = useMemo(() => SidebarOrganization.orderSections(preferences.sectionOrder), [preferences.sectionOrder])
   const rowsBySection = useMemo(() => {
-    const rows = new Map<SidebarSection, SessionSummary[]>(orderedSections.map(section => [section, []]))
+    const rows = new Map<SidebarSection, SessionSummary[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
     const activityAt = new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt]))
     for (const { session, activity } of visibleThreadEntries) {
       if (attentionIds.has(session.id)) continue
@@ -3234,7 +3234,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     now,
     parkedSessionIds,
     pinnedSessionIds,
-    orderedSections,
+    settledSessionIds,
     preferences.idleMinutes,
     preferences.idleSectionOverrides,
     visibleThreadEntries,
@@ -3242,8 +3242,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ])
   // Empty sections fold away rather than render a header, so a drag only reorders the ones on screen.
   const shownSections = useMemo(
-    () => orderedSections.filter(section => section === 'active' || (rowsBySection.get(section)?.length ?? 0) > 0),
-    [orderedSections, rowsBySection],
+    () =>
+      orderedSections.filter(
+        section => section === 'active' || (section === 'remote' ? props.openRemoteThreads !== undefined : (rowsBySection.get(section)?.length ?? 0) > 0),
+      ),
+    [orderedSections, props.openRemoteThreads, rowsBySection],
   )
   const sectionHeaderRefs = useRef<(HTMLButtonElement | null)[]>([])
   const sectionDragRef = useRef<{ pointerId: number; from: number; startY: number; centers: number[] | null } | null>(null)
@@ -4535,7 +4538,76 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
             {threadView.groupBy === 'status'
-              ? (isBoard ? orderedSections : renderedSections).map((section, index) => {
+              ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
+                  if (section === 'remote') {
+                    return props.openRemoteThreads === undefined ? null : (
+                      <RemoteThreadsSection
+                        key="remote"
+                        headerClassName={stickyHeaderClass}
+                        onOpen={props.openRemoteThreads}
+                        onOpenSession={props.openRemoteSession}
+                        title={props.tSidebar('threadSidebarSectionReorderHint')}
+                        keepEmpty
+                        onHeaderRef={element => {
+                          sectionHeaderRefs.current[index] = element
+                        }}
+                        onHeaderPointerDown={event => {
+                          if (isBoard || event.button !== 0) return
+                          sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
+                        }}
+                        onHeaderPointerMove={event => {
+                          const current = sectionDragRef.current
+                          if (current === null || current.pointerId !== event.pointerId) return
+                          if (current.centers === null) {
+                            if (Math.abs(event.clientY - current.startY) < SECTION_DRAG_THRESHOLD_PX) return
+                            current.centers = shownSections.map((_, position) => {
+                              const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
+                              return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
+                            })
+                            event.currentTarget.setPointerCapture(event.pointerId)
+                          }
+                          event.preventDefault()
+                          setSectionDrag({
+                            from: current.from,
+                            to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
+                          })
+                        }}
+                        onHeaderPointerUp={event => {
+                          const current = sectionDragRef.current
+                          if (current === null || current.pointerId !== event.pointerId) return
+                          if (current.centers !== null) {
+                            suppressSectionClick.current = true
+                            commitSectionOrder(
+                              current.from,
+                              SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
+                            )
+                          }
+                          endSectionDrag()
+                        }}
+                        onHeaderPointerCancel={endSectionDrag}
+                        onHeaderLostPointerCapture={() => {
+                          if (sectionDragRef.current?.centers !== null) endSectionDrag()
+                        }}
+                        onHeaderKeyDown={event => {
+                          if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                          const fromShownIndex = shownSections.indexOf(section)
+                          const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
+                          if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
+                          event.preventDefault()
+                          commitSectionOrder(fromShownIndex, toShownIndex)
+                        }}
+                        onHeaderClick={event => {
+                          if (suppressSectionClick.current) {
+                            suppressSectionClick.current = false
+                            event.preventDefault()
+                            return
+                          }
+                          props.openRemoteThreads?.()
+                        }}
+                        dragging={sectionDrag?.from === index}
+                      />
+                    )
+                  }
                   const rows = rowsBySection.get(section) ?? []
                   const collapsed = collapsedSections.includes(section)
                   return (
@@ -4725,9 +4797,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               </section>
             )
           })}
-          {props.openRemoteThreads === undefined ? null : (
+          {threadView.groupBy !== 'status' && props.openRemoteThreads !== undefined ? (
             <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} onOpenSession={props.openRemoteSession} />
-          )}
+          ) : null}
           {draftSessions.length === 0 ? null : (
             <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>
               <div

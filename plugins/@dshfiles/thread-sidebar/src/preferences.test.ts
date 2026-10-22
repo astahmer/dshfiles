@@ -238,7 +238,7 @@ test('older preferences show every thread-row hover action', () => {
 
 test('older preferences keep the shipped section order and repair a stored one', () => {
   const { sectionOrder, ...older } = DEFAULT_PREFERENCES
-  assert.deepEqual(sectionOrder, ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'])
+  assert.deepEqual(sectionOrder, ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived', 'remote'])
   assert.deepEqual(SidebarPreferencesModel.decode(older)?.sectionOrder, sectionOrder)
   assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, sectionOrder: ['settled', 'archived'] })?.sectionOrder, [
     'settled',
@@ -247,6 +247,7 @@ test('older preferences keep the shipped section order and repair a stored one',
     'active',
     'parked',
     'inactive',
+    'remote',
   ])
   assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, sectionOrder: ['archived', 'archived'] })?.sectionOrder, [
     'archived',
@@ -255,6 +256,7 @@ test('older preferences keep the shipped section order and repair a stored one',
     'parked',
     'inactive',
     'settled',
+    'remote',
   ])
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, sectionOrder: ['nope'] }), null)
 })

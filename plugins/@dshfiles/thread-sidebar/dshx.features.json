@@ -648,7 +648,7 @@
     {
       "id": "section-order",
       "title": "Reorder thread sections",
-      "summary": "Drag visible section headers to reorder the sidebar; the saved order survives reload, and empty sections fold away instead of taking a drag position.",
+      "summary": "Drag visible local or Remote section headers to reorder the sidebar; the saved order survives reload, and empty local sections keep their saved slots instead of taking a drag position.",
       "reach": ["click button \"All threads\"", "expect region \"Threads\""],
       "surfaces": ["client"],
       "configuration": [],

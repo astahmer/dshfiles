@@ -40,7 +40,7 @@ Feature: Thread sidebar journeys
     Then the continuation opens in that project with the conversation and the original thread is settled
 
   @scenario:thread-sidebar.section-order
-  Scenario: Reorder the sidebar sections by dragging a header
+  Scenario: Reorder local and remote sidebar sections by dragging a header
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When an archived thread and a settled thread fill the bottom sections
     Then dragging the Archived header above Active reorders the sections and survives a reload

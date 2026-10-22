@@ -7,12 +7,11 @@ This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
 activity, with pinned, active, parked, inactive, settled, and archived sections. Active
 includes running or recently updated threads; the idle threshold moves older,
-non-running threads to Inactive. Sections render in the saved `sectionOrder`
-(preferences), shipped as pinned, active, parked, inactive, settled, archived:
-drag a section header to move it, or focus one and press Alt+↑/↓. A section with
-no rows folds away and keeps its saved slot while the shown ones reorder around
-it. The project picker scopes rows to one workspace
-or unassigned sessions.
+non-running threads to Inactive. In the status list, the Remote group joins the
+saved `sectionOrder` after local sections by default; drag its header or any
+status header to move it, or focus one and press Alt+↑/↓. A local status section
+with no rows folds away and keeps its saved slot while the shown ones reorder
+around it. The project picker scopes rows to one workspace or unassigned sessions.
 
 **Moving a row between sections.** Drag a thread row onto another section header
 (or anywhere inside that section) to put it there; while a row is in flight every

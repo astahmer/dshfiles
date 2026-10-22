@@ -10,7 +10,9 @@ import { WorkspacePaths } from './workspace-paths.js'
 
 /** Render order: settled sits right before archived, since both are storage rather than places to work. */
 export const SIDEBAR_SECTIONS = ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'] as const
+export const SIDEBAR_ORDER_SECTIONS = [...SIDEBAR_SECTIONS, 'remote'] as const
 export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number]
+export type SidebarOrderSection = (typeof SIDEBAR_ORDER_SECTIONS)[number]
 
 /** A section a user dropped a row in, with the instant it happened; see `sectionDropPlan`. */
 export interface IdleSectionOverride {
@@ -87,7 +89,7 @@ export interface SidebarPreferences {
   /** Group headers a user keeps closed, by view group key (`project:<id>`, `date:<bucket>`). */
   collapsedGroups: string[]
   /** Section header order; the sections themselves are fixed, only their sequence changes. */
-  sectionOrder: SidebarSection[]
+  sectionOrder: SidebarOrderSection[]
   /**
    * Active or Inactive as a row was dropped there, by session id. Both are otherwise derived from
    * the idle threshold, so a drop has to outrank that derivation; `at` lets a later turn make the
@@ -165,7 +167,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   // Keep every working section open; archived and settled threads stay folded until requested.
   collapsedSections: ['archived', 'settled'],
   collapsedGroups: [],
-  sectionOrder: [...SIDEBAR_SECTIONS],
+  sectionOrder: [...SIDEBAR_ORDER_SECTIONS],
   idleSectionOverrides: {},
   workspaceFilter: null,
   headerMode: 'compact',
@@ -472,17 +474,17 @@ const reorderVisibleEntry = (options: {
 const dropIndexAt = (options: { readonly centers: readonly number[]; readonly fromIndex: number; readonly position: number }): number =>
   options.centers.filter((center, index) => index !== options.fromIndex && center < options.position).length
 
-const SECTION_IDS: ReadonlySet<string> = new Set(SIDEBAR_SECTIONS)
-const isSidebarSection = (value: string): value is SidebarSection => SECTION_IDS.has(value)
+const ORDER_SECTION_IDS: ReadonlySet<string> = new Set(SIDEBAR_ORDER_SECTIONS)
+const isSidebarOrderSection = (value: string): value is SidebarOrderSection => ORDER_SECTION_IDS.has(value)
 
 /**
  * A saved section order: unknown or repeated ids are dropped, and a section the
  * saved order misses (one shipped after it was written) keeps its shipped place
  * behind the saved ones.
  */
-const orderSections = (savedOrder: readonly string[]): SidebarSection[] => {
-  const saved = [...new Set(savedOrder)].filter(isSidebarSection)
-  return [...saved, ...SIDEBAR_SECTIONS.filter(section => !saved.includes(section))]
+const orderSections = (savedOrder: readonly string[]): SidebarOrderSection[] => {
+  const saved = [...new Set(savedOrder)].filter(isSidebarOrderSection)
+  return [...saved, ...SIDEBAR_ORDER_SECTIONS.filter(section => !saved.includes(section))]
 }
 
 /**
@@ -492,10 +494,10 @@ const orderSections = (savedOrder: readonly string[]): SidebarSection[] => {
  */
 const reorderSections = (options: {
   readonly savedOrder: readonly string[]
-  readonly shownSections: readonly SidebarSection[]
+  readonly shownSections: readonly SidebarOrderSection[]
   readonly fromShownIndex: number
   readonly toShownIndex: number
-}): SidebarSection[] => {
+}): SidebarOrderSection[] => {
   const orderedSections = orderSections(options.savedOrder)
   const movedId = options.shownSections[options.fromShownIndex]
   if (movedId === undefined) return orderedSections

@@ -4,6 +4,7 @@ import { threadMutesSchema } from './thread-mute.js'
 import {
   ATTENTION_COLOR_OPTIONS,
   DEFAULT_PREFERENCES,
+  SIDEBAR_ORDER_SECTIONS,
   SIDEBAR_SECTIONS,
   SidebarOrganization,
   THREAD_ROW_ACTIONS,
@@ -17,6 +18,7 @@ import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, thread
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
 const sidebarSectionSchema = z.enum(SIDEBAR_SECTIONS)
+const sidebarOrderSectionSchema = z.enum(SIDEBAR_ORDER_SECTIONS)
 const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
 
@@ -67,8 +69,8 @@ const preferencesInputSchema = z
     collapsedSections: z.array(sidebarSectionSchema).max(SIDEBAR_SECTIONS.length),
     collapsedGroups: z.array(z.string().min(1).max(200)).max(200).default(DEFAULT_PREFERENCES.collapsedGroups),
     sectionOrder: z
-      .array(sidebarSectionSchema)
-      .max(SIDEBAR_SECTIONS.length)
+      .array(sidebarOrderSectionSchema)
+      .max(SIDEBAR_ORDER_SECTIONS.length)
       .default([...DEFAULT_PREFERENCES.sectionOrder])
       .transform(order => SidebarOrganization.orderSections(order)),
     idleSectionOverrides: z

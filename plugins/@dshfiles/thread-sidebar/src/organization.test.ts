@@ -73,13 +73,13 @@ test('archived and settled start folded and the working sections start open', ()
   assert.deepEqual(workingSections, [])
 })
 
-test('settled renders right before archived, after the sections a user works in', () => {
+test('settled renders right before archived in the local status sections', () => {
   assert.deepEqual(SIDEBAR_SECTIONS, ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'])
 })
 
 test('a saved section order keeps its sequence and appends the sections it misses', () => {
-  assert.deepEqual(SidebarOrganization.orderSections(['archived', 'pinned']), ['archived', 'pinned', 'active', 'parked', 'inactive', 'settled'])
-  assert.deepEqual(SidebarOrganization.orderSections(['pinned', 'pinned', 'nope']), ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'])
+  assert.deepEqual(SidebarOrganization.orderSections(['archived', 'pinned']), ['archived', 'pinned', 'active', 'parked', 'inactive', 'settled', 'remote'])
+  assert.deepEqual(SidebarOrganization.orderSections(['pinned', 'pinned', 'nope']), ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived', 'remote'])
 })
 
 test('reordering the sections on screen leaves an unrendered section in its saved slot', () => {
@@ -90,7 +90,19 @@ test('reordering the sections on screen leaves an unrendered section in its save
       fromShownIndex: 2,
       toShownIndex: 0,
     }),
-    ['settled', 'pinned', 'parked', 'inactive', 'active', 'archived'],
+    ['settled', 'pinned', 'parked', 'inactive', 'active', 'archived', 'remote'],
+  )
+})
+
+test('remote can move between local sections and keeps hidden sections in their saved slots', () => {
+  assert.deepEqual(
+    SidebarOrganization.reorderSections({
+      savedOrder: ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived', 'remote'],
+      shownSections: ['active', 'archived', 'remote'],
+      fromShownIndex: 2,
+      toShownIndex: 0,
+    }),
+    ['pinned', 'remote', 'parked', 'inactive', 'settled', 'active', 'archived'],
   )
 })
 

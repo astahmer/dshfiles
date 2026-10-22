@@ -517,9 +517,8 @@ When('an archived thread and a settled thread fill the bottom sections', async (
 Then('dragging the Archived header above Active reorders the sections and survives a reload', async ({ page }: { page: Page }) => {
   const headers = threadSidebar(page).locator('section > button')
   const headerNames = (): Promise<string[]> => headers.evaluateAll(buttons => buttons.map(button => button.textContent.trim()))
-  await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
-    expect(await headerNames()).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)'])
-    const dragged = await headers.last().boundingBox()
+  const dragHeaderToTop = async (fromIndex: number): Promise<void> => {
+    const dragged = await headers.nth(fromIndex).boundingBox()
     const target = await headers.first().boundingBox()
     if (dragged === null || target === null) throw new Error('A section header has no layout box to drag.')
     await page.mouse.move(dragged.x + 60, dragged.y + dragged.height / 2)
@@ -528,12 +527,18 @@ Then('dragging the Archived header above Active reorders the sections and surviv
       await page.mouse.move(dragged.x + 60, dragged.y + (target.y - dragged.y) * step, { steps: 4 })
     }
     await page.mouse.up()
-    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+  }
+  await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
+    expect(await headerNames()).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)', 'Remote(0)'])
+    await dragHeaderToTop(2)
+    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)', 'Remote(0)'])
+    await dragHeaderToTop(3)
+    await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Settled(1)'])
   })
   await page.reload()
   await recordAssertion(page, 'thread-sidebar-section-order-survives-reload', async () => {
     await expect(threadSidebar(page)).toBeVisible()
-    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+    await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Settled(1)'])
   })
   await finishJourneyAssertions(page)
 })
