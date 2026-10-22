@@ -40,7 +40,7 @@ describe('indexRebasedThreadSessions', () => {
     expect(result.dueSessionIds).toEqual(['session-a'])
   })
 
-  it('does not expose or archive threads with new work after their last rebase', () => {
+  it('keeps the rebased marker visible without auto-settling newer unlanded work', () => {
     const result = indexRebasedThreadSessions({
       threads: [thread({ unlanded: [{ commitId: 'new-work' }] })],
       sessions: new Map([['session-a', session('session-a')]]),
@@ -51,7 +51,22 @@ describe('indexRebasedThreadSessions', () => {
       delayMs: 0,
     })
 
-    expect(result.rebasedAtBySessionId.size).toBe(0)
+    expect(result.rebasedAtBySessionId).toEqual(new Map([['session-a', 1_000]]))
+    expect(result.dueSessionIds).toEqual([])
+  })
+
+  it('does not auto-settle threads with new work after their last rebase', () => {
+    const result = indexRebasedThreadSessions({
+      threads: [thread({ unlanded: [{ commitId: 'new-work' }] })],
+      sessions: new Map([['session-a', session('session-a')]]),
+      archivedSessionIds: new Set(),
+      settledSessionIds: new Set(),
+      pinnedSessionIds: new Set(),
+      now: 100_000,
+      delayMs: 0,
+    })
+
+    expect(result.rebasedAtBySessionId).toEqual(new Map([['session-a', 1_000]]))
     expect(result.dueSessionIds).toEqual([])
   })
 

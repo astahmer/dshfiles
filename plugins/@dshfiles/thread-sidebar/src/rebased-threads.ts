@@ -30,9 +30,9 @@ export const indexRebasedThreadSessions = (input: {
 
   for (const thread of input.threads) {
     const rebasedAt = thread.rebasedAt
-    if (rebasedAt === undefined || thread.unlanded.length > 0) continue
+    if (rebasedAt === undefined) continue
     for (const sessionId of thread.sessionIds) rebasedAtBySessionId.set(sessionId, rebasedAt)
-    if (input.now < rebasedAt + input.delayMs || thread.sessionIds.length === 0) continue
+    if (thread.unlanded.length > 0 || input.now < rebasedAt + input.delayMs || thread.sessionIds.length === 0) continue
 
     const sessions = thread.sessionIds.map(sessionId => input.sessions.get(sessionId))
     if (
