@@ -15,11 +15,11 @@
     openAt: first-search
     persistedReadConcurrency: 4
 - id: ui-settings-general
-  name: "@deepseek-ai/dsh-client-ui-settings-general"
+  name: '@deepseek-ai/dsh-client-ui-settings-general'
   config:
     welcomeNoticeVersion: 2026-09-28.1
 - id: agent-default-model
-  name: "@deepseek-ai/dsh-agent-default-model"
+  name: '@deepseek-ai/dsh-agent-default-model'
   config:
     provider: codex-alex2
     model: gpt-6-luna
@@ -180,7 +180,7 @@
   config:
     edgeWidget: false
 - id: permission
-  name: "@deepseek-ai/dsh-permission-presets"
+  name: '@deepseek-ai/dsh-permission-presets'
   config:
     presets:
       read-only:
@@ -194,11 +194,11 @@
         approval: never
     defaultPreset: danger-full-access
 - id: ui-theme
-  name: "@deepseek-ai/dsh-client-ui-theme"
+  name: '@deepseek-ai/dsh-client-ui-theme'
   config:
     preference: light
 - id: llm-pi-ai
-  name: "@deepseek-ai/dsh-llm-pi-ai"
+  name: '@deepseek-ai/dsh-llm-pi-ai'
   config:
     providers: {}
 - id: llm-deepseek
@@ -206,11 +206,11 @@
 - id: llm-deepseek-account
   disabled: true
 - id: ui-chat
-  name: "@deepseek-ai/dsh-client-ui-chat"
+  name: '@deepseek-ai/dsh-client-ui-chat'
   config:
     transcriptView: detailed
 - id: dshfiles-jujutsu
-  name: "@dshfiles/jujutsu"
+  name: '@dshfiles/jujutsu'
   config:
     hideImmutable: false
     fileView: flat
@@ -240,6 +240,14 @@
   disabled: true
 - id: session-log-download
   disabled: false
+# Brave replaces DeepSeek's server-side search: the same key the Models page manages
+# for chat is a chat key, not a search key. The Brave key is bound in
+# dshfiles-web-search-brave settings as secret:brave-api-key; fetch stays anonymous HTTP.
+- id: web
+  name: '@deepseek-ai/dsh-web'
+  config:
+    searchProvider: brave
+    fetchProvider: http
 # Host HMR recomposes a running Host whenever a linked bundle or a patch file changes, and a replacement can drop a
 # plugin service another row depends on — 2026-10-19 the live `web` profile lost `sessionQuery` on two bundle
 # rebuilds, which took `session-controller` and the whole Session surface with it, and only a restart cleared it.

@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-web-search-brave
+      name: '@dshfiles/web-search-brave'
