@@ -2,6 +2,8 @@ import type {} from '@deepseek-ai/cordis'
 import type {
   SessionCancelRequest,
   SessionCancelValue,
+  SessionSelectModelRequest,
+  SessionSelectModelValue,
   SessionFollowFrame,
   SessionFollowRequest,
   SessionListRequest,
@@ -35,12 +37,15 @@ export interface MirroredSessionSource {
   list(request: SessionListRequest, signal: AbortSignal): Promise<readonly SessionSummary[]>
   /** Cheap ownership test used when a Session id is not in the claim cache yet. */
   owns(sessionId: SessionId): boolean | Promise<boolean>
+  /** Optional runtime identity for capabilities that must execute on the owning Host. */
+  runtimeIdForSession?(sessionId: string): Promise<string | undefined>
   follow?(request: SessionFollowRequest, signal: AbortSignal): AsyncIterable<SessionFollowFrame>
   page?(request: SessionPageRequest, signal: AbortSignal): Promise<SessionPage>
   prompt?(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
   cancel?(request: SessionCancelRequest): SessionCancelValue | Promise<SessionCancelValue>
   updateQueue?(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue>
   projections?(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue>
+  selectModel?(request: SessionSelectModelRequest): Promise<SessionSelectModelValue>
 }
 
 /** The registry the Session controller provides as `sessionSources`. */
@@ -52,7 +57,7 @@ export interface SessionSourceRegistry {
   /** Record that these Sessions belong to that source, e.g. from a `list` answer. */
   claim(source: MirroredSessionSource, sessionIds: readonly SessionId[]): void
   /** The source that claimed this Session, without any I/O. */
-  ownerOf(sessionId: SessionId): MirroredSessionSource | undefined
+  ownerOf(sessionId: string): MirroredSessionSource | undefined
   /** The claiming source, asking every source's cheap `owns` when nothing is cached. */
   resolveOwner(sessionId: SessionId): Promise<MirroredSessionSource | undefined>
 }
@@ -113,6 +118,7 @@ const sessionSummaryShape = z
 const sessionFollowFrameShape = z.object({ type: z.enum(['snapshot', 'event', 'assistant-stream']) }).passthrough()
 const sessionPageShape = z.object({ records: z.array(z.unknown()).max(10_000), hasMore: z.boolean() }).passthrough()
 const acceptedShape = z.object({ accepted: z.literal(true) }).passthrough()
+const modelSelectionShape = z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }).passthrough()
 const projectionsShape = z.union([
   z.null(),
   z.object({ kind: z.literal('sequenced'), asOfSeq: z.number() }).passthrough(),
@@ -172,6 +178,11 @@ export class SessionSourcePayload {
   /** Decode an admitted cancellation receipt. */
   static cancel(value: unknown): SessionCancelValue {
     return acceptedShape.parse(value)
+  }
+
+  /** Decode the selected model accepted by a remote Session's runtime. */
+  static selectedModel(value: unknown): SessionSelectModelValue {
+    return z.custom<SessionSelectModelValue>(answer => z.object({ selected: modelSelectionShape }).passthrough().safeParse(answer).success).parse(value)
   }
 
   /** Decode an applied queue mutation receipt. */

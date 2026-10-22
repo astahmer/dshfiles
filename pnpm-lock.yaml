@@ -2728,6 +2728,9 @@ importers:
       '@dshfiles/input-trigger':
         specifier: workspace:*
         version: link:../input-trigger
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -2801,6 +2804,9 @@ importers:
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -2847,6 +2853,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/session-controller':
+        specifier: workspace:*
+        version: link:../session-controller
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
@@ -2914,6 +2923,9 @@ importers:
       '@deepseek-ai/dsh-client-connection':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
+      '@deepseek-ai/dsh-client-file-upload':
+        specifier: 0.2.1-rc.2
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -3586,9 +3598,15 @@ importers:
 
   plugins/@dshfiles/rich-composer:
     dependencies:
+      '@deepseek-ai/dsh-client-ui-workspace':
+        specifier: '>=0.2.0-rc.1 <0.3.0-0'
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-tools':
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(0ab00a8eb09daf0ab308290e757fa426)
+      '@dshfiles/multi-host':
+        specifier: workspace:*
+        version: link:../multi-host
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4
@@ -6719,6 +6737,11 @@ packages:
 
   '@deepseek-ai/dsh-client-ui-workflow-run@0.2.1-rc.2':
     resolution: {integrity: sha512-7fGswd+FlzWls4IEX4+XPncXn4Jk2bNlw0kXbgvmpLwaV+sgNFRLK4PlCLUc5x4mDUsKGeG6vX1+UnOCgSdnwg==}
+    peerDependencies:
+      '@deepseek-ai/cordis': 4.0.4
+
+  '@deepseek-ai/dsh-client-ui-workspace@0.2.0-rc.2':
+    resolution: {integrity: sha512-dGKLOFJXBiGDKl+qWMQ0cYF0AT485JMzSk+AUM6/81tZPapJuirxP7Yf5ZFMfsmgQFv6m4jjYlnOc6KcIfUUZQ==}
     peerDependencies:
       '@deepseek-ai/cordis': 4.0.4
 
@@ -16877,6 +16900,10 @@ snapshots:
       '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
 
   '@deepseek-ai/dsh-client-ui-workflow-run@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)':
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
+
+  '@deepseek-ai/dsh-client-ui-workspace@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)':
     dependencies:
       '@deepseek-ai/cordis': 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
 

@@ -24,6 +24,8 @@ export interface ApiClientRuntime {
   client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods>
 }
 
+export const createApiClient = ApiRuntimeModel.createClient
+
 function runtime(): ReactRuntime {
   if (react !== undefined) return react
   const loader = typeof require === 'function' ? require : (globalThis as { require?: (name: string) => ReactRuntime }).require

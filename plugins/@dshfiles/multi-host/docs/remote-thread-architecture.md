@@ -9,16 +9,17 @@ Researched 2026-10-21 against DSH 0.2.1-rc.2.
 
 ## The problem
 
-The New thread bar replaces this machine's composer with a plain card while a host
-is chosen (`RemoteComposer`): a textarea, a flat model dropdown and a send button.
-Everything the local composer does — `/` commands, `@` references, prompt snippets,
-image and file attachments, reasoning effort, queue edit/steer, plan and permission
-controls, the todo and jj chips, approvals — is missing, and each missing piece is a
-separate reason the remote thread feels foreign.
+The original New thread bar replaced this machine's composer with a plain card while
+a host was chosen (`RemoteComposer`): a textarea, a flat model dropdown and a send
+button. That reduced composer has been removed. A remote thread now opens as an empty
+mirrored Session in the native chat and composer. The model catalog and reasoning
+effort, file uploads, and `@` file references route to the owning remote runtime.
 
-Asking "why not just reuse the composer?" is the right question. The answer is that
-the composer is not a component that talks to a target; it is a view of one local
-Session's input machine, and that machine is wired to this runtime's Host.
+The composer is not a component that inherently talks to any target; it is a view of
+a Session's input machine. `session-controller` now routes model selection for
+mirrored Sessions through their source, and rich-composer resolves the Session owner
+before forwarding upload. Session-owned file reference lookup likewise checks the
+remote runtime identity before contacting its file-reference service.
 
 ## What the composer is actually made of
 
@@ -122,10 +123,10 @@ Full notes, with the files and URLs read for each product, are in
    are Host-side, and attachments are uploaded through the aggregator, bound to the
    runtime they were uploaded to (re-upload if the target changes).
 5. **A dropped connection restricts submission; it never replaces the composer.** The
-   current `RemoteComposer` fails this rule in its calm state, not only when offline.
-6. **Strict machine-local paths.** An absolute path from this machine is never sent to
-   another host; the file is uploaded instead (bb's rule, t3code's environment-bound
-   uploads, Codex rejecting host-local image paths).
+   native composer remains in place and retains its draft when remote calls fail.
+6. **Strict machine-local paths.** A local attachment is uploaded through the
+   owning-runtime API; it is not passed as a local filesystem path. Cross-machine
+   absolute-path refusal messaging remains unverified.
 
 ## What DSH already gives us
 
@@ -142,8 +143,10 @@ runtime's gateway:
   opens its `/api/remote.mux` WebSocket for `session/follow`
   (`src/connectors/gateway.ts`, `follow()`), and forwards prompts and cancels today.
 
-So the missing piece is **not a composer**: it is a session source that answers the
-existing client's `session/*` calls for a remote Session.
+So the missing piece was **not a composer**: it was a session source that answers
+the existing client's `session/*` calls for a remote Session. That mirror now routes
+model selection as well; the rich-composer upload and file-reference paths resolve
+the owning runtime before forwarding.
 
 ## The three routes
 
@@ -160,10 +163,10 @@ C splits into two implementations, and one of them is much cheaper here:
   Deep infrastructure forks, and every client package keeps assuming one runtime.
 - **C2, Host mirror** (bb's shape): the local Host presents remote Sessions as its
   own — `session/list` adds them, `session/follow`/`page` re-serve the remote frames
-  verbatim (same wire contract), `prompt`/`cancel`/`updateQueue` forward, model
-  catalog and uploads come from that runtime. The browser client is untouched, so
-  the native composer, chat, transcript windowing and every local plugin work on a
-  remote thread by construction.
+  verbatim (same wire contract), `prompt`/`cancel`/`updateQueue` and model selection
+  forward, and the model catalog, uploads and file references come from that runtime.
+  The native composer and chat render the remote thread; JJ/workspace path proxies,
+  approval answers and terminal access remain on the host UI.
 
 `session/follow` frames are the same JSON events on both sides (same DSH version),
 which is what makes C2 tractable at all: the mirror re-emits, it does not translate.
@@ -195,24 +198,31 @@ client's per-session model/upload services cannot be pointed at a remote runtime
 without forking those client packages too, C2 collapses back to A and the gap is
 recorded in [plans/dsh-host-gaps.md](../../../../plans/dsh-host-gaps.md).
 
-## What is implemented (2026-10-22)
+## Current implementation
 
-The read-and-write slice of C2 is live: a remote Session is listed, followed, paged,
-prompted, cancelled and queue-edited through this Host, so it opens in the native chat
-and composer and the bespoke remote view is gone. The seam is
+A remote Session is listed, followed, paged, prompted, cancelled, queue-edited and
+model-selected through this Host. It opens in native chat and composer; the reduced
+remote composer is gone. The seam is
 [`@dshfiles/session-source-port`](../../session-source-port) (mirror endpoints per
 source), provided by this fork's `MirroredSessions` and filled by multi-host's
-`remote-session-source.ts`. Remaining slices: per-session model catalog, uploads and
-file references, approvals/terminals. The plan and its evidence live in
-[plans/remote-thread-composer](../../../../plans/remote-thread-composer/).
+`remote-session-source.ts`. The model picker reads the remote catalog and reasoning
+efforts, uploads are staged on the owning Host, and `@` file references are listed
+from that runtime with Session ownership checked before forwarding. Drafts stay in the
+client; questions/approvals and terminal interactions still require the host UI.
 
-## Staged plan for C2
+Validation: `DSHX_E2E_ONLY=@dshfiles/multi-host node --run check:e2e` covers remote
+Session creation, file-reference results, and a file upload over loopback SSH. Focused
+unit tests cover Session ownership authorization and mirrored model selection. Direct
+browser interaction with model selection and the file picker, plus cross-machine
+absolute-path refusal messaging, remain unverified.
 
-| Step | Slice                                                                   | Proves                                                      |
-| ---- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 1    | mirror store + `session/list` rows (runtime id, cwd, title, updatedAt)  | the sidebar and main panel show a remote thread as a thread |
-| 2    | `session/follow` + `session/page` re-served from the remote stream      | the native chat renders it, live, with tool cards           |
-| 3    | `session/prompt` (text, then images), `cancel`, `updateQueue`           | the native composer sends, steers and stops                 |
-| 4    | per-session model catalog and reasoning effort                          | the model chip is the host's, not this machine's            |
-| 5    | file-upload and file-reference proxies                                  | attachments and `@` resolve on the host                     |
-| 6    | jj/workspace path proxies + approvals (waterfall) or the embed fallback | full local-feeling thread                                   |
+## Remaining boundaries
+
+- In-client answers to questions and tool approvals, terminal access, and JJ/workspace
+  path operations are not mirrored; the native thread still offers the host UI for
+  those operations.
+- The loopback SSH E2E tests Host API transport for remote file references and uploads,
+  but does not drive the browser's model picker or attachment picker.
+- The implementation routes selected local files through the owning runtime's upload
+  service. A specific cross-machine absolute-path refusal message has not been
+  implemented or tested.

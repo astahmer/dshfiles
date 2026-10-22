@@ -108,13 +108,14 @@
     },
     {
       "id": "session-routing",
-      "title": "Start and follow threads on a remote host",
-      "summary": "Browse the host's folders, start a thread there from the New thread composer, follow its transcript and reply from the remote thread view, see threads started directly on the host in the remote inventory, and see when a remote turn waits on a question or approval.",
+      "title": "Use the native composer for remote threads",
+      "summary": "Open a native thread composer on a selected remote host, then keep its model catalog and reasoning-effort picker, file attachments, and @ file references bound to that Session's owning runtime; follow and reply in the same native chat.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["folder-chosen", "starting", "running", "finished", "offline", "waiting-on-host"],
+      "states": ["folder-chosen", "starting", "running", "finished", "offline", "waiting-on-host", "model-loading", "uploading", "resolving-file-reference"],
       "failureModes": [
         "A capability or version mismatch disables incompatible actions.",
+        "A file-reference request for an unowned Session or wrong runtime is refused before the remote filesystem is queried.",
         "An unknown mutation result after a lost reply is inspected and never automatically replayed."
       ],
       "externalDependencies": [

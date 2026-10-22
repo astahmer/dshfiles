@@ -16,6 +16,10 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./dist/api.js"
+    },
     "./destination": {
       "types": "./src/destination/index.ts",
       "default": "./src/destination/index.ts"
@@ -38,6 +42,7 @@
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-client-file-upload": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",

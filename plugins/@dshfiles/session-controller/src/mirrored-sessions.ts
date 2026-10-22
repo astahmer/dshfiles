@@ -6,6 +6,8 @@ import type {
   SessionAddress,
   SessionCancelRequest,
   SessionCancelValue,
+  SessionSelectModelRequest,
+  SessionSelectModelValue,
   SessionFollowFrame,
   SessionFollowRequest,
   SessionListRequest,
@@ -256,6 +258,20 @@ export class MirroredSessions {
       return await source.projections(request, signal)
     } catch (error) {
       throw MirroredSessions.failure('session/projections', error)
+    }
+  }
+
+  async selectModel(
+    request: SessionSelectModelRequest,
+    local: (request: SessionSelectModelRequest) => Promise<SessionSelectModelValue>,
+  ): Promise<SessionSelectModelValue> {
+    const source = await this.resolve(request.sessionId)
+    if (source === undefined) return local(request)
+    if (source.selectModel === undefined) throw new RemoteError('gateway/bad-request', 'This runtime cannot select a model for that Session.', {})
+    try {
+      return await source.selectModel(request)
+    } catch (error) {
+      throw MirroredSessions.failure('session/selectModel', error)
     }
   }
 }

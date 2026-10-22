@@ -28,6 +28,7 @@
   "dependencies": {
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
+    "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "zod": "catalog:"
   },

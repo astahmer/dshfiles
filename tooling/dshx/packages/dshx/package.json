@@ -50,6 +50,10 @@
       "types": "./dist/api/index.d.ts",
       "default": "./dist/api/index.js"
     },
+    "./api/client": {
+      "types": "./dist/api/client.d.ts",
+      "default": "./dist/api/client.js"
+    },
     "./settings": {
       "types": "./dist/settings/index.d.ts",
       "default": "./dist/settings/index.js"

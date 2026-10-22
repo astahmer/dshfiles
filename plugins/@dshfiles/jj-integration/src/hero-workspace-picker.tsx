@@ -11,12 +11,12 @@ import {
 } from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
-import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap } from '@dshfiles/multi-host/destination'
+import { useLayoutEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
-import { RemoteDestinationChips } from './remote-destination.js'
+import { prepareRemoteFolder, RemoteDestinationChips } from './remote-destination.js'
 import { recentProjectPaths } from './recent-projects.js'
 
 const NO_FOLDER_ID = 'dshfiles:no-folder'
@@ -58,8 +58,6 @@ export const HeroWorkspacePicker = (
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
   const directory = useQuery({ ...multiHostQueries.directory(multiHost), enabled: destination.kind === 'runtime' })
   const remote = destination.kind === 'runtime'
-  const takeOverComposer = props.services.takeOverComposer
-  useEffect(() => (remote ? takeOverComposer() : undefined), [remote, takeOverComposer])
   const projects = useQuery({
     queryKey: ['jj-integration', 'projects'],
     enabled: !remote,
@@ -75,6 +73,14 @@ export const HeroWorkspacePicker = (
       // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).
       <div className="dshx-root dshx:contents" aria-label={props.t('destination')} data-remote-destination="">
         <HostChipSlot />
+        <RemoteSessionBootstrap
+          api={multiHost}
+          runtimeId={destination.runtimeId}
+          hostName={hostName}
+          cwd={destination.folder}
+          prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
+          onStarted={props.services.openSession}
+        />
         <RemoteDestinationChips
           api={multiHost}
           destination={destination}

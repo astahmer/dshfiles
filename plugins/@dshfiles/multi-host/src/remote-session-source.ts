@@ -2,9 +2,10 @@ import type {
   SessionAddress,
   SessionCancelRequest,
   SessionCancelValue,
+  SessionSelectModelRequest,
+  SessionSelectModelValue,
   SessionFollowFrame,
   SessionFollowRequest,
-  SessionListRequest,
   SessionPage,
   SessionPageRequest,
   SessionProjectionsRequest,
@@ -32,6 +33,7 @@ export interface RemoteRuntimeTarget {
 /** The runtime access the source borrows from multi-host's Host half. */
 export interface RemoteRuntimes {
   list(): Promise<readonly RemoteRuntimeTarget[]>
+  recordedSessions(): Promise<readonly { readonly sessionId: string; readonly runtimeId: string; readonly cwd?: string }[]>
   acquire(runtimeId: string): Promise<PooledGateway>
   run<Result>(runtimeId: string, request: (gateway: Gateway) => Promise<Result>, options: { readonly mutation: boolean }): Promise<Result>
 }
@@ -45,39 +47,36 @@ export interface RemoteRuntimes {
  * repair, and a prompt/cancel/queue mutation goes through the pool's no-replay path.
  */
 export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: RemoteRuntimes }): MirroredSessionSource => {
-  const ownerBySession = new Map<string, string>()
-  let refreshing: Promise<void> | undefined
+  const ownerBySessionRefresh = new Map<string, Promise<RemoteRuntimeTarget | undefined>>()
   let recent: { readonly key: string; readonly at: number; readonly rows: readonly SessionSummary[] } | undefined
   const listCacheMs = 2_000
 
-  const remember = (runtimeId: string, rows: readonly SessionSummary[]): void => {
-    for (const row of rows) ownerBySession.set(String(row.sessionId), runtimeId)
-  }
-
-  const refreshOwners = async (request: SessionListRequest): Promise<void> => {
-    refreshing ??= (async () => {
-      for (const runtime of await runtimes.list()) {
+  const runtimeFor = async (sessionId: string): Promise<RemoteRuntimeTarget | undefined> => {
+    const ongoingRefresh = ownerBySessionRefresh.get(sessionId)
+    if (ongoingRefresh !== undefined) return ongoingRefresh
+    const lookup = (async (): Promise<RemoteRuntimeTarget | undefined> => {
+      const runtimesNow = await runtimes.list()
+      const recorded = (await runtimes.recordedSessions()).find(thread => thread.sessionId === sessionId)
+      const recordedRuntime = recorded === undefined ? undefined : runtimesNow.find(runtime => runtime.id === recorded.runtimeId)
+      if (recorded !== undefined) return recordedRuntime
+      for (const runtime of runtimesNow) {
         try {
-          const value = await runtimes.run(runtime.id, gateway => gateway.run('session', 'list', { _request: request }, undefined), { mutation: false })
-          remember(runtime.id, SessionSourcePayload.summaries(value))
+          const value = await runtimes.run(runtime.id, gateway => gateway.run('session', 'list', { _request: {} }), { mutation: false })
+          const row = SessionSourcePayload.summaries(value).find(item => String(item.sessionId) === sessionId)
+          if (row === undefined) continue
+          return runtime
         } catch {
-          // An unreachable runtime must not keep another runtime's threads from opening.
+          // A Session owned by an unreachable runtime cannot authorize a routed operation.
         }
       }
-    })().finally(() => {
-      refreshing = undefined
-    })
-    await refreshing
-  }
-
-  const runtimeFor = async (sessionId: SessionId): Promise<RemoteRuntimeTarget | undefined> => {
-    const cached = ownerBySession.get(sessionId)
-    const runtimesNow = await runtimes.list()
-    const claimed = cached === undefined ? undefined : runtimesNow.find(runtime => runtime.id === cached)
-    if (claimed !== undefined) return claimed
-    await refreshOwners({})
-    const refreshed = ownerBySession.get(sessionId)
-    return refreshed === undefined ? undefined : runtimesNow.find(runtime => runtime.id === refreshed)
+      return undefined
+    })()
+    ownerBySessionRefresh.set(sessionId, lookup)
+    try {
+      return await lookup
+    } finally {
+      if (ownerBySessionRefresh.get(sessionId) === lookup) ownerBySessionRefresh.delete(sessionId)
+    }
   }
 
   const requireRuntime = async (sessionId: SessionId): Promise<RemoteRuntimeTarget> => {
@@ -91,22 +90,62 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
     label: 'Remote hosts',
     list: async request => {
       const key = JSON.stringify(request)
-      if (recent !== undefined && recent.key === key && Date.now() - recent.at < listCacheMs) return recent.rows
+      const recordedSessions = await runtimes.recordedSessions()
+      const cached = recent
+      if (
+        cached !== undefined &&
+        cached.key === key &&
+        Date.now() - cached.at < listCacheMs &&
+        recordedSessions.every(thread => cached.rows.some(row => String(row.sessionId) === thread.sessionId))
+      )
+        return cached.rows
       const rows: SessionSummary[] = []
+      const recordedByRuntime = new Map<string, Map<string, { readonly sessionId: string; readonly cwd?: string }>>()
+      for (const thread of recordedSessions) {
+        const sessions = recordedByRuntime.get(thread.runtimeId) ?? new Map()
+        sessions.set(thread.sessionId, thread)
+        recordedByRuntime.set(thread.runtimeId, sessions)
+      }
       for (const runtime of await runtimes.list()) {
         try {
           const value = await runtimes.run(runtime.id, gateway => gateway.run('session', 'list', { _request: request }, undefined), { mutation: false })
-          const runtimeRows = SessionSourcePayload.summaries(value)
-          remember(runtime.id, runtimeRows)
-          rows.push(...runtimeRows)
+          const listedRows = SessionSourcePayload.summaries(value)
+          const listedIds = new Set(listedRows.map(row => String(row.sessionId)))
+          const missingRecorded = [...(recordedByRuntime.get(runtime.id)?.values() ?? [])].filter(thread => !listedIds.has(thread.sessionId))
+          const runtimeRows: readonly SessionSummary[] = [
+            ...listedRows,
+            ...missingRecorded.map(thread => ({
+              sessionId: thread.sessionId as SessionId,
+              updatedAt: 0,
+              running: false,
+              blank: true,
+              agentAvailable: true,
+              ...(thread.cwd === undefined ? {} : { cwd: thread.cwd }),
+            })),
+          ]
+          rows.push(
+            ...runtimeRows.map(row => ({
+              agentAvailable: row.agentAvailable,
+              blank: row.blank,
+              ...(row.cwd === undefined ? {} : { cwd: row.cwd }),
+              ...(row.formatStatus === undefined ? {} : { formatStatus: row.formatStatus }),
+              ...(row.origin === undefined ? {} : { origin: row.origin }),
+              ...(row.parentSessionId === undefined ? {} : { parentSessionId: row.parentSessionId }),
+              ...(row.projections === undefined ? {} : { projections: row.projections }),
+              running: row.running,
+              sessionId: row.sessionId,
+              updatedAt: row.updatedAt,
+            })),
+          )
         } catch {
-          // Same rule as refreshOwners: one host down is not a list failure.
+          // One host down is not a list failure.
         }
       }
       recent = { key, at: Date.now(), rows }
       return rows
     },
     owns: async sessionId => (await runtimeFor(sessionId)) !== undefined,
+    runtimeIdForSession: async sessionId => (await runtimeFor(sessionId))?.id,
     follow: async function* (request: SessionFollowRequest, signal: AbortSignal): AsyncIterable<SessionFollowFrame> {
       const runtime = await requireRuntime(ownedSessionOf(request.address))
       const leased = await runtimes.acquire(runtime.id)
@@ -142,6 +181,11 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
       const runtime = await requireRuntime(request.sessionId)
       const value = await runtimes.run(runtime.id, gateway => gateway.run('session', 'projections', { request }, signal), { mutation: false })
       return SessionSourcePayload.projections(value)
+    },
+    selectModel: async (request: SessionSelectModelRequest): Promise<SessionSelectModelValue> => {
+      const runtime = await requireRuntime(request.sessionId)
+      const value = await runtimes.run(runtime.id, gateway => gateway.run('session', 'selectModel', { request }), { mutation: true })
+      return SessionSourcePayload.selectedModel(value)
     },
   }
 }

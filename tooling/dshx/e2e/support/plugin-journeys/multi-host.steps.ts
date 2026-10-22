@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -26,8 +27,13 @@ const nativeCreateSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
 ])
 
+const threadCreateSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), sessionId: z.string() }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string(), sessionId: z.string().optional() }),
+])
+
 const nativeSessionListSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: z.object({ items: z.array(z.object({ sessionId: z.string() }).passthrough()) }).passthrough() }),
+  z.object({ ok: z.literal(true), value: z.object({ items: z.array(z.object({ sessionId: z.string(), blank: z.boolean() }).passthrough()) }).passthrough() }),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
 ])
 
@@ -49,6 +55,27 @@ const connectionTestSchema = z.discriminatedUnion('ok', [
 const transcriptSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), cwd: z.string(), entries: z.array(z.unknown()) }).passthrough(),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
+])
+
+const sessionRuntimeSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), runtimeId: z.string().nullable() }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+])
+
+const fileReferencesSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), candidates: z.array(z.object({ path: z.string(), kind: z.enum(['file', 'directory']) })) }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+])
+
+const fileUploadSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    value: z.object({
+      receiptId: z.string().min(1),
+      file: z.object({ attachmentId: z.string().min(1), name: z.string(), bytes: z.number().int().nonnegative() }),
+    }),
+  }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
 ])
 
 const runtimeDirectorySchema = z.object({
@@ -230,16 +257,13 @@ When('a remote thread is created and read over SSH', async ({ page }: { readonly
   const runtime = directory.runtimes.find(item => item.hostId === host.id)
   if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
 
-  const created = nativeCreateSchema.parse(
-    await call('runtimeCall', {
-      runtimeId: runtime.id,
-      request: { namespace: 'session', method: 'create', args: { request: { cwd: pair.remote.homeRoot } } },
-    }),
-  )
-  if (!created.ok) throw new Error(`The remote session could not be created: ${created.code}.`)
-  const sessionId = created.value.sessionId
+  await writeFile(join(pair.remote.homeRoot, 'remote-composer-reference.txt'), 'remote attachment references belong to the owning Host.\n')
+  const created = threadCreateSchema.parse(await call('threadCreate', { runtimeId: runtime.id, cwd: pair.remote.homeRoot }))
+  if (!created.ok) throw new Error(`The empty remote thread could not be created: ${created.code}.`)
+  const sessionId = created.sessionId
   const transcript = transcriptSchema.parse(await call('threadTranscript', { runtimeId: runtime.id, sessionId }))
   if (!transcript.ok) throw new Error(`The remote thread transcript could not be read: ${transcript.code}.`)
+  expect(transcript.entries).toEqual([])
   const sessions = nativeSessionListSchema.parse(
     await call('runtimeCall', {
       runtimeId: runtime.id,
@@ -247,9 +271,44 @@ When('a remote thread is created and read over SSH', async ({ page }: { readonly
     }),
   )
   if (!sessions.ok) throw new Error(`The remote session list could not be read: ${sessions.code}.`)
-  expect(sessions.value.items.some(item => item.sessionId === sessionId)).toBe(true)
+  expect(sessions.value.items.find(item => item.sessionId === sessionId)?.blank).toBe(true)
   expect(transcript.cwd).toBe(pair.remote.homeRoot)
   observations.set(page, { runtimeId: runtime.id, remoteHome: runtime.remoteHome, sessionId, transcriptCwd: transcript.cwd })
+})
+
+When('the remote composer resolves @file suggestions on SSH', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const observation = observations.get(page)
+  if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
+  const call = await hostApi(pair.manager)
+  const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: observation.sessionId }))
+  if (!ownership.ok) throw new Error(`The owning runtime could not be resolved: ${ownership.code}.`)
+  expect(ownership.runtimeId).toBe(observation.runtimeId)
+  const result = fileReferencesSchema.parse(await call('runtimeFileReferences', {
+    runtimeId: observation.runtimeId,
+    sessionId: SessionId(observation.sessionId),
+    query: 'remote-composer-reference',
+  }))
+  if (!result.ok) throw new Error(`Remote file-reference discovery failed: ${result.code}: ${result.message}.`)
+  expect(result.candidates).toEqual(expect.arrayContaining([
+    expect.objectContaining({ kind: 'file', path: expect.stringContaining('remote-composer-reference.txt') }),
+  ]))
+})
+
+When('a remote file attachment is staged on its owning SSH host', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const observation = observations.get(page)
+  if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
+  const call = await hostApi(pair.manager)
+  const content = 'A file staged by the native remote composer.\n'
+  const result = fileUploadSchema.parse(await call('sessionUploadFile', {
+    runtimeId: observation.runtimeId,
+    sessionId: observation.sessionId,
+    data: Buffer.from(content).toString('base64'),
+    name: 'remote-composer-attachment.txt',
+  }))
+  if (!result.ok) throw new Error(`Remote attachment upload failed: ${result.code}: ${result.message}`)
+  expect(result.value.file).toMatchObject({ name: 'remote-composer-attachment.txt', bytes: Buffer.byteLength(content) })
 })
 
 When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Page }) => {

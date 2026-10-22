@@ -44,13 +44,16 @@ With a host chosen:
 - When the host runs `@dshfiles/jj-integration` and the folder is a jj
   repository, the bookmark and **workspace** chips come from the host; sending
   creates the isolated workspace there.
-- The composer is replaced: the message, and a model picked from the host's
-  own catalog, start a Session **on the host**. No local Session is created.
-  While the host is unreachable the composer says so and offers **Reconnect**;
-  nothing is sent. This replacement is a stopgap: the plan is for a remote
-  Session to open in this client's own chat and composer, which is what bb,
-  t3code and Codex all do. Why it cannot simply reuse the local composer today,
-  and the route that removes the stopgap, are in
+- Starting a remote thread opens an empty Session on that host in the same
+  native chat and composer used for local threads; it does not create a local
+  Session. The composer keeps its model/reasoning selector, file attachments,
+  and `@` file references, with those operations routed to the Session's owner.
+  Existing command, prompt, queue, plan, permission, todo, and jj/workspace
+  surfaces remain subject to the capabilities available from the remote Host.
+  If the runtime is unreachable, the native composer stays visible and keeps the
+  draft; its send is refused until the owner is reachable. Interactive browser
+  verification of the model picker and attachment picker is still pending.
+  The ownership boundary and unsupported surfaces are described in
   [docs/remote-thread-architecture.md](docs/remote-thread-architecture.md).
 - The started thread opens in the main area as a **normal thread of this client**:
   this Host mirrors the remote Session, so the native chat, its live transcript,

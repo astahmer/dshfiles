@@ -2,7 +2,7 @@ Feature: Multi-host loopback SSH lifecycle
 
   This journey boots two repository-owned scratch DSH profiles behind a generated,
   loopback-only sshd. The manager composes @dshfiles/multi-host and @dshfiles/jj-integration
-  to expose the host picker; it verifies remote thread routing, tunnel recovery, stale launch
+  to expose the host picker; it verifies native remote composer ownership, tunnel recovery, stale launch
   rejection, profile-sync cleanup, lost-response reconciliation, and scratch cleanup.
 
   @scenario:multi-host.identity-profile
@@ -14,6 +14,8 @@ Feature: Multi-host loopback SSH lifecycle
     Given a loopback SSH DSH pair is booted
     When the scratch remote is added from the host UI
     And a remote thread is created and read over SSH
+    And the remote composer resolves @file suggestions on SSH
+    And a remote file attachment is staged on its owning SSH host
     And the SSH tunnel drops and reconnects
     And stale SSH launch metadata is rejected
     And a failed scratch profile sync is cleaned without starting DSH

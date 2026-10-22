@@ -7,8 +7,10 @@ describe('multi-host tool exposure', () => {
     expect(tools.map(tool => tool.name).sort()).toEqual([
       'multi_host_browse',
       'multi_host_checkout_sync',
+      'multi_host_create_thread',
       'multi_host_doctor',
       'multi_host_exec',
+      'multi_host_file_references',
       'multi_host_find_homes',
       'multi_host_forget_thread',
       'multi_host_identity',
@@ -37,6 +39,33 @@ describe('multi-host tool exposure', () => {
     ])
   })
 
+  test('remote model results preserve reasoning choices', async () => {
+    const outputSchema = multiHostApi.methods.runtimeModels.output
+    if (outputSchema === undefined) throw new Error('The remote model catalog API must define an output schema.')
+    const validation = await outputSchema['~standard'].validate({
+      ok: true,
+      default: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
+      routableProviders: ['deepseek'],
+      groups: [
+        {
+          id: 'deepseek',
+          name: 'DeepSeek',
+          models: [
+            {
+              id: 'chat',
+              name: 'Chat',
+              reasoning: { efforts: [{ id: 'high', name: 'High', description: 'More deliberate.' }], defaultEffort: 'high' },
+            },
+          ],
+        },
+      ],
+      failures: [],
+    })
+    if ('issues' in validation) throw new Error('The remote model catalog output was rejected.')
+    if (!validation.value.ok) throw new Error('The remote model catalog fixture must be successful.')
+    expect(validation.value.groups[0]?.models[0]?.reasoning?.efforts[0]?.id).toBe('high')
+  })
+
   test('inspection stays read-only and every write needs the user to have asked', () => {
     const readOnly = Object.values(multiHostApi.methods)
       .filter(method => method.tool?.readOnly === true)
@@ -45,6 +74,7 @@ describe('multi-host tool exposure', () => {
     expect(readOnly).toEqual([
       'multi_host_browse',
       'multi_host_doctor',
+      'multi_host_file_references',
       'multi_host_identity',
       'multi_host_list',
       'multi_host_models',
@@ -63,7 +93,16 @@ describe('multi-host tool exposure', () => {
   })
 
   test('the raw RPC escape hatches stay untooled on purpose', () => {
-    const untooled = ['runtimeCall', 'runtimePluginCall', 'runtimePing', 'runtimeOpenView', 'runtimeCloseView', 'sessionCursor'] as const
+    const untooled = [
+      'runtimeCall',
+      'runtimePluginCall',
+      'runtimePing',
+      'runtimeOpenView',
+      'runtimeCloseView',
+      'sessionUploadFile',
+      'sessionCursor',
+      'sessionRuntime',
+    ] as const
     for (const name of untooled) {
       expect(multiHostApi.methods[name].tool).toBeUndefined()
     }

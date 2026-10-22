@@ -334,7 +334,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('selectModel')
   selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
-    return this.commands.selectModel(request)
+    return this.mirrored.selectModel(request, value => this.commands.selectModel(value))
   }
 
   /**
@@ -361,8 +361,11 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('modelCatalog')
   modelCatalog(): Promise<ModelCatalog> {
-    // dshfiles delta: every composer, picker and usage surface asks on load (12 calls, up to 2.7 s each, on one live
-    // page load), and each build lists every provider's models. Callers within 5 s of a build share it.
+    return this.buildLocalModelCatalog()
+  }
+
+  private buildLocalModelCatalog(): Promise<ModelCatalog> {
+    // Composer selectors share this bounded Host-generation snapshot instead of listing providers on every mount.
     const key = JSON.stringify(this.ctx.agentDefaultModel.currentSelection())
     const kept = this.catalogBuild
     if (kept !== undefined && kept.key === key && performance.now() - kept.startedAt < 5_000) return kept.value

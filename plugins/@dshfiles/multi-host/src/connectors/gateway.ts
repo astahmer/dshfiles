@@ -4,7 +4,8 @@ import { WebSocket } from 'ws'
 import { z } from 'zod'
 import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
 
-const maxNativeResponseBytes = 4 * 1024 * 1024
+const maxNativeResponseBytes = 32 * 1024 * 1024
+const maxNativeRequestBytes = 48 * 1024 * 1024
 const maxStreamFrameBytes = 2 * 1024 * 1024
 
 const nativeResponseSchema = z
@@ -56,6 +57,16 @@ export type Gateway = {
 }
 
 export type GatewayOutcome = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly code: string; readonly message: string }
+
+export class GatewayRequestError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'GatewayRequestError'
+  }
+}
 
 export class GatewayUnavailableError extends Error {
   constructor(
@@ -139,7 +150,7 @@ export const connectGateway = async ({
     closed,
     run: async (namespace, method, args, callSignal) => {
       const result = await attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal })
-      if (!result.ok) throw new GatewayUnavailableError(result.code, result.message)
+      if (!result.ok) throw new GatewayRequestError(result.code, result.message)
       return result.value
     },
     runSafe: (namespace, method, args, callSignal) => attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal }),
@@ -379,13 +390,17 @@ const attemptRun = async ({
     return { ok: false, code: 'invalid-endpoint', message: 'The requested runtime API endpoint is invalid.' }
   }
   const rpcId = randomUUID()
+  const requestBody = JSON.stringify({ type: 'client-request', rpcId, method: namespace + '/' + method, payload: { args } })
+  if (Buffer.byteLength(requestBody, 'utf8') > maxNativeRequestBytes) {
+    return { ok: false, code: 'request-too-large', message: 'The runtime API request exceeded the 48 MB transport limit.' }
+  }
   let response: Response
   try {
     response = await fetch(origin + '/api/' + encodeURIComponent(namespace) + '/' + encodeURIComponent(method), {
       method: 'POST',
       redirect: 'error',
       headers: { 'content-type': 'application/json', cookie },
-      body: JSON.stringify({ type: 'client-request', rpcId, method: namespace + '/' + method, payload: { args } }),
+      body: requestBody,
       ...(signal === undefined ? {} : { signal }),
     })
   } catch {

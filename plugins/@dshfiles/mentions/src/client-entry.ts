@@ -7,7 +7,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
 import type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-session-reference'
-import { defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { multiHostApi } from '@dshfiles/multi-host/api'
 import { FileMentions } from './file-mentions.js'
 import { MENTIONS_LOCALE_NAMESPACE, mentionsLocale } from './locales.js'
 import { MentionRanking, type FileEntry, type MentionQuery, type ThreadEntry } from './mention-ranking.js'
@@ -50,6 +51,7 @@ export default defineClient({
   locales: [mentionsLocale],
   inject: ['inputTriggers', 'sessions', 'remote', 'remote.fileReferences', 'remote.sessionReferenceResolver', 'sidebarRight', 'uiWorkspace'],
   setup(ctx) {
+    const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     const t = ctx.locale.bind(MENTIONS_LOCALE_NAMESPACE)
     const pickValues = new Map<string, PickValue>()
     const keep = (value: PickValue): string => {
@@ -196,10 +198,21 @@ export default defineClient({
           request.signal.throwIfAborted()
           const state = reference.binding.session.getSnapshot()
           if (state.openState !== 'open') throw state.openError ?? new Error(`session "${session.sessionId}" is not open`)
-          const fileLookup: Promise<readonly FileReferenceCandidate[]> =
-            query.scope === 'thread'
-              ? Promise.resolve([])
-              : ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal).then(result => (result.ok ? result.value : []))
+          const fileLookup: Promise<readonly FileReferenceCandidate[]> = query.scope === 'thread'
+            ? Promise.resolve([])
+            : (async () => {
+                const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal })
+                if (!ownership.ok) return []
+                if (ownership.runtimeId === null) {
+                  const result = await ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal)
+                  return result.ok ? result.value : []
+                }
+                const result = await multiHost.runtimeFileReferences(
+                  { runtimeId: ownership.runtimeId, sessionId: session.sessionId, query: query.text },
+                  { signal: request.signal },
+                )
+                return result.ok ? result.candidates : []
+              })()
           const threadLookup: Promise<readonly SessionReferenceMentionCandidate[]> =
             query.scope === 'file'
               ? Promise.resolve([])

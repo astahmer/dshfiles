@@ -1,3 +1,5 @@
+import type { FileUploadValue } from '@deepseek-ai/dsh-client-file-upload/types'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import { z } from 'zod'
@@ -8,6 +10,7 @@ const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
 const idSchema = z.string().min(1).max(64)
 const sessionIdSchema = z.string().min(1).max(256)
+const brandedSessionIdSchema = z.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -103,7 +106,49 @@ const directoryListingSchema = z.object({
   entries: z.array(directoryEntrySchema),
   truncated: z.boolean(),
 })
-const modelSelectionSchema = z.object({ provider: z.string().min(1).max(128), model: z.string().min(1).max(256) })
+const fileReferenceCandidateSchema = z.object({ path: z.string().max(4096), kind: z.enum(['file', 'directory']) })
+const encodedFileDataSchema = z
+  .string()
+  .max(32_000_000)
+  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u)
+export const fileUploadValueSchema = z.custom<FileUploadValue>(
+  value =>
+    z
+      .object({
+        receiptId: z.string().min(1).max(256),
+        file: z
+          .object({
+            attachmentId: z.string().min(1).max(256),
+            name: z.string().max(1024),
+            bytes: z.number().int().nonnegative(),
+          })
+          .strict(),
+      })
+      .strict()
+      .safeParse(value).success,
+)
+const modelSelectionSchema = z.object({
+  provider: z.string().min(1).max(128),
+  model: z.string().min(1).max(256),
+  reasoningEffort: z.string().min(1).max(128).optional(),
+})
+const modelCatalogModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  reasoning: z
+    .object({
+      efforts: z.array(z.object({ id: z.string(), name: z.string(), description: z.string().optional() })),
+      defaultEffort: z.string().optional(),
+    })
+    .optional(),
+})
+const modelCatalogGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  models: z.array(modelCatalogModelSchema),
+})
+const modelCatalogFailureSchema = z.object({ id: z.string(), name: z.string(), message: z.string() })
 const transcriptEntrySchema = z.object({
   seq: z.number().int(),
   kind: z.enum(['user', 'assistant', 'tool', 'status']),
@@ -412,13 +457,51 @@ export const multiHostApi = defineApi({
         z.object({
           ok: z.literal(true),
           default: modelSelectionSchema.nullable(),
-          groups: z.array(z.object({ id: z.string(), name: z.string(), models: z.array(z.object({ id: z.string(), name: z.string() })) })),
+          routableProviders: z.array(z.string()),
+          groups: z.array(modelCatalogGroupSchema),
+          failures: z.array(modelCatalogFailureSchema),
         }),
         failedSchema,
       ]),
       description:
-        'The provider-grouped model catalog of one remote runtime with its default model, so a remote thread can be started on a chosen model. Read-only.',
+        "The provider-grouped model catalog of one remote runtime, including adapter reasoning efforts, so remote thread composers can use that Host's model choices. Read-only.",
       tool: { name: 'multi_host_models', readOnly: true, render: compactJson },
+    }),
+    sessionRuntime: method({
+      input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtimeId: idSchema.nullable() }), failedSchema]),
+      description: 'Resolve the runtime that owns a mirrored Session, or null for a local Session.',
+    }),
+    runtimeFileReferences: method({
+      input: z.object({ runtimeId: idSchema, sessionId: brandedSessionIdSchema, query: z.string().max(4096) }).strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({ ok: z.literal(true), candidates: z.array(fileReferenceCandidateSchema.strict()).max(1000) }),
+        failedSchema,
+      ]),
+      description: 'List file and directory mentions for one remote Session cwd. Read-only.',
+      tool: { name: 'multi_host_file_references', readOnly: true, render: compactJson },
+    }),
+    sessionUploadFile: method({
+      input: z
+        .object({
+          runtimeId: idSchema,
+          sessionId: brandedSessionIdSchema,
+          data: encodedFileDataSchema,
+          name: z.string().max(1024).optional(),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), value: fileUploadValueSchema }), failedSchema]),
+      description: 'Stage one file attachment up to 24 MB for a remote Session. This is a non-replayable mutation.',
+    }),
+    threadCreate: method({
+      input: z.object({ runtimeId: idSchema, cwd: z.string().min(1).max(4096) }).strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({ ok: z.literal(true), sessionId: sessionIdSchema }),
+        failedSchema.extend({ sessionId: sessionIdSchema.optional() }),
+      ]),
+      description:
+        'Create an empty thread on one remote runtime and open it in the native chat composer. Call only when the user asked to start a thread on that machine.',
+      tool: { name: 'multi_host_create_thread', render: compactJson },
     }),
     threadStart: method({
       input: z

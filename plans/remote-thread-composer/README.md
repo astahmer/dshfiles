@@ -58,8 +58,8 @@ running }`, marked so the UI can badge them.
 | 1   | Mirror store + `session/list` rows for threads started here and threads started on the host | the sidebar and main panel show a remote thread as a thread, badged with its runtime                              | done   |
 | 2   | `session/follow` + `session/page` re-served from the remote journal stream                  | native chat renders the live transcript: user text, assistant blocks, tool cards, windowed history                | done   |
 | 3   | `session/prompt` (text), `cancel`, `updateQueue` forwarded                                  | the native composer sends, steers, queues and stops a remote turn; the plain-textarea view is deleted             | done   |
-| 4   | Per-session model catalog + reasoning effort                                                | the composer's model chip is the host's catalog, not this machine's                                               | todo   |
-| 5   | Image and file uploads, file references (`@`) resolved on the host                          | pasted images and `@` paths reach the remote agent; cross-machine absolute paths are refused with a stated reason | todo   |
+| 4   | Per-session model catalog + reasoning effort                                                | remote catalog and selection are wired; interactive browser check remains                                       | partial |
+| 5   | Image and file uploads, file references (`@`) resolved on the host                          | SSH E2E covers upload and `@`; direct picker and cross-machine path refusal remain unverified                     | partial |
 | 6   | jj/workspace path proxies; approvals/questions (waterfall) or the embedded fallback         | a remote thread feels local end to end, or the residual gaps are named in the plugin README                       | todo   |
 
 ## Risks and stop conditions
@@ -84,6 +84,14 @@ was accepted by B, `cancel` reached B, and typing in A's browser composer appear
 B's log with no console errors
 ([screenshot](../../plugins/@dshfiles/multi-host/docs/screenshots/remote-thread-native.png)).
 
-Next: milestone 4. The composer's model chip still shows this machine's catalog and
-`selectModel` is not mirrored; then uploads and `@` references (5), then workspace and
-jj path proxies plus approvals (6).
+Milestones 4 and 5 are implemented: the model selector loads remote models and
+reasoning-effort options and routes selection through the mirrored Session; upload and
+file-reference APIs route through the owning runtime. Ownership is verified before
+file lookup or upload, and empty remote Sessions are persisted and recovered into the
+native Session list.
+
+The loopback SSH E2E passes and verifies an empty composer-ready Session, remote file
+reference results, and a remote file upload through Host APIs. Interactive model-chip
+selection and the browser attachment picker are not yet driven in a browser, and
+cross-machine absolute-path refusal messaging is not yet implemented or verified.
+Milestone 6 remains: workspace/JJ proxies and in-client approval/question flows.

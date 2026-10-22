@@ -14,7 +14,6 @@ import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/ds
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
-import { hostDestination, multiHostApi, multiHostQueries, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
@@ -32,7 +31,6 @@ import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel, threadQueryKeys, threadRebaseMutationKey } from './panel.js'
-import { prepareRemoteFolder } from './remote-destination.js'
 import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -208,23 +206,6 @@ export default defineClient({
         ),
       'jj-integration: move the side-panel view to the main area',
     )
-    const RemoteComposerBar = (): JSX.Element | null => {
-      const multiHost = useApi(multiHostApi)
-      const destination = hostDestination.useValue()
-      const directory = useQuery(multiHostQueries.directory(multiHost))
-      if (destination.kind !== 'runtime') return null
-      const runtime = directory.data?.runtimes.find(item => item.id === destination.runtimeId)
-      return (
-        <RemoteComposer
-          api={multiHost}
-          runtimeId={destination.runtimeId}
-          hostName={directory.data?.hosts.find(host => host.id === runtime?.hostId)?.name ?? runtime?.name ?? 'Remote host'}
-          cwd={destination.folder}
-          prepareCwd={() => prepareRemoteFolder(multiHost, destination)}
-          onStarted={ref => ctx.uiWorkspace.openSession(SessionId(ref.sessionId))}
-        />
-      )
-    }
     const composerNavigation = createComposerWorkspaceNavigation({
       selectedWorkspace: () => {
         const sessions = ctx.sessions.list.getSnapshot()
@@ -248,16 +229,7 @@ export default defineClient({
       openWorkspace: composerNavigation.open,
       pickWorkspace: composerNavigation.pickWorkspace,
       bindWorkspacePicker: composerNavigation.bind,
-      // A blank thread's composer would create a Session on this machine; while a remote host is chosen it sends there.
-      takeOverComposer: () =>
-        ctx.slots.register(
-          { name: 'conversation.composer.bar', priority: -100 },
-          decorate(() => (
-            <PluginQueryProvider>
-              <RemoteComposerBar />
-            </PluginQueryProvider>
-          )),
-        ),
+      openSession: sessionId => ctx.uiWorkspace.openSession(SessionId(sessionId)),
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
     const integrationTimeline = new IntegrationTimeline()

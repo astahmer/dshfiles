@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto'
+import type { MirroredSessionSource, SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
-import { multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
+import { fileUploadValueSchema, multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
 import { connectLocal } from './connectors/local.js'
 import { SshConnector } from './connectors/ssh.js'
-import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
+import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
+import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
@@ -93,12 +95,36 @@ const workspaceContainerSchema = z
     snapshot: z.unknown().optional(),
   })
   .passthrough()
+const fileReferenceCandidatesSchema = z.array(z.object({ path: z.string().max(4096), kind: z.enum(['file', 'directory']) }).strip()).max(1000)
 const modelCatalogSchema = z
   .object({
-    default: z.object({ provider: z.string(), model: z.string() }).passthrough().optional(),
+    default: z.object({ provider: z.string(), model: z.string(), reasoningEffort: z.string().optional() }).passthrough().optional(),
+    routableProviders: z.array(z.string()).optional(),
     groups: z.array(
-      z.object({ id: z.string(), name: z.string(), models: z.array(z.object({ id: z.string(), name: z.string() }).passthrough()) }).passthrough(),
+      z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          models: z.array(
+            z
+              .object({
+                id: z.string(),
+                name: z.string(),
+                description: z.string().optional(),
+                reasoning: z
+                  .object({
+                    efforts: z.array(z.object({ id: z.string(), name: z.string(), description: z.string().optional() }).passthrough()),
+                    defaultEffort: z.string().optional(),
+                  })
+                  .passthrough()
+                  .optional(),
+              })
+              .passthrough(),
+          ),
+        })
+        .passthrough(),
     ),
+    failures: z.array(z.object({ id: z.string(), name: z.string(), message: z.string() }).passthrough()).optional(),
   })
   .passthrough()
 const sessionSnapshotSchema = z
@@ -138,6 +164,7 @@ interface ViewLease {
 }
 
 let configuredProfile: string | undefined
+const activeSessionSources = new Set<SessionSourceRegistry>()
 const viewLeases = new Map<string, ViewLease>()
 const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
@@ -230,6 +257,7 @@ const safeFailure = (error: unknown): { readonly code: string; readonly message:
     error instanceof DirectoryStoreError ||
     error instanceof RuntimeIdentityError ||
     error instanceof GatewayUnavailableError ||
+    error instanceof GatewayRequestError ||
     error instanceof IdentityMismatchError
   ) {
     return { code: error.code, message: error.message }
@@ -790,6 +818,30 @@ const multiHostHandlers = multiHostApi.host({
       return { ok: false as const, ...failure }
     }
   },
+  threadCreate: async ({ input }) => {
+    const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
+    if (runtime === undefined) return { ok: false as const, code: 'runtime-not-found', message: 'This host is no longer recorded.' }
+    let sessionId: string | undefined
+    try {
+      return await withRuntime(
+        runtime.id,
+        async gateway => {
+          const created = await NativeRpcModel.call(gateway, {
+            namespace: 'session',
+            method: 'create',
+            args: { request: { cwd: input.cwd } },
+          })
+          if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
+          sessionId = sessionCreatedSchema.parse(created.value).sessionId
+          await RemoteThreadStore.record({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: '', createdAt: new Date().toISOString() })
+          return { ok: true as const, sessionId }
+        },
+        { mutation: true, broken: brokenRpc },
+      )
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error), ...(sessionId === undefined ? {} : { sessionId }) }
+    }
+  },
   threadStart: async ({ input }) => {
     const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
     if (runtime === undefined) return { ok: false as const, code: 'runtime-not-found', message: 'This host is no longer recorded.' }
@@ -807,7 +859,12 @@ const multiHostHandlers = multiHostApi.host({
           sessionId = sessionCreatedSchema.parse(created.value).sessionId
           if (input.model !== undefined) {
             const selected = await gateway.runSafe('session', 'selectModel', {
-              request: { sessionId, provider: input.model.provider, model: input.model.model },
+              request: {
+                sessionId,
+                provider: input.model.provider,
+                model: input.model.model,
+                ...(input.model.reasoningEffort === undefined ? {} : { reasoningEffort: input.model.reasoningEffort }),
+              },
             })
             if (!selected.ok)
               return { ok: false as const, code: selected.code, message: `The thread was created but its model was refused: ${selected.message}`, sessionId }
@@ -842,8 +899,94 @@ const multiHostHandlers = multiHostApi.host({
       return {
         ok: true as const,
         default: catalog.default ?? null,
-        groups: catalog.groups.map(group => ({ id: group.id, name: group.name, models: group.models.map(model => ({ id: model.id, name: model.name })) })),
+        routableProviders: catalog.routableProviders ?? catalog.groups.map(group => group.id),
+        groups: catalog.groups.map(group => ({
+          id: group.id,
+          name: group.name,
+          models: group.models.map(model => ({
+            id: model.id,
+            name: model.name,
+            ...(model.description === undefined ? {} : { description: model.description }),
+            ...(model.reasoning === undefined ? {} : { reasoning: model.reasoning }),
+          })),
+        })),
+        failures: catalog.failures ?? [],
       }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  sessionRuntime: async ({ input }) => {
+    try {
+      const recorded = (await RemoteThreadStore.list()).find(thread => thread.sessionId === input.sessionId)
+      if (recorded !== undefined && (await HostDirectoryStore.findRuntime(recorded.runtimeId)) !== undefined) {
+        return { ok: true as const, runtimeId: recorded.runtimeId }
+      }
+      let source: MirroredSessionSource | undefined
+      for (const sessionSources of [...activeSessionSources].reverse()) {
+        try {
+          source = sessionSources.ownerOf(input.sessionId) ?? (await sessionSources.resolveOwner(input.sessionId))
+          if (source !== undefined) break
+        } catch {
+          continue
+        }
+      }
+      const runtimeId = source?.runtimeIdForSession === undefined ? undefined : await source.runtimeIdForSession(input.sessionId)
+      return { ok: true as const, runtimeId: runtimeId ?? null }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  runtimeFileReferences: async ({ input, signal }) => {
+    try {
+      const recordedSessions = await RemoteThreadStore.list()
+      const authorization = await authorizeRemoteSessionRuntime({
+        sessionId: input.sessionId,
+        runtimeId: input.runtimeId,
+        recordedSessions,
+        sessionSources: [...activeSessionSources],
+      })
+      if (!authorization.ok) return authorization
+      const outcome = await withRuntime(
+        input.runtimeId,
+        gateway => gateway.runSafe('fileReferences', 'list', { agentId: input.sessionId, query: input.query }, signal),
+        { mutation: false, broken: result => !result.ok && transportFailures.has(result.code) },
+      )
+      if (!outcome.ok) return { ok: false as const, code: outcome.code, message: outcome.message }
+      const candidates = fileReferenceCandidatesSchema.parse(outcome.value).map(candidate => ({ path: candidate.path, kind: candidate.kind }))
+      return { ok: true as const, candidates }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  sessionUploadFile: async ({ input, signal }) => {
+    try {
+      const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
+      if (runtime === undefined) return { ok: false as const, code: 'runtime-not-found', message: 'This host is no longer recorded.' }
+      const authorization = await authorizeRemoteSessionRuntime({
+        sessionId: input.sessionId,
+        runtimeId: runtime.id,
+        recordedSessions: await RemoteThreadStore.list(),
+        sessionSources: [...activeSessionSources],
+      })
+      if (!authorization.ok) return authorization
+      const value = await withRuntime(
+        runtime.id,
+        async gateway =>
+          fileUploadValueSchema.parse(
+            await gateway.run(
+              'fileUploads',
+              'upload',
+              {
+                agentId: input.sessionId,
+                request: { data: input.data, ...(input.name === undefined ? {} : { name: input.name }) },
+              },
+              signal,
+            ),
+          ),
+        { mutation: true },
+      )
+      return { ok: true as const, value }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }
@@ -1028,16 +1171,22 @@ export default defineHost({
     // A Session of another runtime opens in this Host's own chat and composer: the controller asks this source for any
     // Session it does not hold, and every endpoint forwards to the runtime that owns it.
     ctx.inject(['sessionSources'], scoped => {
+      activeSessionSources.add(scoped.sessionSources)
       const unregister = scoped.sessionSources.register(
         createRemoteSessionSource({
           runtimes: {
             list: async () => (await HostDirectoryStore.listRuntimes()).map(runtime => ({ id: runtime.id, label: runtime.name })),
+            recordedSessions: async () =>
+              (await RemoteThreadStore.list()).map(thread => ({ sessionId: thread.sessionId, runtimeId: thread.runtimeId, cwd: thread.cwd })),
             acquire: runtimeId => pool.acquire(runtimeId),
             run: (runtimeId, request, options) => withRuntime(runtimeId, request, options),
           },
         }),
       )
-      scoped.effect(() => unregister)
+      scoped.effect(() => () => {
+        unregister()
+        activeSessionSources.delete(scoped.sessionSources)
+      })
     })
     ctx.effect(() => async () => {
       for (const leaseId of [...viewLeases.keys()]) await closeLease(leaseId)

@@ -3,7 +3,7 @@ export type { RemoteThreadSummary, RuntimeSummary } from '../api.js'
 export { HostChip } from './host-chip.js'
 export { HostsPage } from './hosts-page.js'
 export { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
-export { RemoteComposer } from './remote-composer.js'
+export { RemoteSessionBootstrap } from './remote-session-bootstrap.js'
 export { remoteDirectoryPicker } from './remote-folders.js'
 export {
   HOSTS_PANEL_ID,

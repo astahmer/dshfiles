@@ -10,6 +10,8 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
+import { createApiClient } from '@dshfiles/dshx/api/client'
+import { multiHostApi } from '@dshfiles/multi-host/api'
 // Type-only imports: a plugin-to-plugin value import is a bundle purity
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
@@ -31,6 +33,14 @@ import type {
   DraftAttachmentId, DraftAttachmentSerializationResult, SessionInputResolver, SubmitAttachment, SubmitOutcome,
 } from './contract/input.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
+
+const encodeBase64 = (bytes: Uint8Array): string => {
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  }
+  return btoa(binary)
+}
 
 /**
  * The outward conversation face (`ctx.conversation`): the scope-addressed
@@ -169,6 +179,7 @@ export class ConversationController extends Service implements IConversation {
   }> = []
   private activeFileUploads = 0
   private readonly maxConcurrentFileUploads: number
+  private readonly multiHost: ReturnType<typeof createApiClient<typeof multiHostApi.methods>>
 
   /**
    * @param ctx - owning root context (the plugin apply context; the service
@@ -186,6 +197,7 @@ export class ConversationController extends Service implements IConversation {
     this.input = config.input
     this.blocks = config.blocks
     this.maxConcurrentFileUploads = config.maxConcurrentFileUploads
+    this.multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     ctx.effect(() => async () => {
       const operations = [...this.fileUploadOperations.values()]
       for (const operation of operations) operation.controller.abort()
@@ -357,23 +369,43 @@ export class ConversationController extends Service implements IConversation {
       try {
         if (controller.signal.aborted
           || this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
-        const result = await this.ctx.fileUpload.upload(
-          sessionId,
-          attachment.file,
-          attachment.file.name === '' ? undefined : attachment.file.name,
-          controller.signal,
-          (progress) => {
-            if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
-            this.fileUploads.update((draft) => {
-              if (!(attachment.id in draft)) return
-              draft[attachment.id] = {
-                status: 'uploading',
-                loaded: progress.loaded,
-                ...(progress.total === undefined ? {} : { total: progress.total }),
-              }
-            })
-          },
-        )
+        const onProgress = (progress: { readonly loaded: number; readonly total?: number }): void => {
+          if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
+          this.fileUploads.update((draft) => {
+            if (!(attachment.id in draft)) return
+            draft[attachment.id] = {
+              status: 'uploading',
+              loaded: progress.loaded,
+              ...(progress.total === undefined ? {} : { total: progress.total }),
+            }
+          })
+        }
+        const ownership = await this.multiHost.sessionRuntime({ sessionId }, { signal: controller.signal })
+        if (!ownership.ok) throw new Error(`${ownership.message} (${ownership.code})`)
+        const result = ownership.runtimeId === null
+          ? await this.ctx.fileUpload.upload(
+              sessionId,
+              attachment.file,
+              attachment.file.name === '' ? undefined : attachment.file.name,
+              controller.signal,
+              onProgress,
+            )
+          : await (async (runtimeId: string) => {
+              const bytes = new Uint8Array(await attachment.file.arrayBuffer())
+              controller.signal.throwIfAborted()
+              const uploaded = await this.multiHost.sessionUploadFile(
+                {
+                  runtimeId,
+                  sessionId,
+                  data: encodeBase64(bytes),
+                  ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
+                },
+                { signal: controller.signal },
+              )
+              if (!uploaded.ok) throw new Error(`${uploaded.message} (${uploaded.code})`)
+              onProgress({ loaded: attachment.file.size, total: attachment.file.size })
+              return { ok: true as const, value: uploaded.value }
+            })(ownership.runtimeId)
         if (this.fileUploadOperations.get(attachment.id)?.controller !== controller) return
         this.fileUploads.update((draft) => {
           if (!(attachment.id in draft)) return
