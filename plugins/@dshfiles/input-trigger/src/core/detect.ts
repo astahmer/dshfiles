@@ -11,6 +11,11 @@ const WORD_CHAR = /[\p{L}\p{N}_]/u
 const WHITESPACE = /\s/u
 const UNQUOTED_AT_TOKEN = /(?:^|\s)(@[^\r\n@]*)$/u
 
+const hasCaretToken = (query: string): boolean => {
+  const token = query.match(/\S+$/u)?.[0]
+  return token !== undefined && !/^\p{P}+$/u.test(token)
+}
+
 /**
  * Word-boundary rule: a trigger char opens only at start-of-draft, after
  * whitespace (newlines included), or after punctuation. Two URL carve-outs
@@ -53,7 +58,8 @@ export const detectTrigger: DetectTrigger = (draft, caret, guard) => {
   const unquotedAt = UNQUOTED_AT_TOKEN.exec(draft.slice(lineStart, caret))?.[1]
   const prefix = at?.prefix ?? unquotedAt
   const query = at?.query ?? unquotedAt?.slice(1) ?? ''
-  if (prefix !== undefined && !(at?.quoted !== true && /\s:/u.test(query))) {
+  const caretTokenIsActive = query === '' || hasCaretToken(query)
+  if (prefix !== undefined && (at?.quoted === true || caretTokenIsActive)) {
     const start = caret - prefix.length
     return {
       trigger: '@',

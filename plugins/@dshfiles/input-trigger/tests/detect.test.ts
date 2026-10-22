@@ -41,10 +41,29 @@ describe('shared input trigger detection', () => {
     })
   })
 
-  it('does not keep an unquoted @ query active after a whitespace-delimited colon', () => {
-    const draft = 'Follow-up after @session:session-example :'
+  it('targets the token at the caret instead of a preceding @ query', () => {
+    expect(detect('Follow-up after @session:session-example :')).toBeNull()
+    expect(detect('Follow-up after @session:session-example !')).toBeNull()
+  })
 
-    expect(detect(draft)).toBeNull()
+  it('keeps multiword title search active while the caret is in its final word', () => {
+    expect(detect('Find @a thread title')).toMatchObject({
+      trigger: '@',
+      query: 'a thread title',
+      quoted: false,
+    })
+  })
+
+  it('keeps colons inside the active mention token', () => {
+    expect(detect('@session:session-example')).toMatchObject({
+      trigger: '@',
+      query: 'session:session-example',
+      quoted: false,
+    })
+  })
+
+  it('does not keep a query active after its trailing separator whitespace', () => {
+    expect(detect('@a thread title ')).toBeNull()
   })
 
   it('does not let an unquoted query cross a newline', () => {
