@@ -84,7 +84,7 @@ export const ImageLightbox = (props: {
 
   return createPortal(
     <div
-      className="dshx-root dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:grid dshx:place-items-center dshx:p-10"
+      className="dshx-root dshx:fixed dshx:inset-0 dshx:z-[1150] dshx:grid dshx:place-items-center dshx:p-10"
       role="dialog"
       aria-modal="true"
       aria-label={labels.dialog}

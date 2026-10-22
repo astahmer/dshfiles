@@ -169,8 +169,11 @@ Feature: Backlog
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
     And a Command Code account backed by a local fake provider is added
     And the Backlog panel is opened
+    And two images are attached to the capture
     And "Ship the backlog reference preview" is captured
     When a thread on the fake model writes "Working on b:1"
     Then the inline backlog preview shows "Ship the backlog reference preview"
+    When an image is opened from the inline backlog preview
+    Then the inline backlog preview gallery opens above its card and navigates both images
     When the backlog preview is opened in the Backlog panel
     Then the backlog detail shows "Ship the backlog reference preview"

@@ -1,9 +1,12 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 
+const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed' })
 const feedItems = (page: Page) => feed(page).getByRole('article', { name: /^Item b:/ })
 const searchResults = (page: Page) => page.getByRole('list', { name: 'Search results' })
@@ -115,6 +118,13 @@ When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   await StartupDialogs.registerProviderSetupDismissal(page)
   await page.getByRole('button', { name: 'Backlog', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+})
+
+When('two images are attached to the capture', async ({ page }: { page: Page }) => {
+  const captureForm = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'Capture', exact: true }) })
+  await captureForm.locator('input[type="file"]').setInputFiles([join(attachmentFixtures, 'red.png'), join(attachmentFixtures, 'blue.png')])
+  await expect(captureForm.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  await expect(captureForm.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
 })
 
 When('{string} is captured', async ({ page }: { page: Page }, text: string) => {
@@ -589,6 +599,31 @@ Then('the inline backlog preview shows {string}', async ({ page }: { page: Page 
       if ((await preview.count()) === 0) await reference.click()
       await expect(preview).toContainText(text, { timeout: 1_500 })
     }).toPass({ timeout: 30_000 })
+    await expect(preview.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+    await expect(preview.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('an image is opened from the inline backlog preview', async ({ page }: { page: Page }) => {
+  await page.locator('[data-dshfiles-backlog-preview]').getByRole('button', { name: 'Open red.png', exact: true }).click()
+})
+
+Then('the inline backlog preview gallery opens above its card and navigates both images', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-reference-image-gallery', async () => {
+    const preview = page.locator('[data-dshfiles-backlog-preview]')
+    const gallery = page.getByRole('dialog', { name: 'Image preview', exact: true })
+    await expect(gallery).toBeVisible()
+    await expect(gallery.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+    const galleryZIndex = Number(await gallery.evaluate(element => getComputedStyle(element).zIndex))
+    const previewZIndex = Number(await preview.evaluate(element => getComputedStyle(element).zIndex))
+    expect(galleryZIndex).toBeGreaterThan(previewZIndex)
+    await page.keyboard.press('ArrowRight')
+    await expect(gallery.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(gallery.getByRole('button', { name: 'Image 2 of 2', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(gallery).toHaveCount(0)
+    await expect(preview).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

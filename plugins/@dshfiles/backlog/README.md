@@ -109,8 +109,9 @@ same gallery from the conversation.
 
 An Agent writes `b:<n>` in its markdown, the way `jj:<rev>` marks a revision: prose and inline code become
 links, while fenced code, existing links and words that merely contain the token stay as written. Clicking
-one opens an inline card with the item's title, kind, status, project and body; **Open in Backlog** selects
-that item in the panel. An item that no longer exists says so in the card instead of failing the
+one opens an inline card with the item's title, kind, status, project and body. Image attachments appear as
+thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. **Open in Backlog**
+selects that item in the panel. An item that no longer exists says so in the card instead of failing the
 conversation.
 
 ## Starting a thread from an item

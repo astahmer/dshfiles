@@ -14,6 +14,7 @@ import {
 } from './backlog-reference.js'
 import { backlogApi, BacklogViews } from './api.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { AttachmentMedia } from './item-files.js'
 import type { BacklogKind, BacklogStatus } from './item.js'
 
 const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
@@ -132,6 +133,7 @@ export const BacklogReferenceOverlay = (props: {
                   <MarkdownText text={detail.item.body} labels={markdownLabels} variant="compact" />
                 </div>
               )}
+              <AttachmentMedia itemId={detail.item.id} attachments={detail.item.attachments} />
             </>
           )}
         </div>
