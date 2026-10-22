@@ -12,11 +12,12 @@ code[data-dshfiles-jj-reference-owner] {
 [data-dshfiles-jj-reference] {
   color: var(--dsw-alias-state-business-primary);
   cursor: pointer;
-  display: inline;
+  display: inline-flex;
   font: inherit;
   font-weight: 500;
   margin: 0 2px;
-  max-width: 100%;
+  max-width: min(32ch, 100%);
+  width: auto;
   overflow-wrap: anywhere;
   text-align: inherit;
   white-space: inherit;
