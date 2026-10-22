@@ -569,13 +569,18 @@
     {
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
-      "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Views save a view and search to the plugin settings.",
+      "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Multi-select status chips show counts for the current search and narrow results. Views save a view and search to the plugin settings.",
       "surfaces": ["client", "host", "settings", "tool"],
       "configuration": [],
       "states": ["browsing", "searching", "saved"],
       "failureModes": ["A settings write that the Host refuses drops the optimistic saved view."],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.search-status-filter",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.search-unit-rank",

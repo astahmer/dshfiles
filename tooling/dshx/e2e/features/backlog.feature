@@ -14,6 +14,24 @@ Feature: Backlog
     When the backlog is searched for "chips"
     Then the feed lists only "composer drops chips on paste"
 
+  @scenario:backlog.search-status-filter
+  Scenario: Filter search results by one or several statuses
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "bug: composer chip in progress" is captured
+    And "idea: composer chip in inbox" is captured
+    When item b:1 is moved to In progress on the board
+    And the backlog is searched for "composer chip"
+    Then search results offer one count for each matching status
+    When search is filtered by the "In progress" status
+    Then search results list only "composer chip in progress"
+    When search is also filtered by the "Inbox" status
+    Then search results list both "composer chip in progress" and "composer chip in inbox"
+    When the "In progress" status search filter is cleared
+    Then search results list only "composer chip in inbox"
+    When the "Inbox" status search filter is cleared
+    Then search results list both "composer chip in progress" and "composer chip in inbox"
+
   @scenario:backlog.board-links
   Scenario: Move an item on the board and follow its backlinks
     Given the isolated plugin profile "@dshfiles/backlog" is booted

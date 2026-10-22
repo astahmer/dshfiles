@@ -8,8 +8,11 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__session-controller.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__session-source-port.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/session-controller/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/session-controller/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/session-source-port/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/session-source-port/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
         "$TURBO_ROOT$/profiles/web/**",
         "$TURBO_ROOT$/tooling/dshx/package.json",

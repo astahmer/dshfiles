@@ -150,6 +150,55 @@ Then('the feed lists only {string}', async ({ page }: { page: Page }, title: str
   await finishJourneyAssertions(page)
 })
 
+Then('search results offer one count for each matching status', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-search-status-counts', async () => {
+    await expect(statusChip(page, 'In progress')).toHaveAccessibleName('In progress, 1 item')
+    await expect(statusChip(page, 'Inbox')).toHaveAccessibleName('Inbox, 1 item')
+  })
+})
+
+When('search is filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
+  const chip = statusChip(page, label)
+  await chip.click()
+  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+})
+
+When('search is also filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
+  const chip = statusChip(page, label)
+  await chip.click()
+  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+})
+
+When('the {string} status search filter is cleared', async ({ page }: { page: Page }, label: string) => {
+  const chip = statusChip(page, label)
+  await chip.click()
+  await expect(chip).toHaveAttribute('aria-pressed', 'false')
+})
+
+Then('search results list only {string}', async ({ page }: { page: Page }, title: string) => {
+  const assertionId = `backlog-search-status-single-${title.toLowerCase().replaceAll(' ', '-')}`
+  await recordAssertion(page, assertionId, async () => {
+    const results = searchResults(page)
+    await expect(results.getByRole('listitem', { name: /^Item b:/ })).toHaveCount(1)
+    await expect(results).toContainText(title)
+  })
+})
+
+Then('search results list both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
+  const statusFilters = await Promise.all(
+    ['In progress', 'Inbox'].map(async label => ((await statusChip(page, label).getAttribute('aria-pressed')) === 'true' ? label.toLowerCase().replaceAll(' ', '-') : null)),
+  )
+  const selection = statusFilters.filter((label): label is string => label !== null)
+  const assertionId = `backlog-search-status-multiple-${selection.join('-') || 'all'}`
+  await recordAssertion(page, assertionId, async () => {
+    const results = searchResults(page)
+    await expect(results.getByRole('listitem', { name: /^Item b:/ })).toHaveCount(2)
+    await expect(results).toContainText(first)
+    await expect(results).toContainText(second)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('item b:{int} is moved to In progress on the board', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
   await page
