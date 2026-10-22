@@ -16,6 +16,7 @@ import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
 import { BacklogFocusModel } from './backlog-focus.js'
 import { BacklogMentions } from './backlog-mentions.js'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { installBacklogReferenceLinks } from './backlog-reference-links.js'
 import { BacklogReferenceOverlay } from './backlog-reference-overlay.jsx'
@@ -180,6 +181,18 @@ export default defineClient({
         />
         <BacklogNoticeToast openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)} />
       </PluginQueryProvider>
+    )
+    ctx.effect(
+      () =>
+        workbenchPanels().register({
+          id: PANEL_ID,
+          title: 'Backlog',
+          component: PanelView,
+          mainPanelId: PANEL_ID,
+          showInContextMenu: true,
+          showInEmptyState: true,
+        }),
+      'backlog: workbench side panel',
     )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))

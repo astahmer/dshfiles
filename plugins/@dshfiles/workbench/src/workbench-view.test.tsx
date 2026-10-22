@@ -92,6 +92,23 @@ const draftOf = (id: string): HTMLTextAreaElement => {
 }
 
 describe('WorkbenchView', () => {
+  it('toggles empty-state and context-menu visibility and changes chooser order', () => {
+    const registry = createWorkbenchPanelRegistry()
+    registry.register({ id: 'backlog', title: 'Backlog', component: DraftPanel, showInContextMenu: true, showInEmptyState: true })
+    registry.register({ id: 'other', title: 'Other', component: DraftPanel })
+    renderWorkbench(registry, memoryStorage(), 'bottom')
+
+    expect(screen.getByRole('button', { name: 'Backlog' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Other' })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'panelContextMenu:{"title":"Backlog"}' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'panelEmptyState:{"title":"Other"}' }))
+    expect(registry.preference('backlog')?.contextMenu).toBe(false)
+    expect(screen.getByRole('button', { name: 'Other' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'movePanelEarlier:{"title":"Other"}' }))
+    expect(registry.preference('other')?.order).toBe(0)
+    expect(registry.preference('backlog')?.order).toBe(1)
+  })
+
   it('opens the first two registered panels side by side by default', () => {
     const { api } = renderWorkbench(registryWith('a', 'b', 'c'))
     expect(api.groups).toHaveLength(2)

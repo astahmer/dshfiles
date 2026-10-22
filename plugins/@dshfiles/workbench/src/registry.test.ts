@@ -14,6 +14,13 @@ describe('workbench panel registry', () => {
     expect(registry.get('a')).toBeUndefined()
   })
 
+  it('rejects malformed panel identities before adding them to the registry', () => {
+    const registry = createWorkbenchPanelRegistry()
+    expect(() => registry.register(panel(''))).toThrow('Workbench panel id and title must be valid.')
+    expect(() => registry.register({ ...panel('valid-id'), title: ' ' })).toThrow('Workbench panel id and title must be valid.')
+    expect(registry.list()).toEqual([])
+  })
+
   it('keeps a re-registration when the stale disposer of the replaced one runs', () => {
     const registry = createWorkbenchPanelRegistry()
     const disposeOld = registry.register(panel('a'))
@@ -31,6 +38,23 @@ describe('workbench panel registry', () => {
     const snapshot = registry.list()
     expect(registry.list()).toBe(snapshot)
     expect(notified).toBe(1)
+  })
+
+  it('validates panel preference writes and persists visibility and ordering choices', () => {
+    const registry = createWorkbenchPanelRegistry()
+    registry.register({ ...panel('prefs-a'), showInContextMenu: true, showInEmptyState: true })
+    registry.register(panel('prefs-b'))
+    expect(registry.preference('prefs-a')).toEqual({ contextMenu: true, emptyState: true, order: 0 })
+    expect(registry.listContextMenuPanels().map(definition => definition.id)).toEqual(['prefs-a'])
+    expect(registry.setPreference('missing', { contextMenu: true, emptyState: true, order: 0 })).toBe(false)
+    expect(registry.setPreference('prefs-a', { contextMenu: true, emptyState: false, order: 2.5 })).toBe(false)
+    expect(registry.setPreference('prefs-a', { contextMenu: false, emptyState: true, order: 0 })).toBe(true)
+    expect(registry.preference('prefs-a')).toEqual({ contextMenu: false, emptyState: true, order: 0 })
+    expect(registry.listContextMenuPanels()).toEqual([])
+    expect(registry.movePreference('prefs-b', 'earlier')).toBe(true)
+    expect(registry.preference('prefs-b')?.order).toBe(0)
+    expect(registry.preference('prefs-a')?.order).toBe(1)
+    expect(registry.movePreference('prefs-b', 'earlier')).toBe(false)
   })
 
   it('keeps open requests, deduplicated and latest last, until the workbench takes them', () => {

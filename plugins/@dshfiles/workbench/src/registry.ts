@@ -1,3 +1,5 @@
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { z } from 'zod'
 import type { ComponentType } from 'react'
 
 /** The workbench's own `main` panel key; a contributor checks the slot ledger for it to know the workbench is loaded. */
@@ -25,6 +27,28 @@ export interface WorkbenchPanelDefinition {
    * it back in.
    */
   readonly mainPanelId?: string
+  /** Whether this panel appears in the thread-item and header-tab side-panel menus by default. */
+  readonly showInContextMenu?: boolean
+  /** Whether this panel appears in the side-panel workbench's empty state by default. */
+  readonly showInEmptyState?: boolean
+}
+
+const panelIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/u)
+const panelDefinitionSchema = z.object({ id: panelIdSchema, title: z.string().trim().min(1) })
+const panelPreferenceSchema = z.object({ contextMenu: z.boolean(), emptyState: z.boolean(), order: z.number().int() }).strict()
+const panelPreferencesSchema = z.record(z.string().min(1), panelPreferenceSchema)
+
+const emptyPanelPreferences: z.infer<typeof panelPreferencesSchema> = {}
+const storedPanelPreferences = createStoredValue({
+  key: 'dshfiles.workbench.side-panel-preferences.v1',
+  schema: panelPreferencesSchema,
+  fallback: emptyPanelPreferences,
+})
+
+export interface WorkbenchPanelPreference {
+  readonly contextMenu: boolean
+  readonly emptyState: boolean
+  readonly order: number
 }
 
 export interface WorkbenchPanelRegistry {
@@ -32,6 +56,10 @@ export interface WorkbenchPanelRegistry {
   readonly register: (definition: WorkbenchPanelDefinition) => () => void
   readonly get: (id: string) => WorkbenchPanelDefinition | undefined
   readonly list: () => readonly WorkbenchPanelDefinition[]
+  readonly listContextMenuPanels: () => readonly WorkbenchPanelDefinition[]
+  readonly preference: (id: string) => WorkbenchPanelPreference | undefined
+  readonly setPreference: (id: string, preference: WorkbenchPanelPreference) => boolean
+  readonly movePreference: (id: string, direction: 'earlier' | 'later') => boolean
   /** Asks the workbench to show the panel; kept until the workbench takes it, so it works before the view mounts. */
   readonly open: (id: string) => void
   readonly hasOpenRequests: () => boolean
@@ -50,8 +78,22 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
     for (const listener of listeners) listener()
   }
 
+  const preference = (id: string): WorkbenchPanelPreference | undefined => {
+    const definition = definitions.get(id)
+    if (definition === undefined) return undefined
+    const stored = storedPanelPreferences.get()[id]
+    return (
+      stored ?? {
+        contextMenu: definition.showInContextMenu ?? false,
+        emptyState: definition.showInEmptyState ?? false,
+        order: snapshot.findIndex(panel => panel.id === id),
+      }
+    )
+  }
+
   return {
     register: definition => {
+      if (!panelDefinitionSchema.safeParse(definition).success) throw new TypeError('Workbench panel id and title must be valid.')
       definitions.set(definition.id, definition)
       notify()
       return () => {
@@ -62,6 +104,37 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
     },
     get: id => definitions.get(id),
     list: () => snapshot,
+    listContextMenuPanels: () => snapshot.filter(panel => preference(panel.id)?.contextMenu === true),
+    preference,
+    setPreference: (id, preference) => {
+      if (!definitions.has(id) || !panelPreferenceSchema.safeParse(preference).success) return false
+      storedPanelPreferences.set({ ...storedPanelPreferences.get(), [id]: preference })
+      notify()
+      return true
+    },
+    movePreference: (id, direction) => {
+      const ordered = snapshot
+        .map(panel => ({
+          id: panel.id,
+          preference: { ...(preference(panel.id) ?? { contextMenu: false, emptyState: false, order: 0 }) },
+        }))
+        .sort((left, right) => left.preference.order - right.preference.order)
+      const index = ordered.findIndex(panel => panel.id === id)
+      const adjacent = ordered[index + (direction === 'earlier' ? -1 : 1)]
+      if (index === -1 || adjacent === undefined) return false
+      const current = ordered[index]
+      if (current === undefined) return false
+      const currentOrder = current.preference.order
+      current.preference.order = adjacent.preference.order
+      adjacent.preference.order = currentOrder
+      storedPanelPreferences.set({
+        ...storedPanelPreferences.get(),
+        [current.id]: current.preference,
+        [adjacent.id]: adjacent.preference,
+      })
+      notify()
+      return true
+    },
     open: id => {
       const queued = openRequests.indexOf(id)
       if (queued !== -1) openRequests.splice(queued, 1)

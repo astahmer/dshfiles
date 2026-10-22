@@ -97,7 +97,73 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       const Panel = definition.component
       return <Panel panelId={id} />
     }
-    const Watermark = (): JSX.Element => <p className="dshx-root dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{t('empty')}</p>
+    const Watermark = (): JSX.Element => {
+      const panels = useSyncExternalStore(registry.subscribe, registry.list, registry.list)
+      const ordered = panels
+        .map(panel => ({ panel, preference: registry.preference(panel.id) }))
+        .filter(
+          (entry): entry is { readonly panel: WorkbenchPanelDefinition; readonly preference: NonNullable<ReturnType<typeof registry.preference>> } =>
+            entry.preference !== undefined,
+        )
+        .sort((left, right) => left.preference.order - right.preference.order)
+      const available = ordered.filter(entry => entry.preference.emptyState)
+      return (
+        <section className="dshx-root dshx:flex dshx:h-full dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-4 dshx:text-sm">
+          <p className="dshx:text-muted-foreground">{t('empty')}</p>
+          {available.map(({ panel }) => (
+            <Button key={panel.id} size="sm" variant="outline" onClick={() => registry.open(panel.id)}>
+              {panel.title}
+            </Button>
+          ))}
+          {ordered.length > 0 ? (
+            <fieldset className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-3">
+              <legend className="dshx:mb-2 dshx:text-xs dshx:font-medium">{t('configureSidePanelPlugins')}</legend>
+              {ordered.map(({ panel, preference }, index) => (
+                <div key={panel.id} className="dshx:flex dshx:items-center dshx:gap-2">
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{panel.title}</span>
+                  <label className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
+                    <input
+                      type="checkbox"
+                      checked={preference.contextMenu}
+                      aria-label={t('panelContextMenu', { title: panel.title })}
+                      onChange={event => registry.setPreference(panel.id, { ...preference, contextMenu: event.currentTarget.checked })}
+                    />
+                    {t('menus')}
+                  </label>
+                  <label className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
+                    <input
+                      type="checkbox"
+                      checked={preference.emptyState}
+                      aria-label={t('panelEmptyState', { title: panel.title })}
+                      onChange={event => registry.setPreference(panel.id, { ...preference, emptyState: event.currentTarget.checked })}
+                    />
+                    {t('emptyState')}
+                  </label>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('movePanelEarlier', { title: panel.title })}
+                    disabled={index === 0}
+                    onClick={() => registry.movePreference(panel.id, 'earlier')}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('movePanelLater', { title: panel.title })}
+                    disabled={index === ordered.length - 1}
+                    onClick={() => registry.movePreference(panel.id, 'later')}
+                  >
+                    ↓
+                  </Button>
+                </div>
+              ))}
+            </fieldset>
+          ) : null}
+        </section>
+      )
+    }
     return { components: { [WORKBENCH_COMPONENT]: RegisteredPanel }, Watermark }
   }, [registry, t])
 

@@ -4,6 +4,7 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
@@ -99,6 +100,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
   type ReactNode,
@@ -314,6 +316,7 @@ const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0
 const isSidebarSection = (value: string | undefined): value is SidebarSection => SIDEBAR_SECTIONS.some(section => section === value)
 
 const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
+const PANEL_ASIDE_EVENT = 'dshfiles:move-panel-aside'
 const threadTabFocusEventSchema = z.object({ sessionId: z.string().min(1) }).strict()
 
 const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
@@ -680,10 +683,20 @@ const BatchThreadMenuItems = (props: {
   )
 }
 
+const openRegisteredPanelAside = (panelId: string): void => {
+  const registry = workbenchPanels()
+  if (registry.get(panelId) === undefined) return
+  window.dispatchEvent(new CustomEvent(PANEL_ASIDE_EVENT, { detail: { panelId }, cancelable: true }))
+  registry.open(panelId)
+}
+
 const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked, settled } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
+  const registry = workbenchPanels()
+  useSyncExternalStore(registry.subscribe, registry.list, registry.list)
+  const sidePanelDefinitions = registry.listContextMenuPanels()
   const selection = props.actions.selection()
   if (selection.sessionIds.length > 1 && selection.sessionIds.includes(session.id)) {
     return <BatchThreadMenuItems snapshot={props.actions.batch()} actions={props.actions} t={t} />
@@ -705,6 +718,18 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
         {t('threadSidebarCopyLink')}
       </ContextMenuItem>
       {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
+      {!archived && sidePanelDefinitions.length > 0 ? (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>{t('threadSidebarOpenPluginInSidePanel')}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+            {sidePanelDefinitions.map(definition => (
+              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
+                {definition.title}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      ) : null}
       <ContextMenuSub>
         <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
         <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>

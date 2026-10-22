@@ -30,6 +30,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
+    "@dshfiles/workbench": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -76,7 +77,8 @@
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "@dshfiles/thread-sidebar": ">=0.1.0"
+    "@dshfiles/thread-sidebar": ">=0.1.0",
+    "@dshfiles/workbench": ">=0.1.0"
   },
   "dsh": {
     "bundle": {

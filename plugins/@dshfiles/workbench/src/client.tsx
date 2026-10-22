@@ -169,9 +169,12 @@ export default defineClient({
       const onMovePanelAside = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
         const request = panelAsideRequestSchema.safeParse(event.detail)
-        if (!request.success || request.data.panelId !== PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        if (!request.success || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        const definition = registry.list().find(panel => panel.id === request.data.panelId || panel.mainPanelId === request.data.panelId)
+        if (request.data.panelId !== PANEL_ID && definition === undefined) return
         event.preventDefault()
         ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+        if (definition !== undefined) registry.open(definition.id)
       }
       window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
       return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)

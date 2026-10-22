@@ -17,7 +17,7 @@
     "./client": "./dist/client.js",
     "./registry": {
       "types": "./src/registry.ts",
-      "default": "./src/registry.ts"
+      "default": "./dist/registry.js"
     }
   },
   "scripts": {

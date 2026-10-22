@@ -1265,6 +1265,9 @@ importers:
       '@dshfiles/thread-sidebar':
         specifier: workspace:*
         version: link:../thread-sidebar
+      '@dshfiles/workbench':
+        specifier: workspace:*
+        version: link:../workbench
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2385,6 +2388,9 @@ importers:
       '@dshfiles/thread-sidebar':
         specifier: workspace:*
         version: link:../thread-sidebar
+      '@dshfiles/workbench':
+        specifier: workspace:*
+        version: link:../workbench
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -4628,6 +4634,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/workbench':
+        specifier: workspace:*
+        version: link:../workbench
       zod:
         specifier: 'catalog:'
         version: 4.4.3

@@ -5,6 +5,7 @@ import type { MainTabsTranslate } from './locales.js'
 import { OPEN_THREAD_ASIDE_EVENT } from './thread-aside.js'
 import { PANEL_ASIDE_EVENT } from './panel-aside.js'
 import { THREAD_MENTION_INSERT_EVENT, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { TabStrip, type TabView } from './tab-strip.js'
 import type { TabsEvent } from './tabs-machine.js'
 
@@ -16,6 +17,7 @@ const labels = {
   renameThread: 'Edit title',
   renameFailed: 'Could not rename the thread.',
   openInSidePanel: 'Open in side panel',
+  openPluginInSidePanel: 'Open plugin in side panel',
   moveToSidePanel: 'Move to side panel',
   sidePanelUnavailable: 'The side panel is not available here.',
   panelAsideUnavailable: 'This panel has no side-panel view while no thread is on screen.',
@@ -61,9 +63,13 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView ??= () => {}
 })
 
+const registeredPanelDisposers: (() => void)[] = []
+
 afterEach(() => {
+  for (const dispose of registeredPanelDisposers.splice(0)) dispose()
   cleanup()
   window.removeEventListener(OPEN_THREAD_ASIDE_EVENT, onAsideRequest)
+  window.removeEventListener(PANEL_ASIDE_EVENT, onAsideRequest)
   asideRequests.length = 0
   Reflect.deleteProperty(document, 'elementFromPoint')
   document.body.innerHTML = ''
@@ -152,7 +158,32 @@ describe('TabStrip thread actions', () => {
     await screen.findByRole('menuitem', { name: 'Close tab' })
     expect(screen.queryByRole('menuitem', { name: 'Copy thread ID' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'Copy thread link' })).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: 'Open in side panel' })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: 'Open in side panel' })).toBeTruthy()
+  })
+
+  it('opens a selected registered plugin and hides it when its context-menu preference is off', async () => {
+    const registry = workbenchPanels()
+    registeredPanelDisposers.push(
+      registry.register({
+        id: 'test.backlog-panel',
+        title: 'Backlog',
+        component: () => null,
+        showInContextMenu: true,
+      }),
+    )
+    window.addEventListener(PANEL_ASIDE_EVENT, onAsideRequest)
+    mount()
+
+    openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Open plugin in side panel' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Backlog' }))
+    expect(asideRequests).toEqual([{ detail: { panelId: 'test.backlog-panel' }, cancelable: true }])
+
+    const preference = registry.preference('test.backlog-panel')
+    if (preference === undefined) throw new Error('The registered panel has no preference.')
+    registry.setPreference('test.backlog-panel', { ...preference, contextMenu: false })
+    openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
+    expect(screen.queryByRole('menuitem', { name: 'Open plugin in side panel' })).toBeNull()
   })
 
   it('asks the side panel for a thread tab and stays quiet when it takes it', async () => {

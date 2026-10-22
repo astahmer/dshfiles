@@ -1,11 +1,21 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { ChevronDownIcon, CopyIcon, PanelRightOpenIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { requestThreadMentionInsertion, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
@@ -94,6 +104,9 @@ const STRIP_BUTTON =
  */
 export const TabStrip = (props: TabStripProps): ReactElement => {
   const { tabs, send, t } = props
+  const registry = workbenchPanels()
+  useSyncExternalStore(registry.subscribe, registry.list, registry.list)
+  const pluginPanels = registry.listContextMenuPanels()
   const scroller = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -378,8 +391,40 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                 {tab.preview ? <ContextMenuItem onSelect={() => send({ type: 'tab.keep', tabId: tab.id })}>{t('keepOpen')}</ContextMenuItem> : null}
                 {tab.kind === 'thread' ? <ContextMenuItem onSelect={() => setRenamingTabId(tab.id)}>{t('renameThread')}</ContextMenuItem> : null}
                 {tab.kind === 'start' && !tab.preview ? null : <ContextMenuSeparator />}
+                {tab.kind === 'panel' ? (
+                  <>
+                    <ContextMenuItem onSelect={() => requestPanelAside(tab.panelId)}>
+                      <PanelRightOpenIcon aria-hidden="true" />
+                      {t('openInSidePanel')}
+                    </ContextMenuItem>
+                    {pluginPanels.length > 0 ? (
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>{t('openPluginInSidePanel')}</ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+                          {pluginPanels.map(definition => (
+                            <ContextMenuItem key={definition.id} onSelect={() => requestPanelAside(definition.id)}>
+                              {definition.title}
+                            </ContextMenuItem>
+                          ))}
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                    ) : null}
+                  </>
+                ) : null}
                 {tab.kind === 'thread' ? (
                   <>
+                    {pluginPanels.length > 0 ? (
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>{t('openPluginInSidePanel')}</ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+                          {pluginPanels.map(definition => (
+                            <ContextMenuItem key={definition.id} onSelect={() => requestPanelAside(definition.id)}>
+                              {definition.title}
+                            </ContextMenuItem>
+                          ))}
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                    ) : null}
                     <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId, ThreadMentionDrag.activeComposerSessionId())}>
                       {t('mentionThread')}
                     </ContextMenuItem>
