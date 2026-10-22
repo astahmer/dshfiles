@@ -575,6 +575,17 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     },
   }, InputBar)
 
+  // The root `conversation` service must exist before any slot entry injects it:
+  // a hot replacement tears the old fiber down before the new one applies, and a
+  // slot that renders in that window (the composer bar, the dock) reads the
+  // service through `ctx.get('conversation')`. Registering the controller first
+  // closes that window for this plugin's own entries.
+  ctx.plugin(ConversationController, {
+    input: inputHub,
+    blocks: composerBlocks,
+    maxConcurrentFileUploads,
+  })
+
   slots.inject('main', function* () {
     yield slots.register({
       name: 'main',
@@ -589,11 +600,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     yield registerComposerBar()
   })
 
-  ctx.plugin(ConversationController, {
-    input: inputHub,
-    blocks: composerBlocks,
-    maxConcurrentFileUploads,
-  })
   ctx.plugin(todoDockEntry)
   ctx.plugin(queueDockEntry)
 }
