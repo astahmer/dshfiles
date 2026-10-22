@@ -5,7 +5,7 @@ description: Keep verify-dsh, `dshx dev` and the catalog `reach` steps in sync w
 
 # Maintain verify-dsh
 
-The DSH instance of `maintain-verification-skill`. Event-driven: run it scoped
+The DSH instance of `verification-skill` (maintain mode). Event-driven: run it scoped
 to what the change touched. `dshx` is defined in `verify-dsh`.
 
 ## Trigger check

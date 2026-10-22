@@ -5,7 +5,7 @@ description: Supervises long-running work across DSH threads while the user is a
 
 # AFK Thread Supervision
 
-Use one dedicated supervisor thread for the user's monitoring request. Load `dsh-sessions`; for JJ integration load `jj-merge-workspaces` and `jj-history-consolidation`; for plugin changes load `dsh-plugin-verify` as needed.
+Use one dedicated supervisor thread for the user's monitoring request. Load `dsh-sessions`; for JJ integration load `jj-linearize` (it absorbed `jj-merge-workspaces` and `jj-history-consolidation`); for plugin changes load `dsh-plugin-verify` as needed.
 
 If the user asks for a separate supervisor thread and the current thread is not suitable, create one with the `dshx sessions create --cwd <repo> --json` flow from `dsh-sessions`, then send its kickoff prompt to the returned session ID. Do not create redundant supervisors. If it needs to edit or land code, use its own JJ workspace rather than an active agent's workspace.
 
@@ -28,7 +28,7 @@ If the user asks for a separate supervisor thread and the current thread is not 
 
 1. Use Jujutsu, not Git. Inspect `jj workspace list`, bookmarks, and the graph before any history change; `node scripts/jj-state.mjs --repo <workspace> --read-only` prints the working copy, conflicts, `main`/`main@origin` and the revisions above `main` in one call. Treat `main@origin` as the last-known remote tracking point, not proof of the current server state.
 2. Never rewrite, rebase, abandon, or snapshot an active agent's workspace. Keep active branches separate until their work is complete, unless the user explicitly chooses another safe plan. Use `jj --ignore-working-copy` for read-only graph inspection of another workspace; `jj status` can snapshot it.
-3. Integrate only completed, described revisions after checks cover the latest edits. Run the repository's focused tests and required plugin E2E; rerun checks after later edits. Use `jj-merge-workspaces` for completed branches and `jj-history-consolidation` for many heads, duplicates, or conflicts. Stop on unclear duplicate changes or conflict roots.
+3. Integrate only completed, described revisions after checks cover the latest edits. Run the repository's focused tests and required plugin E2E; rerun checks after later edits. Use `jj-linearize` for completed branches and for many heads, duplicates, or conflicts. Stop on unclear duplicate changes or conflict roots.
 4. Never push unless the user explicitly asks. Never restart the live DSH instance; use the project's scratch verification workflow when runtime proof is needed.
 
 ## Forget empty workspaces

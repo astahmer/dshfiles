@@ -29,7 +29,8 @@ Shared skills (`~/.agents/skills/`) for the same kinds of work:
 - `safe-transformations` — codemods: version pins, namespace classes, renames across plugins.
 - `focused-validation` — the narrowest check that proves a change.
 - `memory-curation` — the memory plugin's stored memories.
-- `jj-merge-workspaces` — landing several workspaces onto `main`.
+- `jj-linearize` — collapsing many heads, duplicates or divergent copies above a base into one linear line (replaces the retired `jj-merge-workspaces`).
+- `verification-skill` — create or maintain a project's scripted `verify-<app>` loop (replaces the former create/maintain pair).
 - `disk-space-cleanup` — stale workspaces, `node_modules` and build output.
 
 ## Performance work: measure the live GUI first

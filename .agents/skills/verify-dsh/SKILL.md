@@ -5,7 +5,7 @@ description: Launch, check, drive and capture evidence from a scratch DeepSeek H
 
 # Verify in a scratch DSH
 
-The DSH instance of `create-verification-skill`: the lever is `dshx dev`, the
+The DSH instance of `verification-skill`: the lever is `dshx dev`, the
 feature map is the `reach` field of each `plugins/@dshfiles/*/dshx.features.json`.
 Build, import-check and HMR/restart rules stay in `dsh-plugin-verify`; run that
 first when the change is a plugin.
@@ -80,7 +80,7 @@ that point of the element's own box instead of its centre; use it when an overla
 the element reveals on hover — a thread row's action strip — covers the centre:
 `rightclick text "Mute target" at 24,16`. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
-decide drift vs regression with `maintain-verification-skill`. To drive something
+decide drift vs regression with `maintain-verify-dsh` (maintain mode of `verification-skill`). To drive something
 ad hoc, add `reach` to its catalog entry rather than scripting Playwright.
 
 ## Evidence
@@ -134,7 +134,7 @@ them — `pnpm check:e2e <plugin>` already reruns a package whose inputs changed
 and replays the rest — and reserve a forced run for the one pass before landing,
 or when a binary outside the repository changed.
 
-A red journey is drift or a regression: triage it with `maintain-verification-skill`.
+A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
 
 ## Gotchas
 
