@@ -295,6 +295,46 @@ Every task states its metric above; a task is done only with a before/after pair
 from the same window and the confounders named (provider outage, user
 interruption, forked-Session duplication).
 
+## Progress (2026-10-22 run)
+
+| Task | State   | Receipt                                                                                      |
+| ---- | ------- | -------------------------------------------------------------------------------------------- |
+| T1   | done    | `jj:spqtwrnzmnkn` — projection keeps object `oneOf`; 7 api-registry tests pass               |
+| T2   | partial | `jj:xpmyrwyklvzw` — any positive `jj_load` limit, `ThreadError` is a `PluginApiError`        |
+| T13  | done    | `jj:vtyusvmosyyx` — Definition of done in AGENTS.md                                          |
+| T14  | done    | `jj:vtyusvmosyyx` — waiting table names `background_jobs_wait`                               |
+| T15  | done    | `jj:mrtrszptlmwp` — Host-side wait for jobs, no model polling; 23 background-jobs tests pass |
+| T16  | done    | `jj:tmsmwstyxwxz` — intent-to-tool table in `docs/agent-tool-parity.md`                      |
+| T18  | done    | `jj:vtyusvmosyyx` — AGENTS.md 27,382 → 23,665 chars; `validate` has no over-budget warning   |
+| T21  | partial | `jj:yswswrowkkky` — TTL 10 min, stopped Sessions skipped, scoped read without corpus listing |
+| T28  | done    | ledger entry marked `validated`                                                              |
+
+### Skipped in that run, and why
+
+- **T3/T4/T5/T5b** (read receipts, patch tool, inspection tool): the patch tool is
+  L and needs a design review before it touches writes; `T3` may need a Host seam.
+- **T5c/T5d** (tool-search, tool profiles): that work belongs to a live Session
+  (`0e7f3adb…`, workspace `thread-8b729e`); coordinate before touching it.
+- **T6/T7** (fetch and search providers): a new owned plugin plus a Brave key.
+  Brave is approved; the key is not configured yet.
+- **T9** (fff-search root guard), **T10** (checkout-sync auto-heal),
+  **T12** (workspace_doctor), **T17** (delegation docs): S–M, next pass.
+- **T11** (isolation bypass): needs the creation-path investigation first.
+- **T19/T20/T22** (skill reload, compaction input, store folds): measurement or
+  fork work, not a quick edit.
+- **T23/T24** (ai-accounts health, distribution): the routing decisions are now
+  known, but the change needs its own tests and a routing review.
+- **T25/T26/T27**: operational or other repositories (corpus prune, nixfiles
+  supervisor, `github:astahmer/AGENTS` dead link).
+
+### User decisions confirmed 2026-10-22
+
+- `T7`: Brave free tier, once a key exists.
+- `T24`: `priority`, with fallback only to the provider's own sibling accounts;
+  Claude never falls back and is never a fallback target.
+- `T4`: ship the patch tool beside `edit`; do not replace the native tool.
+- `T27`: fix the dead skill link in its own repository and bump the flake input.
+
 ## Open questions for the human
 
 1. `T7` search provider: Brave free tier (key) or fix the existing provider's key?
