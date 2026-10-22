@@ -28,10 +28,10 @@ Feature: Thread sidebar journeys
     Then the thread is settled, opens read-only and unsettles to reply
 
   @scenario:thread-sidebar.board-view
-  Scenario: Switch between thread list and an independent board view
+  Scenario: Open the thread board as a page with its own grouping and filters
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When the sidebar board layout is selected
-    Then board grouping and filters persist independently from the thread list
+    When the thread board page is opened
+    Then the board groups and filters independently from the sidebar list
 
   @scenario:thread-sidebar.section-order
   Scenario: Reorder the sidebar sections by dragging a header

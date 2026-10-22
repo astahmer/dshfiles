@@ -11,6 +11,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
+import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -22,7 +23,8 @@ import { createPortal } from 'react-dom'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { SettledThreadDock } from './settled-thread-dock.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
-import { ThreadAsideOpenProvider, ThreadSidebar } from './client.js'
+import { SidebarStateProvider } from './sidebar-state.js'
+import { ThreadAsideOpenProvider, ThreadSidebar, type ThreadSidebarStandardProps } from './client.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
@@ -40,7 +42,7 @@ import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
-import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
+import { PALETTE_EVENT, PaletteApi } from '@dshfiles/command-palette/api'
 import './client.css'
 import { SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
@@ -58,6 +60,9 @@ import {
   THREAD_MENTION_TARGET_ATTRIBUTE,
   type ThreadMentionFailureDiagnosticInput,
 } from './thread-mention.js'
+
+/** The board page's id: its `main` slot key and its row in the sidebar's panel list. */
+const BOARD_PANEL_ID = 'dshfiles-thread-board'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -771,6 +776,27 @@ export default defineClient({
       })()
     }
 
+    /** The Host verbs both thread-list surfaces drive: the sidebar list and the full-page board. */
+    const threadSidebarActions = () => ({
+      tSidebar: ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE),
+      archiveSession: (sessionId: SessionSummary['id']) =>
+        SidebarOrganization.archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
+      unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
+      pinSession: async (sessionId: SessionSummary['id']) => {
+        const result = await ctx.remote.workspace.pinSession({ sessionId })
+        if (!result.ok) throw new Error(result.error.code)
+      },
+      unpinSession: async (sessionId: SessionSummary['id']) => {
+        const result = await ctx.remote.workspace.unpinSession({ sessionId })
+        if (!result.ok) throw new Error(result.error.code)
+      },
+      renameSession,
+      startFollowUp,
+      open: openThread,
+      openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
+      openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),
+    })
+
     ctx.slots.inject('sidebar.workspaces', () =>
       ctx.slots.register(
         {
@@ -778,28 +804,39 @@ export default defineClient({
           registrant: '@dshfiles/thread-sidebar',
           priority: -1000,
           locale: 'workspace',
-          inject: () => ({
-            tSidebar: ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE),
-            archiveSession: (sessionId: SessionSummary['id']) =>
-              SidebarOrganization.archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
-            unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
-            pinSession: async (sessionId: SessionSummary['id']) => {
-              const result = await ctx.remote.workspace.pinSession({ sessionId })
-              if (!result.ok) throw new Error(result.error.code)
-            },
-            unpinSession: async (sessionId: SessionSummary['id']) => {
-              const result = await ctx.remote.workspace.unpinSession({ sessionId })
-              if (!result.ok) throw new Error(result.error.code)
-            },
-            renameSession,
-            startFollowUp,
-            open: openThread,
-            openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
-            openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),
-          }),
+          inject: threadSidebarActions,
         },
         decorate(ThreadSidebarWithHistoryLookahead),
       ),
+    )
+
+    // The board is a page of its own: the sidebar keeps the list, and this mount reads the same preferences and Host
+    // state through the slot runtime's selector hooks while it renders the sections as columns.
+    const ThreadBoardPanel = (props: ThreadSidebarStandardProps & ReturnType<typeof threadSidebarActions>): JSX.Element => (
+      <SidebarStateProvider>
+        <ThreadAsideOpenProvider value={openAside}>
+          <ThreadSidebar {...props} surface="board" wide />
+        </ThreadAsideOpenProvider>
+      </SidebarStateProvider>
+    )
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: BOARD_PANEL_ID, inject: threadSidebarActions }, decorate(ThreadBoardPanel)))
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: BOARD_PANEL_ID, order: 2, label: () => translate('threadSidebarBoardTitle'), locale: THREAD_SIDEBAR_LOCALE_NAMESPACE },
+        BoardPanelGlyph,
+      ),
+    )
+    ctx.effect(
+      () =>
+        PaletteApi.registerAction({
+          id: '@dshfiles/thread-sidebar/open-board',
+          label: () => translate('threadSidebarBoardTitle'),
+          aliases: ['thread board', 'board', 'kanban', 'columns'],
+          icon: <LayoutGridIcon className="dshx:size-4" />,
+          group: 'destination',
+          run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
+        }),
+      'thread-sidebar: open the thread board',
     )
 
     // One thread in its own right-sidebar tab: the same embedded Conversation a subagent chat hosts, but for a
@@ -901,3 +938,21 @@ export default defineClient({
     )
   },
 })
+
+/** Columns of a board: the panel list's glyph for the thread board page. */
+const BoardPanelGlyph = (props: { readonly size?: number }): JSX.Element => (
+  <svg
+    aria-hidden
+    width={props.size ?? 18}
+    height={props.size ?? 18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+  >
+    <rect x="3.5" y="4" width="5" height="16" rx="1.5" />
+    <rect x="10" y="4" width="5" height="11" rx="1.5" />
+    <rect x="16.5" y="4" width="4" height="7" rx="1.5" />
+  </svg>
+)

@@ -42,6 +42,13 @@ const batchSelectionJourneys = new WeakMap<Page, BatchSelectionJourney>()
 const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
 
 const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads' })
+const threadBoard = (page: Page) => page.getByRole('region', { name: 'Thread board' })
+/** The board is a page of its own, opened from the sidebar's panel list; a reload comes back to the thread view. */
+const openThreadBoard = async (page: Page): Promise<void> => {
+  if (await threadBoard(page).isVisible()) return
+  await page.getByRole('button', { name: 'Thread board', exact: true }).click()
+  await expect(threadBoard(page)).toBeVisible()
+}
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
 const customizeSidebar = (page: Page) => page.getByRole('region', { name: 'Customize sidebar' })
 const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Sidebar settings' })
@@ -127,8 +134,13 @@ const statusFilterLabels: readonly string[] = [
   'Archived',
 ]
 
-const setThreadStatusFilters = async (page: Page, triggerName: string, selectedLabels: readonly string[]): Promise<void> => {
-  await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
+const setThreadStatusFilters = async (
+  page: Page,
+  triggerName: string,
+  selectedLabels: readonly string[],
+  scope: Locator = threadSidebar(page),
+): Promise<void> => {
+  await scope.getByRole('button', { name: triggerName, exact: true }).click()
   for (const label of statusFilterLabels) {
     const item = page.getByRole('menuitemcheckbox', { name: label, exact: true })
     const shouldBeChecked = label === 'All threads' ? selectedLabels.length === 0 : selectedLabels.includes(label)
@@ -138,12 +150,12 @@ const setThreadStatusFilters = async (page: Page, triggerName: string, selectedL
   await page.keyboard.press('Escape')
 }
 
-const selectThreadViewValue = async (page: Page, triggerName: string, value: string): Promise<void> => {
+const selectThreadViewValue = async (page: Page, triggerName: string, value: string, scope: Locator = threadSidebar(page)): Promise<void> => {
   if (statusFilterLabels.includes(value)) {
-    await setThreadStatusFilters(page, triggerName, value === 'All threads' ? [] : [value])
+    await setThreadStatusFilters(page, triggerName, value === 'All threads' ? [] : [value], scope)
     return
   }
-  await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
+  await scope.getByRole('button', { name: triggerName, exact: true }).click()
   await page.getByRole('menuitemradio', { name: value, exact: true }).click()
 }
 
@@ -509,46 +521,41 @@ Then('the settled thread archives itself without a click', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
-When('the sidebar board layout is selected', async ({ page }: { page: Page }) => {
-  await threadSidebar(page).getByRole('button', { name: 'Board layout', exact: true }).click()
+When('the thread board page is opened', async ({ page }: { page: Page }) => {
+  await openThreadBoard(page)
 })
 
-Then('board grouping and filters persist independently from the thread list', async ({ page }: { page: Page }) => {
-  const sidebar = threadSidebar(page)
+Then('the board groups and filters independently from the sidebar list', async ({ page }: { page: Page }) => {
+  const board = threadBoard(page)
   await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
-    await expect(sidebar.getByRole('region', { name: /column$/u })).toHaveCount(6)
-    await expect(sidebar.getByRole('button', { name: 'Board layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(board.getByRole('region', { name: /column$/u })).toHaveCount(6)
+    // The sidebar keeps the list; the page carries the board's own view controls.
+    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+    await expect(board.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
   })
 
-  await selectThreadViewValue(page, 'Group: Status', 'Project')
-  await selectThreadViewValue(page, 'Filter: None', 'Working')
-  await selectThreadViewValue(page, 'Filter: Working', 'Subagent threads')
-  await sidebar.getByRole('button', { name: 'All projects', exact: true }).click()
+  await selectThreadViewValue(page, 'Group: Status', 'Project', board)
+  await selectThreadViewValue(page, 'Filter: None', 'Working', board)
+  await selectThreadViewValue(page, 'Filter: Working', 'Subagent threads', board)
+  await board.getByRole('button', { name: 'All projects', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Unassigned', exact: true }).click()
-  await expect(sidebar.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
-  await expect(sidebar.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
-  await expect(sidebar.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
+  await expect(board.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
+  await expect(board.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(board.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: 'All projects', exact: true })).toBeVisible()
 
   await page.reload()
   const reloadedSidebar = threadSidebar(page)
   await expect(reloadedSidebar).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
-
-  await reloadedSidebar.getByRole('button', { name: 'List layout', exact: true }).click()
   await expect(reloadedSidebar.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: None', exact: true })).toBeVisible()
   await expect(reloadedSidebar.getByRole('button', { name: 'All projects', exact: true })).toBeVisible()
 
-  await reloadedSidebar.getByRole('button', { name: 'Board layout', exact: true }).click()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
-  await reloadedSidebar.getByRole('button', { name: 'List layout', exact: true }).click()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: None', exact: true })).toBeVisible()
-  await expect(reloadedSidebar.getByRole('button', { name: 'All projects', exact: true })).toBeVisible()
+  await openThreadBoard(page)
+  const reloadedBoard = threadBoard(page)
+  await expect(reloadedBoard.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
+  await expect(reloadedBoard.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(reloadedBoard.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
   await finishJourneyAssertions(page)
 })
 
@@ -1831,7 +1838,8 @@ When('a thread title is renamed from its row menu and a second edit is cancelled
   await page.getByRole('menuitem', { name: 'Edit title', exact: true }).click()
   const titleEditor = threadSidebar(page).getByRole('textbox', { name: 'Edit title', exact: true })
   await expect(titleEditor).toBeVisible()
-  await titleEditor.click()
+  // The row's hover action strip sits over the editor's right half; click the free left side for the caret.
+  await titleEditor.click({ position: { x: 12, y: 10 } })
   await titleEditor.fill('  Sidebar rename e2e  ')
   await titleEditor.press('Enter')
   await expect(titleEditor).toHaveCount(0)

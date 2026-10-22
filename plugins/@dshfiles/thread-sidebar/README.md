@@ -1,6 +1,6 @@
 # Thread Sidebar
 
-![Thread sidebar status board with switchable list layout](docs/screenshots/thread-classification.png)
+![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
@@ -28,13 +28,18 @@ and archive keep their usual refusals (a running thread cannot be parked, settle
 or archived), and every move honors Apply actions to child threads. The row
 context menu's Move to group submenu performs the same moves from the keyboard.
 
-**List and board layouts.** The header toggles between the existing thread list and
-an alternate board. The board has independent grouping, status/source filters,
-project scope, and collapsed groups from the list; it defaults to the six status
-lanes (including empty ones), and can also group its own columns by project, date,
-or no grouping. Thread row actions are unchanged, and dragging between status lanes
-uses the same section move behavior. Both the layout choice and board view state
-are stored in this browser and survive reloads.
+**The thread board page.** The sidebar only ever shows the list; the board is a
+full-width page opened from the thread board row in the sidebar's panel list (or
+the "Thread board" command in the palette). It renders the same thread rows with
+each section as a column: it defaults to the six status lanes (including empty
+ones), and can also group its columns by project, date, or no grouping. The board
+has independent grouping, status/source filters, project scope, and collapsed
+groups from the list, and keeps them in this browser across reloads; the sidebar
+list keeps its own saved views. Thread row actions are unchanged, and dragging
+between lanes uses the same section move behavior. The page reads the same Host
+state as the sidebar but never runs the sidebar's background work (auto-archive,
+auto-settle, notifications or attention polling), so both surfaces can be open
+without doing that work twice.
 
 **Keyboard and multi-select.** ↑/↓ move focus and open the focused thread (or
 only move focus when Sidebar settings says Move focus only); Shift+↑/↓ extends a

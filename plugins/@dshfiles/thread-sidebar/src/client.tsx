@@ -8,10 +8,10 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
-import { storedThreadLayoutMode } from './thread-layout-mode.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
+import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadsSection } from './remote-threads-section.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
@@ -79,8 +79,6 @@ import {
   CirclePauseIcon,
   GripVerticalIcon,
   LinkIcon,
-  ListIcon,
-  LayoutGridIcon,
   MonitorIcon,
   PanelRightOpenIcon,
   RefreshCwIcon,
@@ -218,12 +216,18 @@ type InjectedActions = {
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
 }
 
-type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
+/** The slot runtime's global selector hooks, the one part of the props a `main` panel mount supplies itself. */
+export type ThreadSidebarStandardProps = Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'useWorkspaces'>
+
+type ThreadSidebarProps = ThreadSidebarStandardProps &
+  Pick<WorkspaceBrowserProps, 'open'> &
   InjectedActions & {
     tSidebar: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
     onNavigationLookahead?: (sessionIds: readonly SessionSummary['id'][]) => void
     /** The sidebar shell hides the thread region with CSS when it is collapsed; absent means a mount with no shell. */
     wide?: boolean
+    /** Absent means `sidebar`. The board page mounts beside it, so only the primary mount runs side effects. */
+    surface?: ThreadSidebarSurface
   }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
@@ -1195,6 +1199,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => (
 )
 
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
+  const surface = props.surface ?? 'sidebar'
+  const isBoard = surface === 'board'
+  // Both surfaces can be mounted at once: URL ownership, notifications, attention polling and the auto-archive/settle
+  // scans stay with the sidebar mount, so one session change is never handled twice.
+  const isPrimarySurface = !isBoard
   const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
@@ -1206,7 +1215,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const recoveryQuery = useQuery({
     queryKey: restartRecoveryQueryKey,
     queryFn: ({ signal }) => recoveryApi.pending(undefined, { signal }),
-    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 5000),
+    refetchInterval: query => (isPrimarySurface && !isApiOwnerMissing(query.state.error) ? 5000 : false),
     retry: false,
   })
   const resumeMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.resume(input) })
@@ -1230,16 +1239,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const usageLimitQuery = useQuery({
     queryKey: usageLimitQueryKey,
     queryFn: ({ signal }) => accountsApi.quotaContinuations(undefined, { signal }),
-    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 15_000),
+    refetchInterval: query => (isPrimarySurface && !isApiOwnerMissing(query.state.error) ? 15_000 : false),
     retry: false,
   })
   const [usageLimitBusyIds, setUsageLimitBusyIds] = useState<ReadonlySet<string>>(() => new Set())
   const [usageLimitResumeAllBusy, setUsageLimitResumeAllBusy] = useState(false)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   // Collapsing the sidebar hides the thread region with CSS, so a jj scan bought while collapsed has no reader: the
-  // query waits, the schedule stops, and expanding the sidebar fetches once and arms it again.
-  const jjInventoryVisible = props.wide !== false
-  const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {}, enabled: jjInventoryVisible })
+  // query waits, the schedule stops, and expanding the sidebar fetches once and arms it again. The board page reads
+  // the same cached inventory but never owns the schedule.
+  const jjInventoryPolling = isPrimarySurface && props.wide !== false
+  const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {}, enabled: props.wide !== false || isBoard })
   const jjThreads = useApi(jjIntegrationApi)
   const refetchJjRepositories = jjRepositories.refetch
   const jjOwnerMissing = isApiOwnerMissing(jjRepositories.error)
@@ -1255,18 +1265,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     })
     const onVisibilityChange = (): void => poll.visibilityChanged()
     const onRepositoryChange = (): void => {
-      if (jjInventoryVisible && !jjOwnerMissing) void refetchJjRepositories()
+      if (jjInventoryPolling && !jjOwnerMissing) void refetchJjRepositories()
     }
     window.addEventListener('dshfiles:jj-changed', onRepositoryChange)
     document.addEventListener('visibilitychange', onVisibilityChange)
     poll.start()
-    poll.setAvailable(!jjOwnerMissing && jjInventoryVisible)
+    poll.setAvailable(!jjOwnerMissing && jjInventoryPolling)
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('dshfiles:jj-changed', onRepositoryChange)
       poll.stop()
     }
-  }, [jjInventoryVisible, jjOwnerMissing, refetchJjRepositories])
+  }, [jjInventoryPolling, jjOwnerMissing, refetchJjRepositories])
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [threadSelection, setThreadSelection] = useState<ThreadSelectionState>(EMPTY_THREAD_SELECTION)
@@ -1275,14 +1285,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   selectionRef.current = threadSelection
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const layoutMode = storedThreadLayoutMode.useValue() ?? 'list'
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
   const threadViewSettings = preferences.threadViews
   const listThreadView = ThreadViewPreferencesModel.activeThreadView(threadViewSettings)
   const boardViewSettings = storedThreadBoardView.useValue() ?? DEFAULT_THREAD_BOARD_VIEW
-  const threadView = layoutMode === 'board' ? boardViewSettings : listThreadView
-  const activeWorkspaceFilter = layoutMode === 'board' ? boardViewSettings.projectFilter : preferences.workspaceFilter
+  const threadView = isBoard ? boardViewSettings : listThreadView
+  const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
@@ -1467,15 +1476,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const { requestScan, refreshCandidates } = useAutoArchive({
     client: archiveClient,
-    enabled: settledArchiveEnabled,
+    enabled: isPrimarySurface && settledArchiveEnabled,
     intervalMs: preferences.scanIntervalMinutes * 60_000,
     onSettled: () => refreshCandidates('all'),
   })
   const dueArchiveSessionIdsKey = dueSettledArchiveSessionIds.join(',')
   useEffect(() => {
-    if (!settledArchiveEnabled || dueArchiveSessionIdsKey === '') return
+    if (!isPrimarySurface || !settledArchiveEnabled || dueArchiveSessionIdsKey === '') return
     requestScan('all')
-  }, [dueArchiveSessionIdsKey, requestScan, settledArchiveEnabled])
+  }, [dueArchiveSessionIdsKey, isPrimarySurface, requestScan, settledArchiveEnabled])
   const questionCandidates = useMemo(
     () =>
       sessions
@@ -1498,7 +1507,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return { sessionIds: activeSessionIds }
     },
     enabled: questionCandidates.length > 0,
-    refetchInterval: questionCandidates.length > 0 ? 10_000 : false,
+    refetchInterval: isPrimarySurface && questionCandidates.length > 0 ? 10_000 : false,
     retry: false,
   })
   const continuedQuestionSessionIds = useMemo(() => new Set(activeQuestionsQuery.data?.sessionIds ?? []), [activeQuestionsQuery.data])
@@ -1777,22 +1786,25 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
   useEffect(() => {
+    if (!isPrimarySurface) return
     const onFocusThread = (event: Event): void => {
       const request = event instanceof CustomEvent ? threadTabFocusEventSchema.safeParse(event.detail) : undefined
       if (request?.success === true) setThreadToScrollTo(request.data.sessionId)
     }
     window.addEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
     return () => window.removeEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
-  }, [])
+  }, [isPrimarySurface])
   const refreshAttention = attention.refresh
   useEffect(() => {
+    if (!isPrimarySurface) return
     if (!attentionRefreshed.current) {
       attentionRefreshed.current = true
       return
     }
     refreshAttention()
-  }, [refreshAttention, runningSignature])
+  }, [isPrimarySurface, refreshAttention, runningSignature])
   useEffect(() => {
+    if (!isPrimarySurface) return
     const refresh = (): void => refreshAttention()
     const onVisibility = (): void => {
       if (document.visibilityState === 'visible') refresh()
@@ -1808,11 +1820,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.clearInterval(timer)
     }
-  }, [refreshAttention])
+  }, [isPrimarySurface, refreshAttention])
   const selectedAttention = selectedSessionId === undefined ? undefined : attention.records.get(selectedSessionId)
   const acknowledgeAttention = attention.acknowledge
   const acknowledgeManualUnread = attention.clearUnread
   useEffect(() => {
+    if (!isPrimarySurface) return
     if (selectedSessionId === undefined) {
       previousSelectedId.current = null
       return
@@ -1823,7 +1836,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     // Watching a thread finish acknowledges that turn; it never clears a mark the user made on purpose just now.
     if (selectedAttention.finishedAt !== null) acknowledgeAttention(selectedSessionId, selectedAttention.version)
     else if (justSelected) acknowledgeManualUnread(selectedSessionId, selectedAttention.version)
-  }, [acknowledgeAttention, acknowledgeManualUnread, selectedAttention, selectedSessionId])
+  }, [acknowledgeAttention, acknowledgeManualUnread, isPrimarySurface, selectedAttention, selectedSessionId])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   const selectThread = (sessionId: SessionSummary['id']): void => {
@@ -1860,6 +1873,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   openThreadRef.current = openThread
 
   useEffect(() => {
+    if (!isPrimarySurface) return
     const onPopState = (): void => {
       const requested = readThreadUrl(window.location.href)?.sessionId ?? null
       suppressUrlForSession.current = requested === null ? (selectedSession?.id ?? null) : null
@@ -1868,10 +1882,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [selectedSession?.id])
+  }, [isPrimarySurface, selectedSession?.id])
 
   useEffect(() => {
-    if (routeRequest === null || sessionState.phase !== 'ready') return
+    if (!isPrimarySurface || routeRequest === null || sessionState.phase !== 'ready') return
     const target = sessions.find(session => session.id === routeRequest)
     if (target === undefined) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarLinkNotFound') })
@@ -1887,17 +1901,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (openedRouteId.current === routeRequest) return
     openedRouteId.current = routeRequest
     openThreadRef.current(target.id)
-  }, [archivedSessionIds, props, routeRequest, sessions, sessionState.phase, setNotice])
+  }, [archivedSessionIds, isPrimarySurface, props, routeRequest, sessions, sessionState.phase, setNotice])
 
   useEffect(() => {
-    if (selectedSession === undefined || routeRequest !== null) return
+    if (!isPrimarySurface || selectedSession === undefined || routeRequest !== null) return
     if (suppressUrlForSession.current === selectedSession.id) return
     suppressUrlForSession.current = null
     const workspaceId =
       realWorkspaceBySession.get(selectedSession.id) ?? SidebarOrganization.workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
     const next = buildThreadUrl(window.location.href, selectedSession.id, workspaceId)
     if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
-  }, [realWorkspaceBySession, routeRequest, selectedSession, sessionState.byId, workspaceBySession])
+  }, [isPrimarySurface, realWorkspaceBySession, routeRequest, selectedSession, sessionState.byId, workspaceBySession])
 
   const changePreferences = useCallback(
     (patch: Partial<SidebarPreferences>): void => {
@@ -1909,25 +1923,25 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // Saved views moved from browser storage to Host settings: hand the browser copy over once, then drop it.
   const viewsMigrationStarted = useRef(false)
   useEffect(() => {
-    if (!hostBacked || viewsMigrationStarted.current) return
+    if (!isPrimarySurface || !hostBacked || viewsMigrationStarted.current) return
     viewsMigrationStarted.current = true
     const legacy = threadViewPreferences.get()
     threadViewPreferences.remove()
     if (JSON.stringify(legacy) === JSON.stringify(DEFAULT_THREAD_VIEW_SETTINGS)) return
     if (JSON.stringify(preferences.threadViews) !== JSON.stringify(DEFAULT_THREAD_VIEW_SETTINGS)) return
     changePreferences({ threadViews: legacy })
-  }, [changePreferences, hostBacked, preferences.threadViews])
+  }, [changePreferences, hostBacked, isPrimarySurface, preferences.threadViews])
 
   // Group collapse moved from browser storage to Host settings: hand the browser copy over once, then drop it.
   const groupsMigrationStarted = useRef(false)
   useEffect(() => {
-    if (!hostBacked || groupsMigrationStarted.current) return
+    if (!isPrimarySurface || !hostBacked || groupsMigrationStarted.current) return
     groupsMigrationStarted.current = true
     const legacy = storedCollapsedGroups.get()
     storedCollapsedGroups.remove()
     if (legacy.length === 0 || preferences.collapsedGroups.length > 0) return
     changePreferences({ collapsedGroups: [...legacy] })
-  }, [changePreferences, hostBacked, preferences.collapsedGroups])
+  }, [changePreferences, hostBacked, isPrimarySurface, preferences.collapsedGroups])
 
   const attentionDisplayRow = (key: AttentionDisplayPreferenceKey, label: ThreadAttentionLabel, colorKey: AttentionColorKey): JSX.Element => {
     const mode = preferences[key]
@@ -2381,23 +2395,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       if (plan.idleOverride === null) delete idleSectionOverrides[targetId]
       else idleSectionOverrides[targetId] = { section: plan.idleOverride, at: Date.now() }
     }
-    const nextCollapsedSections = collapsedSections.includes(section) ? collapsedSections.filter(item => item !== section) : collapsedSections
-    if (layoutMode === 'board') storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    // A drop opens the destination instead of folding it: the section the row was dragged inside is already open,
+    // so toggling would fold it and hide the row that just landed.
+    const nextCollapsedSections = collapsedSections.filter(item => item !== section)
     const nextPreferences = {
       parkedSessionIds: [...nextParked],
       ...(plan.settle ? SettledThreadsModel.settle(status, targets, Date.now()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
       idleSectionOverrides,
     }
-    if (layoutMode === 'list') {
-      changePreferences({
-        ...nextPreferences,
-        // A drop opens the destination instead of folding it: the section the row was dragged inside is already open,
-        // so toggling would fold it and hide the row that just landed.
-        collapsedSections: [...nextCollapsedSections],
-      })
-    } else {
-      changePreferences(nextPreferences)
-    }
+    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
     if (failed) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
     else if (!plan.archive) setNotice(null)
   }
@@ -2410,30 +2417,34 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   settleRequest.current = sessionId => {
     if (!settledSessionIds.has(sessionId)) applySettled(sessionId, true)
   }
-  useEffect(() => answerSettleRequests(sessionId => settleRequest.current(SessionId(sessionId))), [])
+  useEffect(() => {
+    if (!isPrimarySurface) return
+    return answerSettleRequests(sessionId => settleRequest.current(SessionId(sessionId)))
+  }, [isPrimarySurface])
 
-  const collapsedGroups = layoutMode === 'board' ? boardViewSettings.collapsedGroups : preferences.collapsedGroups
-  const collapsedSections = layoutMode === 'board' ? boardViewSettings.collapsedSections : preferences.collapsedSections
+  const collapsedGroups = isBoard ? boardViewSettings.collapsedGroups : preferences.collapsedGroups
+  const collapsedSections = isBoard ? boardViewSettings.collapsedSections : preferences.collapsedSections
   const toggleGroup = (key: string): void => {
     const nextCollapsedGroups = toggleCollapsedGroup(collapsedGroups, key)
-    if (layoutMode === 'board') storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedGroups: nextCollapsedGroups }))
+    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedGroups: nextCollapsedGroups }))
     else changePreferences({ collapsedGroups: nextCollapsedGroups })
   }
 
   const toggleSection = (section: SidebarSection): void => {
     const nextCollapsedSections = SidebarPreferencesModel.toggleCollapsedSection(collapsedSections, section)
-    if (layoutMode === 'board') storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
     else changePreferences({ collapsedSections: nextCollapsedSections })
   }
 
   // Archiving outranks settled: an archived thread keeps no settled status, so restoring it comes back usable
   // instead of waiting for the archive delay that already fired. Covers every archive path, the Agent's included.
   useEffect(() => {
+    if (!isPrimarySurface) return
     const archivedStillSettled = preferences.settledSessionIds.filter(sessionId => archivedSessionIds.has(sessionId))
     if (archivedStillSettled.length === 0) return
     const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
     changePreferences(SettledThreadsModel.unsettle(status, archivedStillSettled))
-  }, [archivedSessionIds, changePreferences, preferences.settledAt, preferences.settledSessionIds])
+  }, [archivedSessionIds, changePreferences, isPrimarySurface, preferences.settledAt, preferences.settledSessionIds])
 
   /** Both delay settings carry the same five choices, so one control renders each of them. */
   const threadDelayControl = (input: {
@@ -2530,7 +2541,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   })
   useAutoSettle({
     client: autoSettleClient,
-    enabled: autoSettleEnabled,
+    enabled: isPrimarySurface && autoSettleEnabled,
     intervalMs: preferences.scanIntervalMinutes * 60_000,
     refreshKey: autoSettleRefreshKey,
   })
@@ -2548,7 +2559,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [draftSessionIds, activeWorkspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
 
   useEffect(() => {
-    if (threadToScrollTo === null) return
+    if (!isPrimarySurface || threadToScrollTo === null) return
     const scrollArea = document.querySelector<HTMLElement>('[data-testid="thread-sidebar-scroll"]')
     const row = Array.from(scrollArea?.querySelectorAll<HTMLElement>('[data-thread-id]') ?? []).find(element => element.dataset.threadId === threadToScrollTo)
     if (row !== undefined) {
@@ -2562,7 +2573,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return
     }
     setThreadToScrollTo(null)
-  }, [childrenOpenOverrides, threadToScrollTo, threadTree])
+  }, [childrenOpenOverrides, isPrimarySurface, threadToScrollTo, threadTree])
 
   const sectionEntries = useMemo(
     () =>
@@ -2652,12 +2663,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // A snooze that ran out wakes the thread at once (through `now`); dropping its entry keeps the settings small.
   const mutesAwake = useMemo(() => withoutExpiredMutes(mutedThreads, now), [mutedThreads, now])
   useEffect(() => {
+    if (!isPrimarySurface) return
     if (Object.keys(mutesAwake).length !== Object.keys(mutedThreads).length) updatePreferences({ mutedThreads: mutesAwake })
-  }, [mutedThreads, mutesAwake, updatePreferences])
+  }, [isPrimarySurface, mutedThreads, mutesAwake, updatePreferences])
 
   // The Host owns attention now: hand it whatever this browser still holds, then drop the browser copy.
   useEffect(() => {
-    if (migrationStarted.current || !attention.available || sessionState.phase !== 'ready') return
+    if (!isPrimarySurface || migrationStarted.current || !attention.available || sessionState.phase !== 'ready') return
     migrationStarted.current = true
     const legacy = legacyNotificationPreferences.get()
     if (legacy === null) return
@@ -2684,7 +2696,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         () => legacyNotificationPreferences.remove(),
         () => undefined,
       )
-  }, [attention, mutedThreads, preferences.desktopNotificationsEnabled, preferences.notificationCategories, sessionState.phase, sessions, updatePreferences])
+  }, [
+    attention,
+    isPrimarySurface,
+    mutedThreads,
+    preferences.desktopNotificationsEnabled,
+    preferences.notificationCategories,
+    sessionState.phase,
+    sessions,
+    updatePreferences,
+  ])
 
   const needsInputRows = useMemo(
     () =>
@@ -3172,16 +3193,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
    * dragstart/dragover/drop stream instead of a pointer gesture that never sees the move.
    */
   useEffect(() => {
-    const sectionAt = (clientX: number, clientY: number): SidebarSection | null => {
+    const sectionAt = (clientX: number, clientY: number): { readonly element: Element | null; readonly section: SidebarSection } | null => {
       const element = document.elementFromPoint(clientX, clientY)
       const section = element instanceof Element ? element.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection : undefined
-      return isSidebarSection(section) ? section : null
+      return isSidebarSection(section) ? { element, section } : null
     }
     const onDragStart = (event: DragEvent): void => {
       const target = event.target
       if (!(target instanceof Element)) return
       const row = target.closest<HTMLElement>('article[data-thread-id][data-thread-section-row]')
-      if (row === null) return
+      if (row === null || threadSurfaceOf(row) !== surface) return
       const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
       const threadId = row.dataset.threadId
       if (!isSidebarSection(section) || threadId === undefined) return
@@ -3191,7 +3212,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     const onDragOver = (event: DragEvent): void => {
       if (rowDragRef.current === null) return
-      const next = sectionAt(event.clientX, event.clientY)
+      const target = sectionAt(event.clientX, event.clientY)
+      const next = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
       if (next === null) {
         rowDropSectionRef.current = null
         setRowDropSection(current => (current === null ? current : null))
@@ -3212,7 +3234,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const onDrop = (event: DragEvent): void => {
       const current = rowDragRef.current
       if (current === null) return
-      const droppedOn = sectionAt(event.clientX, event.clientY)
+      const target = sectionAt(event.clientX, event.clientY)
+      const droppedOn = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
       if (droppedOn === null) {
         endRowDrag()
         return
@@ -3236,7 +3259,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       window.removeEventListener('drop', onDrop, true)
       window.removeEventListener('dragend', endRowDrag, true)
     }
-  }, [])
+  }, [surface])
   const groupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
     return ThreadViewModel.groupEntries({
@@ -3293,7 +3316,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const selectProject = (value: string): void => {
     setSettingsOpen(false)
     const projectFilter = value === ALL_PROJECTS ? null : value === UNASSIGNED_PROJECT ? '' : value
-    if (layoutMode === 'board') storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { projectFilter }))
+    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { projectFilter }))
     else changePreferences({ workspaceFilter: projectFilter })
   }
 
@@ -3304,11 +3327,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ]
 
   const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
-  const showGroupControl = layoutMode === 'board' || threadViewSettings.showGroupControl
-  const showFilterControl = layoutMode === 'board' || threadViewSettings.showFilterControl
+  const showGroupControl = isBoard || threadViewSettings.showGroupControl
+  const showFilterControl = isBoard || threadViewSettings.showFilterControl
 
   const updateThreadView = (patch: Partial<ThreadViewPreferences>): void => {
-    if (layoutMode === 'board') {
+    if (isBoard) {
       storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, patch))
       return
     }
@@ -3429,10 +3452,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences,
   }
   useEffect(() => {
+    if (!isPrimarySurface) return
     PaletteApi.setRecentLimit(preferences.paletteRecentLimit)
-  }, [preferences.paletteRecentLimit])
-  useEffect(() => () => PaletteApi.setRecentLimit(10), [])
+  }, [isPrimarySurface, preferences.paletteRecentLimit])
   useEffect(() => {
+    if (!isPrimarySurface) return
+    return () => PaletteApi.setRecentLimit(10)
+  }, [isPrimarySurface])
+  useEffect(() => {
+    if (!isPrimarySurface) return
     const actions: readonly PaletteAction[] = [
       ...(asideOpener === null
         ? []
@@ -3502,7 +3530,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     ]
     const disposers = actions.map(action => PaletteApi.registerAction(action))
     return () => disposers.forEach(dispose => dispose())
-  }, [])
+  }, [isPrimarySurface])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {
     return {
@@ -3754,7 +3782,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   useEffect(() => {
-    if (sessionState.phase !== 'ready') return
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
     const currentStatusEntries = sessions.map(session => {
       const status = sessionStatus.get(session.id)
       return {
@@ -3791,10 +3819,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         tSidebar('threadSidebarInputNotificationBody'),
       )
     }
-  }, [tSidebar, selectedSession?.id, sessionStatus, sessionState.phase, sessions])
+  }, [isPrimarySurface, tSidebar, selectedSession?.id, sessionStatus, sessionState.phase, sessions])
 
   // Host attention records carry the latest finish reason and sequence, so an acknowledged row can still be deduped by event id.
   useEffect(() => {
+    if (!isPrimarySurface) return
     const previous = previousAttention.current
     previousAttention.current = attention.records
     if (previous === null) return
@@ -3813,7 +3842,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         tSidebar(messageKeys.body),
       )
     }
-  }, [attention.records, selectedSession?.id, sessionStatus, sessions, tSidebar])
+  }, [attention.records, isPrimarySurface, selectedSession?.id, sessionStatus, sessions, tSidebar])
 
   const isTransientNotice =
     notice !== null && (notice.tone === 'success' || notice.durationMs !== undefined || (notice.actionLabel !== undefined && notice.onAction !== undefined))
@@ -3848,13 +3877,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     <TooltipProvider delayDuration={500}>
       <section
         className="dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
-        aria-label={props.tSidebar('threadSidebarTitle')}
+        aria-label={props.tSidebar(isBoard ? 'threadSidebarBoardTitle' : 'threadSidebarTitle')}
+        data-thread-surface={surface}
       >
-        <header className="dshx:px-2 dshx:py-1">
-          <div className="dshx:flex dshx:items-center dshx:gap-1">
+        <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
+          {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
+          <div className={cn('dshx:flex dshx:items-center dshx:gap-1', isBoard && 'dshx:shrink-0')}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:px-2.5 dshx:text-base dshx:font-medium">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:px-2.5 dshx:font-medium',
+                    isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
+                  )}
+                >
                   <span className="dshx:truncate">{projectFilterLabel}</span>
                   <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
                     <IconChevronDownOutlineRegular size={14} />
@@ -3869,52 +3906,35 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
-                  {props.tSidebar('threadSidebarSettings')}
-                </DropdownMenuCheckboxItem>
+                {isBoard ? null : (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
+                      {props.tSidebar('threadSidebarSettings')}
+                    </DropdownMenuCheckboxItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
-            <div role="group" aria-label={props.tSidebar('threadSidebarLayoutGroup')} className="dshx:flex dshx:shrink-0 dshx:items-center">
+            {isBoard ? null : (
               <Button
                 type="button"
                 size="icon"
-                variant={layoutMode === 'list' ? 'secondary' : 'ghost'}
-                aria-label={props.tSidebar('threadSidebarLayoutList')}
-                aria-pressed={layoutMode === 'list'}
-                title={props.tSidebar('threadSidebarLayoutList')}
-                onClick={() => storedThreadLayoutMode.set('list')}
+                variant={settingsOpen ? 'secondary' : 'ghost'}
+                aria-label={props.tSidebar('threadSidebarSettings')}
+                aria-expanded={settingsOpen}
+                onClick={() => setSettingsOpen(current => !current)}
               >
-                <ListIcon />
+                <Settings2Icon />
               </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant={layoutMode === 'board' ? 'secondary' : 'ghost'}
-                aria-label={props.tSidebar('threadSidebarLayoutBoard')}
-                aria-pressed={layoutMode === 'board'}
-                title={props.tSidebar('threadSidebarLayoutBoard')}
-                onClick={() => storedThreadLayoutMode.set('board')}
-              >
-                <LayoutGridIcon />
-              </Button>
-            </div>
-            <Button
-              type="button"
-              size="icon"
-              variant={settingsOpen ? 'secondary' : 'ghost'}
-              aria-label={props.tSidebar('threadSidebarSettings')}
-              aria-expanded={settingsOpen}
-              onClick={() => setSettingsOpen(current => !current)}
-            >
-              <Settings2Icon />
-            </Button>
+            )}
           </div>
           <div
             role="group"
-            className={cn('dshx:flex dshx:gap-1 dshx:overflow-x-auto dshx:pt-1', layoutMode === 'board' && 'dshx:hidden')}
+            className={cn('dshx:flex dshx:gap-1 dshx:overflow-x-auto', !isBoard && 'dshx:pt-1')}
             aria-label={props.tSidebar('threadSidebarListView')}
             onKeyDown={event => navigateThreadList(event.nativeEvent)}
+            hidden={isBoard}
           >
             {threadViewSettings.views
               .filter(view => view.enabled)
@@ -3964,7 +3984,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               })}
           </div>
           {showGroupControl || showFilterControl ? (
-            <div className={cn('dshx:grid dshx:gap-1 dshx:pt-1', showGroupControl && showFilterControl ? 'dshx:grid-cols-2' : 'dshx:grid-cols-1')}>
+            <div
+              className={cn(
+                'dshx:grid dshx:gap-1',
+                isBoard
+                  ? 'dshx:grid-flow-col dshx:auto-cols-max'
+                  : cn('dshx:pt-1', showGroupControl && showFilterControl ? 'dshx:grid-cols-2' : 'dshx:grid-cols-1'),
+              )}
+            >
               {showGroupControl ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -4047,35 +4074,33 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
         </header>
 
-        {settingsOpen ? (
+        {settingsOpen && !isBoard ? (
           <section
             className="dshx:mx-2 dshx:mb-2 dshx:grid dshx:min-h-0 dshx:shrink dshx:gap-3 dshx:overflow-y-auto dshx:overscroll-contain dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3"
             aria-label={props.tSidebar('threadSidebarSettings')}
           >
-            {layoutMode === 'list' ? (
-              <fieldset className="dshx:grid dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
-                <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarViewControls')}</legend>
-                <Label className="dshx:font-normal dshx:leading-snug">
-                  <Checkbox
-                    aria-label={props.tSidebar('threadSidebarShowGroupControl')}
-                    checked={threadViewSettings.showGroupControl}
-                    onCheckedChange={checked => updateThreadViewControls({ showGroupControl: checked === true })}
-                  />
-                  {props.tSidebar('threadSidebarShowGroupControl')}
-                </Label>
-                <Label className="dshx:font-normal dshx:leading-snug">
-                  <Checkbox
-                    aria-label={props.tSidebar('threadSidebarShowFilterControl')}
-                    checked={threadViewSettings.showFilterControl}
-                    onCheckedChange={checked => updateThreadViewControls({ showFilterControl: checked === true })}
-                  />
-                  {props.tSidebar('threadSidebarShowFilterControl')}
-                </Label>
-                <Button className="dshx:justify-start" onClick={() => setViewsManagerOpen(true)} size="sm" type="button" variant="outline">
-                  {props.tSidebar('threadSidebarManageViews')}
-                </Button>
-              </fieldset>
-            ) : null}
+            <fieldset className="dshx:grid dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
+              <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarViewControls')}</legend>
+              <Label className="dshx:font-normal dshx:leading-snug">
+                <Checkbox
+                  aria-label={props.tSidebar('threadSidebarShowGroupControl')}
+                  checked={threadViewSettings.showGroupControl}
+                  onCheckedChange={checked => updateThreadViewControls({ showGroupControl: checked === true })}
+                />
+                {props.tSidebar('threadSidebarShowGroupControl')}
+              </Label>
+              <Label className="dshx:font-normal dshx:leading-snug">
+                <Checkbox
+                  aria-label={props.tSidebar('threadSidebarShowFilterControl')}
+                  checked={threadViewSettings.showFilterControl}
+                  onCheckedChange={checked => updateThreadViewControls({ showFilterControl: checked === true })}
+                />
+                {props.tSidebar('threadSidebarShowFilterControl')}
+              </Label>
+              <Button className="dshx:justify-start" onClick={() => setViewsManagerOpen(true)} size="sm" type="button" variant="outline">
+                {props.tSidebar('threadSidebarManageViews')}
+              </Button>
+            </fieldset>
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox checked={preferences.autoSettleEnabled} onCheckedChange={checked => changePreferences({ autoSettleEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
@@ -4262,8 +4287,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <div
           ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
-          className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
-          onKeyDown={event => navigateThreadList(event.nativeEvent)}
+          className={cn('dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3', isBoard && 'dshx:p-4')}
+          onKeyDown={event => {
+            if (!isBoard) navigateThreadList(event.nativeEvent)
+          }}
           onClickCapture={handleSelectionClickCapture}
           onContextMenuCapture={handleSelectionContextMenuCapture}
         >
@@ -4409,22 +4436,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {groupedAttentionRows.turnFinished.map(session => renderThreadRow(session, 'threadSidebarTurnFinished'))}
             </section>
           ) : null}
-          <div className={cn(layoutMode === 'board' && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
+          <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
             {threadView.groupBy === 'status'
-              ? (layoutMode === 'board' ? orderedSections : renderedSections).map((section, index) => {
+              ? (isBoard ? orderedSections : renderedSections).map((section, index) => {
                   const rows = rowsBySection.get(section) ?? []
                   const collapsed = collapsedSections.includes(section)
                   return (
                     <section
                       className={cn(
                         'dshx:mt-1 dshx:rounded-md',
-                        layoutMode === 'board' && 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
+                        isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                         rowDrag !== null && rowDropSection === section && 'dshx:bg-accent/40 dshx:ring-1 dshx:ring-inset dshx:ring-ring/30',
                       )}
                       key={section}
                       data-thread-section={section}
-                      data-thread-board-column={layoutMode === 'board' ? section : undefined}
-                      aria-label={layoutMode === 'board' ? `${props.tSidebar(sectionLabels[section])} column` : undefined}
+                      data-thread-board-column={isBoard ? section : undefined}
+                      aria-label={isBoard ? `${props.tSidebar(sectionLabels[section])} column` : undefined}
                     >
                       <button
                         ref={element => {
@@ -4442,7 +4469,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         )}
                         aria-expanded={!collapsed}
                         onPointerDown={event => {
-                          if (layoutMode === 'board' || event.button !== 0) return
+                          if (isBoard || event.button !== 0) return
                           sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
                         }}
                         onPointerMove={event => {
@@ -4520,17 +4547,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     <section
                       className={cn(
                         'dshx:mt-1 dshx:rounded-md',
-                        layoutMode === 'board' && 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
+                        isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                       )}
                       key={group.key}
-                      data-thread-board-column={layoutMode === 'board' ? group.key : undefined}
-                      aria-label={
-                        layoutMode === 'board'
-                          ? `${group.label || props.tSidebar('threadSidebarAllThreads')} column`
-                          : group.showHeader
-                            ? group.label
-                            : undefined
-                      }
+                      data-thread-board-column={isBoard ? group.key : undefined}
+                      aria-label={isBoard ? `${group.label || props.tSidebar('threadSidebarAllThreads')} column` : group.showHeader ? group.label : undefined}
                     >
                       {group.showHeader ? (
                         <button
