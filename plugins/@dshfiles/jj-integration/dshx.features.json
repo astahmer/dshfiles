@@ -227,7 +227,18 @@
         "An inherited thread workspace is not reused as the new thread's own destination, even when it is registered as a spare.",
         "A created thread never takes the view back from another thread, another main panel or the Start page; the toast offers it instead."
       ],
-      "externalDependencies": [],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/main-tabs",
+          "boundary": "The active main-view tab stays on Backlog while a prepared New-thread send completes.",
+          "deterministicFake": "The isolated scratch tab registry."
+        },
+        {
+          "id": "@dshfiles/backlog",
+          "boundary": "Backlog remains selectable while New-thread destination preparation is held.",
+          "deterministicFake": "The isolated scratch Backlog store."
+        }
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -237,6 +248,11 @@
         {
           "kind": "gherkin",
           "id": "jj-integration.new-thread-deferred-submit-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.backlog-stays-selected-during-first-send-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {

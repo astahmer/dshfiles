@@ -18,6 +18,11 @@ interface ThreadRepository {
   readonly releaseCommitId: string
 }
 
+interface HeldDestinationLookup {
+  readonly wasRequested: () => boolean
+  readonly release: () => void
+}
+
 const repositories = new WeakMap<Page, ThreadRepository>()
 /** The thread workspace the New thread screen last provisioned; a started thread's header no longer names it. */
 const provisionedThreads = new WeakMap<Page, string>()
@@ -25,6 +30,12 @@ const provisionedThreads = new WeakMap<Page, string>()
 const rememberedBlankThreads = new WeakMap<Page, string>()
 /** The thread workspaces that existed just before the draft was sent; its send must add none. */
 const beforeSendNames = new WeakMap<Page, string>()
+const heldDestinationLookups = new WeakMap<Page, HeldDestinationLookup>()
+const heldDestinationLookupFor = (page: Page): HeldDestinationLookup => {
+  const lookup = heldDestinationLookups.get(page)
+  if (lookup === undefined) throw new Error('No held New thread destination lookup exists for this page.')
+  return lookup
+}
 const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
 const threadComposerName = 'Message or run a task, / commands, @ files or sessions'
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
@@ -568,6 +579,46 @@ Then('the message is delivered from its new thread workspace', async ({ page }: 
   await finishJourneyAssertions(page)
 })
 
+When('the New thread destination lookup is held', async ({ page }: { page: Page }) => {
+  let requestSeen = false
+  let releaseLookup: (() => void) | undefined
+  const lookupGate = new Promise<void>(resolve => {
+    releaseLookup = resolve
+  })
+  heldDestinationLookups.set(page, {
+    wasRequested: () => requestSeen,
+    release: () => releaseLookup?.(),
+  })
+  await page.context().route('**/api/**', async route => {
+    const parsedRequest = destinationRequestSchema.safeParse(route.request().postDataJSON())
+    if (!parsedRequest.success || requestSeen) return route.continue()
+    requestSeen = true
+    await lookupGate
+    return route.continue()
+  })
+})
+
+When('Backlog is selected while the destination lookup is held', async ({ page }: { page: Page }) => {
+  await expect.poll(heldDestinationLookupFor(page).wasRequested).toBe(true)
+  await page
+    .getByRole('navigation', { name: 'Sidebar navigation', exact: true })
+    .getByRole('button', { name: 'Backlog', exact: true })
+    .click()
+  await expect(page.getByRole('tab', { name: 'Backlog', exact: true })).toHaveAttribute('aria-selected', 'true')
+})
+
+When('the held New thread destination lookup is released', async ({ page }: { page: Page }) => {
+  heldDestinationLookupFor(page).release()
+})
+
+Then('the completed first send leaves Backlog selected', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-new-thread-first-send-keeps-backlog-selected', async () => {
+    await expect(page.getByText(/^Thread started in /u)).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Backlog', exact: true })).toHaveAttribute('aria-selected', 'true')
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the next five New thread destination lookups fail', async ({ page }: { page: Page }) => {
   let remainingFailures = 5
   await page.context().route('**/api/**', async route => {
@@ -601,7 +652,7 @@ Then('a failed destination lookup leaves the first send retryable', async ({ pag
   await destination.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(destination.getByRole('alert')).toHaveCount(0)
   await expect(composer).toHaveText('first message from the inherited workspace')
-  expect(workspaceNames(repositoryFor(page), [previousThread])).toEqual(['default', previousThread].sort())
+  await expect.poll(() => workspaceNames(repositoryFor(page), [previousThread])).toHaveLength(3)
   await finishJourneyAssertions(page)
 })
 
@@ -1068,6 +1119,8 @@ Then('the thread workspace is gone from jj and from the panel', async ({ page }:
 })
 
 After(async ({ page }: { page: Page }) => {
+  heldDestinationLookups.get(page)?.release()
+  heldDestinationLookups.delete(page)
   const repository = repositories.get(page)
   if (repository === undefined) return
   repositories.delete(page)

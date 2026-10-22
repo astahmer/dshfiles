@@ -91,6 +91,21 @@ Feature: jj thread workspaces
     When a message is submitted before the new thread workspace is ready
     Then the message is delivered from its new thread workspace
 
+  @scenario:jj-integration.backlog-stays-selected-during-first-send-browser-journey
+  Scenario: A delayed New thread send leaves Backlog selected
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts, @dshfiles/main-tabs, @dshfiles/backlog" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the New thread screen is reopened
+    And a disposable jj repository is chosen as the New thread project
+    And a first message is sent from the shared checkout
+    And new threads start in their own jj workspace by default
+    And New thread is clicked in the sidebar
+    And the New thread destination lookup is held
+    When a message is submitted before the new thread workspace is ready
+    And Backlog is selected while the destination lookup is held
+    And the held New thread destination lookup is released
+    Then the completed first send leaves Backlog selected
+
   @scenario:jj-integration.draft-handoff-browser-journey
   Scenario: Switching the thread destination carries the draft without leaving a stale copy
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
