@@ -67,8 +67,9 @@ Picking a project the header does not show keeps that chip until you clear it.
 
 ## Feed, board and freshness
 
-The feed lists pinned items first, then newest activity. A chip row above the feed and the Items list
-narrows both to one status or several at once; the picks persist across reloads and `All` clears them.
+The feed lists pinned items first, then newest activity by default. Use the sort menu on Feed, Inbox or Items to
+choose last update or creation date; each view remembers its choice across reloads. A chip row above the feed and
+the Items list narrows both to one status or several at once; the picks persist across reloads and `All` clears them.
 Freshness is derived on read and never stored:
 
 | Item               | Leaves the feed                             |

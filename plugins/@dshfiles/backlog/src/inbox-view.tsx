@@ -3,6 +3,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import { sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import { linkedThreadIds, type InboxThread } from './inbox-threads.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -52,12 +53,16 @@ const headline = (item: BacklogSummaryView): ReactNode => {
   return <>Triage has a suggestion for {title}</>
 }
 
-export const inboxOrder = (items: readonly BacklogSummaryView[], filter: InboxFilter = 'all'): BacklogSummaryView[] =>
-  items.filter(item => matchesFilter(item, filter)).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+export const inboxOrder = (items: readonly BacklogSummaryView[], filter: InboxFilter = 'all', sort: BacklogSort = 'updated'): BacklogSummaryView[] =>
+  sortBacklogItems(
+    items.filter(item => matchesFilter(item, filter)),
+    sort,
+  )
 
 /** The attention queue: what wants a decision from the user, beside the inspector of the selected one. */
 export const InboxView = (props: {
   readonly items: readonly BacklogSummaryView[]
+  readonly sort: BacklogSort
   readonly threads: readonly InboxThread[]
   readonly openId: number | null
   readonly select: (id: number) => void
@@ -70,7 +75,7 @@ export const InboxView = (props: {
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [filter, setFilter] = useState<InboxFilter>('all')
-  const rows = inboxOrder(props.items, filter)
+  const rows = inboxOrder(props.items, filter, props.sort)
   const threads = props.threads.filter(thread => threadMatches(thread, filter))
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1">

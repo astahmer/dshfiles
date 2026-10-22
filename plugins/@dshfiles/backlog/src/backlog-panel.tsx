@@ -5,6 +5,8 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
@@ -13,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
+  ArrowDownWideNarrowIcon,
   BookmarkIcon,
   FolderIcon,
   FolderKanbanIcon,
@@ -38,6 +41,7 @@ import { BacklogFocusModel } from './backlog-focus.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
+import { sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import { inboxThreadsFrom } from './inbox-threads.js'
 import { InboxView, inboxOrder } from './inbox-view.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
@@ -73,8 +77,22 @@ const preferences = createStoredValue({
     showDormant: z.boolean(),
     statuses: z.array(BacklogItems.statusSchema).default([]),
     project: z.string().nullable().default(null),
+    sort: z
+      .object({
+        feed: z.enum(['updated', 'created']).default('updated'),
+        inbox: z.enum(['updated', 'created']).default('updated'),
+        items: z.enum(['updated', 'created']).default('updated'),
+      })
+      .default({ feed: 'updated', inbox: 'updated', items: 'updated' }),
   }),
-  fallback: { view: 'feed' as const, groupBy: 'status' as const, showDormant: false, statuses: [], project: null },
+  fallback: {
+    view: 'feed' as const,
+    groupBy: 'status' as const,
+    showDormant: false,
+    statuses: [],
+    project: null,
+    sort: { feed: 'updated' as const, inbox: 'updated' as const, items: 'updated' as const },
+  },
 })
 
 const isTyping = (target: EventTarget | null): boolean =>
@@ -400,11 +418,17 @@ export const BacklogPanel = (props: {
     requestAnimationFrame(() => captureComposer.current?.focus())
   }
 
+  const sort: BacklogSort = view === 'feed' || view === 'inbox' || view === 'items' ? stored.sort[view] : 'updated'
   const viewOrder = () => {
     if (debounced !== '') return all
-    if (view === 'inbox') return inboxOrder(inboxItems)
-    if (view === 'items') return itemsOrder(filteredItems, stored.groupBy, collapsed)
-    if (view === 'feed') return [...filteredItems].filter(item => !item.pinned).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+    if (view === 'inbox') return inboxOrder(inboxItems, 'all', sort)
+    if (view === 'items') return itemsOrder(filteredItems, stored.groupBy, collapsed, sort)
+    if (view === 'feed')
+      return sortBacklogItems(
+        filteredItems.filter(item => !item.pinned),
+        sort,
+        'ascending',
+      )
     return items
   }
   const order = viewOrder()
@@ -526,6 +550,35 @@ export const BacklogPanel = (props: {
             }}
           />
           <ProjectFilter project={projectFilter} projects={projectPaths} onPick={project => setPreference({ project })} />
+          {view === 'feed' || view === 'inbox' || view === 'items' ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label={`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}
+                title={`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}
+                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground"
+              >
+                <ArrowDownWideNarrowIcon className="dshx:size-3.5" />
+                <span className="dshx:@max-pane-compact:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="dshx-root">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={sort}
+                  onValueChange={value => {
+                    if (value !== 'updated' && value !== 'created') return
+                    setPreference({ sort: { ...stored.sort, [view]: value } })
+                  }}
+                >
+                  <DropdownMenuRadioItem value="updated" className="dshx:text-[13px]">
+                    Last update
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="created" className="dshx:text-[13px]">
+                    Creation date
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
           <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
           <button
             type="button"
@@ -585,6 +638,7 @@ export const BacklogPanel = (props: {
             }
             inspector={inspector}
             loaded={inbox.isSuccess}
+            sort={stored.sort.inbox}
             startThread={openStartThread}
             projectPaths={projectPaths}
           />
@@ -594,6 +648,7 @@ export const BacklogPanel = (props: {
               {view === 'feed' && (
                 <FeedView
                   items={filteredItems}
+                  sort={stored.sort.feed}
                   counts={statusTotals}
                   statuses={stored.statuses}
                   toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
@@ -609,6 +664,7 @@ export const BacklogPanel = (props: {
               {view === 'items' && (
                 <ItemsView
                   items={filteredItems}
+                  sort={stored.sort.items}
                   counts={statusTotals}
                   statuses={stored.statuses}
                   toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}

@@ -5,6 +5,7 @@ import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-sc
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import { backlogSortTime, sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import type { BacklogStatus } from './item.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -199,6 +200,7 @@ const selectionLabel = (statuses: readonly BacklogStatus[]): string => {
  */
 export const FeedView = (props: {
   readonly items: readonly BacklogSummaryView[]
+  readonly sort: BacklogSort
   readonly counts: Record<BacklogStatus, number>
   readonly statuses: readonly BacklogStatus[]
   readonly toggleStatus: (status: BacklogStatus) => void
@@ -215,8 +217,13 @@ export const FeedView = (props: {
   const scroller = useRef<HTMLDivElement | null>(null)
   const atBottom = useRef(true)
   const ordered = useMemo(
-    () => [...props.items].filter(item => !item.pinned).sort((left, right) => left.lastActivityAt - right.lastActivityAt || left.id - right.id),
-    [props.items],
+    () =>
+      sortBacklogItems(
+        props.items.filter(item => !item.pinned),
+        props.sort,
+        'ascending',
+      ),
+    [props.items, props.sort],
   )
   const [shown, setShown] = useState(PAGE)
   const visible = ordered.slice(-shown)
@@ -245,9 +252,10 @@ export const FeedView = (props: {
   }, [props.loaded])
 
   const renderVisibleEntry = (item: BacklogSummaryView, index: number): JSX.Element => {
-    const label = dayLabel(item.lastActivityAt, now)
+    const itemDate = backlogSortTime(item, props.sort)
+    const label = dayLabel(itemDate, now)
     const previous = visible[index - 1]
-    const separator = previous === undefined || dayLabel(previous.lastActivityAt, now) !== label
+    const separator = previous === undefined || dayLabel(backlogSortTime(previous, props.sort), now) !== label
     return (
       <div key={item.id}>
         {separator ? (

@@ -23,6 +23,7 @@ import { useVirtualizer } from '@dshfiles/plugin-ui/virtual'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import { backlogSortTime, sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -98,13 +99,19 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
 }
 
 /** Rows in the order they render, for keyboard movement in the panel. */
-export const itemsOrder = (items: readonly BacklogSummaryView[], by: GroupBy, collapsed: ReadonlySet<string>): BacklogSummaryView[] =>
+export const itemsOrder = (
+  items: readonly BacklogSummaryView[],
+  by: GroupBy,
+  collapsed: ReadonlySet<string>,
+  sort: BacklogSort = 'updated',
+): BacklogSummaryView[] =>
   groupsOf(items, by)
     .filter(group => !collapsed.has(group.key))
-    .flatMap(group => [...group.items].sort((left, right) => Number(right.pinned) - Number(left.pinned) || right.lastActivityAt - left.lastActivityAt))
+    .flatMap(group => sortBacklogItems(group.items, sort).sort((left, right) => Number(right.pinned) - Number(left.pinned)))
 
 const Row = (props: {
   readonly item: BacklogSummaryView
+  readonly sort: BacklogSort
   readonly open: boolean
   readonly cursor: boolean
   readonly selected: boolean
@@ -240,7 +247,9 @@ const Row = (props: {
         <span className={roomyOnly}>
           <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} max={2} />
         </span>
-        <span className="dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
+        <span className="dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
+          {ItemGlyphs.ago(backlogSortTime(item, props.sort))}
+        </span>
       </div>
     </BacklogItemMenu>
   )
@@ -249,6 +258,7 @@ const Row = (props: {
 /** Every item as a dense grouped table: group by status, kind, project or attention; select many to move them at once. */
 export const ItemsView = (props: {
   readonly items: readonly BacklogSummaryView[]
+  readonly sort: BacklogSort
   readonly openId: number | null
   readonly cursorId: number | null
   readonly select: (id: number) => void
@@ -277,7 +287,10 @@ export const ItemsView = (props: {
     if (selectionAnchor.current !== null && !availableIds.has(selectionAnchor.current)) selectionAnchor.current = null
   }, [props.items])
   const groups = useMemo(() => groupsOf(props.items, props.groupBy), [props.items, props.groupBy])
-  const orderedIds = useMemo(() => itemsOrder(props.items, props.groupBy, props.collapsed).map(item => item.id), [props.items, props.groupBy, props.collapsed])
+  const orderedIds = useMemo(
+    () => itemsOrder(props.items, props.groupBy, props.collapsed, props.sort).map(item => item.id),
+    [props.items, props.groupBy, props.collapsed, props.sort],
+  )
   const toggle = (id: number): void => {
     selectionAnchor.current = id
     setSelected(toggleBacklogSelection(selected, id))
@@ -324,8 +337,8 @@ export const ItemsView = (props: {
       visibleGroups.flatMap(group => {
         const header: Entry = { kind: 'header', key: `h:${group.key}`, group }
         if (props.collapsed.has(group.key)) return [header]
-        const rows = [...group.items]
-          .sort((left, right) => Number(right.pinned) - Number(left.pinned) || right.lastActivityAt - left.lastActivityAt)
+        const rows = sortBacklogItems(group.items, props.sort)
+          .sort((left, right) => Number(right.pinned) - Number(left.pinned))
           .map((item): Entry => ({ kind: 'row', key: `r:${String(item.id)}`, item }))
         return [header, ...rows]
       }),
@@ -383,7 +396,7 @@ export const ItemsView = (props: {
           <span className={roomyOnly}>Kind</span>
           <span className={wideOnly}>Project</span>
           <span className={roomyOnly}>People</span>
-          <span className="dshx:text-right">Updated</span>
+          <span className="dshx:text-right">{props.sort === 'created' ? 'Created' : 'Updated'}</span>
         </div>
         {entries.length === 0 && filtering ? (
           <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-20 dshx:text-center">
@@ -447,6 +460,7 @@ export const ItemsView = (props: {
                 ) : (
                   <Row
                     item={entry.item}
+                    sort={props.sort}
                     open={entry.item.id === props.openId}
                     cursor={entry.item.id === props.cursorId}
                     selected={selected.has(entry.item.id)}
