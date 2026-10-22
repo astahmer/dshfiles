@@ -2,8 +2,7 @@ import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useSyncExternalStore } from 'react'
 
-/** What a report is about: work still running, work that finished, or work that could not start. */
-export type BacklogNoticeKind = 'progress' | 'success' | 'failure'
+import { BACKLOG_NOTICE_HOLD_MS, type BacklogNoticeKind } from './notice-policy.js'
 
 /** One report from a start-thread run that outlives the dialog which asked for it. */
 export interface BacklogNotice {
@@ -13,9 +12,6 @@ export interface BacklogNotice {
   /** The thread the report is about, when opening it is still the user's to do. */
   readonly sessionId: SessionId | null
 }
-
-/** A progress banner outlives the workspace it waits for; a finished one only has to be read. */
-const HOLD_MS = { progress: 60_000, success: 6_000, failure: 9_000 } satisfies Record<BacklogNoticeKind, number>
 
 /**
  * A thread started from an item is created in the background, so the dialog that asked for it is gone before the answer
@@ -65,7 +61,7 @@ export const BacklogNoticeToast = (props: { readonly openThread: (sessionId: Ses
     <Toast
       key={current.sequence}
       text={current.text}
-      holdMs={HOLD_MS[current.kind]}
+      holdMs={BACKLOG_NOTICE_HOLD_MS[current.kind]}
       {...(current.kind === 'success' ? { tone: 'success' as const } : {})}
       {...(sessionId === null
         ? {}
