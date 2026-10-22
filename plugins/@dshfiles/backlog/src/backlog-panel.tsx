@@ -266,6 +266,7 @@ export const BacklogPanel = (props: {
   readonly openThread: OpenThread
   readonly listThreads: () => readonly ComposerThread[]
   readonly startThread: StartThreadPorts
+  readonly agentForThread: (sessionId: string) => Promise<{ readonly name: string } | null>
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
@@ -467,6 +468,7 @@ export const BacklogPanel = (props: {
         embedded={view === 'inbox'}
         toggleExpanded={() => withViewTransition(() => setExpanded(!expanded))}
         openThread={props.openThread}
+        agentForThread={props.agentForThread}
         select={select}
         projectPaths={projectPaths}
         startThread={openStartThread}

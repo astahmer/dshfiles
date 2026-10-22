@@ -53,6 +53,7 @@ import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
+import { actorThreadFor } from './actor-thread.js'
 import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
@@ -663,6 +664,47 @@ const LinkRow = (props: {
   )
 }
 
+const AgentThreadChip = (props: {
+  readonly actorId: string
+  readonly threads: readonly ComposerThread[]
+  readonly agentForThread: (sessionId: string) => Promise<{ readonly name: string } | null>
+  readonly openThread: OpenThread
+}): JSX.Element => {
+  const thread = actorThreadFor(props.actorId, props.threads)
+  const sessionId = props.actorId.slice('agent:'.length)
+  const agentQuery = useQuery({
+    queryKey: ['dshfiles-backlog', 'agent-thread', sessionId],
+    queryFn: () => props.agentForThread(sessionId),
+    enabled: props.actorId.startsWith('agent:'),
+    staleTime: 30_000,
+    retry: false,
+  })
+  if (!props.actorId.startsWith('agent:')) return <ItemGlyphs.ActorAvatar actorId={props.actorId} />
+  const name = agentQuery.data?.name ?? ItemGlyphs.actorName(props.actorId)
+  if (thread === undefined) {
+    return (
+      <span title={name} className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:px-1.5 dshx:py-1 dshx:text-xs">
+        <ItemGlyphs.ActorAvatar actorId={props.actorId} className="dshx:size-4 dshx:ring-0" />
+        {name}
+      </span>
+    )
+  }
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="outline"
+      title={`${name} · ${thread.title}`}
+      aria-label={`Open ${name}'s thread: ${thread.title}`}
+      onClick={() => props.openThread(thread.id)}
+      className="dshx:h-7 dshx:max-w-48 dshx:gap-1.5 dshx:px-1.5"
+    >
+      <ItemGlyphs.ActorAvatar actorId={props.actorId} className="dshx:size-4 dshx:ring-0" />
+      <span className="dshx:truncate">{agentQuery.data === null ? thread.title : name}</span>
+    </Button>
+  )
+}
+
 const PeekBody = (props: {
   readonly detail: BacklogDetailView
   readonly threads: readonly ComposerThread[]
@@ -670,6 +712,7 @@ const PeekBody = (props: {
   readonly expanded: boolean
   readonly toggleExpanded: () => void
   readonly openThread: OpenThread
+  readonly agentForThread: (sessionId: string) => Promise<{ readonly name: string } | null>
   readonly select: (id: number) => void
   readonly close: () => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
@@ -783,8 +826,16 @@ const PeekBody = (props: {
                   attention={item.attention ?? 'none'}
                   onPick={attention => actions.update.mutate({ id: item.id, attention })}
                 />
-                <span className="dshx:ml-1">
-                  <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} />
+                <span className="dshx:ml-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+                  {item.actors.map(actor => (
+                    <AgentThreadChip
+                      key={actor.id}
+                      actorId={actor.id}
+                      threads={props.threads}
+                      agentForThread={props.agentForThread}
+                      openThread={props.openThread}
+                    />
+                  ))}
                 </span>
               </div>
               <TagsField id={item.id} tags={item.tags} />
@@ -914,6 +965,7 @@ const ItemPeek = (props: {
   readonly expanded: boolean
   readonly toggleExpanded: () => void
   readonly openThread: OpenThread
+  readonly agentForThread: (sessionId: string) => Promise<{ readonly name: string } | null>
   readonly select: (id: number) => void
   readonly close: () => void
   readonly embedded?: boolean
@@ -951,6 +1003,7 @@ const ItemPeek = (props: {
           expanded={props.expanded}
           toggleExpanded={props.toggleExpanded}
           openThread={props.openThread}
+          agentForThread={props.agentForThread}
           select={props.select}
           close={props.close}
           startThread={props.startThread}

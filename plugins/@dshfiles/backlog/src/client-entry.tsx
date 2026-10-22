@@ -157,6 +157,14 @@ export default defineClient({
               const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
               if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
             }}
+            agentForThread={async sessionId => {
+              try {
+                const result = await agents.threadAgent({ sessionId })
+                return result.agent === null ? null : { name: result.agent.name }
+              } catch {
+                return null
+              }
+            }}
           />
         </AgentDispatchProvider>
       </PluginQueryProvider>
