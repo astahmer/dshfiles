@@ -54,7 +54,8 @@ export const useBacklogActions = () => {
   })
   const applyProposal = useMutation({ mutationFn: (id: number) => api.applyProposal({ id }), onSuccess: invalidate })
   const dismissProposal = useMutation({ mutationFn: (id: number) => api.dismissProposal({ id }), onSuccess: invalidate })
-  return { patch, update, capture, link, comment, attachFile, removeFile, triage, backfillTriage, applyProposal, dismissProposal }
+  const deleteItem = useMutation({ mutationFn: (input: Parameters<typeof api.delete>[0]) => api.delete(input), onSuccess: invalidate })
+  return { patch, update, capture, link, comment, attachFile, removeFile, triage, backfillTriage, applyProposal, dismissProposal, delete: deleteItem }
 }
 
 export class BacklogQueries {

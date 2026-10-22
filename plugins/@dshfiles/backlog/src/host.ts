@@ -661,6 +661,10 @@ const backlogApiHost = backlogApi.host({
     return { ok: true, value: { dataUrl: result.value.dataUrl, path } }
   },
   removeFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).removeFile({ ...input, actor: actorOf(caller) }),
+  delete: async ({ ctx, input }) => {
+    const result = await (await backlogFor(ctx)).delete(input)
+    return result.ok ? { ok: true } : result
+  },
   speechStatus: ({ ctx }) => speechStatusOf(ctx),
   jevSetupStatus: async ({ ctx }) => {
     const settings = currentSettings()

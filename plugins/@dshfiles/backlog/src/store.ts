@@ -102,6 +102,7 @@ export interface BacklogStore {
   attachFile(input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   readFile(input: { readonly id: number; readonly attachmentId: string }): Promise<BacklogResult<{ readonly dataUrl: string }>>
   removeFile(input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
+  delete(input: { readonly id: number; readonly confirm: boolean }): Promise<BacklogResult<void>>
   update(input: BacklogUpdate & { readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   link(input: {
     readonly id: number
@@ -454,6 +455,21 @@ const createBacklogStore = ({
           { attachments: item.attachments.filter(candidate => candidate.id !== attachmentId) },
         ),
       }
+    },
+    delete: async ({ id, confirm }) => {
+      if (confirm !== true) throw new Error('Deleting a backlog item requires explicit confirmation')
+      if (!records.has(id)) return { ok: false, reason: 'not-found' }
+      for (const [key, record] of files.entries()) {
+        if (record.itemId === id) await files.delete(key)
+      }
+      records.delete(id)
+      revision = Math.max(revision + 1, now())
+      const result = writes.then(async () => {
+        await items.delete(String(id))
+      })
+      writes = result.catch(() => undefined)
+      await result.catch(reportError)
+      return { ok: true, value: undefined }
     },
     update: async ({ id, actor, ...fields }) => {
       const item = find(id)

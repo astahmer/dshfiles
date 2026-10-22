@@ -236,6 +236,18 @@ export const backlogApi = defineApi({
       description: `Remove one image or file from a backlog item. ${writeNote}`,
       tool: { name: 'backlog_remove_file', readOnly: false },
     }),
+    delete: method({
+      input: z
+        .object({ id: idSchema, confirm: z.literal(true).describe('Explicit opt-in acknowledging this permanently deletes the item and its attachments.') })
+        .strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({ ok: z.literal(true) }).strict(),
+        z.object({ ok: z.literal(false), reason: z.literal('not-found') }).strict(),
+      ]),
+      description:
+        'Permanently delete a backlog item and its attachments. This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true. Use it when the user asked, never to rewrite items unrelated to the task.',
+      tool: { name: 'backlog_delete', readOnly: false },
+    }),
     speechStatus: method({
       input: z.void(),
       output: speechStatusSchema,

@@ -527,6 +527,29 @@ describe('attention and inbox', () => {
     expect(await store.readFile({ id: detail.item.id, attachmentId: 'image-one-1234' })).toEqual({ ok: false, reason: 'not-found' })
   })
 
+  it('permanently deletes an item and all its attachments only with explicit confirmation', async () => {
+    const items = memoryTable<BacklogItem>()
+    const files = memoryFiles()
+    const store = BacklogModel.createStore({ items, files, now: () => 1_000 })
+    const created = await store.capture({
+      text: 'mistaken capture',
+      files: [{ id: 'delete-file-123', kind: 'file', name: 'draft.txt', mediaType: 'text/plain', bytes: 3, data: 'aGk=' }],
+      actor: user,
+    })
+    await store.flush()
+
+    await expect(store.delete({ id: created.item.id, confirm: false })).rejects.toThrow('explicit confirmation')
+    expect(store.get(created.item.id).ok).toBe(true)
+    const deleted = await store.delete({ id: created.item.id, confirm: true })
+    await store.flush()
+
+    expect(deleted).toEqual({ ok: true, value: undefined })
+    expect(store.get(created.item.id)).toEqual({ ok: false, reason: 'not-found' })
+    expect(files.rows.size).toBe(0)
+    expect(items.rows.size).toBe(0)
+    expect(await store.delete({ id: created.item.id, confirm: true })).toEqual({ ok: false, reason: 'not-found' })
+  })
+
   it('keeps the images a comment carries on its own event and reads them back', async () => {
     const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1_000 })
     await store.capture({ text: 'the description can hold screenshots', actor: user })

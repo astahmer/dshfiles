@@ -11,14 +11,17 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
-import { FolderIcon, MessagesSquareIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
-import type { ReactNode } from 'react'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import { FolderIcon, MessagesSquareIcon, PinIcon, Trash2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { errorMessage } from '@dshfiles/plugin-ui/query'
+import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
-import type { BacklogUpdateInput } from './use-backlog-actions.js'
+import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
 
 const NO_PROJECT = 'no-project'
 type BacklogMenuItem = Pick<BacklogSummaryView, 'id' | 'title' | 'kind' | 'status' | 'project' | 'pinned'> & {
@@ -41,6 +44,8 @@ export const BacklogItemMenu = (props: {
   readonly children: ReactNode
 }): JSX.Element => {
   const item = props.item
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const actions = useBacklogActions()
   const attention = item.attention ?? 'none'
   const selection = props.selection !== undefined && props.selection.length > 1 ? props.selection : [startThreadItemOf(item)]
   const applyToSelection = (action: (id: number) => void): void => {
@@ -50,118 +55,160 @@ export const BacklogItemMenu = (props: {
   const update = (change: Omit<BacklogUpdateInput, 'id'>): void => applyToSelection(id => props.update({ id, ...change }))
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
-      <ContextMenuContent className="dshx-root dshx:min-w-52">
-        <ContextMenuLabel className="dshx:max-w-64 dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-          {selection.length > 1 ? `${String(selection.length)} selected · ` : null}b:{item.id} · {item.title}
-        </ContextMenuLabel>
-        <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
-          <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
-          {selection.length > 1 ? `Start thread for ${String(selection.length)} items…` : 'Start thread…'}
-        </ContextMenuItem>
-        {props.openItem === undefined ? null : (
-          <ContextMenuItem className="dshx:text-[13px]" onSelect={() => props.openItem?.(item.id)}>
-            <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-            Open item
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
+        <ContextMenuContent className="dshx-root dshx:min-w-52">
+          <ContextMenuLabel className="dshx:max-w-64 dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+            {selection.length > 1 ? `${String(selection.length)} selected · ` : null}b:{item.id} · {item.title}
+          </ContextMenuLabel>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
+            <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
+            {selection.length > 1 ? `Start thread for ${String(selection.length)} items…` : 'Start thread…'}
           </ContextMenuItem>
-        )}
-        <ContextMenuSeparator />
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
-            <ItemGlyphs.StatusIcon status={item.status} />
-            Status
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            <ContextMenuRadioGroup
-              value={item.status}
-              onValueChange={value => {
-                const status = BacklogItems.statuses.find(candidate => candidate === value)
-                if (status !== undefined) update({ status })
-              }}
+          {props.openItem === undefined ? null : (
+            <ContextMenuItem className="dshx:text-[13px]" onSelect={() => props.openItem?.(item.id)}>
+              <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+              Open item
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <ItemGlyphs.StatusIcon status={item.status} />
+              Status
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              <ContextMenuRadioGroup
+                value={item.status}
+                onValueChange={value => {
+                  const status = BacklogItems.statuses.find(candidate => candidate === value)
+                  if (status !== undefined) update({ status })
+                }}
+              >
+                {BacklogItems.statuses.map(status => (
+                  <ContextMenuRadioItem key={status} value={status} className="dshx:text-[13px]">
+                    <ItemGlyphs.StatusIcon status={status} />
+                    {ItemGlyphs.statusLabels[status]}
+                  </ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <ItemGlyphs.KindIcon kind={item.kind} />
+              Kind
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              <ContextMenuRadioGroup
+                value={item.kind}
+                onValueChange={value => {
+                  const kind = BacklogItems.kinds.find(candidate => candidate === value)
+                  if (kind !== undefined) update({ kind })
+                }}
+              >
+                {BacklogItems.kinds.map(kind => (
+                  <ContextMenuRadioItem key={kind} value={kind} className="dshx:text-[13px]">
+                    <ItemGlyphs.KindIcon kind={kind} />
+                    {ItemGlyphs.kindLabels[kind]}
+                  </ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              {attention === 'none' ? (
+                <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+              ) : (
+                <ItemGlyphs.AttentionBadge attention={attention} compact />
+              )}
+              Attention
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              <ContextMenuRadioGroup
+                value={attention}
+                onValueChange={value => {
+                  const attention = BacklogItems.attentions.find(candidate => candidate === value)
+                  if (attention !== undefined) update({ attention })
+                }}
+              >
+                {BacklogItems.attentions.map(attention => (
+                  <ContextMenuRadioItem key={attention} value={attention} className="dshx:text-[13px]">
+                    {attention === 'none' ? <span className="dshx:w-3.5" /> : <ItemGlyphs.AttentionBadge attention={attention} compact />}
+                    {ItemGlyphs.attentionLabels[attention]}
+                  </ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <FolderIcon aria-hidden className="dshx:size-3.5" />
+              Project
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-52">
+              <ContextMenuRadioGroup value={item.project ?? NO_PROJECT} onValueChange={value => update({ project: value === NO_PROJECT ? null : value })}>
+                <ContextMenuRadioItem value={NO_PROJECT} className="dshx:text-[13px]">
+                  No project
+                </ContextMenuRadioItem>
+                {props.projectPaths.map(project => (
+                  <ContextMenuRadioItem key={project} value={project} title={project} className="dshx:max-w-72 dshx:text-[13px]">
+                    <ItemGlyphs.ProjectDot project={project} />
+                    <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
+                  </ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSeparator />
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ pinned: !item.pinned })}>
+            <PinIcon aria-hidden className="dshx:size-3.5" />
+            {item.pinned ? 'Unpin item' : 'Pin item'}
+          </ContextMenuItem>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
+            <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
+            Run triage
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px] dshx:text-destructive" onSelect={() => setDeleteOpen(true)}>
+            <Trash2Icon aria-hidden className="dshx:size-3.5" />
+            Delete permanently…
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+      <Dialog open={deleteOpen} onOpenChange={open => (actions.delete.isPending ? undefined : setDeleteOpen(open))}>
+        <DialogContent className="dshx-root">
+          <DialogHeader>
+            <DialogTitle>Delete b:{item.id} permanently?</DialogTitle>
+            <DialogDescription>
+              This permanently removes “{item.title}” and its attachments. This cannot be undone. Dropping the item keeps it in your backlog.
+            </DialogDescription>
+          </DialogHeader>
+          {actions.delete.error === null ? null : (
+            <p className="dshx:text-xs dshx:text-destructive">{errorMessage(actions.delete.error, 'Could not delete this item.')}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={actions.delete.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={actions.delete.isPending}
+              onClick={() =>
+                void actions.delete
+                  .mutateAsync({ id: item.id, confirm: true })
+                  .then(() => setDeleteOpen(false))
+                  .catch(() => undefined)
+              }
             >
-              {BacklogItems.statuses.map(status => (
-                <ContextMenuRadioItem key={status} value={status} className="dshx:text-[13px]">
-                  <ItemGlyphs.StatusIcon status={status} />
-                  {ItemGlyphs.statusLabels[status]}
-                </ContextMenuRadioItem>
-              ))}
-            </ContextMenuRadioGroup>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
-            <ItemGlyphs.KindIcon kind={item.kind} />
-            Kind
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            <ContextMenuRadioGroup
-              value={item.kind}
-              onValueChange={value => {
-                const kind = BacklogItems.kinds.find(candidate => candidate === value)
-                if (kind !== undefined) update({ kind })
-              }}
-            >
-              {BacklogItems.kinds.map(kind => (
-                <ContextMenuRadioItem key={kind} value={kind} className="dshx:text-[13px]">
-                  <ItemGlyphs.KindIcon kind={kind} />
-                  {ItemGlyphs.kindLabels[kind]}
-                </ContextMenuRadioItem>
-              ))}
-            </ContextMenuRadioGroup>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
-            {attention === 'none' ? <span aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : <ItemGlyphs.AttentionBadge attention={attention} compact />}
-            Attention
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            <ContextMenuRadioGroup
-              value={attention}
-              onValueChange={value => {
-                const attention = BacklogItems.attentions.find(candidate => candidate === value)
-                if (attention !== undefined) update({ attention })
-              }}
-            >
-              {BacklogItems.attentions.map(attention => (
-                <ContextMenuRadioItem key={attention} value={attention} className="dshx:text-[13px]">
-                  {attention === 'none' ? <span className="dshx:w-3.5" /> : <ItemGlyphs.AttentionBadge attention={attention} compact />}
-                  {ItemGlyphs.attentionLabels[attention]}
-                </ContextMenuRadioItem>
-              ))}
-            </ContextMenuRadioGroup>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
-            <FolderIcon aria-hidden className="dshx:size-3.5" />
-            Project
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-52">
-            <ContextMenuRadioGroup value={item.project ?? NO_PROJECT} onValueChange={value => update({ project: value === NO_PROJECT ? null : value })}>
-              <ContextMenuRadioItem value={NO_PROJECT} className="dshx:text-[13px]">
-                No project
-              </ContextMenuRadioItem>
-              {props.projectPaths.map(project => (
-                <ContextMenuRadioItem key={project} value={project} title={project} className="dshx:max-w-72 dshx:text-[13px]">
-                  <ItemGlyphs.ProjectDot project={project} />
-                  <span className="dshx:min-w-0 dshx:truncate">{ItemGlyphs.projectName(project)}</span>
-                </ContextMenuRadioItem>
-              ))}
-            </ContextMenuRadioGroup>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ pinned: !item.pinned })}>
-          <PinIcon aria-hidden className="dshx:size-3.5" />
-          {item.pinned ? 'Unpin item' : 'Pin item'}
-        </ContextMenuItem>
-        <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
-          <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-          Run triage
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+              <Trash2Icon aria-hidden className="dshx:size-3.5" />
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
