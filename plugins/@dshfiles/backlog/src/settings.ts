@@ -52,7 +52,7 @@ export const backlogSettings = defineSettings({
     startThreadOpensCreated: Schema.boolean()
       .default(false)
       .description(
-        'Open a thread the start-thread dialog created as soon as it exists. Off leaves you where you were; the thread shows up in the sidebar, linked to its items, and the report offers to open it. A comment that mentions an agent never opens the thread it starts.',
+        'Open threads started from a backlog item as soon as they exist, including threads started by an @agent comment. Off leaves you where you were and the report offers to open the thread; the dialog checkbox overrides this setting for one thread.',
       ),
     revisionRepositories: Schema.array(Schema.string())
       .default([])

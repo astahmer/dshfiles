@@ -498,7 +498,11 @@ const Conversation = (props: {
   )
 }
 
-const CommentBox = (props: { readonly item: StartThreadItem; readonly threads: readonly ComposerThread[] }): JSX.Element => {
+const CommentBox = (props: {
+  readonly item: StartThreadItem
+  readonly threads: readonly ComposerThread[]
+  readonly openCreatedByDefault: boolean
+}): JSX.Element => {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
@@ -533,7 +537,7 @@ const CommentBox = (props: { readonly item: StartThreadItem; readonly threads: r
       // A dispatched reply carries its images with the item, so the thread can read them once it starts.
       for (const file of files) await actions.attachFile.mutateAsync({ id: props.item.id, file: fileInput(file) })
       if (files.length > 0) attachments.clear()
-      const outcome = await dispatch.dispatch({ item: props.item, text })
+      const outcome = await dispatch.dispatch({ item: props.item, text, open: props.openCreatedByDefault })
       if (outcome.kind === 'dispatched') setText('')
       else if (outcome.kind === 'failed') setFailed(outcome.reason)
       else comment([])
@@ -668,6 +672,7 @@ const PeekBody = (props: {
   readonly select: (id: number) => void
   readonly close: () => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
+  readonly openCreatedByDefault: boolean
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -888,7 +893,11 @@ const PeekBody = (props: {
               threadLabel={threadLabel}
               openThread={props.openThread}
             />
-            <CommentBox item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }} threads={props.threads} />
+            <CommentBox
+              item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
+              threads={props.threads}
+              openCreatedByDefault={props.openCreatedByDefault}
+            />
           </Section>
         </div>
       </div>
@@ -908,6 +917,7 @@ const ItemPeek = (props: {
   readonly close: () => void
   readonly embedded?: boolean
   readonly startThread: (items: readonly StartThreadItem[]) => void
+  readonly openCreatedByDefault: boolean
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)
@@ -943,6 +953,7 @@ const ItemPeek = (props: {
           select={props.select}
           close={props.close}
           startThread={props.startThread}
+          openCreatedByDefault={props.openCreatedByDefault}
           projectPaths={props.projectPaths}
         />
       ) : (

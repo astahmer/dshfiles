@@ -130,14 +130,13 @@ leaves it as an editable draft, and the dialog's _Send this message now_ box ove
 links the item to the thread (provenance `user`, or `agent` when an agent started it).
 
 It does not take you to the thread by default: you stay where you were, and the report carries an **Open** action.
-Settings → `dshfiles-backlog` → _Open the thread when it is created_ — or the dialog's own _Open the thread when it is
-created_ box, which overrides the setting for one thread — opens it instead. A comment that mentions an agent never
-opens the thread it starts; the same report offers it.
+Settings → `dshfiles-backlog` → _Open threads started from a backlog item_ opens them instead; the dialog's own _Open the
+thread when it is created_ box overrides that setting for one thread. An `@agent` comment follows the same setting.
 
 Agents start the same thread through `backlog_start_thread` (`startThread` on the Host): the item ids, and optionally a
 project workspace or bare folder, an agent handle, an account/model, the first message and whether to send it. The panel
-and the tool share one Host verb, so a thread an agent starts is the thread the dialog starts, and neither redirects the
-caller.
+and the tool share one Host verb, so a thread an agent starts is the thread the dialog starts. The tool itself does not
+navigate the calling thread.
 
 A thread started from an item always runs in its own jj workspace of the chosen project, whatever the
 isolate-by-default setting says: work captured in the backlog is independent, so it never shares a checkout

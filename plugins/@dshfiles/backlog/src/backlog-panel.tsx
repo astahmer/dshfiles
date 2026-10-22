@@ -446,6 +446,7 @@ export const BacklogPanel = (props: {
         select={select}
         projectPaths={projectPaths}
         startThread={openStartThread}
+        openCreatedByDefault={settings.value?.startThreadOpensCreated ?? false}
         close={() => {
           setOpenId(null)
           setExpanded(false)

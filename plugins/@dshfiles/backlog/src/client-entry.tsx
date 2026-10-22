@@ -131,7 +131,7 @@ export default defineClient({
           return []
         }
       },
-      dispatch: async ({ item, text }) => {
+      dispatch: async ({ item, text, open }) => {
         const mention = AgentComments.mention(text)
         if (mention === null) return { kind: 'skipped', reason: 'no-mention' }
         let agent
@@ -145,7 +145,9 @@ export default defineClient({
         if (!agent.enabled) return { kind: 'skipped', reason: 'disabled-agent' }
         const projects = startThreadPorts.listProjects()
         const items = [item]
-        const started = await startThreadPorts.start(AgentComments.request({ items, agent, task: mention.task, target: defaultTargetFor(items, projects) }))
+        const started = await startThreadPorts.start(
+          AgentComments.request({ items, agent, task: mention.task, target: defaultTargetFor(items, projects), open }),
+        )
         if (!started.ok) return { kind: 'failed', reason: started.reason }
         await api.safe.comment({ id: item.id, text })
         return { kind: 'dispatched' }

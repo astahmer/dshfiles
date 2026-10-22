@@ -19,7 +19,7 @@ export interface AgentChoice {
 
 /** The Host lookup and thread start the comment box needs; owned by the client entry. */
 export interface AgentDispatchPort {
-  dispatch(input: { readonly item: StartThreadItem; readonly text: string }): Promise<AgentDispatchOutcome>
+  dispatch(input: { readonly item: StartThreadItem; readonly text: string; readonly open: boolean }): Promise<AgentDispatchOutcome>
   /** Enabled agents, loaded once when an `@` is typed; an unavailable agents bundle answers an empty list. */
   choices(): Promise<readonly AgentChoice[]>
 }
@@ -57,14 +57,15 @@ export class AgentComments {
   /**
    * The start-thread request for an agent comment: the agent's preset and route, the item context the thread must name,
    * and the comment text. The Host prepends the agent's identity and instructions to the message it is handed. The
-   * caller supplies the target because only it knows the projects. A dispatch never opens the thread it starts: the
-   * comment box keeps the item in front of the user, and the report the start writes offers the thread instead.
+   * caller supplies the target because only it knows the projects. Opening follows the backlog setting: off keeps the
+   * comment box in front of the user, and the report the start writes offers the thread instead.
    */
   static request(input: {
     readonly items: readonly StartThreadItem[]
     readonly agent: Agent
     readonly task: string
     readonly target: StartThreadTarget
+    readonly open?: boolean
   }): StartThreadRequest {
     const task = input.task.trim()
     const context = StartThreadForm.message(input.items)
@@ -77,7 +78,7 @@ export class AgentComments {
       reasoningEffort: undefined,
       message: task === '' ? context : `${context}\n\n${task}`,
       send: true,
-      open: false,
+      open: input.open ?? false,
     }
   }
 }
