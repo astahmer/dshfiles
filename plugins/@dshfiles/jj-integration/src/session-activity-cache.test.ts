@@ -14,7 +14,7 @@ const deferred = <Value>() => {
 
 const cacheOf = (
   read: (signal: AbortSignal) => Promise<SessionActivity | undefined>,
-  options: { readonly now?: () => number; readonly guardBudgetMs?: number; readonly guardAttempts?: number } = {},
+  options: { readonly now?: () => number; readonly guardBudgetMs?: number; readonly guardAttempts?: number; readonly guardCeilingMs?: number } = {},
 ) =>
   createSessionActivityCache({
     read,
@@ -22,7 +22,7 @@ const cacheOf = (
     displayBudgetMs: 2_500,
     guardBudgetMs: options.guardBudgetMs ?? 15_000,
     guardAttempts: options.guardAttempts ?? 2,
-    guardCeilingMs: 60_000,
+    guardCeilingMs: options.guardCeilingMs ?? 60_000,
     ...(options.now === undefined ? {} : { now: options.now }),
   })
 
@@ -44,7 +44,7 @@ describe('session activity cache', () => {
     expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['waiting-session'], activity)).toBe(false)
   })
 
-  test('an absent Session remains unknown for the workspace guard', async () => {
+  test('an absent Session stays unknown for a guard with no snapshot to confirm it', async () => {
     const activity = await readWorkspaceSessionActivity({
       sessionIds: ['readable-session', 'absent-session'],
       signal: new AbortController().signal,
@@ -54,6 +54,38 @@ describe('session activity cache', () => {
 
     expect(activity.get('absent-session')).toEqual({ running: undefined, pendingUserQuestion: undefined })
     expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['readable-session', 'absent-session'], activity)).toBeUndefined()
+  })
+
+  test('a Session the full snapshot confirms is gone does not keep the workspace unverifiable', async () => {
+    let fallbackReads = 0
+    const activity = await readWorkspaceSessionActivity({
+      sessionIds: ['readable-session', 'deleted-session'],
+      signal: new AbortController().signal,
+      getRunning: () => false,
+      readProjections: async sessionId => (sessionId === 'deleted-session' ? null : { values: { userQuestions: { active: [] } } }),
+      readFallback: async sessionIds => {
+        fallbackReads += 1
+        expect(sessionIds).toEqual(['deleted-session'])
+        return new Map()
+      },
+    })
+
+    expect(fallbackReads).toBe(1)
+    expect(activity.get('deleted-session')).toEqual({ running: false, pendingUserQuestion: false })
+    expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['readable-session', 'deleted-session'], activity)).toBe(true)
+  })
+
+  test('an absent Session the full snapshot still knows keeps the snapshot activity', async () => {
+    const activity = await readWorkspaceSessionActivity({
+      sessionIds: ['absent-session'],
+      signal: new AbortController().signal,
+      getRunning: () => false,
+      readProjections: async () => null,
+      readFallback: async () => new Map([['absent-session', { running: false, pendingUserQuestion: true }]]),
+    })
+
+    expect(activity.get('absent-session')).toEqual({ running: false, pendingUserQuestion: true })
+    expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['absent-session'], activity)).toBe(false)
   })
 
   test('an unavailable scoped read falls back to the full activity snapshot', async () => {
@@ -242,13 +274,29 @@ describe('session activity cache', () => {
     expect(reads).toBe(1)
   })
 
-  test('a guard read that never settles reports unknown once every attempt elapsed', async () => {
+  test('a guard read that never settles reports unknown once its ceiling elapsed', async () => {
     const cache = cacheOf(async () => await new Promise<SessionActivity | undefined>(() => undefined), {
       guardBudgetMs: 10,
       guardAttempts: 2,
+      guardCeilingMs: 40,
     })
 
     await expect(cache.guard()).resolves.toBeUndefined()
+  })
+
+  test('a slow read that answers after every budget still decides instead of reporting unknown', async () => {
+    const pending = deferred<SessionActivity | undefined>()
+    const cache = cacheOf(async () => await pending.promise, {
+      guardBudgetMs: 10,
+      guardAttempts: 2,
+      guardCeilingMs: 500,
+    })
+
+    const guarded = cache.guard()
+    // Past both budgeted attempts, well inside the ceiling the same read was opened with.
+    await new Promise(done => setTimeout(done, 40))
+    pending.resolve(activityOf('session-a', false))
+    await expect(guarded).resolves.toEqual(activityOf('session-a', false))
   })
 
   test('a guard read that came back empty is read again within its attempts', async () => {

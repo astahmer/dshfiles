@@ -22,6 +22,7 @@ export const readWorkspaceSessionActivity = async (input: {
   const sessionIds = [...new Set(input.sessionIds)]
   let nextIndex = 0
   const unavailableSessionIds: string[] = []
+  const absentSessionIds: string[] = []
   const readNext = async (): Promise<void> => {
     while (nextIndex < sessionIds.length) {
       input.signal.throwIfAborted()
@@ -31,19 +32,20 @@ export const readWorkspaceSessionActivity = async (input: {
       try {
         const projections = await input.readProjections(sessionId, input.signal)
         input.signal.throwIfAborted()
-        activity.set(
-          sessionId,
-          projections === null
-            ? { running: undefined, pendingUserQuestion: undefined }
-            : {
-                running: input.getRunning(sessionId),
-                pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(
-                  projections.values.userQuestions == null ? undefined : { userQuestions: projections.values.userQuestions },
-                ),
-                title: projections.values.title ?? undefined,
-                blank: projections.values.sessionListMetadata?.blank,
-              },
-        )
+        if (projections === null) {
+          // Neither live nor stored: the full snapshot then confirms whether the Session really is gone.
+          absentSessionIds.push(sessionId)
+          activity.set(sessionId, { running: undefined, pendingUserQuestion: undefined })
+          continue
+        }
+        activity.set(sessionId, {
+          running: input.getRunning(sessionId),
+          pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(
+            projections.values.userQuestions == null ? undefined : { userQuestions: projections.values.userQuestions },
+          ),
+          title: projections.values.title ?? undefined,
+          blank: projections.values.sessionListMetadata?.blank,
+        })
       } catch (error) {
         input.signal.throwIfAborted()
         if (error instanceof Error && error.name === 'AbortError') throw error
@@ -54,24 +56,32 @@ export const readWorkspaceSessionActivity = async (input: {
   }
   await Promise.all(Array.from({ length: Math.min(WORKSPACE_ACTIVITY_READ_CONCURRENCY, sessionIds.length) }, () => readNext()))
   input.signal.throwIfAborted()
-  if (unavailableSessionIds.length > 0 && input.readFallback !== undefined) {
-    try {
-      const fallbackActivity = await input.readFallback(unavailableSessionIds, input.signal)
-      input.signal.throwIfAborted()
-      for (const sessionId of unavailableSessionIds) {
-        const fallback = fallbackActivity?.get(sessionId)
-        if (fallback !== undefined) activity.set(sessionId, fallback)
-      }
-    } catch {
-      input.signal.throwIfAborted()
+  const unresolvedSessionIds = [...unavailableSessionIds, ...absentSessionIds]
+  if (unresolvedSessionIds.length === 0 || input.readFallback === undefined) return activity
+  let fallbackActivity: SessionActivity | undefined
+  try {
+    fallbackActivity = await input.readFallback(unresolvedSessionIds, input.signal)
+    input.signal.throwIfAborted()
+  } catch {
+    input.signal.throwIfAborted()
+    return activity
+  }
+  const absent = new Set(absentSessionIds)
+  for (const sessionId of unresolvedSessionIds) {
+    const fallback = fallbackActivity?.get(sessionId)
+    if (fallback !== undefined) {
+      activity.set(sessionId, fallback)
+      continue
     }
+    // The full snapshot does not know it either, so nothing can be running in it or waiting on an answer.
+    if (absent.has(sessionId)) activity.set(sessionId, { running: input.getRunning(sessionId) ?? false, pendingUserQuestion: false })
   }
   return activity
 }
 
 /** A resolved read, tagged so a caller can tell "nothing came back yet" from "the read came back empty". */
 type Settled<Value> = { readonly value: Value }
-type ActivityScan = { readonly promise: Promise<SessionActivity | undefined> }
+type ActivityScan = { readonly promise: Promise<SessionActivity | undefined>; readonly startedAt: number }
 
 const readWithin = async (read: (signal: AbortSignal) => Promise<SessionActivity | undefined>, budgetMs: number): Promise<SessionActivity | undefined> => {
   try {
@@ -136,7 +146,7 @@ export const createSessionActivityCache = (options: {
   const beginGuardScan = (): ActivityScan => {
     if (guardScan !== undefined) return guardScan
     const promise = options.read(AbortSignal.timeout(options.guardCeilingMs)).then(publish, () => undefined)
-    const scan = { promise }
+    const scan = { promise, startedAt: now() }
     guardScan = scan
     void promise.then(() => {
       if (guardScan === scan) guardScan = undefined
@@ -157,7 +167,7 @@ export const createSessionActivityCache = (options: {
         value => value,
         () => undefined,
       ) ?? Promise.resolve(undefined)
-    const scan = { promise }
+    const scan = { promise, startedAt: now() }
     workspaceGuardScans.set(key, scan)
     void promise.then(() => {
       if (workspaceGuardScans.get(key) === scan) workspaceGuardScans.delete(key)
@@ -166,15 +176,23 @@ export const createSessionActivityCache = (options: {
   }
 
   const guard = async (sessionIds?: readonly string[]): Promise<SessionActivity | undefined> => {
-    let lastAnswer: SessionActivity | undefined
+    let unfinished: ActivityScan | undefined
     for (let attempt = 1; attempt <= options.guardAttempts; attempt += 1) {
       const scan = sessionIds === undefined ? beginGuardScan() : beginWorkspaceGuardScan(sessionIds)
       const settled = await settleWithin(scan.promise, options.guardBudgetMs)
-      if (settled === undefined) continue
-      lastAnswer = settled.value
-      if (lastAnswer !== undefined) return lastAnswer
+      // A read that already failed does not get faster on the next wait; a fresh one may still answer.
+      if (settled === undefined) {
+        unfinished = scan
+        continue
+      }
+      unfinished = undefined
+      if (settled.value !== undefined) return settled.value
     }
-    return lastAnswer
+    if (unfinished === undefined) return undefined
+    // Slow is not unreadable: the last read keeps what is left of its own ceiling instead of answering unknown.
+    const remaining = Math.max(0, options.guardCeilingMs - (now() - unfinished.startedAt))
+    const settled = await settleWithin(unfinished.promise, remaining)
+    return settled?.value
   }
 
   const reset = (): void => {
