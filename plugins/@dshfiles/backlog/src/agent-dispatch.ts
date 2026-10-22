@@ -1,5 +1,6 @@
 import { Agents, type Agent, type AgentIdentity } from '@dshfiles/agents/contract'
 
+import type { BacklogFileInput } from './item.js'
 import type { StartThreadAgent, StartThreadItem, StartThreadRequest, StartThreadTarget } from './start-thread.js'
 import { StartThreadForm } from './start-thread.js'
 
@@ -19,7 +20,12 @@ export interface AgentChoice {
 
 /** The Host lookup and thread start the comment box needs; owned by the client entry. */
 export interface AgentDispatchPort {
-  dispatch(input: { readonly item: StartThreadItem; readonly text: string; readonly open: boolean }): Promise<AgentDispatchOutcome>
+  dispatch(input: {
+    readonly item: StartThreadItem
+    readonly text: string
+    readonly files: readonly BacklogFileInput[]
+    readonly open: boolean
+  }): Promise<AgentDispatchOutcome>
   /** Enabled agents, loaded once when an `@` is typed; an unavailable agents bundle answers an empty list. */
   choices(): Promise<readonly AgentChoice[]>
 }
@@ -52,6 +58,15 @@ export class AgentComments {
   static mention(text: string): { readonly handle: string; readonly task: string } | null {
     const mention = Agents.parseMention(text)
     return mention === null ? null : { handle: mention.handle, task: mention.text }
+  }
+
+  /** Reply files belong to the comment event, not the item's shared attachment list. */
+  static comment(input: { readonly id: number; readonly text: string; readonly files: readonly BacklogFileInput[] }): {
+    readonly id: number
+    readonly text: string
+    readonly files?: BacklogFileInput[]
+  } {
+    return input.files.length === 0 ? { id: input.id, text: input.text } : { ...input, files: [...input.files] }
   }
 
   /**
