@@ -297,21 +297,22 @@ interruption, forked-Session duplication).
 
 ## Progress (2026-10-22 run)
 
-| Task | State   | Receipt                                                                                                        |
-| ---- | ------- | -------------------------------------------------------------------------------------------------------------- |
-| T1   | done    | `jj:spqtwrnzmnkn` — projection keeps object `oneOf`; 7 api-registry tests pass                                 |
-| T2   | partial | `jj:xpmyrwyklvzw` — any positive `jj_load` limit, `ThreadError` is a `PluginApiError`                          |
-| T4   | done    | `jj:mktwwmlswtzk` — `apply_patch` plugin, wired into the web seed; 9 tests, lint and bundle import clean       |
-| T13  | done    | `jj:vtyusvmosyyx` — Definition of done in AGENTS.md                                                            |
-| T14  | done    | `jj:vtyusvmosyyx` — waiting table names `background_jobs_wait`                                                 |
-| T15  | done    | `jj:mrtrszptlmwp` — Host-side wait for jobs, no model polling; 23 background-jobs tests pass                   |
-| T16  | done    | `jj:tmsmwstyxwxz` — intent-to-tool table in `docs/agent-tool-parity.md`                                        |
-| T18  | done    | `jj:vtyusvmosyyx` — AGENTS.md 27,382 → 23,945 chars; `validate` has no over-budget warning                     |
-| T21  | partial | `jj:yswswrowkkky` — TTL 10 min, stopped Sessions skipped, scoped read without corpus listing                   |
-| T23  | done    | `jj:yqmqmxosxvzm` — reset-aware cooldown, sticky preflight, transport cooling, NO_ADAPTER preflight; 401 tests |
-| T24  | done    | `jj:yqmqmxosxvzm` — `priority` derived family chain: Codex↔Codex, OpenCode↔OpenCode, Claude excluded both ways |
-| T27  | partial | external commit `74171ab` in `astahmer/AGENTS`; the nixfiles flake input still pins the old commit             |
-| T28  | done    | ledger entry marked `validated`                                                                                |
+| Task | State   | Receipt                                                                                                                     |
+| ---- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| T1   | done    | `jj:spqtwrnzmnkn` — projection keeps object `oneOf`; 7 api-registry tests pass                                              |
+| T2   | partial | `jj:xpmyrwyklvzw` — any positive `jj_load` limit, `ThreadError` is a `PluginApiError`                                       |
+| T4   | done    | `jj:mktwwmlswtzk` — `apply_patch` plugin, wired into the web seed; 9 tests, lint and bundle import clean                    |
+| T13  | done    | `jj:vtyusvmosyyx` — Definition of done in AGENTS.md                                                                         |
+| T14  | done    | `jj:vtyusvmosyyx` — waiting table names `background_jobs_wait`                                                              |
+| T15  | done    | `jj:mrtrszptlmwp` — Host-side wait for jobs, no model polling; 23 background-jobs tests pass                                |
+| T16  | done    | `jj:tmsmwstyxwxz` — intent-to-tool table in `docs/agent-tool-parity.md`                                                     |
+| T18  | done    | `jj:vtyusvmosyyx` — AGENTS.md 27,382 → 23,945 chars; `validate` has no over-budget warning                                  |
+| T21  | partial | `jj:yswswrowkkky` — TTL 10 min, stopped Sessions skipped, scoped read without corpus listing                                |
+| T23  | done    | `jj:yqmqmxosxvzm` — reset-aware cooldown, sticky preflight, transport cooling, NO_ADAPTER preflight; 401 tests              |
+| T24  | done    | `jj:yqmqmxosxvzm` — `priority` derived family chain: Codex↔Codex, OpenCode↔OpenCode, Claude excluded both ways              |
+| T27  | partial | external commit `74171ab` in `astahmer/AGENTS`; the nixfiles flake input still pins the old commit                          |
+| T28  | done    | ledger entry marked `validated`                                                                                             |
+| T7   | done    | `jj:qywruurkkxns` — live `web_search` returns Brave sources with `page_age` dates; key resolves from `secret:brave-api-key` |
 
 ### Skipped in that run, and why
 
@@ -320,7 +321,8 @@ interruption, forked-Session duplication).
   the measured edit error rate does not drop.
 - **T5c/T5d** (tool-search, tool profiles): that work belongs to a live Session
   (`0e7f3adb…`, workspace `thread-8b729e`); coordinate before touching it.
-- **T6/T7** (fetch and search providers): a new owned plugin plus a Brave key.
+- **T6** (fetch provider): redirects and content types are still the base
+  `http` provider; T7 covered search only.
   Brave is approved; no `BRAVE_API_KEY` exists in the Secret Catalog or nixfiles.
 - **T9** (fff-search root guard), **T10** (checkout-sync auto-heal),
   **T12** (workspace_doctor), **T17** (delegation docs): S–M, next pass.
