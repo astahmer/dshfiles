@@ -92,7 +92,6 @@ export class AgentComments {
       model: null,
       reasoningEffort: undefined,
       message: task === '' ? context : `${context}\n\n${task}`,
-      send: true,
       open: input.open ?? false,
     }
   }

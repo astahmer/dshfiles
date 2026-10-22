@@ -49,7 +49,6 @@ test('an agent comment starts on the agent preset, route and instructions', () =
   })
   assert.equal(request.provider, null)
   assert.equal(request.model, null)
-  assert.equal(request.send, true)
   assert.equal(request.open, false)
   // The Host prepends the agent's identity and instructions to this text, so the request carries the task alone.
   assert.match(request.message, /^Work on b:12: Fix the flaky test/u)

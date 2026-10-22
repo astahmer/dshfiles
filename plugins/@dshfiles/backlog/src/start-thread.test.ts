@@ -1,32 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import type { BacklogSummaryView } from './api.js'
-import { BacklogViews } from './api.js'
-import { StartThreadForm } from './start-thread.js'
+import { StartThreadForm, type StartThreadItem } from './start-thread.js'
 
-const item = (fields: Partial<BacklogSummaryView> = {}): BacklogSummaryView =>
-  BacklogViews.summary({
-    id: 103,
-    title: 'right click backlog item -> start a thread',
-    kind: 'task',
-    status: 'doing',
-    project: null,
-    tags: [],
-    links: [],
-    actors: [{ id: 'user', role: 'owner' }],
-    pinned: false,
-    freshness: 'fresh',
-    createdAt: 1,
-    lastActivityAt: 2,
-    preview: '',
-    proposal: null,
-    attention: 'none',
-    acknowledgedAt: null,
-    snoozedUntil: null,
-    activity: { count: 0, agents: 0, comments: 0, last: null },
-    match: null,
-    ...fields,
-  })
+const item = (fields: Partial<StartThreadItem> = {}): StartThreadItem => ({
+  id: 103,
+  title: 'right click backlog item -> start a thread',
+  project: null,
+  preview: '',
+  ...fields,
+})
 
 const catalog = {
   default: { provider: 'opencode-go', model: 'deepseek-v4.1-flash', reasoningEffort: 'medium' },
@@ -79,6 +61,23 @@ describe('start thread form', () => {
     expect(StartThreadForm.defaultModelKey(decoded)).toBe('opencode-go/deepseek-v4.1-flash')
     const withoutDefault = { ...decoded, defaultProvider: 'gone', defaultModel: 'gone' }
     expect(StartThreadForm.defaultModelKey(withoutDefault)).toBe('opencode-go/deepseek-v4.1-flash')
+  })
+
+  it('displays home paths in familiar form and leaves other paths unchanged', () => {
+    expect(StartThreadForm.projectPath('/Users/astahmer/dev/dshfiles')).toBe('~/dev/dshfiles')
+    expect(StartThreadForm.projectPath('/home/jev/work')).toBe('~/work')
+    expect(StartThreadForm.projectPath('/tmp/work')).toBe('/tmp/work')
+  })
+
+  it('assigns distinct repeatable colors to project rows', () => {
+    expect([0, 1, 2, 3, 4].map(StartThreadForm.projectTone)).toEqual([
+      'dshx:bg-chart-1',
+      'dshx:bg-chart-2',
+      'dshx:bg-chart-3',
+      'dshx:bg-chart-4',
+      'dshx:bg-chart-5',
+    ])
+    expect(StartThreadForm.projectTone(5)).toBe(StartThreadForm.projectTone(0))
   })
 
   it('preselects the item project, a bare folder for an unregistered path, and the Host default without one', () => {
@@ -151,7 +150,6 @@ describe('start thread form', () => {
       model: null,
       reasoningEffort: undefined,
       message: 'Keep changes focused',
-      send: true,
       open: false,
     }
     const separate = StartThreadForm.requests(request)

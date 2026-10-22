@@ -1,4 +1,3 @@
-import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -26,16 +25,9 @@ import './client.css'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
 
-declare module '@deepseek-ai/dsh-api-session-controller/client' {
-  interface SessionReferenceSourceMap {
-    /** A thread the backlog just started for one item, retained while its first message is admitted. */
-    backlogStartThread: unknown
-  }
-}
-
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'conversation', 'inputTriggers'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers'],
   setup(ctx, decorate) {
     ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
     const api = createApiClient(ctx, backlogApi)
@@ -46,7 +38,7 @@ export default defineClient({
         return { ok: false, reason }
       }
       if (report) BacklogNotices.show({ text: StartThreadForm.starting(request.items), kind: 'progress', sessionId: null })
-      const start: Parameters<typeof api.safe.startThread>[0] = { ids: request.items.map(item => item.id), send: request.send }
+      const start: Parameters<typeof api.safe.startThread>[0] = { ids: request.items.map(item => item.id) }
       if (request.target.kind === 'project') start.workspaceId = request.target.projectId
       else if (request.target.kind === 'cwd') start.cwd = request.target.path
       if (request.agent !== undefined) start.agent = request.agent.handle
@@ -58,17 +50,6 @@ export default defineClient({
       if (!started.ok) return failed(started.error.message)
       // SAFETY: SessionId is a type-only brand over the Host-minted unique id returned for this request.
       const sessionId = started.value.sessionId as SessionId
-      if (!request.send && request.message !== '') {
-        const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
-        try {
-          await reference.ready
-          ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
-        } catch (cause) {
-          console.warn(`backlog: thread ${sessionId} started without its draft: ${String(cause)}`)
-        } finally {
-          reference.release()
-        }
-      }
       if (request.open) {
         try {
           ctx.uiWorkspace.openSession(sessionId)

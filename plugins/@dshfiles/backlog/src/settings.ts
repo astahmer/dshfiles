@@ -44,11 +44,6 @@ export const backlogSettings = defineSettings({
       .description(
         'Remember the project of the last capture, so the next item lands in the same project. Off starts every capture with no project unless the header filters by one.',
       ),
-    startThreadSendsFirstMessage: Schema.boolean()
-      .default(true)
-      .description(
-        'When a thread is started from an item, send its prefilled first message at once. Off opens the thread with that text as a draft you can edit before sending.',
-      ),
     startThreadOpensCreated: Schema.boolean()
       .default(false)
       .description(

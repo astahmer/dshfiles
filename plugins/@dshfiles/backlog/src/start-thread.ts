@@ -117,8 +117,6 @@ export interface StartThreadRequest {
   readonly model: string | null
   readonly reasoningEffort: string | undefined
   readonly message: string
-  /** Send the message as the thread's first turn; false leaves it as an editable draft. */
-  readonly send: boolean
   /** Open the created thread once it exists; false leaves the panel where it is. */
   readonly open: boolean
 }
@@ -157,6 +155,16 @@ export class StartThreadForm {
     return catalog.providers.flatMap(provider => provider.models.map(model => ({ key: `${provider.id}/${model.id}`, provider, model })))
   }
 
+  static projectPath(path: string): string {
+    return path.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, '~')
+  }
+
+  /** Distinct project tone within the visible list, matching the project glyphs used elsewhere in DSH. */
+  static projectTone(index: number): string {
+    const tones = ['dshx:bg-chart-1', 'dshx:bg-chart-2', 'dshx:bg-chart-3', 'dshx:bg-chart-4', 'dshx:bg-chart-5'] as const
+    return tones[index % tones.length] ?? tones[0]
+  }
+
   /** One item's own project preselects; a project-registered path wins over the same path taken as a bare folder. */
   static targets(items: readonly StartThreadItem[], projects: readonly StartThreadProject[]): StartThreadTargetOption[] {
     const registered = projects.map(project => ({
@@ -168,7 +176,13 @@ export class StartThreadForm {
     const bare =
       itemPath === null || projects.some(project => project.path === itemPath)
         ? []
-        : [{ value: `cwd:${itemPath}`, label: `${itemPath} (folder, no project)`, target: { kind: 'cwd', path: itemPath } as const }]
+        : [
+            {
+              value: `cwd:${itemPath}`,
+              label: `${StartThreadForm.projectPath(itemPath)} (folder, no project)`,
+              target: { kind: 'cwd', path: itemPath } as const,
+            },
+          ]
     const fallback = projects.length === 0 ? 'No workspace' : 'Host default workspace'
     return [...bare, { value: 'default', label: fallback, target: { kind: 'default' } as const }, ...registered]
   }

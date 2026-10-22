@@ -2,6 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 
@@ -28,7 +29,6 @@ export const StartThreadDialog = (props: {
   readonly loadCatalog: () => Promise<StartThreadCatalog>
   /** Every enabled agent, so the thread can start as one with its preset, route and instructions. */
   readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
-  readonly sendByDefault: boolean
   readonly openByDefault: boolean
   readonly start: (request: StartThreadRequest) => void
   readonly close: () => void
@@ -42,7 +42,6 @@ export const StartThreadDialog = (props: {
   const [mode, setMode] = useState<'together' | 'per-item'>('together')
   const [message, setMessage] = useState(() => StartThreadForm.message(props.items))
   const [instructions, setInstructions] = useState('')
-  const [send, setSend] = useState(props.sendByDefault)
   const [open, setOpen] = useState(props.openByDefault)
   const catalogQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'catalog'], queryFn: props.loadCatalog, staleTime: 30_000 })
   const agentsQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'agents'], queryFn: props.listAgents, staleTime: 30_000 })
@@ -53,9 +52,11 @@ export const StartThreadDialog = (props: {
   const selected = rows.find(row => row.key === selectedKey)
   const effortValue = effort ?? (selected === undefined ? undefined : StartThreadForm.defaultEffort(selected))
   const target = targets.find(option => option.value === targetValue)?.target ?? { kind: 'default' }
+  const projectIndex = (projectId: string): number => props.projects.findIndex(project => project.id === projectId)
   const projectOptions: readonly ComboboxOption[] = targets.map(option => {
     const optionTarget = option.target
-    const description = optionTarget.kind === 'project' ? props.projects.find(project => project.id === optionTarget.projectId)?.path : undefined
+    const project = optionTarget.kind === 'project' ? props.projects.find(candidate => candidate.id === optionTarget.projectId) : undefined
+    const description = project === undefined ? undefined : StartThreadForm.projectPath(project.path)
     return description === undefined ? { value: option.value, label: option.label } : { value: option.value, label: option.label, description }
   })
   const agentOptions: readonly ComboboxOption[] = [
@@ -96,7 +97,7 @@ export const StartThreadDialog = (props: {
     if (picked === null) return
     props.close()
     const startTarget = mode === 'per-item' && !targetWasChosen ? { kind: 'default' as const } : target
-    props.start({ items: props.items, mode, target: startTarget, ...picked, message: mode === 'per-item' ? instructions : picked.message, send, open })
+    props.start({ items: props.items, mode, target: startTarget, ...picked, message: mode === 'per-item' ? instructions : picked.message, open })
   }
 
   return (
@@ -135,6 +136,20 @@ export const StartThreadDialog = (props: {
                 setTargetValue(value)
               }}
               options={projectOptions}
+              renderOption={option => {
+                const project = props.projects.find(candidate => `project:${candidate.id}` === option.value)
+                return (
+                  <>
+                    {project === undefined ? null : (
+                      <span aria-hidden className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', StartThreadForm.projectTone(projectIndex(project.id)))} />
+                    )}
+                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{option.label}</span>
+                    {option.description === undefined ? null : (
+                      <span className="dshx:max-w-40 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{option.description}</span>
+                    )}
+                  </>
+                )
+              }}
               searchAbove={0}
               searchPlaceholder="Search workspaces and folders…"
               value={targetValue}
@@ -209,15 +224,6 @@ export const StartThreadDialog = (props: {
               className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
             />
             <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
-              <input
-                type="checkbox"
-                checked={send}
-                onChange={event => setSend(event.currentTarget.checked)}
-                disabled={mode === 'together' && message.trim() === ''}
-              />
-              Send this message now
-            </label>
-            <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
               <input type="checkbox" aria-label="Open the thread when it is created" checked={open} onChange={event => setOpen(event.currentTarget.checked)} />
               Open the thread when it is created
             </label>
@@ -228,14 +234,10 @@ export const StartThreadDialog = (props: {
                   ? `The thread is linked to all ${String(props.items.length)} items. `
                   : 'The thread is linked to this item. '}
               {mode === 'per-item' ? (
-                send ? (
-                  'Each thread starts with a message.'
-                ) : (
-                  'Each thread keeps its message as an editable draft.'
-                )
+                'Each thread starts with a message.'
               ) : (
                 <>
-                  {message.trim() === '' ? 'It is created empty' : send ? 'It is told what to work on' : 'It opens with the message as an editable draft'}
+                  {message.trim() === '' ? 'It is created empty' : 'It is told what to work on'}
                   {open ? ' and opens when it is ready.' : ', in the background, until you open it.'}
                 </>
               )}

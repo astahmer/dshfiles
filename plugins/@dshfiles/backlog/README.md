@@ -122,23 +122,23 @@ conversation.
 Right-click a feed entry, an Items row or a board card (or press **Start thread** in the peek header) to open
 the start-thread dialog. It prefills the item's own project when that path is a registered project, offers the
 other projects plus a bare folder for a project path the registry does not know, and lists every routable
-account/model from the Host catalog with the model's reasoning efforts. The first message is prefilled from
-the item (title plus preview) and can be cleared to open an empty draft instead.
+account/model from the Host catalog with the model's reasoning efforts. Project rows have distinct color dots and
+home paths display as `~/...`. The first message is prefilled from
+the item (title plus preview) and can be cleared to create an empty thread instead.
 
 Starting hands the request over and closes the dialog at once: the thread is created in the background, so a slow jj
 workspace never holds the panel. The banner says `Starting a thread for b:<n>…` while the workspace and the Session are
 built, then reports `Thread started for b:<n>`. The Host selects the account/model on the thread, names it after the
-item, sends the first message when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off
-leaves it as an editable draft, and the dialog's _Send this message now_ box overrides the setting for one thread), and
-links the item to the thread (provenance `user`, or `agent` when an agent started it).
+item, and sends its first message when one is present. Clearing the message creates an empty thread. The item is linked
+to the thread (provenance `user`, or `agent` when an agent started it).
 
 It does not take you to the thread by default: you stay where you were, and the report carries an **Open** action.
 Settings → `dshfiles-backlog` → _Open threads started from a backlog item_ opens them instead; the dialog's own _Open the
 thread when it is created_ box overrides that setting for one thread. An `@agent` comment follows the same setting.
 
 Agents start the same thread through `backlog_start_thread` (`startThread` on the Host): the item ids, and optionally a
-project workspace or bare folder, an agent handle, an account/model, the first message and whether to send it. The panel
-and the tool share one Host verb, so a thread an agent starts is the thread the dialog starts. The tool itself does not
+project workspace or bare folder, an agent handle, an account/model, and the first message. The panel and the tool share
+one Host verb, so a thread an agent starts is the thread the dialog starts. The tool itself does not
 navigate the calling thread.
 
 A thread started from an item always runs in its own jj workspace of the chosen project, whatever the

@@ -299,10 +299,6 @@ export const backlogApi = defineApi({
             .describe(
               "The thread's first message; the items' own headings by default. An agent's identity and instructions are prepended when `agent` is named.",
             ),
-          send: z
-            .boolean()
-            .default(true)
-            .describe('Send the message as the thread’s first turn; false creates the thread empty, for a caller that leaves a draft.'),
         })
         .strict(),
       output: z.object({ sessionId: z.string().min(1), linked: z.array(idSchema), missing: z.array(idSchema) }).strict(),

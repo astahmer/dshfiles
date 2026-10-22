@@ -927,7 +927,7 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked, sending immediately unless configured to keep an editable draft. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; change status, kind, attention or project; pin or unpin; run triage; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked, sending its first message immediately when one is present. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
@@ -949,28 +949,18 @@
         "click button \"Start thread\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
-        "fill textbox \"Comment\" \"@dsh fix\"",
-        "click button \"Reply\"",
-        "expect text \"Thread started for b:1*\"",
         "click button \"Start thread\"",
+        "click combobox \"Thread project\"",
+        "expect option \"sample*\"",
         "expect checkbox \"Open the thread when it is created\""
       ],
       "surfaces": ["client", "settings", "tool"],
       "configuration": [],
-      "states": [
-        "item-without-project",
-        "item-project-registered",
-        "item-project-unregistered",
-        "send-at-once",
-        "draft-only",
-        "stays-in-backlog",
-        "opened-on-request"
-      ],
+      "states": ["item-without-project", "item-project-registered", "item-project-unregistered", "send-at-once", "stays-in-backlog", "opened-on-request"],
       "failureModes": [
         "A thread the Host refuses is reported in a toast and no item link is written.",
         "A model switch that the Host rejects keeps the thread on the Host default model and the toast still offers it.",
         "An empty first message creates an empty thread instead of sending anything.",
-        "A blocked draft initialization leaves the thread open with an empty composer.",
         "A thread workspace that cannot be created is reported in a toast instead of starting the thread in a checkout another thread edits."
       ],
       "externalDependencies": [],
@@ -987,11 +977,6 @@
         },
         {
           "kind": "gherkin",
-          "id": "backlog.start-thread-draft",
-          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
-        },
-        {
-          "kind": "gherkin",
           "id": "backlog.multi-select-start-threads",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
@@ -1002,21 +987,33 @@
         },
         {
           "kind": "unit-test",
-          "id": "backlog-start-thread-project-targets",
+          "id": "backlog.start-thread-project-targets",
           "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
           "testName": "preselects the item project, a bare folder for an unregistered path, and the Host default without one"
         },
         {
           "kind": "unit-test",
-          "id": "backlog-start-thread-catalog",
+          "id": "backlog.start-thread-catalog",
           "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
           "testName": "lists one row per provider and model so equal model ids stay distinct"
         },
         {
           "kind": "unit-test",
-          "id": "backlog-start-thread-message",
+          "id": "backlog.start-thread-message",
           "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
           "testName": "opens with the item heading and appends the preview once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.start-thread-project-path",
+          "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
+          "testName": "displays home paths in familiar form and leaves other paths unchanged"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.start-thread-project-colors",
+          "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
+          "testName": "assigns distinct repeatable colors to project rows"
         },
         {
           "kind": "unit-test",

@@ -707,7 +707,6 @@ export const BacklogPanel = (props: {
           projects={props.startThread.listProjects()}
           loadCatalog={props.startThread.loadCatalog}
           listAgents={props.startThread.listAgents}
-          sendByDefault={settings.value?.startThreadSendsFirstMessage ?? true}
           openByDefault={settings.value?.startThreadOpensCreated ?? false}
           start={request => {
             // Creating the thread runs on in the background; the entry reports it in a toast wherever the user went.

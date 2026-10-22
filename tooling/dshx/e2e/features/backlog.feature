@@ -92,9 +92,9 @@ Feature: Backlog
     When backlog card b:1 is clicked
     And the Start thread button in the item detail is clicked
     Then the start thread dialog offers the account model and the Host default folder
-    And the start thread dialog sends the prefilled message by default
+    And the start thread dialog has no send-now toggle
     And the start thread dialog keeps the thread in the backlog by default
-    When the thread is started from the dialog without a first message
+    When the thread is started from the dialog with the prefilled first message
     Then the backlog panel stays open while the thread is created
     When the Backlog panel is opened again
     And backlog item b:1 is opened
@@ -136,19 +136,6 @@ Feature: Backlog
     When one thread per item is chosen
     And the selected backlog threads are started
     Then the backlog reports that two threads were started
-
-
-  @scenario:backlog.start-thread-draft
-  Scenario: Start a thread with the first message left as a draft
-    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
-    When a Command Code account backed by a local fake provider is added
-    And the Backlog panel is opened
-    And "Draft the thread starter" is captured
-    When backlog item b:1 is right-clicked for a thread
-    And the send-now box is unchecked
-    And the open-when-created box is checked
-    And the thread is started from the dialog with its message kept
-    Then the thread composer holds "Work on b:1: Draft the thread starter" as a draft
 
   @scenario:backlog.item-context-actions
   Scenario: Right-click actions follow items across backlog views

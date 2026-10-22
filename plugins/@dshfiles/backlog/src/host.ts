@@ -538,7 +538,6 @@ const startThreadForItems = async (
     readonly model?: string | undefined
     readonly reasoningEffort?: string | undefined
     readonly message?: string | undefined
-    readonly send: boolean
   },
   caller: ApiCaller,
 ): Promise<{ readonly sessionId: string; readonly linked: number[]; readonly missing: number[] }> => {
@@ -590,7 +589,7 @@ const startThreadForItems = async (
   } catch (error) {
     logFailure('Backlog thread kept its created title')(error)
   }
-  if (input.send && message !== '') {
+  if (message !== '') {
     try {
       // SAFETY: SessionRequestId is a type-only brand over a Host-minted unique id.
       const requestId = randomUUID() as SessionRequestId
