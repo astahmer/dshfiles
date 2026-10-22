@@ -62,8 +62,8 @@ Feature: jj thread workspaces
     And New thread is clicked in the sidebar
     Then a failed destination lookup leaves the first send retryable
 
-  @scenario:jj-integration.new-thread-background-browser-journey
-  Scenario: A New thread provisions nothing until its first send
+  @scenario:jj-integration.new-thread-preparation-browser-journey
+  Scenario: A New thread prepares its destination once its draft starts
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And the New thread screen is reopened
@@ -72,8 +72,12 @@ Feature: jj thread workspaces
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
     Then the New thread composer opens before its workspace exists
-    And the blank New thread provisions no jj workspace
-    And a reload keeps the blank New thread unprovisioned
+    And the untouched New thread claims no jj workspace
+    When the New thread composer takes a draft "typed before the thread has a workspace"
+    Then the prepared destination is a checked-out thread workspace
+    And the New thread screen still shows that draft
+    When the prepared draft is sent
+    Then the thread runs in its prepared workspace
 
   @scenario:jj-integration.new-thread-deferred-submit-browser-journey
   Scenario: The first send allocates the thread workspace and delivers the message there

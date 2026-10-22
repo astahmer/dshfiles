@@ -207,30 +207,79 @@
       ]
     },
     {
-      "id": "new-thread-background",
-      "title": "New thread provisions nothing until its first send",
-      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once and provision nothing: with isolation on by default the blank thread waits in the project (or inherited) checkout, and its own jj workspace (a spare when available, but never the inherited source workspace) is created only by its first send. That send waits for the new Session to open and delivers the same draft there. An abandoned New thread therefore leaves no jj workspace behind; a reload before the first send keeps it unprovisioned. A thread left in another thread's workspace moves back to the project checkout on arrival when isolation is off, which creates nothing.",
-      "reach": ["click button \"New thread\"", "expect checkbox \"workspace\""],
+      "id": "new-thread-preparation",
+      "title": "New thread prepares its destination while the draft is written",
+      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once and claim nothing: with isolation on by default the blank thread waits in the project (or inherited) checkout. Once its draft holds something, the destination is prepared in the background (the jj workspace claimed, its blank Session connected) so the first send copies the draft and submits instead of waiting for both; the send still holds the composer until that Session is open. The created thread takes the view only while this New thread screen is the visible main view, and is otherwise offered in a toast. An abandoned draft keeps the prepared workspace as the project's spare, which a reload or the next New thread reuses. A thread left in another thread's workspace moves back to the project checkout on arrival when isolation is off, which creates nothing.",
+      "reach": [
+        "click button \"New thread\"",
+        "expect checkbox \"workspace\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"prepared while writing\"",
+        "expect text \"prepared while writing\""
+      ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["opening", "deferred", "committing", "switching", "settled"],
+      "states": ["opening", "deferred", "preparing", "committing", "switching", "settled"],
       "failureModes": [
-        "Arriving creates no jj workspace and opens none, so a New thread the user abandons leaves the repository untouched.",
-        "The first send provisions or claims the workspace, holds the composer until the destination Session is open, and delivers the draft there; a failed provision keeps the draft and shows the send failure.",
+        "Arriving creates no jj workspace and opens none; only a draft claims the destination it is about to send into.",
+        "The send takes the prepared workspace and Session when they are ready, so it no longer provisions or connects; a failed preparation keeps the draft and shows the send failure.",
+        "A destination changes name or source workspace with the thread: the warm is dropped and kept as this project's spare, never reused by the send that asks for another one.",
         "Each New-thread Session is settled once, keyed by Session: a manual toggle is never undone, and two New threads waiting at once never share one destination.",
-        "An inherited thread workspace is not reused as the new thread's own destination, even when it is registered as a spare."
+        "An inherited thread workspace is not reused as the new thread's own destination, even when it is registered as a spare.",
+        "A created thread never takes the view back from another thread, another main panel or the Start page; the toast offers it instead."
       ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
-          "id": "jj-integration.new-thread-background-browser-journey",
+          "id": "jj-integration.new-thread-preparation-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
           "kind": "gherkin",
           "id": "jj-integration.new-thread-deferred-submit-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-eligible",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "starts once the draft holds something"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-prepares",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "hands the send the destination and the blank composer it already prepared"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-mismatch",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "offers nothing to a thread that changed its source workspace or name"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-spare",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "keeps a provisioned workspace as the project spare when the thread is abandoned"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-consumed",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "never keeps the workspace a send took"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-retry",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "forgets a failed warm so the send falls back and the next attempt retries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-preparation-unit-follows",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-warmup.test.ts",
+          "testName": "follows the created thread only while its own screen is the visible main view"
         },
         {
           "kind": "unit-test",

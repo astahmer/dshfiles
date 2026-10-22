@@ -35,6 +35,8 @@ import { prepareRemoteFolder } from './remote-destination.js'
 import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
+import { ThreadNotices, ThreadNoticeToast } from './thread-notices.js'
+import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
@@ -669,11 +671,17 @@ export default defineClient({
      * The last line of defence against two threads sharing one jj thread workspace: whatever the toggle remembers, a
      * blank Session sending from a thread workspace another Session uses moves to a fresh one first.
      */
+    // One forced move per blank Session and workspace: the name it generates is carried by the warm and the send, so
+    // asking twice must not propose two destinations.
+    const sharedWorkspaceMoves = new Map<string, DeferredMove>()
     const sharedThreadWorkspaceMove = (sessionId: SessionSummary['id'], workspaceId: string): DeferredMove | undefined => {
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
       if (workspace === undefined || !threadWorkspaceName.safeParse(workspace.path.split('/').at(-1)).success) return undefined
       if (!workspaceHasOtherSession({ sessionId, workspaceSessionIds: workspace.sessionIds })) return undefined
-      return {
+      const key = `${sessionId}\u0000${workspaceId}`
+      const cached = sharedWorkspaceMoves.get(key)
+      if (cached !== undefined) return cached
+      const move: DeferredMove = {
         sessionId,
         visitId: mainViewSessionVisitId(sessionId),
         workspaceId,
@@ -681,6 +689,8 @@ export default defineClient({
         wantsIsolation: true,
         request: null,
       }
+      sharedWorkspaceMoves.set(key, move)
+      return move
     }
     const releaseOnceSent = (sessionId: SessionId, release: () => void): void => {
       let timer: ReturnType<typeof setTimeout> | undefined
@@ -708,6 +718,118 @@ export default defineClient({
       if (scoped === undefined) throw new Error('The thread workspace Session is not available.')
       return { sessionId, workspaceId, blank: true, input: ctx.conversation.input.for(scoped) }
     }
+    const warmups = new ThreadWarmup<Awaited<ReturnType<typeof threadComposerIn>>>()
+    /** Whether that Session's Conversation screen is the one on screen: the Start page hides the main outlet, not unmounts it. */
+    const threadScreenVisible = (sessionId: SessionSummary['id']): boolean => {
+      const root = document.querySelector(`[data-conversation-session="${sessionId}"]`)
+      return root instanceof HTMLElement && root.offsetParent !== null
+    }
+    /**
+     * The move the destination bar deferred for a New thread visit. The shared-workspace fallback is not one: it is the
+     * send's last line of defence for an inherited workspace, and warming for it would provision a workspace under a
+     * name the arrival later replaces.
+     */
+    const deferredMoveFor = (sessionId: SessionSummary['id']): DeferredMove | undefined =>
+      workspaceToggle.getSnapshot().context.deferred.find(candidate => candidate.sessionId === sessionId)
+    /**
+     * Prepare this New thread's destination while the user writes. Provisioning the jj workspace, waiting for its listing
+     * and connecting its blank Session are the seconds a first send used to sit through; running them here moves that
+     * work under typing, and the send only copies the draft and submits. Nothing moves until the send asks for it.
+     */
+    const prepareWarm = (sessionId: SessionSummary['id'], move: DeferredMove): void => {
+      /** Record a prepared workspace as this project's spare under the name the Host actually gave it. */
+      const keepAsSpare = (input: { readonly workspaceId: string; readonly name: string; readonly request: ToggleRequest }): void => {
+        // Reusing a client spare skips the Host rename, so the requested name is not always the folder's: read it back.
+        const listed = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)
+        const name = listed?.path.split('/').at(-1) ?? input.name
+        workspaceToggle.getSnapshot().context.client.keepSpare(WorkspaceToggle.spareKey(input.request.projectWorkspaceId, input.request.base), {
+          workspaceId: input.workspaceId,
+          name,
+        })
+      }
+      warmups.prepare(
+        { sessionId, sourceWorkspaceId: move.workspaceId, name: move.name },
+        {
+          destination: signal => resolveMove(move, signal, { force: false }),
+          isolate: async (request, signal) => {
+            const landed = await WorkspaceToggle.isolateFirstSend({
+              client: workspaceToggle.getSnapshot().context.client,
+              request,
+              name: move.name,
+              signal,
+            })
+            // Until a send claims it, the prepared workspace is this project's spare: a reload between the draft and
+            // its send must reuse it instead of stranding it and provisioning another.
+            keepAsSpare({ ...landed, name: move.name, request })
+            return landed
+          },
+          composerIn: (workspaceId, signal) => threadComposerIn(workspaceId, signal),
+          keepSpare: keepAsSpare,
+        },
+      )
+    }
+    /**
+     * A New thread prepares its destination once its draft holds something, and drops it when the draft is cleared.
+     * Re-targeting the thread restarts the warm under its new name.
+     */
+    ctx.effect(() => {
+      let unsubscribeInput: (() => void) | undefined
+      let watchedSession: SessionSummary['id'] | undefined
+      let queued = false
+      let disposed = false
+      const evaluate = (): void => {
+        const source = workspaceComposerFor()
+        if (source === undefined || !source.blank) {
+          unsubscribeInput?.()
+          unsubscribeInput = undefined
+          if (watchedSession !== undefined) warmups.abandon(watchedSession)
+          watchedSession = undefined
+          return
+        }
+        if (watchedSession !== source.sessionId) {
+          unsubscribeInput?.()
+          // One New thread is watched at a time: the one that was abandoned keeps its provisioned workspace as a spare.
+          if (watchedSession !== undefined) warmups.abandon(watchedSession)
+          watchedSession = source.sessionId
+          unsubscribeInput = source.input.state.subscribe(changed)
+        }
+        const move = deferredMoveFor(source.sessionId)
+        const isolating = move !== undefined && defersIsolationToSend(move)
+        if (
+          move !== undefined &&
+          ThreadPreparation.shouldPrepare({
+            blank: source.blank,
+            sending: pendingSubmissions.has(source.sessionId),
+            content: ThreadPreparation.holdsContent(source.input.state.getSnapshot()),
+            isolating,
+          })
+        ) {
+          prepareWarm(source.sessionId, move)
+          return
+        }
+        if (!isolating) warmups.abandon(source.sessionId)
+      }
+      function changed(): void {
+        if (queued) return
+        queued = true
+        queueMicrotask(() => {
+          queued = false
+          if (!disposed) evaluate()
+        })
+      }
+      const unsubscribeSessions = ctx.sessions.list.subscribe(changed)
+      const unsubscribeWorkspaces = ctx.workspaces.list.subscribe(changed)
+      const toggleSubscription = workspaceToggle.subscribe(changed)
+      evaluate()
+      return () => {
+        disposed = true
+        unsubscribeInput?.()
+        unsubscribeSessions()
+        unsubscribeWorkspaces()
+        toggleSubscription.unsubscribe()
+        warmups.dispose()
+      }
+    }, 'jj-integration: prepare a New thread workspace while the draft is written')
     const stopSubmit = (event: Event): void => {
       event.preventDefault()
       event.stopImmediatePropagation()
@@ -738,21 +860,33 @@ export default defineClient({
         // thread opened meanwhile, or a second thread sent before this one lands, keeps its own composer and move.
         let request = move.request
         const files = DraftAttachmentCarry.filesOf(ctx.conversation, state.attachmentIds)
+        // The destination this New thread prepared while it was being written: its provision, listing and blank Session
+        // are already under way, so the send only copies the draft and submits instead of waiting for all three.
+        const warm = warmups.for({ sessionId, sourceWorkspaceId: source.workspaceId, name: move.name })
+        let deliveredSessionId: SessionId | undefined
+        let followed = false
         // Keep the source registered while the send runs, so its draft survives the user opening another thread.
         const sourceHeld = ctx.sessions.retain(sessionId, { source: 'controllerOperation' })
         void deliverFirstSend({
           source,
           submitSource,
           destination: async signal => {
+            if (warm !== undefined) return warm.destination(signal)
             request ??= await resolveMove(move, signal, { force: move === sharedWorkspaceMove })
             return request
           },
-          isolate: signal => {
+          isolate: async signal => {
+            if (warm !== undefined) return { workspaceId: (await warm.target(signal)).workspaceId }
             // SAFETY of the fallback: `destination` returned an isolating request before `isolate` runs.
             const isolating = request ?? { isolate: true, projectWorkspaceId: move.workspaceId, leaving: null, leavingBase: null }
             return WorkspaceToggle.isolateFirstSend({ client: workspaceToggle.getSnapshot().context.client, request: isolating, name: move.name, signal })
           },
-          composerIn: (workspaceId, signal) => threadComposerIn(workspaceId, signal),
+          composerIn: async (workspaceId, signal) => {
+            const target = warm === undefined ? await threadComposerIn(workspaceId, signal) : await warm.target(signal)
+            if (target.workspaceId !== workspaceId) throw new Error('The prepared thread workspace moved before the send landed.')
+            deliveredSessionId = target.sessionId
+            return target
+          },
           copyDraft: async (target, signal) => {
             const snapshot = source.input.state.getSnapshot()
             if (files === undefined) return false
@@ -767,8 +901,19 @@ export default defineClient({
             source.input.setDraft('')
             for (const id of carried) source.input.removeAttachment(id)
           },
-          showsSource: () => mainViewSessionId(ctx.sessions.list.getSnapshot()) === sessionId,
-          show: targetSessionId => ctx.uiWorkspace.openSession(targetSessionId),
+          // The created thread takes the view only while this New thread screen is still the one on screen: going to
+          // another thread, another tab or the Start page means the user is done watching it.
+          showsSource: () =>
+            ThreadPreparation.waitsOnNewThread({
+              sourceSessionId: sessionId,
+              mainViewSessionId: mainViewSessionId(ctx.sessions.list.getSnapshot()),
+              activePanelId: ctx.layout.panelInfo.getSnapshot().activePanelId,
+              screenVisible: threadScreenVisible(sessionId),
+            }),
+          show: targetSessionId => {
+            followed = true
+            ctx.uiWorkspace.openSession(targetSessionId)
+          },
           blocks: ctx.conversation.blocks,
           reason: translate('preparingWorkspace', { name: move.name }),
           failureMessage: translate('workspaceSendFailed'),
@@ -776,7 +921,17 @@ export default defineClient({
           signal: controller.signal,
         })
           .then(outcome => {
-            if (outcome === 'sent' || outcome === 'kept') workspaceToggle.send({ type: 'claim', sessionId })
+            if (outcome === 'sent') {
+              workspaceToggle.send({ type: 'claim', sessionId })
+              warmups.consume(sessionId)
+              // The view did not follow, so the thread is only offered: the send happened where the user was not.
+              if (!followed && deliveredSessionId !== undefined) {
+                ThreadNotices.show({ text: translate('threadStartedElsewhere', { name: move.name }), sessionId: deliveredSessionId })
+              }
+              return
+            }
+            if (outcome === 'kept') workspaceToggle.send({ type: 'claim', sessionId })
+            if (outcome !== 'not-ready') warmups.abandon(sessionId)
           })
           .catch(() => source.input.notify('error', translate('workspaceSendFailed')))
           .finally(() => {
@@ -843,11 +998,27 @@ export default defineClient({
         for (const move of moves) {
           const sessionId = SessionId(move.sessionId)
           const stale = archived.includes(sessionId) || sessions.byId[sessionId]?.blank === false
-          if (stale) workspaceToggle.send({ type: 'cancel', sessionId: move.sessionId })
+          if (stale) {
+            workspaceToggle.send({ type: 'cancel', sessionId: move.sessionId })
+            warmups.abandon(move.sessionId)
+          }
         }
       }
-      const unsubscribeSessions = ctx.sessions.list.subscribe(cancelStaleMoves)
-      const unsubscribeWorkspaces = ctx.workspaces.list.subscribe(cancelStaleMoves)
+      const pruneSharedMoves = (): void => {
+        if (sharedWorkspaceMoves.size === 0) return
+        const sessions = ctx.sessions.list.getSnapshot()
+        const archived = ctx.workspaces.list.getSnapshot().archivedSessionIds
+        for (const [key, move] of sharedWorkspaceMoves) {
+          const sessionId = SessionId(move.sessionId)
+          if (archived.includes(sessionId) || sessions.byId[sessionId]?.blank === false) sharedWorkspaceMoves.delete(key)
+        }
+      }
+      const cancelGone = (): void => {
+        cancelStaleMoves()
+        pruneSharedMoves()
+      }
+      const unsubscribeSessions = ctx.sessions.list.subscribe(cancelGone)
+      const unsubscribeWorkspaces = ctx.workspaces.list.subscribe(cancelGone)
       return () => {
         unsubscribeSessions()
         unsubscribeWorkspaces()
@@ -907,6 +1078,12 @@ export default defineClient({
             />
           </PluginQueryProvider>
         )),
+      ),
+    )
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-jj-integration-thread-notice', order: 122 },
+        decorate(() => <ThreadNoticeToast openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)} openLabel={translate('openStartedThread')} />),
       ),
     )
   },

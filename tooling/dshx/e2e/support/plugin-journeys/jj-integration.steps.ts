@@ -23,6 +23,8 @@ const repositories = new WeakMap<Page, ThreadRepository>()
 const provisionedThreads = new WeakMap<Page, string>()
 /** A blank thread whose next visit must find a draft persisted by a previous one. */
 const rememberedBlankThreads = new WeakMap<Page, string>()
+/** The thread workspaces that existed just before the draft was sent; its send must add none. */
+const beforeSendNames = new WeakMap<Page, string>()
 const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
 const threadComposerName = 'Message or run a task, / commands, @ files or sessions'
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
@@ -410,9 +412,12 @@ Then('the remembered blank thread is no longer current', async ({ page }: { page
 When('the saved draft {string} is restored to the remembered thread', async ({ page }: { page: Page }, text: string) => {
   const sessionId = rememberedBlankThreads.get(page)
   if (sessionId === undefined) throw new Error('No blank thread was remembered for the saved draft.')
-  await page.evaluate(({ sessionId, text }) => {
-    localStorage.setItem(`dsh.conversation.${sessionId}`, JSON.stringify({ draft: text }))
-  }, { sessionId, text })
+  await page.evaluate(
+    ({ sessionId, text }) => {
+      localStorage.setItem(`dsh.conversation.${sessionId}`, JSON.stringify({ draft: text }))
+    },
+    { sessionId, text },
+  )
 })
 
 When('the disposable jj repository is chosen again as the New thread project', async ({ page }: { page: Page }) => {
@@ -468,36 +473,75 @@ Then('the New thread composer opens before its workspace exists', async ({ page 
   })
 })
 
-Then('the blank New thread provisions no jj workspace', async ({ page }: { page: Page }) => {
+/** The thread workspaces this disposable repository holds right now, working copies the Host adds ahead included. */
+const rawWorkspaceNames = (repository: ThreadRepository): readonly string[] =>
+  jjAt(repository.repositoryPath, repository.temporaryRoot, ['--ignore-working-copy', 'workspace', 'list'])
+    .split('\n')
+    .filter(line => line.includes(':'))
+    .map(line => line.slice(0, line.indexOf(':')))
+    .filter(name => name !== 'default')
+    .sort()
+
+/** The thread workspaces the draft has claimed, once the Host has one checked out for it. */
+const waitForPreparedWorkspace = async (page: Page): Promise<void> => {
+  await expect.poll(() => rawWorkspaceNames(repositoryFor(page)), { timeout: 45_000 }).not.toEqual([])
+}
+
+Then('the untouched New thread claims no jj workspace', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  const composer = newThreadComposer(page)
-  await recordAssertion(page, 'jj-integration-blank-new-thread-provisions-nothing', async () => {
-    await expect(composer).toBeEditable()
-    await composer.click()
-    await expect(composer).toBeFocused()
-    await page.keyboard.type('typed before the thread has a workspace')
-    await expect(composer).toHaveText('typed before the thread has a workspace')
+  await recordAssertion(page, 'jj-integration-untouched-new-thread-claims-nothing', async () => {
+    await expect(newThreadComposer(page)).toBeEditable()
     await expect(projectButton(page)).toHaveText('repo')
     await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
     // The toggle shows the destination the thread will take, not a workspace that exists yet.
     await expect(workspaceToggle(page)).toBeChecked()
     await expect(workspaceToggle(page)).toBeEnabled()
-    await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
-    // Give a provision that must not happen time to show up before trusting the jj workspace list.
+    // Give a claim that must not happen time to show up before trusting the jj workspace list.
     await page.waitForTimeout(2_000)
     expect(workspaceNames(repository)).toEqual(['default'])
   })
   await finishJourneyAssertions(page)
 })
 
-Then('a reload keeps the blank New thread unprovisioned', async ({ page }: { page: Page }) => {
+When('the New thread composer takes a draft {string}', async ({ page }: { page: Page }, text: string) => {
+  const composer = newThreadComposer(page)
+  await expect(composer).toBeEditable()
+  await composer.click()
+  await page.keyboard.type(text)
+  await expect(composer).toHaveText(text)
+})
+
+Then('the prepared destination is a checked-out thread workspace', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-draft-prepares-the-thread-workspace', async () => {
+    await waitForPreparedWorkspace(page)
+    // Preparing a destination moves nothing: the New thread screen keeps the draft and no thread started.
+    await expect(newThreadComposer(page)).toHaveText('typed before the thread has a workspace')
+    await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
+    expect(workspaceNames(repositoryFor(page))).toContain('default')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the New thread screen still shows that draft', async ({ page }: { page: Page }) => {
+  await expect(newThreadComposer(page)).toHaveText('typed before the thread has a workspace')
+  await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
+})
+
+When('the prepared draft is sent', async ({ page }: { page: Page }) => {
+  const composer = newThreadComposer(page)
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+  beforeSendNames.set(page, rawWorkspaceNames(repositoryFor(page)).join(','))
+  await composer.press('Enter')
+})
+
+Then('the thread runs in its prepared workspace', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await page.reload()
-  await recordAssertion(page, 'jj-integration-reload-keeps-the-blank-new-thread-unprovisioned', async () => {
-    await expect(newThreadComposer(page)).toBeVisible({ timeout: 30_000 })
-    await expect(projectButton(page)).toHaveText('repo', { timeout: 30_000 })
-    await expect(workspaceToggle(page)).toBeChecked()
-    expect(workspaceNames(repository)).toEqual(['default'])
+  await recordAssertion(page, 'jj-send-lands-in-the-prepared-workspace', async () => {
+    await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
+    await expect(page.getByText('typed before the thread has a workspace', { exact: true })).toBeVisible()
+    // The send moved into a workspace the draft had already claimed: it provisioned none of its own. (Another
+    // workspace may still appear as the Host's spare for the next thread, which is not this send's destination.)
+    expect((beforeSendNames.get(page) ?? '').split(',')).toContain(await currentHeaderThreadName(page))
   })
   await finishJourneyAssertions(page)
 })

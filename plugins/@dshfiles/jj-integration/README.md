@@ -52,18 +52,25 @@ the toggle remembers:
 - The Host never reuses a requested workspace name that a folder or jj workspace
   already holds; it silently picks another.
 
-**New thread provisions nothing until its first send.** The sidebar button, the
-palette and the project picker open the composer at once in the project (or
-current) checkout, and with `isolateByDefault` on the blank thread stays there:
-the destination bar shows the workspace it will take (the spare when there is
-one, else a workspace named by the client) without creating it. The first Send
-creates or claims that workspace, gets its blank Session without changing the
-main view, copies the draft, attachments and structured references into it and
-sends there; the view follows only while it still shows the thread that sent.
+**A New thread claims nothing on arrival and prepares its destination while the
+draft is written.** The sidebar button, the palette and the project picker open
+the composer at once in the project (or current) checkout, and with
+`isolateByDefault` on the blank thread stays there: the destination bar shows the
+workspace it will take (the spare when there is one, else a workspace named by
+the client) without creating it. As soon as the draft holds something, that
+destination is prepared in the background: the jj workspace is created or claimed,
+its blank Session is connected without changing the main view, and the prepared
+state is kept as this project's spare so the next New thread reuses it.
+The first Send then copies the draft, attachments and structured references into
+that Session and submits, instead of waiting for provisioning and a Session; when
+the preparation is still running, the send waits for the same work rather than
+starting it twice. The view follows the created thread only while this New thread
+screen is still the one on screen (its own blank Session, no main panel, not the
+Start page); after another thread or tab the thread is offered in a toast instead.
 Each first send runs on its own, so opening another New thread right after Send,
 or sending two threads back to back, keeps every prompt in its own workspace.
-Typing never waits on jj, and a New thread the user abandons leaves no jj
-workspace behind. With isolation off, a thread that started in another thread's workspace
+Typing never waits on jj, and a New thread whose draft never sends leaves one
+reusable spare rather than a pile of workspaces. With isolation off, a thread that started in another thread's workspace
 returns to the project checkout on arrival, which creates nothing. The chip
 shows the workspace name with a spinner while the first-send switch runs. Each
 new thread is moved at most once, so a manual toggle sticks, and a blank thread
