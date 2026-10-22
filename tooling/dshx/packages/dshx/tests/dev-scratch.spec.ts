@@ -160,6 +160,34 @@ describe('dshx dev scratch commands', () => {
     }
   })
 
+  it('seeds Backlog Jev enabled idempotently through Settings', async () => {
+    const browser = await chromium.launch({ headless: true })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <button aria-label="Account menu" onclick="document.querySelector('#menu').hidden = false">Account</button>
+        <div id="menu" role="menu" hidden>
+          <button role="menuitem" aria-label="Settings" onclick="document.querySelector('#menu').hidden = true; document.querySelector('#settings').hidden = false">Settings</button>
+        </div>
+        <div id="settings" role="dialog" hidden>
+          <input type="search" aria-label="Search settings">
+          <button id="jev-enabled" role="switch" aria-label="Jev enabled" aria-checked="false" data-clicks="0" onclick="this.setAttribute('aria-checked', String(this.getAttribute('aria-checked') !== 'true')); this.dataset.clicks = String(Number(this.dataset.clicks) + 1)">Jev enabled</button>
+        </div>
+        <script>document.addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelector('#settings').hidden = true })</script>
+      `)
+
+      await ScratchSeedRuntime.seedBacklogJevEnabled(page, 1_000)
+      await ScratchSeedRuntime.seedBacklogJevEnabled(page, 1_000)
+
+      const jevEnabled = page.locator('#jev-enabled')
+      expect(await jevEnabled.getAttribute('aria-checked')).toBe('true')
+      expect(await jevEnabled.getAttribute('data-clicks')).toBe('1')
+      expect(await page.locator('#settings').isVisible()).toBe(false)
+    } finally {
+      await browser.close()
+    }
+  })
+
   it('explains each action and names the fix for misuse', async () => {
     const help = await run(['dev', 'open', '--help'])
     expect(help.code).toBe(0)

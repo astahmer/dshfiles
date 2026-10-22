@@ -192,3 +192,15 @@ Feature: Backlog
     Then the inline backlog preview gallery opens above its card and navigates both images
     When the backlog preview is opened in the Backlog panel
     Then the backlog detail shows "Ship the backlog reference preview"
+
+  @fake-secret-cli
+  @scenario:backlog.jev-secret-setup
+  Scenario: Offer a masked secret setup from chat when Jev has no key
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/settings-shell" is booted
+    And a Command Code account backed by a local fake provider is added
+    When Backlog Jev is enabled without a secret reference
+    And a thread on the fake model writes "Reply briefly."
+    Then the chat tail offers Jev secret setup
+    When the Jev setup offer stores and binds a synthetic value
+    Then Backlog stores only the secret reference for Jev
+    And the Jev setup journey is complete

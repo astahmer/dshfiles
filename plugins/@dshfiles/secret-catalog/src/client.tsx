@@ -56,7 +56,12 @@ export default defineClient({
         <SecretInputOverlay t={translate} />
       </PluginQueryProvider>
     )
-    ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118 }, decorate(SecretOverlay)))
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118, locale: SECRET_CATALOG_LOCALE_NAMESPACE },
+        decorate(SecretOverlay),
+      ),
+    )
     ctx.slots.inject('conversation.chat.turnTail', () =>
       ctx.slots.register(
         {

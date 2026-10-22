@@ -21,6 +21,7 @@ import { AgentComments } from './agent-dispatch.js'
 import { backlogApi } from './api.js'
 import { writeAttachmentFile } from './attachment-file.js'
 import { BacklogBackfill, type TriageOutcome } from './backfill.js'
+import { jevNeedsSecretSetup } from './jev-setup-status.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { StartThreadForm, startThreadItemOf } from './start-thread.js'
@@ -644,11 +645,8 @@ const backlogApiHost = backlogApi.host({
   speechStatus: ({ ctx }) => speechStatusOf(ctx),
   jevSetupStatus: async ({ ctx }) => {
     const settings = currentSettings()
-    if (!settings.jevEnabled) return { needsSetup: false }
-    try {
-      return { needsSetup: (await jevApiKey(ctx, settings)) === undefined }
-    } catch {
-      return { needsSetup: true }
+    return {
+      needsSetup: await jevNeedsSecretSetup({ enabled: settings.jevEnabled, resolveKey: () => jevApiKey(ctx, settings) }),
     }
   },
   transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),

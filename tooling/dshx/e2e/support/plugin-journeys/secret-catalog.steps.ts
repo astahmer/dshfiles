@@ -5,7 +5,7 @@ import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Before, Given, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 /**
@@ -20,6 +20,7 @@ interface SecretFixturePaths {
 }
 interface SecretFixture extends SecretFixturePaths {
   readonly previousPath: string | undefined
+  readonly previousJevKey: string | undefined
   readonly previousPrewarm: string | undefined
 }
 
@@ -64,6 +65,7 @@ const readStore = async (page: Page): Promise<Store> => JSON.parse(await readFil
 
 Before({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   const previousPrewarm = process.env.DSHX_E2E_PREWARM
+  const previousJevKey = process.env.TYPESAFE_API_KEY
   process.env.DSHX_E2E_PREWARM = '0'
   process.env.TYPESAFE_API_KEY = ''
   const paths = await fakeCliFixtureForWorker()
@@ -78,7 +80,7 @@ Before({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
     vault: { 'item-github': 'gh-e2e-global-value', 'item-db-prod': 'db-e2e-prod-value', 'item-db-dev': 'db-e2e-dev-value', 'item-local': 'local-e2e-value' },
   }
   await writeFile(paths.storePath, JSON.stringify(store))
-  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousPrewarm })
+  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousJevKey, previousPrewarm })
   process.env.PATH = `${paths.bin}${delimiter}${process.env.PATH ?? ''}`
 })
 
@@ -86,8 +88,10 @@ After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   const fixture = fixtures.get(page)
   if (fixture === undefined) return
   fixtures.delete(page)
-  process.env.PATH = fixture.previousPath
-  delete process.env.TYPESAFE_API_KEY
+  if (fixture.previousPath === undefined) delete process.env.PATH
+  else process.env.PATH = fixture.previousPath
+  if (fixture.previousJevKey === undefined) delete process.env.TYPESAFE_API_KEY
+  else process.env.TYPESAFE_API_KEY = fixture.previousJevKey
   if (fixture.previousPrewarm === undefined) delete process.env.DSHX_E2E_PREWARM
   else process.env.DSHX_E2E_PREWARM = fixture.previousPrewarm
 })
@@ -221,30 +225,32 @@ Then('the Jev setup offer appears on the latest completed turn only', async ({ p
   await recordAssertion(page, `secret-catalog-jev-chat-offer-latest-turn-only-${assertionNumber}`, async () => {
     const offers = page.getByTestId('jev-inline-setup-offer')
     await expect(offers).toHaveCount(1)
-    await expect(offers.getByRole('button', { name: 'Set up Jev key', exact: true })).toBeVisible()
+    await expect(page.getByTestId('secret-setup-offer')).toHaveCount(1)
+    await expect(offers.getByRole('button', { name: 'Set up missing secrets', exact: true })).toBeVisible()
   })
 })
 
 Then('the Jev setup offer is absent while Jev is disabled', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'secret-catalog-jev-chat-offer-disabled', async () => {
     await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
+    await expect(page.getByTestId('secret-setup-offer')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
 
 When('the inline Jev setup is opened', async ({ page }: { page: Page }) => {
-  await page.getByTestId('jev-inline-setup-offer').getByRole('button', { name: 'Set up Jev key', exact: true }).click()
-  await expect(page.getByTestId('jev-secret-setup')).toBeVisible()
+  await page.getByTestId('jev-inline-setup-offer').getByRole('button', { name: 'Set up missing secrets', exact: true }).click()
+  await expect(page.getByTestId('secret-setup-form')).toBeVisible()
 })
 
 Then('the inline Jev key input is masked', async ({ page }: { page: Page }) => {
-  await expect(page.getByTestId('jev-secret-setup').getByLabel('TypeSafe API key', { exact: true })).toHaveAttribute('type', 'password')
+  await expect(page.getByTestId('secret-setup-form').getByLabel('Secret value', { exact: true })).toHaveAttribute('type', 'password')
 })
 
 When('the Jev API key {string} is entered and saved in chat', async ({ page }: { page: Page }, value: string) => {
-  const setup = page.getByTestId('jev-secret-setup')
-  await setup.getByLabel('TypeSafe API key', { exact: true }).fill(value)
-  await setup.getByRole('button', { name: 'Add and bind', exact: true }).click()
+  const setup = page.getByTestId('secret-setup-form')
+  await setup.getByLabel('Secret value', { exact: true }).fill(value)
+  await setup.getByRole('button', { name: 'Create and bind', exact: true }).click()
   await expect(setup).toHaveCount(0, { timeout: 30_000 })
   await expect(page.getByRole('status').filter({ hasText: 'Jev key stored; only its reference was saved to Backlog.' })).toBeVisible()
 })
@@ -252,7 +258,7 @@ When('the Jev API key {string} is entered and saved in chat', async ({ page }: {
 Then('the chat Jev setup stores a global key and binds only its reference', async ({ page }: { page: Page }) => {
   const value = 'jev-e2e-chat-sensitive-value'
   const store = await readStore(page)
-  const globalMatches = store.rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global' && row.environment === 'prod')
+  const globalMatches = store.rows.filter(row => row.alias === 'TYPESAFE_API_KEY' && row.scope === 'global' && row.environment === 'prod')
   const projectMatches = store.rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'project' && row.environment === 'prod')
   await recordAssertion(page, 'secret-catalog-jev-chat-key-is-global-reference-only', async () => {
     expect(globalMatches).toHaveLength(1)
@@ -270,7 +276,7 @@ Then('the chat Jev setup stores a global key and binds only its reference', asyn
   })
   await openBacklogSettings(page)
   await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
-    'secret:jev-api-key-optmem',
+    'secret:TYPESAFE_API_KEY',
   )
   await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).toBeChecked()
   await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
@@ -587,5 +593,73 @@ Then('the tool result {string} {string}', async ({ page }: { page: Page }, expec
 })
 
 Then('the secret tools journey is complete', async ({ page }: { page: Page }) => {
+  await finishJourneyAssertions(page)
+})
+
+When('the Backlog Jev secret-reference setting is focused', async ({ page }: { page: Page }) => {
+  const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
+  if (!(await settingsDialog.isVisible())) await openSettingsDialog(page)
+  await settingsDialog.getByRole('group', { name: 'Plugins', exact: true }).getByRole('button', { name: 'Backlog', exact: true }).click()
+  const field = page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')
+  await expect(field).toBeVisible()
+  await field.focus()
+  await expect(page.getByRole('button', { name: 'Bind a secret', exact: true })).toBeVisible()
+})
+
+When('the create-and-bind form is cancelled and reopened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Bind a secret', exact: true }).click()
+  await page.getByRole('button', { name: 'Add a new secret', exact: true }).click()
+  const panel = page.getByTestId('secret-input-panel')
+  const secretValue = panel.getByRole('textbox', { name: 'Secret value', exact: true })
+  await expect(secretValue).toBeVisible()
+  await secretValue.fill('synthetic-cancelled-setup-value')
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Add a new secret', exact: true }).click()
+})
+
+Then('the cancelled setup writes no alias and reopens with a blank masked value', async ({ page }: { page: Page }) => {
+  const store = await readStore(page)
+  const panel = page.getByTestId('secret-input-panel')
+  const secretValue = panel.getByRole('textbox', { name: 'Secret value', exact: true })
+  await recordAssertion(page, 'secret-catalog-setup-cancel-keeps-value-transient', async () => {
+    expect(store.rows.some(row => row.alias === 'SYNTHETIC_SETUP_TOKEN')).toBe(false)
+    await expect(secretValue).toHaveValue('')
+    await expect(secretValue).toHaveAttribute('type', 'password')
+  })
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Bind a secret', exact: true }).click()
+})
+
+When('a secret is created and bound with the value {string}', async ({ page }: { page: Page }, value: string) => {
+  await page.getByRole('button', { name: 'Bind a secret', exact: true }).click()
+  await page.getByRole('button', { name: 'Add a new secret', exact: true }).click()
+  const panel = page.getByTestId('secret-input-panel')
+  await panel.getByRole('textbox', { name: 'Alias', exact: true }).fill('SYNTHETIC_SETUP_TOKEN')
+  await panel.getByRole('textbox', { name: 'Environment', exact: true }).fill('staging')
+  const secretValue = panel.getByRole('textbox', { name: 'Secret value', exact: true })
+  await expect(secretValue).toHaveAttribute('type', 'password')
+  await secretValue.fill(value)
+  await panel.getByRole('button', { name: 'Create and bind', exact: true }).click()
+  await expect(page.getByTestId('secret-input-panel')).toHaveCount(0)
+  const field = page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')
+  await expect(field).toHaveValue('secret:SYNTHETIC_SETUP_TOKEN@staging')
+  await field.press('Enter')
+})
+
+Then('the field stores only {string} while the fake CLI stores the synthetic value', async ({ page }: { page: Page }, reference: string) => {
+  const store = await readStore(page)
+  const entry = store.rows.find(row => row.alias === 'SYNTHETIC_SETUP_TOKEN')
+  const field = page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')
+  await recordAssertion(page, 'secret-catalog-setup-stores-value-on-host-and-reference-in-field', async () => {
+    expect(entry?.scope).toBe('global')
+    expect(entry?.environment).toBe('staging')
+    expect(entry).toBeDefined()
+    expect(store.vault[entry?.item ?? '']).toBe('synthetic-inline-setup-value')
+    await expect(field).toHaveValue(reference)
+    expect(await page.locator('body').innerText()).not.toContain('synthetic-inline-setup-value')
+  })
+})
+
+Then('the secret setup journey is complete', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })

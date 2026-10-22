@@ -988,6 +988,54 @@
           "testName": "keeps a bare folder instead of provisioning a workspace for it"
         }
       ]
+    },
+    {
+      "id": "jev-secret-setup",
+      "title": "Set up a missing Jev key from chat",
+      "summary": "When Jev is enabled but its Host-resolved key is missing or invalid, the chat turn tail offers an opt-in Secret Catalog form. Values stay on the Host and Backlog persists only the bound secret reference.",
+      "reach": [
+        "seed fake-secret-cli",
+        "seed backlog-jev-enabled",
+        "seed tool-call-thread",
+        "expect text \"Tool finished.\"",
+        "expect text \"Required secrets are missing\"",
+        "click button \"Set up missing secrets\"",
+        "expect textbox \"Secret value\""
+      ],
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [],
+      "states": ["disabled", "missing-key", "offered", "editing-masked", "cancelled", "bound", "binding-failed", "catalog-unavailable"],
+      "failureModes": [
+        "A malformed or unresolved key reference offers setup without returning the key or resolver error to chat.",
+        "Cancelling leaves the setting unchanged; a failed binding retains only the stored reference for retry.",
+        "A configured key suppresses the offer, and disabling Jev stops the status lookup.",
+        "If Secret Catalog metadata cannot load or its API owner is absent, the offer is hidden instead of inviting a failing setup."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Resolve the bound key on the Host and store synthetic setup values.",
+          "deterministicFake": "Use the fake secret CLI with an empty synthetic store and a cleared TYPESAFE_API_KEY environment variable."
+        },
+        {
+          "id": "command-code",
+          "boundary": "Finish a chat turn that hosts the setup suggestion.",
+          "deterministicFake": "Use the loopback fake Command Code provider, never a real account or key."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.jev-secret-setup",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.jev-secret-setup-status",
+          "file": "plugins/@dshfiles/backlog/src/jev-setup-status.test.ts",
+          "testName": "suggests setup when the key is missing or its reference cannot resolve"
+        }
+      ]
     }
   ],
   "kind": "bundle"

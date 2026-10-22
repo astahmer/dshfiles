@@ -22,6 +22,7 @@ body or an item link can carry it without becoming a secret.
 | Value port (CLI access)     | `@dshfiles/secret-catalog`  | `secretCatalogValues.resolve({ reference, cwd })`                              |
 | Reference → control mapping | `@dshfiles/settings-shell`  | `Schema.string().role('secret-ref')`                                           |
 | Vault picker                | `@dshfiles/secret-catalog`  | `shell.overlay` on `[data-secret-input="reference"]`                           |
+| Missing-key setup offer     | `@dshfiles/secret-catalog`  | `@dshfiles/secret-catalog/setup` (`SecretSetupOffer`)                          |
 
 ## Consuming a reference on the Host
 
@@ -62,6 +63,26 @@ never guessed.
   field's own dialog: a modal layer makes everything outside it inert. The
   panel opens below the field, flips above when that side has more room, and
   caps its height to the room left, so it never leaves the viewport.
+
+## Offering masked setup when a required key is missing
+
+A consuming plugin can opt in to a separate setup card or chat-tail offer by
+importing `SecretSetupOffer` and its `SecretSetupRequirement` and
+`SecretSetupBinding` types from `@dshfiles/secret-catalog/setup`. The consumer
+checks availability on its Host, then passes only missing requirement metadata
+(id, label, and optional alias/environment/scope/folder suggestions) to the
+component in a decorated client slot under the consumer's `PluginQueryProvider`.
+The offer preflights non-secret Catalog metadata and stays hidden when the
+Catalog is unavailable. Its `onBind` callback receives only `{ id, reference }`;
+the form sends the masked value directly to the Secret Catalog Host and stores
+no value in the consumer's settings, callback, or chat state. A cancel before
+storage writes nothing; if binding fails after storage, only the reference is
+retained for retry.
+
+The Backlog uses this opt-in path for Jev when Jev is enabled and its Host-side
+resolver cannot produce a key. The chat composer remains ordinary prose; the
+suggestion is a separate turn-tail card, not a credential button on free-form
+chat text.
 
 ## What is deliberately not here
 

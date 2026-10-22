@@ -23,6 +23,20 @@ const openSettingsDialog = async (page: Page, timeoutMs: number): Promise<void> 
   await page.getByRole('menuitem', { name: /^Settings/ }).click({ timeout: timeoutMs })
 }
 
+const seedBacklogJevEnabled = async (page: Page, timeoutMs: number): Promise<void> => {
+  await openSettingsDialog(page, timeoutMs)
+  await page.getByRole('searchbox', { name: 'Search settings', exact: true }).fill('Jev enabled', { timeout: timeoutMs })
+  const jevEnabled = page.getByRole('switch', { name: 'Jev enabled', exact: true })
+  await jevEnabled.waitFor({ state: 'visible', timeout: timeoutMs })
+  if ((await jevEnabled.getAttribute('aria-checked')) === 'true') {
+    await page.keyboard.press('Escape')
+    return
+  }
+  await jevEnabled.click({ timeout: timeoutMs })
+  if ((await jevEnabled.getAttribute('aria-checked')) !== 'true') throw new Error('Backlog Jev did not enable in Settings.')
+  await page.keyboard.press('Escape')
+}
+
 const openAIAccountsPanel = async (page: Page, timeoutMs: number): Promise<void> => {
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   if (await accounts.isVisible()) return
@@ -643,6 +657,7 @@ export class ScratchSeedRuntime {
   static readonly openAIAccountsPanel = openAIAccountsPanel
   static readonly openSeedThreadComposer = openSeedThreadComposer
   static readonly chooseFakeProviderModel = chooseFakeProviderModel
+  static readonly seedBacklogJevEnabled = seedBacklogJevEnabled
   static readonly applySeed = applySeed
   static readonly startFakeProvider = startFakeProvider
 }

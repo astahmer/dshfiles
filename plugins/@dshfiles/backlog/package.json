@@ -41,6 +41,7 @@
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/secret-catalog": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
     "zod": "catalog:"
@@ -98,6 +99,7 @@
     "@dshfiles/agents": ">=0.1.0 <0.2.0-0",
     "@dshfiles/input-trigger": ">=0.1.0 <0.2.0-0",
     "@dshfiles/jj-integration": ">=0.1.0 <0.2.0-0",
+    "@dshfiles/secret-catalog": ">=0.1.0 <0.2.0-0",
     "@dshfiles/thread-sidebar": ">=0.1.0"
   },
   "dsh": {

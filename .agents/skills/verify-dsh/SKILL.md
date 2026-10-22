@@ -67,11 +67,12 @@ pass, also load `@dshfiles/multi-host` and `@dshfiles/jj-integration` for the
 sidebar's remote-thread and repository queries),
 `chat-reference-thread` (the same fake-provider account; a thread whose answer
 holds a `` `jj:main` `` code span, so a chat link is really rendered; needs
-`@dshfiles/ai-accounts` and `@dshfiles/jujutsu`), `fake-secret-cli` (resets synthetic aliases; needs
-`up --fake-secret-cli`, which puts the e2e fake `secret` first on the Host's PATH
-so Secret Catalog never reaches a real vault), and `backlog-jev-enabled` (turns
-on Backlog Jev through Settings and keeps auto-triage off without storing a key;
-needs `@dshfiles/backlog`). `attach "<repo file>"` hands a fixture
+`@dshfiles/ai-accounts` and `@dshfiles/jujutsu`), and `fake-secret-cli` (resets synthetic
+aliases; needs `up --fake-secret-cli`, which puts the e2e fake `secret` first on
+the Host's PATH so Secret Catalog never reaches a real vault), and
+`backlog-jev-enabled` (turns Jev on in scratch Settings only when off, keeps
+auto-triage off, and stores no key; needs `@dshfiles/backlog`). `attach "<repo file>"`
+hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next
 `shot`. A `click`, `rightclick` or `hover` step may end with `at <x>,<y>` to hit

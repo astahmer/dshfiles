@@ -1259,6 +1259,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/secret-catalog':
+        specifier: workspace:*
+        version: link:../secret-catalog
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

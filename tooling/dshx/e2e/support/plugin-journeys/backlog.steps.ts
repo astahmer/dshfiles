@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 
@@ -196,7 +196,9 @@ Then('search results list only {string}', async ({ page }: { page: Page }, title
 
 Then('search results list both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
   const statusFilters = await Promise.all(
-    ['In progress', 'Inbox'].map(async label => ((await statusChip(page, label).getAttribute('aria-pressed')) === 'true' ? label.toLowerCase().replaceAll(' ', '-') : null)),
+    ['In progress', 'Inbox'].map(async label =>
+      (await statusChip(page, label).getAttribute('aria-pressed')) === 'true' ? label.toLowerCase().replaceAll(' ', '-') : null,
+    ),
   )
   const selection = statusFilters.filter((label): label is string => label !== null)
   const assertionId = `backlog-search-status-multiple-${selection.join('-') || 'all'}`
@@ -745,5 +747,49 @@ Then('the board card for b:{int} is titled {string}', async ({ page }: { page: P
       .click()
     await expect(peek(page)).toContainText(title)
   })
+  await finishJourneyAssertions(page)
+})
+
+When('Backlog Jev is enabled without a secret reference', async ({ page }: { page: Page }) => {
+  await openSettingsDialog(page)
+  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Backlog', exact: true }).click()
+  const enabled = page.locator('[data-setting-path="jevEnabled"]').getByRole('switch')
+  if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click()
+  await expect(enabled).toHaveAttribute('aria-checked', 'true')
+  await expect(page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')).toHaveValue('')
+  await page.keyboard.press('Escape')
+})
+
+Then('the chat tail offers Jev secret setup', async ({ page }: { page: Page }) => {
+  const offer = page.getByTestId('secret-setup-offer')
+  await recordAssertion(page, 'backlog-jev-setup-offer-appears-when-key-is-missing', async () => {
+    await expect(offer).toBeVisible({ timeout: 30_000 })
+    await expect(offer).toContainText('Required secrets are missing')
+    await expect(offer).toContainText('TypeSafe API key')
+  })
+})
+
+When('the Jev setup offer stores and binds a synthetic value', async ({ page }: { page: Page }) => {
+  const offer = page.getByTestId('secret-setup-offer')
+  await offer.getByRole('button', { name: 'Set up missing secrets', exact: true }).click()
+  const value = offer.getByRole('textbox', { name: 'Secret value', exact: true })
+  await expect(value).toHaveAttribute('type', 'password')
+  await value.fill('synthetic-jev-setup-value')
+  await offer.getByRole('button', { name: 'Create and bind', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Bound' })).toBeVisible({ timeout: 30_000 })
+})
+
+Then('Backlog stores only the secret reference for Jev', async ({ page }: { page: Page }) => {
+  await openSettingsDialog(page)
+  await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Backlog', exact: true }).click()
+  const reference = page.locator('[data-setting-path="jevSecret"] [data-secret-input="reference"]')
+  await recordAssertion(page, 'backlog-jev-persists-reference-not-value', async () => {
+    await expect(reference).toHaveValue('secret:TYPESAFE_API_KEY')
+    expect(await page.locator('body').innerText()).not.toContain('synthetic-jev-setup-value')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the Jev setup journey is complete', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })

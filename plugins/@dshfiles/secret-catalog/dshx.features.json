@@ -293,6 +293,56 @@
       ]
     },
     {
+      "id": "inline-reference-setup",
+      "title": "Create and bind from a secret-reference field",
+      "summary": "A marked controlled input opens a masked create-and-bind form. The Secret Catalog Host stores the value, the consumer receives only a reference, and cancelling discards the draft without creating an alias.",
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "fill searchbox \"Search settings\" \"Jev secret\"",
+        "expect textbox \"Jev secret\"",
+        "click textbox \"Jev secret\"",
+        "expect button \"Bind a secret\"",
+        "click button \"Bind a secret\"",
+        "click button \"Add a new secret\"",
+        "expect textbox \"Secret value\""
+      ],
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [],
+      "states": ["offered", "editing-masked", "cancelled", "stored", "bound", "bind-failed"],
+      "failureModes": [
+        "Invalid or duplicate aliases, invalid environments, and folderless project/local scopes are rejected before storage.",
+        "A failed bind retains only the stored reference for retry; the value is cleared and never sent to the consumer.",
+        "Ambiguous aliases are not offered in the picker."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Secret value writes and metadata reads.",
+          "deterministicFake": "Use the fake secret CLI with synthetic values; assert manual values travel on stdin and consumer fields receive references only."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.reference-setup",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.inline-reference-setup-validation",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-setup-model.test.ts",
+          "testName": "validates alias, environment, and a non-empty bounded value through the shared schemas"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.inline-reference-setup-partial-failure",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-setup-flow.test.ts",
+          "testName": "keeps a stored reference for retry when binding fails, without creating a second secret"
+        }
+      ]
+    },
+    {
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
       "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment.",
@@ -358,14 +408,14 @@
     {
       "id": "backlog-jev-chat-setup",
       "title": "Set up a Jev key from chat",
-      "summary": "The latest completed chat turn offers a masked Jev key form only when Jev is enabled and its key cannot resolve; the Host stores the value through Secret Catalog and Backlog saves only its reference.",
+      "summary": "The latest completed chat turn offers the shared masked Secret Catalog setup form only when Jev is enabled and its key cannot resolve; it suggests the global TYPESAFE_API_KEY alias, and Backlog saves only its reference.",
       "reach": [
         "seed fake-secret-cli",
         "seed backlog-jev-enabled",
         "seed jev-setup-chat-thread",
-        "expect button \"Set up Jev key\"",
-        "click button \"Set up Jev key\"",
-        "expect textbox \"TypeSafe API key\""
+        "expect button \"Set up missing secrets\"",
+        "click button \"Set up missing secrets\"",
+        "expect textbox \"Secret value\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],

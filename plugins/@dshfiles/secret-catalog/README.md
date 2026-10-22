@@ -1,5 +1,7 @@
 # Secret Catalog
 
+![Create and bind from a secret-reference field](docs/screenshots/inline-reference-setup.png)
+
 ![Browse aliases by scope and environment](docs/screenshots/scoped-alias-catalog.png)
 
 ![Add a Jev key from the Backlog setting](docs/screenshots/backlog-jev-setup.png)
@@ -53,10 +55,10 @@ when it is registered, its workspace id.
   folder, so a project-scoped alias will not work there. The value goes to the
   Host and secret CLI stdin, never the conversation or settings.
 - When Jev is enabled and the Host cannot resolve its key, the newest completed
-  chat turn offers the same masked setup form inline. Its status request returns
-  only whether setup is needed; saving still sends the value to the Secret
-  Catalog Host and writes only `secret:jev-api-key-optmem` to Backlog settings.
-  The action does not enable Jev or auto-triage.
+  chat turn offers Secret Catalog's masked setup flow inline. It suggests the
+  global `TYPESAFE_API_KEY` alias; the value goes to the Secret Catalog Host and
+  Backlog settings receive only `secret:TYPESAFE_API_KEY`. The action does not
+  enable Jev or auto-triage.
 - Edit supports item name, source, tags, and a two-step masked value
   replacement. Value replacement is passed through stdin with an explicit
   overwrite flag after user confirmation. The CLI's `edit --field` also
@@ -157,3 +159,22 @@ the attribute names and the write helper for code that wants to name them. The
 Settings form uses it for `Schema.string().role('secret-ref')` fields. The panel
 opens below the field, flips above when that side has more room, and caps its
 height to the room left, so it stays inside the viewport.
+
+A focused reference field can also choose **Add a new secret**. That form masks
+the value, sends it once to this Host and the `secret` CLI on stdin, and writes
+only `secret:ALIAS` or `secret:ALIAS@env` through the field's normal input event.
+Optional `data-secret-alias`, `data-secret-environment`, `data-secret-scope`,
+and `data-secret-cwd` attributes provide suggestions; alias/environment/scope
+still go through the Catalog's canonical validation and duplicate checks. If
+storage succeeds but binding fails, the field keeps only the stored reference
+for retry—never the value.
+
+For a separate missing-credential offer (for example, in a chat turn tail),
+import `SecretSetupOffer`, `SecretSetupRequirement`, and `SecretSetupBinding`
+from `@dshfiles/secret-catalog/setup`. The consumer owns the Host-side missing
+status and supplies labels and optional suggestions; `onBind` receives only the
+requirement id and canonical reference. Render it inside a decorated client
+slot with that plugin's `PluginQueryProvider`; the offer preflights non-secret
+catalog metadata and stays hidden if the Catalog is unavailable. The offer is
+opt-in and its form writes values through Secret Catalog without exposing them
+to the consumer.

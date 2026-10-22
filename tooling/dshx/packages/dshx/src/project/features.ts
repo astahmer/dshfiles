@@ -40,7 +40,7 @@ const externalDependencySchema = z
  * `chat-reference-thread` is a thread in the scratch jj project whose transcript holds an explicit `` `jj:main` ``
  * reference, so the chat link is really rendered before the walk clicks it;
  * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`;
- * `backlog-jev-enabled` enables Backlog Jev in the scratch Settings page without supplying a credential;
+ * `backlog-jev-enabled` turns on Backlog Jev in scratch Settings only when off, without supplying a credential;
  * `multi-host-hosts` writes a synthetic host directory (one hidden host, one SSH host) for the Hosts page.
  */
 export const REACH_SEEDS = [

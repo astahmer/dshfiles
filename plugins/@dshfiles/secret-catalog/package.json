@@ -12,6 +12,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./setup": {
+      "types": "./src/setup.tsx",
+      "default": "./dist/setup.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
