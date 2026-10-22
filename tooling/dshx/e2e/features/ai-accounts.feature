@@ -124,3 +124,12 @@ Feature: AI Accounts
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When a briefly exhausted Command Code account fails a turn with auto-resume on
     Then the turn resumes on its own one minute after the reset
+
+  @scenario:model-effort-picker.fast-mode-supported
+  Scenario: Fast mode appears only on supported Codex models
+    Given the isolated AI Accounts and model effort picker plugin profile is booted
+    When a submitted prompt opens a scratch Session
+    And a supported Codex model is selected in the composer picker
+    And the reasoning-effort slider is adjusted one step
+    Then the picker reflects the adjusted reasoning effort
+    And Fast mode works for supported Codex models and stays hidden for Spark

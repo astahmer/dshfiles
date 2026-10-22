@@ -30,58 +30,29 @@ When('the composer model picker is searched for an unavailable model', async ({ 
 
   await expect(page.getByText('Choose a model', { exact: true })).toHaveCount(0)
   const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
-  const providerGroups = modelList.locator('section[aria-label]')
-  await expect(providerGroups.first()).toBeVisible()
   const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
   const modelOptions = modelList.locator('[data-model-picker-option]')
+  await expect(modelList).toBeVisible()
+  await expect(modelOptions).toHaveCount(0)
+  await expect(search).toBeFocused()
   await search.press('ArrowDown')
-  await expect(modelOptions.first()).toBeFocused()
-  await modelOptions.first().press('ArrowDown')
-  await expect(modelOptions.nth(1)).toBeFocused()
-  await modelOptions.nth(1).press('ArrowUp')
-  await expect(modelOptions.first()).toBeFocused()
-  await modelOptions.first().press('ArrowUp')
   await expect(search).toBeFocused()
 
   const popoverBounds = await page.getByRole('dialog').boundingBox()
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(430)
   const effort = reasoningEffort(page)
-  const providerDefault = effort.getByRole('button', { name: 'Use provider default', exact: true })
-  await expect(providerDefault).toBeVisible()
-  const defaultBounds = await providerDefault.boundingBox()
-  const slider = effort.getByRole('slider')
-  const sliderBounds = await slider.boundingBox()
-  if (defaultBounds === null || sliderBounds === null) throw new Error('The reasoning controls have no visible bounds.')
-  expect(defaultBounds.y + defaultBounds.height).toBeLessThan(sliderBounds.y)
-  const trackBounds = await effort.locator('[data-model-effort-slider] [data-slot="slider-track"]').boundingBox()
-  if (trackBounds === null) throw new Error('The effort slider track has no visible bounds.')
-  expect(trackBounds.height).toBeGreaterThanOrEqual(10)
-  expect(sliderBounds.width).toBeGreaterThanOrEqual(20)
-  const accentRange = await effort.locator('[data-model-effort-slider] [data-slot="slider-range"]').evaluate(element => {
-    const probe = document.createElement('div')
-    probe.style.backgroundColor = 'var(--dsw-alias-state-business-primary)'
-    document.body.append(probe)
-    const accentColor = getComputedStyle(probe).backgroundColor
-    probe.remove()
-    return accentColor !== 'rgba(0, 0, 0, 0)' && getComputedStyle(element).backgroundColor === accentColor
-  })
-  expect(accentRange).toBe(true)
-  expect(await effort.locator('[data-model-effort-slider-markers] [data-model-effort-marker]').count()).toBe(
-    await effort.locator('[data-model-effort-option]').count(),
-  )
-
-  await expect(modelList.getByText(selectedModel, { exact: true })).toBeVisible()
-  await expect(search).toBeVisible()
+  await expect(effort).toContainText('Select a model to see its reasoning controls.')
+  await expect(effort.getByRole('slider')).toHaveCount(0)
   await search.fill('zz-no-provider-model-83914')
   await expect(modelList.getByText('No matching models.', { exact: true })).toBeVisible()
 })
 
-Then('an empty search preserves the selected model and reasoning controls', async ({ page }: { page: Page }) => {
+Then('the empty catalog preserves selection without model-specific reasoning controls', async ({ page }: { page: Page }) => {
   const selection = pickerSelectionByPage.get(page)
   if (selection === undefined) throw new Error('The model picker selection was not captured before search.')
 
-  await recordAssertion(page, 'empty-search-preserves-model-and-reasoning', async () => {
+  await recordAssertion(page, 'empty-catalog-preserves-model-and-effort', async () => {
     const model = page.locator('[data-model-picker-text]')
     const effortLabel = page.locator('[data-model-picker-effort]')
     await expect(model).toHaveText(selection.model)
@@ -89,8 +60,8 @@ Then('an empty search preserves the selected model and reasoning controls', asyn
     await expect(page.getByRole('list', { name: 'Models grouped by provider', exact: true }).getByText('No matching models.', { exact: true })).toBeVisible()
 
     const effort = reasoningEffort(page)
-    await expect(effort.getByRole('slider')).toBeVisible()
-    await expect(effort.getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(effort).toContainText('Select a model to see its reasoning controls.')
+    await expect(effort.getByRole('slider')).toHaveCount(0)
   })
 })
 
@@ -131,6 +102,110 @@ Then('the picker reflects the adjusted reasoning effort', async ({ page }: { pag
     await expect(page.locator('[data-model-picker-text]')).toHaveText(selection.model)
     await expect(page.locator('[data-model-picker-effort]')).toHaveText(selection.effort)
     await expect(reasoningEffort(page).getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a supported Codex model is selected in the composer picker', async ({ page }: { page: Page }) => {
+  const providerAccounts = page.getByRole('complementary', { name: 'Provider accounts', exact: true })
+  await page.getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await expect(providerAccounts).toBeVisible()
+  await providerAccounts.getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+  await page.getByRole('treeitem', { name: /Open a scratch Session for/i }).click()
+  await expect(providerAccounts).toBeHidden()
+
+  const trigger = page.locator('[data-model-picker-text]')
+  await trigger.click()
+  const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  const codexGroup = modelList.getByRole('region', { name: 'Codex 1', exact: true })
+  const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
+  const modelOptions = modelList.locator('[data-model-picker-option]')
+  await search.fill('gpt-')
+  expect(await modelOptions.count()).toBeGreaterThan(1)
+  await search.press('ArrowDown')
+  await expect(modelOptions.first()).toBeFocused()
+  await modelOptions.first().press('ArrowDown')
+  await expect(modelOptions.nth(1)).toBeFocused()
+  await modelOptions.nth(1).press('ArrowUp')
+  await expect(modelOptions.first()).toBeFocused()
+  await modelOptions.first().press('ArrowUp')
+  await expect(search).toBeFocused()
+  await search.fill('gpt-6-luna')
+  const model = codexGroup.getByRole('button', { name: /gpt-6-luna/ })
+  await expect(model).toBeVisible()
+  await model.click()
+  await expect(trigger).toHaveAttribute('title', /Codex 1/)
+
+  const fastMode = page.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })
+  const dialog = page.getByRole('dialog')
+  if (!(await dialog.isVisible())) await trigger.click()
+  await expect(dialog).toBeVisible()
+  await expect(fastMode).toBeVisible()
+
+  const popoverBounds = await dialog.boundingBox()
+  if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
+  expect(popoverBounds.width).toBeLessThanOrEqual(430)
+  const effort = reasoningEffort(page)
+  const providerDefault = effort.getByRole('button', { name: 'Use provider default', exact: true })
+  await expect(providerDefault).toBeVisible()
+  const defaultBounds = await providerDefault.boundingBox()
+  const slider = effort.getByRole('slider')
+  const sliderBounds = await slider.boundingBox()
+  if (defaultBounds === null || sliderBounds === null) throw new Error('The reasoning controls have no visible bounds.')
+  expect(defaultBounds.y + defaultBounds.height).toBeLessThan(sliderBounds.y)
+  const trackBounds = await effort.locator('[data-model-effort-slider] [data-slot="slider-track"]').boundingBox()
+  if (trackBounds === null) throw new Error('The effort slider track has no visible bounds.')
+  expect(trackBounds.height).toBeGreaterThanOrEqual(10)
+  expect(sliderBounds.width).toBeGreaterThanOrEqual(20)
+  const accentRange = await effort.locator('[data-model-effort-slider] [data-slot="slider-range"]').evaluate(element => {
+    const probe = document.createElement('div')
+    probe.style.backgroundColor = 'var(--dsw-alias-state-business-primary)'
+    document.body.append(probe)
+    const accentColor = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return accentColor !== 'rgba(0, 0, 0, 0)' && getComputedStyle(element).backgroundColor === accentColor
+  })
+  expect(accentRange).toBe(true)
+  expect(await effort.locator('[data-model-effort-slider-markers] [data-model-effort-marker]').count()).toBe(
+    await effort.locator('[data-model-effort-option]').count(),
+  )
+  pickerSelectionByPage.set(page, {
+    model: (await trigger.innerText()).trim(),
+    effort: (await page.locator('[data-model-picker-effort]').innerText()).trim(),
+  })
+})
+
+Then('Fast mode works for supported Codex models and stays hidden for Spark', async ({ page }: { page: Page }) => {
+  const selection = pickerSelectionByPage.get(page)
+  if (selection === undefined) throw new Error('The Codex model selection was not captured before checking Fast mode.')
+
+  const trigger = page.locator('[data-model-picker-text]')
+  const dialog = page.getByRole('dialog')
+  const fastMode = page.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })
+  await recordAssertion(page, 'fast-mode-is-limited-to-supported-codex-models', async () => {
+    if (!(await dialog.isVisible())) await trigger.click()
+    await expect(dialog).toBeVisible()
+    await expect(trigger).toHaveText(selection.model)
+    await expect(page.locator('[data-model-picker-effort]')).toHaveText(selection.effort)
+    await expect(reasoningEffort(page).getByRole('slider')).toBeVisible()
+    await expect(reasoningEffort(page).getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(fastMode).toBeEnabled()
+    await fastMode.click()
+    await expect(fastMode).toBeChecked()
+
+    if (!(await dialog.isVisible())) await trigger.click()
+    await expect(dialog).toBeVisible()
+    const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+    const codexGroup = modelList.getByRole('region', { name: 'Codex 1', exact: true })
+    const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
+    await search.fill('gpt-5.3-codex-spark')
+    const spark = codexGroup.getByRole('button', { name: /gpt-5.3-codex-spark/ })
+    await expect(spark).toBeVisible()
+    await spark.click()
+    if ((await dialog.count()) === 0) await trigger.click()
+    await expect(dialog.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

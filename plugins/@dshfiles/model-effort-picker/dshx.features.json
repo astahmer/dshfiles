@@ -23,6 +23,48 @@
       ]
     },
     {
+      "id": "fast-mode",
+      "title": "Enable Fast mode on supported Codex models",
+      "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models. AI Accounts keeps the per-session route preference and adds service_tier=fast through pi-ai's supported payload hook.",
+      "reach": [
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a scratch session for Fast mode\"",
+        "click button \"Send message\"",
+        "expect text \"MISSING_CREDENTIAL\"",
+        "click button \"AI Accounts\"",
+        "click button \"Add account\"",
+        "click menuitem \"Codex account\"",
+        "click text \"Open a scratch session for*\"",
+        "click button \"reasoning*\"",
+        "fill textbox \"Search models and providers\" \"gpt-6-luna\"",
+        "click button \"GPT-6 Luna*\"",
+        "expect switch \"Fast mode; may cost more\"",
+        "click switch \"Fast mode; may cost more\"",
+        "expect switch \"Fast mode; may cost more\""
+      ],
+      "surfaces": ["client", "host", "api"],
+      "configuration": [],
+      "states": ["hidden", "available", "enabled", "updating", "error"],
+      "failureModes": [
+        "Without an eligible AI Accounts Codex route/model the switch stays hidden.",
+        "Unsupported models and non-Codex provider routes never receive the Fast service tier.",
+        "Fast mode is stored in Host memory per session and resets when the Host restarts."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.codex-fast-mode-wire-tier",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-fast-mode.test.ts",
+          "testName": "adds service_tier fast to the actual Codex request only while enabled"
+        },
+        {
+          "kind": "gherkin",
+          "id": "model-effort-picker.fast-mode-supported",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ]
+    },
+    {
       "id": "account-swap",
       "title": "Swap to the next account offering the same model",
       "summary": "A swap button beside the composer model picker moves the Session to the next provider route, in catalog order, that offers the selected model id, keeping the reasoning effort when the target advertises it.",

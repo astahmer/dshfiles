@@ -323,6 +323,12 @@ as agent tools`): read-only `ai_accounts_identity`, `ai_accounts_catalog`,
 `ai_accounts_set_auto_retry`, `ai_accounts_set_native_provider` and
 `ai_accounts_refresh_pricing`.
 
+The Fast mode API (`ai-accounts-model-fast-mode`, imported by the composer model
+picker) binds read-only `ai_accounts_fast_mode_status` and the user-requested
+write `ai_accounts_set_fast_mode`. It is session-scoped, Agent callers are
+restricted to their own Session, and only explicitly supported AI Accounts
+Codex routes/models are accepted.
+
 The model fallback chain (`ai-accounts-model-fallback` API, imported by the
 composer picker through the `model-fallback-api` module) binds every verb the
 picker's Fallbacks section uses: read-only `model_fallback_state`, and the
@@ -363,7 +369,8 @@ Still missing, because they write secrets or need a browser:
 ### model-effort-picker, usage, memory, optmem
 
 - `model-effort-picker`: `session_models` (`session/modelCatalog`); model
-  _selection_ is already served by `thread_select_model`.
+  _selection_ is already served by `thread_select_model`. Fast mode reads and
+  writes are served by AI Accounts' `ai-accounts-model-fast-mode` API above.
 - `usage`: `usage_status` (read-only) and `usage_reindex` are now bound, as are the
   existing `usage_requests` and `usage_report` — but the plugin is **not installed**
   in the web profile, so all four are latent until it is.

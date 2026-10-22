@@ -20,6 +20,10 @@
       "types": "./src/model-fallback-api.ts",
       "default": "./dist/model-fallback-api.js"
     },
+    "./model-fast-mode-api": {
+      "types": "./src/model-fast-mode-api.ts",
+      "default": "./dist/model-fast-mode-api.js"
+    },
     "./locale/en.json": "./locale/en.json",
     "./pricing-catalog": {
       "types": "./src/pricing-catalog.ts",

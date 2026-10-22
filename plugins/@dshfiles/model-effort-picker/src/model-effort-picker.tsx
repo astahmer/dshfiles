@@ -11,6 +11,7 @@ import { Slider } from '@dshfiles/plugin-ui/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftRightIcon, CheckIcon, ChevronDownIcon, LoaderCircleIcon, RotateCcwIcon, SearchIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { FastModeSection } from './fast-mode-section.js'
 import { FallbacksSection } from './fallbacks-section.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { modelEffortPickerSettings } from './settings.js'
@@ -321,6 +322,15 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               </div>
             )}
           </section>
+          {current !== null && (
+            <FastModeSection
+              disabled={busy}
+              key={`${sessionId}:${current.provider}:${current.model}`}
+              model={current.model}
+              provider={current.provider}
+              sessionId={sessionId}
+            />
+          )}
           <FallbacksSection busy={busy} current={current} groups={state.groups} sessionId={sessionId} />
         </PopoverContent>
       </Popover>

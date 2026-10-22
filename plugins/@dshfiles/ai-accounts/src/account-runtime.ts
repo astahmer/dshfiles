@@ -7,6 +7,7 @@ import type { AccountsUsage } from './api.js'
 import type { PricingCatalog } from './pricing-catalog.js'
 import type { CopilotLoginService } from './copilot-login.js'
 import type { ModelFallbackRouter } from './model-fallback-router.js'
+import type { FastModeService } from './codex-fast-mode.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
@@ -20,6 +21,7 @@ interface AccountRuntime {
   pricing?: PricingCatalog
   copilotLogin?: CopilotLoginService
   modelFallbackRouter?: ModelFallbackRouter
+  fastMode?: FastModeService
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()
@@ -32,6 +34,7 @@ export const activateAccountRuntime = (ctx: Context): AccountRuntime => {
   ctx.effect(() => () => {
     runtime.scheduler?.dispose()
     runtime.copilotLogin?.dispose()
+    runtime.fastMode?.clear()
     if (runtimes.get(ctx.root) === runtime) runtimes.delete(ctx.root)
   })
   return runtime

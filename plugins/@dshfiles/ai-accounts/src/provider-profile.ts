@@ -2,6 +2,7 @@ import type { GenerateOptions, LlmImageRequestPricing, LlmResolvedModelInfo, Pre
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import type { FastModeService } from './codex-fast-mode.js'
 import { AccountsRules } from './api.js'
 import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
@@ -188,6 +189,7 @@ async function* retryableUpstreamReplayOverflow(chunks: AsyncIterable<StreamChun
  */
 export class EffortPinnedAdapter extends PiAiAdapter {
   private readonly reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
+  private readonly fastMode: FastModeService
   private readonly profilesFor: ConstructorParameters<typeof PiAiAdapter>[0]['profiles']
   private readonly routeFor: (options: GenerateOptions) => string
   private readonly pricingFor: ((provider: string, model: string) => LlmImageRequestPricing | undefined) | undefined
@@ -196,6 +198,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     config: ConstructorParameters<typeof PiAiAdapter>[0],
     deps: {
       reasoningDefaults: ReadonlyMap<string, Readonly<Record<string, string>>>
+      fastMode: FastModeService
       /**
        * The account that serves this request on the wire. A fail-over swaps the
        * route here only, like Luna Reserve swaps the model, so the picker, the
@@ -209,6 +212,7 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     super(config)
     this.profilesFor = config.profiles
     this.reasoningDefaults = deps.reasoningDefaults
+    this.fastMode = deps.fastMode
     this.routeFor = deps.routeFor ?? (options => options.provider)
     this.pricingFor = deps.imageRequestPricing
   }
@@ -243,15 +247,31 @@ export class EffortPinnedAdapter extends PiAiAdapter {
     return pinnedCall(provider === options.provider ? options : { ...options, provider }, this.reasoningDefaults, this.thinkingDefault)
   }
 
+  private withFastMode(options: GenerateOptions, wireOptions: GenerateOptions, stream: AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk> {
+    return this.fastMode.withRequest(
+      {
+        sessionId: options.sessionId,
+        selectedProvider: options.provider,
+        wireProvider: wireOptions.provider,
+        model: wireOptions.model,
+      },
+      stream,
+    )
+  }
+
   override stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    return retryableUpstreamReplayOverflow(super.stream(this.wireCall(options)))
+    const wireOptions = this.wireCall(options)
+    return this.withFastMode(options, wireOptions, retryableUpstreamReplayOverflow(super.stream(wireOptions)))
   }
 
   override prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
     return super.prepareCall(provider, model, signal).then(call => ({
       ...call,
       model: this.withModelDefault(call.model),
-      stream: (options: GenerateOptions) => retryableUpstreamReplayOverflow(call.stream(this.wireCall(options))),
+      stream: (options: GenerateOptions) => {
+        const wireOptions = this.wireCall(options)
+        return this.withFastMode(options, wireOptions, retryableUpstreamReplayOverflow(call.stream(wireOptions)))
+      },
     }))
   }
 }

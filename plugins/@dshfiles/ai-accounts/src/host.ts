@@ -16,6 +16,8 @@ import { CLAUDE_CLI_TOKEN, ClaudeCliSessions } from './claude-cli.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { AccountSettingsModel, aiAccountsHostSettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
+import { FastModeService, isCodexFastModeModel, withCodexFastMode } from './codex-fast-mode.js'
+import { modelFastModeHostApi } from './model-fast-mode-host.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
 import { accountStoreService, type AccountStoreFile } from './account-store.js'
@@ -33,6 +35,8 @@ import { createProvider } from '@earendil-works/pi-ai'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
 import { GITHUB_COPILOT_KIND } from './provider-routes.js'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
@@ -86,8 +90,8 @@ const PRICING_CHECK_MS = 30 * 60_000
 
 export default definePlugin({
   id: 'llm-ai-accounts',
-  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials'],
-  apis: [accountsHostApi, modelFallbackHostApi],
+  inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials', 'agents'],
+  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],
   setup: api => {
@@ -155,6 +159,27 @@ export default definePlugin({
     const initialFile = accountStoreService.readAccountFileSync()
     let config = configFromAccountsFile(initialFile)
     let routes = ProviderRoutes.buildRoutes(config).routes
+    let profiles = new Map<string, ResolvedPiAiProviderProfile>()
+    const fastMode = new FastModeService({
+      isAvailable: route => {
+        if (routes.get(route.provider)?.kind !== CODEX_KIND) return false
+        const model = profiles
+          .get(route.provider)
+          ?.piProvider?.getModels()
+          .find(candidate => candidate.id === route.model)
+        return model !== undefined && isCodexFastModeModel(model)
+      },
+      isLiveSession: sessionId => ctx.agents.get(SessionId(sessionId)) !== undefined,
+    })
+    runtime.fastMode = fastMode
+    const registerFastModeCleanup = (agent: Agent): void => {
+      agent.ctx.effect(() => () => fastMode.delete(agent.id), 'ai-accounts: Fast mode session state')
+    }
+    for (const agent of ctx.agents.list()) registerFastModeCleanup(agent)
+    ctx.on('agent/created', ({ agent }) => {
+      registerFastModeCleanup(agent)
+      return undefined
+    })
     const copilotLogin = createCopilotLoginService({
       credentials: ctx.credentials,
       isCopilotAccount: instanceId => routes.get(instanceId)?.kind === GITHUB_COPILOT_KIND,
@@ -163,6 +188,7 @@ export default definePlugin({
     runtime.copilotLogin = copilotLogin
 
     const codexUpstream = openaiCodexProvider()
+    const codexFastUpstream = withCodexFastMode({ upstream: codexUpstream, fastMode })
     const opencodeUpstream = opencodeGoProvider()
     const claudeUpstream = anthropicProvider()
     const claudeCli = new ClaudeCliSessions({
@@ -241,7 +267,7 @@ export default definePlugin({
       const upstreamFor = (id: string, route: Route) => {
         if (route.kind === CODEX_KIND) {
           return withLunaReserve({
-            upstream: codexUpstream,
+            upstream: codexFastUpstream,
             onReserve: () =>
               AccountSettingsModel.readLunaReserveRouting() &&
               (lunaReserveHeld(id, Date.now()) ||
@@ -282,7 +308,7 @@ export default definePlugin({
         ),
       )
 
-    let profiles = buildProfiles(routes, initialFile)
+    profiles = buildProfiles(routes, initialFile)
     const reasoningDefaults = buildReasoningDefaults(initialFile)
 
     const pool = createAccountPool({
@@ -479,6 +505,7 @@ export default definePlugin({
       },
       {
         reasoningDefaults,
+        fastMode,
         routeFor: accountForRequest,
         imageRequestPricing: (provider, model) =>
           routes.get(provider)?.kind === COMMANDCODE_KIND ? CommandCodeCapabilities.imageRequestPricing(model) : undefined,

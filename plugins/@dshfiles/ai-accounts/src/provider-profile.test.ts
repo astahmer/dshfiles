@@ -3,6 +3,7 @@ import { ReasoningEffortId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
+import { FastModeService } from './codex-fast-mode.js'
 import { createCommandCodeProvider } from './commandcode-provider.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
 
@@ -10,6 +11,8 @@ const modelsFor = (profile: ReturnType<typeof buildProfile>) => {
   if (profile.piProvider === undefined) throw new Error('The resolved profile must expose its provider.')
   return profile.piProvider.getModels()
 }
+
+const disabledFastMode = new FastModeService({ isAvailable: () => false, isLiveSession: () => true })
 
 describe('account provider profiles', () => {
   it.each(['gpt-6.1-sol', 'gpt-6.1-luna', 'gpt-6.1'])('inherits matching GPT family capabilities for %s instead of Spark', async modelId => {
@@ -34,7 +37,7 @@ describe('account provider profiles', () => {
           authContext: { env: async () => undefined, fileExists: async () => false },
         },
       },
-      { reasoningDefaults: new Map() },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
     )
 
     expect(await adapter.resolveModel('codex-emialex', modelId)).toMatchObject({
@@ -105,6 +108,7 @@ describe('account provider profiles', () => {
           ['codex-alex2', { [modelId]: 'max' }],
           ['codex-emialex', { [modelId]: 'high' }],
         ]),
+        fastMode: disabledFastMode,
       },
     )
 
@@ -204,7 +208,7 @@ describe('Codex upstream replay overflow', () => {
           authContext: { env: async () => undefined, fileExists: async () => false },
         },
       },
-      { reasoningDefaults: new Map() },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
     )
     const originalFetch = globalThis.fetch
     globalThis.fetch = async () => new Response(body, { status })
@@ -250,7 +254,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
           authContext: { env: async () => undefined, fileExists: async () => false },
         },
       },
-      { reasoningDefaults: new Map() },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
     )
     const originalFetch = globalThis.fetch
     let body: Record<string, unknown> = {}
@@ -284,7 +288,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
           authContext: { env: async () => undefined, fileExists: async () => false },
         },
       },
-      { reasoningDefaults: new Map() },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
     )
     const reasoning = (await adapter.resolveModel('opencode-go-test', 'deepseek-v4.1-flash')).reasoning
     expect(reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'low', 'high', 'max'])
