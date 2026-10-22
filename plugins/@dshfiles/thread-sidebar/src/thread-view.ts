@@ -69,7 +69,7 @@ const matchesThreadStatusFilter = (options: {
     if (filter === 'working') return options.running
     // Settled threads are storage, like archived ones: they belong to the settled section of the unfiltered list,
     // never to a working view that happens to clip running threads out.
-    if (filter === 'not-working') return !options.archived && !options.settled && !options.muted && (!options.running || options.needsAttention)
+    if (filter === 'not-working') return !options.archived && !options.settled && !options.muted && !options.running
     if (filter === 'attention') return options.needsAttention
     if (filter === 'settled') return options.settled
     return options.archived
@@ -104,7 +104,7 @@ const attentionLabelForView = (input: {
       !matchesThreadStatusFilter({
         filters: input.filters,
         running: entry.running,
-        needsAttention: true,
+        needsAttention: entry.attentionLabel !== undefined,
         archived: entry.archived,
         settled: entry.settled,
         muted: entry.muted,

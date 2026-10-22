@@ -337,8 +337,8 @@
         "hidden"
       ],
       "failureModes": [
-        "Working and not-working status matching uses session activity plus attention, archive, and mute state; source filters use parentId and origin.",
-        "Attention dots appear only on matching non-All-threads views and use one highest-priority attention color.",
+        "Not-working excludes every running thread, even when it has an attention label; stopped attention threads remain eligible. Source filters use parentId and origin.",
+        "Attention dots appear only on matching non-All-threads views, exclude running threads from not-working views, and use one highest-priority attention color.",
         "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled."
       ],
       "externalDependencies": [],
@@ -375,7 +375,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.view-controls-unit-not-working-filter",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
-          "testName": "includes stopped input-needed and usage-limit threads in Not working"
+          "testName": "includes stopped input-needed and usage-limit threads, but no running threads, in Not working"
         },
         {
           "kind": "unit-test",

@@ -104,6 +104,22 @@ describe('thread view attention markers', () => {
     ).toBe('threadSidebarInterrupted')
   })
 
+  it('does not badge a not-working view from an attention thread that is still running', () => {
+    const runningFinishedChild = {
+      thread: {},
+      attentionLabel: 'threadSidebarTurnFinished',
+      running: true,
+      archived: false,
+      settled: false,
+      muted: false,
+    } as const
+
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBeUndefined()
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['working'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBe(
+      'threadSidebarTurnFinished',
+    )
+  })
+
   it('only considers attention threads that match the tab source and status', () => {
     const entries = [
       {
@@ -156,10 +172,10 @@ describe('thread view unread counts', () => {
     expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
   })
 
-  it('counts an unread running thread when its attention makes it visible', () => {
+  it('counts an unread running thread only in the views that list running attention', () => {
     const unreadAttention = entry({ attentionLabel: 'threadSidebarInputNeeded', unread: true, running: true })
 
-    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(0)
     expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(1)
   })
 
@@ -229,7 +245,7 @@ describe('thread view filters', () => {
     ).toBe(false)
   })
 
-  it('includes stopped input-needed and usage-limit threads in Not working', () => {
+  it('includes stopped input-needed and usage-limit threads, but no running threads, in Not working', () => {
     for (const status of ['input-needed', 'usage-limit']) {
       expect(
         ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, settled: false, muted: false }),
@@ -241,7 +257,7 @@ describe('thread view filters', () => {
     ).toBe(true)
     expect(
       ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, settled: false, muted: false }),
-    ).toBe(true)
+    ).toBe(false)
     expect(
       ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
     ).toBe(false)
