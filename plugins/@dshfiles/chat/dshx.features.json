@@ -37,7 +37,8 @@
           "id": "chat.transcript-window",
           "file": "plugins/@dshfiles/chat/tests/transcript-window.test.ts",
           "testName": "mounts the latest rows first and widens toward older rows"
-        }
+        },
+        { "kind": "gherkin", "id": "chat.windowed-transcript", "featureFile": "tooling/dshx/e2e/features/chat.feature" }
       ]
     },
     {

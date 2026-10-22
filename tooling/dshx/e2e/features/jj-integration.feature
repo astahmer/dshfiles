@@ -233,6 +233,34 @@ Feature: jj thread workspaces
     When the integration is queued from the workspace menu
     Then main advances onto the work described "Queued work" once the thread is idle
 
+  @scenario:jj-integration.thread-integration-attention-view
+  Scenario: Thread integration opens on work needing attention
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace gains a revision described "Attention work"
+    And the Thread workspaces panel is opened
+    Then the Thread integration panel prioritises work needing attention
+    When the All integration view is selected
+    Then the Thread integration panel keeps its counts visible
+
+  @scenario:jj-integration.thread-integration-row-details
+  Scenario: Expand a thread integration row for revision and session details
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace gains a revision described "Detailed work"
+    And the Thread workspaces panel is opened
+    Then the thread row details show revisions, sessions, path and preview
+
+  @scenario:jj-integration.new-thread-project-picker-browser-journey
+  Scenario: Browse registered projects and thread workspaces in the New thread picker
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    Then the New thread picker shows its Projects and JJ workspace listings for a disposable repository
+
   @scenario:jj-integration.thread-workspace-rebase-browser-journey
   Scenario: Thread workspaces update as soon as a rebase succeeds
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

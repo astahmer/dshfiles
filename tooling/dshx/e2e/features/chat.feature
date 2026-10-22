@@ -1,4 +1,17 @@
-Feature: Resume the latest interrupted task inline
+Feature: Chat browser journeys
+
+  @scenario:chat.windowed-transcript
+  Scenario: A long persisted transcript mounts older rows as the reader scrolls
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When a real thread with one hundred eighty transcript turns is opened
+    Then the latest transcript rows are visible and older rows appear when scrolling up
+
+  @scenario:session-controller.lean-session-follow
+  Scenario: A real Host follow renders history without provider replay blocks in browser frames
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When a real Host session with provider replay data is opened
+    Then the browser renders the response without receiving provider replay blocks
+
 
   @scenario:chat.resume-interrupted
   Scenario: Only the latest idle interrupted task can be resumed

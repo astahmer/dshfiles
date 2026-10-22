@@ -1,8 +1,61 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { createRequire } from 'node:module'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { When, Then } from '../bdd.js'
 import { profileFor, recordAssertion, finishJourneyAssertions } from '../steps.js'
 import { seedInterruptedSession } from '../seed-interrupted-session.mjs'
 import { seedChatImageLinkSession } from '../seed-chat-image-link-session.mjs'
+
+const replayMarker = 'provider-replay-private-marker'
+const browserFrames = new WeakMap<Page, string[]>()
+
+const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void> => {
+  const projectRequire = createRequire(new URL('../../../../../plugins/@dshfiles/session-controller/package.json', import.meta.url))
+  const require = createRequire(projectRequire.resolve('@deepseek-ai/dsh/package.json'))
+  const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href)
+  const persistence = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-persistence-jsonl')).href)
+  const { SessionId } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session')).href)
+  const { createAssistantMessage, createUserMessage } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-llm')).href)
+  const context = new Context()
+  try {
+    await context.plugin(persistence, { root: join(homeRoot, 'sessions') })
+    const handle = await context.sessionPersistence.create({
+      id: SessionId('session-chat-transcript-window-fixture'),
+      createdAt: Date.now(),
+      cwd: '/tmp',
+      version: 4,
+      isSeeded: false,
+      delegationDepth: 0,
+      agentPreset: 'standard',
+    })
+    const events = [
+      { type: 'permission/preset', seq: 0, time: 100, data: { preset: 'workspace-write' } },
+      { type: 'session/title', seq: 1, time: 200, data: { title: 'Chat transcript window fixture', messageSeqs: [], source: { kind: 'user' } } },
+    ]
+    let seq = 2
+    for (let row = 1; row <= rowCount; row++) {
+      events.push({ type: 'turn/start', seq: seq++, time: 300 + row * 10, data: { turn: row } })
+      events.push({
+        type: 'user/message', seq: seq++, time: 301 + row * 10, surfaceOp: 'append',
+        data: createUserMessage({ content: [{ type: 'text', text: `Transcript question ${row}` }], source: { kind: 'user' } }),
+      })
+      events.push({ type: 'step/start', seq: seq++, time: 302 + row * 10, data: { turn: row, step: 1 } })
+      const source = { provider: 'fixture', model: 'fixture', ...(row === rowCount ? { replayState: { response: { id: 'fixture_response', stopReason: 'toolUse' }, blocks: [{ signature: replayMarker }] } } : {}) }
+      events.push({
+        type: 'assistant/message', seq: seq++, time: 303 + row * 10, surfaceOp: 'append',
+        data: { turn: row, step: 1, message: createAssistantMessage({ content: [{ type: 'text', text: `Transcript answer ${row}` }], source }), stream: [] },
+      })
+      events.push({ type: 'step/end', seq: seq++, time: 304 + row * 10, data: { turn: row, step: 1 } })
+      events.push({ type: 'turn/end', seq: seq++, time: 305 + row * 10, data: { turn: row, reason: { kind: 'completed' } } })
+    }
+    await handle.append(events)
+    await handle.flush()
+    await handle.close()
+  } finally {
+    await context.fiber.dispose()
+  }
+}
 
 When('a thread with two interrupted tasks is opened', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
@@ -42,6 +95,56 @@ Then('the stopped notices remain but Resume disappears', async ({ page }: { page
     await expect(page.getByRole('button', { name: 'Resume', exact: true })).toHaveCount(0)
     await expect(page.getByText('Task stopped', { exact: true })).toHaveCount(2)
     await expect(page.getByText('Continue the interrupted task', { exact: false }).first()).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+const openTranscriptFixture = async (page: Page, rowCount: number): Promise<void> => {
+  const profile = profileFor(page)
+  await seedTranscript(profile.homeRoot, rowCount)
+  const fixture = page.getByRole('treeitem', { name: /Untitled|Chat transcript window fixture/ })
+  await expect.poll(async () => {
+    await page.reload()
+    if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
+    await fixture.first().waitFor({ state: 'attached', timeout: 3_000 }).catch(() => undefined)
+    return fixture.count()
+  }, { timeout: 30_000 }).toBeGreaterThan(0)
+  await fixture.first().click()
+}
+
+When('a real thread with one hundred eighty transcript turns is opened', async ({ page }: { page: Page }) => {
+  await openTranscriptFixture(page, 180)
+})
+
+Then('the latest transcript rows are visible and older rows appear when scrolling up', async ({ page }: { page: Page }) => {
+  const scrollport = page.locator('[data-conversation-scroll]').first()
+  await recordAssertion(page, 'chat-windowed-transcript-starts-at-tail', async () => {
+    await expect(page.getByText('Transcript answer 180', { exact: true })).toBeVisible()
+    await expect(page.getByText('Transcript answer 1', { exact: true })).toHaveCount(0)
+  })
+  await scrollport.hover()
+  for (let attempt = 0; attempt < 12; attempt++) await page.mouse.wheel(0, -600)
+  await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible({ timeout: 10_000 })
+  await recordAssertion(page, 'chat-windowed-transcript-mounts-older-rows-on-scroll', async () =>
+    await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible(),
+  )
+  await finishJourneyAssertions(page)
+})
+
+When('a real Host session with provider replay data is opened', async ({ page }: { page: Page }) => {
+  const frames: string[] = []
+  browserFrames.set(page, frames)
+  page.on('websocket', socket => socket.on('framereceived', frame => frames.push(typeof frame.payload === 'string' ? frame.payload : frame.payload.toString('utf8'))))
+  await openTranscriptFixture(page, 1)
+})
+
+Then('the browser renders the response without receiving provider replay blocks', async ({ page }: { page: Page }) => {
+  const frames = browserFrames.get(page) ?? []
+  await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible()
+  await expect.poll(() => frames.length, { timeout: 10_000 }).toBeGreaterThan(0)
+  await recordAssertion(page, 'session-controller-browser-follow-omits-provider-blocks', () => {
+    expect(frames.join('\n')).toContain('Transcript answer 1')
+    expect(frames.join('\n')).not.toContain(replayMarker)
   })
   await finishJourneyAssertions(page)
 })

@@ -48,6 +48,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "test-runs.card",
+          "featureFile": "tooling/dshx/e2e/features/test-runs.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "test-runs.parse-default",
           "file": "plugins/@dshfiles/test-runs/src/vitest-report.test.ts",

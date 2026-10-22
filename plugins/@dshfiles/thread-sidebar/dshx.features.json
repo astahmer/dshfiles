@@ -1918,6 +1918,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "thread-sidebar.rename-thread-title",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "thread-sidebar.rename-title-route",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",

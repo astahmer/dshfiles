@@ -18,6 +18,13 @@ interface ThreadHistoryJourney {
 const threadHistoryJourneys = new WeakMap<Page, ThreadHistoryJourney>()
 const archivedOpenJourneys = new WeakMap<Page, string>()
 
+interface ThreadTitleJourney {
+  readonly threadId: string
+  readonly title: string
+}
+
+const threadTitleJourneys = new WeakMap<Page, ThreadTitleJourney>()
+
 interface FinishedTurnJourney {
   readonly targetThreadId: string
 }
@@ -1803,6 +1810,47 @@ Then('the blocked session is listed only in the Usage limit group when grouped b
     await expect(group.locator(`[data-thread-id="${sessionId}"]`)).toBeVisible()
     // A usage-limit row is a bare button, a list row an article: count the main action both carry.
     await expect(threadSidebar(page).locator(`[data-thread-main-action][data-thread-id="${sessionId}"]`)).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a thread title is renamed from its row menu and a second edit is cancelled', async ({ page }: { page: Page }) => {
+  const threadId = await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar rename title e2e')
+  await composer.press('Enter')
+  const row = threadRow(page, threadId)
+  await expect(row).toHaveCount(1)
+
+  await openThreadRowMenu(row)
+  await page.getByRole('menuitem', { name: 'Edit title', exact: true }).click()
+  const titleEditor = threadSidebar(page).getByRole('textbox', { name: 'Edit title', exact: true })
+  await expect(titleEditor).toBeVisible()
+  await titleEditor.click()
+  await titleEditor.fill('  Sidebar rename e2e  ')
+  await titleEditor.press('Enter')
+  await expect(titleEditor).toHaveCount(0)
+  await expect(row).toContainText('Sidebar rename e2e')
+
+  await openThreadRowMenu(row)
+  await page.getByRole('menuitem', { name: 'Edit title', exact: true }).click()
+  const cancelledEditor = threadSidebar(page).getByRole('textbox', { name: 'Edit title', exact: true })
+  await cancelledEditor.fill('Cancelled draft')
+  await cancelledEditor.press('Escape')
+  await expect(cancelledEditor).toHaveCount(0)
+  threadTitleJourneys.set(page, { threadId, title: 'Sidebar rename e2e' })
+})
+
+Then('the renamed thread title survives reload and the cancelled draft is discarded', async ({ page }: { page: Page }) => {
+  const journey = threadTitleJourneys.get(page)
+  if (journey === undefined) throw new Error('No thread title rename was recorded for this browser page.')
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  const row = threadRow(page, journey.threadId)
+  await recordAssertion(page, 'thread-sidebar-row-title-rename-persists-and-cancel-discards', async () => {
+    await expect(row).toContainText(journey.title)
+    await expect(row).not.toContainText('Cancelled draft')
+    await expect(threadSidebar(page).getByRole('textbox', { name: 'Edit title', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

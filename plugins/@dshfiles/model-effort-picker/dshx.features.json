@@ -93,6 +93,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "model-effort-picker.account-swap",
+          "featureFile": "tooling/dshx/e2e/features/model-effort-picker-account-swap.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "model-effort-picker.account-swap-next",
           "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",

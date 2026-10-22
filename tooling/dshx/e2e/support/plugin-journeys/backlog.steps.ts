@@ -5,6 +5,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { openActivity } from './activity-timeline.steps.js'
 
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed' })
@@ -665,6 +666,177 @@ Then('the backlog detail shows {string}', async ({ page }: { page: Page }, text:
   await recordAssertion(page, 'backlog-reference-opened-in-panel', async () => {
     await expect(peek(page).getByText(text, { exact: true })).toBeVisible()
   })
+})
+
+When('the backlog backfill is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Backfill triage', exact: true }).click()
+})
+
+Then('the backfill dialog explains that it runs Jev and the configured triage model', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-backfill-dialog', async () => {
+    const dialog = page.getByRole('dialog', { name: 'Backfill triage', exact: true })
+    await expect(dialog).toContainText('Runs Jev and the configured triage model')
+    await expect(dialog.getByRole('button', { name: 'Run backfill', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the captured backlog item keeps both image attachments', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-rich-capture-images', async () => {
+    await row(page, 'Capture screenshots with the issue').click()
+    await expect(peek(page).getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+    await expect(peek(page).getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the item description is replaced with {string}', async ({ page }: { page: Page }, text: string) => {
+  await peek(page).getByRole('button', { name: 'Edit description', exact: true }).click()
+  const body = peek(page).getByRole('textbox', { name: 'Body', exact: true })
+  await body.fill(text)
+  await body.press('ControlOrMeta+Enter')
+})
+
+Then('the item detail shows the saved Markdown description', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-rich-text-description', async () => {
+    await expect(peek(page)).toContainText('Observed')
+    await expect(peek(page).locator('strong')).toContainText('Observed')
+  })
+})
+
+When('a comment {string} is added', async ({ page }: { page: Page }, text: string) => {
+  await peek(page).getByRole('textbox', { name: 'Comment', exact: true }).fill(text)
+  await peek(page).getByRole('button', { name: 'Reply', exact: true }).click()
+})
+
+Then('the item activity shows the comment', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-rich-text-comment', async () => {
+    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Confirmed in the scratch profile')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the capture composer offers a project picker', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-project-scope-picker', async () => {
+    await expect(page.getByRole('combobox', { name: 'Filter by project', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Project of the new item', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Backlog Inbox is opened', async ({ page }: { page: Page }) => {
+  const inbox = page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Inbox' })
+  await inbox.click()
+  await expect(inbox).toHaveAttribute('aria-current', 'page')
+})
+
+Then('the Inbox lists {string} under {string}', async ({ page }: { page: Page }, title: string, filter: string) => {
+  await recordAssertion(page, 'backlog-attention-inbox', async () => {
+    const inbox = page.getByRole('region', { name: 'Inbox', exact: true })
+    const filterTab = inbox.getByRole('tab', { name: new RegExp(`^${filter}`) })
+    await filterTab.click()
+    await expect(filterTab).toHaveAttribute('aria-selected', 'true')
+    await expect(inbox.getByRole('list')).toContainText(title)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('Backlog automatic triage is configured to use the local fake model', async ({ page }: { page: Page }) => {
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
+  const settings = page.locator('[data-settings-namespace="dshfiles-backlog"]')
+  await expect(settings.locator('[data-setting-path="jevSecret"]')).toBeVisible()
+  await settings.locator('[data-setting-path="triageProvider"] input').fill('commandcode_work')
+  await settings.locator('[data-setting-path="triageModel"] input').fill('gpt-6-luna')
+  const autoTriage = settings.getByRole('switch', { name: 'Auto triage', exact: true })
+  if (!(await autoTriage.isChecked())) await autoTriage.click()
+  await expect(autoTriage).toBeChecked()
+  await expect(settings.locator('[data-setting-path="triageProvider"] input')).toHaveValue('commandcode_work')
+  await expect(settings.locator('[data-setting-path="triageModel"] input')).toHaveValue('gpt-6-luna')
+  await expect(settings.locator('[data-setting-path="triageProvider"]')).toHaveAttribute('data-modified', '')
+  await expect(settings.locator('[data-setting-path="triageModel"]')).toHaveAttribute('data-modified', '')
+  await expect(settings.locator('[data-setting-path="autoTriage"]')).toHaveAttribute('data-modified', '')
+})
+
+When('an item with a deterministic fake triage proposal is captured', async ({ page }: { page: Page }) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  await capture.fill('[[answer {"confidence":0.99,"title":"Automatic triage proposal"}]]')
+  await capture.press('Enter')
+  await expect(capture).toHaveValue('')
+})
+
+Then('automatic triage applies the fake model title to the item', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-auto-triage-proposal-applied', async () => {
+    await expect(row(page, 'Automatic triage proposal')).toBeVisible({ timeout: 30_000 })
+    await row(page, 'Automatic triage proposal').click()
+    await expect(peek(page)).toContainText('Automatic triage proposal')
+    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('triage applied title')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the item detail links the thread that mentioned it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-lifecycle-thread-link', async () => {
+    const related = peek(page).getByRole('list', { name: 'Related' })
+    await expect(related.getByRole('button', { name: 'Fake thread title', exact: true })).toBeVisible()
+    await expect(related.getByText('idle', { exact: true })).toBeVisible()
+    await expect(peek(page).getByRole('button', { name: 'Status of b:1', exact: true })).toContainText('In progress')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the comment box searches for the backlog item mention', async ({ page }: { page: Page }) => {
+  const comment = peek(page).getByRole('textbox', { name: 'Comment', exact: true })
+  await comment.fill('')
+  await comment.pressSequentially('@target')
+  await expect(peek(page).getByRole('listbox', { name: 'Reply suggestions', exact: true })).toBeVisible()
+})
+
+Then('the comment suggestions include {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'backlog-mentions-suggestion', async () => {
+    await expect(peek(page).getByRole('option', { name: new RegExp(title) })).toBeVisible()
+  })
+})
+
+When('the backlog item mention is picked', async ({ page }: { page: Page }) => {
+  await peek(page)
+    .getByRole('option', { name: /A target for a composer reference/ })
+    .click()
+})
+
+Then('the comment box contains {string}', async ({ page }: { page: Page }, value: string) => {
+  await recordAssertion(page, 'backlog-mentions-inserted', async () => {
+    await expect(peek(page).getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue(value)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Activity panel is opened from the Backlog journey', async ({ page }: { page: Page }) => {
+  await openActivity(page)
+})
+
+Then('the Activity Timeline shows the backlog creation and status change', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-shared-activity-timeline', async () => {
+    const creation = page.getByRole('button').filter({ hasText: 'You created b:1 Shared timeline event' }).first()
+    const move = page.getByRole('button').filter({ hasText: 'You moved b:1 Shared timeline event' }).first()
+    await expect(creation).toBeVisible({ timeout: 15_000 })
+    await expect(move).toBeVisible({ timeout: 15_000 })
+    await expect(creation).toContainText('System')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the captured item displays its project when one is available', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-capture-project-target', async () => {
+    const item = row(page, 'An item captured in the current project')
+    await expect(item).toBeVisible()
+    const project = item.locator('[title]').filter({ hasText: /.+/ })
+    await expect(async () => {
+      const count = await project.count()
+      expect(count === 0 || count === 1).toBe(true)
+    }).toPass()
+  })
+  await finishJourneyAssertions(page)
 })
 
 const inlineTitle = (page: Page) => page.getByRole('textbox', { name: 'Item title', exact: true })

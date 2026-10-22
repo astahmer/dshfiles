@@ -18,7 +18,8 @@
           "id": "session-controller.browser-event",
           "file": "plugins/@dshfiles/session-controller/tests/browser-event.test.ts",
           "testName": "drops provider replay state from assistant events and keeps everything else"
-        }
+        },
+        { "kind": "gherkin", "id": "session-controller.lean-session-follow", "featureFile": "tooling/dshx/e2e/features/chat.feature" }
       ]
     }
   ]

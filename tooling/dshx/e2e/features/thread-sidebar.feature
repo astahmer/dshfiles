@@ -213,6 +213,12 @@ Feature: Thread sidebar journeys
     When another thread references a visible Host thread from its composer
     Then both menus list the referencing thread under Referenced by
 
+  @scenario:thread-sidebar.rename-thread-title
+  Scenario: Rename a thread from its row menu and cancel an edit
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a thread title is renamed from its row menu and a second edit is cancelled
+    Then the renamed thread title survives reload and the cancelled draft is discarded
+
   @scenario:thread-sidebar.jj-inventory-pauses-while-collapsed
   Scenario: A collapsed sidebar stops reading the JJ inventory
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

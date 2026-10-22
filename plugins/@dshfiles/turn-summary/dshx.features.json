@@ -39,6 +39,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "turn-summary.failed-command",
+          "featureFile": "tooling/dshx/e2e/features/turn-summary.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "turn-summary.model-commands",
           "file": "plugins/@dshfiles/turn-summary/src/turn-activity.test.ts",

@@ -763,6 +763,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "jj-integration.thread-integration-attention-view",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "jj-integration.attention-filter-default",
           "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
@@ -793,6 +798,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.thread-integration-row-details",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
         {
           "kind": "unit-test",
           "id": "jj-integration.blockers-priority",
@@ -825,12 +835,10 @@
       "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "click button \"Choose workspace\"",
         "expect tab \"Projects\"",
-        "expect option \"No folder*\"",
-        "click tab \"Everything\"",
-        "expect text \"JJ workspaces\""
+        "expect option \"No folder*\""
       ],
       "surfaces": ["host", "client"],
       "configuration": [],
@@ -838,6 +846,11 @@
       "failureModes": ["Removed thread workspaces whose folders are gone are listed as projects.", "Thread workspaces are listed on the default Projects tab."],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.new-thread-project-picker-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
         {
           "kind": "unit-test",
           "id": "jj-integration.registered-projects",

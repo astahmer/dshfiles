@@ -45,7 +45,13 @@ test('Command Code routes use explicit paths and pure chat dispatch', async () =
   const response = await app.request(`${origin}/provider/v1/chat/completions`, {
     method: 'POST',
     headers: { authorization: 'Bearer key-123456', 'content-type': 'application/json' },
-    body: JSON.stringify({ messages: [{ role: 'user', content: '[[call read {"file_path":"README.md"}]]' }] }),
+    body: JSON.stringify({
+      messages: [
+        { role: 'user', content: '[[call read {"file_path":"README.md"}]]' },
+        { role: 'user', content: 'Project context follows the user directive.' },
+        { role: 'system', content: 'Runtime context follows the project context.' },
+      ],
+    }),
   })
   assert.equal(response.status, 200)
   const stream = await response.text()

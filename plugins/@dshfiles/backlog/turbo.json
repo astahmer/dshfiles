@@ -81,6 +81,7 @@
     "test:e2e": {
       "dependsOn": [],
       "inputs": [
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__activity-timeline.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__agents.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ai-accounts.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__backlog.sha256",
@@ -104,6 +105,8 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ui-styles.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-folder-picker.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/activity-timeline/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/agents/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/ai-accounts/cordis.patch.yml",
@@ -153,6 +156,7 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/features/backlog.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/activity-timeline.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/ai-accounts.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/backlog.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/package.json",

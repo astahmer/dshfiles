@@ -240,23 +240,12 @@
       "surfaces": ["client", "host", "settings", "tool"],
       "configuration": [],
       "states": ["off", "proposed", "applied", "dismissed"],
-      "failureModes": [
-        "A failing or missing Jev key or model is skipped; the item stays in the Inbox.",
-        "A model answer with invalid fields keeps only the valid ones; a duplicate it was not shown is ignored."
-      ],
-      "externalDependencies": [
-        {
-          "id": "typesafe-jev",
-          "boundary": "Optional POST to api.typesafe.ai/v1/systemone with the item text, behind jevEnabled and TYPESAFE_API_KEY; any failure is skipped.",
-          "deterministicFake": "An injected jev function answers fixed probabilities in src/triage.test.ts."
-        },
-        {
-          "id": "dsh-llm",
-          "boundary": "Optional cheap-model call through the DSH llm service on triageProvider/triageModel; the answer is decoded with a schema and invalid fields dropped.",
-          "deterministicFake": "An injected complete function returns fixed text in src/triage.test.ts."
-        }
-      ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.auto-triage",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.auto-triage-unit-jev-work",
@@ -317,6 +306,22 @@
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "dismisses a proposal without changing the item"
         }
+      ],
+      "failureModes": [
+        "A failing or missing Jev key or model is skipped; the item stays in the Inbox.",
+        "A model answer with invalid fields keeps only the valid ones; a duplicate it was not shown is ignored."
+      ],
+      "externalDependencies": [
+        {
+          "id": "typesafe-jev",
+          "boundary": "Optional POST to api.typesafe.ai/v1/systemone with the item text, behind jevEnabled and TYPESAFE_API_KEY; any failure is skipped.",
+          "deterministicFake": "An injected jev function answers fixed probabilities in src/triage.test.ts."
+        },
+        {
+          "id": "dsh-llm",
+          "boundary": "Optional cheap-model call through the DSH llm service on triageProvider/triageModel; the answer is decoded with a schema and invalid fields dropped.",
+          "deterministicFake": "An injected complete function returns fixed text in src/triage.test.ts."
+        }
       ]
     },
     {
@@ -350,6 +355,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.backfill-triage",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.backfill-unit-oldest",
@@ -402,6 +412,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.lifecycle-signals",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.lifecycle-unit-mentions",
@@ -501,6 +516,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.backlog-mentions",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.mentions-unit-scopes",
@@ -632,6 +652,11 @@
       ],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "backlog.attention-inbox",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "backlog.inbox-unit-threads",
           "file": "plugins/@dshfiles/backlog/src/inbox-threads.test.ts",
@@ -679,6 +704,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.shared-activity",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "host-test",
           "id": "backlog.activity-host-summary",
@@ -738,6 +768,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "backlog.rich-capture",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "host-test",
           "id": "backlog.rich-capture-files",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
@@ -784,6 +819,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "backlog.rich-item-text",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "host-test",
           "id": "backlog.rich-item-text-comment-files",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
@@ -815,6 +855,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.project-scope",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.project-scope-command",
@@ -855,6 +900,11 @@
       ],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "backlog.capture-project-target",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "host-test",
           "id": "backlog.capture-project-target-thread",
           "file": "plugins/@dshfiles/backlog/src/project-target.test.ts",
@@ -886,10 +936,10 @@
         "expect text \"Start a thread from b:1\"",
         "click button \"Feed\"",
         "rightclick article \"Item b:1\"",
-        "expect menuitem \"Start thread\u2026\"",
+        "expect menuitem \"Start thread…\"",
         "expect menuitem \"Status\"",
         "expect menuitem \"Project\"",
-        "click menuitem \"Start thread\u2026\"",
+        "click menuitem \"Start thread…\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
         "click button \"Board\"",
@@ -938,6 +988,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.start-thread-draft",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.multi-select-start-threads",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
-import { Then, When } from '../bdd.js'
+import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '../fake-command-code.js'
 
 const reasoningEffort = (page: Page) => page.getByRole('region', { name: 'Reasoning effort', exact: true })
 const pickerSelectionByPage = new WeakMap<Page, { readonly model: string; readonly effort: string }>()
@@ -208,4 +209,62 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
     await expect(dialog.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
+})
+
+When('two Command Code accounts offer the same model in a new thread', async ({ page }: { page: Page }) => {
+  await startFakeCommandCode(page)
+  const accounts = page.getByRole('button', { name: 'AI Accounts', exact: true })
+  await accounts.click()
+  const panel = page.getByRole('complementary', { name: 'Provider accounts', exact: true })
+  await expect(panel).toBeVisible()
+  for (const [name, key] of [
+    ['Command Code 1', 'e2e-fake-key-ALPHA1'],
+    ['Command Code 2', 'e2e-fake-key-BRAVO2'],
+  ]) {
+    await panel.getByRole('button', { name: 'Add account', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+    const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
+    await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
+    await baseUrl.blur()
+    await expect(page.getByRole('status').filter({ hasText: /^(Saved|Changes save automatically)$/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
+    const keyDialog = page.getByRole('dialog', { name: `Configure ${name} key`, exact: true })
+    await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(key)
+    await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click()
+    await expect(keyDialog).toBeHidden()
+  }
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  const picker = page.getByRole('button', { name: /, reasoning / })
+  await expect(picker).toBeVisible()
+  await picker.click()
+  const list = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
+  const firstAccount = list.getByRole('region', { name: 'Command Code 1', exact: true })
+  await search.fill('gpt-6-luna')
+  await firstAccount.getByRole('button', { name: /gpt-6-luna/ }).click()
+  const selectedModel = page.locator('[data-model-picker-text]')
+  await expect(selectedModel).toHaveText('gpt-6-luna')
+  await expect(selectedModel).toHaveAttribute('title', /Command Code 1/)
+})
+
+Then('swapping accounts keeps the model and selects the next account', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'model-effort-picker-account-swap-preserves-selection', async () => {
+    const model = page.locator('[data-model-picker-text]')
+    const effort = page.locator('[data-model-picker-effort]')
+    const initialEffort = await effort.innerText()
+    await expect(model).toHaveText('gpt-6-luna')
+    await expect(model).toHaveAttribute('title', /Command Code 1/)
+    await expect(page.getByRole('button', { name: 'Switch to Command Code 2', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Switch to Command Code 2', exact: true }).click()
+    await expect(model).toHaveText('gpt-6-luna')
+    await expect(model).toHaveAttribute('title', /Command Code 2/)
+    await expect(effort).toHaveText(initialEffort)
+    await expect(page.getByRole('button', { name: 'Switch to Command Code 1', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+After(async ({ page }: { page: Page }) => {
+  await stopFakeCommandCode(page)
 })

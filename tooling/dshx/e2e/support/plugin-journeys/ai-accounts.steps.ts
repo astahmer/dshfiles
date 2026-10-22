@@ -588,6 +588,26 @@ Then('the exhausted turn offers an inline route switch and one-minute auto-resum
   await finishJourneyAssertions(page)
 })
 
+Then('the quota forecast shows its account and forecast views', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-quota-forecast-account-row', async () => {
+    await page.getByRole('button', { name: 'Quota forecast', exact: true }).click()
+    await expect(page.getByRole('tab', { name: 'Forecast', exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Table', exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Hand-off', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Command Code 1/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Command Code 2/ })).toBeVisible()
+    await page.getByRole('tab', { name: 'Table', exact: true }).click()
+    const forecastTable = page.getByRole('table')
+    await expect(forecastTable).toContainText('Command Code 1')
+    await expect(forecastTable).toContainText('Command Code 2')
+    await expect(forecastTable).toContainText('90%')
+    await page.getByRole('tab', { name: 'Hand-off', exact: true }).click()
+    await expect(page.getByText('Work on Command Code 1', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Work on the account that resets soonest, hand off when it runs out/)).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 After(async ({ page }: { page: Page }) => {
   await stopFakeCommandCode(page)
 })

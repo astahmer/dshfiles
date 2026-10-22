@@ -204,3 +204,93 @@ Feature: Backlog
     When the Jev setup offer stores and binds a synthetic value
     Then Backlog stores only the secret reference for Jev
     And the Jev setup journey is complete
+
+  @scenario:backlog.backfill-triage
+  Scenario: Review the backlog triage backfill before it runs
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "An older capture to triage" is captured
+    And the backlog backfill is opened
+    Then the backfill dialog explains that it runs Jev and the configured triage model
+
+  @scenario:backlog.rich-capture
+  Scenario: Capture an item with image attachments
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And two images are attached to the capture
+    And "Capture screenshots with the issue" is captured
+    Then the captured backlog item keeps both image attachments
+
+  @scenario:backlog.rich-item-text
+  Scenario: Save a Markdown description and reply
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Describe the issue" is captured
+    And backlog item b:1 is opened
+    And the item description is replaced with "**Observed** in the browser"
+    Then the item detail shows the saved Markdown description
+    When a comment "Confirmed in the scratch profile" is added
+    Then the item activity shows the comment
+
+  @scenario:backlog.project-scope
+  Scenario: Scope the feed to a project
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    Then the capture composer offers a project picker
+
+  @scenario:backlog.attention-inbox
+  Scenario: Find an item asking for input in the Inbox
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Waiting for a decision" is captured
+    And backlog item b:1 is marked "Needs you" from its feed context menu
+    When the Backlog Inbox is opened
+    Then the Inbox lists "Waiting for a decision" under "Needs you"
+
+  @scenario:backlog.auto-triage
+  Scenario: Apply a deterministic automatic triage proposal
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts, @dshfiles/settings-shell" is booted
+    When the Backlog panel is opened
+    And Backlog automatic triage is configured to use the local fake model
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    When an item with a deterministic fake triage proposal is captured
+    Then automatic triage applies the fake model title to the item
+
+  @scenario:backlog.lifecycle-signals
+  Scenario: Link a backlog item to a thread that mentions it
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Follow up on the deployment" is captured
+    And a thread on the fake model writes "Working on b:1"
+    When the Backlog panel is opened again
+    And backlog item b:1 is opened
+    Then the item detail links the thread that mentioned it
+
+  @scenario:backlog.backlog-mentions
+  Scenario: Complete a backlog item mention in a comment
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "A target for a composer reference" is captured
+    And backlog item b:1 is opened
+    When the comment box searches for the backlog item mention
+    Then the comment suggestions include "A target for a composer reference"
+    When the backlog item mention is picked
+    Then the comment box contains "b:1 "
+
+  @scenario:backlog.shared-activity
+  Scenario: Publish backlog changes to the Activity Timeline
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/activity-timeline" is booted
+    When the Backlog panel is opened
+    And "Shared timeline event" is captured
+    And item b:1 is moved to In progress on the board
+    When the Activity panel is opened from the Backlog journey
+    Then the Activity Timeline shows the backlog creation and status change
+
+  @scenario:backlog.capture-project-target
+  Scenario: Capture an item from the current project
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "An item captured in the current project" is captured
+    Then the captured item displays its project when one is available

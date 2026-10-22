@@ -921,6 +921,64 @@ When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) =
   await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
 })
 
+Then('the Thread integration panel prioritises work needing attention', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('button', { name: /^Needs attention/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Ready/ })).toBeVisible()
+  await expect(threadRow(page).getByRole('button', { name: 'Integrate', exact: true })).toBeVisible()
+})
+
+When('the All integration view is selected', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: /^All/ }).click()
+})
+
+Then('the Thread integration panel keeps its counts visible', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('button', { name: /^Needs attention/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Completed/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Conflicts/ })).toBeVisible()
+})
+
+Then('the thread row details show revisions, sessions, path and preview', async ({ page }: { page: Page }) => {
+  const row = threadRow(page)
+  await row.getByRole('button', { name: 'View details', exact: true }).click()
+  await expect(row.getByText('Detailed work', { exact: false })).toBeVisible()
+  await expect(row.getByText(threadWorkspacePathFor(page), { exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: `Copy workspace ID ${provisionedThreadName(page)}`, exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: 'Open thread: jj integration rebase e2e thread', exact: true }).first()).toBeVisible()
+  await row.getByRole('button', { name: 'Preview', exact: true }).click()
+  await expect(row).toContainText('jj integration rebase e2e thread')
+})
+
+Then('the New thread picker shows its Projects and JJ workspace listings for a disposable repository', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: /^(?:New session|New thread)$/ }).first().click()
+  await expect(newThreadComposer(page)).toBeVisible()
+  const repository = await createRepository(page)
+  await chooseProjectPath(page, repository.repositoryPath)
+  await workspaceToggle(page).check()
+  await expect(projectButton(page)).toHaveText(/^repo · thread-/)
+  provisionedThreads.set(page, await currentThreadName(page))
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+  const settled = page.getByRole('status').filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })
+  const settledCount = await settled.count()
+  await newThreadComposer(page).fill('jj picker workspace seed')
+  await newThreadComposer(page).press('Enter')
+  await expect(settled).toHaveCount(settledCount + 1, { timeout: 60_000 })
+  await expect(page.getByRole('textbox', { name: threadComposerName, exact: true })).toBeVisible()
+  await expect.poll(() => workspaceNames(repository)).toContain(provisionedThreadName(page))
+  await page.reload()
+  await expect(threadComposer(page)).toBeVisible()
+  await page.getByRole('button', { name: /^(?:New session|New thread)$/ }).first().click()
+  await expect(newThreadComposer(page)).toBeVisible()
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+  await projectButton(page).click()
+
+  const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+  const projects = picker.getByRole('listbox', { name: 'Projects', exact: true })
+  await expect(projects.getByRole('option', { name: /^No folder/ }).first()).toBeVisible()
+  await expect(picker.getByRole('tab', { name: 'Everything', exact: true })).toBeVisible()
+  await picker.getByRole('tab', { name: 'Everything', exact: true }).click()
+  await expect(picker.getByRole('group', { name: 'JJ workspaces', exact: true })).toContainText(provisionedThreadName(page))
+})
+
 /** Long enough to queue, undo and queue again while the turn still runs, even on a loaded machine. */
 const BUSY_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 60 && echo queued-integration', description: 'Keep the thread busy' })}]]`
 const queueIntegrationButton = (page: Page) => page.getByRole('button', { name: 'Queue integration into main', exact: true })

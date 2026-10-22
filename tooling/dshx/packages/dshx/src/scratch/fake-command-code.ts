@@ -147,20 +147,27 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   if (input.key.endsWith('-EXHAUSTED'))
     return responseAnswer({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }, 400)
 
-  // DSH appends runtime context and turn-time snapshots after the user's message.
+  // DSH can append project and runtime context after the user's tool directive.
   const last = messages.filter(message => !isRuntimeContextMessage(message.text)).at(-1)
-  const streamDirective = /\[\[stream (\d+)\]\]/.exec(last?.text ?? '')
+  const lastAssistantIndex = messages.findLastIndex(message => message.role === 'assistant' || message.role === 'tool')
+  const hasDirective = /\[\[(?:stream|empty|hold|answer|(?:once )?call|read|memory_search)\b/
+  const directiveMessage = messages
+    .slice(lastAssistantIndex + 1)
+    .findLast(message => message.role === 'user' && !isRuntimeContextMessage(message.text) && hasDirective.test(message.text))
+  const lastUser = messages.filter(message => message.role === 'user' && !isRuntimeContextMessage(message.text)).at(-1)
+  const directiveText = directiveMessage?.text ?? lastUser?.text ?? last?.text ?? ''
+  const streamDirective = /\[\[stream (\d+)\]\]/.exec(directiveText)
   const parsedDelay = streamDirective === null ? null : z.number().int().min(1).max(250).safeParse(Number(streamDirective[1]))
   if (parsedDelay !== null && !parsedDelay.success) return responseAnswer({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }, 400)
   const streamDelayMs = parsedDelay?.success === true ? parsedDelay.data : 0
   if (last?.role === 'tool') return streamAnswer({ content: 'Tool finished.' })
-  if (last?.text.includes('[[empty]]') === true) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
-  if (last?.text.includes('[[hold]]') === true) return { kind: 'held' }
+  if (directiveText.includes('[[empty]]')) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
+  if (directiveText.includes('[[hold]]')) return { kind: 'held' }
 
-  const answer = /\[\[answer ([^\]]+)\]\]/.exec(last?.text ?? '')
+  const answer = /\[\[answer ([^\]]+)\]\]/.exec(directiveText)
   if (answer?.[1] !== undefined) return streamAnswer({ content: answer[1] }, streamDelayMs)
 
-  const calls = [...(last?.text ?? '').matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
+  const calls = [...directiveText.matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
     const directive = match[0] ?? ''
     if (match[1] !== undefined) {
       if (input.state.oneShotCalls.has(directive)) return []
@@ -172,10 +179,10 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   })
   if (calls.length > 0) return streamAnswer(toolCalls(calls))
 
-  const read = /\[\[read ([^\]]+)\]\]/.exec(last?.text ?? '')
+  const read = /\[\[read ([^\]]+)\]\]/.exec(directiveText)
   if (read?.[1] !== undefined) return streamAnswer(toolCall('read', JSON.stringify({ file_path: read[1] })))
 
-  const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(last?.text ?? '')
+  const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(directiveText)
   if (search?.[1] !== undefined)
     return streamAnswer(toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })))
 

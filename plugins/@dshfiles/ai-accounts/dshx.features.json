@@ -374,6 +374,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "ai-accounts.quota-forecast",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts-quota-forecast.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "ai-accounts.forecast-lock",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-forecast-model.test.ts",
