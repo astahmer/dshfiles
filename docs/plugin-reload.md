@@ -4,7 +4,15 @@ What a rebuilt bundle does and does not update, and when only a Host restart
 helps. `AGENTS.md` keeps the short version; this page is the detail.
 
 `@deepseek-ai/dsh-client-hmr` polls each bundle every 500 ms and pushes a graph
-frame, so a rebuilt `dist/client.js` reaches the browser without a restart.
+frame, so a rebuilt `dist/client.js` reaches the browser without a restart. This
+profile replaces that row with [`@dshfiles/hmr-gate`](../plugins/@dshfiles/hmr-gate),
+which keeps the poll and both frame kinds but announces a rebuild only while the
+package's Host half is the code the running Host loaded. A rebuild whose Host half
+changed is announced as `deferred` instead: the browser keeps the last-good client
+code and Settings → Plugins shows an **HMR updates** row naming what a restart
+would apply. Deferring is the only rollback available, because the browser tears
+the old code down when it receives the frame and the Host serves the current file
+for every rev.
 
 The stock Host's `hmr` entry would be on in `web` — it is disabled only when the
 launcher supplies no `profileContext` — with `root: []`: it watches the profile

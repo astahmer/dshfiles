@@ -18,6 +18,11 @@ machine-readable record (upstream package, pinned ref, path mapping, delta files
 normalized to `.js`, so it is not byte-identical and has no `native-fork.json`; its delta and update policy live in
 its [`UPSTREAM.md`](../plugins/@dshfiles/input-trigger/UPSTREAM.md).
 
+[`@dshfiles/hmr-gate`](../plugins/@dshfiles/hmr-gate) replaces the `client-hmr` row the same way, without vendoring:
+it reimplements the transport (route, poll, frame shapes) and adds the compatibility gate, so it carries no
+`native-fork.json` either; provenance, the copied-behaviour table and the update policy are in its
+[`UPSTREAM.md`](../plugins/@dshfiles/hmr-gate/UPSTREAM.md).
+
 ## Checking and updating
 
 ```sh

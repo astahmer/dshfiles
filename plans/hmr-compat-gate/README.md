@@ -13,13 +13,13 @@
 
 | Slice                                                     | State       | Evidence |
 | --------------------------------------------------------- | ----------- | -------- |
-| S0 Reproduce, name the skew, record the Host gap          | not started | —        |
-| S1 Prove the gate's inputs (loaded-vs-disk, scratch DSH)   | not started | —        |
-| S2 Gate: defer a rebuilt client frame while its Host half is stale | not started | — |
-| S3 Surface: notice, retry, page reload                    | not started | —        |
-| S4 Containment: slot `inject` callbacks never throw       | not started | —        |
-| S5 Verification (scratch DSH, both skews, two builds)     | not started | —        |
-| S6 Docs and Host-gap rows                                 | not started | —        |
+| S0 Reproduce, name the skew, record the Host gap          | not started | gaps 76/77 added; reproduction still open |
+| S1 Prove the gate's inputs (loaded-vs-disk, scratch DSH)   | partial     | `src/host/gate.test.ts` (8 tests): `exports`/`main` resolution, digest, apply/defer/release; scratch run open |
+| S2 Gate: defer a rebuilt client frame while its Host half is stale | shipped | `plugins/@dshfiles/hmr-gate` (Host transport + gate + `deferred` frame + `hmr_gate_status`); typecheck, tests, build, host import check |
+| S3 Surface: notice, retry, page reload                    | shipped (notice) | `plugins.item` row "HMR updates" in Settings → Plugins; retry/reload actions open |
+| S4 Containment: slot `inject` callbacks never throw       | shipped     | `rich-composer` registers `ConversationController` before slots (+ `apply-order.test.ts`); `queue-reorder` resolves `conversation` per call |
+| S5 Verification (scratch DSH, both skews, two builds)     | partial     | plugin typecheck/test/build green; boot check and the two-build journey open |
+| S6 Docs and Host-gap rows                                 | shipped     | `docs/plugin-reload.md`, `docs/native-forks.md`, plan, plugin README/UPSTREAM, gaps 76/77, profile seed row |
 
 ## Context
 
