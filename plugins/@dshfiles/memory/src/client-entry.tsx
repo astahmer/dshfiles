@@ -19,19 +19,19 @@ export default defineClient({
   inject: ['slots', 'sessions', 'uiWorkspace', 'layout'],
   setup(ctx, decorate) {
     ctx.effect(() => installMemoryReferenceLinks(), 'memory reference links')
+    const openThread = (sessionId: string): void => {
+      const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate.id === sessionId)
+      if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
+    }
     const PanelView = (): JSX.Element => (
       <PluginQueryProvider>
-        <MemoryPanel
-          openThread={sessionId => {
-            const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate.id === sessionId)
-            if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
-          }}
-        />
+        <MemoryPanel openThread={openThread} />
       </PluginQueryProvider>
     )
     const ReferenceOverlay = (): JSX.Element => (
       <PluginQueryProvider>
         <MemoryReferenceOverlay
+          openThread={openThread}
           openInMemory={focus => {
             MemoryFocusModel.request(focus)
             ctx.layout.selectPanel(PANEL_ID as MainPanelId)

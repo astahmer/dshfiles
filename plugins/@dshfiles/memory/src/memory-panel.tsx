@@ -69,17 +69,28 @@ const AddMemoryDialog = (props: {
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
           <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs">
             <span className="dshx:text-muted-foreground">Project</span>
-            <Combobox
-              label="Note project"
-              matchTriggerWidth
-              onValueChange={setProject}
-              options={[
-                { value: '', label: 'Choose a project…' },
-                ...props.projects.map(item => ({ value: item.project, label: `${PanelFormat.projectName(item.project)} (${item.notes} notes)` })),
-              ]}
-              searchAbove={0}
-              value={project}
-            />
+            {/* A fresh profile has no stored project to offer: the first note needs a path typed in. */}
+            {props.projects.length === 0 ? (
+              <Input
+                aria-label="New note project path"
+                placeholder="/path/to/project"
+                value={project}
+                onChange={event => setProject(event.currentTarget.value)}
+                className="dshx:h-8"
+              />
+            ) : (
+              <Combobox
+                label="Note project"
+                matchTriggerWidth
+                onValueChange={setProject}
+                options={[
+                  { value: '', label: 'Choose a project…' },
+                  ...props.projects.map(item => ({ value: item.project, label: `${PanelFormat.projectName(item.project)} (${item.notes} notes)` })),
+                ]}
+                searchAbove={0}
+                value={project}
+              />
+            )}
           </label>
           <div className="dshx:flex dshx:gap-2">
             <label className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:text-xs">

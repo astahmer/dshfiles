@@ -1,5 +1,7 @@
 # @dshfiles/memory
 
+![Preview cited memory inline](docs/screenshots/memory-reference-preview.png)
+
 ![Browse and correct memory in the Memory panel](docs/screenshots/memory-panel.png)
 
 Read [docs/findings.md](docs/findings.md) first: why memory exists, its design, and how it compares with native DSH.

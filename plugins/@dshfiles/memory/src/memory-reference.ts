@@ -65,3 +65,25 @@ export const memoryReferencePreviewRequestSchema = z
   .strict()
 
 export type MemoryReferencePreviewRequest = z.infer<typeof memoryReferencePreviewRequestSchema>
+
+/** The stored item a citation names, whether or not it still exists; a range only names part of a thread's log. */
+export type MemoryReferenceKey =
+  | { readonly kind: 'note'; readonly noteId: number }
+  | { readonly kind: 'digest'; readonly threadKey: string }
+  | { readonly kind: 'excerpt'; readonly threadKey: string; readonly range: string }
+
+const referenceIdPattern = /^n:(\d+)$/iu
+
+/**
+ * Split a citation into the note or thread it points at, the one place both the model-facing read and the panel's
+ * preview decide what `n:1`, a backticked `t:abc`, and `t:abc#12` mean.
+ */
+export const memoryReferenceKey = (reference: { readonly id: string; readonly range?: string | undefined }): MemoryReferenceKey | null => {
+  const id = reference.id.trim().replace(/^`|`$/gu, '')
+  const note = referenceIdPattern.exec(id)
+  if (note !== null) return { kind: 'note', noteId: Number.parseInt(note[1] ?? '', 10) }
+  const threadKey = id.replace(/^t:/iu, '').replace(/#\d+$/u, '')
+  if (threadKey.length === 0) return null
+  const range = reference.range?.trim() ?? ''
+  return range.length === 0 ? { kind: 'digest', threadKey } : { kind: 'excerpt', threadKey, range }
+}

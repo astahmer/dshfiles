@@ -31,12 +31,83 @@ When('the Memory panel is opened', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('tablist', { name: 'Memory views' })).toBeVisible()
 })
 
+When('the Add memory dialog is given the project path {string} and the note {string}', async ({ page }: { page: Page }, project: string, text: string) => {
+  await page.getByRole('button', { name: 'Add memory', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add a memory', exact: true })
+  // A profile memory has no project for yet has no list to choose from: the path is typed instead.
+  await dialog.getByRole('textbox', { name: 'New note project path', exact: true }).fill(project)
+  await dialog.getByRole('textbox', { name: 'New note text', exact: true }).fill(text)
+  await dialog.getByRole('button', { name: 'Add memory', exact: true }).click()
+  await expect(dialog).toBeHidden()
+})
+
 When('a thread on the fake model cites memory {string}', async ({ page }: { page: Page }, id: string) => {
   // A provider-less profile ends the first turn immediately, and the client then drops the conversation for the New
   // thread screen — taking the citation, and with it this journey's subject, out of the DOM. Run a real turn on the
   // local fake provider and wait for it to settle, so the citation outlives the step that reads it.
   await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
   await sendMessage(page, `memory: ${id}`)
+})
+
+Given(
+  'memory holds a digest of thread {string} titled {string} saying {string}',
+  async ({ page }: { page: Page }, id: string, title: string, digest: string) => {
+    const store = openMemoryStore({ path: join(profileFor(page).homeRoot, 'plugins', 'memory', 'memory.db') })
+    try {
+      store.putThread({
+        id,
+        project: '/work/e2e-project',
+        parent: null,
+        title,
+        decision: 'Ship the release notes with the canary switch on.',
+        digest,
+        source: 'trail',
+        lastSeq: 8,
+        updatedAt: Date.now(),
+      })
+    } finally {
+      store.close()
+    }
+  },
+)
+
+const openReference = async (page: Page, id: string, range?: string): Promise<void> => {
+  const name = `Preview memory ${id}${range === undefined ? '' : ` #${range}`}`
+  const reference = page.getByRole('link', { name, exact: true }).last()
+  await expect(reference).toBeVisible()
+  const preview = page.locator('[data-dshfiles-memory-preview]')
+  await expect(async () => {
+    if ((await preview.count()) === 0) await reference.click()
+    await expect(preview).toBeVisible({ timeout: 1_500 })
+  }).toPass({ timeout: 30_000 })
+}
+
+Then('the inline digest preview shows {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'memory-reference-digest-preview', async () => {
+    await openReference(page, 't:session-e2e-digest')
+    const preview = page.locator('[data-dshfiles-memory-preview]')
+    await expect(preview.getByText('Thread digest', { exact: true })).toBeVisible()
+    await expect(preview.locator('[data-dshfiles-memory-title]')).toHaveText('Ship the release notes')
+    await expect(preview.getByText(text, { exact: true })).toBeVisible()
+    await expect(preview.getByText('Source & evidence', { exact: true })).toBeVisible()
+    await expect(preview.getByRole('button', { name: 'Open thread', exact: true })).toBeVisible()
+    await expect(preview.locator('code').first()).toHaveText('t:session-e2e-digest')
+  })
+})
+
+Then('the inline excerpt preview shows {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'memory-reference-excerpt-preview', async () => {
+    await openReference(page, 't:session-e2e-digest', '1')
+    const preview = page.locator('[data-dshfiles-memory-preview]')
+    await expect(preview.getByText('Thread excerpt', { exact: true })).toBeVisible()
+    const excerpt = preview.locator('[data-dshfiles-memory-body]')
+    await expect(excerpt).toContainText(text)
+    // The excerpt keeps raw log lines as a bounded monospace block, not prose.
+    const fontFamily = await excerpt.evaluate(element => getComputedStyle(element).fontFamily)
+    expect(fontFamily.toLowerCase()).toContain('mono')
+    await expect(preview.locator('code').first()).toHaveText('t:session-e2e-digest #1')
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the inline memory preview shows {string}', async ({ page }: { page: Page }, text: string) => {
@@ -50,6 +121,31 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
       if ((await preview.count()) === 0) await reference.click()
       await expect(preview).toContainText(text, { timeout: 1_500 })
     }).toPass({ timeout: 30_000 })
+    // The card mirrors the panel's note detail: tone and status badges, the note as its title, sections.
+    await expect(preview.getByText('Decision', { exact: true }).first()).toBeVisible()
+    await expect(preview.getByText('Active', { exact: true }).first()).toBeVisible()
+    await expect(preview.getByText('Source & evidence', { exact: true })).toBeVisible()
+    await expect(preview.getByText('Metadata', { exact: true })).toBeVisible()
+    await expect(preview.getByText('repo', { exact: true }).first()).toBeVisible()
+    await expect(preview.locator('code').first()).toHaveText('n:1')
+    const previewTitle = preview.locator('[data-dshfiles-memory-title]').first()
+    await expect(previewTitle).toHaveText(text)
+    const fontSize = await previewTitle.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize))
+    expect(fontSize).toBeGreaterThanOrEqual(15)
+    const previewWidth = await preview.evaluate(element => element.getBoundingClientRect().width)
+    expect(previewWidth).toBeLessThanOrEqual(560)
+    await expect(preview.getByRole('button', { name: 'Copy', exact: true })).toBeEnabled()
+    await expect(preview.getByRole('tab', { name: 'Related', exact: true })).toBeVisible()
+  })
+})
+
+Then('opening the preview in Memory focuses {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'memory-reference-open-in-memory', async () => {
+    const preview = page.locator('[data-dshfiles-memory-preview]')
+    await preview.getByRole('button', { name: 'Open in Memory', exact: true }).click()
+    const memoryPanel = page.locator('main.dshx-root:visible')
+    await expect(memoryPanel.getByRole('heading', { name: 'Memory', exact: true })).toBeVisible()
+    await expect(memoryPanel.getByText(text, { exact: true }).first()).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

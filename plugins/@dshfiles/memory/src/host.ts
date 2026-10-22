@@ -23,6 +23,7 @@ import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@
 
 import { AgentScope } from './agent-scope.ts'
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryEvent, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { memoryReferenceKey } from './memory-reference.ts'
 import { projectPathFor } from './project-path.ts'
 import { MemoryGuidance } from './guidance.ts'
 import { ProjectScripts, type WorkspaceScripts } from './project-scripts.ts'
@@ -535,7 +536,24 @@ const panelApi = memoryApi.host({
     ),
   relatedThreads: ({ input, caller }) => withMemory(active => active.relatedThreads(callerOf(caller), input)),
   read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
-  preview: ({ input }) => withRuntime(active => active.preview(input)),
+  preview: ({ input }) =>
+    withMemory(async active => {
+      const summary = await active.preview(input)
+      const key = memoryReferenceKey(input)
+      const store = key === null || key.kind === 'excerpt' ? undefined : requireStore()
+      if (key?.kind === 'note' && store !== undefined) {
+        const note = store.noteHistory(key.noteId).find(record => record.valid && record.id === key.noteId)
+        if (note === undefined) return { kind: 'missing' as const, id: input.id, summary, note: null, thread: null }
+        return { kind: 'note' as const, id: input.id, summary, note: panelNote(note), thread: null }
+      }
+      if (key?.kind === 'digest' && store !== undefined) {
+        const thread = store.thread(key.threadKey)
+        if (thread === undefined) return { kind: 'missing' as const, id: input.id, summary, note: null, thread: null }
+        return { kind: 'digest' as const, id: input.id, summary, note: null, thread: panelThread(thread) }
+      }
+      if (key?.kind === 'excerpt') return { kind: 'excerpt' as const, id: input.id, summary, note: null, thread: null }
+      return { kind: 'missing' as const, id: input.id, summary, note: null, thread: null }
+    }),
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
   usage: ({ input }) => usage(input.days ?? 30),
   projects: async () => {

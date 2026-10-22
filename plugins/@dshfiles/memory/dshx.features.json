@@ -300,6 +300,11 @@
           "kind": "gherkin",
           "id": "memory.panel-notes",
           "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "memory.panel-first-note",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
         }
       ],
       "reach": ["click button \"Memory\"", "expect tab \"Notes\""]
@@ -307,10 +312,10 @@
     {
       "id": "memory-reference-preview",
       "title": "Preview cited memory inline",
-      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a wide inline preview of the relevant note, thread digest or bounded message excerpt, with an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Preview reads do not create synthetic memory-tool usage records.",
+      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens an inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the Metadata grid, and Related and History tabs — with Copy and an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Digests and bounded message excerpts use the same card, and a reference that no longer exists shows a dashed not-found state. Preview reads do not create synthetic memory-tool usage records.",
       "surfaces": ["client", "api"],
       "configuration": [],
-      "states": ["idle", "loading", "note", "digest", "excerpt", "unavailable"],
+      "states": ["idle", "loading", "note", "digest", "excerpt", "missing", "unavailable"],
       "failureModes": [
         "A missing or stale reference shows an inline error without failing the conversation.",
         "Opening a preview does not record another agent memory-tool call."
@@ -333,24 +338,29 @@
           "id": "memory.preview-no-usage",
           "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
           "testName": "previews a note without recording an agent memory-tool call"
+        },
+        {
+          "kind": "gherkin",
+          "id": "memory.reference-digest",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
         }
       ],
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"memory: n:1\"",
+        "seed tool-call-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"memory: n:1\"",
         "press Enter",
         "expect link \"Preview memory n:1\"",
         "click link \"Preview memory n:1\"",
-        "expect text \"Memory \u00b7 n:1\"",
+        "expect text \"Not found\"",
+        "expect text \"Nothing stored for n:1\"",
         "expect text \"No valid note n:1*\"",
-        "click button \"Open in Memory\"",
-        "expect heading \"Memory\""
+        "expect button \"Open in Memory\""
       ]
     },
     {
       "id": "usage-telemetry",
       "title": "Show what memory costs and whether it holds up",
-      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated \ud83d\udc4d/\ud83d\udc4e. The Memory page's Analytics tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
+      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated 👍/👎. The Memory page's Analytics tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
       "surfaces": ["client", "storage"],
       "configuration": [],
       "states": ["no-activity", "counted", "priced", "unpriced", "rated"],

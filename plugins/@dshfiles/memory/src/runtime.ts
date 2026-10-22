@@ -10,6 +10,7 @@ import { ThreadDigestRules, type Signal, type ThreadHeader } from './digest.ts'
 import { MemoryGuidance } from './guidance.ts'
 import type { MemoryEmbedder, RetrievalStatus } from './embedder.ts'
 import { JevClassifier } from './jev.ts'
+import { memoryReferenceKey } from './memory-reference.ts'
 import type { MemorySettings } from './settings.ts'
 import type { MemoryStore, NoteCategory, SearchHit } from './store.ts'
 import {
@@ -656,11 +657,11 @@ export const createMemoryRuntime = (options: {
         projects: projectsFilterFor(own, args.project?.trim(), clientCaller),
         ownProject: own,
         limit: args.limit ?? 8,
-        ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
-        ...(args.availability === undefined ? {} : { availability: args.availability }),
-        ...(args.createdFrom === undefined ? {} : { createdFrom: args.createdFrom }),
-        ...(args.createdTo === undefined ? {} : { createdTo: args.createdTo }),
-        ...(args.includeNotes === undefined ? {} : { includeNotes: args.includeNotes }),
+        cursor: args.cursor,
+        availability: args.availability,
+        createdFrom: args.createdFrom,
+        createdTo: args.createdTo,
+        includeNotes: args.includeNotes,
       }),
     )
     store.recordToolCall({ thread: caller.id, tool: 'find_threads', results: page.hits.length + page.notes.length, ids: page.hits.map(hit => hit.sessionId) })
@@ -692,23 +693,24 @@ export const createMemoryRuntime = (options: {
       store.recordToolCall({ thread: caller.id, tool: 'memory_read', results, ids })
     }
     const id = args.id.trim().replace(/^`|`$/g, '')
-    if (/^n:\d+$/i.test(id)) {
-      const note = store.note(Number(id.slice(2)))
+    const key = memoryReferenceKey(args)
+    if (key === null) return `Unknown memory reference ${id}.`
+    if (key.kind === 'note') {
+      const note = store.note(key.noteId)
       recordRead(note === undefined ? 0 : 1, [id.toLowerCase()])
       if (!note) return `No valid note ${id} (it may have been updated or forgotten; search for its topic).`
       return `${id} [${note.category}, ${note.scope}, ${note.confidence}] ${day(note.createdAt)}${note.sourceThread === null ? '' : ` from t:${ThreadDigestRules.shortId(note.sourceThread)}`}${note.supersedes === null ? '' : `, supersedes n:${note.supersedes}`}\n${note.text}`
     }
-    const threadKey = id.replace(/^t:/i, '').replace(/#\d+$/, '')
-    const thread = store.thread(threadKey)
-    const sessionId = thread?.id ?? (threadKey.startsWith('session-') ? threadKey : undefined)
-    const ids = [`t:${ThreadDigestRules.shortId(sessionId ?? threadKey)}`]
-    if (args.range === undefined || args.range.trim().length === 0) {
+    const thread = store.thread(key.threadKey)
+    const sessionId = thread?.id ?? (key.threadKey.startsWith('session-') ? key.threadKey : undefined)
+    const ids = [`t:${ThreadDigestRules.shortId(sessionId ?? key.threadKey)}`]
+    if (key.kind === 'digest') {
       recordRead(thread === undefined ? 0 : 1, ids)
       if (!thread) return `No digest for ${id}. It may still be running, trivial, or past retention; memory_search finds its messages.`
       return `${ids[0]} digest (${day(thread.updatedAt)}, ${basename(thread.project)}, ${thread.source === 'model' ? 'written by a model' : 'from the thread record'}). ${MemoryGuidance.untrusted}\n${thread.digest}`
     }
     if (sessionId === undefined) return `Unknown thread ${id}.`
-    const match = /^(\d+)\s*-\s*(\d+)$/.exec(args.range.trim()) ?? /^(\d+)$/.exec(args.range.trim())
+    const match = /^(\d+)\s*-\s*(\d+)$/.exec(key.range.trim()) ?? /^(\d+)$/.exec(key.range.trim())
     if (!match) return 'range must look like "120-180" (event sequence numbers from memory_search hits).'
     const from = Number(match[1])
     const to = Math.min(Number(match[2] ?? match[1]), from + 60)

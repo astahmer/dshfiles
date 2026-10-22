@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryReferenceMatches } from './memory-reference.ts'
+import { memoryReferenceKey, memoryReferenceMatches } from './memory-reference.ts'
 
 describe('memoryReferenceMatches', () => {
   it('extracts note, digest and message references only from memory citations', () => {
@@ -18,5 +18,20 @@ describe('memoryReferenceMatches', () => {
 
   it('ignores malformed citations and rejects non-positive note ids', () => {
     expect(memoryReferenceMatches('memory: nothing; memory: n:0; t:valid-outside-citation')).toEqual([])
+  })
+})
+
+describe('memoryReferenceKey', () => {
+  it('names the note or thread a citation points at, whichever way it was written', () => {
+    expect(memoryReferenceKey({ id: 'n:12' })).toEqual({ kind: 'note', noteId: 12 })
+    expect(memoryReferenceKey({ id: '`n:12`' })).toEqual({ kind: 'note', noteId: 12 })
+    expect(memoryReferenceKey({ id: 't:9356abc7' })).toEqual({ kind: 'digest', threadKey: '9356abc7' })
+    expect(memoryReferenceKey({ id: 't:9356abc7#42' })).toEqual({ kind: 'digest', threadKey: '9356abc7' })
+    expect(memoryReferenceKey({ id: 't:9356abc7', range: '42-48' })).toEqual({ kind: 'excerpt', threadKey: '9356abc7', range: '42-48' })
+  })
+
+  it('reads an empty range as the whole digest and refuses a reference with no id left', () => {
+    expect(memoryReferenceKey({ id: 't:9356abc7', range: '  ' })).toEqual({ kind: 'digest', threadKey: '9356abc7' })
+    expect(memoryReferenceKey({ id: 't:' })).toBeNull()
   })
 })

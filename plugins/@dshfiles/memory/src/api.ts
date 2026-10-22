@@ -73,6 +73,8 @@ export type PanelNote = z.infer<typeof panelNoteSchema>
 
 export type PanelThread = z.infer<typeof panelThreadSchema>
 
+export type MemoryPreview = z.infer<typeof memoryPreviewSchema>
+
 /** Every field is sent; an empty string means "any". The API payload cannot carry `undefined`. */
 export type NotesFilter = z.infer<typeof notesFilterSchema>
 
@@ -114,6 +116,18 @@ export const panelThreadSchema = z.object({
   events: z.number().int().nullable(),
   lastSeq: z.number().int(),
   citations: z.number().int(),
+})
+
+/**
+ * What a citation preview holds: the stored item itself, so the card renders it instead of the model-facing text.
+ * `missing` and `excerpt` carry only `summary`, which is also all a Host older than this shape sends.
+ */
+export const memoryPreviewSchema = z.object({
+  kind: z.enum(['note', 'digest', 'excerpt', 'missing']),
+  id: z.string(),
+  summary: z.string(),
+  note: panelNoteSchema.nullable(),
+  thread: panelThreadSchema.nullable(),
 })
 
 /** Every field is sent; an empty string means "any". */
@@ -254,7 +268,7 @@ export const memoryApi = defineApi({
     }),
     preview: method({
       input: readInput,
-      output: toolOutput,
+      output: memoryPreviewSchema,
       description: 'Read one digest, note or bounded thread excerpt for a UI preview without counting it as an agent memory-tool call.',
     }),
     note: method({

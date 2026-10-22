@@ -85,6 +85,29 @@ export class PanelFormat {
 
   /** A thread row's secondary line: project and the short reference agents use. */
   static readonly threadSubtitle = (thread: PanelThread): string => `${PanelFormat.projectName(thread.project)} · ${PanelFormat.threadRef(thread.id)}`
+
+  /**
+   * The notes worth showing beside one note: its own versions, then notes from the same source thread, then notes
+   * sharing at least two words. The panel and the chat preview rank them the same way.
+   */
+  static readonly relatedNotes = (note: PanelNote, notes: readonly PanelNote[]): readonly PanelNote[] => {
+    const linked = new Set<number>([note.supersedes, note.supersededBy].filter((id): id is number => id !== null))
+    const wordsOf = (text: string): Set<string> => new Set(text.toLowerCase().match(/[a-z0-9][a-z0-9_-]{3,}/gu) ?? [])
+    const ownWords = wordsOf(note.text)
+    const stopWords = new Set(['that', 'this', 'with', 'from', 'when', 'into', 'your', 'they', 'them', 'then', 'than', 'must', 'only', 'each'])
+    return notes
+      .filter(candidate => candidate.id !== note.id)
+      .map(candidate => {
+        if (linked.has(candidate.id)) return { candidate, score: 3, overlap: 99 }
+        if (note.sourceThread !== null && candidate.sourceThread === note.sourceThread) return { candidate, score: 2, overlap: 99 }
+        const overlap = [...wordsOf(candidate.text)].filter(word => ownWords.has(word) && !stopWords.has(word)).length
+        return { candidate, score: overlap >= 2 ? 1 : 0, overlap }
+      })
+      .filter(entry => entry.score > 0)
+      .sort((left, right) => right.score - left.score || right.overlap - left.overlap || right.candidate.updatedAt - left.candidate.updatedAt)
+      .slice(0, 3)
+      .map(entry => entry.candidate)
+  }
 }
 
 export type NoteStatus = PanelNote['status']

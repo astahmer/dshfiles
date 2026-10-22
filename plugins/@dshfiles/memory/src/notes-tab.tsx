@@ -251,25 +251,7 @@ const RelatedNotes = (props: {
   readonly notes: readonly PanelNote[]
   readonly onSelect: (id: number) => void
 }): JSX.Element | null => {
-  const related = useMemo(() => {
-    const linked = new Set<number>([props.note.supersedes, props.note.supersededBy].filter((id): id is number => id !== null))
-    const wordsOf = (text: string): Set<string> => new Set(text.toLowerCase().match(/[a-z0-9][a-z0-9_-]{3,}/gu) ?? [])
-    const ownWords = wordsOf(props.note.text)
-    const scored = props.notes
-      .filter(candidate => candidate.id !== props.note.id)
-      .map(candidate => {
-        if (linked.has(candidate.id)) return { candidate, score: 3, overlap: 99 }
-        if (props.note.sourceThread !== null && candidate.sourceThread === props.note.sourceThread) return { candidate, score: 2, overlap: 99 }
-        const shared = [...wordsOf(candidate.text)].filter(word => ownWords.has(word))
-        const overlap = shared.filter(
-          word => !['that', 'this', 'with', 'from', 'when', 'into', 'your', 'they', 'them', 'then', 'than', 'must', 'only', 'each'].includes(word),
-        ).length
-        return { candidate, score: overlap >= 2 ? 1 : 0, overlap }
-      })
-      .filter(entry => entry.score > 0)
-      .sort((left, right) => right.score - left.score || right.overlap - left.overlap || right.candidate.updatedAt - left.candidate.updatedAt)
-    return scored.slice(0, 3).map(entry => entry.candidate)
-  }, [props.note, props.notes])
+  const related = useMemo(() => PanelFormat.relatedNotes(props.note, props.notes), [props.note, props.notes])
   if (related.length === 0) return null
   return (
     <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Related memories">

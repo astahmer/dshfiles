@@ -13,6 +13,13 @@ Feature: Thread memory panel
     And editing it to "Deploys need the ops-approval label and a green canary." keeps the old text in its history
     And forgetting it with a reason removes it from the list
 
+  @scenario:memory.panel-first-note
+  Scenario: Write the first memory on a profile memory has no project for
+    Given the isolated plugin profile "@dshfiles/memory" is booted
+    When the Memory panel is opened
+    And the Add memory dialog is given the project path "/work/e2e-project" and the note "Backlog items are never deleted."
+    Then the note "Backlog items are never deleted." is listed in the Notes tab
+
   @scenario:memory.panel-usage
   Scenario: See memory usage per day
     Given the isolated plugin profile "@dshfiles/memory" is booted
@@ -36,3 +43,14 @@ Feature: Thread memory panel
     And a Command Code account backed by a local fake provider is added
     When a thread on the fake model cites memory "n:1"
     Then the inline memory preview shows "Deploys need the ops approval label."
+    And opening the preview in Memory focuses "Deploys need the ops approval label."
+
+  @scenario:memory.reference-digest
+  Scenario: Preview a cited digest, then a bounded excerpt of it
+    Given the isolated plugin composition of "@dshfiles/memory, @dshfiles/ai-accounts" is booted
+    And memory holds a digest of thread "session-e2e-digest" titled "Ship the release notes" saying "Release notes ship with the canary switch."
+    And a Command Code account backed by a local fake provider is added
+    When a thread on the fake model cites memory "t:session-e2e-digest"
+    Then the inline digest preview shows "Release notes ship with the canary switch."
+    When a thread on the fake model cites memory "t:session-e2e-digest#1"
+    Then the inline excerpt preview shows "not readable"
