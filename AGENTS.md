@@ -340,20 +340,23 @@ before inspecting another workspace, and `--repo <path>` to target one.
 
 ## Waiting
 
-Never `sleep` to wait for work, and never loop a discovery tool to pass time;
-both hold the turn with nothing running.
+Never `sleep` and never loop a discovery tool to pass time; both hold the turn
+with nothing running.
 
-- Long command? Run it as a background job and collect it with `job_output`;
-  keep its `wait` timeout short (a minute or two), do other work between polls,
-  and let the completion notice wake you rather than blocking for 10+ minutes.
-  Blocking `job_output` waits cost 16h across the 2026-10-15..18 window.
-- Waiting for another agent or the user? End the turn, or set a `schedule_*`
-  reminder; a pending question or the next user message resumes you anyway.
-  `list_thread_questions` projects every Session in the corpus (~50s per call
-  before reuse caching), so call it once per check, never in a poll loop, and
-  pass `sessionId` when you already know which Session you care about.
-- `sleep` in a bash command (81 calls, 2.2h in that window) is the same waste
-  wearing a different hat, including inside a retry loop.
+| Waiting for          | Do this                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A background command | `background_jobs_wait` (Host-side, no polling); a bounded `job_output` wait only when the job is nearly done |
+| Another agent        | `send_message` it, or end the turn — its reply resumes you                                                   |
+| The user             | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you    |
+| Thread questions     | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                              |
+
+## Definition of done
+
+Before claiming completion, run the narrowest check and say what it proves:
+reproduce, state the root cause, apply the smallest fix, then write
+`Verified: <command> → <result>` and `Unverified: <what you could not measure>`.
+The 2026-10-15..22 window logged 245 “incomplete or unfixed” pushbacks; a claim
+without a fresh check is the pattern behind them. See `focused-validation`.
 
 ## Verifying
 
@@ -379,87 +382,20 @@ A plugin that installs is not a plugin that works.
 
 ### Repository checks
 
-Run a single script name with `node --run <script>`, not `pnpm run <script>`:
-the wrapper costs ~170-400 ms for nothing (medians 2026-10-18 — `check:diff`
-350 ms via `pnpm run`, 184 ms via `node --run`, 127 ms calling
-`scripts/check-diff.mjs` directly; `jj:state --read-only` 830 / 591 / 430 ms),
-and call the script path directly in a loop you repeat within a session.
-`node --run` forwards arguments only after `--`
-(`node --run jj:state -- --read-only`) and skips `pre*`/`post*` lifecycle
-hooks, which this repository does not use. **A bare argument is dropped
-silently**, not rejected: `node --run check:e2e workbench` ran every journey in
-the repository (measured: 50 minutes) where the caller meant one owner, so pass
-a script argument with `pnpm run <script> <arg>`, with `node --run <script> --
-<arg>`, or through the check's own environment variable
-(`DSHX_E2E_ONLY=workbench node --run check:e2e`). `check:e2e` now refuses a
-broad run without `--all`, so the mistake costs a second instead of an hour.
-Keep `pnpm run` where Turbo does the real work: minutes of Turbo swamp the
-wrapper either way.
-
-From `plugins/`: `node --run contract`, then the Turbo tasks `pnpm run build`,
-`pnpm run typecheck`, `pnpm run test` (the order `check:plugins` uses). The
-root `pnpm run check` adds dshx, desktop, scripts, web-profile contract,
-`lint` and `fmt:check`.
-`lint` ratchets Oxlint and the ast-grep rules (`node --run sg`): any error, or
-a rule exceeding its cap in `scripts/lint-ratchet.json`, fails; lower a cap
-when you fix sites, never raise it.
-`node --run check:diff` lints and format-checks only the paths your revision
-touches, and `node --run check:green` runs everything except lint/format.
-`check:green` ends with `check:plugin-boot` and `check:e2e:smoke` (the `@smoke`
-journeys only); before landing a plugin change, also run
-`pnpm run check:e2e <plugin>` (its journeys, headless, serial; `node --run`
-would drop the name) green, or `DSHX_E2E_ONLY=<plugin> node --run check:e2e`.
-A broad journey run needs `pnpm run check:e2e --all`: it is the pre-land or
-post-merge gate, not the iteration loop. All
-three are Turbo tasks keyed on the built bundles they boot, so an unchanged
-package replays from cache in seconds; `--force` reruns everything (see
-[`docs/e2e-testing.md`](docs/e2e-testing.md#cached-browser-tasks)). Do not reach
-for `--force`/`TURBO_FORCE` while iterating: 210 forced browser runs cost 3.7h
-of wall time across the 2026-10-15..18 window. Scope the run instead, and force
-only for the pass before landing or when a binary outside the repository
-changed. After
-adding or retagging a feature file, run
-`node tooling/dshx/scripts/browser-tasks.mjs --write`.
+`node --run <script>` is faster than `pnpm run` and drops a bare argument
+silently, so pass it after `--` or through the check's own environment variable
+(`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The order, the
+`check:diff`/`check:green` split, the Turbo cache and `--force` rules, and the
+e2e scope rule live in
+[docs/repository-checks.md](docs/repository-checks.md).
 
 ### Rebuilt plugins reach the browser over HMR
 
-`@deepseek-ai/dsh-client-hmr` polls each bundle every 500ms and pushes a graph
-frame, so a rebuilt `dist/client.js` reaches the browser without a restart.
-
-The Host's `hmr` entry is on in `web` too — it is disabled only when the
-launcher supplies no `profileContext` — with `root: []`: it watches the profile
-manifest and both user patch files, so ordinary plugin enable/disable and
-`cordis.patch.yml` edits recompose the running Host, and a recomposition also
-replaces the plugins whose linked-package files changed on disk — our
-`link:`-installed bundles included. What needs a restart, which is the user's
-call:
-
-- a failed or unavailable module comparison, logged as
-  `restart required: module-comparison`
-- a publication the runtime resolution rejects, such as a retained profile
-  mapping whose directory moved (`restartReason: 'package-moved'`)
-- Host code no recomposition reaches: `root: []` watches no source tree, and
-  `dshx dev.hostHmr` stays a development-only opt-in `web` does not enable
-
-Until then the live DSH runs the **old Host** under the **new client**: decode
-Host snapshots once at the boundary with defaults, never assume a new field or
-method exists, and fall back to defaults when the settings namespace is
-unregistered. Do not HMR-remove an old keybinding or event owner before its
-replacement is live.
-
-A reload is not a rollback. Once the old client fiber is torn down, a failed
-replacement leaves the plugin broken in that page — Settings → Plugins → Plugin
-list retries it — and a failed Host replacement stops the plugin and reports its
-entry `failed`. Revisions are bundle metadata (mtime, ctime, size), so a rewrite
-that preserves all three never reloads, while a metadata-only touch reloads the
-plugin with fresh component state. A page also applies graphs only from the
-release it booted, and it closes `/plugins/events` for good when a restarting
-Host answers that route non-200 before registering it: the page then updates
-nothing and learns of no release change until it is reloaded. Reload a tab you
-want kept in sync after a Host restart.
-
-Report the stages separately: source validated, web seed updated, profile
-synced, live runtime confirmed. If the active profile was not synced, say so.
+A rebuilt `dist/client.js` reaches the browser without a restart; Host code does
+not, and until a restart the old Host runs under the new client, so decode
+snapshots with defaults and never assume a new field, method or settings
+namespace. What needs a restart, how a failed reload behaves and what to report
+are in [docs/plugin-reload.md](docs/plugin-reload.md).
 
 ### Client boot failures are cross-plugin
 
