@@ -96,6 +96,24 @@ Feature: Secret Catalog
     And a thread in the seeded project asks the fake model to "Reply briefly."
     Then the Jev setup offer is absent while Jev is disabled
 
+  @scenario:secret-catalog.backlog-jev-bound-key-unresolved
+  Scenario: Explain an unresolved configured Jev reference without offering duplicate creation
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    And Backlog Jev triage is enabled without a resolvable key
+    And Backlog Jev has an unresolved configured reference
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the fake model to "Reply briefly."
+    Then the unresolved Jev secret is reported without a setup form
+
+  @scenario:secret-catalog.backlog-jev-bound-key-resolves
+  Scenario: Hide Jev setup when its configured reference resolves
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    And Backlog Jev triage is enabled without a resolvable key
+    And Backlog Jev has a resolvable configured reference
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the fake model to "Reply briefly."
+    Then the Jev offer and repair warning are both absent
+
   @scenario:secret-catalog.backlog-jev-chat-setup
   Scenario: Set up Jev from the latest chat turn without putting its key in the conversation
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
@@ -131,6 +149,15 @@ Feature: Secret Catalog
     When a secret is created and bound with the value "synthetic-inline-setup-value"
     Then the field stores only "secret:SYNTHETIC_SETUP_TOKEN@staging" while the fake CLI stores the synthetic value
     And the secret setup journey is complete
+
+  @scenario:secret-catalog.reference-setup-existing-alias
+  Scenario: Bind an existing alias rather than submit a duplicate
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/backlog, @dshfiles/settings-shell, @dshfiles/ai-accounts, @dshfiles/memory" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the Memory Jev secret-reference setting is focused
+    And the existing setup alias is stored
+    When the duplicate alias is entered in setup
+    Then setup offers to bind that alias without storing another copy
 
   @scenario:secret-catalog.agent-tools
   Scenario: Agents list aliases without values and read one exact alias

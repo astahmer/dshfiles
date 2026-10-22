@@ -54,11 +54,14 @@ when it is registered, its workspace id.
   `secret:jev-api-key-optmem`. Backlog resolves this setting without a project
   folder, so a project-scoped alias will not work there. The value goes to the
   Host and secret CLI stdin, never the conversation or settings.
-- When Jev is enabled and the Host cannot resolve its key, the newest completed
-  chat turn offers Secret Catalog's masked setup flow inline. It suggests the
-  global `TYPESAFE_API_KEY` alias; the value goes to the Secret Catalog Host and
-  Backlog settings receive only `secret:TYPESAFE_API_KEY`. The action does not
-  enable Jev or auto-triage.
+- When Jev is enabled, no key resolves, and Backlog has no configured reference,
+  the newest completed chat turn offers Secret Catalog's compact masked setup
+  flow inline. It suggests the global `TYPESAFE_API_KEY` alias; the value goes to
+  the Secret Catalog Host and Backlog settings receive only the reference. A
+  configured but unresolvable reference shows a repair warning instead of a
+  duplicate-create form. The action does not enable Jev or auto-triage.
+- If a manually entered alias already exists, setup offers to bind its unique
+  existing record. Ambiguous duplicates still need to be resolved in the catalog.
 - Edit supports item name, source, tags, and a two-step masked value
   replacement. Value replacement is passed through stdin with an explicit
   overwrite flag after user confirmation. The CLI's `edit --field` also

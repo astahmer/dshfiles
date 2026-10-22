@@ -125,6 +125,33 @@ Given('Backlog Jev triage is enabled without a resolvable key', async ({ page }:
   expect(globalKey).toHaveLength(0)
 })
 
+Given('Backlog Jev has an unresolved configured reference', async ({ page }: { page: Page }) => {
+  const field = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  await field.fill('secret:MISSING_JEV_FOR_E2E')
+  await field.press('Enter')
+  await expect(field).toHaveValue('secret:MISSING_JEV_FOR_E2E')
+})
+
+Given('Backlog Jev has a resolvable configured reference', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const store = await readStore(page)
+  store.rows.push({
+    alias: 'DSH_JEV_BACKLOG',
+    scope: 'global',
+    root: null,
+    environment: 'prod',
+    item: 'item-dsh-jev-backlog',
+    field: 'password',
+    source: 'Synthetic setup',
+  })
+  store.vault['item-dsh-jev-backlog'] = 'synthetic-valid-jev-value'
+  await writeFile(fixture.storePath, JSON.stringify(store))
+  const field = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  await field.fill('secret:DSH_JEV_BACKLOG')
+  await field.press('Enter')
+  await expect(field).toHaveValue('secret:DSH_JEV_BACKLOG')
+})
+
 When('the Backlog Jev secret setup is opened from Settings', async ({ page }: { page: Page }) => {
   await openBacklogSettings(page)
   const jevRow = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')
@@ -226,8 +253,27 @@ Then('the Jev setup offer appears on the latest completed turn only', async ({ p
     const offers = page.getByTestId('jev-inline-setup-offer')
     await expect(offers).toHaveCount(1)
     await expect(page.getByTestId('secret-setup-offer')).toHaveCount(1)
+    await expect(page.getByTestId('secret-setup-offer')).toHaveCSS('max-width', '576px')
     await expect(offers.getByRole('button', { name: 'Set up missing secrets', exact: true })).toBeVisible()
   })
+})
+
+Then('the unresolved Jev secret is reported without a setup form', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'secret-catalog-jev-unresolved-reference-warning', async () => {
+    await expect(page.getByTestId('jev-configured-secret-unresolved')).toBeVisible()
+    await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
+    await expect(page.getByTestId('secret-setup-offer')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the Jev offer and repair warning are both absent', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'secret-catalog-jev-resolved-reference-hides-setup', async () => {
+    await expect(page.getByTestId('jev-configured-secret-unresolved')).toHaveCount(0)
+    await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
+    await expect(page.getByTestId('secret-setup-offer')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the Jev setup offer is absent while Jev is disabled', async ({ page }: { page: Page }) => {
@@ -604,6 +650,45 @@ When('the Memory Jev secret-reference setting is focused', async ({ page }: { pa
   await expect(field).toBeVisible()
   await field.focus()
   await expect(page.getByRole('button', { name: 'Bind a secret', exact: true })).toBeVisible()
+})
+
+When('the existing setup alias is stored', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const store = await readStore(page)
+  store.rows.push({
+    alias: 'SYNTHETIC_SETUP_TOKEN',
+    scope: 'global',
+    root: null,
+    environment: 'staging',
+    item: 'item-existing-setup',
+    field: 'password',
+    source: 'Synthetic setup',
+  })
+  store.vault['item-existing-setup'] = 'synthetic-existing-setup-value'
+  await writeFile(fixture.storePath, JSON.stringify(store))
+})
+
+When('the duplicate alias is entered in setup', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Bind a secret', exact: true }).click()
+  await page.getByRole('button', { name: 'Add a new secret', exact: true }).click()
+  const panel = page.getByTestId('secret-input-panel')
+  await panel.getByRole('textbox', { name: 'Alias', exact: true }).fill('SYNTHETIC_SETUP_TOKEN')
+  await panel.getByRole('textbox', { name: 'Environment', exact: true }).fill('staging')
+  await expect(panel.getByText('This alias already exists. Bind the existing secret instead of creating another.', { exact: true })).toBeVisible()
+})
+
+Then('setup offers to bind that alias without storing another copy', async ({ page }: { page: Page }) => {
+  const panel = page.getByTestId('secret-input-panel')
+  await panel.getByRole('button', { name: 'Use existing secret', exact: true }).click()
+  const field = page.locator('[data-settings-namespace="dshfiles-memory"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+  await expect(field).toHaveValue('secret:SYNTHETIC_SETUP_TOKEN@staging')
+  const store = await readStore(page)
+  await recordAssertion(page, 'secret-catalog-duplicate-setup-binds-existing-row', async () => {
+    expect(store.rows.filter(row => row.alias === 'SYNTHETIC_SETUP_TOKEN' && row.environment === 'staging')).toHaveLength(1)
+    expect(store.vault['item-existing-setup']).toBe('synthetic-existing-setup-value')
+    expect(await page.locator('body').innerText()).not.toContain('synthetic-existing-setup-value')
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('the create-and-bind form is cancelled and reopened', async ({ page }: { page: Page }) => {

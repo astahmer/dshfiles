@@ -71,6 +71,19 @@ describe('Secret Catalog setup draft', () => {
     })
   })
 
+  it('offers to bind one matching existing alias, but not ambiguous aliases', () => {
+    const existing = row({ alias: 'SYNTHETIC_TOKEN', environment: 'prod', scope: 'global' })
+    expect(SecretSetupModel.existingReference({ alias: existing.alias, environment: existing.environment, rows: [existing] })).toBe('secret:SYNTHETIC_TOKEN')
+    expect(
+      SecretSetupModel.existingReference({
+        alias: existing.alias,
+        environment: existing.environment,
+        rows: [existing, row({ alias: existing.alias, environment: existing.environment, scope: 'project' })],
+      }),
+    ).toBeNull()
+    expect(SecretSetupModel.existingReference({ alias: existing.alias, environment: 'staging', rows: [existing] })).toBeNull()
+  })
+
   it('formats a reference without the default environment suffix', () => {
     expect(SecretSetupModel.reference({ alias: 'SYNTHETIC_TOKEN', environment: 'prod' })).toBe('secret:SYNTHETIC_TOKEN')
     expect(SecretSetupModel.reference({ alias: 'SYNTHETIC_TOKEN', environment: 'staging' })).toBe('secret:SYNTHETIC_TOKEN@staging')

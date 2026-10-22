@@ -164,9 +164,10 @@ background, so adding an item never waits:
   environment when that setting is empty. The settings field's **Add secret** button creates or replaces the global
   `jev-api-key-optmem` alias and binds its reference automatically; project-scoped aliases cannot resolve here because
   triage has no project folder. The value is resolved on the Host and never stored in settings.
-  When Jev is enabled but no bound or environment key resolves, the latest completed chat turn shows an opt-in **Set up
-  missing secrets** offer. It creates a global alias (suggested `TYPESAFE_API_KEY`) and saves only `secret:ALIAS` to
-  `jevSecret`; the value stays in Secret Catalog and never enters the conversation.
+  When Jev is enabled, no key resolves, and `jevSecret` has no reference, the latest completed chat turn shows an opt-in
+  **Set up missing secrets** offer. It creates a global alias (suggested `TYPESAFE_API_KEY`) and saves only `secret:ALIAS`
+  to `jevSecret`; the value stays in Secret Catalog and never enters the conversation. If a reference is already set but
+  cannot be resolved, the turn shows a repair warning instead of suggesting another alias.
 - **A cheap model** (`triageProvider` + `triageModel`) proposes kind, status, title, tags and a duplicate
   among the similar items it is shown. Items whose applied triage you later corrected by hand are given
   to it as examples; they are read from the event log, not stored separately.

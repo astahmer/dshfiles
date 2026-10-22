@@ -82,7 +82,7 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
 
   return (
     <section
-      className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-3"
+      className="dshx-root dshx:@container dshx:flex dshx:max-w-xl dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-3"
       data-testid="secret-setup-offer"
     >
       <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-2">

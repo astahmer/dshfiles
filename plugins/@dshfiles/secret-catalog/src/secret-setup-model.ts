@@ -62,6 +62,15 @@ export class SecretSetupModel {
     return formatSecretReference(input)
   }
 
+  static existingReference(input: { readonly alias: string; readonly environment: string; readonly rows: readonly SecretMetadata[] }): string | null {
+    const matchingRows = input.rows.filter(row => row.alias === input.alias && row.environment === input.environment)
+    if (matchingRows.length !== 1) return null
+    const matchingRow = matchingRows[0]
+    if (matchingRow === undefined) return null
+    if (!SecretSetupModel.uniquelyBindableSecrets(input.rows).some(row => row.id === matchingRow.id)) return null
+    return SecretSetupModel.reference({ alias: matchingRow.alias, environment: matchingRow.environment })
+  }
+
   static uniquelyBindableSecrets(rows: readonly SecretMetadata[]): readonly SecretMetadata[] {
     const matches = new Map<string, number>()
     for (const row of rows) {

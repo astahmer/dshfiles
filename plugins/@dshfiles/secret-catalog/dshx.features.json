@@ -295,7 +295,7 @@
     {
       "id": "inline-reference-setup",
       "title": "Create and bind from a secret-reference field",
-      "summary": "A marked controlled input opens a masked create-and-bind form. The Secret Catalog Host stores the value, the consumer receives only a reference, and cancelling discards the draft without creating an alias.",
+      "summary": "A marked controlled input opens a compact masked create-and-bind form. The Secret Catalog Host stores the value, the consumer receives only a reference, and a duplicate alias can bind the existing record instead of failing creation.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings*\"",
@@ -309,11 +309,11 @@
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],
-      "states": ["offered", "editing-masked", "cancelled", "stored", "bound", "bind-failed"],
+      "states": ["offered", "editing-masked", "duplicate-detected", "existing-bound", "cancelled", "stored", "bound", "bind-failed"],
       "failureModes": [
-        "Invalid or duplicate aliases, invalid environments, and folderless project/local scopes are rejected before storage.",
+        "Invalid aliases, environments, and folderless project/local scopes are rejected before storage.",
         "A failed bind retains only the stored reference for retry; the value is cleared and never sent to the consumer.",
-        "Ambiguous aliases are not offered in the picker."
+        "A duplicate alias offers to bind its unique existing record; ambiguous duplicates must be resolved in the catalog."
       ],
       "externalDependencies": [
         {
@@ -326,6 +326,11 @@
         {
           "kind": "gherkin",
           "id": "secret-catalog.reference-setup",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.reference-setup-existing-alias",
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {
@@ -408,7 +413,7 @@
     {
       "id": "backlog-jev-chat-setup",
       "title": "Set up a Jev key from chat",
-      "summary": "The latest completed chat turn offers the shared masked Secret Catalog setup form only when Jev is enabled and its key cannot resolve; it suggests the global TYPESAFE_API_KEY alias, and Backlog saves only its reference.",
+      "summary": "The latest completed chat turn offers the compact masked setup form only when Jev is enabled, no key resolves, and no reference is already configured. A bound but unresolvable reference gets a repair warning instead of a duplicate-create form.",
       "reach": [
         "seed fake-secret-cli",
         "seed backlog-jev-enabled",
@@ -419,11 +424,12 @@
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],
-      "states": ["disabled-off", "key-needed-offer", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
+      "states": ["disabled-off", "key-needed-offer", "bound-reference-unresolved", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
       "failureModes": [
         "The offer is absent when Jev is disabled or its key resolves.",
+        "A configured but unresolvable reference shows a repair warning, not another create form.",
         "The raw key stays out of conversation content and Backlog settings; only its reference is bound.",
-        "Secret CLI or Settings failures show a generic error and do not put the key in the chat."
+        "Secret CLI or Settings failures show an error without putting the key in the chat."
       ],
       "externalDependencies": [
         {
@@ -447,6 +453,22 @@
           "kind": "gherkin",
           "id": "secret-catalog.backlog-jev-chat-setup",
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-bound-key-unresolved",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-bound-key-resolves",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.jev-inline-setup-view",
+          "file": "plugins/@dshfiles/secret-catalog/src/jev-inline-setup-model.test.ts",
+          "testName": "shows a resolution warning instead of suggesting a duplicate when a reference is configured"
         },
         {
           "kind": "unit-test",
