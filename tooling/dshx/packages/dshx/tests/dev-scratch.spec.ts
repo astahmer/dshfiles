@@ -195,6 +195,7 @@ describe('dshx dev scratch commands', () => {
     expect(help.stdout).toContain('click <role|text|label|title>')
     expect(help.stdout).toContain('provider-setup dialogs')
     expect(help.stdout).toContain('quota-blocked-thread')
+    expect(help.stdout).toContain('jev-setup-chat-thread')
     expect(help.stdout).toContain('credential-recovery')
 
     const missingFeature = await run(['dev', 'open', '--json'])

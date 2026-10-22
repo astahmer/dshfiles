@@ -123,9 +123,9 @@ Feature: Secret Catalog
 
   @scenario:secret-catalog.reference-setup
   Scenario: Create and bind from a marked secret-reference field
-    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/backlog, @dshfiles/settings-shell, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/backlog, @dshfiles/settings-shell, @dshfiles/ai-accounts, @dshfiles/memory" is booted
     When a Command Code account backed by a local fake provider is added
-    And the Backlog Jev secret-reference setting is focused
+    And the Memory Jev secret-reference setting is focused
     And the create-and-bind form is cancelled and reopened
     Then the cancelled setup writes no alias and reopens with a blank masked value
     When a secret is created and bound with the value "synthetic-inline-setup-value"

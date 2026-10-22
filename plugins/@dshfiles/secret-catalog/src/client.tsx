@@ -1,17 +1,17 @@
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/remote'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
-import { JevInlineSetup } from './jev-inline-setup.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
+import { JevInlineSetup } from './jev-inline-setup.js'
 import { SecretInputOverlay } from './secret-input-overlay.js'
 import { createWorkspacePickerPorts } from './workspace-picker-adapter.js'
 
@@ -27,7 +27,7 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 export default defineClient({
   name: '@dshfiles/secret-catalog',
   locales: [secretCatalogLocale],
-  inject: ['slots', 'remote', 'remote.directoryPicker', 'remote.workspace', 'workspaces'],
+  inject: ['slots', 'conversation', 'remote', 'remote.directoryPicker', 'remote.workspace', 'workspaces'],
   setup(ctx, decorate) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const translate = ctx.locale.bind(SECRET_CATALOG_LOCALE_NAMESPACE)
@@ -51,17 +51,6 @@ export default defineClient({
         )),
       ),
     )
-    const SecretOverlay = (): JSX.Element => (
-      <PluginQueryProvider>
-        <SecretInputOverlay t={translate} />
-      </PluginQueryProvider>
-    )
-    ctx.slots.inject('shell.overlay', () =>
-      ctx.slots.register(
-        { name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118, locale: SECRET_CATALOG_LOCALE_NAMESPACE },
-        decorate(SecretOverlay),
-      ),
-    )
     ctx.slots.inject('conversation.chat.turnTail', () =>
       ctx.slots.register(
         {
@@ -77,6 +66,14 @@ export default defineClient({
           </PluginQueryProvider>
         )),
       ),
+    )
+    const SecretOverlay = (): JSX.Element => (
+      <PluginQueryProvider>
+        <SecretInputOverlay t={translate} />
+      </PluginQueryProvider>
+    )
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118, locale: SECRET_CATALOG_LOCALE_NAMESPACE }, decorate(SecretOverlay)),
     )
   },
 })

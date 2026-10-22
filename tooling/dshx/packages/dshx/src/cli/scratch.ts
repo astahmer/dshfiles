@@ -91,7 +91,7 @@ Notice and provider-setup dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
   hover <role|text|label|title> "<name>"       (leaves the pointer there, for hover-only UI)
-  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|quota-blocked-thread|chat-reference-thread|credential-recovery|fake-secret-cli|backlog-jev-enabled|multi-host-hosts>
+  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|jev-setup-chat-thread|quota-blocked-thread|chat-reference-thread|credential-recovery|fake-secret-cli|backlog-jev-enabled|multi-host-hosts>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
 A click, rightclick or hover may end with "at <x>,<y>" to hit that point of the element's own box
@@ -101,9 +101,10 @@ Seed steps come first and run once per instance: rebase-ready-thread starts a th
 workspace through the New thread screen and describes a revision there; pending-restart changes
 thread-sidebar's Host entry on disk, as a rebuild would ("down" restores it); tool-call-thread
 points an AI Accounts Command Code account at a loopback fake provider ("down" stops it) and runs a
-thread whose model calls bash for three seconds; quota-blocked-thread creates an exhausted turn that
-appears in the Usage limit group; credential-recovery configures a Command Code account whose loopback
-provider rejects the next turn with HTTP 401 (these seeds need @dshfiles/ai-accounts);
+thread whose model calls bash for three seconds; jev-setup-chat-thread asks "Can you help me set up Jev?"
+through that loopback provider; quota-blocked-thread creates an exhausted turn that appears in the
+Usage limit group; credential-recovery configures a Command Code account whose loopback provider
+rejects the next turn with HTTP 401 (these seeds need @dshfiles/ai-accounts);
 fake-secret-cli resets the synthetic aliases of a Host started with "up --fake-secret-cli".
 backlog-jev-enabled uses Settings to turn on Jev only when it is off, without entering a key;
 chat-reference-thread adds a rendered jj:main link to a fake-provider transcript, and multi-host-hosts

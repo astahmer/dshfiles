@@ -299,7 +299,7 @@
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings*\"",
-        "fill searchbox \"Search settings\" \"Jev secret\"",
+        "fill searchbox \"Search settings\" \"Memory Jev secret\"",
         "expect textbox \"Jev secret\"",
         "click textbox \"Jev secret\"",
         "expect button \"Bind a secret\"",

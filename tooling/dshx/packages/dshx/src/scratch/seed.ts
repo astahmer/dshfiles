@@ -526,7 +526,7 @@ const seedFakeSecretCli = async (state: ScratchState): Promise<void> => {
   await writeFile(join(state.fakeSecretCli, 'store.json'), fakeSecretStore(state.project.path), { mode: 0o600 })
 }
 
-const seedBacklogJevEnabled = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
+const seedBacklogJevReadyForSetup = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
   if (!state.bundles.includes('@dshfiles/backlog')) {
     throw new ScratchError(
       'seed-needs-plugin',
@@ -634,7 +634,7 @@ const applySeed = async (input: {
     return {}
   }
   if (input.seed === 'backlog-jev-enabled') {
-    await seedBacklogJevEnabled(input.state, input.page, input.timeoutMs)
+    await seedBacklogJevReadyForSetup(input.state, input.page, input.timeoutMs)
     return {}
   }
   if (input.seed === 'multi-host-hosts') {

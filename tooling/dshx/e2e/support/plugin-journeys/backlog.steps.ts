@@ -776,7 +776,7 @@ When('the Jev setup offer stores and binds a synthetic value', async ({ page }: 
   await expect(value).toHaveAttribute('type', 'password')
   await value.fill('synthetic-jev-setup-value')
   await offer.getByRole('button', { name: 'Create and bind', exact: true }).click()
-  await expect(page.getByRole('status').filter({ hasText: 'Bound' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Jev key stored; only its reference was saved to Backlog.' })).toBeVisible({ timeout: 30_000 })
 })
 
 Then('Backlog stores only the secret reference for Jev', async ({ page }: { page: Page }) => {
