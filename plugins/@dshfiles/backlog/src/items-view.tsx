@@ -120,8 +120,9 @@ const Row = (props: {
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
-  /** The whole selection when this row belongs to one, so its menu starts one thread for all of it. */
-  readonly startThreadSelection?: readonly StartThreadItem[] | undefined
+  /** The whole selection when this row belongs to one, so its menu applies repeatable actions to all of it. */
+  readonly selection?: readonly StartThreadItem[] | undefined
+  readonly clearSelection?: () => void
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -142,7 +143,8 @@ const Row = (props: {
       update={input => actions.update.mutate(input)}
       triage={id => actions.triage.mutate(id)}
       startThread={props.startThread}
-      selection={props.startThreadSelection}
+      selection={props.selection}
+      clearSelection={props.clearSelection}
       openItem={props.select}
     >
       <div
@@ -472,7 +474,8 @@ export const ItemsView = (props: {
                     }}
                     hover={props.hover}
                     startThread={props.startThread}
-                    startThreadSelection={selected.has(entry.item.id) ? selectedItems : undefined}
+                    selection={selected.has(entry.item.id) ? selectedItems : undefined}
+                    clearSelection={clearSelection}
                     projectPaths={props.projectPaths}
                   />
                 )}

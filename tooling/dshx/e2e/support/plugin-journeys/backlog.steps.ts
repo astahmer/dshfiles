@@ -560,6 +560,31 @@ When('the Items view selects a range and toggles one item', async ({ page }: { p
   await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
 })
 
+When("the selected item's context menu moves all selected items to {string}", async ({ page }: { page: Page }, status: string) => {
+  const row = page.getByRole('row', { name: 'Item b:2', exact: true })
+  await row.click({ button: 'right' })
+  await expect(contextMenu(page)).toContainText('2 selected')
+  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true }).click()
+})
+
+Then('the context menu status action updates all selected items', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-multi-select-context-status', async () => {
+    await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Status of b:1' })).toContainText('Inbox')
+    await expect(page.getByRole('button', { name: 'Status of b:2' })).toContainText('Todo')
+    await expect(page.getByRole('button', { name: 'Status of b:3' })).toContainText('Todo')
+  })
+})
+
+When('the remaining selection is made again', async ({ page }: { page: Page }) => {
+  const second = page.getByRole('row', { name: 'Item b:2', exact: true }).getByRole('checkbox', { name: 'Select b:2' })
+  const third = page.getByRole('row', { name: 'Item b:3', exact: true }).getByRole('checkbox', { name: 'Select b:3' })
+  await second.click()
+  await third.click({ modifiers: ['ControlOrMeta'] })
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+})
+
 Then('the batch status action updates only the remaining selected items', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-multi-select-batch-status', async () => {
     await page.getByRole('button', { name: 'Move to' }).click()

@@ -34,22 +34,27 @@ export const BacklogItemMenu = (props: {
   readonly update: (input: BacklogUpdateInput) => void
   readonly triage: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
-  /** The whole selection when this row is part of one, so the menu starts a single thread for all of it. */
+  /** The whole selection when this row is part of one, so repeatable actions apply to every item. */
   readonly selection?: readonly StartThreadItem[] | undefined
+  readonly clearSelection?: (() => void) | undefined
   readonly openItem?: (id: number) => void
   readonly children: ReactNode
 }): JSX.Element => {
   const item = props.item
   const attention = item.attention ?? 'none'
   const selection = props.selection !== undefined && props.selection.length > 1 ? props.selection : [startThreadItemOf(item)]
-  const update = (change: Omit<BacklogUpdateInput, 'id'>): void => props.update({ id: item.id, ...change })
+  const applyToSelection = (action: (id: number) => void): void => {
+    for (const selected of selection) action(selected.id)
+    if (selection.length > 1) props.clearSelection?.()
+  }
+  const update = (change: Omit<BacklogUpdateInput, 'id'>): void => applyToSelection(id => props.update({ id, ...change }))
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
       <ContextMenuContent className="dshx-root dshx:min-w-52">
         <ContextMenuLabel className="dshx:max-w-64 dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-          b:{item.id} · {item.title}
+          {selection.length > 1 ? `${String(selection.length)} selected · ` : null}b:{item.id} · {item.title}
         </ContextMenuLabel>
         <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
           <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
@@ -152,7 +157,7 @@ export const BacklogItemMenu = (props: {
           <PinIcon aria-hidden className="dshx:size-3.5" />
           {item.pinned ? 'Unpin item' : 'Pin item'}
         </ContextMenuItem>
-        <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.triage(item.id)}>
+        <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
           <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
           Run triage
         </ContextMenuItem>

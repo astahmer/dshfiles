@@ -120,6 +120,9 @@ Feature: Backlog
     And "Second selection item" is captured
     And "Third selection item" is captured
     When the Items view selects a range and toggles one item
+    And the selected item's context menu moves all selected items to "Todo"
+    Then the context menu status action updates all selected items
+    When the remaining selection is made again
     Then the batch status action updates only the remaining selected items
 
   @scenario:backlog.multi-select-start-threads
