@@ -107,6 +107,8 @@ export interface StartThreadAgentChoice extends StartThreadAgent {
 export interface StartThreadRequest {
   /** The item (or the selection) the thread works on; every one of them is linked to the new thread. */
   readonly items: readonly StartThreadItem[]
+  /** Create one thread for all items, or a separate thread for each selected item. */
+  readonly mode?: 'together' | 'per-item'
   readonly target: StartThreadTarget
   /** The agent picked in the dialog; its preset and route win over the provider/model fields. */
   readonly agent?: StartThreadAgent
@@ -201,6 +203,19 @@ export class StartThreadForm {
       return `${heading}\n\n${preview}`
     })
     return body.join('\n\n').slice(0, MESSAGE_MAX)
+  }
+
+  /** One item's opening message, with shared optional instructions after its own backlog reference. */
+  static itemMessage(item: StartThreadItem, instructions: string): string {
+    const heading = StartThreadForm.message([item])
+    const extra = instructions.trim()
+    return (extra === '' ? heading : `${heading}\n\n${extra}`).slice(0, MESSAGE_MAX)
+  }
+
+  /** Split a multi-item request into item-specific requests only when the user chose separate threads. */
+  static requests(request: StartThreadRequest): StartThreadRequest[] {
+    if (request.mode !== 'per-item') return [request]
+    return request.items.map(item => ({ ...request, items: [item], message: StartThreadForm.itemMessage(item, request.message) }))
   }
 
   /** The thread title the sidebar shows: the first item, and how many more the selection carried. */

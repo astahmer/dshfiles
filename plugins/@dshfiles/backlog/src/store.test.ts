@@ -386,7 +386,7 @@ describe('attention and inbox', () => {
     expect(store.list({ inbox: true }).total).toBe(0)
 
     await store.update({ id: 1, status: 'doing', actor: user })
-    const blockedAgain = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'new work stopped' })
+    const blockedAgain = await store.applyThreadAttention({ id: 1, threadId: 'session-new-work', attention: 'blocked', reason: 'new work stopped' })
     expect(blockedAgain.ok && blockedAgain.value.item.attention).toBe('blocked')
   })
 

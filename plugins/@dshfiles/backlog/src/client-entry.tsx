@@ -40,6 +40,45 @@ export default defineClient({
     ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
     const api = createApiClient(ctx, backlogApi)
     const agents = createApiClient(ctx, agentsApi)
+    const startOne = async (request: StartThreadRequest, report: boolean): Promise<StartThreadOutcome> => {
+      const failed = (reason: string): StartThreadOutcome => {
+        if (report) BacklogNotices.show({ text: reason, kind: 'failure', sessionId: null })
+        return { ok: false, reason }
+      }
+      if (report) BacklogNotices.show({ text: StartThreadForm.starting(request.items), kind: 'progress', sessionId: null })
+      const start: Parameters<typeof api.safe.startThread>[0] = { ids: request.items.map(item => item.id), send: request.send }
+      if (request.target.kind === 'project') start.workspaceId = request.target.projectId
+      else if (request.target.kind === 'cwd') start.cwd = request.target.path
+      if (request.agent !== undefined) start.agent = request.agent.handle
+      if (request.provider !== null) start.provider = request.provider
+      if (request.model !== null) start.model = request.model
+      if (request.reasoningEffort !== undefined) start.reasoningEffort = request.reasoningEffort
+      if (request.message !== '') start.message = request.message
+      const started = await api.safe.startThread(start)
+      if (!started.ok) return failed(started.error.message)
+      // SAFETY: SessionId is a type-only brand over the Host-minted unique id returned for this request.
+      const sessionId = started.value.sessionId as SessionId
+      if (!request.send && request.message !== '') {
+        const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
+        try {
+          await reference.ready
+          ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
+        } catch (cause) {
+          console.warn(`backlog: thread ${sessionId} started without its draft: ${String(cause)}`)
+        } finally {
+          reference.release()
+        }
+      }
+      if (request.open) {
+        try {
+          ctx.uiWorkspace.openSession(sessionId)
+        } catch (cause) {
+          console.warn(`backlog: thread ${sessionId} could not be opened: ${String(cause)}`)
+        }
+      }
+      if (report) BacklogNotices.show({ text: StartThreadForm.started(request.items), kind: 'success', sessionId: request.open ? null : sessionId })
+      return { ok: true, sessionId }
+    }
     const startThreadPorts: StartThreadPorts = {
       // The chooser sets an item's project: a registered jj workspace is work in progress, not a project to file into.
       listProjects: () =>
@@ -62,47 +101,21 @@ export default defineClient({
         }
       },
       start: async (request: StartThreadRequest): Promise<StartThreadOutcome> => {
-        /** Nothing was created; the dialog is already gone, so the reason travels as a report. */
-        const failed = (reason: string): StartThreadOutcome => {
-          BacklogNotices.show({ text: reason, kind: 'failure', sessionId: null })
-          return { ok: false, reason }
-        }
-        // A jj workspace and a Session take a moment; the banner says the work is under way until a report replaces it.
-        BacklogNotices.show({ text: StartThreadForm.starting(request.items), kind: 'progress', sessionId: null })
-        const start: Parameters<typeof api.safe.startThread>[0] = { ids: request.items.map(item => item.id), send: request.send }
-        if (request.target.kind === 'project') start.workspaceId = request.target.projectId
-        else if (request.target.kind === 'cwd') start.cwd = request.target.path
-        if (request.agent !== undefined) start.agent = request.agent.handle
-        if (request.provider !== null) start.provider = request.provider
-        if (request.model !== null) start.model = request.model
-        if (request.reasoningEffort !== undefined) start.reasoningEffort = request.reasoningEffort
-        if (request.message !== '') start.message = request.message
-        const started = await api.safe.startThread(start)
-        if (!started.ok) return failed(started.error.message)
-        // SAFETY: the Host answers the Session it just created; the brand is type-only on the wire.
-        const sessionId = started.value.sessionId as SessionId
-        if (!request.send && request.message !== '') {
-          // A draft belongs to the composer that owns it, so the panel leaves it after the Host created the thread.
-          const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
-          try {
-            await reference.ready
-            ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
-          } catch (cause) {
-            console.warn(`backlog: thread ${sessionId} started without its draft: ${String(cause)}`)
-          } finally {
-            reference.release()
-          }
-        }
-        if (request.open) {
-          try {
-            ctx.uiWorkspace.openSession(sessionId)
-          } catch (cause) {
-            console.warn(`backlog: thread ${sessionId} could not be opened: ${String(cause)}`)
-          }
-        }
-        // Opening it is already done when asked, so the report only carries the thread when it is still the user's to do.
-        BacklogNotices.show({ text: StartThreadForm.started(request.items), kind: 'success', sessionId: request.open ? null : sessionId })
-        return { ok: true, sessionId }
+        const requests = StartThreadForm.requests(request)
+        if (requests.length === 1) return startOne(requests[0]!, true)
+
+        BacklogNotices.show({ text: `Starting ${String(requests.length)} threads…`, kind: 'progress', sessionId: null })
+        const outcomes: StartThreadOutcome[] = []
+        for (const oneRequest of requests) outcomes.push(await startOne(oneRequest, false))
+        const started = outcomes.filter((outcome): outcome is Extract<StartThreadOutcome, { readonly ok: true }> => outcome.ok)
+        const failed = outcomes.filter((outcome): outcome is Extract<StartThreadOutcome, { readonly ok: false }> => !outcome.ok)
+        const text =
+          failed.length === 0
+            ? `Started ${String(started.length)} threads for ${StartThreadForm.refs(request.items)}`
+            : `Started ${String(started.length)} of ${String(requests.length)} threads; ${String(failed.length)} failed.`
+        BacklogNotices.show({ text, kind: failed.length === 0 ? 'success' : 'failure', sessionId: null })
+        const last = started.at(-1)
+        return failed.length === 0 && last !== undefined ? { ok: true, sessionId: last.sessionId } : { ok: false, reason: text }
       },
     }
     /**

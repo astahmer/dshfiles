@@ -581,6 +581,32 @@ Then('the batch status action updates only the remaining selected items', async 
   await finishJourneyAssertions(page)
 })
 
+When('Start thread is clicked for the selection', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Start thread', exact: true }).click()
+})
+
+Then('the start thread dialog offers both thread-count choices', async ({ page }: { page: Page }) => {
+  const dialog = startThreadDialog(page)
+  await expect(dialog.getByRole('radio', { name: 'One thread for all 2 items' })).toBeVisible()
+  await expect(dialog.getByRole('radio', { name: 'One thread per item (2 threads)' })).toBeVisible()
+})
+
+When('one thread per item is chosen', async ({ page }: { page: Page }) => {
+  await startThreadDialog(page).getByRole('radio', { name: 'One thread per item (2 threads)' }).check()
+  await expect(startThreadDialog(page).getByRole('button', { name: 'Start 2 threads', exact: true })).toBeVisible()
+})
+
+When('the selected backlog threads are started', async ({ page }: { page: Page }) => {
+  await startThreadDialog(page).getByRole('button', { name: 'Start 2 threads', exact: true }).click()
+})
+
+Then('the backlog reports that two threads were started', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-multi-select-start-threads', async () => {
+    await expect(page.getByRole('alert')).toContainText('Started 2 threads for', { timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('a thread on the fake model writes {string}', async ({ page }: { page: Page }, text: string) => {
   // A provider-less profile ends the first turn immediately and the client then drops the conversation, so the
   // reference this journey clicks would be gone; run a real turn on the local fake provider and let it settle.

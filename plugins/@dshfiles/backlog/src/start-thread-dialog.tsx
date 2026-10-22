@@ -34,10 +34,13 @@ export const StartThreadDialog = (props: {
 }): JSX.Element => {
   const targets = StartThreadForm.targets(props.items, props.projects)
   const [targetValue, setTargetValue] = useState(() => StartThreadForm.defaultTargetValue(props.items, props.projects))
+  const [targetWasChosen, setTargetWasChosen] = useState(false)
   const [agentHandle, setAgentHandle] = useState('')
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [effort, setEffort] = useState<string | null>(null)
+  const [mode, setMode] = useState<'together' | 'per-item'>('together')
   const [message, setMessage] = useState(() => StartThreadForm.message(props.items))
+  const [instructions, setInstructions] = useState('')
   const [send, setSend] = useState(props.sendByDefault)
   const [open, setOpen] = useState(props.openByDefault)
   const catalogQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'catalog'], queryFn: props.loadCatalog, staleTime: 30_000 })
@@ -91,7 +94,8 @@ export const StartThreadDialog = (props: {
     const picked = selection()
     if (picked === null) return
     props.close()
-    props.start({ items: props.items, target, ...picked, send, open })
+    const startTarget = mode === 'per-item' && !targetWasChosen ? { kind: 'default' as const } : target
+    props.start({ items: props.items, mode, target: startTarget, ...picked, message: mode === 'per-item' ? instructions : picked.message, send, open })
   }
 
   return (
@@ -106,13 +110,29 @@ export const StartThreadDialog = (props: {
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3">
+          {props.items.length < 2 ? null : (
+            <fieldset className="dshx:flex dshx:flex-col dshx:gap-2">
+              <legend className={labelClass}>Thread count</legend>
+              <label className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-[13px]">
+                <input type="radio" name="backlog-thread-mode" checked={mode === 'together'} onChange={() => setMode('together')} />
+                <span>One thread for all {String(props.items.length)} items</span>
+              </label>
+              <label className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-[13px]">
+                <input type="radio" name="backlog-thread-mode" checked={mode === 'per-item'} onChange={() => setMode('per-item')} />
+                <span>One thread per item ({String(props.items.length)} threads)</span>
+              </label>
+            </fieldset>
+          )}
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
             <span className={labelClass}>Project</span>
             <Combobox
               emptyLabel="No workspace matches."
               label="Thread project"
               matchTriggerWidth
-              onValueChange={setTargetValue}
+              onValueChange={value => {
+                setTargetWasChosen(true)
+                setTargetValue(value)
+              }}
               options={projectOptions}
               searchAbove={0}
               searchPlaceholder="Search workspaces and folders…"
@@ -164,17 +184,22 @@ export const StartThreadDialog = (props: {
             </label>
           )}
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>{chosenAgent === undefined ? 'First message' : 'Task'}</span>
+            <span className={labelClass}>{mode === 'per-item' ? 'Instructions for each thread' : chosenAgent === undefined ? 'First message' : 'Task'}</span>
             <textarea
-              aria-label="First message"
-              value={message}
-              onChange={event => setMessage(event.currentTarget.value)}
+              aria-label={mode === 'per-item' ? 'Instructions for each thread' : 'First message'}
+              value={mode === 'per-item' ? instructions : message}
+              onChange={event => (mode === 'per-item' ? setInstructions(event.currentTarget.value) : setMessage(event.currentTarget.value))}
               rows={4}
-              placeholder="Leave empty to create an empty thread"
+              placeholder={mode === 'per-item' ? 'Optional; each thread gets its own item reference' : 'Leave empty to create an empty thread'}
               className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
             />
             <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
-              <input type="checkbox" checked={send} onChange={event => setSend(event.currentTarget.checked)} disabled={message.trim() === ''} />
+              <input
+                type="checkbox"
+                checked={send}
+                onChange={event => setSend(event.currentTarget.checked)}
+                disabled={mode === 'together' && message.trim() === ''}
+              />
               Send this message now
             </label>
             <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
@@ -182,9 +207,24 @@ export const StartThreadDialog = (props: {
               Open the thread when it is created
             </label>
             <span className="dshx:text-[11px] dshx:text-muted-foreground">
-              {props.items.length > 1 ? `The thread is linked to all ${String(props.items.length)} items. ` : 'The thread is linked to this item. '}
-              {message.trim() === '' ? 'It is created empty' : send ? 'It is told what to work on' : 'It opens with the message as an editable draft'}
-              {open ? ' and opens when it is ready.' : ', in the background, until you open it.'}
+              {mode === 'per-item'
+                ? `Each thread is linked to one item, gets its own b: reference, and uses its project by default. `
+                : props.items.length > 1
+                  ? `The thread is linked to all ${String(props.items.length)} items. `
+                  : 'The thread is linked to this item. '}
+              {mode === 'per-item' ? (
+                send ? (
+                  'Each thread starts with a message.'
+                ) : (
+                  'Each thread keeps its message as an editable draft.'
+                )
+              ) : (
+                <>
+                  {message.trim() === '' ? 'It is created empty' : send ? 'It is told what to work on' : 'It opens with the message as an editable draft'}
+                  {open ? ' and opens when it is ready.' : ', in the background, until you open it.'}
+                </>
+              )}
+              {mode === 'per-item' ? (open ? ' Threads open as they are created.' : ' Threads stay in the background until you open them.') : null}
             </span>
           </label>
         </div>
@@ -194,7 +234,7 @@ export const StartThreadDialog = (props: {
           </Button>
           <Button onClick={submit} disabled={selection() === null}>
             <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
-            Start thread
+            {mode === 'per-item' ? `Start ${String(props.items.length)} threads` : 'Start thread'}
           </Button>
         </DialogFooter>
       </DialogContent>

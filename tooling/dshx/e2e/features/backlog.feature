@@ -122,6 +122,21 @@ Feature: Backlog
     When the Items view selects a range and toggles one item
     Then the batch status action updates only the remaining selected items
 
+  @scenario:backlog.multi-select-start-threads
+  Scenario: Start one thread per selected backlog item
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "First selected work" is captured
+    And "Second selected work" is captured
+    And "Third selected work" is captured
+    When the Items view selects a range and toggles one item
+    And Start thread is clicked for the selection
+    Then the start thread dialog offers both thread-count choices
+    When one thread per item is chosen
+    And the selected backlog threads are started
+    Then the backlog reports that two threads were started
+
 
   @scenario:backlog.start-thread-draft
   Scenario: Start a thread with the first message left as a draft

@@ -132,6 +132,37 @@ describe('start thread form', () => {
     )
   })
 
+  it('generates a separate opening message with only that item and shared instructions', () => {
+    expect(StartThreadForm.itemMessage(item(), '  Keep the change focused  ')).toBe(
+      'Work on b:103: right click backlog item -> start a thread\n\nKeep the change focused',
+    )
+  })
+
+  it('creates one request per selected item only for per-item mode', () => {
+    const items = [
+      { id: 103, title: 'First item', preview: '', project: null },
+      { id: 104, title: 'Second item', preview: '', project: null },
+    ]
+    const request = {
+      items,
+      mode: 'per-item' as const,
+      target: { kind: 'default' as const },
+      provider: null,
+      model: null,
+      reasoningEffort: undefined,
+      message: 'Keep changes focused',
+      send: true,
+      open: false,
+    }
+    const separate = StartThreadForm.requests(request)
+    expect(separate.map(one => one.items.map(selected => selected.id))).toEqual([[103], [104]])
+    expect(separate.map(one => one.message)).toEqual([
+      'Work on b:103: First item\n\nKeep changes focused',
+      'Work on b:104: Second item\n\nKeep changes focused',
+    ])
+    expect(StartThreadForm.requests({ ...request, mode: 'together' })).toEqual([{ ...request, mode: 'together' }])
+  })
+
   it('clips the thread title to the Session title limit', () => {
     expect(StartThreadForm.title([item({ title: 'x'.repeat(400) })])).toHaveLength(200)
   })
