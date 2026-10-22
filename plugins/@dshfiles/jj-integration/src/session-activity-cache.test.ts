@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { createSessionActivityCache, type SessionActivity } from './session-activity-cache.js'
+import { createSessionActivityCache, readWorkspaceSessionActivity, type SessionActivity } from './session-activity-cache.js'
+import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 
 const activityOf = (sessionId: string, running: boolean): SessionActivity => new Map([[sessionId, { running, pendingUserQuestion: false }]])
 
@@ -26,6 +27,54 @@ const cacheOf = (
   })
 
 describe('session activity cache', () => {
+  test('a question blocks integration even when the Session Agent is idle', async () => {
+    const projectionsRead: string[] = []
+    const activity = await readWorkspaceSessionActivity({
+      sessionIds: ['waiting-session', 'other-session'],
+      signal: new AbortController().signal,
+      getRunning: () => false,
+      readProjections: async sessionId => {
+        projectionsRead.push(sessionId)
+        return { values: { userQuestions: { active: sessionId === 'waiting-session' ? [{ callId: 'call' }] : [] } } }
+      },
+    })
+
+    expect(projectionsRead).toEqual(['waiting-session', 'other-session'])
+    expect(activity.get('waiting-session')).toEqual({ running: false, pendingUserQuestion: true, title: undefined, blank: undefined })
+    expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['waiting-session'], activity)).toBe(false)
+  })
+
+  test('a workspace guard reads only its Sessions without replacing the full display snapshot', async () => {
+    let fullReads = 0
+    const guardedSessions: string[][] = []
+    const cache = createSessionActivityCache({
+      read: async () => {
+        fullReads += 1
+        return activityOf('unrelated-session', true)
+      },
+      readGuard: async sessionIds => {
+        guardedSessions.push([...sessionIds])
+        return new Map(sessionIds.map(sessionId => [sessionId, { running: false, pendingUserQuestion: false }]))
+      },
+      ttlMs: 30_000,
+      displayBudgetMs: 2_500,
+      guardBudgetMs: 15,
+      guardAttempts: 1,
+      guardCeilingMs: 60_000,
+    })
+
+    await expect(cache.guard(['workspace-session-a', 'workspace-session-b'])).resolves.toEqual(
+      new Map([
+        ['workspace-session-a', { running: false, pendingUserQuestion: false }],
+        ['workspace-session-b', { running: false, pendingUserQuestion: false }],
+      ]),
+    )
+    expect(guardedSessions).toEqual([['workspace-session-a', 'workspace-session-b']])
+    expect(fullReads).toBe(0)
+    await expect(cache.display()).resolves.toEqual(activityOf('unrelated-session', true))
+    expect(fullReads).toBe(1)
+  })
+
   test('a first display read that outlives its budget resolves as unknown instead of hanging', async () => {
     const cache = cacheOf(async signal => {
       expect(signal).toBeInstanceOf(AbortSignal)

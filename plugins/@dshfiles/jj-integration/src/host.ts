@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import type {} from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-agent'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
@@ -48,7 +49,7 @@ import {
   type ThreadActivityBlocker,
   type ThreadSessionActivity,
 } from './thread-rebase-eligibility.js'
-import { createSessionActivityCache } from './session-activity-cache.js'
+import { createSessionActivityCache, readWorkspaceSessionActivity as readScopedWorkspaceSessionActivity } from './session-activity-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
 import { IntegrationAttribution } from './integration-attribution.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -221,14 +222,11 @@ const createExecutor =
 const isolatedSessionIdsAt = (path: string): readonly string[] =>
   [...isolatedSessionWorkspaces].flatMap(([sessionId, workspace]) => (workspace.path === path ? [sessionId] : []))
 
-/**
- * The Session activity fold costs seconds on a large store — measured at ~18 s cold on this one — so a repository scan
- * waits no more than this while a rebase's guard keeps as many budgets as its fold needs to answer authoritatively.
- */
+/** A full Session activity fold is kept for display and repository-wide cleanup, but never gates one thread rebase. */
 const SESSION_ACTIVITY_TTL_MS = 30_000
 const SESSION_ACTIVITY_DISPLAY_BUDGET_MS = 2_500
 const SESSION_ACTIVITY_GUARD_BUDGET_MS = 15_000
-/** Budgets one guard spends on the same fold before it reports unknown, instead of restarting it and refusing. */
+/** Budgets one guard spends on the same workspace-scoped read before reporting unknown. */
 const SESSION_ACTIVITY_GUARD_ATTEMPTS = 3
 const SESSION_ACTIVITY_GUARD_CEILING_MS = 60_000
 const readSessionActivity = (signal: AbortSignal): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
@@ -251,13 +249,25 @@ const readSessionActivity = (signal: AbortSignal): Promise<ReadonlyMap<string, T
     .catch(() => undefined)
 }
 
+const readWorkspaceSessionActivity = (sessionIds: readonly string[], signal: AbortSignal): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
+  const context = requireContext()
+  const controller = context.get('sessionController')
+  if (controller === undefined) return Promise.resolve(undefined)
+  return readScopedWorkspaceSessionActivity({
+    sessionIds,
+    signal,
+    getRunning: sessionId => context.agents.get(SessionId(sessionId))?.status === 'running',
+    readProjections: sessionId => controller.projections({ sessionId: SessionId(sessionId) }, signal),
+  })
+}
+
 /**
- * The Host folds every stored Session's projections to answer this, which costs seconds on a store this size, so the
- * shared cache serves the last good value at once and refreshes it in the background while a rebase's own guard reads
- * fresh activity before it decides.
+ * Display and repository-wide cleanup need activity across the store, so the shared cache serves the last good full
+ * snapshot while refreshing it in the background. A rebase guard bypasses this fold with workspace-scoped reads.
  */
 const sessionActivity = createSessionActivityCache({
   read: readSessionActivity,
+  readGuard: readWorkspaceSessionActivity,
   ttlMs: SESSION_ACTIVITY_TTL_MS,
   displayBudgetMs: SESSION_ACTIVITY_DISPLAY_BUDGET_MS,
   guardBudgetMs: SESSION_ACTIVITY_GUARD_BUDGET_MS,
@@ -686,7 +696,7 @@ const landThread = async (input: {
     if (location.threadName === undefined) return
     const workspace = await registryOf().resolveByPath(location.workspaceRoot)
     if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
-    const activity = await sessionActivity.guard()
+    const activity = await sessionActivity.guard(workspace.sessionIds)
     const eligible = ThreadRebaseEligibilityModel.eligibility({
       sessionIds: workspace.sessionIds,
       activity,
