@@ -331,7 +331,7 @@ When('No folder is chosen as the New thread project', async ({ page }: { page: P
 
 When('a message is sent in the thread workspace', async ({ page }: { page: Page }) => {
   const composer = page.getByRole('textbox', { name: newThreadComposerName, exact: true })
-  await composer.fill('jj integration rebase e2e thread')
+  await composer.fill('jj integration rebase e2e thread\n\n[[title jj integration rebase e2e thread]]')
   await composer.press('Enter')
   await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })

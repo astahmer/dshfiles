@@ -260,6 +260,7 @@ export default defineClient({
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
     const integrationTimeline = new IntegrationTimeline()
+    const TURN_END_STATUS_REFRESH_WINDOW_MS = 30_000
     const ThreadIntegrationMarkers = (props: { readonly turn: TurnLocation; readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
       const api = useApi(jjIntegrationApi)
       const turnStartedAt = props.turn.start?.time ?? props.turn.end?.time
@@ -271,6 +272,7 @@ export default defineClient({
         () => integrationTimeline.nextTurnStartedAt({ sessionId: props.sessionId, turn: props.turn.turn }),
         () => undefined,
       )
+      const newestTurnHasEnded = props.turn.end?.time !== undefined && nextTurnStartedAt === undefined
       const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
       const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
       // Every Turn tail of a Session shares this query key, so one jj read serves the whole conversation.
@@ -288,7 +290,24 @@ export default defineClient({
             return read({ path }).catch(() => ({ thread: null }))
           })
         },
-        refetchInterval: query => (query.state.data?.thread?.integrationQueuedAt === undefined ? false : 2_000),
+        // Refresh briefly after the newest turn so a status read racing its final JJ write cannot hide the offer.
+        refetchInterval: query => {
+          const thread = query.state.data?.thread
+          if (thread?.integrationQueuedAt !== undefined) return 2_000
+          if (
+            !newestTurnHasEnded ||
+            turnStartedAt === undefined ||
+            thread === null ||
+            thread === undefined ||
+            thread.unlanded.length > 0 ||
+            props.turn.end?.time === undefined ||
+            Date.now() >= props.turn.end.time + TURN_END_STATUS_REFRESH_WINDOW_MS
+          )
+            return false
+          const integrations = thread.integrations ?? (thread.rebasedAt === undefined ? [] : [{ at: thread.rebasedAt }])
+          if (integrations.some(integration => integration.at >= turnStartedAt)) return false
+          return 5_000
+        },
       })
       const bookmark = useBookmark()
       const thread = status.data?.thread
