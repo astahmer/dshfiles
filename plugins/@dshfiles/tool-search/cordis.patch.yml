@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-tool-search
+      name: '@dshfiles/tool-search'

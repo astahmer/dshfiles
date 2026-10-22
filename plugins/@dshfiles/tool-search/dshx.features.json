@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "progressive-tool-disclosure",
+      "title": "Search and disclose tools per agent",
+      "summary": "Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.",
+      "surfaces": ["host", "integration"],
+      "configuration": [
+        {
+          "key": "alwaysVisible",
+          "defaultValue": "[]",
+          "constraints": "Trimmed names; only * is a wildcard.",
+          "coveredBy": ["tool-search.ranking-limits-and-patterns"]
+        },
+        { "key": "maxResults", "defaultValue": "5", "constraints": "Integer from 1 to 100.", "coveredBy": ["tool-search.ranking-limits-and-patterns"] },
+        { "key": "maxQueryChars", "defaultValue": "512", "constraints": "Integer from 1 to 4096.", "coveredBy": ["tool-search.ranking-limits-and-patterns"] }
+      ],
+      "states": ["deferred", "loaded", "unavailable"],
+      "failureModes": [
+        "Invalid query bounds fail without changing visibility.",
+        "Independent tool restrictions remain authoritative.",
+        "Code Mode nested searches are denied."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-search.ranking-limits-and-patterns",
+          "file": "plugins/@dshfiles/tool-search/src/search.test.ts",
+          "testName": "ranks exact names first and uses deterministic name order for ties"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.per-agent-disclosure-policy",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "keeps discovery isolated per agent and loads a matching global tool"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.restore-dynamic-tools",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "restores prior disclosure from the durable request header and tracks late global MCP tools"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.lifecycle-and-code-mode",
+          "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
+          "testName": "rejects nested Code Mode search and unload removes only its own scope contributions"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}

@@ -92,6 +92,7 @@ owning plugin's README — this file is only the decision register.
 | 72  | Re-compose a live Session's Agent preset            | agents                          | host   | drop     | A preset is fixed at `sessions.create`; there is no verb to swap it mid-thread. Product answer: an agent's tool profile applies to the threads it starts, and the panel says so.                                                                                                                                                                       |
 | 73  | Send-time routing hook for plugin mentions          | agents, backlog                 | host   | drop     | The `@` codec's `serialize(ref, signal)` carries no Session identity and the composer has no pre-send interceptor, so a mention in a running thread stays text. Product answer: dispatch belongs to the surfaces that create a thread.                                                                                                                 |
 | 74  | Mid-thread system-prompt injection                  | agents, memory                  | host   | drop     | No supported way to replace the system prompt of a Session that already ran, so instructions and routines ride the opening message. Product answer: the preamble is part of the first message.                                                                                                                                                         |
+| 75  | Read-only live tool-schema inventory                | dshx                            | host   | upstream | `dshx inspect tools` returns DSHX3201 from the linked `web` project: no Runtime Inspect Provider is available. We can measure synthetic schemas but cannot export the live registry without enabling the experiment.                                                                                                                                   |
 
 ## Upstream tracker
 
@@ -133,7 +134,7 @@ before filing a new one; add a comment with our measurement when it is additive.
 ## Upstream asks we still have to file
 
 Rows marked `upstream` with no discussion above: 1, 5, 13, 14, 16, 17, 18, 19, 21,
-24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62. File the smallest of them with a
+24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75. File the smallest of them with a
 measurement, not a feature wish.
 
 ## Triage, 2026-10-19
