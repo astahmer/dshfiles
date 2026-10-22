@@ -19,6 +19,7 @@
     "@dshfiles/editor": "link:../../plugins/@dshfiles/editor",
     "@dshfiles/fff-search": "link:../../plugins/@dshfiles/fff-search",
     "@dshfiles/frame-layout": "link:../../plugins/@dshfiles/frame-layout",
+    "@dshfiles/hmr-gate": "link:../../plugins/@dshfiles/hmr-gate",
     "@dshfiles/goal-stall-guard": "link:../../plugins/@dshfiles/goal-stall-guard",
     "@dshfiles/home": "link:../../plugins/@dshfiles/home",
     "@dshfiles/input-trigger": "link:../../plugins/@dshfiles/input-trigger",
@@ -125,7 +126,8 @@
         "@dshfiles/workspace-folder-picker",
         "@dshfiles/memory",
         "@dshfiles/agent-toolkit",
-        "@dshfiles/home"
+        "@dshfiles/home",
+        "@dshfiles/hmr-gate"
       ]
     }
   }

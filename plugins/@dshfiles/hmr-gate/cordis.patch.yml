@@ -1,0 +1,9 @@
+# Replace the stock Web client HMR transport with the compatibility gate.
+# The stock row owns /plugins/events and announces every rebuilt bundle; this
+# row also withholds the announcement while the rebuilt package's Host half is
+# not the code the running Host loaded (see README.md and UPSTREAM.md).
+- id: client-hmr
+  disabled: true
+- insert:
+    - id: dshfiles-hmr-gate
+      name: '@dshfiles/hmr-gate'
