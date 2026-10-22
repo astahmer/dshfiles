@@ -1507,7 +1507,10 @@
         "expect text \"This turn failed*\"",
         "rightclick text \"Mention target\" at 8,8",
         "click menuitem \"@Mention thread\"",
-        "expect title \"Mention target\""
+        "expect title \"Mention target\"",
+        "rightclick text \"Mention source\" at 8,8",
+        "click menuitem \"Follow-up in a new thread\"",
+        "expect text \"Follow-up after @session:*\""
       ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],

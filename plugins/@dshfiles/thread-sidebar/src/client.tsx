@@ -193,6 +193,7 @@ type InjectedActions = {
   /** Show the remote thread view; set when the layout service is available. */
   openRemoteThreads?: () => void
   openRemoteSession?: (sessionId: string) => void
+  startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
@@ -398,6 +399,7 @@ interface RowActions {
   readonly mute: (sessionId: SessionSummary['id'], option: ThreadMuteOption) => void
   readonly unmute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
+  readonly followUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
   readonly resume: (sessionId: SessionSummary['id']) => void
   readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
   readonly beginRename: (sessionId: SessionSummary['id']) => void
@@ -686,6 +688,9 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
     <>
       <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id, ThreadMentionDrag.activeComposerSessionId())}>
         {t('threadSidebarInsertMention')}
+      </ContextMenuItem>
+      <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
+        {t('threadSidebarFollowUp')}
       </ContextMenuItem>
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
@@ -3291,6 +3296,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     beginRename,
     cancelRename,
     markAttentionUnread: attention.markUnread,
+    startFollowUp: props.startFollowUp,
     notifyThread,
     props,
     sessionsById: sessionState.byId,
@@ -3323,6 +3329,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     beginRename,
     cancelRename,
     markAttentionUnread: attention.markUnread,
+    startFollowUp: props.startFollowUp,
     notifyThread,
     props,
     sessionsById: sessionState.byId,
@@ -3450,6 +3457,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       markUnread: sessionId => {
         latestRowActions.current.markAttentionUnread(sessionId)
       },
+      followUp: (sessionId, workspaceId) => latestRowActions.current.startFollowUp(sessionId, workspaceId),
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       beginRename: sessionId => latestRowActions.current.beginRename(sessionId),

@@ -45,6 +45,7 @@ import './client.css'
 import { SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createSkillMentionSource } from './skill-mention.js'
+import { followUpPrompt } from './follow-up.js'
 import {
   buildThreadReferenceInsert,
   classifyThreadMentionFailure,
@@ -60,6 +61,7 @@ import {
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
+    threadSidebarFollowUp: unknown
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
     threadSidebarNavigation: unknown
@@ -746,6 +748,29 @@ export default defineClient({
       )
     }
 
+    const startFollowUp = (sessionId: SessionSummary['id'], workspaceId: string | undefined): void => {
+      if (workspaceId === undefined) return
+      const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
+      if (workspace === undefined) return
+      void (async () => {
+        try {
+          const followUpSessionId = await ctx.sessions.create({ workspaceId: workspace.workspaceId })
+          const reference = ctx.sessions.retain(followUpSessionId, { source: 'threadSidebarFollowUp' })
+          try {
+            await reference.ready
+            ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: followUpPrompt(sessionId), clearPreviousDraft: true })
+          } catch (cause) {
+            console.warn(`thread-sidebar: follow-up thread ${followUpSessionId} opened without its draft: ${String(cause)}`)
+          } finally {
+            reference.release()
+          }
+          ctx.uiWorkspace.openSession(followUpSessionId)
+        } catch (cause) {
+          console.warn(`thread-sidebar: could not start a follow-up thread: ${String(cause)}`)
+        }
+      })()
+    }
+
     ctx.slots.inject('sidebar.workspaces', () =>
       ctx.slots.register(
         {
@@ -767,6 +792,7 @@ export default defineClient({
               if (!result.ok) throw new Error(result.error.code)
             },
             renameSession,
+            startFollowUp,
             open: openThread,
             openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
             openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),
