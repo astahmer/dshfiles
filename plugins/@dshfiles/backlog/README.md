@@ -194,7 +194,9 @@ On by default (`lifecycleSignals`). Items move without anyone filing them:
 
 Signals only move forward (never Done back to In progress, never out of Dropped) and never over a status or
 attention you set by hand; the link is recorded either way. Only the block this signal set is cleared later,
-so a `blocked` an agent flagged itself stays until someone clears it. Revisions are read with
+so a `blocked` an agent flagged itself stays until someone clears it or closes the item. Closing an item clears
+agent/system attention and pending suggestions; closed items stay out of the Inbox even if older stored state still
+has a flag. Hand-set attention is preserved on the item and can resurface if it is reopened. Revisions are read with
 `jj log --ignore-working-copy` on `main` every `revisionPollMinutes` (5) in each repository an open item
 names, plus `revisionRepositories`; an unchanged `main` costs one call.
 
@@ -277,8 +279,9 @@ item's project, with the full path in its tooltip.
 
 ## Inbox and the rest of the ADE
 
-The Inbox holds items whose `attention` is set (`needs-input`, `blocked`, `waiting`, set by agents with
-`backlog_update` or by you) and items with a triage suggestion. With `inboxThreads` (`failures` by default)
+The Inbox holds open items whose `attention` is set (`needs-input`, `blocked`, `waiting`, set by agents with
+`backlog_update` or by you) and open items with a triage suggestion. Closing an item clears agent/system attention
+and its suggestion. With `inboxThreads` (`failures` by default)
 it also lists threads from the sidebar's unread list that are linked to an item and whose last turn was
 blocked or errored (`all` adds finished turns waiting for review); acknowledging one clears it in the
 sidebar too. Native `ask_user_question` forms stay in their threads: listing them across sessions is the

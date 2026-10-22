@@ -95,6 +95,7 @@ describe('freshness', () => {
     expect(BacklogItems.freshness({ ...base, status: 'doing' }, 60 * DAY_MS)).toBe('stale')
     expect(BacklogItems.freshness({ ...base, status: 'done' }, 6 * DAY_MS)).toBe('fresh')
     expect(BacklogItems.freshness({ ...base, status: 'dropped' }, 7 * DAY_MS)).toBe('archived')
+    expect(BacklogItems.freshness({ ...base, status: 'done', attention: 'blocked' }, 8 * DAY_MS)).toBe('archived')
   })
 })
 
@@ -238,6 +239,19 @@ describe('triage proposals', () => {
     expect(accepted.ok && accepted.value.item.proposal).toBeNull()
   })
 
+  it('clears agent attention when a done suggestion is accepted', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'resolve the integrated change', actor: user })
+    await store.update({ id: 1, attention: 'blocked', actor: agent })
+    await store.propose({ id: 1, proposal: { status: 'done', confidence: 0.9, reason: 'resolved', source: 'jev', at: 9 } })
+
+    const accepted = await store.applyProposal({ id: 1, actor: user })
+
+    expect(accepted.ok && accepted.value.item.status).toBe('done')
+    expect(accepted.ok && accepted.value.item.attention).toBe('none')
+    expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
   it('dismisses a proposal without changing the item', async () => {
     const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'an idea', actor: user })
@@ -258,8 +272,10 @@ describe('lifecycle signals', () => {
     expect(started.ok && started.value.item.status).toBe('doing')
     expect(started.ok && started.value.item.events.at(-1)).toEqual({ at: 9, actor: 'system', kind: 'moved', detail: 'inbox → doing (mentioned in a thread)' })
 
+    await store.update({ id: 1, attention: 'blocked', actor: agent })
     const closed = await store.applySignal({ id: 1, status: 'done', link: { type: 'revision', target: 'kvyxrlmkptyv' }, reason: 'closed by jj:kvyxrlmkptyv' })
     expect(closed.ok && closed.value.item.status).toBe('done')
+    expect(closed.ok && closed.value.item.attention).toBe('none')
 
     const late = await store.applySignal({ id: 1, status: 'doing', link: { type: 'thread', target: 'session-later99' }, reason: 'mentioned in a thread' })
     expect(late.ok && late.value.item.status).toBe('done')
@@ -336,6 +352,49 @@ describe('attention and inbox', () => {
 
     await store.update({ id: 1, attention: 'none', actor: user })
     expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
+  it('clears stale Inbox state when an item is closed', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'finish the integrated change', actor: user })
+    await store.update({ id: 1, attention: 'blocked', actor: agent })
+    await store.propose({ id: 1, proposal: { status: 'done', confidence: 0.9, reason: 'resolved', source: 'jev', at: 9 } })
+
+    const closed = await store.update({ id: 1, status: 'done', actor: user })
+
+    expect(closed.ok && closed.value.item.attention).toBe('none')
+    expect(closed.ok && closed.value.item.proposal).toBeNull()
+    expect(closed.ok && closed.value.item.humanFields).toEqual(['status'])
+    expect(store.list({ inbox: true }).total).toBe(0)
+
+    await store.update({ id: 1, status: 'doing', actor: user })
+    const blockedAgain = await store.applyThreadAttention({ id: 1, attention: 'blocked', reason: 'new work stopped' })
+    expect(blockedAgain.ok && blockedAgain.value.item.attention).toBe('blocked')
+  })
+
+  it('preserves hand-set attention when an item is closed, but hides it until reopening', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'keep this decision visible after reopening', actor: user })
+    await store.update({ id: 1, attention: 'blocked', actor: user })
+
+    const closed = await store.update({ id: 1, status: 'done', actor: user })
+    expect(closed.ok && closed.value.item.attention).toBe('blocked')
+    expect(store.list({ inbox: true }).total).toBe(0)
+
+    await store.update({ id: 1, status: 'doing', actor: user })
+    expect(store.list({ inbox: true }).items.map(item => item.id)).toEqual([1])
+  })
+
+  it('keeps legacy closed items out of the Inbox despite stale flags', async () => {
+    const items = memoryTable<BacklogItem>()
+    const firstStore = BacklogModel.createStore({ files: memoryFiles(), items, now: () => 9 })
+    const created = await firstStore.capture({ text: 'already closed', status: 'done', actor: user })
+    await items.update(String(created.item.id), item => ({ ...item, attention: 'blocked' }))
+
+    const reopened = BacklogModel.createStore({ files: memoryFiles(), items, now: () => 8 * DAY_MS + 9 })
+
+    expect(reopened.list({ inbox: true }).total).toBe(0)
+    expect(reopened.list({ freshness: 'archived' }).items.map(item => item.id)).toEqual([1])
   })
 
   it('hides a snoozed item until its time, then lets it resurface', async () => {

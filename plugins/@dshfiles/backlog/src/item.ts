@@ -206,17 +206,18 @@ const projectPath = (path: string): string => {
 const projectOf = (project: string | null): string | null => (project === null ? null : projectPath(project))
 
 /**
- * Visibility, derived on read and never stored: any activity revives an item and nothing sweeps the store. An item
- * asking for attention never sinks; `dormantDays` of 0 keeps a kind visible forever.
+ * Visibility, derived on read and never stored: any activity revives an item and nothing sweeps the store. An open item
+ * asking for attention never sinks; closed items archive after a week unless pinned.
  */
 const freshness = (
   item: Pick<BacklogItem, 'kind' | 'status' | 'pinned' | 'lastActivityAt'> & { readonly attention?: BacklogAttention | undefined },
   now: number,
   dormantDays: Readonly<Record<BacklogKind, number>> = defaultDormantDays,
 ): BacklogFreshness => {
-  if (item.pinned || (item.attention !== undefined && item.attention !== 'none')) return 'fresh'
+  if (item.pinned) return 'fresh'
   const idleDays = (now - item.lastActivityAt) / DAY_MS
   if (item.status === 'done' || item.status === 'dropped') return idleDays >= ARCHIVE_CLOSED_DAYS ? 'archived' : 'fresh'
+  if (item.attention !== undefined && item.attention !== 'none') return 'fresh'
   if (item.status === 'doing') return idleDays >= STALE_DOING_DAYS ? 'stale' : 'fresh'
   const limit = dormantDays[item.kind]
   return limit > 0 && idleDays >= limit ? 'dormant' : 'fresh'

@@ -95,7 +95,7 @@ const listInputSchema = z
       .enum(['active', 'all', ...BacklogItems.freshnessStates])
       .optional()
       .describe('`active` (default) hides dormant and archived items, like the feed; `all` includes them.'),
-    inbox: z.boolean().optional().describe('Only items that want the user: attention set, or a triage suggestion waiting.'),
+    inbox: z.boolean().optional().describe('Only open items that want the user: attention set, or a triage suggestion waiting; closed items are excluded.'),
     limit: z.number().int().positive().max(2_000).optional(),
   })
   .strict()

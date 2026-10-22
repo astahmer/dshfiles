@@ -599,7 +599,7 @@
     {
       "id": "attention-inbox",
       "title": "Attention Inbox across items and threads",
-      "summary": "Items asking for input, blocked or waiting, items with a triage suggestion, and (setting inboxThreads) linked threads whose last turn was blocked or errored. Read state is separate from requiring action; snoozed items return later.",
+      "summary": "Open items asking for input, blocked or waiting, open items with a triage suggestion, and (setting inboxThreads) linked threads whose last turn was blocked or errored. Closing an item clears agent/system attention and suggestions; read state is separate from requiring action, and snoozed items return later.",
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
@@ -630,6 +630,12 @@
           "id": "backlog.inbox-host-attention",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "puts an item asking for input in the Inbox, keeps it visible, and keeps it there once acknowledged"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.inbox-host-closed",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "clears stale Inbox state when an item is closed"
         },
         {
           "kind": "host-test",

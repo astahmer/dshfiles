@@ -64,7 +64,7 @@ export interface BacklogListQuery {
   readonly actor?: string | undefined
   /** `active` (fresh + stale, the feed), `all`, or one freshness state. */
   readonly freshness?: 'active' | 'all' | BacklogFreshness | undefined
-  /** Only items that want the user: attention set, or a triage suggestion waiting. Snoozed items are left out. */
+  /** Only open items that want the user: attention set, or a triage suggestion waiting. Snoozed items are left out. */
   readonly inbox?: boolean | undefined
   readonly limit?: number | undefined
 }
@@ -195,7 +195,26 @@ const activityOf = (item: BacklogItem): BacklogSummary['activity'] => {
 }
 
 const wantsUser = (item: BacklogItem, now: number): boolean =>
-  (item.snoozedUntil ?? 0) <= now && ((item.attention ?? 'none') !== 'none' || (item.proposal !== undefined && item.proposal !== null))
+  item.status !== 'done' &&
+  item.status !== 'dropped' &&
+  (item.snoozedUntil ?? 0) <= now &&
+  ((item.attention ?? 'none') !== 'none' || (item.proposal !== undefined && item.proposal !== null))
+
+const closedStateChange = (input: {
+  readonly item: BacklogItem
+  readonly status: BacklogItem['status']
+  readonly attention?: BacklogItem['attention'] | undefined
+}): Partial<BacklogItem> => {
+  if (input.status !== 'done' && input.status !== 'dropped') return {}
+  const attention = input.attention ?? input.item.attention ?? 'none'
+  const clearAttention = attention !== 'none' && !input.item.humanFields.includes('attention')
+  const clearProposal = input.item.proposal !== undefined && input.item.proposal !== null
+  if (!clearAttention && !clearProposal) return {}
+  const change: Partial<BacklogItem> = {}
+  if (clearAttention) change.attention = 'none'
+  if (clearProposal) change.proposal = null
+  return change
+}
 
 const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = null, dormantDays = BacklogItems.defaultDormantDays): BacklogSummary => ({
   id: item.id,
@@ -431,55 +450,70 @@ const createBacklogStore = ({
       if (item === undefined) return { ok: false, reason: 'not-found' }
       const change: Partial<BacklogItem> = {}
       const changed: BacklogHumanField[] = []
+      const userChanged = new Set<BacklogHumanField>()
+      const recordChange = (field: BacklogHumanField): void => {
+        changed.push(field)
+        userChanged.add(field)
+      }
       if (fields.title !== undefined && fields.title.trim() !== '' && fields.title !== item.title) {
         change.title = fields.title.trim().slice(0, BacklogItems.maxTitleChars)
-        changed.push('title')
+        recordChange('title')
       }
       if (fields.body !== undefined && fields.body !== item.body) {
         change.body = fields.body.slice(0, BacklogItems.maxBodyChars)
         // A body edit re-reads its references, keeping links the user added by hand.
         change.links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(fields.body)])
-        changed.push('body')
+        recordChange('body')
       }
       if (fields.kind !== undefined && fields.kind !== item.kind) {
         change.kind = fields.kind
-        changed.push('kind')
+        recordChange('kind')
       }
       if (fields.status !== undefined && fields.status !== item.status) {
         change.status = fields.status
-        changed.push('status')
+        recordChange('status')
       }
       if (fields.project !== undefined) {
         const project = BacklogItems.projectOf(fields.project)
         if (project !== item.project) {
           change.project = project
-          changed.push('project')
+          recordChange('project')
         }
       }
       if (fields.tags !== undefined) {
         const tags = [...new Set(fields.tags.map(tag => tag.toLowerCase().replace(/^#/, '')).filter(Boolean))]
         if (tags.join('\n') !== item.tags.join('\n')) {
           change.tags = tags
-          changed.push('tags')
+          recordChange('tags')
         }
       }
       if (fields.pinned !== undefined && fields.pinned !== item.pinned) {
         change.pinned = fields.pinned
-        changed.push('pinned')
+        recordChange('pinned')
       }
       if (fields.attention !== undefined && fields.attention !== (item.attention ?? 'none')) {
         change.attention = fields.attention
         // A new request for attention is unread again, even if an older one was acknowledged.
         change.acknowledgedAt = null
-        changed.push('attention')
+        recordChange('attention')
       }
       if (fields.snoozedUntil !== undefined && fields.snoozedUntil !== (item.snoozedUntil ?? null)) change.snoozedUntil = fields.snoozedUntil
-      if (changed.length === 0 && change.snoozedUntil === undefined) return { ok: true, value: detailOf(item) }
-      if (changed.length === 0) {
-        const until = change.snoozedUntil ?? null
-        return { ok: true, value: await touch(item, actor, { kind: 'edited', detail: until === null ? 'woke it' : 'snoozed it' }, change) }
+      const closedChange = closedStateChange({ item, status: change.status ?? item.status, attention: change.attention })
+      if (closedChange.attention !== undefined) {
+        if (change.attention === undefined) changed.push('attention')
+        else if (change.attention !== closedChange.attention) userChanged.delete('attention')
       }
-      if (actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, ...changed])]
+      Object.assign(change, closedChange)
+      const clearedSuggestion = change.proposal === null
+      if (changed.length === 0 && change.snoozedUntil === undefined && !clearedSuggestion) return { ok: true, value: detailOf(item) }
+      if (changed.length === 0) {
+        const details = [
+          ...(change.snoozedUntil === undefined ? [] : [change.snoozedUntil === null ? 'woke it' : 'snoozed it']),
+          ...(clearedSuggestion ? ['cleared closed-item suggestion'] : []),
+        ]
+        return { ok: true, value: await touch(item, actor, { kind: 'edited', detail: details.join('; ') }, change) }
+      }
+      if (actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, ...userChanged])]
       const detail =
         change.status === undefined
           ? `${changed.join(', ')}`
@@ -556,6 +590,7 @@ const createBacklogStore = ({
         change.links = BacklogItems.uniqueLinks([...item.links, { type: 'item', target: String(chosen.duplicateOf) }])
         applied.duplicateOf = chosen.duplicateOf
       }
+      Object.assign(change, closedStateChange({ item, status: change.status ?? item.status }))
       // Accepting is a person or an agent choosing those values, so they become theirs.
       if (actor.kind !== 'system') {
         const owned = (['kind', 'status', 'title', 'tags'] as const).filter(field => applied[field] !== undefined)
@@ -570,8 +605,19 @@ const createBacklogStore = ({
       const order = ['inbox', 'todo', 'doing', 'done']
       const forward = item.status !== 'dropped' && order.indexOf(status) > order.indexOf(item.status)
       const moves = forward && !item.humanFields.includes('status')
-      if (linked && !moves) return { ok: true, value: detailOf(item) }
-      const change: Partial<BacklogItem> = { links: BacklogItems.uniqueLinks([...item.links, link]) }
+      const closedChange = closedStateChange({ item, status: moves ? status : item.status })
+      const hasClosedChange = closedChange.attention !== undefined || closedChange.proposal !== undefined
+      if (linked && !moves) {
+        if (!hasClosedChange) return { ok: true, value: detailOf(item) }
+        const cleared: string[] = []
+        if (closedChange.attention !== undefined) cleared.push('attention')
+        if (closedChange.proposal !== undefined) cleared.push('suggestion')
+        return {
+          ok: true,
+          value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `closed item: cleared ${cleared.join(' and ')}` }, closedChange),
+        }
+      }
+      const change: Partial<BacklogItem> = { links: BacklogItems.uniqueLinks([...item.links, link]), ...closedChange }
       if (moves) change.status = status
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
       return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail }, change) }
