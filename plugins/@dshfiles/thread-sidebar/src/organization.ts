@@ -90,6 +90,8 @@ export interface SidebarPreferences {
   collapsedGroups: string[]
   /** Section header order; the sections themselves are fixed, only their sequence changes. */
   sectionOrder: SidebarOrderSection[]
+  /** Keep remote rows in a distinct Remote group instead of the active view's matching groups. */
+  separateRemoteThreads: boolean
   /**
    * Active or Inactive as a row was dropped there, by session id. Both are otherwise derived from
    * the idle threshold, so a drop has to outrank that derivation; `at` lets a later turn make the
@@ -168,6 +170,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   collapsedSections: ['archived', 'settled'],
   collapsedGroups: [],
   sectionOrder: [...SIDEBAR_ORDER_SECTIONS],
+  separateRemoteThreads: false,
   idleSectionOverrides: {},
   workspaceFilter: null,
   headerMode: 'compact',

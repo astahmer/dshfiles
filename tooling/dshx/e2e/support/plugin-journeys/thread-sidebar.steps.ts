@@ -514,7 +514,7 @@ When('an archived thread and a settled thread fill the bottom sections', async (
   await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
 })
 
-Then('dragging the Archived header above Active reorders the sections and survives a reload', async ({ page }: { page: Page }) => {
+Then('separate remote grouping is opt-in, reorderable and persists across reloads', async ({ page }: { page: Page }) => {
   const headers = threadSidebar(page).locator('section > button')
   const headerNames = (): Promise<string[]> => headers.evaluateAll(buttons => buttons.map(button => button.textContent.trim()))
   const dragHeaderToTop = async (fromIndex: number): Promise<void> => {
@@ -528,8 +528,16 @@ Then('dragging the Archived header above Active reorders the sections and surviv
     }
     await page.mouse.up()
   }
+  await recordAssertion(page, 'thread-sidebar-remote-group-is-opt-in', async () => {
+    expect(await headerNames()).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)'])
+    await openSidebarSettings(page)
+    const separateRemoteThreads = sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' })
+    await expect(separateRemoteThreads).not.toBeChecked()
+    await separateRemoteThreads.check()
+    await expect.poll(headerNames).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)', 'Remote(0)'])
+    await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  })
   await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
-    expect(await headerNames()).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)', 'Remote(0)'])
     await dragHeaderToTop(2)
     await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)', 'Remote(0)'])
     await dragHeaderToTop(3)
@@ -539,6 +547,12 @@ Then('dragging the Archived header above Active reorders the sections and surviv
   await recordAssertion(page, 'thread-sidebar-section-order-survives-reload', async () => {
     await expect(threadSidebar(page)).toBeVisible()
     await expect.poll(headerNames).toEqual(['Remote(0)', 'Archived(1)', 'Active(0)', 'Settled(1)'])
+    await openSidebarSettings(page)
+    const separateRemoteThreads = sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' })
+    await expect(separateRemoteThreads).toBeChecked()
+    await separateRemoteThreads.uncheck()
+    await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
   })
   await finishJourneyAssertions(page)
 })

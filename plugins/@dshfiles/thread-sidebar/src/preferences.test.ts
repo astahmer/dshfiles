@@ -20,6 +20,13 @@ test('the settings schema and the preference decoder agree on every field', () =
   assert.equal(decoded.workspaceFilter, null)
 })
 
+test('remote threads share view groups by default and can be separated', () => {
+  const { separateRemoteThreads, ...older } = DEFAULT_PREFERENCES
+  assert.equal(separateRemoteThreads, false)
+  assert.equal(SidebarPreferencesModel.decode(older)?.separateRemoteThreads, false)
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, separateRemoteThreads: true })?.separateRemoteThreads, true)
+})
+
 test('older preferences without group collapse default to no collapsed groups', () => {
   const { collapsedGroups, ...older } = DEFAULT_PREFERENCES
   assert.ok(collapsedGroups.length === 0)

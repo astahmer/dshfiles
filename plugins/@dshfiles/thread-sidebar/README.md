@@ -3,15 +3,24 @@
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
 
+![Group remote threads with each view](docs/screenshots/section-order.png)
+
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
 activity, with pinned, active, parked, inactive, settled, and archived sections. Active
 includes running or recently updated threads; the idle threshold moves older,
-non-running threads to Inactive. In the status list, the Remote group joins the
-saved `sectionOrder` after local sections by default; drag its header or any
-status header to move it, or focus one and press Alt+↑/↓. A local status section
-with no rows folds away and keeps its saved slot while the shown ones reorder
-around it. The project picker scopes rows to one workspace or unassigned sessions.
+non-running threads to Inactive. Remote threads started from this DSH join the
+current view by default: status views classify them as Active or Inactive from
+their live running state, while date, project, and flat views group them
+alongside local threads. Enable **Show remote threads in a separate group** in
+sidebar settings to restore a standalone Remote section; in status views its
+header joins the saved `sectionOrder` and can be reordered like local sections.
+Remote runtime status does not include pinned, parked, settled, archived, or
+attention state, so integrated remote sessions only participate in
+Active/Inactive status grouping.
+A local status section with no rows folds away and keeps its saved slot while the
+shown ones reorder around it. The project picker scopes rows to one workspace or
+unassigned sessions.
 
 **Moving a row between sections.** Drag a thread row onto another section header
 (or anywhere inside that section) to put it there; while a row is in flight every

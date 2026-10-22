@@ -647,13 +647,24 @@
     },
     {
       "id": "section-order",
-      "title": "Reorder thread sections",
-      "summary": "Drag visible local or Remote section headers to reorder the sidebar; the saved order survives reload, and empty local sections keep their saved slots instead of taking a drag position.",
-      "reach": ["click button \"All threads\"", "expect region \"Threads\""],
+      "title": "Group remote threads with each view",
+      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
+      "reach": [
+        "click button \"List layout\"",
+        "expect button \"All threads\"",
+        "click button \"All threads\"",
+        "expect region \"Threads\"",
+        "click button \"Sidebar settings\"",
+        "expect region \"Sidebar settings\""
+      ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["default-order", "reordered", "empty-sections-folded"],
-      "failureModes": ["Empty sections can shift the drag position even though they are not rendered.", "A reordered section order does not survive a reload."],
+      "states": ["integrated-by-default", "separate-remote", "reordered", "empty-sections-folded"],
+      "failureModes": [
+        "Remote grouping is shown by default instead of following the current view.",
+        "Empty sections can shift the drag position even though they are not rendered.",
+        "A reordered section order or separate-group choice does not survive a reload."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -666,6 +677,24 @@
           "id": "thread-sidebar.section-order-unit-saved-order",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "a saved section order keeps its sequence and appends the sections it misses"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.section-order-unit-default-grouping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "remote threads share view groups by default and can be separated"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.section-order-unit-mixed-project-grouping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "puts local and remote rows in the same current project group"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.section-order-unit-remote-inventory",
+          "file": "plugins/@dshfiles/thread-sidebar/src/remote-thread-inventory.test.ts",
+          "testName": "remote inventory enriches started-here threads without adding host-only sessions"
         }
       ]
     },

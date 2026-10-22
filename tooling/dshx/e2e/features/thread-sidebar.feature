@@ -40,10 +40,10 @@ Feature: Thread sidebar journeys
     Then the continuation opens in that project with the conversation and the original thread is settled
 
   @scenario:thread-sidebar.section-order
-  Scenario: Reorder local and remote sidebar sections by dragging a header
+  Scenario: Keep remote threads with view groups by default or separate them
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When an archived thread and a settled thread fill the bottom sections
-    Then dragging the Archived header above Active reorders the sections and survives a reload
+    Then separate remote grouping is opt-in, reorderable and persists across reloads
 
   @scenario:thread-sidebar.settled-auto-archive
   Scenario: A settled thread archives itself once its archive delay has passed

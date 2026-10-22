@@ -13,7 +13,8 @@ import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { formatAge } from './relative-age.js'
-import { RemoteThreadsSection } from './remote-threads-section.js'
+import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
+import { useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
@@ -1214,6 +1215,18 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => (
   </PluginQueryProvider>
 )
 
+type SidebarGroupedThread =
+  | { readonly kind: 'local'; readonly session: SessionSummary; readonly updatedAt: number }
+  | { readonly kind: 'remote'; readonly remote: RemoteSidebarThread; readonly updatedAt: number }
+
+type SidebarGroupedViewEntry = {
+  readonly thread: SidebarGroupedThread
+  readonly workspaceId: string | undefined
+  readonly activityAt: number
+}
+
+const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set()
+
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const surface = props.surface ?? 'sidebar'
   const isBoard = surface === 'board'
@@ -1308,6 +1321,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const boardViewSettings = storedThreadBoardView.useValue() ?? DEFAULT_THREAD_BOARD_VIEW
   const threadView = isBoard ? boardViewSettings : listThreadView
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
+  const remoteThreads = useRemoteSidebarThreads(props.wide !== false)
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
@@ -3204,9 +3218,43 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ])
 
   const orderedSections = useMemo(() => SidebarOrganization.orderSections(preferences.sectionOrder), [preferences.sectionOrder])
+  const visibleRemoteThreads = useMemo(
+    () =>
+      preferences.separateRemoteThreads || threadView.sourceFilter === 'subagents'
+        ? []
+        : remoteThreads.filter(thread =>
+            ThreadViewModel.matchesStatusFilter({
+              filters: threadView.statusFilters,
+              running: thread.running,
+              labels: [],
+              unread: false,
+              archived: false,
+              settled: false,
+              muted: false,
+            }),
+          ),
+    [preferences.separateRemoteThreads, remoteThreads, threadView.sourceFilter, threadView.statusFilters],
+  )
+  const remoteRowsBySection = useMemo(() => {
+    const rows = new Map<SidebarSection, RemoteSidebarThread[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
+    for (const thread of visibleRemoteThreads) {
+      const section = SidebarOrganization.sectionForSession({
+        session: { id: SessionId(`remote:${thread.runtimeId}:${thread.sessionId}`), running: thread.running, updatedAt: thread.updatedAt },
+        archivedSessionIds: EMPTY_SESSION_IDS,
+        pinnedSessionIds: EMPTY_SESSION_IDS,
+        parkedSessionIds: EMPTY_SESSION_IDS,
+        settledSessionIds: EMPTY_SESSION_IDS,
+        now,
+        idleMinutes: preferences.idleMinutes,
+      })
+      rows.get(section)?.push(thread)
+    }
+    for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
+    return rows
+  }, [now, preferences.idleMinutes, visibleRemoteThreads])
+  const activityAtBySessionId = useMemo(() => new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt])), [visibleThreadEntries])
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
-    const activityAt = new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt]))
     for (const { session, activity } of visibleThreadEntries) {
       if (attentionIds.has(session.id)) continue
       const section = SidebarOrganization.sectionForSession({
@@ -3222,7 +3270,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       rows.get(section)?.push(session)
     }
     for (const entries of rows.values())
-      entries.sort((left, right) => (activityAt.get(right.id) ?? right.updatedAt) - (activityAt.get(left.id) ?? left.updatedAt))
+      entries.sort((left, right) => (activityAtBySessionId.get(right.id) ?? right.updatedAt) - (activityAtBySessionId.get(left.id) ?? left.updatedAt))
     rows.set(
       'pinned',
       rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
@@ -3237,16 +3285,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     settledSessionIds,
     preferences.idleMinutes,
     preferences.idleSectionOverrides,
+    activityAtBySessionId,
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
   // Empty sections fold away rather than render a header, so a drag only reorders the ones on screen.
   const shownSections = useMemo(
     () =>
-      orderedSections.filter(
-        section => section === 'active' || (section === 'remote' ? props.openRemoteThreads !== undefined : (rowsBySection.get(section)?.length ?? 0) > 0),
-      ),
-    [orderedSections, props.openRemoteThreads, rowsBySection],
+      orderedSections.filter(section => {
+        if (section === 'active') return true
+        if (section === 'remote') return preferences.separateRemoteThreads && props.openRemoteThreads !== undefined
+        return (rowsBySection.get(section)?.length ?? 0) + (remoteRowsBySection.get(section)?.length ?? 0) > 0
+      }),
+    [orderedSections, preferences.separateRemoteThreads, props.openRemoteThreads, remoteRowsBySection, rowsBySection],
   )
   const sectionHeaderRefs = useRef<(HTMLButtonElement | null)[]>([])
   const sectionDragRef = useRef<{ pointerId: number; from: number; startY: number; centers: number[] | null } | null>(null)
@@ -3358,22 +3409,38 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [surface])
   const groupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
+    const entries: SidebarGroupedViewEntry[] = [
+      ...visibleThreadEntries
+        .filter(entry => !attentionIds.has(entry.session.id))
+        .map((entry): SidebarGroupedViewEntry => ({
+          thread: { kind: 'local', session: entry.session, updatedAt: entry.activity.updatedAt },
+          workspaceId: entry.workspaceId,
+          activityAt: entry.activity.updatedAt,
+        })),
+      ...visibleRemoteThreads.map((thread): SidebarGroupedViewEntry => ({
+        thread: { kind: 'remote', remote: thread, updatedAt: thread.updatedAt },
+        workspaceId: thread.workspaceId,
+        activityAt: thread.updatedAt,
+      })),
+    ]
+    const workspaceTitles = new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title]))
+    for (const thread of visibleRemoteThreads) {
+      if (thread.workspaceId !== undefined && thread.workspaceTitle !== undefined) workspaceTitles.set(thread.workspaceId, thread.workspaceTitle)
+    }
     return ThreadViewModel.groupEntries({
       groupBy: threadView.groupBy,
-      entries: visibleThreadEntries
-        .filter(entry => !attentionIds.has(entry.session.id))
-        .map(entry => ({ thread: entry.session, workspaceId: entry.workspaceId, activityAt: entry.activity.updatedAt })),
-      workspaceTitles: new Map(displayWorkspaces.map(workspace => [workspace.id, workspace.title])),
-      unassignedTitle: props.tSidebar('threadSidebarUnassigned'),
+      entries,
+      workspaceTitles,
+      unassignedTitle: tSidebar('threadSidebarUnassigned'),
       dateTitles: {
-        today: props.tSidebar('threadSidebarToday'),
-        yesterday: props.tSidebar('threadSidebarYesterday'),
-        lastSevenDays: props.tSidebar('threadSidebarLast7Days'),
-        older: props.tSidebar('threadSidebarOlder'),
+        today: tSidebar('threadSidebarToday'),
+        yesterday: tSidebar('threadSidebarYesterday'),
+        lastSevenDays: tSidebar('threadSidebarLast7Days'),
+        older: tSidebar('threadSidebarOlder'),
       },
       now,
     })
-  }, [attentionIds, displayWorkspaces, now, props.tSidebar, threadView.groupBy, visibleThreadEntries])
+  }, [attentionIds, displayWorkspaces, now, tSidebar, threadView.groupBy, visibleRemoteThreads, visibleThreadEntries])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -3879,6 +3946,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       />
     )
   }
+  const renderRemoteThreadRow = (thread: RemoteSidebarThread): JSX.Element => (
+    <RemoteThreadItem
+      key={`${thread.runtimeId}:${thread.sessionId}`}
+      runtimeId={thread.runtimeId}
+      sessionId={thread.sessionId}
+      title={thread.title}
+      cwd={thread.cwd}
+      hostName={thread.hostName}
+      connected={thread.connected}
+      onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
+    />
+  )
 
   useEffect(() => {
     if (!isPrimarySurface || sessionState.phase !== 'ready') return
@@ -4257,6 +4336,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarArchiveUndoEnabled')}
             </Label>
             <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarArchiveUndoHint')}</p>
+            <Label className="dshx:font-normal dshx:leading-snug">
+              <Checkbox
+                checked={preferences.separateRemoteThreads}
+                onCheckedChange={checked => changePreferences({ separateRemoteThreads: checked === true })}
+              />
+              {props.tSidebar('threadSidebarSeparateRemoteThreads')}
+            </Label>
+            <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarSeparateRemoteThreadsHint')}</p>
             <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2">
               <div className="dshx:grid dshx:content-start dshx:gap-1.5">
                 <Label htmlFor={`${settingsId}-archive-undo-duration`} className="dshx:text-xs dshx:font-normal dshx:leading-snug dshx:text-muted-foreground">
@@ -4538,12 +4625,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
             {threadView.groupBy === 'status'
-              ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
+              ? (isBoard
+                  ? orderedSections.filter(section => section !== 'remote' || (preferences.separateRemoteThreads && props.openRemoteThreads !== undefined))
+                  : renderedSections
+                ).map((section, index) => {
                   if (section === 'remote') {
-                    return props.openRemoteThreads === undefined ? null : (
+                    return !preferences.separateRemoteThreads || props.openRemoteThreads === undefined ? null : (
                       <RemoteThreadsSection
                         key="remote"
+                        threads={remoteThreads}
                         headerClassName={stickyHeaderClass}
+                        containerClassName={
+                          isBoard ? 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5' : undefined
+                        }
                         onOpen={props.openRemoteThreads}
                         onOpenSession={props.openRemoteSession}
                         title={props.tSidebar('threadSidebarSectionReorderHint')}
@@ -4609,6 +4703,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     )
                   }
                   const rows = rowsBySection.get(section) ?? []
+                  const remoteRows = remoteRowsBySection.get(section) ?? []
+                  const sectionRows: SidebarGroupedThread[] = [
+                    ...rows.map((session): SidebarGroupedThread => ({
+                      kind: 'local',
+                      session,
+                      updatedAt: activityAtBySessionId.get(session.id) ?? session.updatedAt,
+                    })),
+                    ...remoteRows.map((remote): SidebarGroupedThread => ({ kind: 'remote', remote, updatedAt: remote.updatedAt })),
+                  ]
+                  if (section !== 'pinned') sectionRows.sort((left, right) => right.updatedAt - left.updatedAt)
                   const collapsed = collapsedSections.includes(section)
                   return (
                     <section
@@ -4700,13 +4804,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           {sectionIcons[section]}
                         </span>
                         <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
-                        <span className="dshx:text-xs dshx:tabular-nums">({rows.length})</span>
+                        <span className="dshx:text-xs dshx:tabular-nums">({sectionRows.length})</span>
                         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
                         <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
                           {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
                         </span>
                       </button>
-                      {!collapsed ? rows.map(session => renderThreadRow(session, undefined, section)) : null}
+                      {!collapsed
+                        ? sectionRows.map(entry =>
+                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote),
+                          )
+                        : null}
                     </section>
                   )
                 })
@@ -4741,7 +4849,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           </span>
                         </button>
                       ) : null}
-                      {groupCollapsed ? null : group.threads.map(session => renderThreadRow(session, undefined))}
+                      {groupCollapsed
+                        ? null
+                        : group.threads.map(entry =>
+                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined) : renderRemoteThreadRow(entry.remote),
+                          )}
                     </section>
                   )
                 })}
@@ -4797,8 +4909,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               </section>
             )
           })}
-          {threadView.groupBy !== 'status' && props.openRemoteThreads !== undefined ? (
-            <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} onOpenSession={props.openRemoteSession} />
+          {threadView.groupBy !== 'status' && preferences.separateRemoteThreads && props.openRemoteThreads !== undefined ? (
+            <RemoteThreadsSection
+              threads={remoteThreads}
+              headerClassName={stickyHeaderClass}
+              containerClassName={
+                isBoard ? 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5' : undefined
+              }
+              onOpen={props.openRemoteThreads}
+              onOpenSession={props.openRemoteSession}
+            />
           ) : null}
           {draftSessions.length === 0 ? null : (
             <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>

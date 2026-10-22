@@ -73,6 +73,7 @@ const preferencesInputSchema = z
       .max(SIDEBAR_ORDER_SECTIONS.length)
       .default([...DEFAULT_PREFERENCES.sectionOrder])
       .transform(order => SidebarOrganization.orderSections(order)),
+    separateRemoteThreads: z.boolean().default(DEFAULT_PREFERENCES.separateRemoteThreads),
     idleSectionOverrides: z
       .record(z.string().min(1).max(256), z.object({ section: z.enum(['active', 'inactive']), at: z.number().int().nonnegative() }).strict())
       .default(DEFAULT_PREFERENCES.idleSectionOverrides),

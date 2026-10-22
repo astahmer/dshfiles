@@ -46,6 +46,9 @@ export const threadSidebarSettings = defineSettings({
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
     threadRowTime: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTime).description('Show the last activity time.'),
     threadRowStatusDot: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot).description('Show the running / unread status dot.'),
+    separateRemoteThreads: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.separateRemoteThreads)
+      .description('Keep remote threads in a separate group instead of the current view’s status, date, or project groups.'),
     arrowKeysSwitchThread: Schema.boolean()
       .default(DEFAULT_PREFERENCES.arrowKeysSwitchThread)
       .description('Up/Down switches to the focused thread immediately; off moves row focus only until Enter or a click.'),

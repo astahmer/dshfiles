@@ -47,6 +47,22 @@ describe('thread view grouping', () => {
     expect(groups).toMatchObject([{ label: 'Today', threads: [{ id: 'backlog-started' }] }])
   })
 
+  it('puts local and remote rows in the same current project group', () => {
+    const groups = ThreadViewModel.groupEntries({
+      groupBy: 'project',
+      entries: [
+        { thread: { id: 'local-thread', updatedAt: 10 }, workspaceId: 'project:shared' },
+        { thread: { id: 'remote-thread', updatedAt: 20 }, workspaceId: 'project:shared' },
+      ],
+      workspaceTitles: new Map([['project:shared', 'Shared project']]),
+      unassignedTitle: 'Unassigned',
+      dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
+      now: 100,
+    })
+
+    expect(groups).toMatchObject([{ label: 'Shared project', threads: [{ id: 'remote-thread' }, { id: 'local-thread' }] }])
+  })
+
   it('groups activity by local calendar date and leaves none as one flat list', () => {
     const now = new Date(2025, 3, 10, 12).getTime()
     expect(ThreadViewModel.dateGroup(new Date(2025, 3, 10, 1).getTime(), now)).toBe('today')
