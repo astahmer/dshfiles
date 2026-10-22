@@ -206,7 +206,7 @@ export const jujutsuApi = defineApi({
       tool: { name: 'jj_register_repository', readOnly: true, render: output => `${output.repoId} · ${output.root}` },
     }),
     load: method({
-      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(100) }),
+      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(500).default(100) }),
       output: z.union([stateSchema, readFailureSchema]),
       description: 'Repository status and the first page of the revision graph: root, revisions, changed paths, remotes and the last push. Read-only.',
       tool: {

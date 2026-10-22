@@ -5,6 +5,7 @@ import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { PluginApiError } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { JsonText } from './json-text.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -25,13 +26,16 @@ const STATUS_READ_CONCURRENCY = 8
 
 export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal | undefined }) => Promise<JjResult>
 
-export class ThreadError extends Error {
-  constructor(
-    readonly code: 'not-a-repository' | 'not-a-thread' | 'jj-failed' | 'unsafe-path',
-    message: string,
-  ) {
-    super(message)
-    this.name = 'ThreadError'
+export type ThreadErrorCode = 'not-a-repository' | 'not-a-thread' | 'jj-failed' | 'unsafe-path'
+
+/**
+ * A structured API failure, not a bare Error: the tool layer otherwise replaces
+ * the message with "API handler failed. See Host diagnostics.", which is what
+ * `jj_thread_status` returned 125 times in the last measured week.
+ */
+export class ThreadError extends PluginApiError {
+  constructor(code: ThreadErrorCode, message: string) {
+    super(message, { code })
   }
 }
 
