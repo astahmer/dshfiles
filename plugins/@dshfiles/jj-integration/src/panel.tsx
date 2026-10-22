@@ -51,6 +51,7 @@ import { announceRepositoryChange, describeLandResult } from './land-feedback.js
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
 import { indexSessionActivity } from './panel-session-activity.js'
+import { ThreadSessionSelection } from './thread-session-selection.js'
 import { createProjectionRefreshQueue } from './projection-refresh-queue.js'
 import { defaultJjIntegrationSettings, jjIntegrationSettings, RepositoryAutoIntegration } from './settings.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
@@ -378,21 +379,23 @@ const ThreadRow = (props: {
     if (!props.hostEligibilityStale) return
     refreshRepositoriesForUnknownEligibility(queryClient)
   }, [props.hostEligibilityStale, queryClient])
-  const mainSession = thread.sessionIds.map(sessionId => props.sessionById.get(sessionId)).find(session => session !== undefined)
+  const mainSession = ThreadSessionSelection.mainSessionOf({ sessionIds: thread.sessionIds, sessionById: props.sessionById })
+  const listedSessionIds = ThreadSessionSelection.visibleSessionIdsOf({ sessionIds: thread.sessionIds, sessionById: props.sessionById })
   const statusLabel = props.job === undefined ? integrationStatusLabel(t, assessment) : integrationJobLabel(t, props.job.phase)
   const primaryBlocker = props.job?.message ?? (assessment.blocker === undefined ? undefined : blockerMessage(t, assessment.blocker, props.bookmark))
   const statusDescription = primaryBlocker ?? advisoryMessage(t, assessment, props.bookmark)
-  const updatedAt = thread.sessionIds.reduce<number | undefined>((latest, sessionId) => {
+  const updatedAt = listedSessionIds.reduce<number | undefined>((latest, sessionId) => {
     const updated = props.sessionById.get(sessionId)?.updatedAt
     if (updated === undefined) return latest
     return latest === undefined || updated > latest ? updated : latest
   }, undefined)
   const tip = thread.unlanded[0]
   const title = workspaceTitlePrefix(thread.workspaceTitle) ?? props.repositoryTitle
-  const sessionTitle = mainSession?.displayTitle
+  /** A durable title only: displayTitle falls back to the folder basename, which is never a thread's name. */
+  const sessionTitle = mainSession?.title?.trim() || undefined
   const revisionTitle = tip !== undefined && !ThreadIntegrationModel.isPlaceholderRevisionDescription(tip.description) ? tip.description.trim() : undefined
-  const heading = sessionTitle ?? revisionTitle ?? title
-  const userMessages = thread.sessionIds.reduce<{ count: number; known: boolean }>(
+  const heading = sessionTitle ?? revisionTitle ?? mainSession?.displayTitle ?? title
+  const userMessages = listedSessionIds.reduce<{ count: number; known: boolean }>(
     (totals, sessionId) => {
       if (props.sessionById.get(sessionId)?.origin === 'subagent') return totals
       const count = props.userMessagesBySession.get(sessionId)
@@ -464,9 +467,9 @@ const ThreadRow = (props: {
           ))}
         </ul>
       ) : null}
-      {thread.sessionIds.length > 0 ? (
+      {listedSessionIds.length > 0 ? (
         <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-          {thread.sessionIds.map(sessionId => {
+          {listedSessionIds.map(sessionId => {
             const session = props.sessionById.get(sessionId)
             return (
               <li key={sessionId}>
@@ -866,39 +869,43 @@ export const ThreadWorkspacesPanel = (props: {
   )
   const entries = useMemo<readonly ThreadEntry[]>(
     () =>
-      threads.map(({ repository, thread }) => {
-        const cwdActivity = sessionActivity.activityAt(thread.path)
-        const running = cwdActivity.running || thread.sessionIds.some(sessionId => sessionById.get(sessionId)?.running === true)
-        const waitingForInput =
-          cwdActivity.waitingForInput ||
-          thread.sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessionById.get(sessionId)?.projectionValues) === true)
-        const clientCanRebase = ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
-          const session = sessionById.get(sessionId)
-          return session === undefined
-            ? undefined
-            : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
-        })
-        const integrationAllowed =
-          thread.canRebase === false || clientCanRebase === false || running || waitingForInput
-            ? false
-            : thread.canRebase === true && clientCanRebase === true
-              ? true
-              : undefined
-        return {
-          thread,
-          repositoryTitle: repository.title,
-          repositoryRoot: repository.repoRoot,
-          assessment: ThreadIntegrationModel.assess({
+      threads
+        .filter(
+          ({ thread }) => !ThreadSessionSelection.isUnusedThread({ sessionIds: thread.sessionIds, pendingRevisions: thread.unlanded.length, sessionById }),
+        )
+        .map(({ repository, thread }) => {
+          const cwdActivity = sessionActivity.activityAt(thread.path)
+          const running = cwdActivity.running || thread.sessionIds.some(sessionId => sessionById.get(sessionId)?.running === true)
+          const waitingForInput =
+            cwdActivity.waitingForInput ||
+            thread.sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessionById.get(sessionId)?.projectionValues) === true)
+          const clientCanRebase = ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
+            const session = sessionById.get(sessionId)
+            return session === undefined
+              ? undefined
+              : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
+          })
+          const integrationAllowed =
+            thread.canRebase === false || clientCanRebase === false || running || waitingForInput
+              ? false
+              : thread.canRebase === true && clientCanRebase === true
+                ? true
+                : undefined
+          return {
             thread,
-            running,
-            waitingForInput,
-            integrationAllowed,
-            jobPhase: integrationJobs.get(thread.path)?.phase,
-          }),
-          lifecycle: lifecycleOf(thread, running, waitingForInput),
-          hostEligibilityStale: thread.canRebase === false && clientCanRebase === true,
-        }
-      }),
+            repositoryTitle: repository.title,
+            repositoryRoot: repository.repoRoot,
+            assessment: ThreadIntegrationModel.assess({
+              thread,
+              running,
+              waitingForInput,
+              integrationAllowed,
+              jobPhase: integrationJobs.get(thread.path)?.phase,
+            }),
+            lifecycle: lifecycleOf(thread, running, waitingForInput),
+            hostEligibilityStale: thread.canRebase === false && clientCanRebase === true,
+          }
+        }),
     [integrationJobs, sessionActivity, sessionById, threads],
   )
   const lifecycleMatches = (entry: ThreadEntry): boolean => {
@@ -1031,7 +1038,10 @@ export const ThreadWorkspacesPanel = (props: {
   const queuedCount = Math.max(queueSnapshot.context.queue.length - (activeIntegrationPath === null ? 0 : 1), 0)
   const failedPaths = [...integrationJobs.entries()].filter(([, job]) => job.phase === 'failed').map(([path]) => path)
   const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
-  const activeLabel = activeTitle === undefined ? undefined : (sessionById.get(activeTitle.sessionIds[0] ?? '')?.displayTitle ?? activeTitle.name)
+  const activeLabel =
+    activeTitle === undefined
+      ? undefined
+      : (ThreadSessionSelection.mainSessionOf({ sessionIds: activeTitle.sessionIds, sessionById })?.displayTitle ?? activeTitle.name)
   const queueVisible = queueBusy || failedPaths.length > 0
 
   return (

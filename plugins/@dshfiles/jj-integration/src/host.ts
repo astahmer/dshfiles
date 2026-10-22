@@ -243,6 +243,7 @@ const readSessionActivity = (signal: AbortSignal): Promise<ReadonlyMap<string, T
           running: item.running,
           pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(item.projections?.values),
           title: item.projections?.values.title ?? undefined,
+          blank: item.blank,
         })
       }
       return activity
@@ -310,6 +311,7 @@ const threadView = (
   attribution: { readonly sessionId: string | undefined; readonly forkCutAt: number | undefined } | undefined = undefined,
 ): ThreadView => {
   const sessionIds = [...new Set([...(workspace?.sessionIds ?? []), ...isolatedSessionIdsAt(status.path)])]
+  const blankSessionIds = new Set(sessionIds.filter(sessionId => activity?.get(sessionId)?.blank === true))
   const canRebase = ThreadRebaseEligibilityModel.eligibility({ sessionIds, activity, fromAgent: caller.fromAgent, sessionId: caller.sessionId })
   const viewerSessionId = attribution?.sessionId
   const forkCutAt = attribution?.forkCutAt
@@ -318,7 +320,7 @@ const threadView = (
     path: status.path,
     workspaceId: workspace?.id ?? null,
     sessionIds,
-    finished: ThreadIntegrationModel.isFinishedThread(sessionIds, archived),
+    finished: ThreadIntegrationModel.isFinishedThread(sessionIds, archived, blankSessionIds),
     missing: status.missing,
     behind: status.behind,
     behindCount: status.behindCount,

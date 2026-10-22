@@ -131,11 +131,18 @@ describe('thread integration assessment', () => {
     expect(assess({ jobPhase: 'queued', thread: { unlanded: [], rebasedAt: Date.now() } }).category).toBe('integrating')
   })
 
-  it('counts a workspace as finished only when every Session is archived', () => {
+  it('counts a workspace as finished only when every conversation is archived', () => {
     expect(ThreadIntegrationModel.isFinishedThread([], new Set())).toBe(false)
     expect(ThreadIntegrationModel.isFinishedThread(['session-a'], new Set())).toBe(false)
     expect(ThreadIntegrationModel.isFinishedThread(['session-a', 'session-b'], new Set(['session-a']))).toBe(false)
     expect(ThreadIntegrationModel.isFinishedThread(['session-a', 'session-b'], new Set(['session-a', 'session-b']))).toBe(true)
+  })
+
+  it('lets a blank New-thread slot keep an archived thread finished', () => {
+    const archived = new Set(['session-real'])
+    expect(ThreadIntegrationModel.isFinishedThread(['session-blank', 'session-real'], archived, new Set(['session-blank']))).toBe(true)
+    expect(ThreadIntegrationModel.isFinishedThread(['session-blank', 'session-real'], archived, new Set())).toBe(false)
+    expect(ThreadIntegrationModel.isFinishedThread(['session-blank'], new Set(), new Set(['session-blank']))).toBe(false)
   })
 
   it('falls back to the coarse behind flag when a Host predates behindCount', () => {

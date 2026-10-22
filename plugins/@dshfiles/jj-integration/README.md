@@ -178,11 +178,15 @@ Each row keeps a human title first (the conversation title, else the pending
 revision's description, else the project name), with the workspace name and
 lifecycle as secondary metadata. It shows when it was last active, how many user
 messages the thread holds, how many revisions are pending, how far its base sits
-behind the bookmark, its status chip and the primary blocker. The message count
-rides the Host's `turnOutline` projection, which the client asks for per thread
-session, so it costs no log read and no conversation opening. Clicking anywhere
-in the row expands it (or use the chevron); the details list every blocker,
-the pending revisions, the thread's sessions, the workspace path with a copy
+behind the bookmark, its status chip and the primary blocker. A blank New-thread
+slot the app left in the workspace is not a conversation: it never names the
+row, dates it, or counts as its history, and it does not keep an archived thread
+from reading as archived. A registration with no conversation and nothing
+pending is not a row at all. The message count rides the Host's `turnOutline`
+projection, which the client asks for per thread session, so it costs no log
+read and no conversation opening. Clicking anywhere in the row expands it (or
+use the chevron); the details list every blocker, the pending revisions, the
+thread's sessions, the workspace path with a copy
 action, and **Preview**, which loads the latest three user/assistant text
 messages on demand. Hover the current thread workspace chip in the conversation
 header to load a compact revision graph for the thread, configured bookmark and

@@ -51,11 +51,15 @@ export class ThreadIntegrationModel {
   static readonly isPlaceholderRevisionDescription = (description: string): boolean => PLACEHOLDER_DESCRIPTIONS.has(description.trim().toLowerCase())
 
   /**
-   * A workspace nobody ever opened is not finished, and neither is one with an active Session: only every Session being
-   * archived makes a thread inactive. The finished-thread sweep and the row's lifecycle both read this one rule.
+   * A workspace nobody ever opened is not finished, and neither is one with an active Session: only every conversation
+   * being archived makes a thread inactive. A blank New-thread slot is not a conversation, so it never keeps a thread
+   * out of that rule (the app opens one in a workspace and may never prompt it). The finished-thread sweep and the
+   * row's lifecycle both read this one rule.
    */
-  static readonly isFinishedThread = (sessionIds: readonly string[], archived: ReadonlySet<string>): boolean =>
-    sessionIds.length > 0 && sessionIds.every(sessionId => archived.has(sessionId))
+  static readonly isFinishedThread = (sessionIds: readonly string[], archived: ReadonlySet<string>, blank: ReadonlySet<string> = new Set()): boolean => {
+    const conversations = sessionIds.filter(sessionId => blank.has(sessionId) !== true)
+    return conversations.length > 0 && conversations.every(sessionId => archived.has(sessionId))
+  }
 
   /**
    * One answer to "what does this workspace need", used by the row, the filter counts and the batch action so they

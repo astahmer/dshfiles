@@ -7,6 +7,8 @@ export interface ThreadSessionActivity {
   readonly pendingUserQuestion: boolean | undefined
   /** Durable title, so a refusal can name the Session that keeps the workspace busy. */
   readonly title?: string | undefined
+  /** A New-thread slot the app opened in the workspace and nobody ever prompted; it is not a conversation. */
+  readonly blank?: boolean | undefined
 }
 
 /** Projection columns the activity fold reads from the Session list; the rest is paid per row for nothing. */
