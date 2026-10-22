@@ -121,7 +121,7 @@ describe('thread view attention markers', () => {
     ).toBe('threadSidebarInterrupted')
   })
 
-  it('does not badge a not-working view from an attention thread that is still running', () => {
+  it('badges a view from the rows that carry its own attention label', () => {
     const runningFinishedChild = {
       thread: {},
       attentionLabel: 'threadSidebarTurnFinished',
@@ -131,10 +131,10 @@ describe('thread view attention markers', () => {
       muted: false,
     } as const
 
-    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBeUndefined()
-    expect(ThreadViewModel.attentionLabelForView({ filters: ['working'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBe(
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['turn-finished'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBe(
       'threadSidebarTurnFinished',
     )
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['input-needed'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBeUndefined()
   })
 
   it('only considers attention threads that match the tab source and status', () => {
@@ -149,9 +149,9 @@ describe('thread view attention markers', () => {
       },
     ] as const
 
-    expect(ThreadViewModel.attentionLabelForView({ filters: ['working'], sourceFilter: 'subagents', entries })).toBeUndefined()
-    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'main', entries })).toBeUndefined()
-    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'subagents', entries })).toBe('threadSidebarInputNeeded')
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['turn-finished'], sourceFilter: 'subagents', entries })).toBeUndefined()
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['input-needed'], sourceFilter: 'main', entries })).toBeUndefined()
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['input-needed'], sourceFilter: 'subagents', entries })).toBe('threadSidebarInputNeeded')
   })
 })
 
@@ -177,23 +177,18 @@ describe('thread view unread counts', () => {
     ]
 
     expect(ThreadViewModel.unreadCountForView({ filters: [], sourceFilter: 'all', entries })).toBe(4)
-    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['unread'], sourceFilter: 'all', entries })).toBe(2)
     expect(ThreadViewModel.unreadCountForView({ filters: ['settled'], sourceFilter: 'all', entries })).toBe(1)
     expect(ThreadViewModel.unreadCountForView({ filters: ['archived'], sourceFilter: 'all', entries })).toBe(1)
   })
 
-  it('does not count an unread running thread that the view would hide', () => {
-    const manuallyUnread = entry({ unread: true, running: true })
-
-    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
-    expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
-  })
-
-  it('counts an unread running thread only in the views that list running attention', () => {
+  it('counts an unread row by the filter it matches, not by the unread flag alone', () => {
+    const manuallyUnread = entry({ unread: true })
     const unreadAttention = entry({ attentionLabel: 'threadSidebarInputNeeded', unread: true, running: true })
 
-    expect(ThreadViewModel.unreadCountForView({ filters: ['not-working'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(0)
-    expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(1)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['turn-finished'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['attention'], sourceFilter: 'all', entries: [manuallyUnread] })).toBe(0)
+    expect(ThreadViewModel.unreadCountForView({ filters: ['input-needed'], sourceFilter: 'all', entries: [unreadAttention] })).toBe(1)
   })
 
   it('follows the view source filter and leaves muted threads out unless the view asks for them', () => {
@@ -206,6 +201,18 @@ describe('thread view unread counts', () => {
 })
 
 describe('thread view filters', () => {
+  type FilterState = Parameters<typeof ThreadViewModel.matchesStatusFilter>[0]
+  const filterState = (overrides: Partial<FilterState> = {}): FilterState => ({
+    filters: [],
+    running: false,
+    labels: [],
+    unread: false,
+    archived: false,
+    settled: false,
+    muted: false,
+    ...overrides,
+  })
+
   it('hides /btw side chats by their title marker only', () => {
     expect(ThreadViewModel.isSideChat({ title: 'btw · why is the build slow?' })).toBe(true)
     expect(ThreadViewModel.isSideChat({ title: 'btw: notes' })).toBe(false)
@@ -213,83 +220,35 @@ describe('thread view filters', () => {
   })
 
   it('filters supported activity states', () => {
-    expect(ThreadViewModel.matchesStatusFilter({ filters: [], running: false, needsAttention: false, archived: false, settled: false, muted: false })).toBe(
-      true,
-    )
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: false, needsAttention: false, archived: false, settled: false, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['attention'], running: false, needsAttention: true, archived: false, settled: false, muted: false }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['archived'], running: false, needsAttention: false, archived: true, settled: false, muted: false }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['settled'], running: false, needsAttention: false, archived: false, settled: true, muted: false }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['settled'], running: false, needsAttention: false, archived: false, settled: false, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, settled: false, muted: true }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({
-        filters: ['working', 'attention'],
-        running: false,
-        needsAttention: true,
-        archived: false,
-        settled: false,
-        muted: false,
-      }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({
-        filters: ['working', 'attention'],
-        running: false,
-        needsAttention: false,
-        archived: false,
-        settled: false,
-        muted: false,
-      }),
-    ).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter(filterState())).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working'], running: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working'] }))).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['attention'], labels: ['threadSidebarInputNeeded'] }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['attention'] }))).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['archived'], archived: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['settled'], settled: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['settled'] }))).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['muted'], muted: true, running: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['muted'], running: true }))).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working', 'attention'], labels: ['threadSidebarInterrupted'] }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working', 'attention'] }))).toBe(false)
   })
 
-  it('includes stopped input-needed and usage-limit threads, but no running threads, in Not working', () => {
-    for (const status of ['input-needed', 'usage-limit']) {
-      expect(
-        ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, settled: false, muted: false }),
-        status,
-      ).toBe(true)
-    }
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: false, muted: false }),
-    ).toBe(true)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, settled: false, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: true, settled: false, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: false, muted: true }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, settled: true, muted: false }),
-    ).toBe(false)
-    expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: true, muted: false }),
-    ).toBe(false)
+  it('matches the attention labels a row carries, alone or combined', () => {
+    const finished = filterState({ labels: ['threadSidebarTurnFinished'], unread: true })
+    const inputNeededWithFinishedChild = filterState({ labels: ['threadSidebarInputNeeded', 'threadSidebarTurnFinished'] })
+
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['turn-finished'] })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['input-needed'] })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['needs-resume'] })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['attention'] })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['turn-finished', 'needs-resume'] })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ ...inputNeededWithFinishedChild, filters: ['turn-finished'] })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ ...inputNeededWithFinishedChild, filters: ['input-needed'] })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'] })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'], archived: true })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'], settled: true })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'], unread: false })).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {

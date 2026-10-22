@@ -5,6 +5,7 @@ import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
   THREAD_STATUS_FILTER_OPTIONS,
+  upgradeLegacyStatusFilters,
   type ThreadStatusFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
@@ -31,10 +32,13 @@ const statusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS.filter((filter): 
 export const threadBoardViewSchema = z
   .object({
     groupBy: groupBySchema,
-    statusFilters: z
-      .array(statusFilterSchema)
-      .max(THREAD_STATUS_FILTER_OPTIONS.length - 1)
-      .readonly(),
+    statusFilters: z.preprocess(
+      value => (Array.isArray(value) ? upgradeLegacyStatusFilters(value) : value),
+      z
+        .array(statusFilterSchema)
+        .max(THREAD_STATUS_FILTER_OPTIONS.length - 1)
+        .readonly(),
+    ),
     sourceFilter: sourceFilterSchema,
     projectFilter: z.string().max(200).nullable(),
     collapsedGroups: z.array(z.string().max(160)).max(64).readonly(),

@@ -155,6 +155,7 @@ import { useAutoSettle, type AutoSettleClient } from './auto-settle-machine.js'
 import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
+  THREAD_STATUS_FILTER_GROUPS,
   THREAD_STATUS_FILTER_OPTIONS,
   ThreadViewModel,
   type ThreadGroupBy,
@@ -162,7 +163,7 @@ import {
   type ThreadViewPreferences,
 } from './thread-view.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
-import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
+import { ThreadViewManager, threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion, ThreadMentionDrag } from './thread-mention.js'
 import {
   ThreadNotificationModel,
@@ -229,8 +230,13 @@ type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
 const emptyThreadsMessage = {
   all: 'threadSidebarEmpty',
   working: 'threadSidebarNoWorkingThreads',
-  'not-working': 'threadSidebarNoNotWorkingThreads',
   attention: 'threadSidebarNoAttentionThreads',
+  unread: 'threadSidebarNoUnreadThreads',
+  'approval-needed': 'threadSidebarNoApprovalNeededThreads',
+  'input-needed': 'threadSidebarNoInputNeededThreads',
+  'turn-finished': 'threadSidebarNoTurnFinishedThreads',
+  'needs-resume': 'threadSidebarNoNeedsResumeThreads',
+  interrupted: 'threadSidebarNoInterruptedThreads',
   muted: 'threadSidebarNoMutedThreads',
   settled: 'threadSidebarNoSettledThreads',
   archived: 'threadSidebarNoArchivedThreads',
@@ -292,16 +298,6 @@ const threadGroupLabelKeys = {
   date: 'threadSidebarGroupDate',
   none: 'threadSidebarGroupNone',
 } satisfies Record<ThreadGroupBy, Parameters<ThreadSidebarTranslate>[0]>
-
-const threadStatusFilterLabelKeys = {
-  all: 'threadSidebarAllThreads',
-  working: 'threadSidebarWorking',
-  'not-working': 'threadSidebarFilterNotWorking',
-  attention: 'threadSidebarFilterAttention',
-  muted: 'threadSidebarFilterMuted',
-  settled: 'threadSidebarSettled',
-  archived: 'threadSidebarArchived',
-} satisfies Record<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], Parameters<ThreadSidebarTranslate>[0]>
 
 const threadSourceFilterLabelKeys = {
   all: 'threadSidebarFilterAllSources',
@@ -2785,36 +2781,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows]),
     StableValueModel.sameSet,
   )
-  const attentionSessionIds = useStableValue(
-    useMemo(
-      () =>
-        new Set([
-          ...approvalNeededRows,
-          ...needsInputRows,
-          ...turnFinishedRows,
-          ...needsResumeRows,
-          ...interruptedRows,
-          ...usageLimitRows.map(row => row.session.id),
-        ]),
-      [approvalNeededRows, interruptedRows, needsInputRows, needsResumeRows, turnFinishedRows, usageLimitRows],
-    ),
-    StableValueModel.sameSet,
-  )
-  const attentionRootIds = useStableValue(
-    useMemo(() => {
-      const ids = new Set(attentionSessionIds)
-      for (const { session } of sectionEntries) {
-        if ((threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => attentionSessionIds.has(child.id))) ids.add(session.id)
-      }
-      return ids
-    }, [attentionSessionIds, sectionEntries, threadTree]),
-    StableValueModel.sameSet,
-  )
   const attentionLabelsBySession = useMemo(() => {
-    const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
+    const labels = new Map<SessionSummary['id'], readonly ThreadAttentionLabel[]>()
     const addLabel = (sessionId: SessionSummary['id'], label: ThreadAttentionLabel): void => {
-      const mostUrgent = ThreadViewModel.mostUrgentAttentionLabel([labels.get(sessionId), label])
-      if (mostUrgent !== undefined) labels.set(sessionId, mostUrgent)
+      const current = labels.get(sessionId) ?? []
+      if (!current.includes(label)) labels.set(sessionId, [...current, label])
     }
     for (const session of turnFinishedRows) addLabel(session.id, 'threadSidebarTurnFinished')
     for (const session of allNeedsResumeRows) addLabel(session.id, 'threadSidebarNeedsResume')
@@ -2824,13 +2795,25 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     for (const session of allInterruptedRows) addLabel(session.id, 'threadSidebarInterrupted')
     return labels
   }, [allInterruptedRows, allNeedsResumeRows, allUsageLimitRows, approvalNeededRows, needsInputRows, turnFinishedRows])
+  /** A root row carries its own labels plus its children's, which is exactly what its row badge shows. */
+  const attentionLabelsByRow = useMemo(() => {
+    const labels = new Map<SessionSummary['id'], readonly ThreadAttentionLabel[]>(attentionLabelsBySession)
+    for (const { session } of sectionEntries) {
+      const childLabels = (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).flatMap(child => attentionLabelsBySession.get(child.id) ?? [])
+      if (childLabels.length === 0) continue
+      labels.set(session.id, [...(labels.get(session.id) ?? []), ...childLabels])
+    }
+    return labels
+  }, [attentionLabelsBySession, sectionEntries, threadTree])
   const threadViewAttentionEntries = useMemo(() => {
     const entryFor = (
       entry: (typeof sectionEntries)[number] | (typeof childThreadEntries)[number] | (typeof detachedThreadEntries)[number],
       isRoot: boolean,
     ) => {
-      const childLabels = isRoot ? (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).map(child => attentionLabelsBySession.get(child.id)) : []
-      const attentionLabel = ThreadViewModel.mostUrgentAttentionLabel([attentionLabelsBySession.get(entry.session.id), ...childLabels])
+      const childLabels = isRoot
+        ? (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => attentionLabelsBySession.get(child.id) ?? [])
+        : []
+      const attentionLabel = ThreadViewModel.mostUrgentAttentionLabel([...(attentionLabelsBySession.get(entry.session.id) ?? []), ...childLabels])
       return {
         thread: entry.session,
         attentionLabel,
@@ -2870,8 +2853,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       sourceFilteredThreadEntries.filter(entry =>
         ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
+          // A subagent row reports its own state; a root row reports its children's, so a finished child keeps its
+          // parent in the view that names that label.
+          labels: attentionLabelsByRow.get(entry.session.id) ?? [],
+          unread: attention.records.has(entry.session.id),
           running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
-          needsAttention: threadView.sourceFilter === 'subagents' ? attentionSessionIds.has(entry.session.id) : attentionRootIds.has(entry.session.id),
           archived: archivedSessionIds.has(entry.session.id),
           settled: settledSessionIds.has(entry.session.id),
           muted: mutedSessionIds.has(entry.session.id),
@@ -2880,8 +2866,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [
       archivedSessionIds,
       settledSessionIds,
-      attentionRootIds,
-      attentionSessionIds,
+      attention.records,
+      attentionLabelsByRow,
       currentWorkingThreadIds,
       mutedSessionIds,
       sourceFilteredThreadEntries,
@@ -2890,7 +2876,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     ],
   )
   const groupedAttentionRows = useMemo(() => {
-    const filterRows = (rows: readonly SessionSummary[]): SessionSummary[] => {
+    const filterRows = (rows: readonly SessionSummary[], label: ThreadAttentionLabel): SessionSummary[] => {
       if (threadView.groupBy !== 'status') return []
       return rows.filter(
         session =>
@@ -2898,7 +2884,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ThreadViewModel.matchesStatusFilter({
             filters: threadView.statusFilters,
             running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
-            needsAttention: true,
+            labels: [label],
+            unread: attention.records.has(session.id),
             archived: archivedSessionIds.has(session.id),
             settled: settledSessionIds.has(session.id),
             // Attention rows already leave muted threads out.
@@ -2907,14 +2894,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       )
     }
     return {
-      approvalNeeded: preferences.approvalNeededDisplay === 'group' ? filterRows(approvalNeededRows) : [],
-      inputNeeded: preferences.inputNeededDisplay === 'group' ? filterRows(needsInputRows) : [],
-      turnFinished: preferences.turnFinishedDisplay === 'group' ? filterRows(turnFinishedRows) : [],
+      approvalNeeded: preferences.approvalNeededDisplay === 'group' ? filterRows(approvalNeededRows, 'threadSidebarApprovalNeeded') : [],
+      inputNeeded: preferences.inputNeededDisplay === 'group' ? filterRows(needsInputRows, 'threadSidebarInputNeeded') : [],
+      turnFinished: preferences.turnFinishedDisplay === 'group' ? filterRows(turnFinishedRows, 'threadSidebarTurnFinished') : [],
     }
   }, [
     archivedSessionIds,
     settledSessionIds,
     approvalNeededRows,
+    attention.records,
     currentWorkingThreadIds,
     needsInputRows,
     preferences.approvalNeededDisplay,
@@ -2932,13 +2920,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
-          needsAttention: true,
+          labels: ['threadSidebarNeedsResume'],
+          unread: attention.records.has(session.id),
           archived: archivedSessionIds.has(session.id),
           settled: settledSessionIds.has(session.id),
           muted: mutedSessionIds.has(session.id),
         }),
       ),
-    [archivedSessionIds, settledSessionIds, currentWorkingThreadIds, mutedSessionIds, needsResumeRows, threadView.sourceFilter, threadView.statusFilters],
+    [
+      archivedSessionIds,
+      attention.records,
+      settledSessionIds,
+      currentWorkingThreadIds,
+      mutedSessionIds,
+      needsResumeRows,
+      threadView.sourceFilter,
+      threadView.statusFilters,
+    ],
   )
   const statusFilteredInterruptedRows = useMemo(
     () =>
@@ -2946,13 +2944,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
-          needsAttention: true,
+          labels: ['threadSidebarInterrupted'],
+          unread: attention.records.has(session.id),
           archived: archivedSessionIds.has(session.id),
           settled: settledSessionIds.has(session.id),
           muted: mutedSessionIds.has(session.id),
         }),
       ),
-    [archivedSessionIds, settledSessionIds, currentWorkingThreadIds, interruptedRows, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters],
+    [
+      archivedSessionIds,
+      attention.records,
+      settledSessionIds,
+      currentWorkingThreadIds,
+      interruptedRows,
+      mutedSessionIds,
+      threadView.sourceFilter,
+      threadView.statusFilters,
+    ],
   )
   const statusFilteredUsageLimitRows = useMemo(
     () =>
@@ -2960,13 +2968,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? row.session.running : currentWorkingThreadIds.has(row.session.id),
-          needsAttention: true,
+          labels: ['threadSidebarNeedsResume'],
+          unread: attention.records.has(row.session.id),
           archived: archivedSessionIds.has(row.session.id),
           settled: settledSessionIds.has(row.session.id),
           muted: mutedSessionIds.has(row.session.id),
         }),
       ),
-    [archivedSessionIds, settledSessionIds, currentWorkingThreadIds, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters, usageLimitRows],
+    [
+      archivedSessionIds,
+      attention.records,
+      settledSessionIds,
+      currentWorkingThreadIds,
+      mutedSessionIds,
+      threadView.sourceFilter,
+      threadView.statusFilters,
+      usageLimitRows,
+    ],
   )
   const statusFilteredRecoveryRows = useMemo(
     () => [...statusFilteredInterruptedRows, ...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
@@ -3029,7 +3047,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             ThreadViewModel.matchesStatusFilter({
               filters: threadView.statusFilters,
               running: child.running,
-              needsAttention: attentionSessionIds.has(child.id),
+              labels: attentionLabelsBySession.get(child.id) ?? [],
+              unread: attention.records.has(child.id),
               archived: archivedSessionIds.has(child.id),
               settled: settledSessionIds.has(child.id),
               muted: mutedSessionIds.has(child.id),
@@ -3055,8 +3074,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       .filter(group => group.count > 0)
   }, [
     archivedSessionIds,
+    attention.records,
     attentionIds,
-    attentionSessionIds,
+    attentionLabelsBySession,
     mutedSessionIds,
     settledSessionIds,
     preferences.finishedSubagents,
@@ -3987,15 +4007,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
                     <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
-                    {THREAD_STATUS_FILTER_OPTIONS.map(filter => (
-                      <DropdownMenuCheckboxItem
-                        checked={filter === 'all' ? threadView.statusFilters.length === 0 : threadView.statusFilters.includes(filter)}
-                        key={filter}
-                        onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
-                        onSelect={event => event.preventDefault()}
-                      >
-                        {props.tSidebar(threadStatusFilterLabelKeys[filter])}
-                      </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={threadView.statusFilters.length === 0}
+                      onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
+                      onSelect={event => event.preventDefault()}
+                    >
+                      {props.tSidebar(threadStatusFilterLabelKeys.all)}
+                    </DropdownMenuCheckboxItem>
+                    {THREAD_STATUS_FILTER_GROUPS.map(group => (
+                      <div key={group.id}>
+                        <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
+                        {group.filters.map(filter => (
+                          <DropdownMenuCheckboxItem
+                            checked={threadView.statusFilters.includes(filter)}
+                            key={filter}
+                            onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
+                            onSelect={event => event.preventDefault()}
+                          >
+                            {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </div>
                     ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterSource')}</DropdownMenuLabel>

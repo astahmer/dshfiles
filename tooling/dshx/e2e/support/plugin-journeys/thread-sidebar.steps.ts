@@ -112,7 +112,20 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
-const statusFilterLabels: readonly string[] = ['All threads', 'Working', 'Not working', 'Needs attention', 'Muted', 'Settled', 'Archived']
+const statusFilterLabels: readonly string[] = [
+  'All threads',
+  'Working',
+  'Needs attention',
+  'Unread',
+  'Approval needed',
+  'Input needed',
+  'Turn finished',
+  'Needs resume',
+  'Interrupted',
+  'Muted',
+  'Settled',
+  'Archived',
+]
 
 const setThreadStatusFilters = async (page: Page, triggerName: string, selectedLabels: readonly string[]): Promise<void> => {
   await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
@@ -352,12 +365,12 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await expect(banner).toBeVisible()
     await expect(page.getByRole('button', { name: 'Unsettle to reply', exact: true })).toBeVisible()
   })
-  await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-not-working', async () => {
-    // A settled thread is storage, like an archived one: a working view never lists it.
-    await setThreadStatusFilters(page, 'Filter: None', ['Not working'])
+  await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-finished-turns', async () => {
+    // A settled thread is storage, like an archived one: a view that lists finished turns never lists it.
+    await setThreadStatusFilters(page, 'Filter: None', ['Turn finished'])
     await expect(targetRow).toHaveCount(0)
-    await expect(threadSidebar(page).getByText('No stopped or waiting threads right now.', { exact: true })).toBeVisible()
-    await setThreadStatusFilters(page, 'Filter: Not working', [])
+    await expect(threadSidebar(page).getByText('No finished turns to review right now.', { exact: true })).toBeVisible()
+    await setThreadStatusFilters(page, 'Filter: Turn finished', [])
     await expect(targetRow).toHaveCount(1)
   })
   await recordAssertion(page, 'thread-sidebar-settled-banner-carries-actions', async () => {
@@ -810,9 +823,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar view filter e2e' })
   await expect(targetRow).toHaveCount(1)
   await expect(page.getByText('This turn failed', { exact: false })).toBeVisible()
-  await selectThreadViewValue(page, 'Filter: None', 'Not working')
-  await expect(targetRow).toBeVisible()
-  await selectThreadViewValue(page, 'Filter: Not working', 'Working')
+  await selectThreadViewValue(page, 'Filter: None', 'Working')
   await expect(targetRow).toHaveCount(0)
   await expect(threadSidebar(page).getByText('No threads are working right now.', { exact: true })).toBeVisible()
   await selectThreadViewValue(page, 'Filter: Working', 'All threads')
@@ -967,14 +978,7 @@ When('a thread finishes its turn and the browser hands its unfinished marker to 
       ),
     [LEGACY_NOTIFICATION_STORAGE_KEY, targetThreadId],
   )
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
-  await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
-  const viewManager = page.getByRole('dialog')
-  await viewManager.getByRole('button', { name: 'Add view', exact: true }).click()
-  await viewManager.getByLabel('View name').fill('Done')
-  await viewManager.getByRole('checkbox', { name: 'Not working', exact: true }).check()
-  await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
-  await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
+  // The shipped Done view is already in the view row and lists finished turns; nothing to create.
   finishedTurnJourneys.set(page, { targetThreadId })
 })
 
@@ -1308,15 +1312,16 @@ const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
   await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
   const viewManager = page.getByRole('dialog')
-  await viewManager.getByRole('button', { name: 'Edit view Working', exact: true }).click()
-  await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
-  await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
-  for (const name of ['Done', 'Gone']) {
-    await viewManager.getByRole('button', { name: 'Add view', exact: true }).click()
-    await viewManager.getByLabel('View name').fill(name)
+  // Working and the shipped Done view both become plain lists, so every tab in the row holds the same two rows.
+  for (const name of ['Working', 'Done']) {
+    await viewManager.getByRole('button', { name: `Edit view ${name}`, exact: true }).click()
     await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
     await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
   }
+  await viewManager.getByRole('button', { name: 'Add view', exact: true }).click()
+  await viewManager.getByLabel('View name').fill('Gone')
+  await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
+  await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
   await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
   await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
 }

@@ -8,9 +8,10 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useMemo, useState } from 'react'
 import { z } from 'zod'
-import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { THREAD_SIDEBAR_LOCALE_NAMESPACE, type ThreadSidebarLocaleKey } from './locales.js'
 import {
   ALL_THREADS_VIEW_ID,
+  DONE_VIEW_ID,
   LEGACY_CURRENT_VIEW_ID,
   MAX_THREAD_VIEWS,
   ThreadViewPreferencesModel,
@@ -18,7 +19,7 @@ import {
   type ThreadViewSettings,
   WORKING_VIEW_ID,
 } from './thread-view-preferences.js'
-import { THREAD_GROUP_BY_OPTIONS, THREAD_SOURCE_FILTER_OPTIONS, THREAD_STATUS_FILTER_OPTIONS } from './thread-view.js'
+import { THREAD_GROUP_BY_OPTIONS, THREAD_SOURCE_FILTER_OPTIONS, THREAD_STATUS_FILTER_GROUPS, THREAD_STATUS_FILTER_OPTIONS } from './thread-view.js'
 
 export type ThreadSidebarTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
 
@@ -29,15 +30,27 @@ const groupLabelKeys = {
   none: 'threadSidebarGroupNone',
 } as const
 
-const statusLabelKeys = {
+/** One label map for the filter menu, the view editor and the header summary. */
+export const threadStatusFilterLabelKeys = {
   all: 'threadSidebarAllThreads',
   working: 'threadSidebarWorking',
-  'not-working': 'threadSidebarFilterNotWorking',
   attention: 'threadSidebarFilterAttention',
+  unread: 'threadSidebarUnread',
+  'approval-needed': 'threadSidebarApprovalNeeded',
+  'input-needed': 'threadSidebarInputNeeded',
+  'turn-finished': 'threadSidebarTurnFinished',
+  'needs-resume': 'threadSidebarNeedsResume',
+  interrupted: 'threadSidebarInterrupted',
   muted: 'threadSidebarFilterMuted',
   settled: 'threadSidebarSettled',
   archived: 'threadSidebarArchived',
-} as const
+} as const satisfies Record<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], ThreadSidebarLocaleKey>
+
+export const threadStatusFilterGroupLabelKeys = {
+  activity: 'threadSidebarFilterGroupActivity',
+  attention: 'threadSidebarFilterGroupAttention',
+  storage: 'threadSidebarFilterGroupStorage',
+} as const satisfies Record<(typeof THREAD_STATUS_FILTER_GROUPS)[number]['id'], ThreadSidebarLocaleKey>
 
 const sourceLabelKeys = {
   all: 'threadSidebarFilterAllSources',
@@ -49,6 +62,7 @@ export const threadViewPresetLabel = (view: ThreadViewPreset, t: ThreadSidebarTr
   if (view.name !== null) return view.name
   if (view.id === ALL_THREADS_VIEW_ID) return t('threadSidebarAllThreads')
   if (view.id === WORKING_VIEW_ID) return t('threadSidebarWorking')
+  if (view.id === DONE_VIEW_ID) return t('threadSidebarDone')
   return t('threadSidebarCurrentView')
 }
 
@@ -149,16 +163,21 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
                 <Checkbox checked={field.state.value.length === 0} onCheckedChange={checked => checked === true && field.handleChange([])} />
                 {props.t('threadSidebarAllThreads')}
               </Label>
-              {THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all').map(value => (
-                <Label className="dshx:font-normal" key={value}>
-                  <Checkbox
-                    checked={field.state.value.includes(value)}
-                    onCheckedChange={checked =>
-                      field.handleChange(checked === true ? [...field.state.value, value] : field.state.value.filter(selected => selected !== value))
-                    }
-                  />
-                  {props.t(statusLabelKeys[value])}
-                </Label>
+              {THREAD_STATUS_FILTER_GROUPS.map(group => (
+                <div className="dshx:grid dshx:gap-1.5" key={group.id}>
+                  <p className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.t(threadStatusFilterGroupLabelKeys[group.id])}</p>
+                  {group.filters.map(value => (
+                    <Label className="dshx:font-normal" key={value}>
+                      <Checkbox
+                        checked={field.state.value.includes(value)}
+                        onCheckedChange={checked =>
+                          field.handleChange(checked === true ? [...field.state.value, value] : field.state.value.filter(selected => selected !== value))
+                        }
+                      />
+                      {props.t(threadStatusFilterLabelKeys[value])}
+                    </Label>
+                  ))}
+                </div>
               ))}
             </fieldset>
           )}
@@ -245,7 +264,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
                 const statusLabel =
                   view.statusFilters.length === 0
                     ? props.t('threadSidebarAllThreads')
-                    : view.statusFilters.map(status => props.t(statusLabelKeys[status])).join(', ')
+                    : view.statusFilters.map(status => props.t(threadStatusFilterLabelKeys[status])).join(', ')
                 const sourceLabel = props.t(sourceLabelKeys[view.sourceFilter])
                 return (
                   <div className="dshx:grid dshx:min-w-0 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:p-2.5" key={view.id} role="listitem">

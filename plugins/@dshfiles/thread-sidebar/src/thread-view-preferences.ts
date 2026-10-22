@@ -1,10 +1,12 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import {
+  NOT_WORKING_REPLACEMENT_FILTERS,
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
   THREAD_STATUS_FILTER_OPTIONS,
   ThreadViewModel,
+  upgradeLegacyStatusFilters,
   type ThreadStatusFilter,
   type ThreadViewAttentionEntry,
   type ThreadViewPreferences,
@@ -12,8 +14,11 @@ import {
 
 export const ALL_THREADS_VIEW_ID = 'all-threads'
 export const WORKING_VIEW_ID = 'working'
+export const DONE_VIEW_ID = 'done'
 export const LEGACY_CURRENT_VIEW_ID = 'legacy-current'
 export const MAX_THREAD_VIEWS = 12
+/** Built-in views ship with a translated name instead of a stored one. */
+const BUILT_IN_VIEW_IDS = [ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, DONE_VIEW_ID, LEGACY_CURRENT_VIEW_ID]
 
 export interface ThreadViewPreset extends ThreadViewPreferences {
   readonly id: string
@@ -45,7 +50,15 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     sourceFilter: 'all',
     enabled: true,
   },
-] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset]
+  {
+    id: DONE_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: ['turn-finished'],
+    sourceFilter: 'all',
+    enabled: true,
+  },
+] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
 
 export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   views: [...DEFAULT_THREAD_VIEW_PRESETS],
@@ -56,14 +69,15 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
 
 const groupBySchema = z.enum(THREAD_GROUP_BY_OPTIONS)
 const statusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS)
+const legacyStatusFilterSchema = z.union([statusFilterSchema, z.literal('not-working')])
 const selectedStatusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))
-const statusFiltersSchema = z.array(selectedStatusFilterSchema)
+const statusFiltersSchema = z.preprocess(value => (Array.isArray(value) ? upgradeLegacyStatusFilters(value) : value), z.array(selectedStatusFilterSchema))
 const sourceFilterSchema = z.enum(THREAD_SOURCE_FILTER_OPTIONS)
 
 const legacyThreadViewPreferencesSchema = z
   .object({
     groupBy: groupBySchema.default('status'),
-    statusFilter: statusFilterSchema.default('all'),
+    statusFilter: legacyStatusFilterSchema.default('all'),
     sourceFilter: sourceFilterSchema.default('all'),
   })
   .strict()
@@ -82,7 +96,7 @@ const legacyThreadViewPresetSchema = z
     name: z.string().trim().min(1).max(32).nullable(),
     enabled: z.boolean(),
     groupBy: groupBySchema,
-    statusFilter: statusFilterSchema,
+    statusFilter: legacyStatusFilterSchema,
     sourceFilter: sourceFilterSchema,
   })
   .strict()
@@ -93,7 +107,7 @@ const threadViewPresetSchema = z
     name: z.string().trim().min(1).max(32).nullable(),
     enabled: z.boolean(),
     groupBy: groupBySchema,
-    statusFilters: z.array(selectedStatusFilterSchema).readonly(),
+    statusFilters: statusFiltersSchema.readonly(),
     sourceFilter: sourceFilterSchema,
   })
   .strict()
@@ -117,7 +131,7 @@ export const threadViewSettingsSchema = z
         context.addIssue({ code: 'custom', path: ['views', index, 'id'], message: 'View ids must be unique.' })
       }
       ids.add(view.id)
-      if (view.name === null && ![ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, LEGACY_CURRENT_VIEW_ID].includes(view.id)) {
+      if (view.name === null && !BUILT_IN_VIEW_IDS.includes(view.id)) {
         context.addIssue({ code: 'custom', path: ['views', index, 'name'], message: 'Custom views need a name.' })
       }
       if (view.name !== null) {
@@ -137,8 +151,11 @@ export const threadViewSettingsSchema = z
     return { ...settings, activeViewId: activeView?.id ?? ALL_THREADS_VIEW_ID }
   })
 
-const migrateStatusFilter = (statusFilter: (typeof THREAD_STATUS_FILTER_OPTIONS)[number]): readonly ThreadStatusFilter[] =>
-  statusFilter === 'all' ? [] : [statusFilter]
+const migrateStatusFilter = (statusFilter: (typeof THREAD_STATUS_FILTER_OPTIONS)[number] | 'not-working'): readonly ThreadStatusFilter[] => {
+  if (statusFilter === 'all') return []
+  if (statusFilter === 'not-working') return [...NOT_WORKING_REPLACEMENT_FILTERS]
+  return [statusFilter]
+}
 
 const legacyThreadViewSettingsSchema = z
   .object({

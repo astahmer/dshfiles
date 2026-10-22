@@ -33,6 +33,11 @@ describe('thread board view', () => {
     })
     expect(threadBoardViewSchema.safeParse({ ...DEFAULT_THREAD_BOARD_VIEW, statusFilters: ['all'] }).success).toBe(false)
     expect(threadBoardViewSchema.safeParse({ ...DEFAULT_THREAD_BOARD_VIEW, unexpected: true }).success).toBe(false)
+    expect(threadBoardViewSchema.parse({ ...DEFAULT_THREAD_BOARD_VIEW, statusFilters: ['not-working'] }).statusFilters).toEqual([
+      'input-needed',
+      'turn-finished',
+      'interrupted',
+    ])
   })
 
   it('updates only the board view and rejects invalid patches', () => {

@@ -3,6 +3,7 @@ import {
   ALL_THREADS_VIEW_ID,
   DEFAULT_THREAD_VIEW_PRESETS,
   DEFAULT_THREAD_VIEW_SETTINGS,
+  DONE_VIEW_ID,
   LEGACY_CURRENT_VIEW_ID,
   ThreadViewPreferencesModel,
   WORKING_VIEW_ID,
@@ -19,11 +20,12 @@ const attentionView: ThreadViewPreset = {
 }
 
 describe('thread view preferences', () => {
-  it('keeps the existing All threads and Working defaults', () => {
+  it('ships All threads, Working and Done defaults', () => {
     expect(DEFAULT_THREAD_VIEW_SETTINGS).toMatchObject({
       views: [
         { id: ALL_THREADS_VIEW_ID, name: null, groupBy: 'status', statusFilters: [], sourceFilter: 'all', enabled: true },
         { id: WORKING_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all', enabled: true },
+        { id: DONE_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['turn-finished'], sourceFilter: 'all', enabled: true },
       ],
       activeViewId: ALL_THREADS_VIEW_ID,
       showGroupControl: true,
@@ -41,19 +43,28 @@ describe('thread view preferences', () => {
         settled: false,
         muted: false,
       },
+      {
+        thread: {},
+        attentionLabel: 'threadSidebarTurnFinished',
+        running: false,
+        archived: false,
+        settled: false,
+        muted: false,
+      },
     ] as const
 
     expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[0], entries)).toBeUndefined()
     expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[1], entries)).toBe('threadSidebarInputNeeded')
+    expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[2], entries)).toBe('threadSidebarTurnFinished')
   })
 
   it('counts unread threads on saved views but never on All threads', () => {
     const doneView: ThreadViewPreset = {
-      id: 'done',
-      name: 'Done',
+      id: 'my-review',
+      name: 'Review',
       enabled: true,
       groupBy: 'status',
-      statusFilters: ['not-working'],
+      statusFilters: ['turn-finished'],
       sourceFilter: 'all',
     }
     const entries = [
@@ -64,6 +75,7 @@ describe('thread view preferences', () => {
 
     expect(ThreadViewPreferencesModel.unreadCountForPreset(DEFAULT_THREAD_VIEW_PRESETS[0], entries)).toBe(0)
     expect(ThreadViewPreferencesModel.unreadCountForPreset(doneView, entries)).toBe(1)
+    expect(ThreadViewPreferencesModel.unreadCountForPreset(DEFAULT_THREAD_VIEW_PRESETS[2], entries)).toBe(1)
   })
 
   it('decodes individual group and filter presets', () => {
@@ -72,13 +84,27 @@ describe('thread view preferences', () => {
       statusFilters: [],
       sourceFilter: 'all',
     })
-    expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ statusFilters: ['not-working', 'attention'] })).toEqual({
+    expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ statusFilters: ['turn-finished', 'attention'] })).toEqual({
       groupBy: 'status',
-      statusFilters: ['not-working', 'attention'],
+      statusFilters: ['turn-finished', 'attention'],
       sourceFilter: 'all',
     })
     expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ groupBy: 'model' })).toBeNull()
     expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ groupBy: 'date', unexpected: true })).toBeNull()
+  })
+
+  it('rewrites a saved not-working view into the attention labels it stood for', () => {
+    expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ statusFilters: ['not-working', 'attention'] })).toEqual({
+      groupBy: 'status',
+      statusFilters: ['input-needed', 'turn-finished', 'interrupted', 'attention'],
+      sourceFilter: 'all',
+    })
+    expect(
+      ThreadViewPreferencesModel.decodeThreadViewSettings({
+        views: [{ id: 'my-review', name: 'Review', enabled: true, groupBy: 'status', statusFilters: ['not-working'], sourceFilter: 'all' }],
+        activeViewId: 'my-review',
+      })?.views[0]?.statusFilters,
+    ).toEqual(['input-needed', 'turn-finished', 'interrupted'])
   })
 
   it('migrates legacy preferences without losing the active grouping and filters', () => {
@@ -86,6 +112,7 @@ describe('thread view preferences', () => {
       views: [
         { id: ALL_THREADS_VIEW_ID, groupBy: 'status', statusFilters: [], sourceFilter: 'all' },
         { id: WORKING_VIEW_ID, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all' },
+        { id: DONE_VIEW_ID, groupBy: 'status', statusFilters: ['turn-finished'], sourceFilter: 'all' },
         { id: LEGACY_CURRENT_VIEW_ID, name: null, groupBy: 'date', statusFilters: ['archived'], sourceFilter: 'main', enabled: true },
       ],
       activeViewId: LEGACY_CURRENT_VIEW_ID,
@@ -161,20 +188,27 @@ describe('thread view preferences', () => {
   it('reorders presets in either direction and leaves boundary moves unchanged', () => {
     const settings = ThreadViewPreferencesModel.saveThreadView(DEFAULT_THREAD_VIEW_SETTINGS, attentionView)
     const movedUp = ThreadViewPreferencesModel.moveThreadView(settings, attentionView.id, -1)
-    expect(movedUp.views.map(view => view.id)).toEqual([ALL_THREADS_VIEW_ID, attentionView.id, WORKING_VIEW_ID])
+    expect(movedUp.views.map(view => view.id)).toEqual([ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, attentionView.id, DONE_VIEW_ID])
     const movedToTop = ThreadViewPreferencesModel.moveThreadView(movedUp, attentionView.id, -1)
-    expect(movedToTop.views.map(view => view.id)).toEqual([attentionView.id, ALL_THREADS_VIEW_ID, WORKING_VIEW_ID])
-    expect(ThreadViewPreferencesModel.moveThreadView(movedToTop, attentionView.id, -1)).toBe(movedToTop)
+    expect(movedToTop.views.map(view => view.id)).toEqual([ALL_THREADS_VIEW_ID, attentionView.id, WORKING_VIEW_ID, DONE_VIEW_ID])
+    const movedFirst = ThreadViewPreferencesModel.moveThreadView(movedToTop, attentionView.id, -1)
+    expect(movedFirst.views.map(view => view.id)).toEqual([attentionView.id, ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, DONE_VIEW_ID])
+    expect(ThreadViewPreferencesModel.moveThreadView(movedFirst, attentionView.id, -1)).toBe(movedFirst)
     expect(ThreadViewPreferencesModel.moveThreadView(settings, ALL_THREADS_VIEW_ID, 1).views.map(view => view.id)).toEqual([
       WORKING_VIEW_ID,
       ALL_THREADS_VIEW_ID,
+      DONE_VIEW_ID,
       attentionView.id,
     ])
   })
 
   it('removes presets and selects a remaining enabled view when needed', () => {
-    const onlyEnabled = ThreadViewPreferencesModel.setThreadViewEnabled(DEFAULT_THREAD_VIEW_SETTINGS, WORKING_VIEW_ID, false)
-    expect(ThreadViewPreferencesModel.removeThreadView(onlyEnabled, ALL_THREADS_VIEW_ID)).toBe(onlyEnabled)
+    const oneEnabled = ThreadViewPreferencesModel.setThreadViewEnabled(
+      ThreadViewPreferencesModel.setThreadViewEnabled(DEFAULT_THREAD_VIEW_SETTINGS, WORKING_VIEW_ID, false),
+      DONE_VIEW_ID,
+      false,
+    )
+    expect(ThreadViewPreferencesModel.removeThreadView(oneEnabled, ALL_THREADS_VIEW_ID)).toBe(oneEnabled)
 
     const withCustom = ThreadViewPreferencesModel.saveThreadView(
       ThreadViewPreferencesModel.selectThreadView(DEFAULT_THREAD_VIEW_SETTINGS, WORKING_VIEW_ID),
@@ -182,7 +216,7 @@ describe('thread view preferences', () => {
     )
     const withoutWorking = ThreadViewPreferencesModel.removeThreadView(withCustom, WORKING_VIEW_ID)
     expect(withoutWorking.activeViewId).toBe(ALL_THREADS_VIEW_ID)
-    expect(withoutWorking.views.map(view => view.id)).toEqual([ALL_THREADS_VIEW_ID, attentionView.id])
+    expect(withoutWorking.views.map(view => view.id)).toEqual([ALL_THREADS_VIEW_ID, DONE_VIEW_ID, attentionView.id])
     const oneView = ThreadViewPreferencesModel.removeThreadView({ ...withoutWorking, views: [attentionView], activeViewId: attentionView.id }, attentionView.id)
     expect(oneView.views).toEqual([attentionView])
   })

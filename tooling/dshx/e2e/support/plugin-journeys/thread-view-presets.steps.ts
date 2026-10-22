@@ -44,6 +44,7 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
 
   await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
   await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
   await dialog.getByRole('button', { name: 'Edit view All threads', exact: true }).click()
   await dialog.getByLabel('View name').fill('Everything')
   await dialog.getByRole('button', { name: 'Save view', exact: true }).click()
@@ -52,6 +53,7 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await workingEnabled.click()
   await expect(workingEnabled).toHaveAttribute('aria-checked', 'false')
   await dialog.getByRole('button', { name: 'Remove view Working', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Remove view Done', exact: true }).click()
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 
   const sidebar = threadSidebar(page)
