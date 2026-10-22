@@ -22,8 +22,7 @@
     "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
-    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

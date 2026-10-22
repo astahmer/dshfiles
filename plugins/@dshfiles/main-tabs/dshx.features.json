@@ -490,6 +490,63 @@
           "testName": "files a jj thread workspace and a subagent under the project they belong to"
         }
       ]
+    },
+    {
+      "id": "backlog-capture-with-thread-tab",
+      "title": "Typing in Backlog with a kept thread tab",
+      "summary": "Typing and capturing text in the Backlog panel must not activate a retained thread tab in the main-view strip.",
+      "reach": [
+        "seed tool-call-thread",
+        "rightclick tab \"*\"",
+        "click menuitem \"Keep open\"",
+        "click button \"Backlog\"",
+        "expect tab \"Backlog*\"",
+        "click textbox \"Capture\"",
+        "press a",
+        "press b",
+        "press c",
+        "expect tab \"Backlog*\"",
+        "press Enter",
+        "expect tab \"Backlog*\""
+      ],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["main-view", "kept-thread-tab", "capture"],
+      "failureModes": ["Typing in Backlog capture activates the retained thread tab."],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/ai-accounts",
+          "boundary": "The tool-call seed uses a model route to create the existing thread.",
+          "deterministicFake": "The scratch loopback fake provider."
+        },
+        {
+          "id": "@dshfiles/backlog",
+          "boundary": "The Backlog panel stays selected in the main-view tab strip and captures text.",
+          "deterministicFake": "The isolated scratch Backlog store."
+        },
+        {
+          "id": "@dshfiles/thread-sidebar",
+          "boundary": "A thread row remains available beside the main-view tabs.",
+          "deterministicFake": "The seeded scratch session and local fake model."
+        },
+        {
+          "id": "@dshfiles/multi-host",
+          "boundary": "The thread list reads the configured remote-thread inventory.",
+          "deterministicFake": "An empty scratch remote-host list."
+        },
+        {
+          "id": "@dshfiles/jj-integration",
+          "boundary": "The thread list reads workspace and repository context.",
+          "deterministicFake": "The scratch project's local jj repository."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.backlog-capture-with-thread-tab",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        }
+      ]
     }
   ]
 }

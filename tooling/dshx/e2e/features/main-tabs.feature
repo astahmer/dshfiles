@@ -70,6 +70,12 @@ Feature: Main view tabs
     When a thread tab's context menu opens it in the side panel
     Then the side panel hosts that thread beside the main view
 
+  @scenario:main-tabs.backlog-capture-with-thread-tab
+  Scenario: Typing in Backlog does not activate a kept thread tab
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/backlog, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When a kept thread tab is present while text is typed into Backlog
+    Then Backlog remains the active main tab after capture typing
+
   @scenario:main-tabs.move-tab-between-panels
   Scenario: A thread tab moves into the side panel and back to the main view
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted

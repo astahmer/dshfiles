@@ -1,16 +1,8 @@
 import { expect, type Page } from '@playwright/test'
-import { z } from 'zod'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { sendMessage } from '../threads.js'
-
-const createdSessionResponseSchema = z.object({
-  result: z.object({
-    ok: z.literal(true),
-    value: z.object({ sessionId: z.string().min(1) }),
-  }),
-})
 
 const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 
@@ -72,19 +64,16 @@ const sidebarThreadRow = (page: Page, sessionId: string) => threadSidebar(page).
 const threadTab = (page: Page, sessionId: string) => strip(page).locator(`[data-tab-id="thread:${sessionId}"]`)
 
 const startSidebarThread = async (page: Page, prompt: string): Promise<string> => {
-  const createResponsePromise = page.waitForResponse(
-    response => {
-      const request = response.request()
-      return request.method() === 'POST' && request.postData()?.includes('session/create') === true
-    },
-    { timeout: 15_000 },
-  )
-  await page.getByRole('button', { name: 'New thread', exact: true }).click()
-  const createResponse = await createResponsePromise
-  const parsedResponse = createdSessionResponseSchema.safeParse(await createResponse.json())
-  if (!parsedResponse.success) throw new Error('The Host returned an invalid session ID after New thread was clicked.')
-  const sessionId = parsedResponse.data.result.value.sessionId
-  await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(sessionId)
+  const currentThreadId = (): string | null => new URL(page.url()).searchParams.get('thread')
+  let sessionId = currentThreadId()
+  if (sessionId === null || (await sidebarThreadRow(page, sessionId).count()) > 0) {
+    const previousSessionId = sessionId
+    await page.getByRole('button', { name: 'New thread', exact: true }).click()
+    await expect.poll(currentThreadId, { timeout: 15_000 }).not.toBe(previousSessionId)
+    sessionId = currentThreadId()
+  }
+  // Scratch startup can prewarm the blank Session; the URL is the active destination, unlike an unrelated create response.
+  if (sessionId === null) throw new Error('The active New thread has no Session ID in the URL.')
   await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
   await StartupDialogs.dismissProviderSetupIfShown(page)
   await sendMessage(page, prompt)
@@ -264,6 +253,28 @@ Then('the side panel hosts that thread beside the main view', async ({ page }: {
   await recordAssertion(page, 'main-tabs-tab-menu-opens-thread-aside', async () => {
     await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(1)
     await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'tab aside thread' })).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a kept thread tab is present while text is typed into Backlog', async ({ page }: { page: Page }) => {
+  const sessionId = await startSidebarThread(page, 'Backlog capture typing')
+  await threadTab(page, sessionId).dblclick()
+  await page
+    .getByRole('navigation', { name: 'Sidebar navigation', exact: true })
+    .getByRole('button', { name: 'Backlog', exact: true })
+    .click()
+  await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  await capture.pressSequentially('Keyboard capture from Backlog')
+  await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
+  await capture.press('Enter')
+  await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
+})
+
+Then('Backlog remains the active main tab after capture typing', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-backlog-remains-active-during-capture-typing', async () => {
+    await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
   })
   await finishJourneyAssertions(page)
 })

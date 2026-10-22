@@ -24,6 +24,16 @@ describe('readHostView', () => {
     expect(readHostView({ activePanelId: 'jujutsu', sessions: [], workspaces })).toEqual({ target: { kind: 'panel', panelId: 'jujutsu' }, projectId: null })
   })
 
+  it('keeps a selected panel ahead of a retained thread', () => {
+    expect(
+      readHostView({
+        activePanelId: 'backlog',
+        sessions: [{ id: 'thread', retainedBy: { mainView: 1 } }],
+        workspaces,
+      }),
+    ).toEqual({ target: { kind: 'panel', panelId: 'backlog' }, projectId: null })
+  })
+
   it('reports nothing on the New thread screen', () => {
     expect(readHostView({ activePanelId: null, sessions: [{ id: 'main', retainedBy: {} }], workspaces })).toEqual({ target: null, projectId: null })
   })

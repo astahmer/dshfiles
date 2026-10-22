@@ -22,7 +22,8 @@
     "fmt:check": "oxfmt --check .",
     "lint": "oxlint src tests dshx.config.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "zod": "catalog:"
