@@ -23,7 +23,8 @@ const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large
  * limit word followed by exceeded/exhausted/reached, so this lands as `PI_AI_ERROR` and
  * a retry only spends another attempt on a plan that is already spent.
  */
-const SPENT_PLAN_HINT = /\byou(?:'ve| have)\s+(?:hit|reached)\s+(?:your|the)\s+(?:(?:\w+\s+){0,2}(?:usage|weekly|daily|plan|message)\s+)?limits?\b/i
+const SPENT_PLAN_HINT =
+  /\byou(?:'ve| have)\s+(?:hit|reached)\s+(?:your|the)\s+(?:(?:\w+\s+){0,2}(?:usage|weekly|daily|monthly|plan|message|spend|cost|credit|token|quota)\s+)?limits?\b/i
 
 /** `undefined` for failures this plugin leaves alone (image offload, empty responses, cancellations…). */
 const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'>): FailureKind | undefined => {

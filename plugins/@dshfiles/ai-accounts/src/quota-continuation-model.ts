@@ -13,6 +13,8 @@ export const quotaContinuationRecordSchema = z
     failedAt: z.number().int().safe().nonnegative(),
     resetAt: z.number().int().safe().nonnegative().nullable(),
     autoRetry: z.boolean().default(false),
+    /** `user` once someone ticked or unticked this recovery, so its choice carries to the thread's next failure. */
+    autoRetrySource: z.enum(['user', 'default']).optional(),
     snoozedUntil: z.number().int().safe().nonnegative().nullable(),
     scheduleId: z.string().trim().min(1).max(128).nullable(),
     queueSource: z.enum(['manual', 'schedule']).nullable(),

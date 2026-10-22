@@ -45,6 +45,11 @@ const spentPlan: readonly LlmFailure[] = [
   { message: 'You have hit your ChatGPT usage limit (plus plan). Try again in ~151 min.', code: 'PI_AI_ERROR' },
   { message: "You've hit your limit · resets 3:00 PM", code: 'PI_AI_ERROR' },
   { message: 'You have hit your weekly limit. Try again Monday.', code: 'PI_AI_ERROR' },
+  {
+    message: "You've hit your individual spend limit · run /usage-credits to ask your admin for a higher limit · your session limit resets 3pm (Europe/Paris)",
+    code: 'PI_AI_ERROR',
+  },
+  { message: "You've hit your limit · resets 3:00 PM", code: 'PI_AI_ERROR' },
 ]
 
 describe('classifyFailure', () => {

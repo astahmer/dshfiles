@@ -36,7 +36,7 @@ export const usePreferences = () => {
     usagePopoverSize: { width: value?.usagePopoverWidth ?? 0, height: value?.usagePopoverHeight ?? 0 },
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     codexLunaReserve: value?.codexLunaReserve ?? true,
-    autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? false,
+    autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? true,
     showQuotaRetryChoice: value?.showQuotaRetryChoice ?? true,
     failureRecovery: recoveryPolicySchema.parse(value?.failureRecovery),
     modelsPageAccounts: value?.modelsPageAccounts ?? DEFAULT_CLIENT_SETTINGS.modelsPageAccounts,

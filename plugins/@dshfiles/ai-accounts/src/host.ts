@@ -757,7 +757,9 @@ export default definePlugin({
                     rescued: decision !== undefined,
                     autoRetryDefault: AccountSettingsModel.readQuotaRetrySettings().autoRetryDefault,
                   })
-                  if (recovery !== undefined) await quotaContinuations.recordFailure(agent, action.account, recovery.autoRetry, failedSelection)
+                  if (recovery !== undefined) {
+                    await quotaContinuations.recordFailure(agent, action.account, recovery.autoRetry, failedSelection, failure.message)
+                  }
                   return decision
                 }
                 const retryId = action.retryId

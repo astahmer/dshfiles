@@ -57,7 +57,7 @@ export const aiAccountsSettings = defineSettings({
     /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
     codexLunaReserve: Schema.boolean().default(true),
     /** Default for resuming a quota-blocked turn one minute after its known reset. */
-    autoRetryQuotaDefault: Schema.boolean().default(false),
+    autoRetryQuotaDefault: Schema.boolean().default(true),
     /** Show a per-turn automatic-retry checkbox beside exhausted-limit errors. */
     showQuotaRetryChoice: Schema.boolean().default(true),
     /** What each kind of failed model request on an account route does next. */
@@ -169,11 +169,11 @@ const readRecoverySettings = (): {
 }
 
 const quotaRetrySettingsSchema = z.object({
-  autoRetryQuotaDefault: z.boolean().catch(false),
+  autoRetryQuotaDefault: z.boolean().catch(true),
   showQuotaRetryChoice: z.boolean().catch(true),
 })
 
-/** Quota retry defaults; old or unregistered Hosts remain opted out and show the turn-level option. */
+/** Quota retry defaults; old or unregistered Hosts stay opted in and show the turn-level option. */
 const readQuotaRetrySettings = (): {
   readonly autoRetryDefault: boolean
   readonly showChoice: boolean

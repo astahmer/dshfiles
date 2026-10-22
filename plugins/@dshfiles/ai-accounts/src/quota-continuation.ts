@@ -18,6 +18,7 @@ import {
   type QuotaContinuationTable,
 } from './quota-continuation-store.js'
 import { QuotaContinuationMessage, type UserActivityIdentity } from './quota-continuation-message.js'
+import { resetAtFromMessage } from './quota-reset.js'
 
 const MAX_CONTINUATIONS = 500
 const CONTINUATION_RETENTION_MS = 30 * 24 * 60 * 60_000
@@ -63,7 +64,13 @@ type QuotaContinuationService = {
   start(): () => void
   close(): Promise<void>
   list(): Promise<{ scheduleAvailable: boolean; continuations: QuotaContinuationSummary[] }>
-  recordFailure(agent: QuotaFailureAgent, accountId: string, autoRetry: boolean, failedSelection?: Pick<ModelSelection, 'provider' | 'model'>): Promise<void>
+  recordFailure(
+    agent: QuotaFailureAgent,
+    accountId: string,
+    autoRetry: boolean,
+    failedSelection?: Pick<ModelSelection, 'provider' | 'model'>,
+    failureMessage?: string,
+  ): Promise<void>
   resume(continuationId: string, selection?: ModelSelection): Promise<{ accepted: boolean }>
   setAutoRetry(continuationId: string, sessionId: string, enabled: boolean): Promise<{ updated: boolean }>
   snooze(continuationId: string, duration: SnoozeDuration): Promise<{ updated: boolean }>
@@ -453,16 +460,23 @@ const createQuotaContinuationService = ({
     accountId: string,
     autoRetry: boolean,
     failedSelection?: Pick<ModelSelection, 'provider' | 'model'>,
+    failureMessage?: string,
   ): Promise<void> => {
     try {
-      const resetAt = await readResetAt(accountId).catch(() => null)
+      const nowAtFailure = now()
+      const resetAt = (await readResetAt(accountId).catch(() => null)) ?? resetAtFromMessage(failureMessage ?? '', nowAtFailure)
       await serialize(agent.id, async () => {
         const storage = await table()
-        const nowAtFailure = now()
         const oldRecords = [...storage.entries()].map(([, record]) => record).filter(record => record.sessionId === agent.id && isActive(record))
         for (const oldRecord of oldRecords) await invalidate(oldRecord)
 
         const records = await allRecords()
+        // A thread keeps the choice someone made for its earlier recovery, so
+        // unticking the toggle there is not undone by the global default.
+        const chosen = records
+          .filter(record => record.sessionId === agent.id && record.autoRetrySource === 'user')
+          .sort((left, right) => right.failedAt - left.failedAt)[0]
+        const retryChoice = chosen?.autoRetry ?? autoRetry
         if (!(await makeRoom(records, nowAtFailure))) {
           context.logger.warn('ai-accounts: quota recovery capacity is full')
           return
@@ -479,7 +493,8 @@ const createQuotaContinuationService = ({
           failedSeq: agent.session.seq,
           failedAt: nowAtFailure,
           resetAt,
-          autoRetry: autoRetry && resetAt !== null,
+          autoRetry: retryChoice && resetAt !== null,
+          autoRetrySource: 'default' as const,
           snoozedUntil: null,
           scheduleId: null,
           queueSource: null,
@@ -562,7 +577,7 @@ const createQuotaContinuationService = ({
       const current = storage.get(continuationId)
       if (current === undefined || current.sessionId !== sessionId || current.state !== 'waiting' || (enabled && current.resetAt === null))
         return { updated: false }
-      const updated = { ...current, autoRetry: enabled, scheduleId: null }
+      const updated = { ...current, autoRetry: enabled, autoRetrySource: 'user' as const, scheduleId: null }
       await storage.put(continuationId, updated)
       await cancelScheduled(current)
       await ensureScheduled(updated)

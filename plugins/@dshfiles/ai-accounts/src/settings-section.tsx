@@ -293,10 +293,10 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
       {!preferences.failureRecovery.exhausted.failover ? (
         <Group
-          description="For exhausted limits when automatic account failover is off. Automatic resume needs a known provider reset and queues one minute later."
+          description="For exhausted limits. Automatic resume needs a known provider reset and queues one minute later; an account failover still takes the request first."
           title="Quota retry"
         >
-          <Row hint="Pre-check the per-turn choice. The default is off." label="Automatically resume after reset by default">
+          <Row hint="Pre-check the per-turn choice in every thread. The default is on." label="Automatically resume after reset by default">
             {id => (
               <Switch
                 checked={preferences.autoRetryQuotaDefault}
@@ -306,7 +306,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
               />
             )}
           </Row>
-          <Row hint="Show a checkbox with the exhausted-limit message so each turn can override the default." label="Show the per-turn choice">
+          <Row hint="Show the per-thread checkbox beside Resume so a thread can override the default." label="Show the per-thread choice">
             {id => (
               <Switch
                 checked={preferences.showQuotaRetryChoice}

@@ -270,4 +270,57 @@ describe('quota continuation service', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it("carries a thread's own retry choice into its next failure and no further", async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-thread-choice-'))
+    const now = () => 5_000_000
+    const resetAt = now() + 30 * 60_000
+    const thread = SessionId('quota-thread-choice')
+    const otherThread = SessionId('quota-thread-choice-other')
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => resetAt, schedule: scheduler.schedule, now })
+
+      await service.recordFailure(createFailureAgent(thread), 'claude_work', true)
+      const [first] = (await service.list()).continuations
+      if (first === undefined) throw new Error('Quota continuation was not stored.')
+      expect(first.autoRetry).toBe(true)
+      await expect(service.setAutoRetry(first.continuationId, thread, false)).resolves.toEqual({ updated: true })
+
+      await service.recordFailure(createFailureAgent(thread), 'claude_work', true)
+      await service.recordFailure(createFailureAgent(otherThread), 'claude_work', true)
+      const byThread = new Map((await service.list()).continuations.map(record => [record.sessionId, record]))
+      expect(byThread.get(thread)?.autoRetry).toBe(false)
+      expect(byThread.get(otherThread)?.autoRetry).toBe(true)
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('uses the reset a provider message names when the usage card reports none', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-message-reset-'))
+    const now = () => 6_000_000
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => null, schedule: scheduler.schedule, now })
+      await service.recordFailure(createFailureAgent(SessionId('quota-message-reset')), 'claude_work', true, undefined, 'Try again in ~42 min.')
+      const [record] = (await service.list()).continuations
+      expect(record).toMatchObject({ resetAt: now() + 42 * 60_000, autoRetry: true, scheduled: true })
+      expect(scheduler.requests[0]?.after_seconds).toBe(42 * 60 + 60)
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
