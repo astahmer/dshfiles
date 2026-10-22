@@ -93,7 +93,7 @@ describe('chat reference links', () => {
     expect(link.textContent).toBe('main')
     window.dispatchEvent(
       new CustomEvent(chatReferenceTitleResolvedEvent, {
-        detail: { sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, title },
+        detail: { sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, title, targetPath: '/other-repo' },
       }),
     )
 
@@ -103,7 +103,7 @@ describe('chat reference links', () => {
     expect(link.getAttribute('data-ref-chip')).toBeNull()
     expect(link.querySelector('svg.native-reference-icon')).not.toBeNull()
     click(link)
-    expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' })
+    expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' }, '/other-repo')
 
     stop()
     expect(code.textContent).toBe('jj:main')
@@ -121,13 +121,34 @@ describe('chat reference links', () => {
     const link = chipIn(codes[0])
 
     click(link)
-    expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' })
+    expect(onOpen).not.toHaveBeenCalled()
+    window.dispatchEvent(
+      new CustomEvent(chatReferenceTitleResolvedEvent, {
+        detail: { sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, title: 'main', targetPath: '/other-repo' },
+      }),
+    )
+    expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' }, '/other-repo')
 
     link?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
     expect(onOpen).toHaveBeenCalledTimes(2)
 
     click(codes[1])
     expect(onOpen).toHaveBeenCalledTimes(2)
+    stop()
+  })
+
+  it('does not navigate when cross-repository lookup reports ambiguity', () => {
+    const onOpen = vi.fn()
+    document.body.innerHTML = sessionMarkup('<code>jj:main</code>')
+    const stop = install(onOpen)
+    window.dispatchEvent(
+      new CustomEvent(chatReferenceTitleResolvedEvent, {
+        detail: { sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, title: 'main', targetPath: null },
+      }),
+    )
+
+    click(chipIn(document.querySelector('code')))
+    expect(onOpen).not.toHaveBeenCalled()
     stop()
   })
 

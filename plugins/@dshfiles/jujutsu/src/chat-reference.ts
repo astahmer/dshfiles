@@ -84,13 +84,18 @@ export const chatReferenceTitleRequestSchema = z.object({
   reference: referenceIdentitySchema,
 })
 
-export const chatReferenceTitleResolvedSchema = chatReferenceTitleRequestSchema.extend({ title: z.string().min(1).max(255) })
+export const chatReferenceTitleResolvedSchema = chatReferenceTitleRequestSchema.extend({
+  title: z.string().min(1).max(255),
+  targetPath: z.string().min(1).max(2048).nullable().optional(),
+})
 
 export type ChatReferencePreviewRequest = z.infer<typeof chatReferencePreviewRequestSchema>
 export type ChatReferenceTitleRequest = z.infer<typeof chatReferenceTitleRequestSchema>
 export type ChatReferenceTitleResolved = z.infer<typeof chatReferenceTitleResolvedSchema>
 
 const CHAT_REFERENCE_TITLE_LIMIT = 52
+
+const uniqueChatReferenceMatch = <Match>(matches: readonly Match[]): Match | undefined => (matches.length === 1 ? matches[0] : undefined)
 
 const chatReferenceTitleLabel = (input: { readonly title: string; readonly fallback: string }): string => {
   const title = input.title.trim().replace(/\s+/gu, ' ')
@@ -108,4 +113,5 @@ export class ChatReferenceModel {
   static readonly display = chatReferenceDisplay
   static readonly resolve = resolveChatReference
   static readonly titleLabel = chatReferenceTitleLabel
+  static readonly uniqueMatch = uniqueChatReferenceMatch
 }

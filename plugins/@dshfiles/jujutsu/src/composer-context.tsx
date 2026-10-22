@@ -398,7 +398,7 @@ export const ConversationHeaderToggle = (props: ComposerSlotProps & { readonly i
       sessionId: props.sessionId,
       cwd,
       bookmarks,
-      onOpen: reference => props.jujutsu.openJujutsuReference(cwd, { ...reference, behavior }),
+      onOpen: (reference, targetPath) => props.jujutsu.openJujutsuReference(targetPath ?? cwd, { ...reference, behavior }),
     })
   }, [bookmarks, context.cwd, preferences.chatReferenceClickBehavior, preferences.chatReferenceLinks, props.jujutsu, props.sessionId])
   if (repository === null) return null

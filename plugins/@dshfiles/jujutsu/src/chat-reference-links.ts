@@ -15,9 +15,9 @@ export interface ChatReferenceLinkOptions {
   readonly sessionId: string
   /** Local bookmark names the Session repository really has; other words never become links. */
   readonly bookmarks: readonly string[]
-  /** The Session repository the preview reads: the Host turns this path into a repoId. */
+  /** The Session repository is checked first; registered project repositories are searched on a miss. */
   readonly cwd: string
-  readonly onOpen: (reference: ChatReference) => void
+  readonly onOpen: (reference: ChatReference, targetPath?: string) => void
 }
 
 /** A pointer sweeping across a line of text should not flash a card, so hovering waits. */
@@ -106,7 +106,14 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     const code = element.closest('code')
     const reference = code === null ? undefined : referenceIn(code)
     if (reference === undefined) return false
-    options.onOpen(reference)
+    const key = referenceKey(reference)
+    if (!elementPaths.has(key)) {
+      pendingOpens.add(key)
+      requestTitle(element)
+      return true
+    }
+    const targetPath = elementPaths.get(key)
+    if (targetPath !== null && targetPath !== undefined) options.onOpen(reference, targetPath)
     return true
   }
   const previewAt = (element: HTMLElement): boolean => {
@@ -126,6 +133,8 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   const referenceKey = (reference: ChatReference): string =>
     `${reference.kind}:${reference.kind === 'revision' ? reference.value.toLocaleLowerCase() : reference.value}`
   const titles = new Map<string, string>()
+  const elementPaths = new Map<string, string | null>()
+  const pendingOpens = new Set<string>()
   const requestedTitles = new Set<string>()
   const setDisplay = (element: Element, source: string, reference: ChatReference, title?: string): void => {
     const fallback = ChatReferenceModel.display(source)
@@ -186,6 +195,9 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     if (!parsed.success || parsed.data.sessionId !== options.sessionId || parsed.data.cwd !== options.cwd) return
     const key = referenceKey(parsed.data.reference)
     titles.set(key, parsed.data.title)
+    const targetPath = parsed.data.targetPath === undefined ? options.cwd : parsed.data.targetPath
+    elementPaths.set(key, targetPath)
+    if (pendingOpens.delete(key) && targetPath !== null) options.onOpen(parsed.data.reference, targetPath)
     for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${OWNER}]`) ?? []) {
       const reference = referenceIn(element)
       const source = element.getAttribute(SOURCE)

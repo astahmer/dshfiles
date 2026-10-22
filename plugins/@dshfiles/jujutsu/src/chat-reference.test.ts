@@ -49,6 +49,14 @@ describe('chat reference tokens', () => {
     expect(ChatReferenceModel.titleLabel({ title: `${'a'.repeat(50)}🦖ending`, fallback: 'main' })).toBe(`${'a'.repeat(50)}🦖…`)
   })
 
+  it('selects a repository match only when there is exactly one', () => {
+    const local = { root: '/repo-a' }
+    const foreign = { root: '/repo-b' }
+    expect(ChatReferenceModel.uniqueMatch([])).toBeUndefined()
+    expect(ChatReferenceModel.uniqueMatch([foreign])).toBe(foreign)
+    expect(ChatReferenceModel.uniqueMatch([local, foreign])).toBeUndefined()
+  })
+
   it('resolves only a unique revision prefix or exact bookmark', () => {
     const revisions = [
       { commitId: 'a1b2c3d4', changeId: 'e5f6g7', bookmarks: ['main'], localBookmarks: ['main'] },
