@@ -52,6 +52,7 @@ import {
 import { createSessionActivityCache, readWorkspaceSessionActivity as readScopedWorkspaceSessionActivity } from './session-activity-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
 import { IntegrationAttribution } from './integration-attribution.js'
+import { IntegrationRecovery } from './integration-recovery.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
@@ -726,7 +727,13 @@ const landThread = async (input: {
       sessionId: input.sessionId,
     })
     if (eligible === undefined) {
-      throw new PluginApiError('Could not verify whether this workspace is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
+      // Manual integrations are not dead-ended by an unverifiable activity read: queue the same guarded rebase and let
+      // the deferred retry run it once the Host can read idleness. An Agent's own call still reports why it stopped.
+      if (!IntegrationRecovery.queuesInsteadOfRefusing({ fromAgent: input.fromAgent, retrying: input.stillQueued !== undefined })) {
+        throw new PluginApiError('Could not verify whether this workspace is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
+      }
+      await queueIntegration({ path: input.path, sessionId: input.sessionId })
+      throw new PluginApiError('This workspace is not verifiably idle yet; the integration is queued.', { code: 'integration-queued' })
     }
     if (!eligible) {
       const blockers = ThreadRebaseEligibilityModel.blockers({ sessionIds: workspace.sessionIds, activity })

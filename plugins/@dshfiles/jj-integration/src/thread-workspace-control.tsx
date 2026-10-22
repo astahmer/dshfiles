@@ -13,6 +13,7 @@ import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } fr
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
@@ -71,7 +72,15 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const rebase = useMutation({
     mutationKey: threadRebaseMutationKey,
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
-    onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
+    onError: (error, path) => {
+      if (IntegrationRecovery.isQueued(error)) {
+        toast.show({ text: props.t('integrationQueuedHint', { bookmark: props.bookmark }), success: true })
+        announceRepositoryChange()
+        void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
+        return
+      }
+      toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false })
+    },
     onSettled: async (result, _error, path) => {
       announceRepositoryChange()
       await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })

@@ -47,6 +47,7 @@ import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore 
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
+import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
@@ -797,7 +798,10 @@ export const ThreadWorkspacesPanel = (props: {
         text: result.status === 'nothing-to-land' ? t('upToDateNoChanges') : describeLandResult(t, result),
       })
     },
-    onError: error => setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
+    onError: error =>
+      IntegrationRecovery.isQueued(error)
+        ? setNotice({ tone: 'default', text: t('integrationQueuedHint', { bookmark: props.bookmark }) })
+        : setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
     onSettled: refreshAfterChange,
   })
   const [queueSnapshot, queueSend] = useMachine(integrationQueueMachine, {

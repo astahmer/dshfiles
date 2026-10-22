@@ -28,6 +28,7 @@ import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
 import { InlineIntegrateOffer } from './inline-integrate.js'
+import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel, threadQueryKeys, threadRebaseMutationKey } from './panel.js'
@@ -398,7 +399,14 @@ export default defineClient({
         mutationKey: threadRebaseMutationKey,
         mutationFn: (landedPath: string) =>
           runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path: landedPath, sessionId: props.sessionId }, { signal }) }),
-        onError: error => noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false }),
+        onError: (error, landedPath) => {
+          if (IntegrationRecovery.isQueued(error)) {
+            noticeToast.show({ text: translate('integrationQueuedHint', { bookmark }), success: true })
+            void pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(landedPath) })
+            return
+          }
+          noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false })
+        },
         onSettled: async (result, _error, landedPath) => {
           announceRepositoryChange()
           await pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(landedPath) })
