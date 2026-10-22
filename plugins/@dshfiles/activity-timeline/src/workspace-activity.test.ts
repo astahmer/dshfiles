@@ -47,6 +47,15 @@ describe('workspace activity without a workspace', () => {
     expect(page.items[0]?.references).toEqual([{ kind: 'workspace', id: 'workspace-1', label: 'thread-a' }])
   })
 
+  it('stores session activity without an invalid blank session reference', async () => {
+    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
+    await expect(service.ingest(ActivityTimelineAdapters.sessionActivity({ kind: 'created', at: now, sessionId: '' }))).resolves.toMatchObject({
+      duplicate: false,
+    })
+    const page = await service.page({ detailed: true })
+    expect(page.items[0]).toMatchObject({ sessionId: null, references: [] })
+  })
+
   it('rejects a malformed event through its promise instead of throwing at the caller', async () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
     const malformed: ActivityIngest = {

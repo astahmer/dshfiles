@@ -20,8 +20,8 @@ export class ActivityTimelineAdapters {
     readonly detail?: string
     readonly correlationId?: string
   }): ActivityIngest => {
-    const base = { at: input.at, source: 'session' as const, sessionId: input.sessionId, provenance: 'observed' as const }
-    const reference: ActivityReference = { kind: 'session', id: input.sessionId, label: null }
+    const base = { at: input.at, source: 'session' as const, sessionId: identifier(input.sessionId), provenance: 'observed' as const }
+    const references = referencesOf([{ kind: 'session', id: input.sessionId, label: null }])
     if (input.kind === 'created')
       return {
         ...base,
@@ -29,7 +29,7 @@ export class ActivityTimelineAdapters {
         type: 'session.started',
         level: 'notable',
         summary: 'Agent started work',
-        references: [reference],
+        references,
       }
     if (input.kind === 'disposed')
       return {
@@ -38,7 +38,7 @@ export class ActivityTimelineAdapters {
         type: 'session.disposed',
         level: 'notable',
         summary: 'Agent session disposed',
-        references: [reference],
+        references,
       }
     if (input.kind === 'status')
       return {
@@ -48,7 +48,7 @@ export class ActivityTimelineAdapters {
         level: 'routine',
         summary: `Agent became ${input.status ?? 'unknown'}`,
         metadata: { status: input.status ?? null },
-        references: [reference],
+        references,
       }
     if (input.kind === 'input')
       return {
@@ -58,7 +58,7 @@ export class ActivityTimelineAdapters {
         level: 'notable',
         summary: 'Input delivered to an agent',
         detail: input.detail === undefined ? null : clamp(input.detail, 2000),
-        references: [reference],
+        references,
       }
     return {
       ...base,
@@ -67,7 +67,7 @@ export class ActivityTimelineAdapters {
       level: 'attention',
       summary: 'Agent reported an error',
       detail: input.detail === undefined ? null : clamp(input.detail, 2000),
-      references: [reference],
+      references,
     }
   }
 
