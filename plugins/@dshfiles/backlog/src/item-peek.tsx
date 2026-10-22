@@ -225,7 +225,12 @@ const TitleField = (props: { readonly id: number; readonly title: string }): JSX
   )
 }
 
-const BodyField = (props: { readonly id: number; readonly body: string; readonly threads: readonly ComposerThread[] }): JSX.Element => {
+const BodyField = (props: {
+  readonly id: number
+  readonly body: string
+  readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
+}): JSX.Element => {
   const actions = useBacklogActions()
   const [editing, setEditing] = useState(false)
   const [body, setBody] = useState(props.body)
@@ -267,10 +272,11 @@ const BodyField = (props: { readonly id: number; readonly body: string; readonly
       <div className="dshx:flex dshx:flex-col dshx:gap-1">
         <BacklogTextBox
           ariaLabel="Body"
-          placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads and agents; paste or drop an image."
+          placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
           value={body}
           onChange={setBody}
           threads={props.threads}
+          projects={props.projects}
           attachments={attachments}
           variant="body"
           autoFocus
@@ -502,6 +508,7 @@ const Conversation = (props: {
 const CommentBox = (props: {
   readonly item: StartThreadItem
   readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
   readonly openCreatedByDefault: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -553,10 +560,11 @@ const CommentBox = (props: {
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
         ariaLabel="Comment"
-        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads and agents; paste or drop an image"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents; paste or drop an image"
         value={text}
         onChange={setText}
         threads={props.threads}
+        projects={props.projects}
         attachments={attachments}
         variant="reply"
         submitLabel="Reply"
@@ -867,7 +875,7 @@ const PeekBody = (props: {
                 className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-3"
               />
             ) : (
-              <BodyField id={item.id} body={item.body} threads={props.threads} />
+              <BodyField id={item.id} body={item.body} threads={props.threads} projects={props.projectPaths} />
             )}
             {showCapture ? (
               <details className="dshx:group/capture dshx:text-xs">
@@ -948,6 +956,7 @@ const PeekBody = (props: {
             <CommentBox
               item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
               threads={props.threads}
+              projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}
             />
           </Section>

@@ -66,6 +66,12 @@ describe('triage', () => {
     ])
   })
 
+  it('keeps a project mention as a workspace reference without assigning the project', () => {
+    const triaged = BacklogItems.triage('Investigate workspace:%2Fwork%2Fdshfiles')
+    expect(triaged.links).toEqual([{ type: 'workspace', target: '%2Fwork%2Fdshfiles', provenance: 'extracted' }])
+    expect('project' in triaged).toBe(false)
+  })
+
   it('keeps a secret reference as a link, never as a value', () => {
     const triaged = BacklogItems.triage('deploy key for the crawler is secret:CRAWLER_KEY@dev')
     expect(triaged.links).toEqual([{ type: 'secret', target: 'CRAWLER_KEY@dev', provenance: 'extracted' }])

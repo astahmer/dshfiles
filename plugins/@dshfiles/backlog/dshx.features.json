@@ -795,7 +795,7 @@
     {
       "id": "rich-item-text",
       "title": "Write descriptions and replies like a capture",
-      "summary": "An item's description and reply boxes share the capture composer's text box: `@` completes agents, backlog items and threads, images and files can be picked, pasted or dropped, Enter sends a reply and ⌘↵ saves a description, and Markdown stays Markdown. A description's files are kept with the item; a reply's images are kept on that comment and open in the same gallery.",
+      "summary": "An item's description and reply boxes share the capture composer's text box: `@` completes agents, backlog items, threads and projects, images and files can be picked, pasted or dropped, Enter sends a reply and ⌘↵ saves a description, and Markdown stays Markdown. A project completion inserts a workspace reference without assigning the item. A description's files are kept with the item; a reply's images are kept on that comment and open in the same gallery.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Describe me with a screenshot\"",
@@ -805,8 +805,12 @@
         "expect textbox \"Comment\"",
         "expect button \"Add an image or file\"",
         "click button \"Edit description\"",
-        "fill textbox \"Body\" \"**Screenshot** of the bug, see b:1.\"",
-        "expect button \"Attach an image or file to this item\""
+        "expect button \"Attach an image or file to this item\"",
+        "fill textbox \"Body\" \"@sample\"",
+        "expect option \"sample project reference\"",
+        "click option \"sample project reference\"",
+        "press Meta+Enter",
+        "expect text \"workspace:%2F*\""
       ],
       "surfaces": ["client", "host", "storage"],
       "configuration": [],

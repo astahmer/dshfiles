@@ -39,6 +39,7 @@ export const useMentionCompletion = (props: {
   readonly text: string
   readonly caret: number
   readonly threads: readonly MentionThread[]
+  readonly projects?: readonly string[] | undefined
   readonly tags?: readonly string[] | undefined
 }): MentionCompletion => {
   const api = useApi(backlogApi)
@@ -115,6 +116,17 @@ export const useMentionCompletion = (props: {
         ),
         hint: 'thread',
       }))
+    const projectRows = InlineCompletion.projects(token, props.projects ?? []).map(row => ({
+      key: `workspace:${row.path}`,
+      insert: row.insert,
+      label: (
+        <>
+          <ItemGlyphs.ProjectDot project={row.path} />
+          <span className="dshx:truncate">{ItemGlyphs.projectName(row.path)}</span>
+        </>
+      ),
+      hint: 'project reference',
+    }))
     const agentRows = InlineCompletion.agents(token, agentChoices).map(row => {
       const agent = agentChoices.find(choice => choice.handle === row.handle)
       return {
@@ -129,8 +141,8 @@ export const useMentionCompletion = (props: {
         hint: `@${row.handle}`,
       }
     })
-    return [...agentRows, ...itemSuggestions, ...threadsRows]
-  }, [token, tags, threads, itemSuggestions, agentChoices])
+    return [...agentRows, ...itemSuggestions, ...threadsRows, ...projectRows]
+  }, [token, tags, threads, itemSuggestions, agentChoices, props.projects])
 
   return { token, suggestions }
 }

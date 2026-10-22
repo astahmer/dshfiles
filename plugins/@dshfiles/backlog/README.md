@@ -230,7 +230,9 @@ items next to threads and files. The chip is sent as `b:12 "title"`, so the thre
 thread and starts the item, just as typing `b:12` does.
 
 Every backlog text box — the capture composer, an item's description and its reply box — completes the same
-sources from one `@` menu: agents, backlog items and threads. With `@dshfiles/agents` installed an `@rev` lists
+sources from one `@` menu: agents, backlog items, threads and projects. Typing `@project-name` offers known projects;
+picking one inserts `workspace:<URI-encoded absolute path>`, an extracted link reference that does not change the item's
+project field. With `@dshfiles/agents` installed an `@rev` lists
 enabled agents (Tab or Enter completes, Escape dismisses); picking one inserts `@handle ` as plain text, which
 is what the reply box reads as a dispatch and what any other thread reads as a mention. `@b:`, `@t:` and `@f:`
 keep their own scope: no agent row appears and the typed reference is left untouched.

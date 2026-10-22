@@ -244,7 +244,7 @@ export const Composer = (props: {
   )
 
   const projectCommand = BacklogProjectCommand.at(text, caret)
-  const mention = useMentionCompletion({ text, caret, threads: props.threads, tags: props.tags })
+  const mention = useMentionCompletion({ text, caret, threads: props.threads, projects: props.projects, tags: props.tags })
   const suggestions = useMemo((): readonly Suggestion[] => {
     if (projectCommand === null) return mention.suggestions
     const query = projectCommand.query.trim().toLowerCase()
@@ -655,7 +655,8 @@ export const Composer = (props: {
             <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
           </span>
           <span>
-            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items and threads · <code>/project</code> · paste or drop a file
+            <HashIcon aria-hidden className="dshx:inline dshx:size-3" /> tags · <code>@</code> items, threads and projects · <code>/project</code> · paste or
+            drop a file
           </span>
         </p>
       ) : null}

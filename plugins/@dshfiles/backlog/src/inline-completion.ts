@@ -22,6 +22,11 @@ export interface InlineAgentRow {
   readonly insert: string
 }
 
+export interface InlineProjectRow {
+  readonly path: string
+  readonly insert: string
+}
+
 const AGENT_SCOPES: readonly string[] = ['agent', 'a']
 const OTHER_SCOPES: readonly string[] = ['thread', 't', 'file', 'f', 'skill', 'mcp', 'backlog', 'b']
 
@@ -63,6 +68,16 @@ export class InlineCompletion {
       )
       .slice(0, options.limit ?? 8)
       .map(agent => ({ handle: agent.handle, insert: `@${agent.handle} ` }))
+  }
+
+  /** Project paths match by full path or final folder name and insert a non-assigning workspace reference. */
+  static projects(token: InlineToken | null, projects: readonly string[]): readonly InlineProjectRow[] {
+    if (token === null || token.trigger !== '@' || token.scope !== null) return []
+    const query = token.query.trim().toLowerCase()
+    return projects
+      .filter(path => query === '' || path.toLowerCase().includes(query) || (path.split('/').filter(Boolean).at(-1) ?? path).toLowerCase().includes(query))
+      .slice(0, 6)
+      .map(path => ({ path, insert: `workspace:${encodeURIComponent(path)} ` }))
   }
 
   /** The text after picking one row: the readable mention a dispatch reads, plus a space. */

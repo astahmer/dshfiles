@@ -20,6 +20,7 @@ export const BacklogTextBox = (props: {
   readonly value: string
   readonly onChange: (value: string) => void
   readonly threads: readonly MentionThread[]
+  readonly projects?: readonly string[]
   readonly tags?: readonly string[]
   readonly attachments: ComposerFiles
   readonly variant: 'body' | 'reply'
@@ -38,7 +39,7 @@ export const BacklogTextBox = (props: {
   const [navigated, setNavigated] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
-  const completion = useMentionCompletion({ text: props.value, caret, threads: props.threads, tags: props.tags })
+  const completion = useMentionCompletion({ text: props.value, caret, threads: props.threads, projects: props.projects, tags: props.tags })
   const rows = dismissed ? [] : completion.suggestions
   const drop = useFileDrop({ onFiles: files => void props.attachments.add(files) })
   const reply = props.variant === 'reply'

@@ -37,6 +37,17 @@ test('agent rows match handle, name or description, and insert the readable ment
   assert.equal(InlineCompletion.insertFor('reviewer'), '@reviewer ')
 })
 
+test('project completions insert workspace references, never project-assignment commands', () => {
+  assert.deepEqual(InlineCompletion.projects(at('@dsh'), ['/work/dshfiles', '/work/other']), [
+    { path: '/work/dshfiles', insert: 'workspace:%2Fwork%2Fdshfiles ' },
+  ])
+  assert.deepEqual(InlineCompletion.projects(at('@'), ['/work/dshfiles', '/work/space name']), [
+    { path: '/work/dshfiles', insert: 'workspace:%2Fwork%2Fdshfiles ' },
+    { path: '/work/space name', insert: 'workspace:%2Fwork%2Fspace%20name ' },
+  ])
+  assert.deepEqual(InlineCompletion.projects(at('@b:12'), ['/work/dshfiles']), [])
+})
+
 test('another source’s scope keeps its own meaning, so no agent row appears', () => {
   assert.deepEqual(InlineCompletion.agents(at('@b:12'), agents), [])
   assert.deepEqual(InlineCompletion.agents(at('@t:fix'), agents), [])
