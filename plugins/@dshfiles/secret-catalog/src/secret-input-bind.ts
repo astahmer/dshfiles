@@ -24,6 +24,10 @@ export class SecretInputBinding {
     return !element.disabled && !element.readOnly && textInputTypes.has(element.type)
   }
 
+  static isBacklogJevSetting(input: { readonly namespace: string | null; readonly path: string | null }): boolean {
+    return input.namespace === 'dshfiles-backlog' && input.path === 'jevSecret'
+  }
+
   /**
    * Writes text the way typing does: through the prototype's own value setter, then an `input` event, so a controlled
    * field's `onChange` fires. Assigning `element.value` directly updates the DOM but leaves that state stale, and the

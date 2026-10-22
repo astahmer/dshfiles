@@ -159,7 +159,9 @@ background, so adding an item never waits:
   is this work to do (otherwise a plain capture becomes a `note`), and is it the same work as the closest
   open item (a suspected duplicate). Its key comes from `jevSecret` — a Secret Catalog reference such as
   `secret:TYPESAFE_KEY` or `secret:TYPESAFE_KEY@dev` — and falls back to `TYPESAFE_API_KEY` in the Host
-  environment when that setting is empty. The value is resolved on the Host and never stored in settings.
+  environment when that setting is empty. Use the field's **Add secret** button to create or replace the global
+  `jev-api-key-optmem` alias and bind it automatically; project-scoped aliases cannot resolve here because triage has no
+  project folder. The value is resolved on the Host and never stored in settings.
 - **A cheap model** (`triageProvider` + `triageModel`) proposes kind, status, title, tags and a duplicate
   among the similar items it is shown. Items whose applied triage you later corrected by hand are given
   to it as examples; they are read from the event log, not stored separately.

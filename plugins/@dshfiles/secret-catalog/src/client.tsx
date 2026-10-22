@@ -50,7 +50,7 @@ export default defineClient({
     )
     const SecretOverlay = (): JSX.Element => (
       <PluginQueryProvider>
-        <SecretInputOverlay />
+        <SecretInputOverlay t={translate} />
       </PluginQueryProvider>
     )
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118 }, decorate(SecretOverlay)))

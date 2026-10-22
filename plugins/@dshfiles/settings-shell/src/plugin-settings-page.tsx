@@ -15,7 +15,13 @@ export const PluginSettingsPageView = (props: {
     {props.page.description !== '' && <p className="dshx:m-0 dshx:text-[13px] dshx:text-muted-foreground">{props.page.description}</p>}
     <code className="dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground/80">{props.page.ns}</code>
     <div className="dshx:mt-3">
-      <SettingsForm fields={props.page.fields} form={props.form} t={props.t} {...(props.focusPath === undefined ? {} : { focusPath: props.focusPath })} />
+      <SettingsForm
+        fields={props.page.fields}
+        form={props.form}
+        namespace={props.page.ns}
+        t={props.t}
+        {...(props.focusPath === undefined ? {} : { focusPath: props.focusPath })}
+      />
     </div>
   </section>
 )

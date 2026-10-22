@@ -72,6 +72,23 @@ Feature: Secret Catalog
     Then the store holds a generated value for "GLOBAL_TOKEN" in the "global" scope that the page never showed
     And the dialog journey is complete
 
+  @scenario:secret-catalog.backlog-jev-setup
+  Scenario: Add a Jev key from its Backlog setting and bind only its reference
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog" is booted
+    And a project-scoped Jev key is stored for the seeded project folder
+    When the Backlog Jev secret setup is opened from Settings
+    And the Jev API key "jev-e2e-sensitive-value" is entered and saved
+    Then the global Jev secret is stored with value "jev-e2e-sensitive-value" without exposing it in the UI
+
+  @scenario:secret-catalog.backlog-jev-setup-replace
+  Scenario: Replace an existing global Jev key from its Backlog setting
+    Given a global Jev key with value "jev-e2e-existing-value" is already stored
+    And the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog" is booted
+    When the Backlog Jev secret setup is opened from Settings
+    Then the replacement warning is shown before saving the Jev key
+    When the Jev API key "jev-e2e-replacement-value" is entered and saved
+    Then the global Jev secret is stored with value "jev-e2e-replacement-value" without exposing it in the UI
+
   @scenario:secret-catalog.rename-remove
   Scenario: Rename an alias, remove another, and delete a vault item
     Given the isolated plugin profile "@dshfiles/secret-catalog" is booted

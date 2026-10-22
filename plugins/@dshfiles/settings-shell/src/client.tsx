@@ -443,7 +443,7 @@ export default defineClient({
         />
       ),
       renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], highlight: string) => (
-        <SettingsForm fields={fields} form={formFor(page.ns)} highlight={highlight} key={page.ns} t={input.t} />
+        <SettingsForm fields={fields} form={formFor(page.ns)} highlight={highlight} key={page.ns} namespace={page.ns} t={input.t} />
       ),
       sectionOwner,
       t: input.t,
@@ -543,7 +543,7 @@ export default defineClient({
           {pages.map(page => (
             <section aria-label={page.title} className="dshx:flex dshx:flex-col" key={page.ns}>
               {pages.length > 1 && <h4 className="dshx:m-0 dshx:text-[13px] dshx:font-semibold dshx:text-muted-foreground">{page.title}</h4>}
-              <SettingsForm fields={page.fields} form={formFor(page.ns)} t={t} />
+              <SettingsForm fields={page.fields} form={formFor(page.ns)} namespace={page.ns} t={t} />
             </section>
           ))}
         </div>

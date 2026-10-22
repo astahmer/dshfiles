@@ -61,8 +61,19 @@ export const placeSecretPanel = (props: { readonly anchor: AnchorBounds; readonl
   return { side, left, top, maxHeight }
 }
 
-/** The key button rides on the field's right edge and stays on screen even when the field is partly scrolled out. */
-export const placeSecretButton = (props: { readonly anchor: AnchorBounds; readonly viewport: ViewportBounds }): ButtonPlacement => ({
-  left: clamp(props.anchor.right - buttonSize - gap, margin, props.viewport.width - margin - buttonSize),
-  top: clamp(props.anchor.top + (props.anchor.bottom - props.anchor.top - buttonSize) / 2, margin, props.viewport.height - margin - buttonSize),
-})
+/** Keeps a secret action beside its field or label and inside the viewport. */
+export const placeSecretButton = (props: {
+  readonly anchor: AnchorBounds
+  readonly viewport: ViewportBounds
+  readonly width?: number
+  readonly height?: number
+  readonly align?: 'end' | 'after'
+}): ButtonPlacement => {
+  const width = props.width ?? buttonSize
+  const height = props.height ?? buttonSize
+  const left = props.align === 'after' ? props.anchor.right + gap : props.anchor.right - width - gap
+  return {
+    left: clamp(left, margin, props.viewport.width - margin - width),
+    top: clamp(props.anchor.top + (props.anchor.bottom - props.anchor.top - height) / 2, margin, props.viewport.height - margin - height),
+  }
+}

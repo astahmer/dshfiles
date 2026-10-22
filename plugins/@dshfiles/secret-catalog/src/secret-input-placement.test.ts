@@ -36,8 +36,22 @@ describe('secret picker placement', () => {
     expect(right.left).toBe(952)
   })
 
-  it('keeps the key button on screen when the field runs past an edge', () => {
+  it('keeps the secret action on screen when the field runs past an edge', () => {
     expect(placeSecretButton({ anchor: { left: 0, top: 300, right: 20, bottom: 340 }, viewport })).toEqual({ left: 8, top: 308 })
     expect(placeSecretButton({ anchor: { left: 1250, top: 790, right: 1290, bottom: 830 }, viewport })).toEqual({ left: 1248, top: 768 })
+  })
+
+  it('places a wider labeled action inside the viewport', () => {
+    expect(placeSecretButton({ anchor: { left: 1200, top: 300, right: 1276, bottom: 340 }, viewport, width: 104, height: 28 })).toEqual({
+      left: 1166,
+      top: 306,
+    })
+  })
+
+  it('places a labeled setting action after its label', () => {
+    expect(placeSecretButton({ anchor: { left: 380, top: 503, right: 468, bottom: 523 }, viewport, width: 104, height: 28, align: 'after' })).toEqual({
+      left: 474,
+      top: 499,
+    })
   })
 })

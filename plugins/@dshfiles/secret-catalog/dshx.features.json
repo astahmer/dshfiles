@@ -308,6 +308,52 @@
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         }
       ]
+    },
+    {
+      "id": "backlog-jev-setup",
+      "title": "Add a Jev key from the Backlog setting",
+      "summary": "Open a masked setup popover on the Backlog Jev setting, store the key as a global Secret Catalog alias, and bind only its reference.",
+      "reach": [
+        "seed fake-secret-cli",
+        "click button \"Plugins\"",
+        "click button \"View @dshfiles/backlog\"",
+        "click textbox \"Jev secret\"",
+        "click button \"Add secret\"",
+        "expect button \"Add and bind\""
+      ],
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [],
+      "states": ["setup-open", "key-stored-global", "reference-bound", "existing-key-replaced"],
+      "failureModes": [
+        "A project-scoped key cannot resolve from Backlog because triage has no project cwd, so setup writes a global alias.",
+        "The key value stays out of the Agent conversation and settings; only the reference is written there.",
+        "A Secret CLI failure leaves the setting unchanged and shows a generic error."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "The Host secret CLI stores the typed key; the existing API pipes it on stdin.",
+          "deterministicFake": "The journey uses a synthetic value in the fake CLI store; unit coverage proves values never appear in command arguments or output."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-setup",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-setup-replace",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.backlog-jev-target",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-input-bind.test.ts",
+          "testName": "recognizes only the Backlog Jev secret setting as a setup target"
+        }
+      ]
     }
   ],
   "kind": "bundle"

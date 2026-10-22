@@ -2,6 +2,8 @@
 
 ![Browse aliases by scope and environment](docs/screenshots/scoped-alias-catalog.png)
 
+![Add a Jev key from the Backlog setting](docs/screenshots/backlog-jev-setup.png)
+
 Secret Catalog is a DSH 0.2 client/Host plugin backed by the installed
 `secret` CLI contract. It uses `secret print --all --json` only when a project
 folder is selected. Without one it calls `secret print global --json`, so the
@@ -43,6 +45,11 @@ when it is registered, its workspace id.
   working directory; local uses the selected folder's `.secret.local.json`
   through the CLI's `--config`. Both paths check metadata for an existing alias
   in the selected environment and refuse a duplicate before writing.
+- The Backlog Jev setting's **Add secret** button opens a masked popover, creates
+  or replaces the global `jev-api-key-optmem` alias, and binds only
+  `secret:jev-api-key-optmem`. Backlog resolves this setting without a project
+  folder, so a project-scoped alias will not work there. The value goes to the
+  Host and secret CLI stdin, never the conversation or settings.
 - Edit supports item name, source, tags, and a two-step masked value
   replacement. Value replacement is passed through stdin with an explicit
   overwrite flag after user confirmation. The CLI's `edit --field` also

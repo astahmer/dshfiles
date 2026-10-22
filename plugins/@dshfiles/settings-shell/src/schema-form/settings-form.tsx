@@ -501,7 +501,9 @@ const SettingRow = (props: {
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
           <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-[14px] dshx:leading-5 dshx:text-foreground">
-            <Highlight query={props.highlight} text={field.title} />
+            <span data-setting-label={field.path.join('.')}>
+              <Highlight query={props.highlight} text={field.title} />
+            </span>
             {props.modified && <span className="dshx:sr-only">{props.t('form.modified')}</span>}
             {props.modified && (
               <Button
@@ -543,6 +545,7 @@ const SettingRow = (props: {
  * shared ConfigForm, the store native rows, Settings Search and `useSettings` use, so they all stay in step.
  */
 export const SettingsForm = (props: {
+  readonly namespace: string
   readonly form: ConfigForm<unknown>
   readonly fields: readonly SettingField[]
   readonly t: ShellTranslate
@@ -576,7 +579,7 @@ export const SettingsForm = (props: {
   const base = jsonValueSchema.safeParse(snapshot.base)
   const focusKey = props.focusPath?.join('.')
   return (
-    <div className="dshx:flex dshx:flex-col">
+    <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
       {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
       {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
       {props.fields.map((field, index) => {

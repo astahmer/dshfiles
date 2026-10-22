@@ -7,6 +7,12 @@ describe('secret input binding', () => {
     expect(SecretInputBinding.selector).toBe('[data-secret-input="reference"]')
   })
 
+  it('recognizes only the Backlog Jev secret setting as a setup target', () => {
+    expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-backlog', path: 'jevSecret' })).toBe(true)
+    expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-memory', path: 'jevSecret' })).toBe(false)
+    expect(SecretInputBinding.isBacklogJevSetting({ namespace: 'dshfiles-backlog', path: 'autoTriage' })).toBe(false)
+  })
+
   it('writes a reference, leaving out the default environment', () => {
     expect(SecretInputBinding.referenceText({ alias: 'TYPESAFE_API_KEY', environment: 'prod' })).toBe('secret:TYPESAFE_API_KEY')
     expect(SecretInputBinding.referenceText({ alias: 'TYPESAFE_API_KEY', environment: 'dev' })).toBe('secret:TYPESAFE_API_KEY@dev')

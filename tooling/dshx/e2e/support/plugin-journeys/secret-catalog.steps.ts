@@ -1,8 +1,9 @@
 import { expect, type Page } from '@playwright/test'
-import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { rmSync } from 'node:fs'
+import { chmod, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { After, Before, Then, When } from '../bdd.js'
+import { After, Before, Given, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
@@ -11,11 +12,15 @@ import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThre
  * The Host resolves the `secret` executable from the PATH it was launched with, so a tagged scenario puts the
  * fake CLI first on PATH before its Given step boots the Host, and seeds the store with synthetic values.
  */
-interface SecretFixture {
+interface SecretFixturePaths {
   readonly root: string
+  readonly bin: string
   readonly project: string
   readonly storePath: string
+}
+interface SecretFixture extends SecretFixturePaths {
   readonly previousPath: string | undefined
+  readonly previousPrewarm: string | undefined
 }
 
 const StoreRow = { alias: '', scope: '', root: null as string | null, environment: '', item: '', field: 'password', source: '' }
@@ -28,6 +33,25 @@ interface Store {
 
 const fixtures = new WeakMap<Page, SecretFixture>()
 const fakeCli = join(dirname(fileURLToPath(import.meta.url)), '..', 'fake-secret-cli.mjs')
+// Keep PATH stable for prewarmed Hosts; reset the store per scenario and remove it when the worker exits.
+let sharedFakeCliFixture: Promise<SecretFixturePaths> | undefined
+
+const fakeCliFixtureForWorker = (): Promise<SecretFixturePaths> => {
+  if (sharedFakeCliFixture !== undefined) return sharedFakeCliFixture
+  sharedFakeCliFixture = (async () => {
+    const root = await createScratchDirectory('dshx-secret-catalog-e2e-')
+    const bin = join(root, 'bin')
+    const project = join(root, 'secret-project')
+    await mkdir(bin)
+    await mkdir(project)
+    await copyFile(fakeCli, join(bin, 'secret'))
+    await chmod(join(bin, 'secret'), 0o755)
+    const paths = { root, bin, project, storePath: join(bin, 'store.json') }
+    process.once('exit', () => rmSync(root, { recursive: true, force: true }))
+    return paths
+  })()
+  return sharedFakeCliFixture
+}
 
 const fixtureFor = (page: Page): SecretFixture => {
   const fixture = fixtures.get(page)
@@ -38,27 +62,22 @@ const fixtureFor = (page: Page): SecretFixture => {
 const readStore = async (page: Page): Promise<Store> => JSON.parse(await readFile(fixtureFor(page).storePath, 'utf8'))
 
 Before({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
-  const root = await createScratchDirectory('dshx-secret-catalog-e2e-')
-  const bin = join(root, 'bin')
-  const project = join(root, 'secret-project')
-  await mkdir(bin)
-  await mkdir(project)
-  await copyFile(fakeCli, join(bin, 'secret'))
-  await chmod(join(bin, 'secret'), 0o755)
+  const previousPrewarm = process.env.DSHX_E2E_PREWARM
+  process.env.DSHX_E2E_PREWARM = '0'
+  const paths = await fakeCliFixtureForWorker()
   const row = (fields: Partial<StoreRow>): StoreRow => ({ ...StoreRow, ...fields })
   const store: Store = {
     rows: [
       row({ alias: 'GITHUB_TOKEN', scope: 'global', environment: 'prod', item: 'item-github', source: 'github' }),
-      row({ alias: 'DB_PASSWORD', scope: 'project', root: project, environment: 'prod', item: 'item-db-prod', source: 'postgres' }),
-      row({ alias: 'DB_PASSWORD', scope: 'project', root: project, environment: 'dev', item: 'item-db-dev', source: 'postgres' }),
-      row({ alias: 'LOCAL_TOKEN', scope: 'local', root: project, environment: 'prod', item: 'item-local', source: 'laptop' }),
+      row({ alias: 'DB_PASSWORD', scope: 'project', root: paths.project, environment: 'prod', item: 'item-db-prod', source: 'postgres' }),
+      row({ alias: 'DB_PASSWORD', scope: 'project', root: paths.project, environment: 'dev', item: 'item-db-dev', source: 'postgres' }),
+      row({ alias: 'LOCAL_TOKEN', scope: 'local', root: paths.project, environment: 'prod', item: 'item-local', source: 'laptop' }),
     ],
     vault: { 'item-github': 'gh-e2e-global-value', 'item-db-prod': 'db-e2e-prod-value', 'item-db-dev': 'db-e2e-dev-value', 'item-local': 'local-e2e-value' },
   }
-  const storePath = join(bin, 'store.json')
-  await writeFile(storePath, JSON.stringify(store))
-  fixtures.set(page, { root, project, storePath, previousPath: process.env.PATH })
-  process.env.PATH = `${bin}${delimiter}${process.env.PATH ?? ''}`
+  await writeFile(paths.storePath, JSON.stringify(store))
+  fixtures.set(page, { ...paths, previousPath: process.env.PATH, previousPrewarm })
+  process.env.PATH = `${paths.bin}${delimiter}${process.env.PATH ?? ''}`
 })
 
 After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
@@ -66,7 +85,8 @@ After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   if (fixture === undefined) return
   fixtures.delete(page)
   process.env.PATH = fixture.previousPath
-  await rm(fixture.root, { recursive: true, force: true })
+  if (fixture.previousPrewarm === undefined) delete process.env.DSHX_E2E_PREWARM
+  else process.env.DSHX_E2E_PREWARM = fixture.previousPrewarm
 })
 
 const catalog = (page: Page) => page.getByRole('main')
@@ -80,6 +100,101 @@ const openCatalog = async (page: Page): Promise<void> => {
 
 When('the Secret Catalog is opened', async ({ page }: { page: Page }) => {
   await openCatalog(page)
+})
+
+When('the Backlog Jev secret setup is opened from Settings', async ({ page }: { page: Page }) => {
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
+  const jevRow = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')
+  await expect(jevRow).toBeVisible()
+  await jevRow.locator('input[data-secret-input="reference"]').focus()
+  const addSecret = page.getByTestId('secret-input-jev-setup')
+  await expect(addSecret).toBeVisible()
+  await addSecret.click()
+  const setup = page.getByTestId('jev-secret-setup')
+  await expect(setup).toBeVisible()
+  await expect(setup.getByLabel('TypeSafe API key', { exact: true })).toHaveAttribute('type', 'password')
+})
+
+const jevProjectValue = 'jev-e2e-project-scoped-value'
+
+const seedProjectJevAlias = async (page: Page): Promise<void> => {
+  const fixture = fixtureFor(page)
+  const store = await readStore(page)
+  store.rows.push({
+    alias: 'jev-api-key-optmem',
+    scope: 'project',
+    root: fixture.project,
+    environment: 'prod',
+    item: 'item-jev-project',
+    field: 'password',
+    source: 'Typesafe project',
+  })
+  store.vault['item-jev-project'] = jevProjectValue
+  await writeFile(fixture.storePath, JSON.stringify(store))
+}
+
+Given('a project-scoped Jev key is stored for the seeded project folder', async ({ page }: { page: Page }) => {
+  await seedProjectJevAlias(page)
+})
+
+Given('a global Jev key with value {string} is already stored', async ({ page }: { page: Page }, value: string) => {
+  const fixture = fixtureFor(page)
+  await seedProjectJevAlias(page)
+  const store = await readStore(page)
+  store.rows.push({
+    alias: 'jev-api-key-optmem',
+    scope: 'global',
+    root: null,
+    environment: 'prod',
+    item: 'item-jev-existing',
+    field: 'password',
+    source: 'Typesafe',
+  })
+  store.vault['item-jev-existing'] = value
+  await writeFile(fixture.storePath, JSON.stringify(store))
+})
+
+Then('the replacement warning is shown before saving the Jev key', async ({ page }: { page: Page }) => {
+  const setup = page.getByTestId('jev-secret-setup')
+  await expect(setup.getByText('This replaces the existing global Jev key.', { exact: true })).toBeVisible()
+  await expect(setup.getByRole('button', { name: 'Replace and bind', exact: true })).toBeVisible()
+})
+
+When('the Jev API key {string} is entered and saved', async ({ page }: { page: Page }, value: string) => {
+  const setup = page.getByTestId('jev-secret-setup')
+  await setup.getByLabel('TypeSafe API key', { exact: true }).fill(value)
+  const store = await readStore(page)
+  const existingJevKey = store.rows.some(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global' && row.environment === 'prod')
+  const saveButton = existingJevKey ? 'Replace and bind' : 'Add and bind'
+  await setup.getByRole('button', { name: saveButton, exact: true }).click()
+  const jevRow = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')
+  await expect(jevRow.locator('input[data-secret-input="reference"]')).toHaveValue('secret:jev-api-key-optmem')
+  await expect(setup).toHaveCount(0)
+  await page.reload()
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
+  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
+    'secret:jev-api-key-optmem',
+  )
+  expect(await page.locator('body').innerText()).not.toContain(value)
+})
+
+Then('the global Jev secret is stored with value {string} without exposing it in the UI', async ({ page }: { page: Page }, value: string) => {
+  const store = await readStore(page)
+  const matches = store.rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global' && row.environment === 'prod')
+  await recordAssertion(page, 'secret-catalog-backlog-jev-key-is-global', async () => {
+    expect(matches).toHaveLength(1)
+    const match = matches[0]
+    expect(match).toBeDefined()
+    expect(store.vault[match?.item ?? '']).toBe(value)
+    const projectMatches = store.rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'project' && row.environment === 'prod')
+    expect(projectMatches).toHaveLength(1)
+    expect(store.vault[projectMatches[0]?.item ?? '']).toBe(jevProjectValue)
+    await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).not.toBeChecked()
+    await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('the seeded project folder is chosen in the Secret Catalog', async ({ page }: { page: Page }) => {
