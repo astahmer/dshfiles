@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -7,6 +8,10 @@ import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel }
 
 const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
 const BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-meta', description: 'Wait three seconds' })}]]`
+const LONG_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 20 && echo wait-timer-job', description: 'Hold a job for the wait timer' })}]]`
+const WAIT_DIRECTIVE = `[[call background_jobs_wait ${JSON.stringify({ timeoutMs: 12_000 })}]]`
+const WAIT_TIMER_SCREENSHOT = join(tmpdir(), 'dshfiles-tool-meta-wait-timer.png')
+const waitProjects = new WeakMap<Page, string>()
 
 const timingLine = (page: Page) => page.locator('[data-dshfiles-tool-meta]')
 
@@ -49,6 +54,41 @@ Then('the running tool card counts its elapsed seconds', async ({ page }: { page
       expect(Number(/^(\d+) s/.exec((await timer.textContent()) ?? '')?.[1])).toBeGreaterThan(first)
     }).toPass({ timeout: 5_000 })
   })
+})
+
+When('a long shell job starts in the workspace', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-tool-meta-wait-e2e-')
+  const workspace = join(root, 'wait-project')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  waitProjects.set(page, 'wait-project')
+  await startThreadWithModel(page, { project: 'wait-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(LONG_BASH_DIRECTIVE)
+  await composer.press('Enter')
+  await expect(page.locator('[data-chat-call-id]').first()).toBeVisible({ timeout: 30_000 })
+})
+
+When('a second thread waits for jobs with a timeout', async ({ page }: { page: Page }) => {
+  const project = waitProjects.get(page)
+  if (project === undefined) throw new Error('The wait-timer project was not created.')
+  await startThreadWithModel(page, { project, model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(WAIT_DIRECTIVE)
+  await composer.press('Enter')
+})
+
+Then('the wait tool card shows an accessible timeout progress bar', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'tool-meta-wait-tool-shows-timeout-progress', async () => {
+    const progress = page.getByRole('progressbar', { name: /^Wait timeout countdown: \d+ s remaining of 12 s$/ })
+    await expect(progress).toBeVisible({ timeout: 30_000 })
+    const initial = Number(await progress.getAttribute('aria-valuenow'))
+    await expect(async () => {
+      expect(Number(await progress.getAttribute('aria-valuenow'))).toBeGreaterThan(initial)
+    }).toPass({ timeout: 5_000 })
+  })
+  await page.screenshot({ path: WAIT_TIMER_SCREENSHOT })
+  await finishJourneyAssertions(page)
 })
 
 Then('once the turn settles the tool card shows how long the call took and when it started', async ({ page }: { page: Page }) => {

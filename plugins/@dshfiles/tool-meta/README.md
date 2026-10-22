@@ -1,6 +1,8 @@
 # @dshfiles/tool-meta
 
-Start time and duration on every tool call in the chat transcript: `1.2 s · 14:02:11` at the right of each tool card's header row, for native tools and plugin-owned ones, root calls and PTC children alike. While a call runs the duration counts up every second.
+![Tool timing and a live wait countdown](docs/screenshots/tool-call-timing.png)
+
+Start time and duration on every tool call in the chat transcript: `1.2 s · 14:02:11` at the right of each tool card's header row, for native tools and plugin-owned ones, root calls and PTC children alike. While a call runs the duration counts up every second. `job_output` waits and `background_jobs_wait` calls show a live wait bar: a countdown against an explicit timeout when one is supplied, otherwise an indeterminate bar with elapsed time. It measures the wait, not the job's progress or expected completion. To interrupt a wait, steer or stop the turn with the existing composer controls.
 
 Built with dshx (no port: nothing upstream does this). Its own small plugin rather than a slice of an existing one, because it touches no other plugin's state and has its own fragile seam to watch. Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 

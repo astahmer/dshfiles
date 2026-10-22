@@ -8,6 +8,12 @@ export type ToolTiming =
   | { readonly kind: 'finished'; readonly startedAt: number; readonly endedAt: number }
   | { readonly kind: 'ended'; readonly endedAt: number }
 
+export interface WaitTimer {
+  readonly timeoutMs: number | undefined
+  readonly elapsedMs: number
+  readonly remainingMs: number | undefined
+}
+
 /**
  * The slice of the native `tool.call.toolview` owner this plugin reads. A dispatched call carries its `tool/call` time;
  * a result carries its own `tool/result` time and, while the call is still in the loaded window, the call's time.
@@ -17,6 +23,20 @@ const toolCallOwnerSchema = z.discriminatedUnion('phase', [
   z.object({ phase: z.literal('start'), block: z.object({ time: z.number() }) }),
   z.object({ phase: z.literal('result'), block: z.object({ time: z.number(), callTime: z.number().nullable() }) }),
 ])
+
+const waitCallOwnerSchema = z.object({
+  phase: z.literal('start'),
+  toolName: z.enum(['job_output', 'background_jobs_wait']),
+  block: z.object({ time: z.number().finite(), argsRaw: z.string() }),
+})
+
+export type WaitTimerOwner = z.input<typeof waitCallOwnerSchema>
+
+const waitArgumentsSchema = z.object({
+  wait: z.boolean().optional(),
+  timeout_ms: z.number().int().positive().max(3_600_000).optional(),
+  timeoutMs: z.number().int().positive().max(3_600_000).optional(),
+})
 
 /** What this plugin needs of a `ToolCallOwnerProps`; the native owner satisfies it. */
 export type ToolCallTimes = z.input<typeof toolCallOwnerSchema>
@@ -43,6 +63,28 @@ export class ToolTimingModel {
     if (call.phase === 'start') return { kind: 'running', startedAt: call.block.time }
     if (call.block.callTime === null) return { kind: 'ended', endedAt: call.block.time }
     return { kind: 'finished', startedAt: call.block.callTime, endedAt: call.block.time }
+  }
+
+  /** Show wait progress without inventing a deadline when the call has no explicit timeout. */
+  static readonly waitTimerOf = (owner: WaitTimerOwner, now: number): WaitTimer | undefined => {
+    const parsedOwner = waitCallOwnerSchema.safeParse(owner)
+    if (!parsedOwner.success) return undefined
+    let rawArguments: unknown
+    try {
+      rawArguments = JSON.parse(parsedOwner.data.block.argsRaw)
+    } catch {
+      return undefined
+    }
+    const parsedArguments = waitArgumentsSchema.safeParse(rawArguments)
+    if (!parsedArguments.success) return undefined
+    if (parsedOwner.data.toolName === 'job_output' && parsedArguments.data.wait !== true) return undefined
+    const timeoutMs = parsedArguments.data.timeoutMs ?? parsedArguments.data.timeout_ms
+    const elapsedMs = Math.max(0, now - parsedOwner.data.block.time)
+    return {
+      timeoutMs,
+      elapsedMs,
+      remainingMs: timeoutMs === undefined ? undefined : Math.max(0, timeoutMs - elapsedMs),
+    }
   }
 
   /** A finished call keeps tenths under ten seconds; a running counter ticks in whole seconds. */

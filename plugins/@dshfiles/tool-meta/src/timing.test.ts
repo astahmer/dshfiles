@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ToolMetaTranslate } from './locales.js'
-import { ToolTimingModel } from './timing.js'
+import { ToolTimingModel, type WaitTimerOwner } from './timing.js'
 
 const templates = new Map([
   ['seconds', '{n} s'],
@@ -14,6 +14,9 @@ const templates = new Map([
   ['runningLabel', 'Running for {duration}, started {start}'],
   ['finishedLabel', 'Took {duration}, started {start}'],
   ['endedLabel', 'Finished {end}'],
+  ['waitElapsed', 'Waiting for {duration}'],
+  ['waitRemaining', '{duration} until wait timeout'],
+  ['waitProgress', 'Wait timeout countdown: {remaining} remaining of {timeout}'],
 ])
 const t: ToolMetaTranslate = (key, params) => (templates.get(key) ?? key).replaceAll(/\{(\w+)\}/g, (_match, name: string) => String(params?.[name] ?? ''))
 
@@ -34,6 +37,42 @@ describe('toolTimingOf', () => {
   it('reports an owner the native renderer reshaped instead of guessing', () => {
     expect(ToolTimingModel.toolTimingOf({ phase: 'start', block: { time: Number.NaN } })).toBeUndefined()
     expect(ToolTimingModel.toolTimingOf({ phase: 'result', block: { time: 2_200, callTime: Number.POSITIVE_INFINITY } })).toBeUndefined()
+  })
+})
+
+describe('waitTimerOf', () => {
+  const waitCall = (toolName: WaitTimerOwner['toolName'], args: string): WaitTimerOwner => ({
+    phase: 'start',
+    toolName,
+    block: { time: 1_000, argsRaw: args },
+  })
+
+  it('shows elapsed and remaining time for an explicit timed job wait', () => {
+    expect(ToolTimingModel.waitTimerOf(waitCall('job_output', '{"wait":true,"timeout_ms":300000}'), 91_000)).toEqual({
+      timeoutMs: 300_000,
+      elapsedMs: 90_000,
+      remainingMs: 210_000,
+    })
+    expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{"timeoutMs":120000}'), 181_000)).toEqual({
+      timeoutMs: 120_000,
+      elapsedMs: 180_000,
+      remainingMs: 0,
+    })
+    expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{}'), 91_000)).toEqual({
+      timeoutMs: undefined,
+      elapsedMs: 90_000,
+      remainingMs: undefined,
+    })
+  })
+
+  it('shows indeterminate elapsed time without a timeout, and omits malformed or non-wait calls', () => {
+    expect(ToolTimingModel.waitTimerOf(waitCall('job_output', '{"wait":true}'), 91_000)).toEqual({
+      timeoutMs: undefined,
+      elapsedMs: 90_000,
+      remainingMs: undefined,
+    })
+    expect(ToolTimingModel.waitTimerOf(waitCall('job_output', '{"wait":false,"timeout_ms":300000}'), 91_000)).toBeUndefined()
+    expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{'), 91_000)).toBeUndefined()
   })
 })
 

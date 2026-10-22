@@ -5,7 +5,7 @@
     {
       "id": "tool-call-timing",
       "title": "Start time and duration on every tool call",
-      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). While a call runs the duration counts up live. The start time reads as clock time or relative time, and the whole line can be hidden.",
+      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
       "reach": ["seed tool-call-thread", "click text \"Completed in*\"", "click text \"Ran commands\"", "expect note \"Took*\""],
       "surfaces": ["client", "settings"],
       "configuration": [
@@ -24,7 +24,7 @@
           "coveredBy": ["tool-meta.settings", "tool-meta.timing-unit-relative"]
         }
       ],
-      "states": ["preparing", "running", "finished", "start-out-of-window", "hidden"],
+      "states": ["preparing", "running", "timed-wait", "untimed-wait", "finished", "start-out-of-window", "hidden"],
       "failureModes": [
         "No call time is shown while the model is still writing the arguments.",
         "A result whose call fell outside the loaded history shows only when it ended.",
@@ -43,10 +43,21 @@
           "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "tool-meta.wait-timer",
+          "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "tool-meta.timing-unit-phases",
           "file": "plugins/@dshfiles/tool-meta/src/timing.test.ts",
           "testName": "reads a running call from its dispatch time and a settled one from its call and result times"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.wait-timer-component",
+          "file": "plugins/@dshfiles/tool-meta/src/wait-timer-indicator.test.tsx",
+          "testName": "shows elapsed and remaining time as a timeout progress bar"
         },
         {
           "kind": "unit-test",

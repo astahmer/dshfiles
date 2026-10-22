@@ -11,6 +11,14 @@ Feature: Tool call timing
     Then the running tool card counts its elapsed seconds
     And once the turn settles the tool card shows how long the call took and when it started
 
+  @scenario:tool-meta.wait-timer
+  Scenario: A timed wait shows its deadline without presenting it as job progress
+    Given the isolated plugin composition of "@dshfiles/tool-meta, @dshfiles/background-jobs, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a long shell job starts in the workspace
+    And a second thread waits for jobs with a timeout
+    Then the wait tool card shows an accessible timeout progress bar
+
   @scenario:tool-meta.settings
   Scenario: The start time reads relative, or the line hides, from the plugin settings
     Given the isolated plugin composition of "@dshfiles/tool-meta, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted

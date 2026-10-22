@@ -5,6 +5,7 @@ import { useSyncExternalStore, type ReactElement } from 'react'
 import type { ToolMetaTranslate } from './locales.js'
 import { toolMetaSettings } from './settings.js'
 import { ToolTimingModel } from './timing.js'
+import { WaitTimerIndicator } from './wait-timer-indicator.js'
 import { warnOnce } from './warn-once.js'
 
 /** One shared one-second clock for every live line, running only while one is mounted. */
@@ -53,18 +54,32 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
   }
   if (timing === null || !enabled) return null
   const { text, label } = ToolTimingModel.describeTiming({ timing, now, format, t })
+  const waitTimer =
+    owner.phase === 'start' && (owner.toolName === 'job_output' || owner.toolName === 'background_jobs_wait')
+      ? ToolTimingModel.waitTimerOf(
+          {
+            phase: 'start',
+            toolName: owner.toolName,
+            block: { time: owner.block.time, argsRaw: owner.block.argsRaw },
+          },
+          now,
+        )
+      : undefined
   return (
-    <span
-      role={timing.kind === 'running' ? 'timer' : 'note'}
-      aria-label={label}
-      title={label}
-      data-dshfiles-tool-meta={timing.kind}
-      className={cn(
-        'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:bg-background dshx:pl-2 dshx:whitespace-nowrap dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-        timing.kind === 'running' && 'dshx:text-foreground',
-      )}
-    >
-      {text}
+    <span className="dshx:contents">
+      <span
+        role={timing.kind === 'running' ? 'timer' : 'note'}
+        aria-label={label}
+        title={label}
+        data-dshfiles-tool-meta={timing.kind}
+        className={cn(
+          'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:bg-background dshx:pl-2 dshx:whitespace-nowrap dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+          timing.kind === 'running' && 'dshx:text-foreground',
+        )}
+      >
+        {text}
+      </span>
+      {waitTimer !== undefined && <WaitTimerIndicator timer={waitTimer} t={t} />}
     </span>
   )
 }
