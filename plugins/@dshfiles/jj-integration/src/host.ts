@@ -36,6 +36,7 @@ import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
 import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
 import { JsonText } from './json-text.js'
+import { ThreadStatusWarmup } from './thread-status-warmup.js'
 import {
   defaultJjIntegrationSettings,
   isolatesNewThreadsByDefault,
@@ -1625,12 +1626,27 @@ const setupHost = (context: Context): Effect<void> => {
     },
     { prepend: true },
   )
-  context.on('session/event', session => {
+  // The Turn tail asks for this workspace's status the moment its Turn ends; the tool results that describe the work
+  // arrive before that, so the same read lands in the jj view cache and the offer no longer waits for a cold read.
+  const statusWarmup = new ThreadStatusWarmup({
+    read: async path => {
+      const location = await cachedBestEffortLocation(requireThreads(), path)
+      if (location?.threadName === undefined) return
+      await requireThreads().status(location.repoRoot, location.threadName)
+    },
+    report: error => context.logger.warn('jj-integration: warming a thread status failed: %o', error),
+  })
+  context.on('session/event', (session, event) => {
     const queued = deferredIntegrations.paths()
-    if (queued.length === 0) return
-    const touchesQueuedThread = [...registryOf().list()].some(workspace => queued.includes(workspace.path) && workspace.sessionIds.includes(session.id))
-    if (touchesQueuedThread || queued.some(path => isolatedSessionIdsAt(path).includes(String(session.id))))
-      wakeDeferredIntegrations(DEFERRED_INTEGRATION_SETTLE_MS)
+    if (queued.length > 0) {
+      const touchesQueuedThread = [...registryOf().list()].some(workspace => queued.includes(workspace.path) && workspace.sessionIds.includes(session.id))
+      if (touchesQueuedThread || queued.some(path => isolatedSessionIdsAt(path).includes(String(session.id))))
+        wakeDeferredIntegrations(DEFERRED_INTEGRATION_SETTLE_MS)
+    }
+    // Only events that can follow a jj write warm the status; a streaming prediction token would read for nothing.
+    if (event.type !== 'tool/result' && event.type !== 'assistant/message' && event.type !== 'turn/end') return
+    const cwd = session.header.cwd
+    if (cwd !== undefined && cwd.length > 0) statusWarmup.schedule(cwd)
   })
   const deferredFallback = setInterval(() => {
     if (deferredIntegrations.paths().length > 0) wakeDeferredIntegrations(0)
@@ -1655,6 +1671,7 @@ const setupHost = (context: Context): Effect<void> => {
     async *[Symbol.asyncIterator]() {
       yield async () => {
         autoCleanup.dispose()
+        statusWarmup.dispose()
         clearTimeout(firstSweep)
         clearInterval(timer)
         clearInterval(deferredFallback)

@@ -14,10 +14,10 @@ import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/ds
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
-import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { useCallback, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
@@ -44,6 +44,7 @@ import { deferWorkspaceSubmit, deliverFirstSend } from './workspace-submit.js'
 import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, type DeferredMove, type ToggleRequest } from './workspace-toggle-machine.js'
 import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSettings } from './settings.js'
 import { requestThreadSettle } from './settle-request.js'
+import { TurnEndStatusRefresh } from './turn-end-status-refresh.js'
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
@@ -248,9 +249,10 @@ export default defineClient({
       const newestTurnHasEnded = props.turn.end?.time !== undefined && nextTurnStartedAt === undefined
       const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
       const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
+      const statusQueryKey = useMemo(() => ['jj-integration', 'thread', path, props.sessionId] as const, [path, props.sessionId])
       // Every Turn tail of a Session shares this query key, so one jj read serves the whole conversation.
       const status = useQuery({
-        queryKey: ['jj-integration', 'thread', path, props.sessionId],
+        queryKey: statusQueryKey,
         enabled: path !== undefined,
         retry: false,
         queryFn: ({ signal }) => {
@@ -282,6 +284,15 @@ export default defineClient({
           return 5_000
         },
       })
+      // Refresh immediately when the newest Turn ends: the query was read while it ran, so its cached status still
+      // says "nothing to integrate" and the offer would wait for the fallback poll.
+      const queryClient = useQueryClient()
+      const statusRefresh = useRef<TurnEndStatusRefresh | null>(null)
+      statusRefresh.current ??= new TurnEndStatusRefresh(props.turn.end?.time)
+      useEffect(() => {
+        if (!statusRefresh.current?.take({ newestTurnHasEnded, endedAt: props.turn.end?.time })) return
+        void queryClient.invalidateQueries({ queryKey: statusQueryKey, exact: true })
+      }, [newestTurnHasEnded, props.turn.end?.time, queryClient, statusQueryKey])
       const bookmark = useBookmark()
       const thread = status.data?.thread
       const threadPath = thread?.path ?? path
