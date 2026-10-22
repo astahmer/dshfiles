@@ -23,13 +23,17 @@ export interface ChatReferenceLinkOptions {
 /** A pointer sweeping across a line of text should not flash a card, so hovering waits. */
 const PREVIEW_OPEN_DELAY_MS = 160
 
-const MARKER = 'data-dshfiles-jj-reference'
+const OWNER = 'data-dshfiles-jj-reference-owner'
+const CHIP = 'data-dshfiles-jj-reference'
+const CHIP_LABEL = 'data-dshfiles-jj-reference-label'
+const CHIP_SELECTOR = `[${CHIP}]`
+const CHIP_LABEL_SELECTOR = `[${CHIP_LABEL}]`
+const REFERENCE_CHIP_TEMPLATE = '[data-dshfiles-jj-reference-template] [data-ref-chip="session"]'
+const REFERENCE_CHIP_TEMPLATE_WRAPPER = '[data-dshfiles-jj-reference-template]'
 const PREFIXED = 'data-dshfiles-jj-prefixed'
 const SOURCE = 'data-dshfiles-jj-source'
 const LABEL = 'data-dshfiles-jj-label'
 const TITLE = 'data-dshfiles-jj-title'
-const ORIGINAL_ARIA_LABEL = 'data-dshfiles-jj-original-aria-label'
-const ORIGINAL_TITLE = 'data-dshfiles-jj-original-title'
 const CONVERSATION = '[data-conversation-session]'
 
 const ownConversation = (sessionId: string): Element | null => {
@@ -39,10 +43,12 @@ const ownConversation = (sessionId: string): Element | null => {
   return null
 }
 
-/** Native inline code becomes an accessible link without replacing React's own nodes. */
+/** Decorate native inline code with the same reference chip used for session links. */
 export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): (() => void) => {
+  const displayLabelIn = (element: Element): string =>
+    element.querySelector<HTMLElement>(`${CHIP_SELECTOR} ${CHIP_LABEL_SELECTOR}`)?.textContent ?? element.textContent ?? ''
   const referenceIn = (element: Element): ChatReference | undefined => {
-    const text = element.textContent ?? ''
+    const text = displayLabelIn(element)
     const source = element.getAttribute(SOURCE)
     const label = element.getAttribute(LABEL)
     const written = source !== null && label === text ? source : text
@@ -52,37 +58,60 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
       prefixed: written.trim().startsWith(CHAT_REFERENCE_PREFIX) || element.hasAttribute(PREFIXED),
     })
   }
+  const createChip = (): HTMLElement => {
+    const template = document.querySelector<HTMLElement>(REFERENCE_CHIP_TEMPLATE)
+    const chip = document.createElement('span')
+    if (template !== null) chip.className = template.className
+    const icon = template?.querySelector('svg')
+    if (icon !== null && icon !== undefined) chip.append(icon.cloneNode(true))
+    const label = document.createElement('span')
+    label.setAttribute(CHIP_LABEL, '')
+    chip.setAttribute(CHIP, '')
+    chip.setAttribute('role', 'link')
+    chip.setAttribute('tabindex', '0')
+    chip.append(label)
+    return chip
+  }
+  const displayChipIn = (element: Element): HTMLElement => {
+    const chip = element.querySelector<HTMLElement>(CHIP_SELECTOR)
+    const label = chip?.querySelector<HTMLElement>(CHIP_LABEL_SELECTOR)
+    const template = document.querySelector<HTMLElement>(REFERENCE_CHIP_TEMPLATE)
+    const templateIcon = template?.querySelector('svg')
+    const missingNativePresentation =
+      template !== null && (chip?.className !== template.className || (templateIcon !== null && chip?.querySelector('svg') === null))
+    if (chip !== null && label !== null && !missingNativePresentation) return chip
+    const next = createChip()
+    element.replaceChildren(next)
+    return next
+  }
   const unmark = (element: Element): void => {
-    const originalAriaLabel = element.getAttribute(ORIGINAL_ARIA_LABEL)
-    const originalTitle = element.getAttribute(ORIGINAL_TITLE)
-    if (originalAriaLabel === null) element.removeAttribute('aria-label')
-    else element.setAttribute('aria-label', originalAriaLabel)
-    if (originalTitle === null) element.removeAttribute('title')
-    else element.setAttribute('title', originalTitle)
-    element.removeAttribute(MARKER)
+    const source = element.getAttribute(SOURCE)
+    const label = element.getAttribute(LABEL)
+    if (source !== null && label === displayLabelIn(element)) element.textContent = source
+    else element.querySelector(CHIP_SELECTOR)?.remove()
+    element.removeAttribute(OWNER)
     element.removeAttribute(PREFIXED)
     element.removeAttribute(SOURCE)
     element.removeAttribute(LABEL)
     element.removeAttribute(TITLE)
-    element.removeAttribute(ORIGINAL_ARIA_LABEL)
-    element.removeAttribute(ORIGINAL_TITLE)
-    element.removeAttribute('role')
-    element.removeAttribute('tabindex')
   }
   const linkOf = (target: EventTarget | null): HTMLElement | null => {
     if (!(target instanceof Element) || target.closest('[data-composer-card]') !== null) return null
-    const code = target.closest('code')
+    const chip = target.closest(CHIP_SELECTOR)
+    const code = chip?.closest('code')
     const conversation = code?.closest(CONVERSATION)
-    return code instanceof HTMLElement && conversation?.getAttribute('data-conversation-session') === options.sessionId ? code : null
+    return chip instanceof HTMLElement && conversation?.getAttribute('data-conversation-session') === options.sessionId ? chip : null
   }
   const navigate = (element: HTMLElement): boolean => {
-    const reference = referenceIn(element)
+    const code = element.closest('code')
+    const reference = code === null ? undefined : referenceIn(code)
     if (reference === undefined) return false
     options.onOpen(reference)
     return true
   }
   const previewAt = (element: HTMLElement): boolean => {
-    const reference = referenceIn(element)
+    const code = element.closest('code')
+    const reference = code === null ? undefined : referenceIn(code)
     if (reference === undefined) return false
     const rect = element.getBoundingClientRect()
     const parsed = chatReferencePreviewRequestSchema.safeParse({
@@ -101,26 +130,24 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   const setDisplay = (element: Element, source: string, reference: ChatReference, title?: string): void => {
     const fallback = ChatReferenceModel.display(source)
     const label = title === undefined ? fallback : ChatReferenceModel.titleLabel({ title, fallback })
+    const chip = displayChipIn(element)
+    const chipLabel = chip.querySelector<HTMLElement>(CHIP_LABEL_SELECTOR)
+    const kind = reference.kind === 'revision' ? 'revision' : 'bookmark'
     element.setAttribute(SOURCE, source)
     element.setAttribute(LABEL, label)
+    if (chipLabel !== null && chipLabel.textContent !== label) chipLabel.textContent = label
     if (title === undefined) {
       element.removeAttribute(TITLE)
-      const originalAriaLabel = element.getAttribute(ORIGINAL_ARIA_LABEL)
-      if (originalAriaLabel === null) element.removeAttribute('aria-label')
-      else element.setAttribute('aria-label', originalAriaLabel)
-      const originalTitle = element.getAttribute(ORIGINAL_TITLE)
-      if (originalTitle === null) element.removeAttribute('title')
-      else element.setAttribute('title', originalTitle)
+      chip.setAttribute('title', reference.value)
+      chip.setAttribute('aria-label', `Jujutsu ${kind}: ${reference.value}`)
     } else {
       element.setAttribute(TITLE, title)
-      element.setAttribute('title', title)
-      const kind = reference.kind === 'revision' ? 'revision' : 'bookmark'
-      element.setAttribute('aria-label', `Jujutsu ${kind}: ${title} (${reference.value})`)
+      chip.setAttribute('title', title)
+      chip.setAttribute('aria-label', `Jujutsu ${kind}: ${title} (${reference.value})`)
     }
-    if (element.textContent !== label) element.textContent = label
   }
   const requestTitle = (element: HTMLElement): void => {
-    if (element.getAttribute(MARKER) !== options.sessionId) return
+    if (element.getAttribute(OWNER) !== options.sessionId) return
     const reference = referenceIn(element)
     if (reference === undefined) return
     const key = referenceKey(reference)
@@ -159,7 +186,7 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     if (!parsed.success || parsed.data.sessionId !== options.sessionId || parsed.data.cwd !== options.cwd) return
     const key = referenceKey(parsed.data.reference)
     titles.set(key, parsed.data.title)
-    for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${MARKER}]`) ?? []) {
+    for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${OWNER}]`) ?? []) {
       const reference = referenceIn(element)
       const source = element.getAttribute(SOURCE)
       if (reference === undefined || source === null || referenceKey(reference) !== key) continue
@@ -214,8 +241,8 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   const markLinks = (codes: Iterable<Element>): void => {
     for (const element of codes) {
       if (element.closest('[data-composer-card]') !== null) continue
-      const marked = element.getAttribute(MARKER) === options.sessionId
-      const text = element.textContent ?? ''
+      const marked = element.getAttribute(OWNER) === options.sessionId
+      const text = displayLabelIn(element)
       const source = element.getAttribute(SOURCE)
       const label = element.getAttribute(LABEL)
       const written = source !== null && label === text ? source : text
@@ -225,13 +252,8 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
         continue
       }
       if (!marked) {
-        // Native semantics win: this only ever adds link behaviour to code that carries none.
         if (element.hasAttribute('role') || element.hasAttribute('tabindex')) continue
-        if (element.hasAttribute('aria-label')) element.setAttribute(ORIGINAL_ARIA_LABEL, element.getAttribute('aria-label') ?? '')
-        if (element.hasAttribute('title')) element.setAttribute(ORIGINAL_TITLE, element.getAttribute('title') ?? '')
-        element.setAttribute(MARKER, options.sessionId)
-        element.setAttribute('role', 'link')
-        element.setAttribute('tabindex', '0')
+        element.setAttribute(OWNER, options.sessionId)
       }
       if (written.trim().startsWith(CHAT_REFERENCE_PREFIX)) element.setAttribute(PREFIXED, '')
       else element.removeAttribute(PREFIXED)
@@ -271,6 +293,14 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   let frame = 0
   const pending = new Set<Element>()
   const observer = new MutationObserver(records => {
+    const templateAdded = records.some(record =>
+      [...record.addedNodes].some(
+        node => node instanceof Element && (node.matches(REFERENCE_CHIP_TEMPLATE_WRAPPER) || node.querySelector(REFERENCE_CHIP_TEMPLATE) !== null),
+      ),
+    )
+    if (templateAdded) {
+      for (const code of ownConversation(options.sessionId)?.querySelectorAll('code') ?? []) pending.add(code)
+    }
     for (const element of dirtyCodes(records)) pending.add(element)
     if (pending.size === 0 || frame !== 0) return
     frame = requestAnimationFrame(() => {
@@ -303,14 +333,6 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     window.removeEventListener('focusin', onFocusIn)
     window.removeEventListener('focusout', onFocusOut)
     window.removeEventListener(chatReferenceTitleResolvedEvent, onTitleResolved)
-    for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${MARKER}]`) ?? []) {
-      const source = element.getAttribute(SOURCE)
-      const label = element.getAttribute(LABEL)
-      if (source !== null && label === (element.textContent ?? '')) element.textContent = source
-      else if (element.hasAttribute(PREFIXED) && !(element.textContent ?? '').trim().startsWith(CHAT_REFERENCE_PREFIX)) {
-        element.textContent = `${CHAT_REFERENCE_PREFIX}${element.textContent ?? ''}`
-      }
-      unmark(element)
-    }
+    for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${OWNER}]`) ?? []) unmark(element)
   }
 }

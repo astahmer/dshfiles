@@ -1,18 +1,38 @@
 @source './';
 @source '../../project-folder-picker/src';
 
-code[data-dshfiles-jj-reference][role='link'] {
+code[data-dshfiles-jj-reference-owner] {
   background-color: transparent;
   border-radius: 0;
-  color: var(--dsw-alias-state-business-primary);
-  cursor: pointer;
+  color: inherit;
   font: inherit;
   padding: 0;
-  text-decoration-line: underline;
-  text-decoration-style: dotted;
 }
 
-code[data-dshfiles-jj-reference][role='link']:hover,
-code[data-dshfiles-jj-reference][role='link']:focus-visible {
-  text-decoration-style: solid;
+[data-dshfiles-jj-reference] {
+  color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+  display: inline;
+  font: inherit;
+  font-weight: 500;
+  margin: 0 2px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: inherit;
+  white-space: inherit;
+}
+
+[data-dshfiles-jj-reference-label] {
+  display: inline-block;
+  max-width: min(32ch, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+[data-dshfiles-jj-reference]:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
 }

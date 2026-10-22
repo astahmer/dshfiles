@@ -1,3 +1,4 @@
+import { ReferenceChip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
@@ -21,10 +22,10 @@ const titleRequestKey = (request: ChatReferenceTitleRequest): string =>
   `${request.sessionId}\u0000${request.cwd}\u0000${request.reference.kind}\u0000${request.reference.value}`
 
 /**
- * The revision-graph preview for a `jj:` reference in chat. The reference itself is a native `<code>` node this plugin
- * decorated, so the request arrives as a window event carrying the card's anchor; one overlay serves every message.
+ * The revision-graph preview for a `jj:` reference in chat. A native session-reference chip lives inside its code node;
+ * the request arrives as a window event carrying the chip's anchor, so one overlay serves every message.
  */
-export const ChatReferenceOverlay = (): JSX.Element | null => {
+export const ChatReferenceOverlay = (): JSX.Element => {
   const api = useApi(jujutsuApi)
   const [request, setRequest] = useState<ChatReferencePreviewRequest | null>(null)
   const [titleRequests, setTitleRequests] = useState<ChatReferenceTitleRequest[]>([])
@@ -126,73 +127,79 @@ export const ChatReferenceOverlay = (): JSX.Element | null => {
     setTitleRequests(current => (current[0] !== undefined && titleRequestKey(current[0]) === completedKey ? current.slice(1) : current))
   }, [titleGraph.data, titleGraph.isError, titleGraph.isFetching, titleGraph.isSuccess, titleRepository.isError, titleRequest])
 
-  if (request === null) return null
   const referenceGraph = graph.data !== undefined && 'graph' in graph.data ? graph.data : undefined
   const failure = graph.data !== undefined && 'failure' in graph.data ? graph.data.failure.message : undefined
   const rendered = referenceGraph?.graph
   return (
-    <Popover open onOpenChange={open => !open && setRequest(null)}>
-      <PopoverAnchor asChild>
-        <span
-          aria-hidden
-          style={{
-            position: 'fixed',
-            display: 'block',
-            left: request.anchor.left,
-            top: request.anchor.top,
-            width: Math.max(1, request.anchor.width),
-            height: Math.max(1, request.anchor.height),
-            pointerEvents: 'none',
-          }}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        className="dshx-root dshx:w-[34rem] dshx:max-w-[calc(100vw-1rem)]"
-        data-dshfiles-jj-preview
-        onPointerEnter={() => {
-          if (closeTimer.current === undefined) return
-          window.clearTimeout(closeTimer.current)
-          closeTimer.current = undefined
-        }}
-        onPointerLeave={() => setRequest(null)}
-        side="bottom"
-        sideOffset={6}
-      >
-        <PopoverHeader>
-          <PopoverTitle>Revision graph · {request.reference.value}</PopoverTitle>
-        </PopoverHeader>
-        {referenceGraph === undefined ? null : (
-          <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-xs dshx:text-muted-foreground">
-            {referenceGraph.commitId === null ? null : (
-              <span>
-                Commit ID: <code title={referenceGraph.commitId}>{referenceGraph.commitId.slice(0, 8)}</code>
-              </span>
+    <>
+      <span aria-hidden="true" data-composer-card data-dshfiles-jj-reference-template hidden>
+        <ReferenceChip appearance="session" label="Jujutsu reference" title="Jujutsu reference" />
+      </span>
+      {request === null ? null : (
+        <Popover open onOpenChange={open => !open && setRequest(null)}>
+          <PopoverAnchor asChild>
+            <span
+              aria-hidden
+              style={{
+                position: 'fixed',
+                display: 'block',
+                left: request.anchor.left,
+                top: request.anchor.top,
+                width: Math.max(1, request.anchor.width),
+                height: Math.max(1, request.anchor.height),
+                pointerEvents: 'none',
+              }}
+            />
+          </PopoverAnchor>
+          <PopoverContent
+            align="start"
+            className="dshx-root dshx:w-[34rem] dshx:max-w-[calc(100vw-1rem)]"
+            data-dshfiles-jj-preview
+            onPointerEnter={() => {
+              if (closeTimer.current === undefined) return
+              window.clearTimeout(closeTimer.current)
+              closeTimer.current = undefined
+            }}
+            onPointerLeave={() => setRequest(null)}
+            side="bottom"
+            sideOffset={6}
+          >
+            <PopoverHeader>
+              <PopoverTitle>Revision graph · {request.reference.value}</PopoverTitle>
+            </PopoverHeader>
+            {referenceGraph === undefined ? null : (
+              <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-xs dshx:text-muted-foreground">
+                {referenceGraph.commitId === null ? null : (
+                  <span>
+                    Commit ID: <code title={referenceGraph.commitId}>{referenceGraph.commitId.slice(0, 8)}</code>
+                  </span>
+                )}
+                {referenceGraph.changeId === null ? null : (
+                  <span>
+                    Change ID: <code>{referenceGraph.changeId}</code>
+                  </span>
+                )}
+              </div>
             )}
-            {referenceGraph.changeId === null ? null : (
-              <span>
-                Change ID: <code>{referenceGraph.changeId}</code>
-              </span>
+            {graph.isPending || repository.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading revisions…</p> : null}
+            {graph.isError ? (
+              <p className="dshx:text-xs dshx:text-destructive" role="alert">
+                {errorMessage(graph.error, 'That reference could not be read.')}
+              </p>
+            ) : null}
+            {failure === undefined ? null : (
+              <p className="dshx:text-xs dshx:text-destructive" role="alert">
+                {failure}
+              </p>
             )}
-          </div>
-        )}
-        {graph.isPending || repository.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading revisions…</p> : null}
-        {graph.isError ? (
-          <p className="dshx:text-xs dshx:text-destructive" role="alert">
-            {errorMessage(graph.error, 'That reference could not be read.')}
-          </p>
-        ) : null}
-        {failure === undefined ? null : (
-          <p className="dshx:text-xs dshx:text-destructive" role="alert">
-            {failure}
-          </p>
-        )}
-        {rendered === undefined ? null : (
-          <pre aria-label="Revision graph" className="dshx:max-h-72 dshx:overflow-auto dshx:font-mono dshx:text-xs dshx:leading-4">
-            {rendered}
-          </pre>
-        )}
-      </PopoverContent>
-    </Popover>
+            {rendered === undefined ? null : (
+              <pre aria-label="Revision graph" className="dshx:max-h-72 dshx:overflow-auto dshx:font-mono dshx:text-xs dshx:leading-4">
+                {rendered}
+              </pre>
+            )}
+          </PopoverContent>
+        </Popover>
+      )}
+    </>
   )
 }

@@ -9,9 +9,15 @@ import {
 } from './chat-reference.js'
 import { installChatReferenceLinks } from './chat-reference-links.js'
 
-const sessionMarkup = (inner: string): string => `<div data-conversation-session="session-1">${inner}</div>`
+const referenceChipTemplate =
+  '<span aria-hidden="true" data-composer-card data-dshfiles-jj-reference-template hidden><span class="native-session-reference" data-ref-chip="session"><svg class="native-reference-icon"></svg>Session reference</span></span>'
 
-const marked = (): readonly (string | null)[] => [...document.querySelectorAll('code[data-dshfiles-jj-reference]')].map(element => element.textContent)
+const sessionMarkup = (inner: string, includeTemplate = true): string =>
+  `${includeTemplate ? referenceChipTemplate : ''}<div data-conversation-session="session-1">${inner}</div>`
+
+const marked = (): readonly (string | null)[] => [...document.querySelectorAll('code[data-dshfiles-jj-reference-owner]')].map(element => element.textContent)
+
+const chipIn = (element: Element | null | undefined): HTMLElement | null => element?.querySelector<HTMLElement>('[data-dshfiles-jj-reference]') ?? null
 
 const click = (element: Element | null | undefined): void => void element?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
 
@@ -36,14 +42,34 @@ describe('chat reference links', () => {
     const stop = install(onOpen)
 
     expect(marked()).toEqual(['main', '94526da8', 'main'])
-    const link = document.querySelector('code[data-dshfiles-jj-reference]')
+    const code = document.querySelector('code[data-dshfiles-jj-reference-owner]')
+    const link = chipIn(code)
     expect(link?.getAttribute('role')).toBe('link')
     expect(link?.getAttribute('tabindex')).toBe('0')
-    expect(link?.getAttribute('data-dshfiles-jj-prefixed')).toBe('')
+    expect(link?.className).toBe('native-session-reference')
+    expect(link?.querySelector('svg.native-reference-icon')).not.toBeNull()
+    expect(link?.getAttribute('data-ref-chip')).toBeNull()
+    expect(code?.getAttribute('data-dshfiles-jj-prefixed')).toBe('')
     stop()
   })
 
-  it('shows a truncated revision title and keeps its full accessible name and reference', async () => {
+  it('upgrades an early reference when the native session-chip template mounts', async () => {
+    const onOpen = vi.fn()
+    document.body.innerHTML = sessionMarkup('<code>jj:main</code>', false)
+    const stop = install(onOpen)
+    const code = document.querySelector('code')
+    expect(chipIn(code)?.querySelector('svg')).toBeNull()
+
+    document.body.insertAdjacentHTML('afterbegin', referenceChipTemplate)
+    await settleMarks()
+
+    const link = chipIn(code)
+    expect(link?.className).toBe('native-session-reference')
+    expect(link?.querySelector('svg.native-reference-icon')).not.toBeNull()
+    stop()
+  })
+
+  it('uses the native reference chip and keeps the full accessible title', async () => {
     const onOpen = vi.fn()
     const title = 'a'.repeat(80)
     let request: unknown
@@ -53,8 +79,9 @@ describe('chat reference links', () => {
     window.addEventListener(chatReferenceTitleRequestEvent, onRequest)
     document.body.innerHTML = sessionMarkup('<code>jj:main</code>')
     const stop = install(onOpen)
-    const link = document.querySelector('code')
-    if (link === null) throw new Error('No code element')
+    const code = document.querySelector('code')
+    const link = chipIn(code)
+    if (code === null || link === null) throw new Error('No reference chip')
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
     expect(request).toEqual({ sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' } })
@@ -73,13 +100,16 @@ describe('chat reference links', () => {
     expect(link.textContent).toBe(`${'a'.repeat(51)}…`)
     expect(link.getAttribute('title')).toBe(title)
     expect(link.getAttribute('aria-label')).toBe(`Jujutsu bookmark: ${title} (main)`)
+    expect(link.getAttribute('data-ref-chip')).toBeNull()
+    expect(link.querySelector('svg.native-reference-icon')).not.toBeNull()
     click(link)
     expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' })
 
     stop()
-    expect(link.textContent).toBe('jj:main')
-    expect(link.getAttribute('title')).toBeNull()
-    expect(link.getAttribute('aria-label')).toBeNull()
+    expect(code.textContent).toBe('jj:main')
+    expect(code.querySelector('[data-dshfiles-jj-reference]')).toBeNull()
+    expect(code.getAttribute('title')).toBeNull()
+    expect(code.getAttribute('aria-label')).toBeNull()
     window.removeEventListener(chatReferenceTitleRequestEvent, onRequest)
   })
 
@@ -87,14 +117,16 @@ describe('chat reference links', () => {
     const onOpen = vi.fn()
     document.body.innerHTML = sessionMarkup('<code>jj:main</code><code>pnpm</code>')
     const stop = install(onOpen)
+    const codes = document.querySelectorAll('code')
+    const link = chipIn(codes[0])
 
-    click(document.querySelectorAll('code')[0])
+    click(link)
     expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' })
 
-    document.querySelectorAll('code')[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+    link?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
     expect(onOpen).toHaveBeenCalledTimes(2)
 
-    click(document.querySelectorAll('code')[1])
+    click(codes[1])
     expect(onOpen).toHaveBeenCalledTimes(2)
     stop()
   })
@@ -103,13 +135,16 @@ describe('chat reference links', () => {
     const onOpen = vi.fn()
     const requests: unknown[] = []
     let dismissals = 0
-    const onRequest = (event: Event): void => void requests.push((event as CustomEvent).detail)
+    const onRequest = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return
+      requests.push(event.detail)
+    }
     const onDismiss = (): void => void (dismissals += 1)
     window.addEventListener(chatReferencePreviewEvent, onRequest)
     window.addEventListener(chatReferencePreviewDismissEvent, onDismiss)
     document.body.innerHTML = sessionMarkup('<code>jj:main</code>')
     const stop = install(onOpen)
-    const link = document.querySelector('code')
+    const link = chipIn(document.querySelector('code'))
 
     link?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
     await settlePreview()
@@ -128,18 +163,19 @@ describe('chat reference links', () => {
     const onOpen = vi.fn()
     document.body.innerHTML = sessionMarkup('<code>jj:main</code>')
     const stop = install(onOpen)
-    const link = document.querySelector('code')
-    if (link === null) throw new Error('No code element')
-    expect(link.textContent).toBe('main')
+    const code = document.querySelector('code')
+    if (code === null) throw new Error('No code element')
+    expect(code.textContent).toBe('main')
 
-    link.textContent = 'jj:main'
+    code.textContent = 'jj:main'
     await settleMarks()
-    expect(link.textContent).toBe('main')
+    expect(code.textContent).toBe('main')
 
-    link.textContent = 'jj:two words'
+    code.textContent = 'jj:two words'
     await settleMarks()
-    expect(link.textContent).toBe('jj:two words')
-    expect(link.getAttribute('role')).toBeNull()
+    expect(code.textContent).toBe('jj:two words')
+    expect(code.getAttribute('role')).toBeNull()
+    expect(chipIn(code)).toBeNull()
     expect(marked()).toHaveLength(0)
     stop()
   })
@@ -160,6 +196,7 @@ describe('chat reference links', () => {
     stop()
     expect(marked()).toHaveLength(0)
     expect(document.querySelectorAll('code[role="link"]')).toHaveLength(0)
+    expect(document.querySelectorAll('[data-dshfiles-jj-reference][role="link"]')).toHaveLength(0)
   })
 
   it('rescans only the code that changed, not the whole conversation', async () => {
@@ -175,7 +212,7 @@ describe('chat reference links', () => {
     await settleMarks()
 
     expect(scans).not.toHaveBeenCalled()
-    expect(changed.getAttribute('data-dshfiles-jj-reference')).toBeNull()
+    expect(changed.getAttribute('data-dshfiles-jj-reference-owner')).toBeNull()
     expect(marked()).toEqual(['94526da8'])
     scans.mockRestore()
     stop()
