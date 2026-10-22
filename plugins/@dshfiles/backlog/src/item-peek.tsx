@@ -537,11 +537,14 @@ const CommentBox = (props: {
       // A dispatched reply carries its images with the item, so the thread can read them once it starts.
       for (const file of files) await actions.attachFile.mutateAsync({ id: props.item.id, file: fileInput(file) })
       if (files.length > 0) attachments.clear()
+      setText('')
       const outcome = await dispatch.dispatch({ item: props.item, text, open: props.openCreatedByDefault })
-      if (outcome.kind === 'dispatched') setText('')
-      else if (outcome.kind === 'failed') setFailed(outcome.reason)
-      else comment([])
+      if (outcome.kind === 'failed') {
+        setText(current => (current === '' ? text : current))
+        setFailed(outcome.reason)
+      } else if (outcome.kind === 'skipped') comment([])
     } catch (error) {
+      setText(current => (current === '' ? text : current))
       setFailed(errorMessage(error, 'The reply was not sent.'))
     } finally {
       setPending(false)
