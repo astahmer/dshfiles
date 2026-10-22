@@ -1,11 +1,8 @@
 @source './';
 
 [data-dshfiles-memory-reference] {
+  color: var(--dsw-alias-state-business-primary);
   cursor: pointer;
-}
-
-[data-dshfiles-memory-reference]:hover,
-[data-dshfiles-memory-reference]:focus-visible {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
