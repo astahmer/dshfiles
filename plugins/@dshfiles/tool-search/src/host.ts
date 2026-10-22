@@ -7,14 +7,16 @@ import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { ToolSearchModel } from './search.js'
+import { serializedSchemaBytes } from './schema-measurement.js'
 
 const configSchema = z
   .object({
     alwaysVisible: z.array(z.string()).default([]),
     maxResults: z.number().int().positive().max(100).default(5),
     maxQueryChars: z.number().int().positive().max(4096).default(512),
+    reportSchemaMetrics: z.boolean().default(false),
   })
-  .default({ alwaysVisible: [], maxResults: 5, maxQueryChars: 512 })
+  .default({ alwaysVisible: [], maxResults: 5, maxQueryChars: 512, reportSchemaMetrics: false })
 
 type ToolSearchStatus = 'loaded' | 'already_loaded' | 'unavailable'
 
@@ -41,8 +43,22 @@ export default definePlugin({
     const alwaysVisible = ToolSearchModel.compileAlwaysVisible(config.alwaysVisible)
     const states = new Map<Agent, AgentState>()
     let ownRegistryChanges = 0
+    let lastSchemaReport: string | undefined
 
     const globals = (): Map<string, ToolSchema> => new Map(ctx.tools.schemas().map(schema => [schema.name, schema]))
+    const reportGlobalSchemas = (): void => {
+      if (!config.reportSchemaMetrics) return
+      const schemas = ctx.tools.schemas()
+      const schemaJson = JSON.stringify(schemas)
+      const report = JSON.stringify({
+        event: 'tool-search.schema-report',
+        toolCount: schemas.length,
+        schemaBytes: serializedSchemaBytes(schemaJson),
+      })
+      if (report === lastSchemaReport) return
+      lastSchemaReport = report
+      console.warn(report)
+    }
     const ownedMutation = <Value>(operation: () => Value): Value => {
       ownRegistryChanges += 1
       try {
@@ -192,11 +208,13 @@ export default definePlugin({
     })
     const disposeRegistry = ctx.on('tools/change', () => {
       if (ownRegistryChanges > 0) return
+      reportGlobalSchemas()
       for (const state of states.values()) {
         refreshCatalog(state)
         refreshRestriction(state)
       }
     })
+    reportGlobalSchemas()
     for (const agent of ctx.agents.list()) install(agent)
     ctx.effect(
       () => async () => {

@@ -10,6 +10,7 @@ import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import toolSearch from './host.js'
+import { serializedSchemaBytes } from './schema-measurement.js'
 
 interface ObservedRequest {
   readonly toolNames: readonly string[]
@@ -53,7 +54,7 @@ class ScriptedToolSearchAdapter extends LlmAdapter {
     const tools = options.tools ?? []
     this.requests.push({
       toolNames: tools.map(tool => tool.name).sort(),
-      schemaBytes: JSON.stringify(tools).length,
+      schemaBytes: serializedSchemaBytes(JSON.stringify(tools)),
       toolsTokens: breakdown.breakdown.toolsTokens,
     })
 

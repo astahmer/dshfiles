@@ -15,9 +15,10 @@ This package is not included in the web profile by default. Add `@dshfiles/tool-
     alwaysVisible: [read_file, todo_*]
     maxResults: 5
     maxQueryChars: 512
+    reportSchemaMetrics: false
 ```
 
-`alwaysVisible` accepts trimmed tool names with `*` as the only wildcard. `maxResults` must be an integer from 1 through 100; `maxQueryChars` must be an integer from 1 through 4096. Defaults are `[]`, `5`, and `512`.
+`alwaysVisible` accepts trimmed tool names with `*` as the only wildcard. `maxResults` must be an integer from 1 through 100; `maxQueryChars` must be an integer from 1 through 4096. Defaults are `[]`, `5`, and `512`. `reportSchemaMetrics` defaults to `false`; set it to `true` only for an isolated measurement profile.
 
 ## Behavior and safety
 
@@ -64,6 +65,8 @@ Each direct request carried 31,488 estimated tool tokens, near the observed base
 DSH_TOOL_SEARCH_MEASURE=1 fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/provider-benchmark.test.ts
 ```
 
+A temporary instrumented build of the isolated full-profile scratch boot (211 active entries; all 56 bundles under test loaded) recorded a final global catalog of 203 tool schemas and 95,177 UTF-8 bytes of serialized schemas. The final report was the last of 204 registry snapshots. This measures schema payload size only—not provider tokenization or task quality. The opt-in `reportSchemaMetrics` config defaults to false and reports aggregate counts and byte totals only; it never logs schema names or contents.
+
 The same file includes an opt-in provider benchmark that runs the three synthetic tasks in both modes through OpenCode Go Alex at high reasoning. It is skipped unless `DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1`; tools return only fixture data and record note writes in memory. Each scenario caps requests at three direct or four progressive, disables retries, and caps output at 1,024 tokens. It reports schema bytes, local tool-token and context estimates, provider-reported usage, tool selection, and latency without logging prompts, response text, or credentials. It disables the default Harness identity and runtime-context snapshots so only the synthetic system instruction, prompts, and schemas are sent.
 
 Run only when real provider usage is intended. Use `secret run` to inject project aliases; its leak guard scrubs known secret values from child stdout/stderr:
@@ -72,7 +75,7 @@ Run only when real provider usage is intended. Use `secret run` to inject projec
 DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1 secret run -- fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/provider-benchmark.test.ts
 ```
 
-The authorized follow-up run resolved the alias but OpenCode Go returned `AUTH` on the first direct request, with zero usage and no tool call. The early-stop guard prevented the progressive and remaining tasks. DSH account status reported OpenCode Go Alex signed in and healthy, so that status alone does not validate this API credential. Provider-backed A/B results remain unavailable; do not retry until the credential or route is corrected.
+Both authorized provider attempts resolved the alias but OpenCode Go returned `AUTH` on the first direct request, with zero usage and no tool call; the second failed after 544 ms with zero provider tokens. The early-stop guard prevented the progressive and remaining tasks on each attempt. DSH account status reported OpenCode Go Alex signed in and healthy, so that status alone does not validate this API credential. Provider-backed A/B results remain unavailable; do not retry until the credential or route is corrected.
 
 These synthetic tasks do not establish full-profile savings, cache impact, or production-level economics; do not enable progressive disclosure profile-wide from this fixture alone.
 

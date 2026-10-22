@@ -13,6 +13,7 @@ interface ToolSearchConfig {
   readonly alwaysVisible?: readonly string[]
   readonly maxResults?: number
   readonly maxQueryChars?: number
+  readonly reportSchemaMetrics?: boolean
 }
 
 interface AgentEvent {
@@ -64,7 +65,7 @@ const schema = (name: string, description: string): ToolSchema => ({
   parameters: { type: 'object', properties: {} },
 })
 
-const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly string[] } = {}) => {
+const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly string[]; readonly config?: ToolSearchConfig } = {}) => {
   const schemas = new Map<string, ToolSchema>([
     ['read_file', schema('read_file', 'Read a workspace file')],
     ['write_file', schema('write_file', 'Write a workspace file')],
@@ -164,7 +165,7 @@ const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly st
       effects.push(setup())
     },
   }
-  plugin.apply(root, { maxResults: 3 })
+  plugin.apply(root, { maxResults: 3, ...(options.config ?? {}) })
   const searchTool = (agent: TestAgent): RegisteredTool => {
     const tool = scopedTools.get(agent)?.get('tool_search')
     if (tool === undefined) throw new Error('tool_search was not registered')
@@ -205,6 +206,30 @@ const harness = (plugin: BuiltPlugin, options: { readonly restored?: readonly st
 }
 
 describe('tool-search host integration', () => {
+  it('reports only aggregate schema metadata when explicitly enabled', async () => {
+    const reports: string[] = []
+    const originalWarn = console.warn
+    console.warn = (...values: Parameters<typeof console.warn>) => {
+      const report = values[0]
+      if (report !== undefined) reports.push(String(report))
+    }
+
+    try {
+      const defaultRuntime = harness(await loadPlugin())
+      await defaultRuntime.dispose()
+      expect(reports).toEqual([])
+
+      const enabledRuntime = harness(await loadPlugin(), { config: { reportSchemaMetrics: true } })
+      await enabledRuntime.dispose()
+      expect(reports).toHaveLength(1)
+      expect(reports[0]?.startsWith('{"event":"tool-search.schema-report","toolCount":3,"schemaBytes":')).toBe(true)
+      expect(reports[0]?.split(',')).toHaveLength(3)
+      expect(reports[0]?.endsWith('}')).toBe(true)
+    } finally {
+      console.warn = originalWarn
+    }
+  })
+
   it('keeps discovery isolated per agent and loads a matching global tool', async () => {
     const runtime = harness(await loadPlugin())
     const first = runtime.agents[0]!

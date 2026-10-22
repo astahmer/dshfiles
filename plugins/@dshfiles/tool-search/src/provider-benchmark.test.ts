@@ -23,6 +23,7 @@ import { PiAiAdapter, type ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { describe, expect, it } from 'vitest'
 import toolSearch from './host.js'
+import { serializedSchemaBytes } from './schema-measurement.js'
 
 const provider = 'opencode-go-alex'
 const model = 'deepseek-v4.1-flash'
@@ -128,7 +129,7 @@ class ScriptedBenchmarkAdapter extends LlmAdapter {
     const tools = options.tools ?? []
     const request: ProviderRequestMeasurement = {
       toolNames: tools.map(tool => tool.name).sort(),
-      schemaBytes: JSON.stringify(tools).length,
+      schemaBytes: serializedSchemaBytes(JSON.stringify(tools)),
       toolsTokens: breakdown.breakdown.toolsTokens,
       contextTokens: breakdown.breakdown.systemTokens + breakdown.breakdown.messageTokens + breakdown.breakdown.toolsTokens,
       elapsedMs: 0,
@@ -234,7 +235,7 @@ class MeasuredOpenCodeGoAdapter extends PiAiAdapter {
     const tools = options.tools ?? []
     const request: ProviderRequestMeasurement = {
       toolNames: tools.map(tool => tool.name).sort(),
-      schemaBytes: JSON.stringify(tools).length,
+      schemaBytes: serializedSchemaBytes(JSON.stringify(tools)),
       toolsTokens: breakdown.breakdown.toolsTokens,
       contextTokens: breakdown.breakdown.systemTokens + breakdown.breakdown.messageTokens + breakdown.breakdown.toolsTokens,
       elapsedMs: 0,
