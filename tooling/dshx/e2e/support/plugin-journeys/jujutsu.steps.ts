@@ -359,11 +359,15 @@ When('the repository actions menu opens the workspace cleanup', async ({ page }:
   await expect(page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
 })
 
-Then('the cleanup previews idle workspaces without removing anything', async ({ page }: { page: Page }) => {
+Then('a custom cleanup threshold previews workspaces without removing anything', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
   const dialog = page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })
-  await recordAssertion(page, 'jujutsu-cleanup-previews-before-removing', async () =>
-    expect(dialog.getByText(/Would abandon \d+ dangling empty revision/)).toBeVisible({ timeout: 20_000 }),
+  const customHours = dialog.getByRole('spinbutton', { name: 'Custom hours', exact: true })
+  await customHours.fill('12')
+  await expect(customHours).toHaveValue('12')
+  await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'false')
+  await recordAssertion(page, 'jujutsu-cleanup-custom-threshold-previews-before-removing', async () =>
+    expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 }),
   )
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(dialog).toBeHidden()

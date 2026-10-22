@@ -447,7 +447,7 @@
     {
       "id": "workspace-cleanup",
       "title": "Remove idle thread workspaces in the background",
-      "summary": "The repository menu's Clean up thread workspaces dialog previews what qualifies, then starts a background removal job that survives closing the panel: a trail under the panel header reports scanning, each removed or kept workspace, the empty revisions it abandons, and keeps the last result until dismissed.",
+      "summary": "The repository menu's Clean up thread workspaces dialog accepts 1-, 6-, and 24-hour presets or a custom whole-hour inactivity threshold, previews what qualifies, then starts a background removal job that survives closing the panel: a trail under the panel header reports scanning, each removed or kept workspace, the empty revisions it abandons, and keeps the last result until dismissed.",
       "reach": [
         "click button \"Jujutsu\"",
         "click button \"Choose repository\"",
@@ -456,12 +456,16 @@
         "press Enter",
         "click button \"Repository actions\"",
         "click menuitem \"Clean up thread workspaces\u2026\"",
-        "expect text \"Clean up thread workspaces\""
+        "expect text \"Clean up thread workspaces\"",
+        "fill spinbutton \"Custom hours\" \"12\"",
+        "expect spinbutton \"Custom hours\"",
+        "expect text \"0 empty revisions will be abandoned.\""
       ],
       "surfaces": ["client", "host"],
       "configuration": [],
-      "states": ["preview", "queued", "running", "done", "failed"],
+      "states": ["preset-threshold", "custom-threshold", "invalid-threshold", "preview", "queued", "running", "done", "failed"],
       "failureModes": [
+        "A custom inactivity threshold must be a positive whole number of hours.",
         "A workspace with unlanded work, a busy Session or a queued integration is kept.",
         "A second click on the same scope attaches to the job already running instead of queuing it twice.",
         "A Host restart drops the trail with the job; what it already removed stays removed."

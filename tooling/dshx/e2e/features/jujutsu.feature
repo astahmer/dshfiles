@@ -100,4 +100,4 @@ Feature: Jujutsu revision interactions
     Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration" is booted
     When a disposable Jujutsu repository is selected
     And the repository actions menu opens the workspace cleanup
-    Then the cleanup previews idle workspaces without removing anything
+    Then a custom cleanup threshold previews workspaces without removing anything

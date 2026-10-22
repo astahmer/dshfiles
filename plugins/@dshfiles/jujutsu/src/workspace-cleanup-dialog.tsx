@@ -1,6 +1,7 @@
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -9,6 +10,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type CleanupKindView, type CleanupResult } from '@dshfiles/jj-integration/api'
 import { useState } from 'react'
 import { CleanupJobTrailModel, cleanupJobsKey, requestWorkspaceCleanup, useCleanupJobs } from './cleanup-jobs-queries.js'
+import { WorkspaceCleanupSummary } from './workspace-cleanup-summary.js'
 
 const AGE_CHOICES = [
   { hours: 1, label: '1h' },
@@ -21,15 +23,6 @@ const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: s
   { kind: 'integrated', label: 'Already integrated', hint: 'landed, nothing left' },
   { kind: 'untracked', label: 'Untracked folders', hint: 'folders and files in the threads directory no jj workspace owns' },
 ]
-
-const SKIP_LABELS = {
-  'has-work': 'unlanded work',
-  busy: 'thread working',
-  'activity-unknown': 'activity unknown',
-  queued: 'integration queued',
-  'too-recent': 'used recently',
-  'kind-excluded': 'kind not selected',
-} satisfies Record<CleanupResult['skipped'][number]['reason'], string>
 
 const AGE_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
@@ -56,11 +49,6 @@ const cleanupRows = (result: CleanupResult) => [
   })),
 ]
 
-const skippedSummary = (skipped: CleanupResult['skipped']): string =>
-  [...new Set(skipped.map(workspace => workspace.reason))]
-    .map(reason => `${String(skipped.filter(workspace => workspace.reason === reason).length)} ${SKIP_LABELS[reason]}`)
-    .join(' · ')
-
 export const WorkspaceCleanupDialog = (props: {
   readonly open: boolean
   readonly path: string
@@ -69,19 +57,27 @@ export const WorkspaceCleanupDialog = (props: {
 }) => {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
-  const [olderThanHours, setOlderThanHours] = useState<number>(6)
+  const [presetHours, setPresetHours] = useState<number | null>(6)
+  const [customHours, setCustomHours] = useState('')
+  const olderThanHours = WorkspaceCleanupSummary.resolveAgeHours({ presetHours, customHours })
   const [kinds, setKinds] = useState<CleanupKindView[]>(['empty', 'integrated', 'untracked'])
-  const request = { path: props.path, olderThanHours, kinds }
+  const request = olderThanHours === undefined ? null : { path: props.path, olderThanHours, kinds }
   const preview = useQuery({
-    queryKey: ['jujutsu', 'workspace-cleanup-preview', request],
-    enabled: props.open && kinds.length > 0,
+    queryKey: ['jujutsu', 'workspace-cleanup-preview', props.path, olderThanHours, kinds],
+    enabled: props.open && olderThanHours !== undefined && kinds.length > 0,
     placeholderData: keepPreviousData,
     retry: false,
-    queryFn: ({ signal }) => api.cleanupWorkspaces({ ...request, apply: false }, { signal }),
+    queryFn: ({ signal }) => {
+      if (olderThanHours === undefined) throw new Error('Enter a whole number of hours greater than 0.')
+      return api.cleanupWorkspaces({ path: props.path, olderThanHours, kinds, apply: false }, { signal })
+    },
   })
   const running = useCleanupJobs().data?.jobs.find(CleanupJobTrailModel.isActive)
   const cleanup = useMutation({
-    mutationFn: () => requestWorkspaceCleanup(api, request),
+    mutationFn: () => {
+      if (request === null) throw new Error('Enter a whole number of hours greater than 0.')
+      return requestWorkspaceCleanup(api, request)
+    },
     // The removal runs on the Host: the dialog is done the moment the job starts, and the panel trail reports the rest.
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: cleanupJobsKey })
@@ -91,7 +87,7 @@ export const WorkspaceCleanupDialog = (props: {
   })
   const toggleKind = (kind: CleanupKindView, checked: boolean): void =>
     setKinds(current => (checked ? [...new Set([...current, kind])] : current.filter(existing => existing !== kind)))
-  const shown = preview.data
+  const shown = olderThanHours === undefined ? undefined : preview.data
   const candidates = shown === undefined ? [] : cleanupRows(shown)
   const removable = shown === undefined ? 0 : shown.workspaces.length + shown.untracked.length
   const emptyRevisionCount = shown?.emptyRevisions.length ?? 0
@@ -109,24 +105,50 @@ export const WorkspaceCleanupDialog = (props: {
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:text-xs">
-          <div className="dshx:flex dshx:items-center dshx:gap-2">
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <span className="dshx:text-muted-foreground">Unused for</span>
             <div aria-label="Unused for at least" className="dshx:flex dshx:gap-1" role="radiogroup">
               {AGE_CHOICES.map(choice => (
                 <Button
-                  aria-checked={olderThanHours === choice.hours}
+                  aria-checked={presetHours === choice.hours}
                   key={choice.hours}
-                  onClick={() => setOlderThanHours(choice.hours)}
+                  onClick={() => {
+                    setPresetHours(choice.hours)
+                    setCustomHours('')
+                  }}
                   role="radio"
                   size="xs"
                   type="button"
-                  variant={olderThanHours === choice.hours ? 'secondary' : 'ghost'}
+                  variant={presetHours === choice.hours ? 'secondary' : 'ghost'}
                 >
                   {choice.label}
                 </Button>
               ))}
             </div>
+            <Label className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:font-normal">
+              Custom
+              <Input
+                aria-invalid={presetHours === null && olderThanHours === undefined}
+                aria-label="Custom hours"
+                className="dshx:h-7 dshx:w-16 dshx:px-2"
+                min={1}
+                onChange={event => {
+                  setPresetHours(null)
+                  setCustomHours(event.currentTarget.value)
+                }}
+                placeholder="Hours"
+                step={1}
+                type="number"
+                value={customHours}
+              />
+              <span className="dshx:text-muted-foreground">h</span>
+            </Label>
           </div>
+          {presetHours === null && olderThanHours === undefined && (
+            <p className="dshx:text-destructive" role="alert">
+              Enter a whole number of hours greater than 0.
+            </p>
+          )}
           <div className="dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1.5">
             {KIND_CHOICES.map(choice => (
               <Label className="dshx:gap-1.5 dshx:text-xs dshx:font-normal" key={choice.kind} title={choice.hint}>
@@ -151,10 +173,14 @@ export const WorkspaceCleanupDialog = (props: {
             ))}
           </div>
           {shown === undefined ? null : (
-            <p className="dshx:text-muted-foreground">
-              Would abandon {String(emptyRevisionCount)} dangling empty revision(s).
-              {shown.skipped.length > 0 && ` Kept ${String(shown.skipped.length)}: ${skippedSummary(shown.skipped)}.`}
-            </p>
+            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-muted-foreground" aria-live="polite">
+              {WorkspaceCleanupSummary.format({
+                emptyRevisionCount,
+                skippedReasons: shown.skipped.map(workspace => workspace.reason),
+              }).map(line => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
           )}
           {running === undefined ? null : (
             <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground" role="status">
@@ -170,15 +196,15 @@ export const WorkspaceCleanupDialog = (props: {
             Cancel
           </Button>
           <Button
-            disabled={nothingToDo || preview.isFetching || cleanup.isPending || kinds.length === 0 || running !== undefined}
+            disabled={olderThanHours === undefined || nothingToDo || preview.isFetching || cleanup.isPending || kinds.length === 0 || running !== undefined}
             onClick={() => cleanup.mutate()}
             size="sm"
             type="button"
             variant="destructive"
           >
             {cleanup.isPending && <Spinner className="dshx:size-3" />}
-            Remove {String(removable)} item(s)
-            {emptyRevisionCount > 0 && ` + ${String(emptyRevisionCount)} revision(s)`}
+            Remove {WorkspaceCleanupSummary.formatCount(removable, 'item', 'items')}
+            {emptyRevisionCount > 0 && ` + ${WorkspaceCleanupSummary.formatCount(emptyRevisionCount, 'revision', 'revisions')}`}
           </Button>
         </DialogFooter>
       </DialogContent>

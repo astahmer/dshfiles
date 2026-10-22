@@ -6,6 +6,8 @@
 
 ![Keep one repository per Jujutsu tab, thread and dock](docs/screenshots/panel-scopes.png)
 
+![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
+
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
@@ -116,6 +118,9 @@ contracts.
   names them — while any other workspace is only forgotten: its folder, files
   and commits stay on disk. `default` is never offered, and a repository keeps
   at least one workspace.
+- Repository actions → Clean up thread workspaces previews idle candidates with
+  1h, 6h, 24h, or a custom positive whole-hour threshold and explains skipped
+  workspaces; removing candidates starts a background job.
 
 ## Graph landmarks and temporary views
 
