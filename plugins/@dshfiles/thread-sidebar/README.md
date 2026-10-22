@@ -29,10 +29,12 @@ or archived), and every move honors Apply actions to child threads. The row
 context menu's Move to group submenu performs the same moves from the keyboard.
 
 **List and board layouts.** The header toggles between the existing thread list and
-an alternate status board. The board keeps the active view's filters and project
-scope, shows all six status lanes (including empty ones), and preserves thread
-row actions; dragging a row between lanes uses the same section move behavior.
-The layout choice is stored in this browser and survives reloads.
+an alternate board. The board has independent grouping, status/source filters,
+project scope, and collapsed groups from the list; it defaults to the six status
+lanes (including empty ones), and can also group its own columns by project, date,
+or no grouping. Thread row actions are unchanged, and dragging between status lanes
+uses the same section move behavior. Both the layout choice and board view state
+are stored in this browser and survive reloads.
 
 **Keyboard and multi-select.** ↑/↓ move focus and open the focused thread (or
 only move focus when Sidebar settings says Move focus only); Shift+↑/↓ extends a

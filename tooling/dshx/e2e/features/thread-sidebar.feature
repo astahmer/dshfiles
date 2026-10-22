@@ -28,10 +28,10 @@ Feature: Thread sidebar journeys
     Then the thread is settled, opens read-only and unsettles to reply
 
   @scenario:thread-sidebar.board-view
-  Scenario: Switch between thread list and status board layouts
+  Scenario: Switch between thread list and an independent board view
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When the sidebar board layout is selected
-    Then all six thread status lanes are shown and the layout choice survives reload
+    Then board grouping and filters persist independently from the thread list
 
   @scenario:thread-sidebar.section-order
   Scenario: Reorder the sidebar sections by dragging a header

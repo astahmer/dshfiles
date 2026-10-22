@@ -493,20 +493,42 @@ When('the sidebar board layout is selected', async ({ page }: { page: Page }) =>
   await threadSidebar(page).getByRole('button', { name: 'Board layout', exact: true }).click()
 })
 
-Then('all six thread status lanes are shown and the layout choice survives reload', async ({ page }: { page: Page }) => {
+Then('board grouping and filters persist independently from the thread list', async ({ page }: { page: Page }) => {
   const sidebar = threadSidebar(page)
-  const columns = sidebar.getByRole('region', { name: /column$/u })
-  await recordAssertion(page, 'thread-sidebar-board-has-six-status-lanes', async () => {
-    await expect(columns).toHaveCount(6)
+  await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
+    await expect(sidebar.getByRole('region', { name: /column$/u })).toHaveCount(6)
     await expect(sidebar.getByRole('button', { name: 'Board layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
   })
+
+  await selectThreadViewValue(page, 'Group: Status', 'Project')
+  await selectThreadViewValue(page, 'Filter: None', 'Working')
+  await selectThreadViewValue(page, 'Filter: Working', 'Subagent threads')
+  await sidebar.getByRole('button', { name: 'All projects', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Unassigned', exact: true }).click()
+  await expect(sidebar.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
+
   await page.reload()
-  await expect(threadSidebar(page)).toBeVisible()
-  await expect(threadSidebar(page).getByRole('region', { name: /column$/u })).toHaveCount(6)
-  await expect(threadSidebar(page).getByRole('button', { name: 'Board layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await threadSidebar(page).getByRole('button', { name: 'List layout', exact: true }).click()
-  await expect(threadSidebar(page).getByRole('region', { name: /column$/u })).toHaveCount(0)
-  await expect(threadSidebar(page).getByRole('button', { name: 'List layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  const reloadedSidebar = threadSidebar(page)
+  await expect(reloadedSidebar).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
+
+  await reloadedSidebar.getByRole('button', { name: 'List layout', exact: true }).click()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: None', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'All projects', exact: true })).toBeVisible()
+
+  await reloadedSidebar.getByRole('button', { name: 'Board layout', exact: true }).click()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Unassigned', exact: true })).toBeVisible()
+  await reloadedSidebar.getByRole('button', { name: 'List layout', exact: true }).click()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'Filter: None', exact: true })).toBeVisible()
+  await expect(reloadedSidebar.getByRole('button', { name: 'All projects', exact: true })).toBeVisible()
   await finishJourneyAssertions(page)
 })
 
