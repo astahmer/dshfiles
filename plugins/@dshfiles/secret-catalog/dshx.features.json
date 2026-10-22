@@ -354,6 +354,57 @@
           "testName": "recognizes only the Backlog Jev secret setting as a setup target"
         }
       ]
+    },
+    {
+      "id": "backlog-jev-chat-setup",
+      "title": "Set up a Jev key from chat",
+      "summary": "The latest completed chat turn offers a masked Jev key form only when Jev is enabled and its key cannot resolve; the Host stores the value through Secret Catalog and Backlog saves only its reference.",
+      "reach": [
+        "seed fake-secret-cli",
+        "seed backlog-jev-enabled",
+        "seed jev-setup-chat-thread",
+        "expect button \"Set up Jev key\"",
+        "click button \"Set up Jev key\"",
+        "expect textbox \"TypeSafe API key\""
+      ],
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [],
+      "states": ["disabled-off", "key-needed-offer", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
+      "failureModes": [
+        "The offer is absent when Jev is disabled or its key resolves.",
+        "The raw key stays out of conversation content and Backlog settings; only its reference is bound.",
+        "Secret CLI or Settings failures show a generic error and do not put the key in the chat."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "The Host sends the masked value through Secret Catalog to the local secret CLI on stdin.",
+          "deterministicFake": "The browser journey uses a synthetic value in a fake CLI store; no real credentials or live profile state are read."
+        },
+        {
+          "id": "command-code",
+          "boundary": "A local fake provider completes the chat turn used to render the inline offer.",
+          "deterministicFake": "Use the loopback fake Command Code service; no external model or credential is contacted."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-chat-disabled",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-chat-setup",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.jev-chat-turn-latest-only",
+          "file": "plugins/@dshfiles/secret-catalog/src/jev-chat-turn-timeline.test.ts",
+          "testName": "only offers on the greatest observed turn in each session"
+        }
+      ]
     }
   ],
   "kind": "bundle"

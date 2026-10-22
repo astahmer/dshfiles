@@ -4,6 +4,8 @@
 
 ![Add a Jev key from the Backlog setting](docs/screenshots/backlog-jev-setup.png)
 
+![Set up a Jev key from chat](docs/screenshots/backlog-jev-chat-setup.png)
+
 Secret Catalog is a DSH 0.2 client/Host plugin backed by the installed
 `secret` CLI contract. It uses `secret print --all --json` only when a project
 folder is selected. Without one it calls `secret print global --json`, so the
@@ -50,6 +52,11 @@ when it is registered, its workspace id.
   `secret:jev-api-key-optmem`. Backlog resolves this setting without a project
   folder, so a project-scoped alias will not work there. The value goes to the
   Host and secret CLI stdin, never the conversation or settings.
+- When Jev is enabled and the Host cannot resolve its key, the newest completed
+  chat turn offers the same masked setup form inline. Its status request returns
+  only whether setup is needed; saving still sends the value to the Secret
+  Catalog Host and writes only `secret:jev-api-key-optmem` to Backlog settings.
+  The action does not enable Jev or auto-triage.
 - Edit supports item name, source, tags, and a two-step masked value
   replacement. Value replacement is passed through stdin with an explicit
   overwrite flag after user confirmation. The CLI's `edit --field` also

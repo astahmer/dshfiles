@@ -32,6 +32,7 @@ interface Store {
 }
 
 const fixtures = new WeakMap<Page, SecretFixture>()
+const chatOfferAssertionCounts = new WeakMap<Page, number>()
 const fakeCli = join(dirname(fileURLToPath(import.meta.url)), '..', 'fake-secret-cli.mjs')
 // Keep PATH stable for prewarmed Hosts; reset the store per scenario and remove it when the worker exits.
 let sharedFakeCliFixture: Promise<SecretFixturePaths> | undefined
@@ -64,6 +65,7 @@ const readStore = async (page: Page): Promise<Store> => JSON.parse(await readFil
 Before({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   const previousPrewarm = process.env.DSHX_E2E_PREWARM
   process.env.DSHX_E2E_PREWARM = '0'
+  process.env.TYPESAFE_API_KEY = ''
   const paths = await fakeCliFixtureForWorker()
   const row = (fields: Partial<StoreRow>): StoreRow => ({ ...StoreRow, ...fields })
   const store: Store = {
@@ -85,6 +87,7 @@ After({ tags: '@fake-secret-cli' }, async ({ page }: { page: Page }) => {
   if (fixture === undefined) return
   fixtures.delete(page)
   process.env.PATH = fixture.previousPath
+  delete process.env.TYPESAFE_API_KEY
   if (fixture.previousPrewarm === undefined) delete process.env.DSHX_E2E_PREWARM
   else process.env.DSHX_E2E_PREWARM = fixture.previousPrewarm
 })
@@ -98,13 +101,28 @@ const openCatalog = async (page: Page): Promise<void> => {
   await expect(catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true })).toBeVisible()
 }
 
+const openBacklogSettings = async (page: Page): Promise<void> => {
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
+  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')).toBeVisible()
+}
+
 When('the Secret Catalog is opened', async ({ page }: { page: Page }) => {
   await openCatalog(page)
 })
 
+Given('Backlog Jev triage is enabled without a resolvable key', async ({ page }: { page: Page }) => {
+  await openBacklogSettings(page)
+  const enabled = page.getByRole('switch', { name: 'Jev enabled', exact: true })
+  if (!(await enabled.isChecked())) await enabled.click()
+  await expect(enabled).toBeChecked()
+  await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
+  const globalKey = (await readStore(page)).rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global')
+  expect(globalKey).toHaveLength(0)
+})
+
 When('the Backlog Jev secret setup is opened from Settings', async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
-  await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
+  await openBacklogSettings(page)
   const jevRow = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')
   await expect(jevRow).toBeVisible()
   await jevRow.locator('input[data-secret-input="reference"]').focus()
@@ -194,6 +212,69 @@ Then('the global Jev secret is stored with value {string} without exposing it in
     await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).not.toBeChecked()
     await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
   })
+  await finishJourneyAssertions(page)
+})
+
+Then('the Jev setup offer appears on the latest completed turn only', async ({ page }: { page: Page }) => {
+  const assertionNumber = (chatOfferAssertionCounts.get(page) ?? 0) + 1
+  chatOfferAssertionCounts.set(page, assertionNumber)
+  await recordAssertion(page, `secret-catalog-jev-chat-offer-latest-turn-only-${assertionNumber}`, async () => {
+    const offers = page.getByTestId('jev-inline-setup-offer')
+    await expect(offers).toHaveCount(1)
+    await expect(offers.getByRole('button', { name: 'Set up Jev key', exact: true })).toBeVisible()
+  })
+})
+
+Then('the Jev setup offer is absent while Jev is disabled', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'secret-catalog-jev-chat-offer-disabled', async () => {
+    await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the inline Jev setup is opened', async ({ page }: { page: Page }) => {
+  await page.getByTestId('jev-inline-setup-offer').getByRole('button', { name: 'Set up Jev key', exact: true }).click()
+  await expect(page.getByTestId('jev-secret-setup')).toBeVisible()
+})
+
+Then('the inline Jev key input is masked', async ({ page }: { page: Page }) => {
+  await expect(page.getByTestId('jev-secret-setup').getByLabel('TypeSafe API key', { exact: true })).toHaveAttribute('type', 'password')
+})
+
+When('the Jev API key {string} is entered and saved in chat', async ({ page }: { page: Page }, value: string) => {
+  const setup = page.getByTestId('jev-secret-setup')
+  await setup.getByLabel('TypeSafe API key', { exact: true }).fill(value)
+  await setup.getByRole('button', { name: 'Add and bind', exact: true }).click()
+  await expect(setup).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Jev key stored; only its reference was saved to Backlog.' })).toBeVisible()
+})
+
+Then('the chat Jev setup stores a global key and binds only its reference', async ({ page }: { page: Page }) => {
+  const value = 'jev-e2e-chat-sensitive-value'
+  const store = await readStore(page)
+  const globalMatches = store.rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'global' && row.environment === 'prod')
+  const projectMatches = store.rows.filter(row => row.alias === 'jev-api-key-optmem' && row.scope === 'project' && row.environment === 'prod')
+  await recordAssertion(page, 'secret-catalog-jev-chat-key-is-global-reference-only', async () => {
+    expect(globalMatches).toHaveLength(1)
+    expect(store.vault[globalMatches[0]?.item ?? '']).toBe(value)
+    expect(projectMatches).toHaveLength(1)
+    expect(store.vault[projectMatches[0]?.item ?? '']).toBe(jevProjectValue)
+    await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
+    await expect(page.locator('body')).not.toContainText(value)
+    const inputValues = await page.locator('input, textarea').evaluateAll(elements =>
+      elements.map(element => ('value' in element ? String(element.value) : '')).join('\\n'),
+    )
+    expect(inputValues).not.toContain(value)
+    const chatTurns = fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn')
+    expect(JSON.stringify(chatTurns)).not.toContain(value)
+  })
+  await openBacklogSettings(page)
+  await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
+    'secret:jev-api-key-optmem',
+  )
+  await expect(page.getByRole('switch', { name: 'Jev enabled', exact: true })).toBeChecked()
+  await expect(page.getByRole('switch', { name: 'Auto triage', exact: true })).not.toBeChecked()
+  await expect(page.locator('body')).not.toContainText(value)
   await finishJourneyAssertions(page)
 })
 

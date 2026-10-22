@@ -18,6 +18,7 @@ const speechStatusSchema = z
     reason: z.string().nullable(),
   })
   .strict()
+const jevSetupStatusSchema = z.object({ needsSetup: z.boolean() }).strict()
 const transcriptionSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), text: z.string() }).strict(),
   z.object({ ok: z.literal(false), reason: z.string().max(500) }).strict(),
@@ -235,6 +236,12 @@ export const backlogApi = defineApi({
       input: z.void(),
       output: speechStatusSchema,
       description: 'Whether the Host voice-input bundle can transcribe right now, with the selected provider and language. Not an agent tool.',
+    }),
+    jevSetupStatus: method({
+      input: z.void(),
+      output: jevSetupStatusSchema,
+      description:
+        'Whether enabled Backlog Jev lacks a resolvable key, returning setup state only and never any credential. Presentation-only status for the inline setup offer.',
     }),
     transcribeSpeech: method({
       input: z.object({ audioBase64: z.string().min(1).max(24_000_000) }).strict(),

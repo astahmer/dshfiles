@@ -2,11 +2,14 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/remote'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
+import { JevInlineSetup } from './jev-inline-setup.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { SecretInputOverlay } from './secret-input-overlay.js'
@@ -54,6 +57,22 @@ export default defineClient({
       </PluginQueryProvider>
     )
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118 }, decorate(SecretOverlay)))
+    ctx.slots.inject('conversation.chat.turnTail', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.chat.turnTail',
+          id: 'dshfiles-secret-catalog-jev-setup',
+          order: 20,
+          locale: SECRET_CATALOG_LOCALE_NAMESPACE,
+          inject: sessionId => ({ sessionId }),
+        },
+        decorate((props: { readonly sessionId: string; readonly turn: TurnLocation }) => (
+          <PluginQueryProvider>
+            <JevInlineSetup {...props} t={translate} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
   },
 })
 

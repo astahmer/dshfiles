@@ -642,6 +642,15 @@ const backlogApiHost = backlogApi.host({
   },
   removeFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).removeFile({ ...input, actor: actorOf(caller) }),
   speechStatus: ({ ctx }) => speechStatusOf(ctx),
+  jevSetupStatus: async ({ ctx }) => {
+    const settings = currentSettings()
+    if (!settings.jevEnabled) return { needsSetup: false }
+    try {
+      return { needsSetup: (await jevApiKey(ctx, settings)) === undefined }
+    } catch {
+      return { needsSetup: true }
+    }
+  },
   transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),
   update: async ({ ctx, input, caller }) => (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) }),
   link: async ({ ctx, input, caller }) => (await backlogFor(ctx)).link({ ...input, actor: actorOf(caller) }),

@@ -11,6 +11,7 @@ import { JevSecretSetup } from './jev-secret-setup.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import { SecretInputBinding } from './secret-input-bind.js'
+import { JEV_SECRET_ALIAS, JEV_SECRET_ENVIRONMENT, saveGlobalJevSecret } from './jev-secret-store.js'
 import { placeSecretButton, placeSecretPanel } from './secret-input-placement.js'
 
 interface FieldAnchor {
@@ -19,8 +20,6 @@ interface FieldAnchor {
 }
 
 const panelWidth = 320
-const jevAlias = 'jev-api-key-optmem'
-const jevEnvironment = 'prod'
 
 const measure = (element: HTMLInputElement | HTMLTextAreaElement): FieldAnchor | null => {
   if (!element.isConnected || !SecretInputBinding.accepts(element)) return null
@@ -119,7 +118,7 @@ export const SecretInputOverlay = (props: { readonly t: SecretCatalogTranslate }
     return text === '' ? matches : matches.filter(row => rowText(row).toLowerCase().includes(text) || row.item.toLowerCase().includes(text))
   }, [listQuery.data, query])
   const jevRows = useMemo(
-    () => (listQuery.data ?? []).filter(row => row.alias === jevAlias && row.environment === jevEnvironment && row.scope === 'global'),
+    () => (listQuery.data ?? []).filter(row => row.alias === JEV_SECRET_ALIAS && row.environment === JEV_SECRET_ENVIRONMENT && row.scope === 'global'),
     [listQuery.data],
   )
   const backlogJevField = anchor !== null && isBacklogJevField(anchor.element)
@@ -132,12 +131,7 @@ export const SecretInputOverlay = (props: { readonly t: SecretCatalogTranslate }
     if (anchor === null || !(anchor.element instanceof HTMLInputElement) || !anchor.element.isConnected)
       throw new Error('The Jev setting is no longer available.')
     if (!isBacklogJevField(anchor.element) || jevRows.length > 1) throw new Error('The Jev setting is not ready for a key.')
-    if (jevRows.length === 1) {
-      await api.update({ alias: jevAlias, cwd: null, scope: 'global', environment: jevEnvironment, value })
-    } else {
-      await api.create({ alias: jevAlias, cwd: null, scope: 'global', environment: jevEnvironment, valueMode: 'manual', value })
-    }
-    const reference = SecretInputBinding.referenceText({ alias: jevAlias, environment: jevEnvironment })
+    const reference = await saveGlobalJevSecret({ api, existing: jevRows.length === 1, value })
     SecretInputBinding.writeValue(anchor.element, reference)
     anchor.element.focus()
     anchor.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))

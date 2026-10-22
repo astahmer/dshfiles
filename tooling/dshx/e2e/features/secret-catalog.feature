@@ -89,6 +89,28 @@ Feature: Secret Catalog
     When the Jev API key "jev-e2e-replacement-value" is entered and saved
     Then the global Jev secret is stored with value "jev-e2e-replacement-value" without exposing it in the UI
 
+  @scenario:secret-catalog.backlog-jev-chat-disabled
+  Scenario: Do not offer Jev setup in chat while it is disabled
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the fake model to "Reply briefly."
+    Then the Jev setup offer is absent while Jev is disabled
+
+  @scenario:secret-catalog.backlog-jev-chat-setup
+  Scenario: Set up Jev from the latest chat turn without putting its key in the conversation
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    And a project-scoped Jev key is stored for the seeded project folder
+    And Backlog Jev triage is enabled without a resolvable key
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the fake model to "Reply briefly."
+    Then the Jev setup offer appears on the latest completed turn only
+    When a thread in the seeded project asks the fake model to "Reply one more time."
+    Then the Jev setup offer appears on the latest completed turn only
+    When the inline Jev setup is opened
+    Then the inline Jev key input is masked
+    When the Jev API key "jev-e2e-chat-sensitive-value" is entered and saved in chat
+    Then the chat Jev setup stores a global key and binds only its reference
+
   @scenario:secret-catalog.rename-remove
   Scenario: Rename an alias, remove another, and delete a vault item
     Given the isolated plugin profile "@dshfiles/secret-catalog" is booted

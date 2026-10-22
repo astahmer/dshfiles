@@ -67,6 +67,7 @@ describe('plugin feature metadata', () => {
   it('accepts context-menu clicks and seeds that come before the walk', () => {
     const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
     expect(withReach(['seed rebase-ready-thread', 'seed pending-restart', 'rightclick text "Seeded*"', 'expect menuitem "Mark unread"'])).toEqual([])
+    expect(withReach(['seed fake-secret-cli', 'seed backlog-jev-enabled', 'seed jev-setup-chat-thread', 'expect button "Set up Jev key"'])).toEqual([])
     expect(withReach(['hover button "Reveal TOKEN"', 'expect text "Click to reveal"'])).toEqual([])
     expect(withReach(['seed a-thread', 'expect text "x"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
     expect(withReach(['click button "New thread"', 'seed rebase-ready-thread', 'expect text "x"'])).toEqual(

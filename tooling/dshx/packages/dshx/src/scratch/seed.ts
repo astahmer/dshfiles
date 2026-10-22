@@ -78,6 +78,7 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
 
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
 const TOOL_CALL_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-call-thread', description: 'Wait three seconds' })}]]`
+const JEV_SETUP_CHAT_PROMPT = 'Can you help me set up Jev?'
 const REBASE_READY_THREAD_MESSAGE = 'Seeded thread to rebase'
 const PENDING_RESTART_MARKER = '\n// dshx dev seed: pending restart\n'
 /** thread-sidebar reports pending Host updates, so its own Host entry is the one a seeded rebuild changes. */
@@ -407,6 +408,13 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
   return process
 }
 
+const seedJevSetupChatThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  const process = await configureFakeProviderThread({ state, page, seed: 'jev-setup-chat-thread', timeoutMs })
+  await sendFakeProviderTurn(page, JEV_SETUP_CHAT_PROMPT, timeoutMs)
+  await page.getByText('Answered by', { exact: false }).last().waitFor({ state: 'visible', timeout: timeoutMs })
+  return process
+}
+
 /** Seed a model-selected thread whose loopback provider rejects the key, so the next turn fails. */
 const seedQuotaBlockedThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
   const process = await configureFakeProviderThread({
@@ -504,6 +512,37 @@ const seedFakeSecretCli = async (state: ScratchState): Promise<void> => {
   await writeFile(join(state.fakeSecretCli, 'store.json'), fakeSecretStore(state.project.path), { mode: 0o600 })
 }
 
+const seedBacklogJevEnabled = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
+  if (!state.bundles.includes('@dshfiles/backlog')) {
+    throw new ScratchError(
+      'seed-needs-plugin',
+      'Seed backlog-jev-enabled needs @dshfiles/backlog.',
+      'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/backlog ...".',
+    )
+  }
+  const enabled = page.getByRole('switch', { name: 'Jev enabled', exact: true })
+  if (!(await enabled.isVisible())) {
+    await page
+      .getByRole('navigation', { name: 'Global panels', exact: true })
+      .getByRole('button', { name: 'Plugins', exact: true })
+      .click({ timeout: timeoutMs })
+    await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click({ timeout: timeoutMs })
+    await enabled.waitFor({ state: 'visible', timeout: timeoutMs })
+  }
+  if (!(await enabled.isChecked())) await enabled.click({ timeout: timeoutMs })
+  const autoTriage = page.getByRole('switch', { name: 'Auto triage', exact: true })
+  if (await autoTriage.isChecked()) await autoTriage.click({ timeout: timeoutMs })
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevEnabled"] [role="switch"]')?.getAttribute('aria-checked') ===
+        'true' &&
+      document.querySelector('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="autoTriage"] [role="switch"]')?.getAttribute('aria-checked') ===
+        'false',
+    undefined,
+    { timeout: timeoutMs },
+  )
+}
+
 const seedMultiHostHosts = async (state: ScratchState): Promise<void> => {
   if (!state.bundles.includes('@dshfiles/multi-host')) {
     throw new ScratchError(
@@ -580,6 +619,10 @@ const applySeed = async (input: {
     await seedFakeSecretCli(input.state)
     return {}
   }
+  if (input.seed === 'backlog-jev-enabled') {
+    await seedBacklogJevEnabled(input.state, input.page, input.timeoutMs)
+    return {}
+  }
   if (input.seed === 'multi-host-hosts') {
     await seedMultiHostHosts(input.state)
     return {}
@@ -587,6 +630,7 @@ const applySeed = async (input: {
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'credential-recovery') return { fakeProvider: await seedCredentialRecovery(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
+  if (input.seed === 'jev-setup-chat-thread') return { fakeProvider: await seedJevSetupChatThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
   return {}

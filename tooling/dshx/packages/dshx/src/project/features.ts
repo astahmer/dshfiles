@@ -35,20 +35,24 @@ const externalDependencySchema = z
  * `rebase-ready-thread` is a thread in its own jj workspace whose described revision is ready to rebase (the agent's edit
  * is stood in for by the jj CLI); `pending-restart` changes a loaded plugin's Host entry on disk, as a rebuild would;
  * `tool-call-thread` is a thread whose model (a loopback fake provider) ran a few-second `bash` tool call;
+ * `jev-setup-chat-thread` is a natural-prompt thread on that loopback provider for inline Jev setup;
  * `quota-blocked-thread` is a thread whose exhausted fake-provider turn is stored for the Usage limit group;
  * `chat-reference-thread` is a thread in the scratch jj project whose transcript holds an explicit `` `jj:main` ``
  * reference, so the chat link is really rendered before the walk clicks it;
  * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`;
+ * `backlog-jev-enabled` enables Backlog Jev in the scratch Settings page without supplying a credential;
  * `multi-host-hosts` writes a synthetic host directory (one hidden host, one SSH host) for the Hosts page.
  */
 export const REACH_SEEDS = [
   'rebase-ready-thread',
   'pending-restart',
   'tool-call-thread',
+  'jev-setup-chat-thread',
   'quota-blocked-thread',
   'chat-reference-thread',
   'credential-recovery',
   'fake-secret-cli',
+  'backlog-jev-enabled',
   'multi-host-hosts',
 ] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
