@@ -190,6 +190,21 @@ import {
   type ThreadMuteOption,
 } from './thread-mute.js'
 
+const sessionActivityAt = (options: {
+  readonly session: Pick<SessionSummary, 'id' | 'updatedAt'>
+  readonly mutedThreads: Readonly<Record<string, ThreadMute>>
+  readonly finishedAt: number | undefined
+  readonly now: number
+}): number =>
+  effectiveActivityAt(
+    options.mutedThreads,
+    {
+      id: options.session.id,
+      updatedAt: ThreadViewModel.latestActivityAt(options.session.updatedAt, options.finishedAt),
+    },
+    options.now,
+  )
+
 type InjectedActions = {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   unarchiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -2558,12 +2573,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         workspaceId: SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession),
         activity: {
           id: session.id,
-          updatedAt: effectiveActivityAt(mutedThreads, session, now),
+          updatedAt: sessionActivityAt({ session, mutedThreads, finishedAt: finishedAtBySession[session.id], now }),
           // A parent waiting on a running subagent is still active work.
           running: session.running || (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => child.running),
         },
       })),
-    [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
+    [finishedAtBySession, mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
   const childThreadEntries = useMemo(
     () =>
@@ -2571,10 +2586,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         children.map(session => ({
           session,
           workspaceId: SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession),
-          activity: { id: session.id, updatedAt: effectiveActivityAt(mutedThreads, session, now), running: session.running },
+          activity: {
+            id: session.id,
+            updatedAt: sessionActivityAt({ session, mutedThreads, finishedAt: finishedAtBySession[session.id], now }),
+            running: session.running,
+          },
         })),
       ),
-    [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
+    [finishedAtBySession, mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
   const detachedThreadEntries = useMemo(
     () =>
@@ -2582,10 +2601,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         children.map(session => ({
           session,
           workspaceId: SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession),
-          activity: { id: session.id, updatedAt: effectiveActivityAt(mutedThreads, session, now), running: session.running },
+          activity: {
+            id: session.id,
+            updatedAt: sessionActivityAt({ session, mutedThreads, finishedAt: finishedAtBySession[session.id], now }),
+            running: session.running,
+          },
         })),
       ),
-    [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
+    [finishedAtBySession, mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
   const sourceFilteredThreadEntries = useMemo(() => {
     if (threadView.sourceFilter === 'subagents') {

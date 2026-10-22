@@ -26,6 +26,23 @@ describe('thread view grouping', () => {
     ])
   })
 
+  it('uses recent finished activity when a thread summary still has its old creation date', () => {
+    const now = new Date(2026, 9, 23, 0, 18).getTime()
+    const oldThreadDate = new Date(2026, 9, 20, 15, 25).getTime()
+    const recentFinish = new Date(2026, 9, 23, 0, 12).getTime()
+    const activityAt = ThreadViewModel.latestActivityAt(oldThreadDate, recentFinish)
+    const groups = ThreadViewModel.groupEntries({
+      groupBy: 'date',
+      entries: [{ thread: { id: 'backlog-started', updatedAt: oldThreadDate }, workspaceId: undefined, activityAt }],
+      workspaceTitles: new Map(),
+      unassignedTitle: 'Unassigned',
+      dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
+      now,
+    })
+
+    expect(groups).toMatchObject([{ label: 'Today', threads: [{ id: 'backlog-started' }] }])
+  })
+
   it('groups activity by local calendar date and leaves none as one flat list', () => {
     const now = new Date(2025, 3, 10, 12).getTime()
     expect(ThreadViewModel.dateGroup(new Date(2025, 3, 10, 1).getTime(), now)).toBe('today')

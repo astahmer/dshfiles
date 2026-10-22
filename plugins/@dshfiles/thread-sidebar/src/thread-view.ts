@@ -144,6 +144,8 @@ const unreadCountForView = (input: {
   return count
 }
 
+const latestThreadActivityAt = (updatedAt: number, finishedAt: number | undefined): number => Math.max(updatedAt, finishedAt ?? 0)
+
 const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
   if (!Number.isFinite(updatedAt)) return 'older'
   const date = new Date(updatedAt)
@@ -209,6 +211,7 @@ export class ThreadViewModel {
   static readonly mostUrgentAttentionLabel = mostUrgentAttentionLabel
   static readonly attentionLabelForView = attentionLabelForView
   static readonly unreadCountForView = unreadCountForView
+  static readonly latestActivityAt = latestThreadActivityAt
   static readonly dateGroup = threadDateGroup
   static readonly groupEntries = groupThreadEntries
 }
