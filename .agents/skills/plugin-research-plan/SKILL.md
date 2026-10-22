@@ -1,5 +1,5 @@
 ---
-name: feature-research-plan
+name: plugin-research-plan
 description: Researches competitors and DSH feature fit, then returns evidence-backed adopt/extend/build/defer recommendations and phased plans. Use when deciding how DSH should address one or more feature ideas after competitor research.
 ---
 
