@@ -1,6 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { jobBoardFilterSchema, jobBoardSchema, jobIndexingSchema, jobKillSchema, jobOutputSchema } from './types.js'
+import { jobBoardFilterSchema, jobBoardSchema, jobIndexingSchema, jobKillSchema, jobOutputSchema, jobWaitInputSchema, jobWaitSchema } from './types.js'
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -49,6 +49,13 @@ export const backgroundJobsApi = defineApi({
       output: jobIndexingSchema,
       description: 'Index whatever the session logs gained since the last pass and report the indexing state. Call only when the user asked to re-index.',
       tool: { name: 'background_jobs_refresh', readOnly: false, render: compactJson },
+    }),
+    wait: method({
+      input: jobWaitInputSchema,
+      output: jobWaitSchema,
+      description:
+        'Block until background jobs settle instead of polling job_output or sleeping. Waits for the given jobIds, or for every job running when the call starts when jobIds is omitted. Returns the final status of each target and which are still running on timeout. Read-only.',
+      tool: { name: 'background_jobs_wait', readOnly: true, render: compactJson },
     }),
   },
 })

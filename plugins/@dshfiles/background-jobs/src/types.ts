@@ -110,6 +110,43 @@ export const jobKillSchema = z
   .strict()
 export type JobKill = z.infer<typeof jobKillSchema>
 
+export const jobWaitInputSchema = z
+  .object({
+    jobIds: z.array(z.string().min(1).max(128)).max(20).optional().describe('Job ids to wait for; omit to wait for everything running when the call starts.'),
+    until: z
+      .enum(['settled', 'any-settled'])
+      .optional()
+      .describe('settled (default): every target finished. any-settled: stop when the first target finishes.'),
+    timeoutMs: z.number().int().min(1_000).max(3_600_000).optional().describe('Maximum wait in milliseconds; defaults to 300000 (5 minutes).'),
+  })
+  .strict()
+export type JobWaitInput = z.infer<typeof jobWaitInputSchema>
+
+export const jobWaitSchema = z
+  .object({
+    startedAt: z.number().int().nonnegative(),
+    waitedMs: z.number().int().nonnegative(),
+    timeoutMs: z.number().int().nonnegative(),
+    until: z.enum(['settled', 'any-settled']),
+    timedOut: z.boolean(),
+    jobs: z
+      .array(
+        z
+          .object({
+            jobId: z.string().min(1).max(128),
+            status: jobStatusSchema.nullable(),
+            settled: z.boolean(),
+            label: z.string().max(2000).nullable(),
+            category: jobCategorySchema.nullable(),
+          })
+          .strict(),
+      )
+      .max(20),
+    running: z.array(z.string().min(1).max(128)).max(20),
+  })
+  .strict()
+export type JobWait = z.infer<typeof jobWaitSchema>
+
 /** One job as the session log recorded it; live state is layered on top at read time. */
 export const historyJobSchema = z
   .object({

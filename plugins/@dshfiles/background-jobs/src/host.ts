@@ -51,6 +51,7 @@ const api = backgroundJobsApi.host({
   board: ({ input }) => requireRuntime().board.board(input),
   output: ({ input }) => requireRuntime().board.output({ jobId: input.jobId, from: input.from ?? 0 }),
   kill: ({ input }) => requireRuntime().board.kill({ jobId: input.jobId }),
+  wait: ({ input }) => requireRuntime().board.wait(input),
   refresh: async () => {
     const active = requireRuntime()
     await runPass(active)
