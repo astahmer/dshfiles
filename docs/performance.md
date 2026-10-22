@@ -136,6 +136,38 @@ The command's payload dropped 92.8% compact (94.9% pretty). The remaining 279 KB
 (106 KB) are rendered per row in the sidebar, and jj-integration pays 483 KB for `userQuestions`. Removing those needs
 the sidebar to compute per-row facts from a narrower field, not another list algorithm.
 
+## First send no longer waits for its thread workspace (2026-10-22)
+
+A New thread's first Send used to sit through the whole chain before the prompt moved: the `destination` jj read, the
+workspace `provision` (claim a prewarmed spare: `jj new` under the repo lock, a registry write and a second destination
+read) and `connectWorkspace` (`session/create`). Measured on 2026-10-19 on this Host: `POST /api/session/create` alone
+was **1.7 s quiet, 6.1 s with `session/list` in flight, 9.5 s worst**, and on 2026-10-22 at load 59 (`uptime`) the Host
+stalled at p99 **1.39 s**, max **3.05 s** (`host-lag.mjs`, 30 s), so each awaited RPC absorbs a stall. The composer
+stayed blocked on "Preparing thread-…" for the sum of them; the user's report is that it "waits X seconds doing nothing".
+
+The work now starts while the draft is written instead of on Send:
+
+- `jj-integration` prepares the destination once the New thread composer holds text or attachments: the same
+  `destination`/`provision`/`connectWorkspace` chain, run against the pending move, with its blank Session retained. The
+  first Send takes the prepared destination and Session, copies the draft/attachments/references and submits — no
+  provisioning or Session creation on the send path. A send that arrives before the preparation finishes awaits the
+  same promises instead of starting them twice; a failed preparation falls back to the old path.
+- An abandoned or re-targeted draft keeps the claimed workspace as this project's spare (`findSpare`), so the next New
+  thread reuses it instead of provisioning another; a warm expires after 45 s and becomes a spare too.
+- The created thread takes the view only while the New thread screen it left is still the visible main view: its own
+  blank Session, no main `panelId` (the jj panel, Settings) and its conversation screen actually visible (the Start page
+  hides the main outlet rather than unmounting it). Otherwise the send still lands and a toast offers the thread. A
+  journey can't race that reliably under load, so `mainViewWaitsOnNewThread` is covered by unit tests
+  (`thread-warmup.test.ts`) instead.
+- `main-tabs` cancels a pending main-view navigation when the Start page opens (`tab.new`, ⌘T / the "+" button), so a
+  New thread created earlier cannot replace the page the user chose.
+
+Verification: `jj-integration.new-thread-preparation-browser-journey` (no workspace for an untouched New thread; the
+draft claims one; a reload keeps it; the send runs in that prepared workspace instead of provisioning another) plus the
+existing deferred-submit journey. Wall-clock before/after on the live Host is not in this table yet: the change only
+reaches `:3080` after the profile restarts, and the probe cannot create threads on the user's Host, so the evidence here
+is the removed awaits (three RPC chains off the send path) and the journeys, not a re-measured send latency.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
