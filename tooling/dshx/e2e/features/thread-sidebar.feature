@@ -27,6 +27,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is settled from its context menu
     Then the thread is settled, opens read-only and unsettles to reply
 
+  @scenario:thread-sidebar.board-view
+  Scenario: Switch between thread list and status board layouts
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the sidebar board layout is selected
+    Then all six thread status lanes are shown and the layout choice survives reload
+
   @scenario:thread-sidebar.section-order
   Scenario: Reorder the sidebar sections by dragging a header
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

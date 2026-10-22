@@ -489,6 +489,27 @@ Then('the settled thread archives itself without a click', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
+When('the sidebar board layout is selected', async ({ page }: { page: Page }) => {
+  await threadSidebar(page).getByRole('button', { name: 'Board layout', exact: true }).click()
+})
+
+Then('all six thread status lanes are shown and the layout choice survives reload', async ({ page }: { page: Page }) => {
+  const sidebar = threadSidebar(page)
+  const columns = sidebar.getByRole('region', { name: /column$/u })
+  await recordAssertion(page, 'thread-sidebar-board-has-six-status-lanes', async () => {
+    await expect(columns).toHaveCount(6)
+    await expect(sidebar.getByRole('button', { name: 'Board layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await expect(threadSidebar(page).getByRole('region', { name: /column$/u })).toHaveCount(6)
+  await expect(threadSidebar(page).getByRole('button', { name: 'Board layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await threadSidebar(page).getByRole('button', { name: 'List layout', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('region', { name: /column$/u })).toHaveCount(0)
+  await expect(threadSidebar(page).getByRole('button', { name: 'List layout', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await finishJourneyAssertions(page)
+})
+
 let parkedThreadId: string | null = null
 
 When('a nonblank Host thread is parked from its context menu', async ({ page }: { page: Page }) => {

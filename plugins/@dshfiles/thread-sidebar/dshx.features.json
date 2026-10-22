@@ -4,8 +4,8 @@
     {
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
-      "summary": "Group active, pinned, parked, settled, inactive, and archived threads by project; park and settle through sidebar preferences and pin/archive through Host APIs.",
-      "reach": ["expect region \"Threads\"", "expect button \"Group: Status\""],
+      "summary": "Browse threads in list or status-lane board layouts; group active, pinned, parked, settled, inactive, and archived threads by project; park and settle through sidebar preferences and pin/archive through Host APIs.",
+      "reach": ["expect region \"Threads\"", "expect button \"Group: Status\"", "click button \"Board layout\"", "expect region \"Active column\""],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
@@ -104,6 +104,11 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.board-view",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
         {
           "kind": "gherkin",
           "id": "thread-sidebar.classification",

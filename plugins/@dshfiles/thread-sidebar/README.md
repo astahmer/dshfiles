@@ -1,6 +1,6 @@
 # Thread Sidebar
 
-![Organize threads by workspace and status](docs/screenshots/thread-classification.png)
+![Thread sidebar status board with switchable list layout](docs/screenshots/thread-classification.png)
 
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
@@ -27,6 +27,12 @@ thread's other statuses, so restoring brings it back where it was. Pin, settle
 and archive keep their usual refusals (a running thread cannot be parked, settled
 or archived), and every move honors Apply actions to child threads. The row
 context menu's Move to group submenu performs the same moves from the keyboard.
+
+**List and board layouts.** The header toggles between the existing thread list and
+an alternate status board. The board keeps the active view's filters and project
+scope, shows all six status lanes (including empty ones), and preserves thread
+row actions; dragging a row between lanes uses the same section move behavior.
+The layout choice is stored in this browser and survives reloads.
 
 **Keyboard and multi-select.** ↑/↓ move focus and open the focused thread (or
 only move focus when Sidebar settings says Move focus only); Shift+↑/↓ extends a

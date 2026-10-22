@@ -7,6 +7,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
+import { storedThreadLayoutMode } from './thread-layout-mode.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { formatAge } from './relative-age.js'
@@ -76,6 +77,8 @@ import {
   CirclePauseIcon,
   GripVerticalIcon,
   LinkIcon,
+  ListIcon,
+  LayoutGridIcon,
   MonitorIcon,
   PanelRightOpenIcon,
   RefreshCwIcon,
@@ -1235,6 +1238,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   selectionRef.current = threadSelection
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const layoutMode = storedThreadLayoutMode.useValue() ?? 'list'
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
   const threadViewSettings = preferences.threadViews
@@ -3783,6 +3787,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <div role="group" aria-label={props.tSidebar('threadSidebarLayoutGroup')} className="dshx:flex dshx:shrink-0 dshx:items-center">
+              <Button
+                type="button"
+                size="icon"
+                variant={layoutMode === 'list' ? 'secondary' : 'ghost'}
+                aria-label={props.tSidebar('threadSidebarLayoutList')}
+                aria-pressed={layoutMode === 'list'}
+                title={props.tSidebar('threadSidebarLayoutList')}
+                onClick={() => storedThreadLayoutMode.set('list')}
+              >
+                <ListIcon />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant={layoutMode === 'board' ? 'secondary' : 'ghost'}
+                aria-label={props.tSidebar('threadSidebarLayoutBoard')}
+                aria-pressed={layoutMode === 'board'}
+                title={props.tSidebar('threadSidebarLayoutBoard')}
+                onClick={() => storedThreadLayoutMode.set('board')}
+              >
+                <LayoutGridIcon />
+              </Button>
+            </div>
             <Button
               type="button"
               size="icon"
@@ -4284,134 +4312,138 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {groupedAttentionRows.turnFinished.map(session => renderThreadRow(session, 'threadSidebarTurnFinished'))}
             </section>
           ) : null}
-          {threadView.groupBy === 'status'
-            ? renderedSections.map((section, index) => {
-                const rows = rowsBySection.get(section) ?? []
-                const collapsed = preferences.collapsedSections.includes(section)
-                return (
-                  <section
-                    className={cn(
-                      'dshx:mt-1 dshx:rounded-md',
-                      rowDrag !== null && rowDropSection === section && 'dshx:bg-accent/40 dshx:ring-1 dshx:ring-inset dshx:ring-ring/30',
-                    )}
-                    key={section}
-                    data-thread-section={section}
-                  >
-                    <button
-                      ref={element => {
-                        sectionHeaderRefs.current[index] = element
-                      }}
-                      type="button"
-                      data-thread-section-header=""
-                      title={props.tSidebar('threadSidebarSectionReorderHint')}
+          <div className={cn(layoutMode === 'board' && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
+            {layoutMode === 'board' || threadView.groupBy === 'status'
+              ? (layoutMode === 'board' ? orderedSections : renderedSections).map((section, index) => {
+                  const rows = rowsBySection.get(section) ?? []
+                  const collapsed = preferences.collapsedSections.includes(section)
+                  return (
+                    <section
                       className={cn(
-                        stickyHeaderClass,
-                        'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-                        rowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
-                        rowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
-                        sectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
+                        'dshx:mt-1 dshx:rounded-md',
+                        layoutMode === 'board' && 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
+                        rowDrag !== null && rowDropSection === section && 'dshx:bg-accent/40 dshx:ring-1 dshx:ring-inset dshx:ring-ring/30',
                       )}
-                      aria-expanded={!collapsed}
-                      onPointerDown={event => {
-                        if (event.button !== 0) return
-                        sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
-                      }}
-                      onPointerMove={event => {
-                        const current = sectionDragRef.current
-                        if (current === null || current.pointerId !== event.pointerId) return
-                        if (current.centers === null) {
-                          if (Math.abs(event.clientY - current.startY) < SECTION_DRAG_THRESHOLD_PX) return
-                          current.centers = shownSections.map((_, position) => {
-                            const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
-                            return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
-                          })
-                          event.currentTarget.setPointerCapture(event.pointerId)
-                        }
-                        event.preventDefault()
-                        setSectionDrag({
-                          from: current.from,
-                          to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
-                        })
-                      }}
-                      onPointerUp={event => {
-                        const current = sectionDragRef.current
-                        if (current === null || current.pointerId !== event.pointerId) return
-                        if (current.centers !== null) {
-                          suppressSectionClick.current = true
-                          commitSectionOrder(
-                            current.from,
-                            SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
-                          )
-                        }
-                        endSectionDrag()
-                      }}
-                      onPointerCancel={endSectionDrag}
-                      onLostPointerCapture={() => {
-                        if (sectionDragRef.current?.centers !== null) endSectionDrag()
-                      }}
-                      onKeyDown={event => {
-                        if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
-                        const fromShownIndex = shownSections.indexOf(section)
-                        const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
-                        if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
-                        event.preventDefault()
-                        commitSectionOrder(fromShownIndex, toShownIndex)
-                      }}
-                      onClick={() => {
-                        if (suppressSectionClick.current) {
-                          suppressSectionClick.current = false
-                          return
-                        }
-                        toggleSection(section)
-                      }}
+                      key={section}
+                      data-thread-section={section}
+                      aria-label={layoutMode === 'board' ? `${props.tSidebar(sectionLabels[section])} column` : undefined}
                     >
-                      <span
-                        className="dshx:inline-flex dshx:shrink-0 dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100"
-                        aria-hidden="true"
-                      >
-                        <GripVerticalIcon className="dshx:size-3 dshx:cursor-grab dshx:active:cursor-grabbing" />
-                      </span>
-                      <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                        {sectionIcons[section]}
-                      </span>
-                      <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
-                      <span className="dshx:text-xs dshx:tabular-nums">({rows.length})</span>
-                      <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                      <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                        {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
-                      </span>
-                    </button>
-                    {!collapsed ? rows.map(session => renderThreadRow(session, undefined, section)) : null}
-                  </section>
-                )
-              })
-            : groupedThreadEntries.map(group => {
-                const groupCollapsed = group.showHeader && collapsedGroups.includes(group.key)
-                return (
-                  <section className="dshx:mt-1" key={group.key} aria-label={group.showHeader ? group.label : undefined}>
-                    {group.showHeader ? (
                       <button
+                        ref={element => {
+                          sectionHeaderRefs.current[index] = element
+                        }}
                         type="button"
                         data-thread-section-header=""
+                        title={props.tSidebar('threadSidebarSectionReorderHint')}
                         className={cn(
                           stickyHeaderClass,
-                          'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                          'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                          rowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
+                          rowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
+                          sectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
                         )}
-                        aria-expanded={!groupCollapsed}
-                        onClick={() => toggleGroup(group.key)}
+                        aria-expanded={!collapsed}
+                        onPointerDown={event => {
+                          if (layoutMode === 'board' || event.button !== 0) return
+                          sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
+                        }}
+                        onPointerMove={event => {
+                          const current = sectionDragRef.current
+                          if (current === null || current.pointerId !== event.pointerId) return
+                          if (current.centers === null) {
+                            if (Math.abs(event.clientY - current.startY) < SECTION_DRAG_THRESHOLD_PX) return
+                            current.centers = shownSections.map((_, position) => {
+                              const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
+                              return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
+                            })
+                            event.currentTarget.setPointerCapture(event.pointerId)
+                          }
+                          event.preventDefault()
+                          setSectionDrag({
+                            from: current.from,
+                            to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
+                          })
+                        }}
+                        onPointerUp={event => {
+                          const current = sectionDragRef.current
+                          if (current === null || current.pointerId !== event.pointerId) return
+                          if (current.centers !== null) {
+                            suppressSectionClick.current = true
+                            commitSectionOrder(
+                              current.from,
+                              SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
+                            )
+                          }
+                          endSectionDrag()
+                        }}
+                        onPointerCancel={endSectionDrag}
+                        onLostPointerCapture={() => {
+                          if (sectionDragRef.current?.centers !== null) endSectionDrag()
+                        }}
+                        onKeyDown={event => {
+                          if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                          const fromShownIndex = shownSections.indexOf(section)
+                          const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
+                          if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
+                          event.preventDefault()
+                          commitSectionOrder(fromShownIndex, toShownIndex)
+                        }}
+                        onClick={() => {
+                          if (suppressSectionClick.current) {
+                            suppressSectionClick.current = false
+                            return
+                          }
+                          toggleSection(section)
+                        }}
                       >
-                        <span className="dshx:whitespace-nowrap">{group.label}</span>
-                        <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
+                        <span
+                          className="dshx:inline-flex dshx:shrink-0 dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100"
+                          aria-hidden="true"
+                        >
+                          <GripVerticalIcon className="dshx:size-3 dshx:cursor-grab dshx:active:cursor-grabbing" />
+                        </span>
+                        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                          {sectionIcons[section]}
+                        </span>
+                        <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
+                        <span className="dshx:text-xs dshx:tabular-nums">({rows.length})</span>
                         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
                         <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                          {groupCollapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
+                          {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
                         </span>
                       </button>
-                    ) : null}
-                    {groupCollapsed ? null : group.threads.map(session => renderThreadRow(session, undefined))}
-                  </section>
-                )
-              })}
+                      {!collapsed ? rows.map(session => renderThreadRow(session, undefined, section)) : null}
+                    </section>
+                  )
+                })
+              : groupedThreadEntries.map(group => {
+                  const groupCollapsed = group.showHeader && collapsedGroups.includes(group.key)
+                  return (
+                    <section className="dshx:mt-1" key={group.key} aria-label={group.showHeader ? group.label : undefined}>
+                      {group.showHeader ? (
+                        <button
+                          type="button"
+                          data-thread-section-header=""
+                          className={cn(
+                            stickyHeaderClass,
+                            'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                          )}
+                          aria-expanded={!groupCollapsed}
+                          onClick={() => toggleGroup(group.key)}
+                        >
+                          <span className="dshx:whitespace-nowrap">{group.label}</span>
+                          <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
+                          <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                          <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                            {groupCollapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
+                          </span>
+                        </button>
+                      ) : null}
+                      {groupCollapsed ? null : group.threads.map(session => renderThreadRow(session, undefined))}
+                    </section>
+                  )
+                })}
+          </div>
           {detachedThreadGroups.map(group => {
             const branchAction = group.branchAction
             const branchBusy = detachedBranchBusy.has(group.missingAncestorId)
