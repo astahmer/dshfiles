@@ -13,6 +13,7 @@ import {
   type StartThreadProject,
   type StartThreadRequest,
 } from './start-thread.js'
+import { continueMarkdownList } from './list-continuation.js'
 
 const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
 
@@ -187,6 +188,20 @@ export const StartThreadDialog = (props: {
             <span className={labelClass}>{mode === 'per-item' ? 'Instructions for each thread' : chosenAgent === undefined ? 'First message' : 'Task'}</span>
             <textarea
               aria-label={mode === 'per-item' ? 'Instructions for each thread' : 'First message'}
+              onKeyDown={event => {
+                if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+                const current = mode === 'per-item' ? instructions : message
+                const continuation = continueMarkdownList({
+                  text: current,
+                  start: event.currentTarget.selectionStart,
+                  end: event.currentTarget.selectionEnd,
+                })
+                if (continuation === null) return
+                event.preventDefault()
+                const textarea = event.currentTarget
+                mode === 'per-item' ? setInstructions(continuation.value) : setMessage(continuation.value)
+                requestAnimationFrame(() => textarea.setSelectionRange(continuation.caret, continuation.caret))
+              }}
               value={mode === 'per-item' ? instructions : message}
               onChange={event => (mode === 'per-item' ? setInstructions(event.currentTarget.value) : setMessage(event.currentTarget.value))}
               rows={4}

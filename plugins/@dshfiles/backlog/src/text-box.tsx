@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 're
 
 import { AttachFilesButton, AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
+import { continueMarkdownList } from './list-continuation.js'
 
 export type ComposerFiles = ReturnType<typeof useComposerFiles>
 
@@ -131,8 +132,25 @@ export const BacklogTextBox = (props: {
             props.onCancel?.()
             return
           }
-          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
-          if (!reply && !event.metaKey && !event.ctrlKey) return
+          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+          if (event.shiftKey || (!reply && !event.metaKey && !event.ctrlKey)) {
+            const continuation = continueMarkdownList({
+              text: props.value,
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            })
+            if (continuation !== null) {
+              event.preventDefault()
+              props.onChange(continuation.value)
+              setCaret(continuation.caret)
+              requestAnimationFrame(() => {
+                input.current?.setSelectionRange(continuation.caret, continuation.caret)
+              })
+              return
+            }
+            if (event.shiftKey || (!reply && !event.metaKey && !event.ctrlKey)) return
+          }
+          if (event.shiftKey) return
           event.preventDefault()
           submit()
         }}

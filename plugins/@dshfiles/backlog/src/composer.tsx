@@ -39,6 +39,7 @@ import { MentionMenu, useMentionCompletion } from './mention-completion.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjectCommand } from './project-command.js'
+import { continueMarkdownList } from './list-continuation.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
@@ -471,7 +472,22 @@ export const Composer = (props: {
             event.currentTarget.blur()
             return
           }
-          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+          if (event.shiftKey) {
+            const continuation = continueMarkdownList({
+              text,
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            })
+            if (continuation === null) return
+            event.preventDefault()
+            setText(continuation.value)
+            requestAnimationFrame(() => {
+              input.current?.setSelectionRange(continuation.caret, continuation.caret)
+              setCaret(continuation.caret)
+            })
+            return
+          }
           event.preventDefault()
           submit()
         }}

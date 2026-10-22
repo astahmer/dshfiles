@@ -16,7 +16,7 @@
  */
 import type { LexicalEditor } from 'lexical'
 import {
-  COMMAND_PRIORITY_CRITICAL, KEY_ARROW_DOWN_COMMAND, KEY_ARROW_UP_COMMAND, KEY_ENTER_COMMAND,
+  $getSelection, $isRangeSelection, COMMAND_PRIORITY_CRITICAL, KEY_ARROW_DOWN_COMMAND, KEY_ARROW_UP_COMMAND, KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND, KEY_SPACE_COMMAND, KEY_TAB_COMMAND, PASTE_COMMAND,
 } from 'lexical'
 import { mergeRegister } from '@lexical/utils'
@@ -139,7 +139,22 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       if (event !== null && (event.altKey || event.getModifierState('AltGraph')
         || (event.ctrlKey && event.metaKey) || (event.shiftKey && (event.ctrlKey || event.metaKey)))) return true
       // Plain Shift+Enter keeps its native line break, including during composition.
-      if (event?.shiftKey === true) return false
+      if (event?.shiftKey === true) {
+        if (isComposingEvent(event, recentlyComposing)) return false
+        const selection = $getSelection()
+        if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
+        const anchor = selection.anchor
+        const lineText = anchor.getNode().getTextContent().slice(0, anchor.offset)
+        const unordered = /^(\s*)([-*+])\s+(.+)$/.exec(lineText)
+        const ordered = /^(\s*)(\d+)\.\s+(.+)$/.exec(lineText)
+        const match = unordered ?? ordered
+        if (match === null) return false
+        const [, indent, marker] = match
+        if (indent === undefined || marker === undefined) return false
+        selection.insertParagraph()
+        selection.insertText(unordered === null ? `${indent}${String(Number(marker) + 1)}. ` : `${indent}${marker} `)
+        return true
+      }
       if (event !== null && isComposingEvent(event, recentlyComposing)) {
         // The IME consumes this Enter (candidate pick); neither submit nor
         // break the line. No preventDefault: the browser owns the gesture.
