@@ -15,6 +15,13 @@ test('a plain @ token carries the query and where it starts', () => {
   assert.equal(InlineCompletion.tokenAt('no token', 8), null)
 })
 
+test('spaces stay inside multiword @ mentions until the caret', () => {
+  assert.deepEqual(at('please @add new'), { trigger: '@', query: 'add new', start: 7, scope: null })
+  assert.deepEqual(at('@thread:fix project picker'), { trigger: '@', query: 'fix project picker', start: 0, scope: 'thread' })
+  assert.equal(at('please @add new more')?.query, 'add new more')
+  assert.equal(at('please #add new'), null)
+})
+
 test('a scope prefix is parsed, and its own scope keeps the query after the colon', () => {
   assert.deepEqual(at('@agent:rev'), { trigger: '@', query: 'rev', start: 0, scope: 'agent' })
   assert.deepEqual(at('@b:12'), { trigger: '@', query: '12', start: 0, scope: 'b' })

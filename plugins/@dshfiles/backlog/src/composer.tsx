@@ -33,8 +33,9 @@ import { z } from 'zod'
 import { backlogApi, BacklogViews } from './api.js'
 import { CaptureProject } from './capture-project.js'
 import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
-import { fileInput } from './composer-files.js'
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
+import { composerLinkLabel } from './composer-link-label.js'
+import { fileInput } from './composer-files.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -608,7 +609,7 @@ export const Composer = (props: {
             {preview.links.map(link => (
               <span key={`${link.type}:${link.target}`} className={chipClass}>
                 <LinkIcon aria-hidden className="dshx:size-3 dshx:shrink-0" />
-                <span className="dshx:truncate">{link.type === 'item' ? `b:${link.target}` : link.target}</span>
+                <span className="dshx:truncate">{composerLinkLabel(link, props.threads)}</span>
               </span>
             ))}
           </span>

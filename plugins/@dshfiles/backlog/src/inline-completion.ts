@@ -38,12 +38,16 @@ const OTHER_SCOPES: readonly string[] = ['thread', 't', 'file', 'f', 'skill', 'm
 export class InlineCompletion {
   /** The token being typed right before the caret, if any. */
   static tokenAt(text: string, caret: number): InlineToken | null {
-    const match = /(^|\s)([#@])([\w./:-]*)$/u.exec(text.slice(0, caret))
+    const match = /(^|\s)([#@])([\w./:-]*(?:\s+[\w./:-]+)*)$/u.exec(text.slice(0, caret))
     if (match === null || match[2] === undefined) return null
     const trigger = match[2] === '#' ? '#' : '@'
-    const body = match[3] ?? ''
-    const start = caret - body.length - 1
-    if (trigger === '#') return { trigger, query: body, start, scope: null }
+    const rawBody = match[3] ?? ''
+    const body = rawBody.trimEnd()
+    const start = caret - rawBody.length - 1
+    if (trigger === '#') {
+      if (/\s/u.test(body)) return null
+      return { trigger, query: body, start, scope: null }
+    }
     const scope = /^([a-z]+):/iu.exec(body)?.[1]?.toLowerCase() ?? null
     if (scope === null) return { trigger, query: body, start, scope }
     return { trigger, query: body.slice(scope.length + 1), start, scope }
