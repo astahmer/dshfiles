@@ -162,7 +162,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
 
   return (
     <form
-      className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-3"
+      className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-2"
       data-testid="secret-setup-form"
       noValidate
       onSubmit={submitWith(form.handleSubmit)}
@@ -195,7 +195,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
               <field.TextField description={props.t('aliasHint')} label={props.t('fieldAlias')} monospace placeholder={props.t('aliasPlaceholder')} required />
             )}
           </form.AppField>
-          <div className="dshx:grid dshx:gap-3 dshx:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
+          <div className="dshx:grid dshx:gap-2 dshx:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
             <form.Subscribe selector={state => state.values.scope}>
               {scope => (
                 <form.AppField name="scope">

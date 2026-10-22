@@ -231,7 +231,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
       {open ? (
         <div
           ref={panelRef}
-          aria-label={jevSetupOpen ? props.t('jevSetupTitle') : creating ? props.t('setupCreateAndBind') : props.t('bindSecret')}
+          aria-label={jevSetupOpen ? props.t('jevSetupTitle') : props.t(creating ? 'setupCreateAndBind' : 'bindSecret')}
           className="dshx-root dshx:pointer-events-auto dshx:flex dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:text-popover-foreground dshx:shadow-md"
           data-side={placement.side}
           data-testid="secret-input-panel"
@@ -249,29 +249,27 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
               unavailable={jevUnavailable}
             />
           ) : creating ? (
-            <>
-              <p className="dshx:px-1 dshx:text-xs dshx:font-medium">{props.t('setupCreateAndBind')}</p>
-              <SecretSetupForm
-                {...(referenceToRetry === undefined ? {} : { createdReference: referenceToRetry })}
-                onBind={async reference => {
-                  if (!anchor.element.isConnected) throw new Error('The reference field is no longer available.')
-                  SecretInputBinding.writeValue(anchor.element, reference)
-                }}
-                onBound={() => {
-                  setCreatedReference(current => (current?.element === anchor.element ? null : current))
-                  setCreating(false)
-                  setOpen(false)
-                  anchor.element.focus()
-                }}
-                onCancel={() => {
-                  setCreating(false)
-                  anchor.element.focus()
-                }}
-                onCreatedReference={reference => setCreatedReference({ element: anchor.element, reference })}
-                t={props.t}
-                target={targetOf(anchor.element)}
-              />
-            </>
+            <SecretSetupForm
+              {...(referenceToRetry === undefined ? {} : { createdReference: referenceToRetry })}
+              onBind={async reference => {
+                if (!anchor.element.isConnected) throw new Error('The reference field is no longer available.')
+                SecretInputBinding.writeValue(anchor.element, reference)
+              }}
+              onBound={() => {
+                setCreatedReference(current => (current?.element === anchor.element ? null : current))
+                setCreating(false)
+                setOpen(false)
+                anchor.element.focus()
+              }}
+              onCancel={() => {
+                setCreating(false)
+                anchor.element.focus()
+              }}
+              onCreatedReference={reference => setCreatedReference({ element: anchor.element, reference })}
+              t={props.t}
+              target={targetOf(anchor.element)}
+            />
+
           ) : (
             <>
               <p className="dshx:px-1 dshx:text-xs dshx:font-medium">{props.t('bindSecret')}</p>

@@ -78,25 +78,18 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
     setOpened(false)
     setEditingIds(new Set())
   }
+  const visibleRequirements = props.missing.filter(requirement => !opened || boundIds.has(requirement.id) || !editingIds.has(requirement.id))
 
   return (
     <section
-      className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-4"
+      className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-3"
       data-testid="secret-setup-offer"
     >
-      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-        <h3 className="dshx:text-sm dshx:font-semibold">{props.t('setupRequiredTitle')}</h3>
-        <p className="dshx:text-sm dshx:text-muted-foreground">{props.t('setupRequiredDescription')}</p>
-      </div>
-      <ul className="dshx:flex dshx:flex-col dshx:gap-2">
-        {props.missing.map(requirement => (
-          <li className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2" key={requirement.id}>
-            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm">{requirement.label}</span>
-            {boundIds.has(requirement.id) ? <span className="dshx:text-xs dshx:text-success">{props.t('setupBound')}</span> : null}
-          </li>
-        ))}
-      </ul>
-      <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
+      <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-2">
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+          <h3 className="dshx:text-sm dshx:font-semibold">{props.t('setupRequiredTitle')}</h3>
+          <p className="dshx:text-xs dshx:text-muted-foreground">{props.t('setupRequiredDescription')}</p>
+        </div>
         {opened ? (
           <Button disabled={busyIds.size > 0} onClick={closeSetup} size="sm" type="button" variant="ghost">
             {props.t('setupCancel')}
@@ -107,8 +100,18 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
           </Button>
         )}
       </div>
+      {visibleRequirements.length > 0 ? (
+        <ul className="dshx:flex dshx:flex-col dshx:gap-1">
+          {visibleRequirements.map(requirement => (
+            <li className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2" key={requirement.id}>
+              <span className="dshx:min-w-0 dshx:truncate dshx:text-sm">{requirement.label}</span>
+              {boundIds.has(requirement.id) ? <span className="dshx:text-xs dshx:text-success">{props.t('setupBound')}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {opened ? (
-        <div className="dshx:flex dshx:flex-col dshx:gap-4">
+        <div className="dshx:flex dshx:flex-col dshx:gap-3">
           {props.missing.map(requirement => {
             if (boundIds.has(requirement.id)) return null
             if (!editingIds.has(requirement.id)) {
@@ -122,7 +125,7 @@ export const SecretSetupOffer = (props: SecretSetupOfferProps): JSX.Element | nu
               )
             }
             return (
-              <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:p-3" key={requirement.id}>
+              <div className="dshx:flex dshx:flex-col dshx:gap-2" key={requirement.id}>
                 <h4 className="dshx:text-sm dshx:font-medium">{requirement.label}</h4>
                 <SecretSetupForm
                   {...(createdReferences[requirement.id] === undefined ? {} : { createdReference: createdReferences[requirement.id] })}
