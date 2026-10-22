@@ -114,11 +114,11 @@ describe('settings tools: write', () => {
 })
 
 describe('settings-shell tool exposure', () => {
-  test('exposes exactly the settings read, merge and reset tools', async () => {
+  test('exposes the release check and settings read, merge and reset tools', async () => {
     const { settingsShellApi } = await import('./shell-api.js')
     const tools = Object.values(settingsShellApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
-    expect(tools.map(tool => tool.name)).toEqual(['settings_list', 'settings_set', 'settings_unset'])
-    expect(tools.filter(tool => tool.readOnly === true).map(tool => tool.name)).toEqual(['settings_list'])
+    expect(tools.map(tool => tool.name)).toEqual(['dsh_release_status', 'settings_list', 'settings_set', 'settings_unset'])
+    expect(tools.filter(tool => tool.readOnly === true).map(tool => tool.name)).toEqual(['dsh_release_status', 'settings_list'])
     for (const method of Object.values(settingsShellApi.methods)) {
       if (method.tool === undefined) continue
       expect(method.description).toBeTruthy()

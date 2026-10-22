@@ -1,5 +1,7 @@
 # @dshfiles/settings-shell
 
+![DSH release notice and TL;DR](docs/screenshots/dsh-release-notice.png)
+
 ![Native Settings shell, ported](docs/screenshots/settings-shell-port.png)
 
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
@@ -19,6 +21,10 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
   into the main view, keeping the section.
 - Picking the Settings tab, or a reload that lands on it, reopens Settings there; leaving the panel closes it. With no
   other tab left, main-tabs keeps showing Settings (it cannot show an empty main view).
+
+### DSH release notices
+
+The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **General** lists releases between the installed version and latest, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result.
 
 ### Search
 

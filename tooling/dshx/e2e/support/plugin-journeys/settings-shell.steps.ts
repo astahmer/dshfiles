@@ -17,6 +17,15 @@ When('Settings is opened from the sidebar', async ({ page }: { page: Page }) => 
   await openSettings(page)
 })
 
+Then('the DSH release status and manual check action are available', async ({ page }: { page: Page }) => {
+  const notice = page.locator('[data-dsh-release-notice]')
+  await recordAssertion(page, 'settings-shell-shows-release-check', async () => {
+    await expect(notice).toBeVisible()
+    await expect(notice.getByRole('button', { name: 'Check for DSH updates', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the native sections and General rows show in the Settings dialog', async ({ page }: { page: Page }) => {
   const dialog = page.getByRole('dialog', { name: 'Settings', exact: true })
   await recordAssertion(page, 'settings-shell-port-keeps-native-sections', async () => {

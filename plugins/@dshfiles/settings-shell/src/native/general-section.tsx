@@ -8,6 +8,7 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { useState } from 'react'
 import type { ShellTranslate } from './locales.js'
 import { useObservable } from './use-observable.js'
+import { DshReleaseIndicator } from '../release-notice.js'
 
 /** The General section column; rows come from `settings.general.item` registrants. */
 export const GeneralSection = (props: Pick<PropsRenderSlots<'settings.general.item'>, 'renderSlot'>): JSX.Element => (
@@ -61,7 +62,10 @@ export const DeveloperToolsRow = (props: {
 /** The sidebar trigger content: the gear, and the label only in the wide column. */
 export const TriggerContent = (props: { readonly wide: boolean; readonly t: ShellTranslate }): JSX.Element => (
   <>
-    <IconSettingsOutlineMedium size={props.wide ? 16 : 18} />
+    <span className="dshx:relative dshx:inline-flex">
+      <IconSettingsOutlineMedium size={props.wide ? 16 : 18} />
+      <DshReleaseIndicator t={props.t} />
+    </span>
     {props.wide && <span className="dshx:overflow-hidden dshx:whitespace-nowrap">{props.t('trigger')}</span>}
   </>
 )

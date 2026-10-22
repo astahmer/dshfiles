@@ -56,6 +56,20 @@ const shellEn = {
   'config.failed': 'Could not open the configuration file',
   'config.editorNeedsThread': 'Open a thread first: the Editor opens files in a thread’s panel',
   'port.stale': 'This Settings shell was ported from DSH {ported}; DSH {installed} may have changed it. Refresh @dshfiles/settings-shell.',
+  'releaseNotice.badge': 'DSH {version} is available. Open Settings → General for a summary.',
+  'releaseNotice.available': 'DSH {version} is available',
+  'releaseNotice.compare': 'Your version is {current}; this summary covers releases through {latest}.',
+  'releaseNotice.showSummary': 'TL;DR',
+  'releaseNotice.hideSummary': 'Hide TL;DR',
+  'releaseNotice.dismiss': 'Dismiss DSH {version} update notice',
+  'releaseNotice.noHighlights': 'No concise English highlights were included in these release notes.',
+  'releaseNotice.releaseNotes': 'Open release notes',
+  'releaseNotice.checking': 'Checking for DSH releases…',
+  'releaseNotice.failed': 'Could not check DSH releases',
+  'releaseNotice.unknown': 'Could not compare releases with DSH {version}',
+  'releaseNotice.current': 'DSH {version} is up to date',
+  'releaseNotice.check': 'Check for DSH updates',
+  'releaseNotice.retryHint': 'Check your connection and try again.',
 }
 
 const shellZh = {
@@ -106,6 +120,20 @@ const shellZh = {
   'config.failed': '无法打开配置文件',
   'config.editorNeedsThread': '请先打开一个会话：编辑器在会话面板中打开文件',
   'port.stale': '此设置界面移植自 DSH {ported}；DSH {installed} 可能已更改它。请更新 @dshfiles/settings-shell。',
+  'releaseNotice.badge': 'DSH {version} 已发布。打开设置 → 通用设置查看摘要。',
+  'releaseNotice.available': 'DSH {version} 已发布',
+  'releaseNotice.compare': '当前版本为 {current}；以下摘要涵盖至 {latest} 的版本。',
+  'releaseNotice.showSummary': '摘要',
+  'releaseNotice.hideSummary': '收起摘要',
+  'releaseNotice.dismiss': '关闭 DSH {version} 更新通知',
+  'releaseNotice.noHighlights': '这些发行说明中没有简明的英文要点。',
+  'releaseNotice.releaseNotes': '打开发行说明',
+  'releaseNotice.checking': '正在检查 DSH 发行版本…',
+  'releaseNotice.failed': '无法检查 DSH 发行版本',
+  'releaseNotice.unknown': '无法比较 DSH {version} 与现有发行版本',
+  'releaseNotice.current': 'DSH {version} 已是最新版本',
+  'releaseNotice.check': '检查 DSH 更新',
+  'releaseNotice.retryHint': '请检查网络连接后重试。',
 } satisfies Record<keyof typeof shellEn, string>
 
 // Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT), lib/client.js `zh` and `en`.

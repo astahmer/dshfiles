@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { Context } from '@deepseek-ai/cordis'
 import { PluginApiError } from '@dshfiles/dshx/api'
@@ -9,6 +9,7 @@ import { createSettingsTools, type SettingsSurface } from './settings-tools.js'
 import { settingsShellApi } from './shell-api.js'
 import { settingsShellSettings } from './settings.js'
 import { PORTED_FROM, WELCOME_PORTED_FROM } from './upstream.js'
+import { fetchDshReleaseStatus, type DshReleaseStatus } from './release-status.js'
 
 const packageVersionSchema = z.object({ version: z.string() })
 const settingsProviderSchema = z.object({ documentPath: z.string() })
@@ -30,13 +31,38 @@ const installedVersion = (packageName: string): string | null => {
   if (entry === undefined) return null
   try {
     const require = createRequire(realpathSync(entry))
-    return packageVersionSchema.parse(require(`${packageName}/package.json`)).version
+    const manifestPath = require.resolve(`${packageName}/package.json`)
+    return packageVersionSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8'))).version
   } catch {
     return null
   }
 }
 
 const installedUpstreamVersion = (): string | null => installedVersion(PORTED_FROM.packageName)
+
+const RELEASE_CACHE_MS = 60 * 60 * 1000
+let releaseStatusCache: { readonly expiresAt: number; readonly value: DshReleaseStatus } | undefined
+let releaseStatusRequest: Promise<DshReleaseStatus> | undefined
+
+const dshReleaseStatus = async (signal: AbortSignal): Promise<DshReleaseStatus> => {
+  signal.throwIfAborted()
+  if (releaseStatusCache !== undefined && releaseStatusCache.expiresAt > Date.now()) return releaseStatusCache.value
+  if (releaseStatusRequest !== undefined) return releaseStatusRequest
+  const request = fetchDshReleaseStatus({
+    currentVersion: installedVersion('@deepseek-ai/dsh'),
+    fetch: globalThis.fetch,
+    signal,
+  }).then(value => {
+    releaseStatusCache = { expiresAt: Date.now() + RELEASE_CACHE_MS, value }
+    return value
+  })
+  releaseStatusRequest = request
+  try {
+    return await request
+  } finally {
+    if (releaseStatusRequest === request) releaseStatusRequest = undefined
+  }
+}
 
 export default defineHost({
   name: '@dshfiles/settings-shell',
@@ -55,6 +81,7 @@ export default defineHost({
         const installed = installedUpstreamVersion()
         return { portedFrom: PORTED_FROM.version, installed, stale: installed !== null && installed !== PORTED_FROM.version }
       },
+      releaseStatus: ({ signal }) => dshReleaseStatus(signal),
       list: context => settingsTools(context.ctx).list(context),
       set: context => settingsTools(context.ctx).set(context),
       unset: context => settingsTools(context.ctx).unset(context),

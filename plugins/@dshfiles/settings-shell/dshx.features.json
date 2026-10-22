@@ -35,6 +35,40 @@
       ]
     },
     {
+      "id": "dsh-release-notice",
+      "title": "DSH release notice and TL;DR",
+      "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
+      "surfaces": ["client", "host", "api", "tool", "storage"],
+      "configuration": [],
+      "states": ["checking", "up-to-date", "update-available", "summary-expanded", "dismissed", "comparison-unknown", "unavailable"],
+      "failureModes": [
+        "GitHub is unavailable or returns an invalid payload; Settings stays usable and offers a manual retry.",
+        "The installed version is absent from the bounded release history; the plugin reports that comparison is unknown instead of guessing.",
+        "Release notes are bounded and rendered as escaped plain text; malformed or HTML content cannot inject client markup."
+      ],
+      "externalDependencies": [
+        {
+          "id": "GitHub Releases API",
+          "boundary": "Host-only GET to the fixed public deepseek-harness releases endpoint; response data is schema-validated, bounded, and rendered as untrusted text.",
+          "deterministicFake": "release-status.test.ts injects a fixed fetch response and covers release ordering, version matching, English note extraction, redirects, and malformed payloads."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.dsh-release-notice",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.release-status",
+          "file": "plugins/@dshfiles/settings-shell/src/release-status.test.ts",
+          "testName": "lists releases after the installed version and keeps their links on GitHub"
+        }
+      ]
+    },
+    {
       "id": "settings-tab",
       "title": "Settings as a main-view tab",
       "summary": "With main-tabs loaded, Settings fills the main view and gets a tab like any other panel; picking that tab or reloading onto it reopens Settings, leaving the panel closes it.",

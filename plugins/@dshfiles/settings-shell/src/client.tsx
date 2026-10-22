@@ -16,6 +16,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteApi } from '@dshfiles/command-palette/api'
 import { SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import type { ConfigForm, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -31,6 +32,7 @@ import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
+import { DshReleaseNotice } from './release-notice.js'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
@@ -663,9 +665,14 @@ export default defineClient({
     )
 
     ctx.slots.inject('settings.trigger', () =>
-      ctx.slots.register({ name: 'settings.trigger', locale: SHELL_LOCALE_NAMESPACE }, (props: { readonly wide: boolean; readonly t: ShellTranslate }) => (
-        <TriggerContent t={props.t} wide={props.wide} />
-      )),
+      ctx.slots.register(
+        { name: 'settings.trigger', locale: SHELL_LOCALE_NAMESPACE },
+        decorate((props: { readonly wide: boolean; readonly t: ShellTranslate }) => (
+          <PluginQueryProvider>
+            <TriggerContent t={props.t} wide={props.wide} />
+          </PluginQueryProvider>
+        )),
+      ),
     )
     ctx.slots.inject('settings.header', () =>
       ctx.slots.register({ name: 'settings.header', locale: SHELL_LOCALE_NAMESPACE }, (props: { readonly t: ShellTranslate }) => <HeaderContent t={props.t} />),
@@ -770,6 +777,16 @@ export default defineClient({
             t={props.t}
           />
         ),
+      ),
+    )
+    ctx.slots.inject('settings.general.item', () =>
+      ctx.slots.register(
+        { name: 'settings.general.item', id: 'dsh-release-notice', order: 10, locale: SHELL_LOCALE_NAMESPACE },
+        decorate((props: { readonly t: ShellTranslate }) => (
+          <PluginQueryProvider>
+            <DshReleaseNotice t={props.t} />
+          </PluginQueryProvider>
+        )),
       ),
     )
     ctx.slots.inject('settings.general.item', () =>

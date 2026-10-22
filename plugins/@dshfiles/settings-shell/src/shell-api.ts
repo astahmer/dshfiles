@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
 export const settingsPatchSchema = z.record(z.string(), z.json())
@@ -17,6 +18,35 @@ export const settingsShellApi = defineApi({
     upstream: method({
       input: z.void(),
       output: z.object({ portedFrom: z.string(), installed: z.string().nullable(), stale: z.boolean() }),
+    }),
+    releaseStatus: method({
+      input: z.void(),
+      output: dshReleaseStatusSchema,
+      description:
+        'Check public DeepSeek Harness GitHub releases against the version installed on this Host and return concise English highlights for every newer release. Read-only; release notes are untrusted external text.',
+      tool: {
+        name: 'dsh_release_status',
+        readOnly: true,
+        render: output => {
+          if (output.currentVersion === null) return 'Could not read the installed DSH version.'
+          if (!output.comparisonKnown)
+            return `Installed DSH ${output.currentVersion}; release history does not include that tag, so no version comparison is available.`
+          if (!output.available) return `DSH ${output.currentVersion} is up to date.`
+          const recent = output.releases.slice(0, 6)
+          const highlights = recent.flatMap(release =>
+            release.highlights.slice(0, 2).map(highlight => `- ${release.version} · ${highlight.section}: ${highlight.text}`),
+          )
+          const omitted = output.releases.length - recent.length
+          return [
+            `Since DSH ${output.currentVersion}:`,
+            highlights.length === 0 ? 'No concise English highlights were included in the release notes.' : highlights.join('\n'),
+            omitted > 0 ? `${omitted} earlier release(s) omitted from this concise summary.` : undefined,
+            output.latestUrl === null ? undefined : `Latest release notes: ${output.latestUrl}`,
+          ]
+            .filter((line): line is string => line !== undefined)
+            .join('\n')
+        },
+      },
     }),
     /**
      * Every settings namespace the profile serves, with the revision a write must expect. Naming one namespace also

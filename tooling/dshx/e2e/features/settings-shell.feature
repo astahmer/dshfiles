@@ -14,6 +14,12 @@ Feature: Settings shell
     Then the native sections and General rows show in the Settings dialog
     And the Settings shortcut closes and reopens the dialog
 
+  @scenario:settings-shell.dsh-release-notice
+  Scenario: Settings checks new DSH releases against the installed version
+    Given the isolated plugin profile "@dshfiles/settings-shell" is booted
+    When Settings is opened from the sidebar
+    Then the DSH release status and manual check action are available
+
   @smoke
   @scenario:settings-shell.tab
   Scenario: Settings opens as a tab when main-tabs is loaded

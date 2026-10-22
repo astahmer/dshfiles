@@ -2,7 +2,7 @@
   "name": "@dshfiles/settings-shell",
   "version": "0.1.0",
   "private": true,
-  "description": "VS Code-style Settings: a port of the native DSH Settings shell that opens as a main-view tab or a modal, renders every plugin's settings with real controls, and searches them inline.",
+  "description": "VS Code-style DSH Settings shell with plugin settings, search, and notices for new DSH releases.",
   "files": [
     "dist",
     "cordis.patch.yml"
