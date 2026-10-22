@@ -40,8 +40,40 @@ const openToResolution = (item: Pick<BacklogItem, 'status' | 'humanFields' | 'pr
 }
 
 /** What a finished thread's turn says about the items it works on, before any item is touched. */
+export interface IdleThreadNudge {
+  readonly id: number
+  readonly threadId: string
+}
+
+const idleThreadNudges = (input: {
+  readonly items: readonly Pick<BacklogItem, 'id' | 'status' | 'attention' | 'humanFields' | 'links' | 'events'>[]
+  readonly sessions: readonly { readonly sessionId: string; readonly running: boolean; readonly updatedAt: number }[]
+  readonly now: number
+  readonly idleDays: number
+}): IdleThreadNudge[] => {
+  const cutoff = input.now - input.idleDays * 86_400_000
+  const sessions = new Map(input.sessions.map(session => [session.sessionId, session]))
+  const nudges: IdleThreadNudge[] = []
+  for (const item of input.items) {
+    if (item.status !== 'doing' || (item.attention ?? 'none') !== 'none' || item.humanFields.includes('attention')) continue
+    for (const link of item.links) {
+      if (link.type !== 'thread') continue
+      const session = sessions.get(link.target)
+      if (session === undefined || session.running || session.updatedAt > cutoff) continue
+      const alreadyNudged = item.events.some(
+        event => event.kind === 'commented' && event.threadId === session.sessionId && event.detail.startsWith('Thread idle nudge:'),
+      )
+      if (alreadyNudged) continue
+      nudges.push({ id: item.id, threadId: session.sessionId })
+      break
+    }
+  }
+  return nudges
+}
+
 export class ThreadLifecycle {
   static readonly outcome = outcome
   static readonly replyText = replyText
   static readonly openToResolution = openToResolution
+  static readonly idleThreadNudges = idleThreadNudges
 }

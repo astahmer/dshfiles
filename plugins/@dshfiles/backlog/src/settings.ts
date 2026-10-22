@@ -31,6 +31,10 @@ export const backlogSettings = defineSettings({
       .description(
         'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked, and its next finished turn clears that flag. Never overrides a status or attention you set by hand.',
       ),
+    idleThreadNudgeDays: Schema.natural()
+      .max(3_650)
+      .default(0)
+      .description('Opt in to idle-thread nudges by setting a positive day count. Unfinished items on idle threads then ask for review.'),
     threadResolution: Schema.union([
       Schema.const('off').description('Off: a finished thread never suggests anything'),
       Schema.const('propose').description("Propose: ask Jev whether the thread's last reply resolved its open items, and leave a Done suggestion on each"),

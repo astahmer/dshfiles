@@ -340,6 +340,26 @@ const scheduleResolution = (ctx: Context, session: Session, settings: BacklogSet
 }
 
 /** A thread that stopped flags the items it works on; its next finished turn clears only that same flag. */
+const nudgeIdleThreads = async (ctx: Context): Promise<void> => {
+  const settings = currentSettings()
+  if (!settings.lifecycleSignals || settings.idleThreadNudgeDays === 0) return
+  const store = await backlogFor(ctx)
+  const items = store.list({ freshness: 'all', statuses: ['doing'], limit: 2_000 }).items.flatMap(summary => {
+    const detail = store.get(summary.id)
+    return detail.ok ? [detail.value.item] : []
+  })
+  if (items.length === 0) return
+  const sessions = await ctx.sessionController.list({}, AbortSignal.timeout(20_000))
+  for (const nudge of ThreadLifecycle.idleThreadNudges({ items, sessions: sessions.items, now: Date.now(), idleDays: settings.idleThreadNudgeDays })) {
+    await store.applyThreadAttention({
+      id: nudge.id,
+      threadId: nudge.threadId,
+      attention: 'waiting',
+      reason: `Thread idle nudge: linked thread ${nudge.threadId} has been idle for at least ${settings.idleThreadNudgeDays} days. Is this item still active?`,
+    })
+  }
+}
+
 const onThreadTurn = (ctx: Context, session: Session, reason: TurnEndReason): void => {
   const outcome = ThreadLifecycle.outcome(reason)
   if (outcome === null) return
@@ -689,6 +709,16 @@ export default defineHost({
       }, 60_000)
       return () => clearInterval(timer)
     }, 'backlog: revision signals')
+    ctx.effect(() => {
+      let lastNudge = 0
+      const timer = setInterval(() => {
+        const settings = currentSettings()
+        if (!settings.lifecycleSignals || settings.idleThreadNudgeDays === 0 || Date.now() - lastNudge < 60 * 60_000) return
+        lastNudge = Date.now()
+        void nudgeIdleThreads(ctx).catch(logFailure('Backlog idle-thread nudge failed'))
+      }, 60_000)
+      return () => clearInterval(timer)
+    }, 'backlog: idle thread nudges')
     ctx.effect(() => {
       void backlogFor(ctx).catch(() => undefined)
       return async () => {

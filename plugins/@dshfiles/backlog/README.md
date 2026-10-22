@@ -199,6 +199,9 @@ On by default (`lifecycleSignals`). Items move without anyone filing them:
 - A linked thread whose turn ended **blocked** or **failed** marks its open items as blocked, so they reach the
   Inbox instead of sitting silently In progress. Its next finished turn clears that flag again; a cancellation,
   a token ceiling and a crash-interrupted turn leave the item alone.
+- Set `idleThreadNudgeDays` to a positive number to nudge unfinished items when a linked thread has been idle
+  that many days. The Inbox attention and comment name the thread; active threads, closed items and items with
+  an existing attention request are left alone. The default `0` keeps this opt-in.
 
 Signals only move forward (never Done back to In progress, never out of Dropped) and never over a status or
 attention you set by hand; the link is recorded either way. Only the block this signal set is cleared later,

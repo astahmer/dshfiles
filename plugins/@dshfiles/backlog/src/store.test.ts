@@ -348,6 +348,37 @@ describe('thread turn signals', () => {
     expect(late.ok && late.value.item.status).toBe('done')
   })
 
+  it('marks old idle thread work waiting once and clears that flag when the thread resumes', async () => {
+    const store = await workingItem()
+    const flagged = await store.applyThreadAttention({
+      id: 1,
+      threadId: 'session-abc123',
+      attention: 'waiting',
+      reason: 'Thread idle nudge: linked thread session-abc123 has been idle for at least 7 days. Is this item still active?',
+    })
+    expect(flagged.ok && flagged.value.item.attention).toBe('waiting')
+    expect(flagged.ok && flagged.value.item.events.at(-1)?.kind).toBe('commented')
+    expect(flagged.ok && flagged.value.item.events.at(-1)?.detail).toBe(
+      'Thread idle nudge: linked thread session-abc123 has been idle for at least 7 days. Is this item still active?',
+    )
+    expect(flagged.ok && flagged.value.item.events.at(-1)?.threadId).toBe('session-abc123')
+    expect(store.list({ inbox: true }).items.map(item => item.id)).toEqual([1])
+
+    const duplicate = await store.applyThreadAttention({
+      id: 1,
+      threadId: 'session-abc123',
+      attention: 'waiting',
+      reason: 'Thread idle nudge: linked thread session-abc123 has been idle for at least 7 days. Is this item still active?',
+    })
+    expect(
+      duplicate.ok && duplicate.value.item.events.filter(event => event.kind === 'commented' && event.detail.startsWith('Thread idle nudge:')).length,
+    ).toBe(1)
+
+    const resumed = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'none', reason: 'the thread works again' })
+    expect(resumed.ok && resumed.value.item.attention).toBe('none')
+    expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
   it('keeps a block an agent flagged itself when a later turn finishes', async () => {
     const store = await workingItem()
     await store.update({ id: 1, attention: 'blocked', actor: agent })

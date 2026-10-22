@@ -46,6 +46,44 @@ describe('thread replies', () => {
   })
 })
 
+describe('idle thread nudges', () => {
+  const linkedItem = (
+    fields: Partial<Pick<BacklogItem, 'status' | 'attention' | 'humanFields' | 'links' | 'events'>> = {},
+  ): Pick<BacklogItem, 'id' | 'status' | 'attention' | 'humanFields' | 'links' | 'events'> => ({
+    id: 4,
+    status: 'doing',
+    attention: 'none',
+    humanFields: [],
+    links: [{ type: 'thread', target: 'session-abc' }],
+    events: [],
+    ...fields,
+  })
+  const session = (fields: Partial<{ sessionId: string; displayTitle: string; running: boolean; updatedAt: number }> = {}) => ({
+    sessionId: 'session-abc',
+    displayTitle: 'Implement feature',
+    running: false,
+    updatedAt: 2 * 86_400_000,
+    ...fields,
+  })
+
+  it('nudges only unfinished items linked to an idle thread older than the configured cutoff', () => {
+    expect(ThreadLifecycle.idleThreadNudges({ items: [linkedItem()], sessions: [session()], now: 9 * 86_400_000, idleDays: 7 })).toEqual([
+      { id: 4, threadId: 'session-abc' },
+    ])
+    expect(
+      ThreadLifecycle.idleThreadNudges({ items: [linkedItem()], sessions: [session({ updatedAt: 3 * 86_400_000 })], now: 9 * 86_400_000, idleDays: 7 }),
+    ).toEqual([])
+    expect(ThreadLifecycle.idleThreadNudges({ items: [linkedItem()], sessions: [session({ running: true })], now: 9 * 86_400_000, idleDays: 7 })).toEqual([])
+    expect(ThreadLifecycle.idleThreadNudges({ items: [linkedItem({ status: 'done' })], sessions: [session()], now: 9 * 86_400_000, idleDays: 7 })).toEqual([])
+    expect(
+      ThreadLifecycle.idleThreadNudges({ items: [linkedItem({ attention: 'needs-input' })], sessions: [session()], now: 9 * 86_400_000, idleDays: 7 }),
+    ).toEqual([])
+    expect(
+      ThreadLifecycle.idleThreadNudges({ items: [linkedItem({ humanFields: ['attention'] })], sessions: [session()], now: 9 * 86_400_000, idleDays: 7 }),
+    ).toEqual([])
+  })
+})
+
 describe('resolution candidates', () => {
   it('offers a done suggestion only for an in-progress item the user never touched', () => {
     expect(ThreadLifecycle.openToResolution(item())).toBe(true)

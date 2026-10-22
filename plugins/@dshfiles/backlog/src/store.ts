@@ -147,7 +147,7 @@ export interface BacklogStore {
   applyThreadAttention(input: {
     readonly id: number
     readonly threadId: string
-    readonly attention: 'blocked' | 'none'
+    readonly attention: 'blocked' | 'waiting' | 'none'
     readonly reason: string
   }): Promise<BacklogResult<BacklogDetail>>
   /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
@@ -636,6 +636,17 @@ const createBacklogStore = ({
       const item = find(id)
       if (item === undefined) return { ok: false, reason: 'not-found' }
       if (item.humanFields.includes('attention')) return { ok: true, value: detailOf(item) }
+      if (attention === 'waiting') {
+        if (item.status !== 'doing' || (item.attention ?? 'none') !== 'none') return { ok: true, value: detailOf(item) }
+        const alreadyWaiting = item.events.some(
+          event => event.kind === 'commented' && event.threadId === threadId && event.detail.startsWith('Thread idle nudge:'),
+        )
+        if (alreadyWaiting) return { ok: true, value: detailOf(item) }
+        return {
+          ok: true,
+          value: await touch(item, { kind: 'system' }, { kind: 'commented', detail: reason, threadId }, { attention: 'waiting', acknowledgedAt: null }),
+        }
+      }
       if (attention === 'blocked') {
         if ((item.attention ?? 'none') !== 'none' || item.status === 'done' || item.status === 'dropped') return { ok: true, value: detailOf(item) }
         return {
@@ -650,7 +661,17 @@ const createBacklogStore = ({
       }
       const last = item.events.at(-1)
       const stalledHere = last?.actor === 'system' && last.kind === 'edited' && last.detail.startsWith('attention: blocked (')
-      if ((item.attention ?? 'none') !== 'blocked' || stalledHere !== true) return { ok: true, value: detailOf(item) }
+      const waitingSignal = item.events.findLast(
+        event => event.actor === 'system' && event.kind === 'commented' && event.detail.startsWith('Thread idle nudge:'),
+      )
+      const waitingHere = waitingSignal?.threadId === threadId
+      if ((item.attention ?? 'none') === 'blocked' && stalledHere === true) {
+        return {
+          ok: true,
+          value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})`, threadId }, { attention: 'none' }),
+        }
+      }
+      if ((item.attention ?? 'none') !== 'waiting' || waitingHere !== true) return { ok: true, value: detailOf(item) }
       return {
         ok: true,
         value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})`, threadId }, { attention: 'none' }),
