@@ -102,6 +102,12 @@ Then('the inline excerpt preview shows {string}', async ({ page }: { page: Page 
     await expect(preview.getByText('Thread excerpt', { exact: true })).toBeVisible()
     const excerpt = preview.locator('[data-dshfiles-memory-body]')
     await expect(excerpt).toContainText(text)
+    const previewSize = await preview.evaluate(element => {
+      const bounds = element.getBoundingClientRect()
+      return { width: bounds.width, height: bounds.height }
+    })
+    expect(previewSize.width).toBeLessThanOrEqual(560)
+    expect(previewSize.height).toBeLessThanOrEqual(480)
     // The excerpt keeps raw log lines as a bounded monospace block, not prose.
     const fontFamily = await excerpt.evaluate(element => getComputedStyle(element).fontFamily)
     expect(fontFamily.toLowerCase()).toContain('mono')
@@ -112,6 +118,7 @@ Then('the inline excerpt preview shows {string}', async ({ page }: { page: Page 
 
 Then('the inline memory preview shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'memory-reference-inline-preview', async () => {
+    await page.setViewportSize({ width: 1986, height: 736 })
     const reference = page.locator('[data-dshfiles-memory-reference="n:1"]')
     await expect(reference).toBeVisible()
     const preview = page.locator('[data-dshfiles-memory-preview]')
@@ -133,7 +140,9 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
     const fontSize = await previewTitle.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize))
     expect(fontSize).toBeGreaterThanOrEqual(15)
     const previewWidth = await preview.evaluate(element => element.getBoundingClientRect().width)
-    expect(previewWidth).toBeLessThanOrEqual(560)
+    const previewHeight = await preview.evaluate(element => element.getBoundingClientRect().height)
+    expect(previewWidth).toBeLessThanOrEqual(432)
+    expect(previewHeight).toBeLessThanOrEqual(480)
     await expect(preview.getByRole('button', { name: 'Copy', exact: true })).toBeEnabled()
     await expect(preview.getByRole('tab', { name: 'Related', exact: true })).toBeVisible()
   })

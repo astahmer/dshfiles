@@ -312,7 +312,7 @@
     {
       "id": "memory-reference-preview",
       "title": "Preview cited memory inline",
-      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens an inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the Metadata grid, and Related and History tabs — with Copy and an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Digests and bounded message excerpts use the same card, and a reference that no longer exists shows a dashed not-found state. Preview reads do not create synthetic memory-tool usage records.",
+      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the Metadata grid, and Related and History tabs — with Copy and an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Digests and bounded message excerpts use the same card, and a reference that no longer exists shows a dashed not-found state. Preview reads do not create synthetic memory-tool usage records.",
       "surfaces": ["client", "api"],
       "configuration": [],
       "states": ["idle", "loading", "note", "digest", "excerpt", "missing", "unavailable"],

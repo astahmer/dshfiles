@@ -39,11 +39,11 @@ Feature: Thread memory panel
   @scenario:memory.reference-preview
   Scenario: Open a cited note inline from a conversation
     Given the isolated plugin composition of "@dshfiles/memory, @dshfiles/ai-accounts" is booted
-    And memory holds the project note "Deploys need the ops approval label."
+    And memory holds the project note "A long project note title must wrap inside a compact preview instead of stretching across the conversation, while keeping its source and actions easy to reach."
     And a Command Code account backed by a local fake provider is added
     When a thread on the fake model cites memory "n:1"
-    Then the inline memory preview shows "Deploys need the ops approval label."
-    And opening the preview in Memory focuses "Deploys need the ops approval label."
+    Then the inline memory preview shows "A long project note title must wrap inside a compact preview instead of stretching across the conversation, while keeping its source and actions easy to reach."
+    And opening the preview in Memory focuses "A long project note title must wrap inside a compact preview instead of stretching across the conversation, while keeping its source and actions easy to reach."
 
   @scenario:memory.reference-digest
   Scenario: Preview a cited digest, then a bounded excerpt of it

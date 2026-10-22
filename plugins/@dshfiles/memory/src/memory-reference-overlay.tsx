@@ -463,7 +463,7 @@ export const MemoryReferenceOverlay = (props: {
         collisionPadding={8}
         className={cn(
           'dshx-root dshx:flex dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0',
-          card?.kind === 'excerpt' ? 'dshx:w-[44rem]' : 'dshx:w-auto dshx:min-w-[26rem] dshx:max-w-[34rem]',
+          card?.kind === 'excerpt' ? 'dshx:w-[34rem]' : 'dshx:w-[26rem]',
         )}
         data-dshfiles-memory-preview
       >
@@ -480,7 +480,7 @@ export const MemoryReferenceOverlay = (props: {
             <CardHeader card={card} request={request} />
           )}
         </div>
-        <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-4 dshx:[max-height:min(26rem,58vh)]">
+        <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-4 dshx:[max-height:min(20rem,48vh)]">
           {preview.isPending && card === undefined ? (
             <div className="dshx:flex dshx:flex-col dshx:gap-2">
               <Skeleton className="dshx:h-4 dshx:w-11/12" />
