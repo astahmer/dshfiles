@@ -20,6 +20,7 @@ const scriptsSchema = (required: readonly string[]) => z.object(Object.fromEntri
 const bundleManifestSchema = z.object({ scripts: scriptsSchema(['build', 'test', 'typecheck']) })
 const libraryManifestSchema = z.object({ scripts: scriptsSchema(['test', 'typecheck']) })
 const clientBase = '../../../tsconfig.base.client.json'
+const tsconfigBaseExceptions = new Map([['subprocess-local', '../../../tsconfig.base.json']])
 const strictFlags = [
   'strict',
   'noUncheckedIndexedAccess',
@@ -29,11 +30,12 @@ const strictFlags = [
   'isolatedModules',
 ] as const
 const baseTsconfigSchema = z.object({ compilerOptions: z.object(Object.fromEntries(strictFlags.map(flag => [flag, z.literal(true)]))) })
-// Every plugin inherits the strict flags from the shared client base and may not turn one off.
-const tsconfigSchema = z.object({
-  extends: z.literal(clientBase),
-  compilerOptions: z.object(Object.fromEntries(strictFlags.map(flag => [flag, z.literal(true).optional()]))),
-})
+// Client plugins inherit strict flags from the shared base; Host-only forks may declare an explicit base exception.
+const tsconfigSchema = (base: string) =>
+  z.object({
+    extends: z.literal(base),
+    compilerOptions: z.object(Object.fromEntries(strictFlags.map(flag => [flag, z.literal(true).optional()]))),
+  })
 
 const repositoryRoot = join(workspaceRoot, '..')
 const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
@@ -136,7 +138,7 @@ const problemsFor = (name: string): string[] => {
   const directory = join(packagesRoot, name)
   const isBundle = existsSync(join(directory, 'cordis.patch.yml'))
   const manifest = (isBundle ? bundleManifestSchema : libraryManifestSchema).safeParse(JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')))
-  const tsconfig = tsconfigSchema.safeParse(JSON.parse(readFileSync(join(directory, 'tsconfig.json'), 'utf8')))
+  const tsconfig = tsconfigSchema(tsconfigBaseExceptions.get(name) ?? clientBase).safeParse(JSON.parse(readFileSync(join(directory, 'tsconfig.json'), 'utf8')))
   return [
     ...(manifest.success ? [] : manifest.error.issues.map(issue => `package.json ${issue.path.join('.')}: ${issue.message}`)),
     ...(tsconfig.success ? [] : tsconfig.error.issues.map(issue => `tsconfig.json ${issue.path.join('.')}: ${issue.message}`)),
@@ -160,5 +162,5 @@ if (problems.length > 0) {
   process.exit(1)
 }
 console.log(
-  'Workspace contract: every package has its scripts, extends the strict client tsconfig base, pins exact versions outside peers, and forms an acyclic package graph.',
+  'Workspace contract: every package has its scripts, uses its declared strict tsconfig base, pins exact versions outside peers, and forms an acyclic package graph.',
 )

@@ -3844,7 +3844,7 @@ importers:
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(0ab00a8eb09daf0ab308290e757fa426)
       mime-types:
-        specifier: ^3.0.2
+        specifier: 3.0.2
         version: 3.0.2
       zod:
         specifier: 4.4.3
