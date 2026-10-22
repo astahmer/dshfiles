@@ -60,6 +60,7 @@ export interface BacklogListQuery {
   readonly statuses?: readonly BacklogStatus[] | undefined
   readonly kinds?: readonly BacklogKind[] | undefined
   readonly project?: string | null | undefined
+  readonly projects?: readonly (string | null)[] | undefined
   readonly tag?: string | undefined
   readonly actor?: string | undefined
   /** `active` (fresh + stale, the feed), `all`, or one freshness state. */
@@ -354,10 +355,12 @@ const createBacklogStore = ({
     const freshnessFilter = query.freshness ?? 'active'
     // A caller may still ask for the workspace an item was captured in; the item is filed under its project.
     const project = query.project === undefined ? undefined : BacklogItems.projectOf(query.project)
+    const projects = query.projects?.map(candidate => (candidate === null ? null : BacklogItems.projectOf(candidate)))
     const matching = [...records.values()]
       .filter(item => query.statuses === undefined || query.statuses.length === 0 || query.statuses.includes(item.status))
       .filter(item => query.kinds === undefined || query.kinds.length === 0 || query.kinds.includes(item.kind))
       .filter(item => project === undefined || item.project === project)
+      .filter(item => projects === undefined || projects.length === 0 || projects.includes(item.project))
       .filter(item => query.tag === undefined || item.tags.includes(query.tag.toLowerCase().replace(/^#/, '')))
       .filter(item => query.actor === undefined || item.actors.some(actor => actor.id === query.actor))
       .filter(item => query.inbox !== true || wantsUser(item, at))

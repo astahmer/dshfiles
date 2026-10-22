@@ -139,6 +139,20 @@ describe('store', () => {
     expect(fromProject.item.project).toBe('/work/dshfiles')
   })
 
+  it('filters by any of several projects, including items without a project', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 1 })
+    await store.capture({ text: 'in dshfiles', project: '/work/dshfiles', actor: user })
+    await store.capture({ text: 'in bb-plugins', project: '/work/bb-plugins', actor: user })
+    await store.capture({ text: 'unassigned', actor: user })
+    await store.capture({ text: 'in another project', project: '/work/other', actor: user })
+
+    expect(store.list({ projects: ['/work/dshfiles', '/work/bb-plugins', null] }).items.map(item => item.title)).toEqual([
+      'unassigned',
+      'in bb-plugins',
+      'in dshfiles',
+    ])
+  })
+
   it('links an agent capture to its thread and project, and lists newest activity first', async () => {
     const time = clock(1_000)
     const items = memoryTable<BacklogItem>()

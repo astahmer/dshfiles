@@ -90,6 +90,10 @@ const listInputSchema = z
     statuses: z.array(BacklogItems.statusSchema).optional(),
     kinds: z.array(BacklogItems.kindSchema).optional(),
     project: z.string().max(BacklogItems.maxTargetChars).nullable().optional().describe('Absolute project path; null lists items outside any project.'),
+    projects: z
+      .array(z.string().max(BacklogItems.maxTargetChars).nullable())
+      .optional()
+      .describe('Several absolute project paths; null includes items outside any project, and an empty array applies no project filter.'),
     tag: z.string().max(60).optional(),
     actor: BacklogItems.actorIdSchema.optional().describe('`user`, `system` or `agent:<sessionId>`.'),
     freshness: z
@@ -128,7 +132,7 @@ export const backlogApi = defineApi({
       input: listInputSchema,
       output: listOutputSchema,
       description:
-        'List or search backlog items (tasks, bugs, ideas, notes, questions), newest activity first. Dormant and archived items are hidden unless `freshness` asks for them. Read-only.',
+        'List or search backlog items (tasks, bugs, ideas, notes, questions), newest activity first. Filter one project with `project` or any of several with `projects`; null selects items without a project. Dormant and archived items are hidden unless `freshness` asks for them. Read-only.',
       tool: { name: 'backlog_list', readOnly: true },
     }),
     revision: method({

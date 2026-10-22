@@ -15,6 +15,7 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 import type { BacklogAttention, BacklogKind, BacklogStatus } from './item.js'
+import { BacklogProjectPaths } from './project-paths.js'
 
 const statusLabels = { inbox: 'Inbox', todo: 'Todo', doing: 'In progress', done: 'Done', dropped: 'Dropped' } satisfies Record<BacklogStatus, string>
 const kindLabels = { task: 'Task', bug: 'Bug', idea: 'Idea', note: 'Note', question: 'Question' } satisfies Record<BacklogKind, string>
@@ -128,7 +129,7 @@ const ProjectDot = (props: { readonly project: string; readonly className?: stri
 
 /** A project as its dot and short name; the full path stays in the tooltip. */
 const ProjectLabel = (props: { readonly project: string; readonly className?: string }): JSX.Element => (
-  <span title={props.project} className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', props.className)}>
+  <span title={BacklogProjectPaths.displayPath(props.project)} className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', props.className)}>
     <ProjectDot project={props.project} />
     <span className="dshx:truncate">{projectName(props.project)}</span>
   </span>
@@ -214,6 +215,7 @@ export class ItemGlyphs {
   static readonly ActorAvatar = ActorAvatar
   static readonly ActorStack = ActorStack
   static readonly projectName = projectName
+  static readonly displayProjectPath = BacklogProjectPaths.displayPath
   static readonly actorName = actorName
   static readonly ago = ago
   static readonly describeEvent = describeEvent

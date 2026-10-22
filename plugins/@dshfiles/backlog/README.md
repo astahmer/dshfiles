@@ -282,13 +282,14 @@ browser lists the same views.
 
 ## Project scope
 
-The header's project combobox narrows the feed, Inbox, Items, Board and search to one project, to `No
-project`, or to everything; it persists like the status chips and presets the capture box to the same
-project. Candidates are the projects items already name plus every registered workspace, with isolated
-thread workspaces (`…/threads/thread-…`) left out, so the picker offers `dshfiles` and not the checkout a
-thread runs in. The same combobox sits on the item's details line and in every right-click menu's
-**Project** submenu, and every feed entry, Inbox row, Items row, board card and search result labels the
-item's project, with the full path in its tooltip.
+The header's searchable project filter narrows the feed, Inbox, Items, Board and search to any number of
+projects, including `No project`; `All projects` clears the selection. It persists like the status chips
+and presets the capture box when exactly one project is selected. Paths inside the current user's home are
+displayed as `~/...` where shown. Candidates are the projects items already name plus every registered
+workspace, with isolated thread workspaces (`…/threads/thread-…`) left out, so the picker offers `dshfiles`
+and not the checkout a thread runs in. The same single-select picker sits on the item's details line and in
+every right-click menu's **Project** submenu, and every feed entry, Inbox row, Items row, board card and
+search result labels the item's project.
 
 ## Inbox and the rest of the ADE
 

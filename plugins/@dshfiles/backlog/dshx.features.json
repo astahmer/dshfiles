@@ -838,7 +838,7 @@
     {
       "id": "project-scope",
       "title": "File and scope items by project",
-      "summary": "One searchable project combobox scopes every view from the header and presets the capture box to the same project; the same picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project, with the full path in its tooltip. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
+      "summary": "The searchable project filter selects several projects at once and presets the capture box when exactly one project is selected; project paths under a home directory display as `~/...`. The same single-project picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
       "reach": [
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
@@ -848,11 +848,16 @@
         "expect combobox \"Search projects\"",
         "press Escape",
         "click combobox \"Filter by project\"",
-        "expect option \"All projects\""
+        "expect option \"All projects\"",
+        "expect option \"No project\"",
+        "expect option \"sample*\"",
+        "click option \"sample*\"",
+        "click option \"No project\"",
+        "expect text \"2 projects\""
       ],
       "surfaces": ["client", "host", "settings"],
       "configuration": [],
-      "states": ["all-projects", "one-project", "no-project", "remembered"],
+      "states": ["all-projects", "one-project", "multiple-projects", "no-project", "remembered"],
       "failureModes": [
         "With no project candidates the combobox lists No project only; capture still adds the item without one.",
         "Clearing the header scope leaves the capture chip on the project it last used while reuseCaptureProject is on."
