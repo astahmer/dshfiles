@@ -42,6 +42,12 @@ export interface ThreadActionDeps {
   readonly unpin: (sessionId: string) => Promise<readonly string[]>
   readonly rename: (sessionId: string, title: string) => Promise<{ readonly title: string }>
   readonly fork: (sessionId: string, atSeq: number | undefined) => Promise<{ readonly sessionId: string }>
+  /** Fork one thread into a workspace whose directory becomes the new thread's own cwd. */
+  readonly continueIn: (input: {
+    readonly sessionId: string
+    readonly workspaceId: string
+    readonly includeOpenTurn: boolean
+  }) => Promise<{ readonly sessionId: string }>
   readonly create: (input: {
     readonly projectId?: string
     readonly cwd?: string
@@ -98,6 +104,11 @@ export interface ThreadRenameInput {
 export interface ThreadForkInput {
   readonly sessionId?: string | undefined
   readonly atSeq?: number | undefined
+}
+export interface ThreadContinueInInput {
+  readonly sessionId?: string | undefined
+  readonly projectId: string
+  readonly text?: string | undefined
 }
 export interface ThreadCreateInput {
   readonly projectId?: string | undefined
@@ -448,6 +459,40 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
       return { sessionId, forkedSessionId: forked.sessionId }
     } catch (error) {
       throw failure(error, `Could not fork thread ${sessionId}.`)
+    }
+  },
+
+  continueIn: async ({ input, caller, signal }: ThreadActionContext<ThreadContinueInInput>) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    // The calling thread continues mid-turn, so its own request is kept; any other running thread would lose its turn.
+    const continuingItself = callerSessionId(caller) === sessionId
+    if (!continuingItself && (await deps.listSessions(signal)).some(summary => summary.sessionId === sessionId && summary.running)) {
+      throw new PluginApiError(`Thread ${sessionId} is still running. Stop it or wait for its turn to end, then continue it elsewhere.`, {
+        code: 'thread-running',
+      })
+    }
+    let continuedSessionId: string
+    let workspaceId: string
+    try {
+      workspaceId = await deps.ownWorkspaceFor(input.projectId)
+      continuedSessionId = (await deps.continueIn({ sessionId, workspaceId, includeOpenTurn: continuingItself })).sessionId
+    } catch (error) {
+      throw failure(error, `Could not continue thread ${sessionId} in project ${input.projectId}.`)
+    }
+    const continued = { sessionId, continuedSessionId, projectId: input.projectId, workspaceId }
+    // The new thread already exists: a failed settle or first message is reported, never a reason to hide its id.
+    let settled = true
+    try {
+      await deps.setSettled(sessionId, true)
+    } catch {
+      settled = false
+    }
+    if (input.text === undefined) return { ...continued, settled }
+    try {
+      await deps.prompt({ sessionId: continuedSessionId, text: input.text, mode: 'queue' })
+      return { ...continued, settled, prompt: 'accepted' as const }
+    } catch (error) {
+      return { ...continued, settled, prompt: 'refused' as const, promptError: failure(error, 'Could not send its first message.').message }
     }
   },
 

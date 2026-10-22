@@ -16,7 +16,8 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type Transl
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
+import { threadActionsApi } from './thread-actions-api.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -700,6 +701,11 @@ export default defineClient({
       ),
     )
 
+    const continueInProject = async (sessionId: SessionSummary['id'], projectId: string) => {
+      const continued = await createApiClient(ctx, threadActionsApi).continueIn({ sessionId, projectId })
+      return { continuedSessionId: SessionId(continued.continuedSessionId), settled: continued.settled }
+    }
+
     ctx.slots.inject('conversation.session.header.utilities', () =>
       ctx.slots.register(
         {
@@ -708,7 +714,14 @@ export default defineClient({
           order: 100,
           label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarThreadActions'),
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
-          inject: () => ({ archiveSession, unarchiveSession, pinSession, unpinSession, openThread }),
+          inject: () => ({
+            archiveSession,
+            unarchiveSession,
+            pinSession,
+            unpinSession,
+            openThread,
+            continueInProject: async (sessionId: SessionSummary['id'], projectId: string) => (await continueInProject(sessionId, projectId)).continuedSessionId,
+          }),
         },
         decorate(HeaderThreadActions),
       ),
@@ -792,6 +805,7 @@ export default defineClient({
       },
       renameSession,
       startFollowUp,
+      continueInProject,
       open: openThread,
       openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
       openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),

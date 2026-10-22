@@ -37,6 +37,7 @@ const createDeps = (overrides: Partial<ThreadActionDeps> = {}): ThreadActionDeps
   unpin: async () => [],
   rename: async (_sessionId, title) => ({ title }),
   fork: async () => ({ sessionId: 'session-fork' }),
+  continueIn: async () => ({ sessionId: 'session-continued' }),
   create: async () => ({ sessionId: 'session-new' }),
   prompt: async () => undefined,
   ownWorkspaceFor: async projectId => projectId,
@@ -538,6 +539,97 @@ describe('thread actions: projects', () => {
   })
 })
 
+describe('thread actions: continue in another project', () => {
+  const recording = (overrides: Partial<ThreadActionDeps> = {}) => {
+    const continued: Array<{ sessionId: string; workspaceId: string; includeOpenTurn: boolean }> = []
+    const settled: string[] = []
+    const prompts: Array<{ sessionId: string; text: string }> = []
+    const actions = createThreadActions(
+      createDeps({
+        ownWorkspaceFor: async projectId => `${projectId}-thread-workspace`,
+        continueIn: async input => {
+          continued.push(input)
+          return { sessionId: 'session-continued' }
+        },
+        setSettled: async sessionId => {
+          settled.push(sessionId)
+          return [sessionId]
+        },
+        prompt: async input => {
+          prompts.push({ sessionId: input.sessionId, text: input.text })
+        },
+        ...overrides,
+      }),
+    )
+    return { actions, continued, settled, prompts }
+  }
+
+  test('forks an idle thread into the project workspace at its last completed turn and settles it', async () => {
+    const { actions, continued, settled, prompts } = recording()
+
+    expect(await actions.continueIn({ input: { sessionId: 'session-b', projectId: 'project-2' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-b',
+      continuedSessionId: 'session-continued',
+      projectId: 'project-2',
+      workspaceId: 'project-2-thread-workspace',
+      settled: true,
+    })
+    expect(continued).toEqual([{ sessionId: 'session-b', workspaceId: 'project-2-thread-workspace', includeOpenTurn: false }])
+    expect(settled).toEqual(['session-b'])
+    expect(prompts).toEqual([])
+  })
+
+  test('keeps the running turn of the calling thread and queues its first message', async () => {
+    const { actions, continued, prompts } = recording({ listSessions: async () => [summary('session-a', { running: true })] })
+
+    const result = await actions.continueIn({ input: { projectId: 'project-2', text: 'carry on here' }, caller: agent('session-a'), signal })
+
+    expect(result).toMatchObject({ sessionId: 'session-a', continuedSessionId: 'session-continued', settled: true, prompt: 'accepted' })
+    expect(continued).toEqual([{ sessionId: 'session-a', workspaceId: 'project-2-thread-workspace', includeOpenTurn: true }])
+    expect(prompts).toEqual([{ sessionId: 'session-continued', text: 'carry on here' }])
+  })
+
+  test('refuses another thread while it runs, before creating anything', async () => {
+    const { actions, continued, settled } = recording({ listSessions: async () => [summary('session-b', { running: true })] })
+
+    const failure = await actions
+      .continueIn({ input: { sessionId: 'session-b', projectId: 'project-2' }, caller: agent('session-a'), signal })
+      .catch((error: unknown) => error)
+
+    expect(codeOf(failure)).toBe('thread-running')
+    expect(continued).toEqual([])
+    expect(settled).toEqual([])
+  })
+
+  test('reports the continued thread even when the original cannot be settled', async () => {
+    const { actions } = recording({
+      setSettled: async () => {
+        throw new Error('settings namespace unavailable')
+      },
+    })
+
+    expect(await actions.continueIn({ input: { sessionId: 'session-b', projectId: 'project-2' }, caller: agent('session-a'), signal })).toMatchObject({
+      continuedSessionId: 'session-continued',
+      settled: false,
+    })
+  })
+
+  test('names the missing project without settling the original', async () => {
+    const { actions, settled } = recording({
+      continueIn: async () => {
+        throw Object.assign(new Error('workspace "gone" not found'), { code: 'workspace/not-found' })
+      },
+    })
+
+    const failure = await actions
+      .continueIn({ input: { sessionId: 'session-b', projectId: 'gone' }, caller: agent('session-a'), signal })
+      .catch((error: unknown) => error)
+
+    expect(codeOf(failure)).toBe('project-not-found')
+    expect(settled).toEqual([])
+  })
+})
+
 describe('thread actions: references', () => {
   test('lists children and mentioning threads, titled, newest lineage first', async () => {
     const searched: Array<{ query: string; limit: number }> = []
@@ -664,6 +756,7 @@ describe('thread actions: tool exposure', () => {
       'thread_unpin',
       'thread_rename',
       'thread_fork',
+      'thread_continue_in',
       'thread_create',
       'thread_prompt',
       'thread_stop',

@@ -26,6 +26,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { ThreadUrlModel } from './thread-url.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
+import { ContinueInProjectItems } from './continue-in-menu.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -33,6 +34,8 @@ interface HeaderThreadActionsInjected {
   pinSession: (sessionId: SessionSummary['id']) => Promise<void>
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
   openThread: (sessionId: SessionSummary['id']) => void
+  /** Fork the thread into another project and settle it; resolves to the continuing thread. */
+  continueInProject: (sessionId: SessionSummary['id'], projectId: string) => Promise<SessionSummary['id']>
 }
 
 // Only the slot props this component reads, so a test can supply them without the whole runtime surface.
@@ -87,6 +90,7 @@ export const HeaderThreadActions = ({
   pinSession,
   unpinSession,
   openThread,
+  continueInProject,
   t,
 }: HeaderThreadActionsProps) => {
   const sessionState = useSessions(HostSnapshotsModel.selectStableSessionListState)
@@ -163,6 +167,14 @@ export const HeaderThreadActions = ({
       setCopyStatus(t('threadSidebarClipboardFailure'))
     }
   }
+  const continueIn = async (projectId: string): Promise<void> => {
+    setActionFailed(false)
+    try {
+      openThread(await continueInProject(sessionId, projectId))
+    } catch {
+      setActionFailed(true)
+    }
+  }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
   const pinLabel = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
   const pinIcon = pinned ? <PinOffIcon aria-hidden="true" /> : <PinIcon aria-hidden="true" />
@@ -225,6 +237,12 @@ export const HeaderThreadActions = ({
                     >
                       {t('threadSidebarUnmute')}
                     </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={session.running}>{t('threadSidebarContinueIn')}</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
+                    <ContinueInProjectItems t={t} continueIn={projectId => void continueIn(projectId)} Item={DropdownMenuItem} />
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuSeparator />

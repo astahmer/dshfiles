@@ -353,6 +353,30 @@ const workspaceForLineage = (
   return undefined
 }
 
+/**
+ * Whether a child thread folds under its parent row. A fork continued in another project (Continue in project) is
+ * that project's thread, so it gets its own row there; subagents and same-project forks stay nested.
+ */
+const foldsUnderParent = (
+  session: Pick<SessionSummary, 'id' | 'parentId' | 'origin'>,
+  byId: Readonly<Record<string, SessionSummary>>,
+  workspaceBySession: ReadonlyMap<string, string>,
+): boolean => {
+  if (session.parentId === undefined) return false
+  if (session.origin === 'subagent') return true
+  const ownProject = workspaceBySession.get(session.id)
+  if (ownProject === undefined) return true
+  const parent = byId[session.parentId]
+  const parentProject = workspaceForLineage(parent ?? { id: session.parentId }, byId, workspaceBySession)
+  return parentProject === undefined || parentProject === ownProject
+}
+
+/** The same summary as a root row: its lineage stays in the Host header, only the sidebar stops folding it. */
+const withoutParent = (session: SessionSummary): SessionSummary => {
+  const { parentId, ...root } = session
+  return parentId === undefined ? session : root
+}
+
 const parseSessionIds = (value: string): string[] => [
   ...new Set(
     value
@@ -660,6 +684,8 @@ export class SidebarOrganization {
   static readonly sessionWorkspaceIds = sessionWorkspaceIds
   static readonly projectWorkspaces = projectWorkspaces
   static readonly workspaceForLineage = workspaceForLineage
+  static readonly foldsUnderParent = foldsUnderParent
+  static readonly withoutParent = withoutParent
   static readonly parseSessionIds = parseSessionIds
   static readonly orderSidebarEntries = orderSidebarEntries
   static readonly orderRowActions = orderRowActions

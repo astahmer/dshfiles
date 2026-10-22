@@ -87,6 +87,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     pinSession,
     unpinSession: vi.fn(async () => {}),
     openThread: vi.fn(),
+    continueInProject: vi.fn(async () => sessionId),
     t: key => labelFor(key),
   }
   const actions = (

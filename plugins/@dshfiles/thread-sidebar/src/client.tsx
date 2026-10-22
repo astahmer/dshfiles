@@ -123,6 +123,7 @@ import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
+import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
 import {
   failedResumeNotice,
@@ -214,6 +215,11 @@ type InjectedActions = {
   openRemoteThreads?: () => void
   openRemoteSession?: (sessionId: string) => void
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
+  /** Fork the thread into another project and settle it; resolves to the continuing thread and whether it settled. */
+  continueInProject: (
+    sessionId: SessionSummary['id'],
+    projectId: string,
+  ) => Promise<{ readonly continuedSessionId: SessionSummary['id']; readonly settled: boolean }>
 }
 
 /** The slot runtime's global selector hooks, the one part of the props a `main` panel mount supplies itself. */
@@ -423,6 +429,7 @@ interface RowActions {
   readonly unmute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
   readonly followUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
+  readonly continueIn: (sessionId: SessionSummary['id'], projectId: string) => void
   readonly resume: (sessionId: SessionSummary['id']) => void
   readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
   readonly beginRename: (sessionId: SessionSummary['id']) => void
@@ -725,6 +732,14 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
         {t('threadSidebarFollowUp')}
       </ContextMenuItem>
+      {archived ? null : (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger disabled={session.running}>{t('threadSidebarContinueIn')}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
+            <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
@@ -1315,6 +1330,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice(null)
     } catch {
       setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarRenameFailure') })
+    }
+  }
+  const continueThreadIn = async (sessionId: SessionSummary['id'], projectId: string): Promise<void> => {
+    try {
+      const continued = await props.continueInProject(sessionId, projectId)
+      // The Host settle is what blocks further steps; a sidebar on browser-local preferences keeps its own copy, so it
+      // settles the original itself, and never the continuation that is now its child thread.
+      changePreferences(settlePreferences([sessionId]))
+      setNotice(
+        continued.settled
+          ? { tone: 'success', message: props.tSidebar('threadSidebarContinuedIn') }
+          : { tone: 'warning', message: props.tSidebar('threadSidebarContinuedUnsettled') },
+      )
+      openThreadRef.current(continued.continuedSessionId)
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarContinueInFailure') })
     }
   }
   const resumeRecoverySession = async (sessionId: SessionSummary['id']): Promise<boolean> => {
@@ -2570,7 +2601,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       if (session === undefined || session.blank || draftSessionIds.has(session.id) || ThreadViewModel.isSideChat(session)) continue
       const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (activeWorkspaceFilter !== null && (workspaceId ?? '') !== activeWorkspaceFilter) continue
-      listed.push(session)
+      const ownRow = session.parentId !== undefined && !SidebarOrganization.foldsUnderParent(session, sessionState.byId, workspaceBySession)
+      listed.push(ownRow ? SidebarOrganization.withoutParent(session) : session)
     }
     return groupThreadChildren({ threads: listed })
   }, [draftSessionIds, activeWorkspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
@@ -3473,6 +3505,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     cancelRename,
     markAttentionUnread: attention.markUnread,
     startFollowUp: props.startFollowUp,
+    continueThreadIn,
     notifyThread,
     props,
     sessionsById: sessionState.byId,
@@ -3506,6 +3539,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     cancelRename,
     markAttentionUnread: attention.markUnread,
     startFollowUp: props.startFollowUp,
+    continueThreadIn,
     notifyThread,
     props,
     sessionsById: sessionState.byId,
@@ -3639,6 +3673,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         latestRowActions.current.markAttentionUnread(sessionId)
       },
       followUp: (sessionId, workspaceId) => latestRowActions.current.startFollowUp(sessionId, workspaceId),
+      continueIn: (sessionId, projectId) => void latestRowActions.current.continueThreadIn(sessionId, projectId),
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       beginRename: sessionId => latestRowActions.current.beginRename(sessionId),

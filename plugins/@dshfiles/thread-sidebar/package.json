@@ -46,6 +46,7 @@
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "zod": "catalog:"

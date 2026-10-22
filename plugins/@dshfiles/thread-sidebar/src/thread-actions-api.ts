@@ -154,6 +154,37 @@ export const threadActionsApi = defineApi({
         render: output => `Forked thread ${output.sessionId} into ${output.forkedSessionId}.`,
       },
     }),
+    continueIn: method({
+      input: z
+        .object({
+          sessionId: sessionIdSchema.optional(),
+          projectId: projectIdSchema,
+          text: z.string().min(1).max(20_000).optional(),
+        })
+        .strict(),
+      output: z
+        .object({
+          sessionId: z.string(),
+          continuedSessionId: z.string(),
+          projectId: z.string(),
+          workspaceId: z.string(),
+          settled: z.boolean(),
+          prompt: z.enum(['accepted', 'refused']).optional(),
+          promptError: z.string().optional(),
+        })
+        .strict(),
+      description: `Continue one thread in another project: fork its conversation into a new thread that runs in that project's own workspace (its isolated jj workspace when the project isolates new threads), then settle the original so it stays readable but runs no further step. Use it when a thread was started in the wrong folder or its work moved to another repository. Defaults to the calling thread: from inside a turn the new thread keeps this turn too, and this thread stops after the call. Another thread must be idle. text is queued as the new thread's first message. Get projectId from project_list. ${ONLY_WHEN_ASKED}`,
+      tool: {
+        name: 'thread_continue_in',
+        render: output => {
+          const head = `Thread ${output.sessionId} continues as ${output.continuedSessionId} in project ${output.projectId}${output.workspaceId === output.projectId ? '' : ` (workspace ${output.workspaceId})`}.`
+          const settled = output.settled ? ' The original thread is settled.' : ' The original thread could not be settled; settle it with thread_settle.'
+          if (output.prompt === 'accepted') return `${head}${settled} Its first message was accepted.`
+          if (output.prompt === 'refused') return `${head}${settled} Its first message was refused: ${output.promptError ?? 'no reason given'}.`
+          return `${head}${settled}`
+        },
+      },
+    }),
     create: method({
       input: z
         .object({
@@ -295,7 +326,7 @@ export const threadActionsApi = defineApi({
         })
         .strict(),
       output: z.object({ sessionId: z.string(), projectId: z.string(), sessionIds: z.array(z.string()).max(5000) }).strict(),
-      description: `Move one thread into a project, optionally before another thread of that project. ${ONLY_WHEN_ASKED}`,
+      description: `Reorder one thread within the project that already holds it, optionally before another thread of that project. It cannot move a thread to another project; thread_continue_in does that. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_move',
         render: output => `Moved thread ${output.sessionId} into project ${output.projectId}.`,

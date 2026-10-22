@@ -1,7 +1,11 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { z } from 'zod'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
+import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
 
 const createdSessionResponseSchema = z.object({
   result: z.object({
@@ -410,6 +414,72 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   await recordAssertion(page, 'thread-sidebar-unsettle-survives-reload', async () => {
     await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0)
     await expect(threadSidebar(page).getByRole('button', { name: 'Settled (0)', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+interface ContinueInJourney {
+  readonly sourceThreadId: string
+  readonly prompt: string
+}
+
+const continueInJourneys = new WeakMap<Page, ContinueInJourney>()
+const CONTINUE_TARGET_PROJECT = 'continue-target'
+
+When('a nonblank Host thread is continued in another registered project from its context menu', async ({ page }: { page: Page }) => {
+  const prompt = 'thread sidebar continue in project e2e'
+  await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  // The profile has no provider credentials, so the turn fails and leaves a completed turn to fork from.
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
+  const sourceThreadId = currentThreadId(page)
+  if (sourceThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  const target = join(await createScratchDirectory('dshx-continue-in-e2e-'), CONTINUE_TARGET_PROJECT)
+  await mkdir(target)
+  // The replaced sidebar has no Add workspace button: a blank New thread's project chip registers the folder.
+  await startBlankThread(page)
+  await registerWorkspaceFolder(page, target, openNewThreadAddWorkspace)
+  continueInJourneys.set(page, { sourceThreadId, prompt })
+  const sourceRow = threadRow(page, sourceThreadId)
+  await expect(sourceRow).toHaveCount(1)
+  await openThreadRowMenu(sourceRow)
+  await page.getByRole('menuitem', { name: 'Continue in project', exact: true }).click()
+  await page.getByRole('menuitem', { name: CONTINUE_TARGET_PROJECT, exact: true }).click()
+})
+
+Then('the continuation opens in that project with the conversation and the original thread is settled', async ({ page }: { page: Page }) => {
+  const journey = continueInJourneys.get(page)
+  if (journey === undefined) throw new Error('No thread was continued in another project.')
+  await recordAssertion(page, 'thread-sidebar-continuation-notice', async () => {
+    await expect(page.getByText(/^The thread continues in the new project/).first()).toHaveText(
+      'The thread continues in the new project; the original is settled.',
+      { timeout: 20_000 },
+    )
+  })
+  await recordAssertion(page, 'thread-sidebar-continuation-opens', async () => {
+    await expect.poll(() => currentThreadId(page), { timeout: 20_000 }).not.toBe(journey.sourceThreadId)
+    await expect(page.getByText(journey.prompt, { exact: true }).first()).toBeVisible()
+  })
+  const continuedThreadId = currentThreadId(page)
+  if (continuedThreadId === null) throw new Error('The continuation did not open.')
+  await recordAssertion(page, 'thread-sidebar-continuation-runs-in-the-target-project', async () => {
+    await expect(threadRow(page, continuedThreadId)).toContainText(CONTINUE_TARGET_PROJECT)
+  })
+  await recordAssertion(page, 'thread-sidebar-host-holds-the-original-settled', async () => {
+    const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
+    const listed = z
+      .object({ threads: z.array(z.object({ sessionId: z.string(), settled: z.boolean() })) })
+      .parse(await call('list', {}))
+    // The Host's settled set is what blocks the original's next model step, whatever the browser shows.
+    expect(listed.threads.find(thread => thread.sessionId === journey.sourceThreadId)?.settled).toBe(true)
+    expect(listed.threads.find(thread => thread.sessionId === continuedThreadId)?.settled).toBe(false)
+  })
+  await recordAssertion(page, 'thread-sidebar-continued-thread-is-settled', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible({ timeout: 15_000 })
+    await threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true }).click()
+    await expect(sectionOfSidebar(page, 'settled').locator(`article[data-thread-id="${journey.sourceThreadId}"]`)).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })

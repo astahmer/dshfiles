@@ -332,6 +332,30 @@ test('child threads inherit the nearest known workspace through the parent chain
   assert.equal(SidebarOrganization.workspaceForLineage(byId.grandchild, byId, new Map()), undefined)
 })
 
+test('a fork continued in another project gets its own row; subagents and same-project forks stay folded', () => {
+  const byId = {
+    root: sessionSummary({ id: 'root' }),
+    continued: sessionSummary({ id: 'continued', parentId: 'root' }),
+    sameProjectFork: sessionSummary({ id: 'sameProjectFork', parentId: 'root' }),
+    subagent: { ...sessionSummary({ id: 'subagent', parentId: 'root' }), origin: 'subagent' as const },
+    unaccounted: sessionSummary({ id: 'unaccounted', parentId: 'root' }),
+  }
+  const projects = new Map([
+    ['root', 'project-a'],
+    ['continued', 'project-b'],
+    ['sameProjectFork', 'project-a'],
+    ['subagent', 'project-b'],
+  ])
+  const folds = (session: SessionSummary): boolean => SidebarOrganization.foldsUnderParent(session, byId, projects)
+  assert.equal(folds(byId.root), false)
+  assert.equal(folds(byId.continued), false)
+  assert.equal(folds(byId.sameProjectFork), true)
+  assert.equal(folds(byId.subagent), true)
+  assert.equal(folds(byId.unaccounted), true)
+  assert.equal(SidebarOrganization.withoutParent(byId.continued).parentId, undefined)
+  assert.equal(SidebarOrganization.withoutParent(byId.root), byId.root)
+})
+
 test('a session without a workspace falls back to the project its recorded cwd belongs to', () => {
   const project = workspaceView({ id: 'project', path: '/dev/dshfiles' })
   const thread = workspaceView({ id: 'thread', path: '/dev/dshfiles-threads/thread-a', sessionIds: ['accounted'] })

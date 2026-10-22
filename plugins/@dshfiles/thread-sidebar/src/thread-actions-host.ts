@@ -7,6 +7,7 @@ import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { continuationApi } from '@dshfiles/session-controller/continuation-api'
 import { createThreadActions, type ThreadActionDeps } from './thread-actions.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { setSessionSettled, settledSessionIdsFromHost } from './settings.js'
@@ -80,6 +81,7 @@ const dependencies: ThreadActionDeps = {
   rename: async (sessionId, title) => requireContext().sessionController.rename({ sessionId: SessionId(sessionId), title }),
   fork: async (sessionId, atSeq) =>
     requireContext().sessionController.fork({ sessionId: SessionId(sessionId), ...(atSeq === undefined ? undefined : { atSeq }) }),
+  continueIn: async input => createHostApiClient(requireContext(), continuationApi, '@dshfiles/thread-sidebar').continueIn(input),
   create: async input =>
     requireContext().sessionController.create({
       ...(input.projectId === undefined ? undefined : { workspaceId: WorkspaceId(input.projectId) }),

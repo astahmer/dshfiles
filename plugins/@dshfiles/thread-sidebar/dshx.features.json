@@ -1989,6 +1989,53 @@
           "testName": "routes rename, fork, stop and model selection to the named thread"
         }
       ]
+    },
+    {
+      "id": "continue-in-project",
+      "title": "Continue a thread in another project",
+      "summary": "A thread started in the wrong folder, or whose work moved to another repository, continues in a registered project: the row menu and the thread header menu open a Continue in project submenu listing the projects, and the agent tool thread_continue_in does the same. The conversation is forked into a new thread whose own working directory is that project's workspace (its isolated jj workspace when jj-integration isolates new threads), the new thread is told where it came from, the original thread is settled so it stays readable but runs no further step, and the new thread opens. An agent continuing its own thread keeps its running turn in the copy and stops after the call.",
+      "reach": ["seed tool-call-thread", "rightclick text \"sample\"", "click menuitem \"Continue in project\"", "expect menuitem \"sample\""],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["idle", "listing-projects", "continuing", "continued", "continued-unsettled", "failed"],
+      "failureModes": [
+        "Another thread that is still running is refused before anything is created; only the calling thread may continue mid-turn.",
+        "An unknown project is refused before a thread is created, and the original is not settled.",
+        "A continuation whose original cannot be settled is still reported, with a warning instead of a hidden thread id.",
+        "A Host without the session-controller continuation API shows the restart hint in the submenu instead of failing the row menu."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.continue-in-project",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.continue-in-project-unit-idle",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "forks an idle thread into the project workspace at its last completed turn and settles it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.continue-in-project-unit-self",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "keeps the running turn of the calling thread and queues its first message"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.continue-in-project-unit-running",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "refuses another thread while it runs, before creating anything"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.continue-in-project-unit-host-fork",
+          "file": "plugins/@dshfiles/session-controller/tests/host/continue-in.test.ts",
+          "testName": "runs the continuation in the destination project and tells the model where it came from"
+        }
+      ]
     }
   ],
   "kind": "bundle"

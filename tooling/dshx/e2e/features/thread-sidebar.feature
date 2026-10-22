@@ -33,6 +33,12 @@ Feature: Thread sidebar journeys
     When the thread board page is opened
     Then the board groups and filters independently from the sidebar list
 
+  @scenario:thread-sidebar.continue-in-project
+  Scenario: Continue a thread in another project and settle the original
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/workspace-folder-picker" is booted
+    When a nonblank Host thread is continued in another registered project from its context menu
+    Then the continuation opens in that project with the conversation and the original thread is settled
+
   @scenario:thread-sidebar.section-order
   Scenario: Reorder the sidebar sections by dragging a header
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

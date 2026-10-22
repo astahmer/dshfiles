@@ -9,10 +9,20 @@ const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 /** A fresh directory under the system temporary root, resolved so it matches the path the Host canonicalizes. */
 export const createScratchDirectory = async (prefix: string): Promise<string> => realpath(await mkdtemp(join(tmpdir(), prefix)))
 
-/** Register a folder through the sidebar Add workspace flow of @dshfiles/workspace-folder-picker; it becomes the New thread project. */
-export const registerWorkspaceFolder = async (page: Page, path: string): Promise<void> => {
-  const picker = page.getByRole('dialog', { name: 'Add workspace' })
+const openSidebarAddWorkspace = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Add workspace', exact: true }).click()
+}
+
+/** The New thread composer's project chip also opens Add workspace; a replaced sidebar (thread-sidebar) has no button. */
+export const openNewThreadAddWorkspace = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Add workspace/ }).click()
+}
+
+/** Register a folder through the Add workspace flow of @dshfiles/workspace-folder-picker; it becomes the New thread project. */
+export const registerWorkspaceFolder = async (page: Page, path: string, open: (page: Page) => Promise<void> = openSidebarAddWorkspace): Promise<void> => {
+  const picker = page.getByRole('dialog', { name: 'Add workspace' })
+  await open(page)
   await expect(picker).toBeVisible()
   // The picker opens on the Host home and rewrites the path field when that first listing lands.
   await expect(picker.locator('p').filter({ hasText: /^\// }).first()).toBeVisible()

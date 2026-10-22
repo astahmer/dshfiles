@@ -285,6 +285,20 @@ generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
 unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after @session:<id> :` prefilled and the caret on the next line; normal workspace isolation applies.
+
+**Continue in project** (row menu and thread header menu) fixes a thread that
+started in the wrong folder, or whose work moved to another repository. It lists
+the registered projects; picking one forks the conversation into a new thread
+whose own working directory is that project's workspace — its isolated jj
+workspace when jj-integration isolates new threads — settles the original, and
+opens the new thread. The new thread is told which thread it continues and both
+directories. A DSH Session's project, session-log location and sandbox root all
+follow its immutable header cwd, so a fork whose header already names the
+destination is the only move every surface agrees on; the original id stays
+reachable through the fork's parent link. The Host half is the
+`session-continuation` API of `@dshfiles/session-controller`. The original's
+running shells and background jobs keep running in its own folder, where their
+work still belongs; a running thread must be stopped first.
 Attention is Host-owned: the plugin records one durable row per unacknowledged
 thread (a finished turn, a manual unread mark, or both) in the
 `thread_attention` storage domain and serves it through the
@@ -567,13 +581,14 @@ plugin's `react-compiler-runtime` dependency are gone.
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
-the Agent as twenty native tools: `thread_list`, `thread_archive`,
+the Agent as twenty-one native tools: `thread_list`, `thread_archive`,
 `thread_unarchive`, `thread_settle`, `thread_unsettle`, `thread_pin`,
 `thread_unpin`, `thread_rename`,
-`thread_fork`, `thread_create`, `thread_prompt`, `thread_stop`,
+`thread_fork`, `thread_continue_in`, `thread_create`, `thread_prompt`, `thread_stop`,
 `thread_select_model`, `thread_references`, `project_list`,
 `project_register`, `project_rename`, `project_delete`, `project_reorder`, and
-`thread_move`. `src/thread-actions.ts`
+`thread_move` (a reorder within the project that already holds the thread;
+`thread_continue_in` is the cross-project move). `src/thread-actions.ts`
 holds the decoded logic over plain ids and `src/thread-actions-host.ts` resolves
 the live Host services on each call (`sessionController`,
 `workspaceController`, `workspaceRegistry`, `sessionQuery`, and this plugin's own
@@ -592,6 +607,13 @@ starts the thread's next turn or appends to a running one, `mode: 'steer'`
 folds the text into the live turn, which the Host refuses when the thread is
 idle. Both take an explicit `sessionId` to reach another thread and default to
 the calling one.
+
+`thread_continue_in` is the menu's **Continue in project**: `projectId` from
+`project_list`, an optional `sessionId` (the calling thread by default) and an
+optional `text` queued as the new thread's first message. Called by the thread
+it moves, it keeps the running turn in the copy, and the settle stops the
+original after the call; another thread must be idle. A refused settle or first
+message still returns the new thread id.
 
 `thread_references` answers which other threads point back at one thread: its
 forked and subagent children (`header.parentSession`), plus the threads whose

@@ -4637,6 +4637,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/session-controller':
+        specifier: workspace:*
+        version: link:../session-controller
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
