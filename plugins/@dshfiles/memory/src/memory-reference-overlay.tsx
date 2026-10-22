@@ -67,18 +67,6 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
         {body.length === 0 ? null : <MarkdownText text={body} labels={markdownLabels} />}
       </div>
 
-      {props.note.type === 'feedback' ? (
-        <div className="dshx:flex dshx:items-start dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-destructive/20 dshx:bg-destructive/5 dshx:p-3">
-          <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:bg-destructive/10 dshx:text-destructive">
-            <tone.Icon className="dshx:size-4" />
-          </span>
-          <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
-            <span className="dshx:text-xs dshx:font-semibold dshx:text-destructive">This is a correction</span>
-            <span className="dshx:text-xs dshx:text-muted-foreground">It appears in the start block of new threads in this project.</span>
-          </div>
-        </div>
-      ) : null}
-
       <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
         <SectionHeading title="Source & evidence" trailing={`${String(props.note.citations)} citation${props.note.citations === 1 ? '' : 's'}`} />
         {props.note.sourceThread === null ? (
@@ -351,9 +339,9 @@ const headerOf = (card: PreviewCard): PreviewHeader => {
 const CardHeader = (props: { readonly card: PreviewCard; readonly request: MemoryReferencePreviewRequest }): JSX.Element => {
   const header = headerOf(props.card)
   return (
-    <div className="dshx:flex dshx:items-center dshx:gap-3">
-      <span className={cn('dshx:flex dshx:size-9 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-xl', header.tile)}>
-        <header.Icon className="dshx:size-4" />
+    <div className="dshx:flex dshx:items-center dshx:gap-2">
+      <span className={cn('dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-xl', header.tile)}>
+        <header.Icon className="dshx:size-3.5" />
       </span>
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-wrap dshx:items-center dshx:gap-1.5">
         <Badge variant="outline" className={cn('dshx:border-transparent', header.labelClass)}>
@@ -467,10 +455,10 @@ export const MemoryReferenceOverlay = (props: {
         )}
         data-dshfiles-memory-preview
       >
-        <div className="dshx:border-b dshx:border-border dshx:p-4">
+        <div className="dshx:border-b dshx:border-border dshx:px-3 dshx:py-2" data-dshfiles-memory-preview-header>
           {card === undefined ? (
-            <div className="dshx:flex dshx:items-center dshx:gap-3">
-              <Skeleton className="dshx:size-9 dshx:rounded-xl" />
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
+              <Skeleton className="dshx:size-7 dshx:rounded-xl" />
               <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-1.5">
                 <Skeleton className="dshx:h-3 dshx:w-24" />
                 <Skeleton className="dshx:h-2.5 dshx:w-40" />

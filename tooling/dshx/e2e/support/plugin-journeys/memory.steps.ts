@@ -7,14 +7,14 @@ import { sendMessage, startThreadWithModel } from '../threads.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
-Given('memory holds the project note {string}', async ({ page }: { page: Page }, text: string) => {
+const addMemoryNote = (options: { readonly page: Page; readonly text: string; readonly category: 'project' | 'feedback' }): void => {
   // The Host has the same SQLite file open in WAL mode; a second connection writes the note the way memory_note would.
-  const store = openMemoryStore({ path: join(profileFor(page).homeRoot, 'plugins', 'memory', 'memory.db') })
+  const store = openMemoryStore({ path: join(profileFor(options.page).homeRoot, 'plugins', 'memory', 'memory.db') })
   try {
     store.addNote({
       project: '/work/e2e-project',
-      text,
-      category: 'project',
+      text: options.text,
+      category: options.category,
       scope: 'repo',
       confidence: 'stated',
       sourceThread: null,
@@ -24,6 +24,14 @@ Given('memory holds the project note {string}', async ({ page }: { page: Page },
   } finally {
     store.close()
   }
+}
+
+Given('memory holds the project note {string}', async ({ page }: { page: Page }, text: string) => {
+  addMemoryNote({ page, text, category: 'project' })
+})
+
+Given('memory holds the feedback note {string}', async ({ page }: { page: Page }, text: string) => {
+  addMemoryNote({ page, text, category: 'feedback' })
 })
 
 When('the Memory panel is opened', async ({ page }: { page: Page }) => {
@@ -129,8 +137,11 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
       await expect(preview).toContainText(text, { timeout: 1_500 })
     }).toPass({ timeout: 30_000 })
     // The card mirrors the panel's note detail: tone and status badges, the note as its title, sections.
-    await expect(preview.getByText('Decision', { exact: true }).first()).toBeVisible()
+    await expect(preview.getByText('Correction', { exact: true }).first()).toBeVisible()
+    await expect(preview.getByText('This is a correction', { exact: true })).toHaveCount(0)
     await expect(preview.getByText('Active', { exact: true }).first()).toBeVisible()
+    const previewHeaderHeight = await preview.locator('[data-dshfiles-memory-preview-header]').evaluate(element => element.getBoundingClientRect().height)
+    expect(previewHeaderHeight).toBeLessThanOrEqual(48)
     await expect(preview.getByText('Source & evidence', { exact: true })).toBeVisible()
     await expect(preview.getByText('Metadata', { exact: true })).toBeVisible()
     await expect(preview.getByText('repo', { exact: true }).first()).toBeVisible()
@@ -143,6 +154,18 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
     const previewHeight = await preview.evaluate(element => element.getBoundingClientRect().height)
     expect(previewWidth).toBeLessThanOrEqual(432)
     expect(previewHeight).toBeLessThanOrEqual(480)
+    for (const viewportWidth of [360, 480, 768, 1024]) {
+      await page.setViewportSize({ width: viewportWidth, height: 736 })
+      const responsivePreviewSize = await preview.evaluate(element => {
+        const bounds = element.getBoundingClientRect()
+        return { width: bounds.width, height: bounds.height }
+      })
+      expect(responsivePreviewSize.width).toBeLessThanOrEqual(Math.min(416, viewportWidth - 16))
+      expect(responsivePreviewSize.height).toBeLessThanOrEqual(480)
+      const responsiveHeaderHeight = await preview.locator('[data-dshfiles-memory-preview-header]').evaluate(element => element.getBoundingClientRect().height)
+      expect(responsiveHeaderHeight).toBeLessThanOrEqual(48)
+    }
+    await page.setViewportSize({ width: 1986, height: 736 })
     await expect(preview.getByRole('button', { name: 'Copy', exact: true })).toBeEnabled()
     await expect(preview.getByRole('tab', { name: 'Related', exact: true })).toBeVisible()
   })
