@@ -17,8 +17,9 @@ Feature: Usage analytics
     And the status chips, the search and the purpose filter narrow the log
     And a failed request opens the thread that made it
 
-  @scenario:usage.charts-browser-journey
+  @scenario:usage.charts-browser-journey @scenario:usage.jev-usage-card-browser-journey
   Scenario: Read the usage charts
     When the Charts tab is opened
     Then the headline tiles, the charts and the top threads show the indexed usage
+    And the Jev usage card shows DSH-local token estimates
     And selecting a model in the cost breakdown shows its requests in the log

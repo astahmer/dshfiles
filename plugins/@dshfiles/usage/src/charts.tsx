@@ -6,6 +6,7 @@ import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/qu
 import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, type ReactNode } from 'react'
 import { usageApi, type ChartQuery, type ChartView } from './api.js'
+import { JevUsageCard } from './jev-usage-card.js'
 import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 
@@ -125,6 +126,14 @@ export const UsageCharts = (props: {
   const charts = useQuery({
     queryKey: ['dshfiles-usage', 'charts', query],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.charts(query, { signal: hostSignal }) }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    retry: 1,
+  })
+  const jevRange = { from: props.range.from, to: props.range.to }
+  const jevUsage = useQuery({
+    queryKey: ['dshfiles-usage', 'jev', jevRange],
+    queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.jevUsage(jevRange, { signal: hostSignal }) }),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
     retry: 1,
@@ -289,6 +298,10 @@ export const UsageCharts = (props: {
           value={UsageFormattingModel.formatPercent(UsageFormattingModel.cacheHitRatio(summary))}
           detail={`${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
         />
+      </div>
+
+      <div data-usage-jev-card>
+        <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
       </div>
 
       <Panel title="Cost over time" description="List-price estimate, stacked by the largest series.">

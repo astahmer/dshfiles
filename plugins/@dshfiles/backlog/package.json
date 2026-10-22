@@ -43,6 +43,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
+    "@dshfiles/usage": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "zod": "catalog:"
   },

@@ -14,6 +14,10 @@
     "./client": "./dist/client.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./dist/api.js"
+    },
     "./session-log": {
       "types": "./src/session-log.ts",
       "default": "./dist/session-log.js"
@@ -47,10 +51,13 @@
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/ai-accounts": "workspace:*",
+    "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "react": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

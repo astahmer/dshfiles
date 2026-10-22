@@ -1,15 +1,17 @@
 import { redact } from './digest.js'
+import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { Utf8 } from '@dshfiles/optmem-core'
+import type { JevUsageRecord } from '@dshfiles/usage/api'
 
 import { renderStartBlock } from './block.ts'
 import { ThreadDigestRules, type Signal, type ThreadHeader } from './digest.ts'
 import { MemoryGuidance } from './guidance.ts'
 import type { MemoryEmbedder, RetrievalStatus } from './embedder.ts'
-import { JevClassifier } from './jev.ts'
+import { JevClassifier, type JevVerdict } from './jev.ts'
 import { memoryReferenceKey } from './memory-reference.ts'
 import type { MemorySettings } from './settings.ts'
 import type { MemoryStore, NoteCategory, SearchHit } from './store.ts'
@@ -50,8 +52,10 @@ export type MemoryServices = {
       | { readonly provider: string; readonly model: string; readonly input: number; readonly cacheRead: number; readonly output: number }
       | undefined
   }>
-  /** The Jev key, resolved on the Host from a bound Secret Catalog reference or the environment. */
-  readonly jevKey: () => Promise<string | undefined>
+  /** The Jev credential and safe local usage label, resolved on the Host from a secret reference or environment. */
+  readonly jevCredential: () => Promise<{ readonly value: string; readonly label: string } | undefined>
+  /** Records only the DSH Jev request metadata and provider-reported token counts. */
+  readonly recordJevUsage: (record: JevUsageRecord) => Promise<void>
   /** The configured embedding provider, loaded once per specifier; rejects when it cannot load. */
   readonly embedder: (specifier: string) => Promise<MemoryEmbedder>
   readonly fetch?: typeof fetch | undefined
@@ -144,9 +148,44 @@ export const createMemoryRuntime = (options: {
     return log
   }
 
+  const askJev = async (request: {
+    readonly question: 'signal' | 'recall'
+    readonly text: string
+    readonly apiKey: string
+    readonly credential: JevUsageRecord['credential']
+  }): Promise<JevVerdict> => {
+    const requestId = randomUUID()
+    const startedAt = Date.now()
+    const startedClock = performance.now()
+    const record = async (outcome: JevUsageRecord['outcome'], inputTokens: number | null, outputTokens: number | null): Promise<void> => {
+      try {
+        await services.recordJevUsage({
+          requestId,
+          source: 'memory',
+          credential: request.credential,
+          startedAt,
+          durationMs: Math.min(60 * 60_000, Math.max(0, Math.round(performance.now() - startedClock))),
+          outcome,
+          inputTokens,
+          outputTokens,
+        })
+      } catch {
+        return
+      }
+    }
+    try {
+      const verdict = await JevClassifier.ask({ ...request, fetch: services.fetch })
+      await record('success', verdict.inputTokens, verdict.outputTokens)
+      return verdict
+    } catch (error) {
+      await record('failure', null, null)
+      throw error
+    }
+  }
+
   const jevSignals = async (log: SessionLog): Promise<readonly Signal[]> => {
-    const apiKey = await services.jevKey()
-    if (!options.settings().jevEnabled || apiKey === undefined) return []
+    const credential = await services.jevCredential()
+    if (!options.settings().jevEnabled || credential === undefined) return []
     const signals: Signal[] = []
     const candidates = log.events
       .slice(log.inheritedEventCount)
@@ -156,11 +195,12 @@ export const createMemoryRuntime = (options: {
       const text = event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
       if (Utf8.byteLength(text) > 1_500 || text.trim().length === 0) continue
       try {
-        const verdict = await JevClassifier.ask({ question: 'signal', text, apiKey, fetch: services.fetch })
+        const verdict = await askJev({ question: 'signal', text, apiKey: credential.value, credential: credential.label })
+        const inputTokens = verdict.inputTokens ?? 0
         store.bump('jev.calls')
-        store.bump('jev.inputTokens', verdict.inputTokens)
-        store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: verdict.inputTokens, cacheRead: 0, output: 0 })
-        logger.info('memory: jev call {"question":"signal","inputTokens":%d}', verdict.inputTokens)
+        store.bump('jev.inputTokens', inputTokens)
+        store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: inputTokens, cacheRead: 0, output: 0 })
+        logger.info('memory: jev call {"question":"signal","inputTokens":%d}', inputTokens)
         if (verdict.probability >= options.settings().jevThreshold)
           signals.push({ seq: event.seq, kind: 'flagged', text: Utf8.clip(ThreadDigestRules.redact(text).replace(/\s+/g, ' '), 260) })
       } catch (error) {
@@ -340,14 +380,15 @@ export const createMemoryRuntime = (options: {
   }
 
   const recallGate = async (firstUserText: string | undefined): Promise<boolean> => {
-    const apiKey = await services.jevKey()
-    if (!options.settings().jevEnabled || apiKey === undefined || firstUserText === undefined) return true
+    const credential = await services.jevCredential()
+    if (!options.settings().jevEnabled || credential === undefined || firstUserText === undefined) return true
     try {
-      const verdict = await JevClassifier.ask({ question: 'recall', text: firstUserText, apiKey, fetch: services.fetch })
+      const verdict = await askJev({ question: 'recall', text: firstUserText, apiKey: credential.value, credential: credential.label })
+      const inputTokens = verdict.inputTokens ?? 0
       store.bump('jev.calls')
-      store.bump('jev.inputTokens', verdict.inputTokens)
-      store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: verdict.inputTokens, cacheRead: 0, output: 0 })
-      logger.info('memory: jev call {"question":"recall","inputTokens":%d}', verdict.inputTokens)
+      store.bump('jev.inputTokens', inputTokens)
+      store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: inputTokens, cacheRead: 0, output: 0 })
+      logger.info('memory: jev call {"question":"recall","inputTokens":%d}', inputTokens)
       return verdict.probability >= options.settings().jevThreshold
     } catch {
       store.bump('jev.failures')

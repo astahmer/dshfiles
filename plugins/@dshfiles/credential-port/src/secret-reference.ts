@@ -20,6 +20,11 @@ export interface SecretReference {
   readonly environment: string
 }
 
+export interface ResolvedSecretCredential {
+  readonly value: string
+  readonly label: string
+}
+
 const referencePattern = /^secret:([A-Za-z_][A-Za-z0-9_-]*)(?:@([A-Za-z0-9_-]+))?$/
 
 /** Parses `secret:ALIAS` or `secret:ALIAS@ENV`; null for anything else, so a field can hold prose instead. */
@@ -45,6 +50,20 @@ export const secretReferenceSchema = z
       return z.NEVER
     }
     return reference
+  })
+
+export const secretCredentialLabelSchema = z
+  .string()
+  .max(400)
+  .transform((text, context) => {
+    const reference = parseSecretReference(text)
+    if (reference !== null) return formatSecretReference(reference)
+    if (text.startsWith('env:')) {
+      const variableName = secretAliasSchema.safeParse(text.slice('env:'.length))
+      if (variableName.success) return text
+    }
+    context.addIssue({ code: 'custom', message: 'Use a secret reference or env:VARIABLE_NAME label.' })
+    return z.NEVER
   })
 
 /** One reference resolved for a folder: `project`/`local` aliases come from that folder's config, `global` needs none. */
@@ -78,12 +97,22 @@ export class SecretReferenceResolver {
     readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
     readonly environmentValue: string | undefined
   }): Promise<string | undefined> {
+    return (await SecretReferenceResolver.resolveWithLabel({ ...input, environmentVariableName: 'environment' }))?.value
+  }
+
+  static async resolveWithLabel(input: {
+    readonly referenceText: string
+    readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
+    readonly environmentValue: string | undefined
+    readonly environmentVariableName: string
+  }): Promise<ResolvedSecretCredential | undefined> {
     const reference = parseSecretReference(input.referenceText)
     if (reference !== null) {
       if (input.values === undefined) throw new Error('The Secret Catalog plugin is not loaded, so the bound secret reference cannot be resolved.')
-      return input.values.resolve({ reference, cwd: null })
+      return { value: await input.values.resolve({ reference, cwd: null }), label: formatSecretReference(reference) }
     }
     if (input.referenceText.trim() !== '') throw new Error('The bound key is not a secret:ALIAS or secret:ALIAS@env reference.')
-    return input.environmentValue === undefined || input.environmentValue === '' ? undefined : input.environmentValue
+    if (input.environmentValue === undefined || input.environmentValue === '') return undefined
+    return { value: input.environmentValue, label: `env:${input.environmentVariableName}` }
   }
 }

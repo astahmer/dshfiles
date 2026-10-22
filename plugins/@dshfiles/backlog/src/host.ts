@@ -11,11 +11,11 @@ import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
 import { agentsApi, type Agent } from '@dshfiles/agents/contract'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { usageApi, type JevUsageRecord } from '@dshfiles/usage/api'
 import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { randomUUID } from 'node:crypto'
-import { z } from 'zod'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { AgentComments } from './agent-dispatch.js'
 import { backlogApi } from './api.js'
@@ -30,7 +30,8 @@ import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type
 import { BacklogProjectTarget } from './project-target.js'
 import { BacklogSignals } from './signals.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
-import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
+import { JevClient } from './jev-client.js'
+import { BacklogTriage, type TriageServices } from './triage.js'
 
 interface OpenedBacklog {
   readonly store: BacklogStore
@@ -127,24 +128,6 @@ const ownedSettings = backlogSettings.host({
   },
 })
 
-const jevAnswerSchema = z.object({ answers: z.object({ verdict: z.object({ type: z.literal('noul'), noul: z.number().min(0).max(1) }) }) })
-
-/** TypeSafe's Jev (`POST /v1/systemone`) with one Noul question; the probability that the answer is "true". */
-const askJev = async (request: { readonly apiKey: string; readonly question: TriageQuestion; readonly text: string }): Promise<number> => {
-  const response = await fetch('https://api.typesafe.ai/v1/systemone', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${request.apiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: 'jev-latest',
-      state: { role: 'user', content: request.text.slice(0, 8_000) },
-      questions: { verdict: { type: 'noul', ...request.question } },
-    }),
-    signal: AbortSignal.timeout(4_000),
-  })
-  if (!response.ok) throw new Error(`Jev answered ${String(response.status)}`)
-  return jevAnswerSchema.parse(await response.json()).answers.verdict.noul
-}
-
 const complete = async (
   ctx: Context,
   request: { readonly provider: string; readonly model: string; readonly system: string; readonly input: string },
@@ -172,21 +155,30 @@ const complete = async (
 const JEV_ENV_KEY = 'TYPESAFE_API_KEY'
 
 /** The key Jev answers with, resolved on the Host from the bound reference or the environment. */
-const jevApiKey = async (ctx: Context, settings: BacklogSettings): Promise<string | undefined> =>
-  SecretReferenceResolver.resolve({
+const jevCredential = async (ctx: Context, settings: BacklogSettings) =>
+  SecretReferenceResolver.resolveWithLabel({
     referenceText: settings.jevSecret,
     values: ctx.get('secretCatalogValues'),
     environmentValue: process.env[JEV_ENV_KEY],
+    environmentVariableName: JEV_ENV_KEY,
   })
+
+const jevUsageRecorder = (ctx: Context) => {
+  const client = createHostApiClient(ctx, usageApi, '@dshfiles/backlog')
+  return async (record: JevUsageRecord): Promise<void> => {
+    await client.safe.recordJevUsage(record)
+  }
+}
 
 /** The triage services the settings resolve to, and why they are missing when both are. */
 const triageSetup = async (ctx: Context, settings: BacklogSettings): Promise<{ readonly services: TriageServices; readonly reason: string | null }> => {
-  const apiKey = settings.jevEnabled ? await jevApiKey(ctx, settings) : undefined
-  const jevReady = settings.jevEnabled && apiKey !== undefined
+  const credential = settings.jevEnabled ? await jevCredential(ctx, settings) : undefined
+  const jevReady = settings.jevEnabled && credential !== undefined
   const modelReady = settings.triageProvider !== '' && settings.triageModel !== ''
+  const recordUsage = jevUsageRecorder(ctx)
   return {
     services: {
-      jev: jevReady ? request => askJev({ apiKey, ...request }) : undefined,
+      jev: jevReady ? request => JevClient.ask({ ...request, apiKey: credential.value, credential: credential.label, recordUsage }) : undefined,
       complete: modelReady ? request => complete(ctx, { provider: settings.triageProvider, model: settings.triageModel, ...request }) : undefined,
     },
     reason:
@@ -394,10 +386,16 @@ const scheduleResolution = (ctx: Context, session: Session, settings: BacklogSet
     if (open.length === 0) return
     const reply = ThreadLifecycle.replyText(session.deriveMessages())
     if (reply === '') return
-    const apiKey = await jevApiKey(ctx, settings)
-    if (apiKey === undefined) return
+    const credential = await jevCredential(ctx, settings)
+    if (credential === undefined) return
+    const recordUsage = jevUsageRecorder(ctx)
     for (const item of open) {
-      const proposal = await BacklogTriage.resolveThread({ item, reply, jev: request => askJev({ apiKey, ...request }), now: Date.now() })
+      const proposal = await BacklogTriage.resolveThread({
+        item,
+        reply,
+        jev: request => JevClient.ask({ ...request, apiKey: credential.value, credential: credential.label, recordUsage }),
+        now: Date.now(),
+      })
       if (proposal !== null) await store.propose({ id: item.id, proposal })
     }
   })().catch(logFailure('Backlog thread resolution failed'))
@@ -734,7 +732,7 @@ const backlogApiHost = backlogApi.host({
   jevSetupStatus: async ({ ctx }) => {
     const settings = currentSettings()
     return {
-      needsSetup: await jevNeedsSecretSetup({ enabled: settings.jevEnabled, resolveKey: () => jevApiKey(ctx, settings) }),
+      needsSetup: await jevNeedsSecretSetup({ enabled: settings.jevEnabled, resolveKey: async () => (await jevCredential(ctx, settings))?.value }),
     }
   },
   transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),

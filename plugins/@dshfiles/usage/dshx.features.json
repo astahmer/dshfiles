@@ -143,6 +143,65 @@
           "featureFile": "tooling/dshx/e2e/features/usage.feature"
         }
       ]
+    },
+    {
+      "id": "usage-jev-card",
+      "title": "Jev API usage card",
+      "summary": "The Charts tab shows DSH-origin Jev calls reported by Backlog and Memory, grouped by configured secret-reference label or the TYPESAFE_API_KEY environment-variable label, with provider-reported per-call tokens and a TypeSafe list-price estimate. Labels are local references, not provider-verified identity; this is not account balance or usage outside DSH.",
+      "reach": ["click button \"Usage analytics\"", "click tab \"Charts\"", "expect text \"Jev API usage\""],
+      "surfaces": ["host", "storage", "integration", "client"],
+      "configuration": [],
+      "states": ["empty", "recorded", "failed", "missing-token-usage"],
+      "failureModes": [
+        "Calls made outside DSH are not observed; provider-reported balance and account-wide history are not available from the documented Jev API.",
+        "Configured credential labels are local references, not proof of provider billing identity; provider account-wide balance/history are not documented API capabilities.",
+        "The dshx caller package id is cooperative in-process attribution, not authentication against malicious installed plugins.",
+        "Calls without input-token usage remain counted but do not contribute to the estimate.",
+        "The estimate uses TypeSafe's published $0.042 per million input-token price; update the constant if pricing changes."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/backlog",
+          "boundary": "Reports the secret reference label or environment-variable name, request time, outcome and provider-reported token counts; never sends the resolved key, prompt or response text.",
+          "deterministicFake": "plugins/@dshfiles/backlog/src/jev-client.test.ts returns synthetic Jev responses."
+        },
+        {
+          "id": "@dshfiles/memory",
+          "boundary": "Reports the secret reference label or environment-variable name, request time, outcome and provider-reported token counts; never sends the resolved key, prompt or response text.",
+          "deterministicFake": "plugins/@dshfiles/memory/src/runtime.test.ts injects a synthetic Jev response."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "usage.jev-usage-card-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.jev-usage-storage",
+          "file": "plugins/@dshfiles/usage/src/jev-usage.test.ts",
+          "testName": "aggregates only the requested range and estimates input cost"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.jev-usage-api-tool",
+          "file": "plugins/@dshfiles/usage/src/api-tools.test.ts",
+          "testName": "Jev usage report is read-only and request recording stays internal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.jev-usage-recorder-authz",
+          "file": "plugins/@dshfiles/usage/src/jev-usage-recorder.test.ts",
+          "testName": "rejects a Jev plugin claiming another source and accepts only its matching source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.jev-usage-card-rendering",
+          "file": "plugins/@dshfiles/usage/src/jev-usage-card.test.tsx",
+          "testName": "renders the DSH-only estimate and source counts"
+        }
+      ]
     }
   ]
 }

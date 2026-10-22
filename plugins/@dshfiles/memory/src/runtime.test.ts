@@ -8,8 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { projectPathFor } from './project-path.ts'
 import { createMemoryRuntime, type Caller, type SessionLog } from './runtime.ts'
 import type { MemoryEmbedder } from './embedder.ts'
-import { memorySettings, type MemorySettings } from './settings.ts'
+import type { JevUsageRecord } from '@dshfiles/usage/api'
 import { openMemoryStore } from './store.ts'
+import { memorySettings, type MemorySettings } from './settings.ts'
 import { createThread } from './testing/session-fixture.ts'
 
 let root: string
@@ -44,54 +45,62 @@ const conceptEmbedder: MemoryEmbedder = {
     }),
 }
 
-const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedder) => {
+type SessionSearchState = { hits: { sessionId: string; snippet: string }[]; error: Error | null; calls: number }
+
+const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedder, jev: { readonly key?: string; readonly fetch?: typeof fetch } = {}) => {
   const logs = new Map<string, SessionLog>()
   const summaries: string[] = []
   const titles = new Map<string, string>()
   const scopes = new Map<string, string>()
-  const content = {
-    hits: [] as { sessionId: string; snippet: string }[],
-    error: undefined as unknown,
+  const content: SessionSearchState = {
+    hits: [],
+    error: null,
     calls: 0,
   }
+  const jevUsage: JevUsageRecord[] = []
   const store = openMemoryStore({ path: join(root, 'memory.db') })
+  const services = {
+    projectPath: projectPathFor,
+    agentMemoryScope: async (sessionId: string) => scopes.get(sessionId) ?? null,
+    listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false, persisted: true })),
+    readSessionTitles: async (ids: readonly string[]) => ids.map(id => ({ sessionId: id, title: titles.get(id), updatedAt: undefined })),
+    searchSessionContent: async () => {
+      content.calls += 1
+      if (content.error !== null) throw content.error
+      return { hits: content.hits, hasMore: false }
+    },
+    readSession: async (id: string) => {
+      const log = logs.get(id)
+      if (!log) throw new Error(`no session ${id}`)
+      return log
+    },
+    summarize: async (request: { readonly conversationId: string }) => {
+      summaries.push(request.conversationId)
+      return {
+        text: 'Counted 5xx responses in the gateway log; the worker log shows 312 retries.\nUser asked about logs/api-gateway.log and logs/worker.log.',
+      }
+    },
+    jevCredential: async () => (jev.key === undefined ? undefined : { value: jev.key, label: 'env:TYPESAFE_API_KEY' }),
+    recordJevUsage: async (record: JevUsageRecord) => {
+      jevUsage.push(record)
+    },
+    embedder: async (specifier: string) => {
+      if (embedder === undefined) throw new Error(`cannot load ${specifier}`)
+      return embedder
+    },
+  }
+  if (jev.fetch !== undefined) Object.assign(services, { fetch: jev.fetch })
   const runtime = createMemoryRuntime({
     store,
     settings: () => settings(overrides),
     logger: { info: () => {}, warn: () => {} },
-    services: {
-      projectPath: projectPathFor,
-      agentMemoryScope: async sessionId => scopes.get(sessionId) ?? null,
-      listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false, persisted: true })),
-      readSessionTitles: async ids => ids.map(id => ({ sessionId: id, title: titles.get(id), updatedAt: undefined })),
-      searchSessionContent: async () => {
-        content.calls += 1
-        if (content.error !== undefined) throw content.error
-        return { hits: content.hits, hasMore: false }
-      },
-      readSession: async id => {
-        const log = logs.get(id)
-        if (!log) throw new Error(`no session ${id}`)
-        return log
-      },
-      summarize: async request => {
-        summaries.push(request.conversationId)
-        return {
-          text: 'Counted 5xx responses in the gateway log; the worker log shows 312 retries.\nUser asked about logs/api-gateway.log and logs/worker.log.',
-        }
-      },
-      jevKey: async () => undefined,
-      embedder: async specifier => {
-        if (embedder === undefined) throw new Error(`cannot load ${specifier}`)
-        return embedder
-      },
-    },
+    services,
   })
   const caller = (id: string, cwd = root, origin?: 'subagent'): Caller => ({
     id,
     session: { header: origin === undefined ? { id, cwd } : { id, cwd, origin, parentSession: 'session-parent' } },
   })
-  return { logs, summaries, store, runtime, caller, titles, content, scopes }
+  return { logs, summaries, store, runtime, caller, titles, content, scopes, jevUsage }
 }
 
 const halyardThread = (id: string) => {
@@ -181,6 +190,43 @@ describe('memory runtime', () => {
     expect(preview.project).toBe(root)
     expect(preview.text).toBe(await runtime.startBlock(caller('session-aaaaaaaa')))
     expect((await setup({ enabled: false }).runtime.previewStartBlock(root)).text).toBe('')
+  })
+
+  it('records provider-reported Jev usage without the key or request text', async () => {
+    const key = 'synthetic-memory-key'
+    const text = 'synthetic prompt text'
+    const { runtime, caller, jevUsage } = setup({ enabled: true, jevEnabled: true }, undefined, {
+      key,
+      fetch: async (input, init) => {
+        expect(input).toBe('https://api.typesafe.ai/v1/systemone')
+        expect(new Headers(init?.headers).get('authorization')).toBe(`Bearer ${key}`)
+        return new Response(
+          JSON.stringify({ model: 'jev-latest', answers: { verdict: { type: 'noul', noul: 0.8 } }, usage: { input_tokens: 42, output_tokens: 3 } }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      },
+    })
+
+    await runtime.startBlock(caller('session-jev-usage'), async () => text)
+
+    expect(jevUsage).toHaveLength(1)
+    expect(jevUsage[0]).toMatchObject({ source: 'memory', credential: 'env:TYPESAFE_API_KEY', outcome: 'success', inputTokens: 42, outputTokens: 3 })
+    expect(JSON.stringify(jevUsage[0])).not.toContain(key)
+    expect(JSON.stringify(jevUsage[0])).not.toContain(text)
+  })
+
+  it('records failed Jev attempts with unknown token usage', async () => {
+    const { runtime, caller, jevUsage } = setup({ enabled: true, jevEnabled: true }, undefined, {
+      key: 'synthetic-memory-key',
+      fetch: async () => new Response('synthetic private error body', { status: 503 }),
+    })
+
+    await runtime.startBlock(caller('session-jev-failure'), async () => 'synthetic prompt text')
+
+    expect(jevUsage).toHaveLength(1)
+    expect(jevUsage[0]).toMatchObject({ source: 'memory', credential: 'env:TYPESAFE_API_KEY', outcome: 'failure', inputTokens: null, outputTokens: null })
+    expect(JSON.stringify(jevUsage[0])).not.toContain('synthetic-memory-key')
+    expect(JSON.stringify(jevUsage[0])).not.toContain('synthetic private error body')
   })
 
   it('asks a cheap model only for a thread without a trail of its own', async () => {

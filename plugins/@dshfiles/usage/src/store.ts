@@ -4,6 +4,14 @@ import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlit
 import { z } from 'zod'
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import type { ChartQuery, ChartView, RequestPage, RequestQuery, RequestView } from './api.js'
+import {
+  JEV_INPUT_USD_PER_MILLION,
+  jevCredentialLabelSchema,
+  type JevUsageBreakdown,
+  type JevUsageQuery,
+  type JevUsageRecord,
+  type JevUsageView,
+} from './jev-usage.js'
 import { UsageFoldModel, type RequestRow, type SessionMeta } from './fold.js'
 
 /**
@@ -80,6 +88,19 @@ const MIGRATIONS: readonly string[] = [
   `,
   // Pricing reads the distinct routes that have usage; the partial index answers it without reading request rows.
   'CREATE INDEX requests_route_band ON requests (provider, model, band) WHERE input IS NOT NULL;',
+  `
+  CREATE TABLE jev_requests (
+    request_id TEXT PRIMARY KEY,
+    source TEXT NOT NULL CHECK (source IN ('backlog', 'memory')),
+    started_at INTEGER NOT NULL,
+    duration_ms INTEGER NOT NULL CHECK (duration_ms BETWEEN 0 AND 3600000),
+    outcome TEXT NOT NULL CHECK (outcome IN ('success', 'failure')),
+    input_tokens INTEGER CHECK (input_tokens >= 0),
+    output_tokens INTEGER CHECK (output_tokens >= 0)
+  ) STRICT;
+  CREATE INDEX jev_requests_started ON jev_requests (started_at);
+  `,
+  `ALTER TABLE jev_requests ADD COLUMN credential TEXT NOT NULL DEFAULT 'Legacy / unknown' CHECK (length(credential) BETWEEN 1 AND 400);`,
 ]
 
 export interface RouteBand {
@@ -628,6 +649,114 @@ export const openUsageStore = (path: string) => {
     }
   }
 
+  const recordJevUsage = (record: JevUsageRecord): void => {
+    prepare(
+      `INSERT OR IGNORE INTO jev_requests (request_id, source, started_at, duration_ms, outcome, input_tokens, output_tokens, credential)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      record.requestId,
+      record.source,
+      Math.round(record.startedAt),
+      record.durationMs,
+      record.outcome,
+      record.inputTokens,
+      record.outputTokens,
+      record.credential,
+    )
+  }
+
+  const jevUsage = (query: JevUsageQuery): JevUsageView => {
+    const rows = prepare(
+      `SELECT credential, COALESCE(SUM(source = 'backlog'), 0) AS backlogCalls, COALESCE(SUM(source = 'memory'), 0) AS memoryCalls, COUNT(*) AS calls,
+         COALESCE(SUM(outcome = 'success'), 0) AS succeeded,
+         COALESCE(SUM(outcome = 'failure'), 0) AS failed,
+         COALESCE(SUM(input_tokens), 0) AS inputTokens,
+         COALESCE(SUM(output_tokens), 0) AS outputTokens,
+         COALESCE(SUM(input_tokens IS NULL), 0) AS callsWithoutInputUsage
+       FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY credential ORDER BY credential LIMIT 19`,
+    )
+      .all(query.from, query.to)
+      .map(row =>
+        z
+          .object({
+            credential: jevCredentialLabelSchema.or(z.literal('Other credentials')),
+            backlogCalls: z.number().int().nonnegative(),
+            memoryCalls: z.number().int().nonnegative(),
+            calls: z.number().int().nonnegative(),
+            succeeded: z.number().int().nonnegative(),
+            failed: z.number().int().nonnegative(),
+            inputTokens: z.number().int().nonnegative(),
+            outputTokens: z.number().int().nonnegative(),
+            callsWithoutInputUsage: z.number().int().nonnegative(),
+          })
+          .strict()
+          .parse(row),
+      )
+    const byCredential: JevUsageBreakdown[] = rows.map(row => ({
+      credential: row.credential,
+      backlogCalls: row.backlogCalls,
+      memoryCalls: row.memoryCalls,
+      calls: row.calls,
+      succeeded: row.succeeded,
+      failed: row.failed,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      callsWithoutInputUsage: row.callsWithoutInputUsage,
+      estimatedCostUsd: (row.inputTokens * JEV_INPUT_USD_PER_MILLION) / 1_000_000,
+    }))
+    const omitted = z
+      .object({
+        calls: z.number().int().nonnegative(),
+        backlogCalls: z.number().int().nonnegative(),
+        memoryCalls: z.number().int().nonnegative(),
+        succeeded: z.number().int().nonnegative(),
+        failed: z.number().int().nonnegative(),
+        inputTokens: z.number().int().nonnegative(),
+        outputTokens: z.number().int().nonnegative(),
+        callsWithoutInputUsage: z.number().int().nonnegative(),
+      })
+      .parse(
+        prepare(
+          `SELECT COUNT(*) AS calls, COALESCE(SUM(source = 'backlog'), 0) AS backlogCalls, COALESCE(SUM(source = 'memory'), 0) AS memoryCalls,
+             COALESCE(SUM(outcome = 'success'), 0) AS succeeded, COALESCE(SUM(outcome = 'failure'), 0) AS failed,
+             COALESCE(SUM(input_tokens), 0) AS inputTokens, COALESCE(SUM(output_tokens), 0) AS outputTokens,
+             COALESCE(SUM(input_tokens IS NULL), 0) AS callsWithoutInputUsage
+           FROM jev_requests WHERE started_at >= ? AND started_at < ? AND credential NOT IN (SELECT credential FROM jev_requests
+             WHERE started_at >= ? AND started_at < ? GROUP BY credential ORDER BY credential LIMIT 19)`,
+        ).get(query.from, query.to, query.from, query.to),
+      )
+    if (omitted.calls > 0)
+      byCredential.push({
+        credential: 'Other credentials',
+        backlogCalls: omitted.backlogCalls,
+        memoryCalls: omitted.memoryCalls,
+        calls: omitted.calls,
+        succeeded: omitted.succeeded,
+        failed: omitted.failed,
+        inputTokens: omitted.inputTokens,
+        outputTokens: omitted.outputTokens,
+        callsWithoutInputUsage: omitted.callsWithoutInputUsage,
+        estimatedCostUsd: (omitted.inputTokens * JEV_INPUT_USD_PER_MILLION) / 1_000_000,
+      })
+    const totals = {
+      calls: 0,
+      succeeded: 0,
+      failed: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      callsWithoutInputUsage: 0,
+    }
+    for (const row of byCredential) {
+      totals.calls += row.calls
+      totals.succeeded += row.succeeded
+      totals.failed += row.failed
+      totals.inputTokens += row.inputTokens
+      totals.outputTokens += row.outputTokens
+      totals.callsWithoutInputUsage += row.callsWithoutInputUsage
+    }
+    return { ...totals, estimatedCostUsd: (totals.inputTokens * JEV_INPUT_USD_PER_MILLION) / 1_000_000, byCredential }
+  }
+
   const counts = () =>
     z
       .object({ files: z.number(), requests: z.number() })
@@ -645,6 +774,8 @@ export const openUsageStore = (path: string) => {
     setMeta,
     requests,
     charts,
+    recordJevUsage,
+    jevUsage,
     counts,
     close: () => database.close(),
   }

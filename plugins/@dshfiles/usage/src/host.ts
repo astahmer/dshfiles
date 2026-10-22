@@ -6,6 +6,7 @@ import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { usageApi } from './api.js'
+import { createJevUsageRecorder, jevSourceOf } from './jev-usage-recorder.js'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
 import { observeLiveCall } from './live-calls.js'
@@ -71,6 +72,11 @@ const status = (active: UsageRuntime) => {
 }
 
 const api = usageApi.host({
+  jevUsage: ({ input }) => requireRuntime().store.jevUsage(input),
+  recordJevUsage: createJevUsageRecorder({
+    authorize: jevSourceOf,
+    record: input => requireRuntime().store.recordJevUsage(input),
+  }),
   requests: ({ input }) => requireRuntime().store.requests(input),
   charts: ({ input }) => requireRuntime().store.charts(input),
   status: () => status(requireRuntime()),

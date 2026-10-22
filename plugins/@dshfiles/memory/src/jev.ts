@@ -4,10 +4,15 @@ import { z } from 'zod'
 const answerSchema = z.object({
   model: z.string(),
   answers: z.object({ verdict: z.object({ type: z.literal('noul'), noul: z.number().min(0).max(1) }) }),
-  usage: z.object({ input_tokens: z.number().int().nonnegative() }).optional(),
+  usage: z
+    .object({
+      input_tokens: z.number().int().min(0).max(1_000_000).optional(),
+      output_tokens: z.number().int().min(0).max(1_000_000).optional(),
+    })
+    .optional(),
 })
 
-export type JevVerdict = { readonly probability: number; readonly inputTokens: number }
+export type JevVerdict = { readonly probability: number; readonly inputTokens: number | null; readonly outputTokens: number | null }
 
 const questions = {
   signal: {
@@ -51,6 +56,10 @@ export class JevClassifier {
     })
     if (!response.ok) throw new Error(`jev answered HTTP ${response.status}`)
     const parsed = answerSchema.parse(await response.json())
-    return { probability: parsed.answers.verdict.noul, inputTokens: parsed.usage?.input_tokens ?? 0 }
+    return {
+      probability: parsed.answers.verdict.noul,
+      inputTokens: parsed.usage?.input_tokens ?? null,
+      outputTokens: parsed.usage?.output_tokens ?? null,
+    }
   }
 }

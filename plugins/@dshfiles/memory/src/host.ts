@@ -20,6 +20,7 @@ import { z } from 'zod'
 import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from './embedder.ts'
 import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@dshfiles/ai-accounts/pricing-catalog'
+import { JEV_INPUT_USD_PER_MILLION, usageApi } from '@dshfiles/usage/api'
 
 import { AgentScope } from './agent-scope.ts'
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryEvent, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
@@ -121,6 +122,7 @@ const agentScopeOf = (ctx: Context, sessionId: string): Promise<string | null> =
 }
 
 const hostServices = (ctx: Context): MemoryServices => {
+  const jevUsageClient = createHostApiClient(ctx, usageApi, '@dshfiles/memory')
   const sessionQuery = () => {
     const service = ctx.get('sessionQuery')
     if (!service) throw new Error('the DSH sessionQuery service is unavailable')
@@ -259,19 +261,20 @@ const hostServices = (ctx: Context): MemoryServices => {
       loaded.catch(() => embedders.delete(specifier))
       return loaded
     },
-    jevKey: async () =>
-      SecretReferenceResolver.resolve({
+    jevCredential: async () =>
+      SecretReferenceResolver.resolveWithLabel({
         referenceText: currentSettings().jevSecret,
         values: ctx.get('secretCatalogValues'),
         environmentValue: process.env[TYPESAFE_ENV_KEY],
+        environmentVariableName: TYPESAFE_ENV_KEY,
       }),
+    recordJevUsage: async record => {
+      await jevUsageClient.safe.recordJevUsage(record)
+    },
   }
 }
 
 const bm25Only: RetrievalStatus = { requested: 'bm25', active: 'bm25', model: null, reason: null }
-
-/** TypeSafe's list price for Jev input; its output is free. */
-const jevUsdPerMillionInput = 0.042
 
 const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
 let pricingLoaded: Promise<void> | undefined
@@ -299,7 +302,10 @@ const emptyCostLine = (): MemoryCostLine => ({ digest: { calls: 0, input: 0, cac
 
 const addCost = (line: MemoryCostLine, row: ReturnType<MemoryStore['costsByDay']>[number], usd: number | null): MemoryCostLine =>
   row.kind === 'jev'
-    ? { ...line, jev: { calls: line.jev.calls + row.calls, input: line.jev.input + row.input, usd: line.jev.usd + (row.input * jevUsdPerMillionInput) / 1e6 } }
+    ? {
+        ...line,
+        jev: { calls: line.jev.calls + row.calls, input: line.jev.input + row.input, usd: line.jev.usd + (row.input * JEV_INPUT_USD_PER_MILLION) / 1e6 },
+      }
     : {
         ...line,
         digest: {

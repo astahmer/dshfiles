@@ -1,4 +1,5 @@
 import { cp, mkdir, writeFile } from 'node:fs/promises'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
@@ -24,6 +25,20 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
   await cp(FIXTURE_SESSIONS, join(home, 'sessions'), { recursive: true })
   await mkdir(join(home, 'plugins', 'ai-accounts'), { recursive: true })
   await writeFile(join(home, 'plugins', 'ai-accounts', 'pricing.json'), JSON.stringify(PRICE_CACHE))
+  await mkdir(join(home, 'plugins', 'usage'), { recursive: true })
+  const jevDatabase = new DatabaseSync(join(home, 'plugins', 'usage', 'usage.db'))
+  try {
+    jevDatabase.prepare('DELETE FROM jev_requests').run()
+    const insert = jevDatabase.prepare(
+      'INSERT INTO jev_requests (request_id, source, started_at, duration_ms, outcome, input_tokens, output_tokens, credential) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    const startedAt = Date.UTC(2026, 9, 22, 12)
+    insert.run('00000000-0000-4000-8000-000000000001', 'memory', startedAt, 320, 'success', 100_000, 30, 'secret:MEMORY_JEV')
+    insert.run('00000000-0000-4000-8000-000000000002', 'backlog', startedAt + 1_000, 280, 'success', 50_000, 10, 'secret:BACKLOG_JEV')
+    insert.run('00000000-0000-4000-8000-000000000003', 'backlog', startedAt + 2_000, 120, 'failure', null, null, 'secret:BACKLOG_JEV')
+  } finally {
+    jevDatabase.close()
+  }
 })
 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
@@ -104,6 +119,26 @@ Then('the headline tiles, the charts and the top threads show the indexed usage'
   await recordAssertion(page, 'usage-top-threads-by-cost', () =>
     expect(page.getByRole('button', { name: /^Sample thread · sample\s*\$\d/ }).first()).toBeVisible(),
   )
+})
+
+Then('the Jev usage card shows DSH-local token estimates', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'usage-jev-card-shows-scoped-estimate', async () => {
+    const card = page.locator('[data-usage-jev-card]')
+    await expect(card).toHaveCount(1)
+    await expect(card.locator('[data-usage-jev-card-title]')).toHaveText('Jev API usage')
+    await expect(
+      card.getByText('DSH-local estimated usage · $0.042 per 1M input tokens · output free. Not provider account balance.', { exact: true }),
+    ).toBeVisible()
+    await expect(card.getByText('Jev calls', { exact: true })).toBeVisible()
+    await expect(card.getByText('3', { exact: true })).toBeVisible()
+    await expect(card.getByText('150K', { exact: true })).toBeVisible()
+    await expect(card.getByText('$0.0063', { exact: true })).toBeVisible()
+    await expect(card.getByText('secret:BACKLOG_JEV')).toBeVisible()
+    await expect(card.getByText('secret:MEMORY_JEV')).toBeVisible()
+    await expect(card.getByText('2 calls · 50K input · $0.0021 · Backlog 2 / Memory 0')).toBeVisible()
+    await expect(card.getByText('1 calls · 100K input · $0.0042 · Backlog 0 / Memory 1')).toBeVisible()
+    await expect(card.getByText(/DSH-observed requests only; does not include outside DSH/u)).toBeVisible()
+  })
 })
 
 Then('selecting a model in the cost breakdown shows its requests in the log', async ({ page }: { page: Page }) => {

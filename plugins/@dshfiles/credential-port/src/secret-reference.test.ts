@@ -53,9 +53,34 @@ describe('SecretReferenceResolver', () => {
     expect(calls).toEqual([{ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null }])
   })
 
-  it('falls back to the environment when no reference is bound', async () => {
-    await expect(SecretReferenceResolver.resolve({ referenceText: '  ', values: undefined, environmentValue: 'env-key' })).resolves.toBe('env-key')
-    await expect(SecretReferenceResolver.resolve({ referenceText: '', values: undefined, environmentValue: '' })).resolves.toBeUndefined()
+  it('returns safe labels with the resolved credential, never with the value in the label', async () => {
+    const referenceCalls: SecretReferenceResolution[] = []
+    await expect(
+      SecretReferenceResolver.resolveWithLabel({
+        referenceText: ' secret:API_KEY@dev ',
+        values: resolving('super-secret-value', referenceCalls),
+        environmentValue: undefined,
+        environmentVariableName: 'TYPESAFE_API_KEY',
+      }),
+    ).resolves.toEqual({ value: 'super-secret-value', label: 'secret:API_KEY@dev' })
+    expect(referenceCalls).toEqual([{ reference: { alias: 'API_KEY', environment: 'dev' }, cwd: null }])
+
+    await expect(
+      SecretReferenceResolver.resolveWithLabel({
+        referenceText: '  ',
+        values: undefined,
+        environmentValue: 'another-secret-value',
+        environmentVariableName: 'TYPESAFE_API_KEY',
+      }),
+    ).resolves.toEqual({ value: 'another-secret-value', label: 'env:TYPESAFE_API_KEY' })
+    await expect(
+      SecretReferenceResolver.resolveWithLabel({
+        referenceText: '',
+        values: undefined,
+        environmentValue: '',
+        environmentVariableName: 'TYPESAFE_API_KEY',
+      }),
+    ).resolves.toBeUndefined()
   })
 
   it('refuses a binding that is not a reference, and a reference with no catalog to resolve it', async () => {

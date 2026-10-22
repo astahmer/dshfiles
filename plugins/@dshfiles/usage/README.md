@@ -1,6 +1,7 @@
 # DSH usage analytics
 
 ![Request log](docs/screenshots/usage-request-log.png)
+![Jev API usage card](docs/screenshots/usage-jev-card.png)
 
 A **Usage analytics** main panel (sidebar) with a request log and usage charts,
 built from the session logs DSH already writes. Observation only.
@@ -15,6 +16,11 @@ built from the session logs DSH already writes. Observation only.
   (selecting one filters the log), tokens by kind, cache hit ratio, requests
   and failures, TTFT and duration p50/p90, and the top threads by cost,
   hourly or daily. Charts use TanStack Charts from `@dshfiles/plugin-ui`.
+- **Jev API usage**: DSH-origin calls from Backlog and Memory, grouped by the
+  configured secret reference (or the `TYPESAFE_API_KEY` environment-variable
+  label), with provider-reported tokens and a TypeSafe list-price estimate.
+  Labels are local configuration references, not verified billing identity. The
+  card is not a TypeSafe account balance and excludes calls made outside DSH.
 
 ## Data
 
@@ -40,6 +46,12 @@ An `llm/stream` observer adds what the logs lack: the usage and TTFT of title
 calls (merged into the log row), memory digests (`memory`) and other plugin
 calls (`other`). It only sees calls made while the plugin is loaded.
 
+Jev usage is recorded separately as one bounded row per DSH call reported by
+Backlog or Memory. Rows contain source, configured credential label, time,
+outcome, duration and provider-reported tokens; the API key, prompt and response
+are never stored. Legacy rows are grouped as `Legacy / unknown`. The card has no
+historical data before these integrations are loaded.
+
 ## Cost
 
 Costs are never stored. Queries join per-route, per-context-band rates derived
@@ -48,3 +60,9 @@ cache AI Accounts keeps (`$DSH_HOME/plugins/ai-accounts/pricing.json`); this
 plugin never fetches it. Subscription traffic is priced at list price, so
 every figure is an estimate. AI Accounts' per-route price overrides live in its
 settings namespace and are not applied here.
+
+Jev's estimate uses TypeSafe's published price of `$0.042` per million input
+tokens; output is free. The rate lives in `src/jev-usage.ts` and is not fetched
+from a billing endpoint. Unknown input-token counts remain visible as calls but
+do not contribute to cost. This is DSH-local request usage, not account-wide
+billing or balance. TypeSafe's public API documents per-call usage but no account balance/history endpoint ([API reference](https://docs.typesafe.ai/api/system-one), [models/pricing](https://docs.typesafe.ai/models)).

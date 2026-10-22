@@ -1,6 +1,10 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { UsageFoldModel } from './fold.js'
+import { jevUsageQuerySchema, jevUsageRecordSchema, jevUsageViewSchema } from './jev-usage.js'
+
+export { JEV_INPUT_USD_PER_MILLION } from './jev-usage.js'
+export type { JevUsageBreakdown, JevUsageQuery, JevUsageRecord, JevUsageView } from './jev-usage.js'
 
 export const purposeSchema = z.enum(UsageFoldModel.REQUEST_PURPOSES)
 export const statusSchema = z.enum(UsageFoldModel.REQUEST_STATUSES)
@@ -169,6 +173,19 @@ export const usageApi = defineApi({
       output: indexStatusSchema,
       description: 'How far the request index has read the session logs, and when prices were fetched. Read-only.',
       tool: { name: 'usage_status', readOnly: true, render: compactJson },
+    }),
+    jevUsage: method({
+      input: jevUsageQuerySchema,
+      output: jevUsageViewSchema,
+      description:
+        'Read Jev API calls made by DSH between two Unix-ms timestamps, grouped by the local secret-reference label or environment-variable name, including provider-reported tokens and a list-price estimate. Labels are not provider-verified billing identity. Does not include calls outside DSH or TypeSafe account balance. Read-only.',
+      tool: { name: 'usage_jev_report', readOnly: true, render: compactJson },
+    }),
+    recordJevUsage: method({
+      input: jevUsageRecordSchema,
+      output: z.object({ accepted: z.literal(true) }).strict(),
+      description:
+        'Record one DSH Jev request observation with only caller, timing, outcome and token counts. No API key, prompt or response text is accepted.',
     }),
     /** Index whatever the session logs gained since the last pass, then report. */
     refresh: method({

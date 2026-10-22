@@ -8,10 +8,12 @@ export {
   secretAliasSchema,
   secretEnvironmentSchema,
   secretReferenceSchema,
+  secretCredentialLabelSchema,
   SecretReferenceResolver,
   type SecretCatalogValues,
   type SecretReference,
   type SecretReferenceResolution,
+  type ResolvedSecretCredential,
 } from './secret-reference.js'
 
 /**
