@@ -297,35 +297,38 @@ interruption, forked-Session duplication).
 
 ## Progress (2026-10-22 run)
 
-| Task | State   | Receipt                                                                                      |
-| ---- | ------- | -------------------------------------------------------------------------------------------- |
-| T1   | done    | `jj:spqtwrnzmnkn` — projection keeps object `oneOf`; 7 api-registry tests pass               |
-| T2   | partial | `jj:xpmyrwyklvzw` — any positive `jj_load` limit, `ThreadError` is a `PluginApiError`        |
-| T13  | done    | `jj:vtyusvmosyyx` — Definition of done in AGENTS.md                                          |
-| T14  | done    | `jj:vtyusvmosyyx` — waiting table names `background_jobs_wait`                               |
-| T15  | done    | `jj:mrtrszptlmwp` — Host-side wait for jobs, no model polling; 23 background-jobs tests pass |
-| T16  | done    | `jj:tmsmwstyxwxz` — intent-to-tool table in `docs/agent-tool-parity.md`                      |
-| T18  | done    | `jj:vtyusvmosyyx` — AGENTS.md 27,382 → 23,665 chars; `validate` has no over-budget warning   |
-| T21  | partial | `jj:yswswrowkkky` — TTL 10 min, stopped Sessions skipped, scoped read without corpus listing |
-| T28  | done    | ledger entry marked `validated`                                                              |
+| Task | State   | Receipt                                                                                                        |
+| ---- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| T1   | done    | `jj:spqtwrnzmnkn` — projection keeps object `oneOf`; 7 api-registry tests pass                                 |
+| T2   | partial | `jj:xpmyrwyklvzw` — any positive `jj_load` limit, `ThreadError` is a `PluginApiError`                          |
+| T4   | done    | `jj:mktwwmlswtzk` — `apply_patch` plugin, wired into the web seed; 9 tests, lint and bundle import clean       |
+| T13  | done    | `jj:vtyusvmosyyx` — Definition of done in AGENTS.md                                                            |
+| T14  | done    | `jj:vtyusvmosyyx` — waiting table names `background_jobs_wait`                                                 |
+| T15  | done    | `jj:mrtrszptlmwp` — Host-side wait for jobs, no model polling; 23 background-jobs tests pass                   |
+| T16  | done    | `jj:tmsmwstyxwxz` — intent-to-tool table in `docs/agent-tool-parity.md`                                        |
+| T18  | done    | `jj:vtyusvmosyyx` — AGENTS.md 27,382 → 23,945 chars; `validate` has no over-budget warning                     |
+| T21  | partial | `jj:yswswrowkkky` — TTL 10 min, stopped Sessions skipped, scoped read without corpus listing                   |
+| T23  | done    | `jj:yqmqmxosxvzm` — reset-aware cooldown, sticky preflight, transport cooling, NO_ADAPTER preflight; 401 tests |
+| T24  | done    | `jj:yqmqmxosxvzm` — `priority` derived family chain: Codex↔Codex, OpenCode↔OpenCode, Claude excluded both ways |
+| T27  | partial | external commit `74171ab` in `astahmer/AGENTS`; the nixfiles flake input still pins the old commit             |
+| T28  | done    | ledger entry marked `validated`                                                                                |
 
 ### Skipped in that run, and why
 
-- **T3/T4/T5/T5b** (read receipts, patch tool, inspection tool): the patch tool is
-  L and needs a design review before it touches writes; `T3` may need a Host seam.
+- **T3/T5/T5b** (receipt persistence, observation-emitting inspect tool): the
+  patch tool covers the same failure classes without a Host seam; revisit only if
+  the measured edit error rate does not drop.
 - **T5c/T5d** (tool-search, tool profiles): that work belongs to a live Session
   (`0e7f3adb…`, workspace `thread-8b729e`); coordinate before touching it.
 - **T6/T7** (fetch and search providers): a new owned plugin plus a Brave key.
-  Brave is approved; the key is not configured yet.
+  Brave is approved; no `BRAVE_API_KEY` exists in the Secret Catalog or nixfiles.
 - **T9** (fff-search root guard), **T10** (checkout-sync auto-heal),
   **T12** (workspace_doctor), **T17** (delegation docs): S–M, next pass.
 - **T11** (isolation bypass): needs the creation-path investigation first.
 - **T19/T20/T22** (skill reload, compaction input, store folds): measurement or
   fork work, not a quick edit.
-- **T23/T24** (ai-accounts health, distribution): the routing decisions are now
-  known, but the change needs its own tests and a routing review.
-- **T25/T26/T27**: operational or other repositories (corpus prune, nixfiles
-  supervisor, `github:astahmer/AGENTS` dead link).
+- **T25/T26**: operational or another repository (corpus prune, nixfiles
+  supervisor).
 
 ### User decisions confirmed 2026-10-22
 
@@ -334,10 +337,14 @@ interruption, forked-Session duplication).
   Claude never falls back and is never a fallback target.
 - `T4`: ship the patch tool beside `edit`; do not replace the native tool.
 - `T27`: fix the dead skill link in its own repository and bump the flake input.
+- ast-outline stays: it is not the cause of the read-receipt failures, and
+  removing it would push inspection back onto bash reads, the largest measured
+  cause. `apply_patch` handles the receipt gap instead.
 
 ## Open questions for the human
 
-1. `T7` search provider: Brave free tier (key) or fix the existing provider's key?
-2. `T24`: switch ai-accounts to `priority` distribution (makes the fallback chain
-   live, changes routing behaviour) or keep sticky and document the chain as off?
-3. `T4` patch tool: ship beside `edit` (safe) or aim to replace it in instructions?
+1. `T7`: create a Brave Search API key (free tier) and store it as a Secret
+   Catalog alias — the provider work can then land without guessing.
+2. `T27`: run `nix flake update agents` + `nixapply` to refresh `~/.agents/skills`.
+3. `T24`: the routing code is live only when ai-accounts distribution is
+   `priority`; switch the live config when you are ready (restart applies it).
