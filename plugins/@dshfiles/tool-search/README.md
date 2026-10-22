@@ -66,13 +66,13 @@ DSH_TOOL_SEARCH_MEASURE=1 fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/
 
 The same file includes an opt-in provider benchmark that runs the three synthetic tasks in both modes through OpenCode Go Alex at high reasoning. It is skipped unless `DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1`; tools return only fixture data and record note writes in memory. Each scenario caps requests at three direct or four progressive, disables retries, and caps output at 1,024 tokens. It reports schema bytes, local tool-token and context estimates, provider-reported usage, tool selection, and latency without logging prompts, response text, or credentials. It disables the default Harness identity and runtime-context snapshots so only the synthetic system instruction, prompts, and schemas are sent.
 
-Run only when real provider usage is intended; the command reads the configured secret into the benchmark process without printing it:
+Run only when real provider usage is intended. Use `secret run` to inject project aliases; its leak guard scrubs known secret values from child stdout/stderr:
 
 ```sh
-OPENCODE_GO_ALEX="$(secret get opencode-go-alex)" DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1 fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/provider-benchmark.test.ts
+DSH_TOOL_SEARCH_PROVIDER_BENCHMARK=1 secret run -- fnm exec --using=22.23.3 pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/provider-benchmark.test.ts
 ```
 
-Latest run stopped after the first direct request returned `AUTH`, reported zero provider tokens, and executed no tool. The early-stop guard prevented the progressive and remaining tasks, so provider-backed A/B results are still unavailable; verify the credential and route before rerunning.
+The authorized follow-up run resolved the alias but OpenCode Go returned `AUTH` on the first direct request, with zero usage and no tool call. The early-stop guard prevented the progressive and remaining tasks. DSH account status reported OpenCode Go Alex signed in and healthy, so that status alone does not validate this API credential. Provider-backed A/B results remain unavailable; do not retry until the credential or route is corrected.
 
 These synthetic tasks do not establish full-profile savings, cache impact, or production-level economics; do not enable progressive disclosure profile-wide from this fixture alone.
 
