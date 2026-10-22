@@ -7,11 +7,18 @@ import {
   chatReferencePreviewDismissEvent,
   chatReferencePreviewEvent,
   chatReferencePreviewRequestSchema,
+  chatReferenceTitleRequestEvent,
+  chatReferenceTitleRequestSchema,
+  chatReferenceTitleResolvedEvent,
   type ChatReferencePreviewRequest,
+  type ChatReferenceTitleRequest,
 } from './chat-reference.js'
 
 /** Moving the pointer from a reference into the card must not close it, so leaving waits out a short grace. */
 const CLOSE_GRACE_MS = 140
+
+const titleRequestKey = (request: ChatReferenceTitleRequest): string =>
+  `${request.sessionId}\u0000${request.cwd}\u0000${request.reference.kind}\u0000${request.reference.value}`
 
 /**
  * The revision-graph preview for a `jj:` reference in chat. The reference itself is a native `<code>` node this plugin
@@ -20,6 +27,7 @@ const CLOSE_GRACE_MS = 140
 export const ChatReferenceOverlay = (): JSX.Element | null => {
   const api = useApi(jujutsuApi)
   const [request, setRequest] = useState<ChatReferencePreviewRequest | null>(null)
+  const [titleRequests, setTitleRequests] = useState<ChatReferenceTitleRequest[]>([])
   const closeTimer = useRef<number | undefined>(undefined)
 
   useEffect(() => {
@@ -35,6 +43,12 @@ export const ChatReferenceOverlay = (): JSX.Element | null => {
       cancelClose()
       setRequest(parsed.data)
     }
+    const queueTitle = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return
+      const parsed = chatReferenceTitleRequestSchema.safeParse(event.detail)
+      if (!parsed.success) return
+      setTitleRequests(current => (current.some(request => titleRequestKey(request) === titleRequestKey(parsed.data)) ? current : [...current, parsed.data]))
+    }
     const dismiss = (): void => {
       cancelClose()
       closeTimer.current = window.setTimeout(() => {
@@ -48,12 +62,14 @@ export const ChatReferenceOverlay = (): JSX.Element | null => {
     }
     const close = (): void => setRequest(null)
     window.addEventListener(chatReferencePreviewEvent, open)
+    window.addEventListener(chatReferenceTitleRequestEvent, queueTitle)
     window.addEventListener(chatReferencePreviewDismissEvent, dismiss)
     window.addEventListener('scroll', closeOnScroll, true)
     window.addEventListener('resize', close)
     return () => {
       if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current)
       window.removeEventListener(chatReferencePreviewEvent, open)
+      window.removeEventListener(chatReferenceTitleRequestEvent, queueTitle)
       window.removeEventListener(chatReferencePreviewDismissEvent, dismiss)
       window.removeEventListener('scroll', closeOnScroll, true)
       window.removeEventListener('resize', close)
@@ -75,10 +91,45 @@ export const ChatReferenceOverlay = (): JSX.Element | null => {
     retry: false,
     queryFn: ({ signal }) => api.referenceGraph({ repoId: repoId ?? '', reference: referenced ?? '' }, { signal }),
   })
+  const titleRequest = titleRequests.at(0) ?? null
+  const titleRepository = useQuery({
+    queryKey: ['jujutsu', 'reference-preview-repository', titleRequest?.cwd],
+    enabled: titleRequest !== null,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: ({ signal }) => api.registerRepository({ path: titleRequest?.cwd ?? '' }, { signal }),
+  })
+  const titleRepoId = titleRepository.data?.repoId
+  const titleReference = titleRequest?.reference.value
+  const titleGraph = useQuery({
+    queryKey: ['jujutsu', 'reference-preview-graph', titleRepoId, titleReference],
+    enabled: titleRepoId !== undefined && titleReference !== undefined,
+    retry: false,
+    queryFn: ({ signal }) => api.referenceGraph({ repoId: titleRepoId ?? '', reference: titleReference ?? '' }, { signal }),
+  })
+
+  useEffect(() => {
+    if (titleRequest === null) return
+    const output = titleGraph.data
+    const settled = titleRepository.isError || titleGraph.isError || (titleGraph.isSuccess && !titleGraph.isFetching)
+    if (!settled) return
+    if (
+      output !== undefined &&
+      'graph' in output &&
+      output.label === titleRequest.reference.value &&
+      output.description !== undefined &&
+      output.description.trim().length > 0
+    ) {
+      window.dispatchEvent(new CustomEvent(chatReferenceTitleResolvedEvent, { detail: { ...titleRequest, title: output.description } }))
+    }
+    const completedKey = titleRequestKey(titleRequest)
+    setTitleRequests(current => (current[0] !== undefined && titleRequestKey(current[0]) === completedKey ? current.slice(1) : current))
+  }, [titleGraph.data, titleGraph.isError, titleGraph.isFetching, titleGraph.isSuccess, titleRepository.isError, titleRequest])
 
   if (request === null) return null
+  const referenceGraph = graph.data !== undefined && 'graph' in graph.data ? graph.data : undefined
   const failure = graph.data !== undefined && 'failure' in graph.data ? graph.data.failure.message : undefined
-  const rendered = graph.data !== undefined && 'graph' in graph.data ? graph.data.graph : undefined
+  const rendered = referenceGraph?.graph
   return (
     <Popover open onOpenChange={open => !open && setRequest(null)}>
       <PopoverAnchor asChild>
@@ -111,6 +162,20 @@ export const ChatReferenceOverlay = (): JSX.Element | null => {
         <PopoverHeader>
           <PopoverTitle>Revision graph · {request.reference.value}</PopoverTitle>
         </PopoverHeader>
+        {referenceGraph === undefined ? null : (
+          <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-xs dshx:text-muted-foreground">
+            {referenceGraph.commitId === null ? null : (
+              <span>
+                Commit ID: <code title={referenceGraph.commitId}>{referenceGraph.commitId.slice(0, 8)}</code>
+              </span>
+            )}
+            {referenceGraph.changeId === null ? null : (
+              <span>
+                Change ID: <code>{referenceGraph.changeId}</code>
+              </span>
+            )}
+          </div>
+        )}
         {graph.isPending || repository.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Reading revisions…</p> : null}
         {graph.isError ? (
           <p className="dshx:text-xs dshx:text-destructive" role="alert">

@@ -10,7 +10,7 @@ const runner = (): { readonly run: JjRun; readonly calls: (readonly string[])[] 
   const calls: (readonly string[])[] = []
   const run: JjRun = async args => {
     calls.push(args)
-    if (args.join(' ').includes('separate(')) return { stdout: `${COMMIT}\n${CHANGE}\n`, truncated: false }
+    if (args.join(' ').includes('separate(')) return { stdout: `${COMMIT}\n${CHANGE}\nBase fixture\n`, truncated: false }
     if (args.includes('workspace')) return { stdout: 'default\nthread-a\n', truncated: false }
     if (args.includes('default@')) return { stdout: `${DEFAULT_COMMIT}\n`, truncated: false }
     return { stdout: `${CHANGE.slice(0, 8)} > main  ${COMMIT.slice(0, 8)}\n`, truncated: false }
@@ -40,7 +40,7 @@ describe('reference graph', () => {
     const { run, calls } = runner()
     const result = await ReferenceGraphModel.read({ run, reference: 'main' })
 
-    expect(result).toMatchObject({ label: 'main', commitId: COMMIT, changeId: CHANGE })
+    expect(result).toMatchObject({ label: 'main', commitId: COMMIT, changeId: CHANGE, description: 'Base fixture' })
     expect(result.graph).toContain('> main')
     const graphCall = calls.at(-1) ?? []
     expect(graphCall).toContain('--ignore-working-copy')

@@ -173,6 +173,8 @@ export const referenceGraphSchema = z.object({
   label: z.string().min(1).max(255),
   commitId: commitIdSchema.nullable(),
   changeId: z.string().min(1).max(64).nullable(),
+  /** Older Hosts omit it; use the identifier as the chat label until title metadata is available. */
+  description: z.string().max(255).optional(),
   graph: z.string().max(20_000),
 })
 

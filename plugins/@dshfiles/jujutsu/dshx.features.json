@@ -371,14 +371,16 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the bare name.",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace, with separate Commit ID and Change ID labels \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the referenced revision's first-line description as a blue link, truncated when long; the accessible label and hover tooltip retain the full title and reference. Visible links resolve titles lazily and fall back to the bare reference if a title is unavailable.",
       "reach": [
         "seed chat-reference-thread",
-        "hover link \"main\"",
+        "hover link \"Jujutsu bookmark: Sample project (main)\"",
         "expect text \"Revision graph \u00b7 main\"",
         "expect text \"default@*\"",
+        "expect text \"Commit ID:*\"",
+        "expect text \"Change ID:*\"",
         "press Escape",
-        "click link \"main\"",
+        "click link \"Jujutsu bookmark: Sample project (main)\"",
         "expect button \"Jujutsu view settings\"",
         "click button \"Jujutsu view settings\"",
         "expect text \"Open Jujutsu refs from chat\"",
@@ -386,7 +388,10 @@
         "expect text \"Focus revision\"",
         "expect text \"Compare with main/default and show history path\"",
         "press Escape",
-        "expect button \"Full diff\""
+        "expect button \"Full diff\"",
+        "hover link \"Jujutsu bookmark: Sample project (main)\"",
+        "expect text \"Commit ID:*\"",
+        "expect text \"Change ID:*\""
       ],
       "surfaces": ["client", "settings"],
       "configuration": [
@@ -434,7 +439,13 @@
           "kind": "unit-test",
           "id": "jujutsu.chat-reference-links",
           "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
-          "testName": "navigates with the plain name on click and on Enter, and ignores other clicks"
+          "testName": "navigates with the reference on click and on Enter, and ignores other clicks"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.chat-reference-title",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
+          "testName": "shows a truncated revision title and keeps its full accessible name and reference"
         },
         {
           "kind": "unit-test",

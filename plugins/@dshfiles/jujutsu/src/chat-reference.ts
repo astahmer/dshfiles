@@ -66,18 +66,46 @@ const resolveChatReference = <
  */
 export const chatReferencePreviewEvent = 'dshfiles:jujutsu-reference-preview'
 export const chatReferencePreviewDismissEvent = 'dshfiles:jujutsu-reference-preview-dismiss'
+export const chatReferenceTitleRequestEvent = 'dshfiles:jujutsu-reference-title-request'
+export const chatReferenceTitleResolvedEvent = 'dshfiles:jujutsu-reference-title-resolved'
+
+const referenceIdentitySchema = z.object({ value: z.string().min(1).max(255), kind: z.enum(['revision', 'bookmark']) })
 
 export const chatReferencePreviewRequestSchema = z.object({
   /** The Session repository the reference is read in; the Host resolves its repoId from this path. */
   cwd: z.string().min(1).max(2048),
-  reference: z.object({ value: z.string().min(1).max(255), kind: z.enum(['revision', 'bookmark']) }),
+  reference: referenceIdentitySchema,
   anchor: z.object({ left: z.number(), top: z.number(), width: z.number(), height: z.number() }),
 })
 
+export const chatReferenceTitleRequestSchema = z.object({
+  sessionId: z.string().min(1).max(256),
+  cwd: z.string().min(1).max(2048),
+  reference: referenceIdentitySchema,
+})
+
+export const chatReferenceTitleResolvedSchema = chatReferenceTitleRequestSchema.extend({ title: z.string().min(1).max(255) })
+
 export type ChatReferencePreviewRequest = z.infer<typeof chatReferencePreviewRequestSchema>
+export type ChatReferenceTitleRequest = z.infer<typeof chatReferenceTitleRequestSchema>
+export type ChatReferenceTitleResolved = z.infer<typeof chatReferenceTitleResolvedSchema>
+
+const CHAT_REFERENCE_TITLE_LIMIT = 52
+
+const chatReferenceTitleLabel = (input: { readonly title: string; readonly fallback: string }): string => {
+  const title = input.title.trim().replace(/\s+/gu, ' ')
+  if (title.length === 0) return input.fallback
+  const characters = Array.from(title)
+  if (characters.length <= CHAT_REFERENCE_TITLE_LIMIT) return title
+  return `${characters
+    .slice(0, CHAT_REFERENCE_TITLE_LIMIT - 1)
+    .join('')
+    .trimEnd()}…`
+}
 
 export class ChatReferenceModel {
   static readonly fromCode = chatReferenceFromCode
   static readonly display = chatReferenceDisplay
   static readonly resolve = resolveChatReference
+  static readonly titleLabel = chatReferenceTitleLabel
 }

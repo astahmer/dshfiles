@@ -1,8 +1,18 @@
 @source './';
 @source '../../project-folder-picker/src';
 
-[data-dshfiles-jj-reference] {
+code[data-dshfiles-jj-reference][role='link'] {
+  background-color: transparent;
+  border-radius: 0;
+  color: var(--dsw-alias-state-business-primary);
   cursor: pointer;
+  font: inherit;
+  padding: 0;
   text-decoration-line: underline;
   text-decoration-style: dotted;
+}
+
+code[data-dshfiles-jj-reference][role='link']:hover,
+code[data-dshfiles-jj-reference][role='link']:focus-visible {
+  text-decoration-style: solid;
 }

@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { chatReferencePreviewDismissEvent, chatReferencePreviewEvent } from './chat-reference.js'
+import {
+  chatReferencePreviewDismissEvent,
+  chatReferencePreviewEvent,
+  chatReferenceTitleRequestEvent,
+  chatReferenceTitleResolvedEvent,
+} from './chat-reference.js'
 import { installChatReferenceLinks } from './chat-reference-links.js'
 
 const sessionMarkup = (inner: string): string => `<div data-conversation-session="session-1">${inner}</div>`
@@ -23,7 +28,7 @@ describe('chat reference links', () => {
     document.getSelection()?.removeAllRanges()
   })
 
-  it('links only explicit revision and bookmark tokens, showing the bare name', () => {
+  it('links only explicit revision and bookmark tokens while the title is pending', () => {
     const onOpen = vi.fn()
     document.body.innerHTML =
       sessionMarkup('<code>jj:main</code><code>jj:94526da8</code><code>main</code><code>not a ref</code><code>pnpm</code>') +
@@ -38,7 +43,47 @@ describe('chat reference links', () => {
     stop()
   })
 
-  it('navigates with the plain name on click and on Enter, and ignores other clicks', () => {
+  it('shows a truncated revision title and keeps its full accessible name and reference', async () => {
+    const onOpen = vi.fn()
+    const title = 'a'.repeat(80)
+    let request: unknown
+    const onRequest = (event: Event): void => {
+      if (event instanceof CustomEvent) request = event.detail
+    }
+    window.addEventListener(chatReferenceTitleRequestEvent, onRequest)
+    document.body.innerHTML = sessionMarkup('<code>jj:main</code>')
+    const stop = install(onOpen)
+    const link = document.querySelector('code')
+    if (link === null) throw new Error('No code element')
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
+    expect(request).toEqual({ sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' } })
+    window.dispatchEvent(
+      new CustomEvent(chatReferenceTitleResolvedEvent, {
+        detail: { sessionId: 'session-2', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, title: 'Wrong title' },
+      }),
+    )
+    expect(link.textContent).toBe('main')
+    window.dispatchEvent(
+      new CustomEvent(chatReferenceTitleResolvedEvent, {
+        detail: { sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, title },
+      }),
+    )
+
+    expect(link.textContent).toBe(`${'a'.repeat(51)}…`)
+    expect(link.getAttribute('title')).toBe(title)
+    expect(link.getAttribute('aria-label')).toBe(`Jujutsu bookmark: ${title} (main)`)
+    click(link)
+    expect(onOpen).toHaveBeenCalledWith({ value: 'main', kind: 'bookmark' })
+
+    stop()
+    expect(link.textContent).toBe('jj:main')
+    expect(link.getAttribute('title')).toBeNull()
+    expect(link.getAttribute('aria-label')).toBeNull()
+    window.removeEventListener(chatReferenceTitleRequestEvent, onRequest)
+  })
+
+  it('navigates with the reference on click and on Enter, and ignores other clicks', () => {
     const onOpen = vi.fn()
     document.body.innerHTML = sessionMarkup('<code>jj:main</code><code>pnpm</code>')
     const stop = install(onOpen)

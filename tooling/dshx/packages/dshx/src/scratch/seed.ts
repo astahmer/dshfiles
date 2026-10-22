@@ -473,7 +473,7 @@ export const installFakeSecretCli = async (input: { readonly home: string; reado
 }
 
 const CHAT_REFERENCE_PROMPT = '[[answer Trunk is `jj:main` here]]'
-const CHAT_REFERENCE_LINK = 'main'
+const CHAT_REFERENCE_LINK = 'Jujutsu bookmark: Sample project (main)'
 
 /**
  * A thread whose assistant answer holds an explicit `` `jj:main` `` code span, so the chat link exists in a real

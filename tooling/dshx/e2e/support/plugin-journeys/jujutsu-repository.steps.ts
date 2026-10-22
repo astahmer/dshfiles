@@ -304,11 +304,27 @@ When('the repository is registered and its thread answers {string}', async ({ pa
 })
 
 Then('hovering the reference previews the revision graph around it', async ({ page }: { page: Page }) => {
-  const link = page.getByRole('link', { name: 'main', exact: true })
+  const link = page.getByRole('link', { name: 'Jujutsu bookmark: Base fixture (main)', exact: true })
   await expect(link).toBeVisible({ timeout: 30_000 })
   await link.hover()
   await recordAssertion(page, 'jujutsu-chat-reference-hover-previews-revision-graph', async () => {
+    await expect(link).toHaveText('Base fixture')
+    await expect(link).toHaveAttribute('title', 'Base fixture')
+    await expect(link).toHaveCSS('text-decoration-style', 'solid')
+    const referenceColors = await link.evaluate(element => {
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--dsw-alias-state-business-primary)'
+      document.body.append(probe)
+      const expectedColor = getComputedStyle(probe).color
+      probe.remove()
+      return { actualColor: getComputedStyle(element).color, expectedColor }
+    })
+    expect(referenceColors.actualColor).toBe(referenceColors.expectedColor)
     await expect(page.getByText('Revision graph · main', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Commit ID: [a-f0-9]{8}$/u)).toBeVisible()
+    await expect(page.getByText(/^Change ID: [k-z]{8,64}$/u)).toBeVisible()
+    const fullCommitId = page.locator('[data-dshfiles-jj-preview] code[title]')
+    await expect(fullCommitId).toHaveAttribute('title', /^[a-f0-9]{40,64}$/u)
     const graph = page.locator('pre[aria-label="Revision graph"]')
     await expect(graph).toBeVisible()
     await expect(graph).toContainText('main')
@@ -318,7 +334,7 @@ Then('hovering the reference previews the revision graph around it', async ({ pa
 })
 
 Then('clicking the reference opens the panel focused on that revision', async ({ page }: { page: Page }) => {
-  const link = page.getByRole('link', { name: 'main', exact: true })
+  const link = page.getByRole('link', { name: 'Jujutsu bookmark: Base fixture (main)', exact: true })
   await expect(link).toBeVisible({ timeout: 30_000 })
   await link.click()
   await recordAssertion(page, 'jujutsu-chat-reference-opens-focused-revision', async () => {

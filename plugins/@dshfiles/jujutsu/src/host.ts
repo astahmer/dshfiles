@@ -842,7 +842,7 @@ const jujutsuHostApi = jujutsuApi.host({
 
 /**
  * One writing convention for every Agent in this DSH: an explicit revision or bookmark reference is written
- * `jj:<name>`, which the client links to the panel and renders as the bare name.
+ * `jj:<name>`, which the client links to the panel and shows the revision description when available.
  */
 const chatReferenceSection = definePromptSection({
   name: 'dshfiles-jujutsu:chat-references',
@@ -850,7 +850,7 @@ const chatReferenceSection = definePromptSection({
   text: [
     'In chat, write a Jujutsu revision, change or bookmark reference as `jj:<name>` inside inline code — for example',
     '`jj:main`, `jj:94526da8` or `jj:feature/topic`. DSH turns such a token into a link that opens the Jujutsu panel on',
-    'that revision, and shows the reader the bare name.',
+    'that revision, and shows the revision title as link text when available, falling back to the bare name.',
   ].join(' '),
 })
 

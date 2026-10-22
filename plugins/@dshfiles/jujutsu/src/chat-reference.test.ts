@@ -40,6 +40,15 @@ describe('chat reference tokens', () => {
     expect(ChatReferenceModel.display('main')).toBe('main')
   })
 
+  it('normalizes and truncates revision descriptions for chat link labels', () => {
+    expect(ChatReferenceModel.titleLabel({ title: '  Fix  stale\nworkspaces  ', fallback: 'main' })).toBe('Fix stale workspaces')
+    expect(ChatReferenceModel.titleLabel({ title: ' '.repeat(4), fallback: 'main' })).toBe('main')
+    const title = ChatReferenceModel.titleLabel({ title: 'a'.repeat(80), fallback: 'main' })
+    expect(title).toHaveLength(52)
+    expect(title.endsWith('…')).toBe(true)
+    expect(ChatReferenceModel.titleLabel({ title: `${'a'.repeat(50)}🦖ending`, fallback: 'main' })).toBe(`${'a'.repeat(50)}🦖…`)
+  })
+
   it('resolves only a unique revision prefix or exact bookmark', () => {
     const revisions = [
       { commitId: 'a1b2c3d4', changeId: 'e5f6g7', bookmarks: ['main'], localBookmarks: ['main'] },

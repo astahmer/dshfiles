@@ -10,6 +10,8 @@ export interface ReferenceGraph {
   readonly label: string
   readonly commitId: string | null
   readonly changeId: string | null
+  /** First-line description used as the chat link label; empty for undescribed revisions. */
+  readonly description: string
   readonly graph: string
 }
 
@@ -68,9 +70,23 @@ const readReferenceGraph = async (input: { readonly run: JjRun; readonly referen
     if (result.truncated) throw new Error('The reference graph exceeded the bounded output limit.')
     return result.stdout
   }
-  const resolved = rows(await read(['log', '--no-graph', '--limit', '1', '-r', reference, '-T', 'separate("\\n", commit_id, change_id.short())']))
+  const resolved = (
+    await read([
+      'log',
+      '--no-graph',
+      '--limit',
+      '1',
+      '-r',
+      reference,
+      '-T',
+      'separate("\\n", commit_id, change_id.short(), description.first_line().substr(0, 255))',
+    ])
+  )
+    .trimEnd()
+    .split('\n')
   const commitId = resolved.at(0)
   const changeId = resolved.at(1)
+  const description = resolved.slice(2).join('\n')
   if (commitId === undefined || changeId === undefined || !commitIdSchema.safeParse(commitId).success) {
     throw new Error('That reference does not name one revision in this repository.')
   }
@@ -85,7 +101,7 @@ const readReferenceGraph = async (input: { readonly run: JjRun; readonly referen
     '-T',
     template({ commitId, defaultCommitId }),
   ])
-  return { label: input.reference, commitId, changeId, graph: graph.trimEnd() }
+  return { label: input.reference, commitId, changeId, description, graph: graph.trimEnd() }
 }
 
 export class ReferenceGraphModel {

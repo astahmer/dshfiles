@@ -4,6 +4,10 @@ import {
   chatReferencePreviewDismissEvent,
   chatReferencePreviewEvent,
   chatReferencePreviewRequestSchema,
+  chatReferenceTitleRequestEvent,
+  chatReferenceTitleRequestSchema,
+  chatReferenceTitleResolvedEvent,
+  chatReferenceTitleResolvedSchema,
   type ChatReference,
 } from './chat-reference.js'
 
@@ -21,6 +25,11 @@ const PREVIEW_OPEN_DELAY_MS = 160
 
 const MARKER = 'data-dshfiles-jj-reference'
 const PREFIXED = 'data-dshfiles-jj-prefixed'
+const SOURCE = 'data-dshfiles-jj-source'
+const LABEL = 'data-dshfiles-jj-label'
+const TITLE = 'data-dshfiles-jj-title'
+const ORIGINAL_ARIA_LABEL = 'data-dshfiles-jj-original-aria-label'
+const ORIGINAL_TITLE = 'data-dshfiles-jj-original-title'
 const CONVERSATION = '[data-conversation-session]'
 
 const ownConversation = (sessionId: string): Element | null => {
@@ -30,21 +39,33 @@ const ownConversation = (sessionId: string): Element | null => {
   return null
 }
 
-/**
- * Native renders inline code as inert text, so explicit revision and bookmark tokens become links without replacing
- * React's own nodes. The `jj:` prefix is a writing convention: it is what makes a name explicit, and the reader sees
- * the bare name, so a text node React rewrote is re-stripped on the next pass and one that changed stops being a link.
- */
+/** Native inline code becomes an accessible link without replacing React's own nodes. */
 export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): (() => void) => {
-  const referenceIn = (element: Element): ChatReference | undefined =>
-    ChatReferenceModel.fromCode({
-      value: element.textContent ?? '',
+  const referenceIn = (element: Element): ChatReference | undefined => {
+    const text = element.textContent ?? ''
+    const source = element.getAttribute(SOURCE)
+    const label = element.getAttribute(LABEL)
+    const written = source !== null && label === text ? source : text
+    return ChatReferenceModel.fromCode({
+      value: written,
       bookmarks: options.bookmarks,
-      prefixed: element.hasAttribute(PREFIXED),
+      prefixed: written.trim().startsWith(CHAT_REFERENCE_PREFIX) || element.hasAttribute(PREFIXED),
     })
+  }
   const unmark = (element: Element): void => {
+    const originalAriaLabel = element.getAttribute(ORIGINAL_ARIA_LABEL)
+    const originalTitle = element.getAttribute(ORIGINAL_TITLE)
+    if (originalAriaLabel === null) element.removeAttribute('aria-label')
+    else element.setAttribute('aria-label', originalAriaLabel)
+    if (originalTitle === null) element.removeAttribute('title')
+    else element.setAttribute('title', originalTitle)
     element.removeAttribute(MARKER)
     element.removeAttribute(PREFIXED)
+    element.removeAttribute(SOURCE)
+    element.removeAttribute(LABEL)
+    element.removeAttribute(TITLE)
+    element.removeAttribute(ORIGINAL_ARIA_LABEL)
+    element.removeAttribute(ORIGINAL_TITLE)
     element.removeAttribute('role')
     element.removeAttribute('tabindex')
   }
@@ -72,6 +93,78 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     if (!parsed.success) return false
     window.dispatchEvent(new CustomEvent(chatReferencePreviewEvent, { detail: parsed.data }))
     return true
+  }
+  const referenceKey = (reference: ChatReference): string =>
+    `${reference.kind}:${reference.kind === 'revision' ? reference.value.toLocaleLowerCase() : reference.value}`
+  const titles = new Map<string, string>()
+  const requestedTitles = new Set<string>()
+  const setDisplay = (element: Element, source: string, reference: ChatReference, title?: string): void => {
+    const fallback = ChatReferenceModel.display(source)
+    const label = title === undefined ? fallback : ChatReferenceModel.titleLabel({ title, fallback })
+    element.setAttribute(SOURCE, source)
+    element.setAttribute(LABEL, label)
+    if (title === undefined) {
+      element.removeAttribute(TITLE)
+      const originalAriaLabel = element.getAttribute(ORIGINAL_ARIA_LABEL)
+      if (originalAriaLabel === null) element.removeAttribute('aria-label')
+      else element.setAttribute('aria-label', originalAriaLabel)
+      const originalTitle = element.getAttribute(ORIGINAL_TITLE)
+      if (originalTitle === null) element.removeAttribute('title')
+      else element.setAttribute('title', originalTitle)
+    } else {
+      element.setAttribute(TITLE, title)
+      element.setAttribute('title', title)
+      const kind = reference.kind === 'revision' ? 'revision' : 'bookmark'
+      element.setAttribute('aria-label', `Jujutsu ${kind}: ${title} (${reference.value})`)
+    }
+    if (element.textContent !== label) element.textContent = label
+  }
+  const requestTitle = (element: HTMLElement): void => {
+    if (element.getAttribute(MARKER) !== options.sessionId) return
+    const reference = referenceIn(element)
+    if (reference === undefined) return
+    const key = referenceKey(reference)
+    if (titles.has(key) || requestedTitles.has(key)) return
+    const parsed = chatReferenceTitleRequestSchema.safeParse({ sessionId: options.sessionId, cwd: options.cwd, reference })
+    if (!parsed.success) return
+    requestedTitles.add(key)
+    window.dispatchEvent(new CustomEvent(chatReferenceTitleRequestEvent, { detail: parsed.data }))
+  }
+  let titleObserver: IntersectionObserver | undefined
+  const Observer = window.IntersectionObserver
+  if (Observer !== undefined) {
+    titleObserver = new Observer(
+      entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || !(entry.target instanceof HTMLElement)) continue
+          titleObserver?.unobserve(entry.target)
+          requestTitle(entry.target)
+        }
+      },
+      { rootMargin: '120px 0px' },
+    )
+  }
+  const observeTitle = (element: HTMLElement): void => {
+    const reference = referenceIn(element)
+    if (reference === undefined || titles.has(referenceKey(reference))) return
+    if (titleObserver === undefined) {
+      window.requestAnimationFrame(() => requestTitle(element))
+      return
+    }
+    titleObserver.observe(element)
+  }
+  const onTitleResolved = (event: Event): void => {
+    if (!(event instanceof CustomEvent)) return
+    const parsed = chatReferenceTitleResolvedSchema.safeParse(event.detail)
+    if (!parsed.success || parsed.data.sessionId !== options.sessionId || parsed.data.cwd !== options.cwd) return
+    const key = referenceKey(parsed.data.reference)
+    titles.set(key, parsed.data.title)
+    for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${MARKER}]`) ?? []) {
+      const reference = referenceIn(element)
+      const source = element.getAttribute(SOURCE)
+      if (reference === undefined || source === null || referenceKey(reference) !== key) continue
+      setDisplay(element, source, reference, parsed.data.title)
+    }
   }
   let openTimer: number | undefined
   let hovered: HTMLElement | null = null
@@ -122,21 +215,31 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     for (const element of codes) {
       if (element.closest('[data-composer-card]') !== null) continue
       const marked = element.getAttribute(MARKER) === options.sessionId
-      const written = element.textContent ?? ''
-      if (referenceIn(element) === undefined) {
+      const text = element.textContent ?? ''
+      const source = element.getAttribute(SOURCE)
+      const label = element.getAttribute(LABEL)
+      const written = source !== null && label === text ? source : text
+      const reference = referenceIn(element)
+      if (reference === undefined) {
         if (marked) unmark(element)
         continue
       }
       if (!marked) {
         // Native semantics win: this only ever adds link behaviour to code that carries none.
         if (element.hasAttribute('role') || element.hasAttribute('tabindex')) continue
+        if (element.hasAttribute('aria-label')) element.setAttribute(ORIGINAL_ARIA_LABEL, element.getAttribute('aria-label') ?? '')
+        if (element.hasAttribute('title')) element.setAttribute(ORIGINAL_TITLE, element.getAttribute('title') ?? '')
         element.setAttribute(MARKER, options.sessionId)
-        if (written.trim().startsWith(CHAT_REFERENCE_PREFIX)) element.setAttribute(PREFIXED, '')
         element.setAttribute('role', 'link')
         element.setAttribute('tabindex', '0')
       }
-      const display = ChatReferenceModel.display(written)
-      if (display !== written) element.textContent = display
+      if (written.trim().startsWith(CHAT_REFERENCE_PREFIX)) element.setAttribute(PREFIXED, '')
+      else element.removeAttribute(PREFIXED)
+      const key = referenceKey(reference)
+      const previousTitle = source === written && label === text ? (element.getAttribute(TITLE) ?? undefined) : undefined
+      const title = titles.get(key) ?? previousTitle
+      setDisplay(element, written, reference, title)
+      if (element instanceof HTMLElement && title === undefined) observeTitle(element)
     }
   }
   /** A code element this installer owns: it belongs to the Session's own conversation. */
@@ -187,8 +290,10 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   window.addEventListener('pointerout', onPointerOut)
   window.addEventListener('focusin', onFocusIn)
   window.addEventListener('focusout', onFocusOut)
+  window.addEventListener(chatReferenceTitleResolvedEvent, onTitleResolved)
   return () => {
     observer.disconnect()
+    titleObserver?.disconnect()
     cancelAnimationFrame(frame)
     cancelPreview()
     window.removeEventListener('click', onClick)
@@ -197,10 +302,15 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     window.removeEventListener('pointerout', onPointerOut)
     window.removeEventListener('focusin', onFocusIn)
     window.removeEventListener('focusout', onFocusOut)
+    window.removeEventListener(chatReferenceTitleResolvedEvent, onTitleResolved)
     for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${MARKER}]`) ?? []) {
-      const restorePrefix = element.hasAttribute(PREFIXED)
+      const source = element.getAttribute(SOURCE)
+      const label = element.getAttribute(LABEL)
+      if (source !== null && label === (element.textContent ?? '')) element.textContent = source
+      else if (element.hasAttribute(PREFIXED) && !(element.textContent ?? '').trim().startsWith(CHAT_REFERENCE_PREFIX)) {
+        element.textContent = `${CHAT_REFERENCE_PREFIX}${element.textContent ?? ''}`
+      }
       unmark(element)
-      if (restorePrefix) element.textContent = `${CHAT_REFERENCE_PREFIX}${element.textContent ?? ''}`
     }
   }
 }

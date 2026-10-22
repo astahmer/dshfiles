@@ -8,6 +8,8 @@
 
 ![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
 
+![Open Jujutsu revision links from chat](docs/screenshots/chat-references.png)
+
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
@@ -95,10 +97,16 @@ contracts.
   name that really is a local bookmark of the Session repository. The prefix is
   the writing convention: the Host adds a system-prompt section telling every
   Agent to write references that way, it needs no repository lookup, and the
-  reader sees the bare name (`jj:main` renders as a linked `main`). Hovering
+  reader sees the referenced revision's first-line description as a blue link
+  (`jj:main` may render as `Base fixture`), truncated when long. The accessible
+  name and hover tooltip retain the full title and reference. Visible links
+  resolve titles lazily and fall back to the bare reference if unavailable.
+  Hovering
   one lazily previews a bounded revision graph around it: the reference, its
   neighbours, and the working copy, main, main@origin and default workspace
-  landmarks, with the referenced row marked `>`. A click
+  landmarks, with the referenced row marked `>`. The preview labels the selected
+  revision's commit-ID prefix and change ID separately; hover the prefix for the
+  full commit ID. A click
   opens the Jujutsu side panel on that repository and either
   focuses the revision or compares it with main/default while showing its
   history path (`chatReferenceClickBehavior`); `chatReferenceLinks` turns the
