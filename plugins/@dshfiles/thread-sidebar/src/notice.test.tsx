@@ -4,6 +4,7 @@ import { afterEach, test, vi } from 'vitest'
 import {
   ARCHIVED_OPEN_NOTICE_DURATION_MS,
   archivedOpenFailureNotice,
+  failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
   MAX_PENDING_SIDEBAR_NOTICES,
   scheduleSuccessNoticeDismissal,
@@ -37,6 +38,34 @@ test('notice message uses the visible alert column and stays on one line', () =>
   assert.match(html, /dshx:col-start-2/)
   assert.match(html, /dshx:whitespace-nowrap/)
   assert.match(html, /Thread link copied\./)
+})
+
+test('partial resume notices open the first failed thread so its current state can be checked', () => {
+  const opened: string[] = []
+  const notice = failedResumeNotice({
+    message: 'Resume sent to 3 threads; 1 could not be resumed.',
+    actionLabel: 'Open a failed thread',
+    failedSessionIds: ['session-failed', 'session-failed-too'],
+    openThread: sessionId => opened.push(sessionId),
+  })
+
+  assert.equal(notice.tone, 'warning')
+  assert.equal(notice.message, 'Resume sent to 3 threads; 1 could not be resumed.')
+  assert.equal(notice.actionLabel, 'Open a failed thread')
+  notice.onAction?.()
+  assert.deepEqual(opened, ['session-failed'])
+})
+
+test('partial resume notices have no open action when there is no failed thread', () => {
+  const notice = failedResumeNotice({
+    message: 'Resume sent.',
+    actionLabel: 'Open a failed thread',
+    failedSessionIds: [],
+    openThread: () => assert.fail('did not expect an open action'),
+  })
+
+  assert.equal(notice.actionLabel, undefined)
+  assert.equal(notice.onAction, undefined)
 })
 
 test('success notices dismiss after three seconds', () => {

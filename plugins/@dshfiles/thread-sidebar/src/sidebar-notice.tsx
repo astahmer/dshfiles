@@ -71,6 +71,23 @@ export const archivedOpenFailureNotice = (options: {
   durationMs: ARCHIVED_OPEN_NOTICE_DURATION_MS,
 })
 
+export const failedResumeNotice = <SessionId extends string>(options: {
+  readonly message: string
+  readonly actionLabel: string
+  readonly failedSessionIds: readonly SessionId[]
+  readonly openThread: (sessionId: SessionId) => void
+}): SidebarNotice => {
+  const firstFailedSessionId = options.failedSessionIds[0]
+  if (firstFailedSessionId === undefined) return { tone: 'warning', message: options.message }
+
+  return {
+    tone: 'warning',
+    message: options.message,
+    actionLabel: options.actionLabel,
+    onAction: () => options.openThread(firstFailedSessionId),
+  }
+}
+
 export const SidebarNoticeMessage = (props: { readonly message: string }): JSX.Element => (
   <AlertDescription className="dshx:text-xs dshx:whitespace-nowrap">{props.message}</AlertDescription>
 )

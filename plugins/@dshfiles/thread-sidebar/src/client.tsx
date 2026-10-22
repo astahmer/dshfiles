@@ -121,6 +121,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { projectTextTone } from './project-tone.js'
 import {
+  failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
   scheduleSuccessNoticeDismissal,
   SidebarNoticeMessage,
@@ -1607,6 +1608,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     let nextIndex = 0
     let sent = 0
     let failed = 0
+    const failedSessionIds: SessionSummary['id'][] = []
     const worker = async (): Promise<void> => {
       while (nextIndex < pending.length) {
         const row = pending[nextIndex]
@@ -1615,9 +1617,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         try {
           const result = await accountsApi.resumeQuotaContinuation({ continuationId: row.continuation.continuationId })
           if (result.accepted) sent += 1
-          else failed += 1
+          else {
+            failed += 1
+            failedSessionIds.push(row.session.id)
+          }
         } catch {
           failed += 1
+          failedSessionIds.push(row.session.id)
         }
       }
     }
@@ -1627,7 +1633,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice(
         failed === 0
           ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: sent }) }
-          : { tone: 'warning', message: props.tSidebar('threadSidebarResumePartial', { sent, failed }) },
+          : failedResumeNotice({
+              message: props.tSidebar('threadSidebarResumePartial', { sent, failed }),
+              actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
+              failedSessionIds,
+              openThread,
+            }),
       )
     } finally {
       setUsageLimitBusyIds(current => {
@@ -1647,6 +1658,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     let nextIndex = 0
     let sent = 0
     let failed = 0
+    const failedSessionIds: SessionSummary['id'][] = []
     const worker = async (): Promise<void> => {
       while (nextIndex < sessionIds.length) {
         const sessionId = sessionIds[nextIndex]
@@ -1655,9 +1667,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         try {
           const result = await resumeMutation.mutateAsync({ sessionId })
           if (result.accepted) sent += 1
-          else failed += 1
+          else {
+            failed += 1
+            failedSessionIds.push(sessionId)
+          }
         } catch {
           failed += 1
+          failedSessionIds.push(sessionId)
         }
       }
     }
@@ -1667,7 +1683,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice(
         failed === 0
           ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: sent }) }
-          : { tone: 'warning', message: props.tSidebar('threadSidebarResumePartial', { sent, failed }) },
+          : failedResumeNotice({
+              message: props.tSidebar('threadSidebarResumePartial', { sent, failed }),
+              actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
+              failedSessionIds,
+              openThread,
+            }),
       )
     } finally {
       setResumeBusySessionIds(current => {
