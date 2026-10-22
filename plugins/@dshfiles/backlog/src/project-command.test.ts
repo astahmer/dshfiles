@@ -15,6 +15,13 @@ describe('project command', () => {
     expect(BacklogProjectCommand.at('catch up', 8)).toBeNull()
   })
 
+  it('picks a project suggestion on Enter without requiring highlight navigation', () => {
+    const command = BacklogProjectCommand.at('/project dsh', 12)
+    expect(BacklogProjectCommand.picksOnEnter(command, false)).toBe(true)
+    expect(BacklogProjectCommand.picksOnEnter(null, false)).toBe(false)
+    expect(BacklogProjectCommand.picksOnEnter(null, true)).toBe(true)
+  })
+
   it('removes the whole command and joins the surrounding text once', () => {
     const text = 'ship it /project welii please'
     const command = BacklogProjectCommand.at(text, 22)

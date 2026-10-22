@@ -456,8 +456,9 @@ export const Composer = (props: {
               setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length)
               return
             }
-            // Tab completes a suggestion; Enter still adds the item, so a line ending in `#tag` sends on the first press.
-            if (event.key === 'Tab' || (event.key === 'Enter' && navigated)) {
+            // Project suggestions are the command's direct result, so Enter picks the highlighted project without first navigating.
+            // Other inline suggestions keep Enter-to-send unless the user has moved the highlight.
+            if (event.key === 'Tab' || (event.key === 'Enter' && BacklogProjectCommand.picksOnEnter(projectCommand, navigated))) {
               const chosen = suggestions[highlight]
               if (chosen !== undefined) {
                 event.preventDefault()

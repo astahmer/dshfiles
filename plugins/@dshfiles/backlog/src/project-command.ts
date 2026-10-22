@@ -19,6 +19,11 @@ export class BacklogProjectCommand {
     return { query, start, end: caret }
   }
 
+  /** Enter picks project results immediately, while other inline suggestions require explicit navigation. */
+  static picksOnEnter(command: ProjectCommand | null, navigated: boolean): boolean {
+    return command !== null || navigated
+  }
+
   /** Removes a picked `/project …` command, joining the text around it with one space when both sides still have text. */
   static strip(text: string, command: ProjectCommand): string {
     const before = text.slice(0, command.start).replace(/[ \t]+$/, '')
