@@ -2,6 +2,9 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/chat',
+  modules: {
+    'turn-error-action': 'src/turn-error-action.ts',
+  },
   client: {
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages, so the native plugin's build inlines them too.

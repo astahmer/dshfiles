@@ -540,29 +540,31 @@
     {
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
-      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and optionally auto-resume one minute after a known reset.",
+      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset from a checkbox beside Resume, on by default and overridable per thread.",
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
           "key": "autoRetryQuotaDefault",
-          "defaultValue": "false",
-          "constraints": "Boolean; pre-check the per-turn retry choice when exhausted-limit failover is disabled.",
+          "defaultValue": "true",
+          "constraints": "Boolean; pre-check the per-thread auto-resume checkbox for a new recovery.",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.quota-retry-settings"]
         },
         {
           "key": "showQuotaRetryChoice",
           "defaultValue": "true",
-          "constraints": "Boolean; show the per-turn checkbox only when exhausted-limit failover is disabled.",
+          "constraints": "Boolean; show the per-thread checkbox beside Resume and the inline quota notice.",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.quota-retry-settings"]
         }
       ],
       "states": ["quota-exhausted", "route-selection", "waiting-for-reset", "resume-queued", "reset-unknown"],
       "failureModes": [
-        "Automatic retry stays off by default and cannot be enabled without a known reset time; it queues one minute after reset.",
+        "Automatic resume is on by default for a known reset and cannot be enabled without one; it queues one minute after reset.",
+        "A thread keeps the choice made for its earlier recovery, so the global default cannot silently undo it.",
         "Changing one turn's choice creates or removes only that turn's scheduled recovery.",
-        "The inline choice is absent while automatic exhausted-limit failover is enabled and the ladder stored no recovery for the turn.",
+        "The beside-Resume choice only renders for a thread whose lost turn stored a recovery.",
+        "The inline notice is absent while automatic exhausted-limit failover is enabled and the ladder stored no recovery for the turn.",
         "A recovery recorded with exhausted-limit failover enabled, because no other account could take the request, still shows its controls inline.",
         "The notice re-reads this turn's recovery when it appears, so a page of continuations cached before the failure cannot hide the controls.",
         "A manual route switch accepts only a currently catalogued provider/model and applies the reasoning effort before queuing the saved request."
@@ -574,6 +576,24 @@
           "id": "ai-accounts.quota-auto-retry",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
           "testName": "lets one waiting continuation opt into and out of retry-at-reset"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-thread-choice",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "carries a thread's own retry choice into its next failure and no further"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-message-reset",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "uses the reset a provider message names when the usage card reports none"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-reset-wording",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-reset.test.ts",
+          "testName": "reads the wall-clock reset a provider message names in its own zone"
         },
         {
           "kind": "unit-test",
@@ -595,6 +615,11 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.quota-recovery-route",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.quota-auto-resume",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]

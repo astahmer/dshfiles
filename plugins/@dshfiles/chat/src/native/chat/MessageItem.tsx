@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { PropsRenderFactories } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UserTextFacts } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { JsonBlock, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -130,9 +130,10 @@ function ModelRetryItem({ node, active, t }: {
 }
 
 /** Persistent, turn-positioned feedback for a terminal failure. */
-function TurnErrorItem({ node, t, action }: {
+function TurnErrorItem({ node, t, action, extraActions }: {
   node: TurnErrorNode
   action?: ReactNode
+  extraActions?: ReactNode
   t: ChatViewSlotProps['t']
 }) {
   return (
@@ -142,6 +143,7 @@ function TurnErrorItem({ node, t, action }: {
         <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
         <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
       </div>
+      {extraActions}
       {action}
       {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
@@ -349,7 +351,9 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
 })
 
 /** Terminal turn-error keyed Chat renderer. */
-export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t, useChat, useSession, useAccess }: ChatNodeViewProps<'turn-error'>) {
+export const TurnErrorNodeView = memo(function TurnErrorNodeView({
+  node, t, useChat, useSession, useAccess, renderSlot,
+}: ChatNodeViewProps<'turn-error'> & PropsRenderSlots<'conversation.chat.turnErrorAction'>) {
   const latest = useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === node.data.turn)
   const sessionId = useSession(snapshot => snapshot.sessionId)
   const running = useSession(snapshot => snapshot.running)
@@ -357,7 +361,8 @@ export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t, useC
   const action = node.data.code !== 'ACCOUNT_SIGNED_OUT' && latest && !running && allowed
     ? <ResumeInterrupted sessionId={sessionId} seq={node.data.seq} />
     : undefined
-  return <TurnErrorItem node={node.data} t={t} action={action} />
+  const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '' })
+  return <TurnErrorItem node={node.data} t={t} action={action} extraActions={extraActions} />
 })
 
 /** Max-tokens turn-end notice keyed Chat renderer. */

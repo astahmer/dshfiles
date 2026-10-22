@@ -175,14 +175,14 @@ Then('the price refresh interval and explicit override can be changed and restor
   await finishJourneyAssertions(page)
 })
 
-Then('the exhausted-limit retry default is off and the inline choice is on', async ({ page }: { page: Page }) => {
+Then('the exhausted-limit retry default is on and the per-thread choice is shown', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-quota-retry-settings', async () => {
     const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
     const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
     await failover.click()
     await expect(page.getByRole('heading', { name: 'Quota retry', exact: true })).toBeVisible()
-    await expect(page.getByRole('switch', { name: 'Automatically resume after reset by default' })).not.toBeChecked()
-    await expect(page.getByRole('switch', { name: 'Show the per-turn choice' })).toBeChecked()
+    await expect(page.getByRole('switch', { name: 'Automatically resume after reset by default' })).toBeChecked()
+    await expect(page.getByRole('switch', { name: 'Show the per-thread choice' })).toBeChecked()
     await failover.click()
     await expect(page.getByRole('heading', { name: 'Quota retry', exact: true })).toHaveCount(0)
   })
@@ -556,14 +556,12 @@ When('an exhausted Command Code account fails a turn with failover off', async (
 
 When('a briefly exhausted Command Code account fails a turn with auto-resume on', async ({ page }: { page: Page }) => {
   await failTurnOnExhaustedAccount(page, 'e2e-fake-key-RESETTING')
-  const autoResume = page.getByRole('checkbox', { name: 'Automatically resume 1 minute after reset' })
-  await expect(autoResume).toBeEnabled({ timeout: 30_000 })
-  await autoResume.click()
-  await expect(autoResume).toBeChecked()
 })
 
 Then('the turn resumes on its own one minute after the reset', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-exhausted-turn-auto-resumes', async () => {
+    // Auto-resume is on by default for a known reset, so nobody has to opt in.
+    await expect(page.getByRole('checkbox', { name: 'Automatically resume after the limit resets' })).toBeChecked({ timeout: 30_000 })
     // The fake limit resets 5 seconds after the failed turn; the Host resumes 1 minute after that.
     await expect(page.getByText('Answered by ETTING', { exact: true }).last()).toBeVisible({ timeout: 100_000 })
   })
@@ -573,8 +571,12 @@ Then('the turn resumes on its own one minute after the reset', async ({ page }: 
 Then('the exhausted turn offers an inline route switch and one-minute auto-resume', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-exhausted-inline-recovery', async () => {
     await expect(page.getByText("Your current account's usage limit is exhausted", { exact: false })).toBeVisible({ timeout: 30_000 })
-    // A known reset both dates the notice and enables the one-minute auto-resume opt-in.
-    await expect(page.getByRole('checkbox', { name: 'Automatically resume 1 minute after reset' })).toBeEnabled()
+    // The per-thread toggle sits beside Resume and starts on for a known reset.
+    const autoResume = page.getByRole('checkbox', { name: 'Automatically resume after the limit resets' })
+    await expect(autoResume).toBeChecked({ timeout: 30_000 })
+    // Turning it off keeps this scenario manual and proves the toggle writes through.
+    await autoResume.click()
+    await expect(autoResume).not.toBeChecked()
     // The route switch renders only once the Host stored this turn's recovery.
     const expand = page.getByRole('button', { name: 'Resume with another model', exact: true })
     await expect(expand).toBeEnabled({ timeout: 30_000 })

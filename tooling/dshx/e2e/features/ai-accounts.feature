@@ -26,7 +26,7 @@ Feature: AI Accounts
   Scenario: Configure the exhausted-limit retry choice
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When the AI Accounts settings section is opened
-    Then the exhausted-limit retry default is off and the inline choice is on
+    Then the exhausted-limit retry default is on and the per-thread choice is shown
 
   @scenario:ai-accounts.usage-window-layout
   Scenario: Configure how account quota windows are displayed
@@ -115,13 +115,13 @@ Feature: AI Accounts
 
   @scenario:ai-accounts.quota-recovery-route
   Scenario: Recover an exhausted turn on another route
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts and owned Chat plugin profile is booted
     When an exhausted Command Code account fails a turn with failover off
     Then the exhausted turn offers an inline route switch and one-minute auto-resume
 
   @scenario:ai-accounts.quota-auto-resume
   Scenario: Resume an exhausted turn on its own after the limit resets
-    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    Given the isolated AI Accounts and owned Chat plugin profile is booted
     When a briefly exhausted Command Code account fails a turn with auto-resume on
     Then the turn resumes on its own one minute after the reset
 

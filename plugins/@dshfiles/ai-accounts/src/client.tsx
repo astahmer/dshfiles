@@ -20,6 +20,9 @@ import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
 import { CredentialRecoveryMessage } from './credential-recovery-message.js'
+// Type-only: the owned Chat fork's seat beside Resume on a failed turn.
+import type {} from '@dshfiles/chat/turn-error-action'
+import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
 import { QuotaRetryMessage } from './quota-retry-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
@@ -132,6 +135,11 @@ export default defineClientPlugin({
         <QuotaRetryMessage turn={props.turn} sessionId={props.sessionId} />
       </PluginQueryProvider>
     )
+    const QuotaAutoResumeToggleView = (props: { readonly sessionId: string; readonly seq: number }): JSX.Element => (
+      <PluginQueryProvider>
+        <QuotaAutoResumeToggle sessionId={props.sessionId} seq={props.seq} />
+      </PluginQueryProvider>
+    )
     const SettingsSectionView = (props: { readonly close: () => void }): JSX.Element => (
       <PluginQueryProvider>
         <AiAccountsSettingsSection close={props.close} openAccounts={openAccounts} />
@@ -182,6 +190,17 @@ export default defineClientPlugin({
         inject: sessionId => ({ sessionId }),
       },
       QuotaRetryMessageView,
+    )
+    // Beside Resume on the failed turn itself, so the per-thread choice lives
+    // where the user decides to resume. Declared by the owned Chat fork.
+    api.ui.register(
+      {
+        name: 'conversation.chat.turnErrorAction',
+        id: 'ai-accounts-quota-auto-resume',
+        order: 10,
+        inject: sessionId => ({ sessionId }),
+      },
+      QuotaAutoResumeToggleView,
     )
 
     api.ui.register(

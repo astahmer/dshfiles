@@ -278,6 +278,14 @@ Given('the isolated ThreadSidebar and AI Accounts plugin profile is booted', asy
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Given('the isolated AI Accounts and owned Chat plugin profile is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/chat'],
+    profileLabel: 'ai-accounts-owned-chat',
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Given('the isolated AI Accounts and model effort picker plugin profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/model-effort-picker'],

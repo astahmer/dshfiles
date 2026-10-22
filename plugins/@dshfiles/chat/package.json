@@ -18,7 +18,11 @@
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./turn-error-action": {
+      "types": "./src/turn-error-action.ts",
+      "default": "./dist/turn-error-action.js"
+    }
   },
   "scripts": {
     "build": "dshx build",

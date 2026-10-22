@@ -40,6 +40,9 @@
     "src/native/conversation-nodes/README.md",
     "src/native/conversation-nodes/turn-error.ts",
     "src/native/conversation-nodes/turn-process.ts",
-    "src/native/conversation-nodes/turn-tail.ts"
+    "src/native/conversation-nodes/turn-tail.ts",
+    "src/native/contract/slots.ts",
+    "src/native/locale.ts",
+    "src/native/chat/markdown-image-links.ts"
   ]
 }

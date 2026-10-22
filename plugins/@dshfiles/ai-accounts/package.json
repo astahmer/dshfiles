@@ -88,6 +88,7 @@
     "@deepseek-ai/dsh-tool-cordis": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/dsh-workspace": "catalog:",
+    "@dshfiles/chat": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/request-messages": "workspace:*",
     "@types/node": "22.20.5",
