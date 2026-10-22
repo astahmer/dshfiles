@@ -250,4 +250,35 @@ describe('tool parameter projection', () => {
       required: ['name', 'kind', 'tags'],
     })
   })
+
+  it('keeps a discriminated union instead of collapsing the property to an empty schema', () => {
+    const schema = z.object({
+      action: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('describe'), message: z.string() }).strict(),
+        z.object({ kind: z.literal('new'), commitId: z.string().optional() }).strict(),
+      ]),
+    })
+    expect(toToolSchema(publishedJsonSchema(schema, 'input'))).toEqual({
+      type: 'object',
+      properties: {
+        action: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'describe' }, message: { type: 'string' } },
+              required: ['kind', 'message'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: { kind: { type: 'string', const: 'new' }, commitId: { type: 'string' } },
+              required: ['kind'],
+              additionalProperties: false,
+            },
+          ],
+        },
+      },
+      required: ['action'],
+    })
+  })
 })

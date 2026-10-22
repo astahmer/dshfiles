@@ -26,19 +26,33 @@ const nodeType = (type: PublishedJsonSchema['type']): JsonSchemaType | undefined
   return candidates.length === 1 ? NODE_TYPES.find(known => known === candidates[0]) : undefined
 }
 
+/** Object branches only: two branches that both project to `{}` would match every value and make `oneOf` unsatisfiable. */
+const projectDiscriminatedUnion = (branches: readonly PublishedJsonSchema[], projected: JsonSchemaNode): JsonSchemaNode => {
+  const projectedBranches = branches.map(toToolSchema)
+  return projectedBranches.every(branch => branch.type === 'object' && branch.properties !== undefined) ? { ...projected, oneOf: projectedBranches } : projected
+}
+
 /**
  * Project a JSON Schema onto the subset DSH tools enforce. The projection only
  * loosens: an unsupported keyword is dropped, never guessed, and the contract's
  * own schema still validates every call at the Host boundary.
+ *
+ * `oneOf` is kept when every branch projects to an object: DSH enforces
+ * exactly-one unions, and dropping that branch list is what left a
+ * discriminated `action` property as `{}` in every tool schema.
  */
 export function toToolSchema(node: PublishedJsonSchema | undefined): JsonSchemaNode {
   const projected: JsonSchemaNode = {}
   if (node === undefined) return projected
   if (node.description !== undefined) projected.description = node.description
   if (node.title !== undefined) projected.title = node.title
-  const branches = node.anyOf ?? node.oneOf
-  if (branches !== undefined) {
-    const meaningful = branches.filter(branch => branch.type !== 'null')
+  if (node.oneOf !== undefined) {
+    const meaningful = node.oneOf.filter(branch => branch.type !== 'null')
+    if (meaningful.length === 1) return { ...toToolSchema(meaningful[0]), ...projected }
+    if (meaningful.length > 1) return projectDiscriminatedUnion(meaningful, projected)
+  }
+  if (node.anyOf !== undefined) {
+    const meaningful = node.anyOf.filter(branch => branch.type !== 'null')
     return meaningful.length === 1 ? { ...toToolSchema(meaningful[0]), ...projected } : projected
   }
   const type = nodeType(node.type)
