@@ -89,11 +89,7 @@ export const ImageLightbox = (props: {
       aria-modal="true"
       aria-label={labels.dialog}
     >
-      <div
-        className="dshx:absolute dshx:inset-0 dshx:bg-(--dsw-alias-bg-mask-1) dshx:[backdrop-filter:var(--dsw-mask-blur)]"
-        aria-hidden="true"
-        onMouseDown={onClose}
-      />
+      <div className="dshx:absolute dshx:inset-0 dshx:bg-(--dsw-alias-bg-mask-3) dshx:backdrop-blur-md" aria-hidden="true" onMouseDown={onClose} />
       {hasGallery && (
         <Button type="button" variant="ghost" size="icon" className={cn(navigationClass, 'dshx:left-6')} aria-label={labels.previous} onClick={() => move(-1)}>
           <ChevronLeftIcon />

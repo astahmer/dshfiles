@@ -160,7 +160,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
           }
           if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
         } else if (parsed.action === 'attach')
-          await page.locator('input[type="file"]').first().setInputFiles(repositoryFile(parsed.file), { timeout: timeoutMs })
+          await ScratchDriveRuntime.composerFileInput(page).setInputFiles(repositoryFile(parsed.file), { timeout: timeoutMs })
         else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
         else if (parsed.action === 'click') {
           filled = undefined
@@ -296,4 +296,8 @@ export const scratchShot = async (state: ScratchState, label: string, outDir: st
 export class ScratchFeatureCatalog {
   static readonly list = catalogFeatures
   static readonly find = findCatalogFeature
+}
+
+export class ScratchDriveRuntime {
+  static readonly composerFileInput = (page: Page) => page.locator('[data-composer-card] input[type="file"]').first()
 }

@@ -47,7 +47,10 @@
       "surfaces": ["client"],
       "configuration": [],
       "states": ["link-idle", "gallery-open"],
-      "failureModes": ["A supported image link opens the side panel instead of the gallery."],
+      "failureModes": [
+        "A supported image link opens the side panel instead of the gallery.",
+        "The sidebar and composer remain visually at the same layer as the gallery."
+      ],
       "externalDependencies": [],
       "verification": [
         {

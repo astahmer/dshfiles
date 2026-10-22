@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { chromium } from 'playwright'
 import { runCli } from '../src/cli/run.js'
+import { ScratchDriveRuntime } from '../src/scratch/drive.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { ScratchReaperRuntime } from '../src/scratch/reaper.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
@@ -76,6 +77,28 @@ describe('dshx dev scratch commands', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('New Session')).toBe(true)
     expect(NEW_THREAD_START_BUTTON_NAME.test('New session in sample')).toBe(false)
     expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
+  })
+
+  it('attaches scratch fixtures through the composer file input', async () => {
+    const browser = await chromium.launch({ headless: true })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <input id="unrelated-file-input" type="file" />
+        <div data-composer-card><input id="composer-file-input" type="file" multiple /></div>
+      `)
+      await ScratchDriveRuntime.composerFileInput(page).setInputFiles({ name: 'red.png', mimeType: 'image/png', buffer: Buffer.from('red') })
+      const composerFiles = await ScratchDriveRuntime.composerFileInput(page).evaluate(element =>
+        element instanceof HTMLInputElement ? Array.from(element.files ?? [], file => file.name) : [],
+      )
+      const unrelatedFileCount = await page
+        .locator('#unrelated-file-input')
+        .evaluate(element => (element instanceof HTMLInputElement ? (element.files?.length ?? 0) : 0))
+      expect(composerFiles).toEqual(['red.png'])
+      expect(unrelatedFileCount).toBe(0)
+    } finally {
+      await browser.close()
+    }
   })
 
   it('opens AI Accounts through the sidebar or Settings, then selects fake routes', async () => {

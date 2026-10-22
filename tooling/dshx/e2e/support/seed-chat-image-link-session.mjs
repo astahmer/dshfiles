@@ -3,6 +3,10 @@ import { join } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 
 const attachmentFixtures = fileURLToPath(new URL('../fixtures/attachments/', import.meta.url))
+const scrollFixture = Array.from(
+  { length: 24 },
+  (_, index) => `Transcript row ${String(index + 1)} keeps the image preview above floating chat controls.`,
+).join('\n\n')
 
 export const seedChatImageLinkSession = async ({ homeRoot }) => {
   const projectRequire = createRequire(new URL('../../../../plugins/@dshfiles/session-controller/package.json', import.meta.url))
@@ -44,7 +48,7 @@ export const seedChatImageLinkSession = async ({ homeRoot }) => {
           turn: 1,
           step: 1,
           message: createAssistantMessage({
-            content: [{ type: 'text', text: '[red.png](red.png)' }],
+            content: [{ type: 'text', text: `[red.png](red.png)\n\n${scrollFixture}` }],
             source: { provider: 'fixture', model: 'fixture' },
           }),
           stream: [],

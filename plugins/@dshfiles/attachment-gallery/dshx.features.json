@@ -6,9 +6,11 @@
       "title": "Navigate image previews",
       "summary": "Open a draft image and move among all attached images with left/right keyboard controls or the thumbnail strip.",
       "reach": [
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "expect button \"Remove image red.png\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+        "expect button \"Remove image blue.png\"",
         "click button \"red.png, click to view original\"",
         "expect dialog \"Image preview\"",
         "expect img \"red.png\"",
@@ -40,7 +42,7 @@
         {
           "kind": "unit-test",
           "id": "attachment-gallery.image-gallery-navigation-unit-keyboard-controls-and-thumbnails",
-          "file": "plugins/@dshfiles/attachment-gallery/tests/image-lightbox.client.spec.tsx",
+          "file": "plugins/@dshfiles/plugin-ui/tests/image-lightbox.test.tsx",
           "testName": "navigates images with arrow keys, side controls, and thumbnails"
         }
       ]

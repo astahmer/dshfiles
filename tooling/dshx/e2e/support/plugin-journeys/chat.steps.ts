@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { When, Then } from '../bdd.js'
 import { profileFor, recordAssertion, finishJourneyAssertions } from '../steps.js'
 import { seedInterruptedSession } from '../seed-interrupted-session.mjs'
@@ -55,7 +55,10 @@ When('a chat thread with a local image link is opened', async ({ page }: { page:
       async () => {
         await page.reload()
         if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
-        await fixture.first().waitFor({ state: 'attached', timeout: 3_000 }).catch(() => undefined)
+        await fixture
+          .first()
+          .waitFor({ state: 'attached', timeout: 3_000 })
+          .catch(() => undefined)
         return fixture.count()
       },
       { timeout: 30_000 },
@@ -63,15 +66,47 @@ When('a chat thread with a local image link is opened', async ({ page }: { page:
     .toBeGreaterThan(0)
   await fixture.first().click()
   const imageLink = page.getByRole('button', { name: 'red.png', exact: true })
-  await expect(imageLink).toBeVisible()
+  await imageLink.scrollIntoViewIfNeeded()
+  const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
+  await expect(backToBottom).toBeVisible()
   await imageLink.click()
 })
 
 Then('the image link opens in the gallery rather than a side panel', async ({ page }: { page: Page }) => {
   const lightbox = page.getByRole('dialog', { name: 'Image preview', exact: true })
+  const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
+  const rightSidebar = page.getByRole('button', { name: 'Open right sidebar', exact: true })
+  const leftSidebarGroup = page.getByRole('treeitem', { name: 'Ungrouped', exact: true })
+  const composer = page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+  const pointIsInsideLightbox = async (element: Locator): Promise<boolean> =>
+    element.evaluate(target => {
+      const bounds = target.getBoundingClientRect()
+      const topElement = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+      return topElement?.closest('[role="dialog"][aria-label="Image preview"]') !== null
+    })
   await recordAssertion(page, 'chat-image-link-opens-gallery', async () => {
     await expect(lightbox).toBeVisible()
     await expect(lightbox.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+    await expect(backToBottom).toBeVisible()
+    await expect(rightSidebar).toBeVisible()
+    await expect(leftSidebarGroup).toBeVisible()
+    await expect(composer).toBeVisible()
+    const backdropStyle = await lightbox.locator('div[aria-hidden="true"]').evaluate(element => {
+      const computed = getComputedStyle(element)
+      const alpha = computed.backgroundColor.match(/,\s*([\d.]+)\)$/)?.[1]
+      return {
+        alpha: alpha === undefined ? 1 : Number(alpha),
+        backdropFilter: computed.backdropFilter,
+      }
+    })
+    expect(backdropStyle.alpha).toBeGreaterThan(0.4)
+    expect(backdropStyle.backdropFilter).toContain('blur(')
+    const lightboxZIndex = await lightbox.evaluate(element => Number(getComputedStyle(element).zIndex))
+    expect(lightboxZIndex).toBeGreaterThan(1100)
+    expect(await pointIsInsideLightbox(backToBottom)).toBe(true)
+    expect(await pointIsInsideLightbox(rightSidebar)).toBe(true)
+    expect(await pointIsInsideLightbox(leftSidebarGroup)).toBe(true)
+    expect(await pointIsInsideLightbox(composer)).toBe(true)
   })
   await page.keyboard.press('Escape')
   await expect(lightbox).toBeHidden()
