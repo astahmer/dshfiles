@@ -255,7 +255,7 @@ no such seat, so an occupant keeps a footer-action fallback and registers throug
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after @session:<id> : ` prefilled; normal workspace isolation applies.
+unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu. **Follow-up in a new thread** opens a blank composer in the source thread's registered workspace with `Follow-up after @session:<id> :` prefilled and the caret on the next line; normal workspace isolation applies.
 Attention is Host-owned: the plugin records one durable row per unacknowledged
 thread (a finished turn, a manual unread mark, or both) in the
 `thread_attention` storage domain and serves it through the

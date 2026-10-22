@@ -41,6 +41,12 @@ describe('shared input trigger detection', () => {
     })
   })
 
+  it('does not keep an unquoted @ query active after a whitespace-delimited colon', () => {
+    const draft = 'Follow-up after @session:session-example :'
+
+    expect(detect(draft)).toBeNull()
+  })
+
   it('does not let an unquoted query cross a newline', () => {
     expect(detect('@fix the\ndeploy script')).toBeNull()
   })

@@ -52,7 +52,8 @@ export const detectTrigger: DetectTrigger = (draft, caret, guard) => {
   const lineStart = draft.lastIndexOf('\n', caret - 1) + 1
   const unquotedAt = UNQUOTED_AT_TOKEN.exec(draft.slice(lineStart, caret))?.[1]
   const prefix = at?.prefix ?? unquotedAt
-  if (prefix !== undefined) {
+  const query = at?.query ?? unquotedAt?.slice(1) ?? ''
+  if (prefix !== undefined && !(at?.quoted !== true && /\s:/u.test(query))) {
     const start = caret - prefix.length
     return {
       trigger: '@',
