@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { classifyTurn, healthCheck } from './cli.mjs'
+import { classifyTurn, globalInstallPlan, healthCheck } from './cli.mjs'
 
 /**
  * The property that matters: an incomplete candidate is refused rather than
@@ -111,4 +111,51 @@ test('a turn that never ends fails unless the provider is still refusing it', ()
 test('a turn that ends any other way fails', () => {
   assert.equal(classifyTurn([header, turnEnd({ kind: 'blocked' })]).ok, false)
   assert.equal(classifyTurn([header, turnEnd({ kind: 'aborted' })]).ok, false)
+})
+
+const globalRootFixture = settings => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-lkg-global-'))
+  mkdirSync(join(root, 'node_modules'), { recursive: true })
+  if (settings !== undefined) writeFileSync(join(root, 'node_modules', '.pnpm-workspace-state-v1.json'), JSON.stringify({ settings }))
+  return root
+}
+
+test('an upgrade install carries the live build approvals and keeps a local virtual store', () => {
+  const root = globalRootFixture({ allowBuilds: { 'node-pty': true, koffi: true, esbuild: false } })
+  try {
+    assert.deepEqual(globalInstallPlan(root, '0.2.2').argv, [
+      'pnpm',
+      'add',
+      '-g',
+      '--config.enableGlobalVirtualStore=false',
+      '--allow-build=node-pty',
+      '--allow-build=koffi',
+      '@deepseek-ai/dsh@0.2.2',
+    ])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('an upgrade names the live pnpm patches it cannot carry', () => {
+  const root = globalRootFixture({ patchedDependencies: { '@deepseek-ai/dsh-client-ui-user-questions@0.2.1-rc.2': 'patches/x.patch' } })
+  try {
+    assert.deepEqual(globalInstallPlan(root, '0.2.2').patches, ['@deepseek-ai/dsh-client-ui-user-questions@0.2.1-rc.2'])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a live install without pnpm state approves no builds and carries no patches', () => {
+  const root = globalRootFixture(undefined)
+  try {
+    const plan = globalInstallPlan(root, '0.2.2')
+    assert.equal(
+      plan.argv.some(value => value.startsWith('--allow-build')),
+      false,
+    )
+    assert.deepEqual(plan.patches, [])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

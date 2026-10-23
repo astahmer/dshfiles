@@ -105,6 +105,26 @@ On failure it prints each check, names the host log, and exits 1 with the live
 install untouched. Running it again for the installed version is a no-op apart
 from the checks.
 
+Each `pnpm add -g` creates a fresh global dir, so the live install's settings do
+not follow it. `upgrade` carries two of them itself, read from the live
+install's `node_modules/.pnpm-workspace-state-v1.json`:
+
+- **Build approvals** (`allowBuilds`) are passed as `--allow-build`. Without them
+  pnpm skips the node-pty and `dsh-subprocess-local` builds and still exits 0,
+  so `upgrade` also refuses a candidate whose install reports ignored build
+  scripts. A new dependency with a build needs to be approved in the live
+  install's `pnpm-workspace.yaml` (then `pnpm install` there) first.
+- **Local virtual store**: installs always pass
+  `--config.enableGlobalVirtualStore=false`. In global-store links, DSH's
+  native addon loader cannot resolve its platform package and the Host fails
+  with `No usable native binding found`.
+
+**pnpm patches** (`patchedDependencies`) are pinned to the version they were
+written for, so `upgrade` refuses while the live install has any. Check whether
+the new version fixes each one upstream, rerun with `--drop-patches`, then
+re-apply the ones still needed with `pnpm patch` in the new global install
+(the `dsh` shim's `cmd-shim-target` names it) and restart the Host.
+
 `turn` exists because a Host can boot, list threads and render the client while
 every turn fails: an `unknown prompt variable "{{cwd}}"` in the persona suffix
 did exactly that. It clones the live `~/.dsh` data into the verify state (same

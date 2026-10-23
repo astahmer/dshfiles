@@ -745,14 +745,46 @@ const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}
 const dshVersionAt = globalRoot => readJson(join(globalRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'))?.version
 
 /**
+ * Every `pnpm add -g` lands in a fresh global dir, so the live install's build
+ * approvals and patches do not follow it. Unapproved, pnpm skips the node-pty and
+ * dsh-subprocess-local builds and still exits 0; in global virtual-store links
+ * DSH's native addon loader cannot find its platform package. Patches are pinned
+ * to the version they were written for, so they are only named.
+ */
+const globalInstallPlan = (globalRoot, version) => {
+  const settings = readJson(join(globalRoot, 'node_modules', '.pnpm-workspace-state-v1.json'))?.settings ?? {}
+  const approvedBuilds = Object.entries(settings.allowBuilds ?? {}).flatMap(([name, allowed]) => (allowed === true ? [name] : []))
+  return {
+    argv: [
+      'pnpm',
+      'add',
+      '-g',
+      '--config.enableGlobalVirtualStore=false',
+      ...approvedBuilds.map(name => `--allow-build=${name}`),
+      `@deepseek-ai/dsh@${version}`,
+    ],
+    patches: Object.keys(settings.patchedDependencies ?? {}),
+  }
+}
+
+/**
  * `pnpm add -g` swaps the live core in place, so a new version is installed
  * into a private PNPM_HOME first and must run the live profile, plugins and
  * data — including one real turn — before the live install is touched.
  */
-const upgrade = async (version, { turnModel } = {}) => {
+const upgrade = async (version, { turnModel, dropPatches = false } = {}) => {
   requireOperator()
   if (version === undefined || !/^\d[\w.+-]*$/.test(version)) fail('upgrade needs an exact @deepseek-ai/dsh version, e.g. 0.2.2')
   if (process.env.DSH_LKG_GLOBAL?.trim()) fail('upgrade manages the pnpm global install; unset DSH_LKG_GLOBAL')
+  const liveGlobal = installedGlobalRoot()
+  const liveVersion = dshVersionAt(liveGlobal)
+  const plan = globalInstallPlan(liveGlobal, version)
+  if (liveVersion !== version && plan.patches.length > 0 && !dropPatches) {
+    fail(
+      `the live install carries pnpm patches that dsh ${version} will not: ${plan.patches.join(', ')}. ` +
+        'Check whether upstream fixed each one, then rerun with --drop-patches and re-apply the ones still needed to the new global install',
+    )
+  }
   log('dsh-lkg: making sure a healthy snapshot captures the installation before the upgrade')
   const before = await snapshot({ label: 'before upgrade', ifChanged: true })
   if (before.health?.healthy !== true) fail(`the current snapshot ${before.id} is not recorded healthy; run \`verify\` or \`snapshot\` first`)
@@ -766,12 +798,19 @@ const upgrade = async (version, { turnModel } = {}) => {
   log(`dsh-lkg: installing @deepseek-ai/dsh@${version} into ${work}`)
   // pnpm puts a global install under PNPM_HOME and refuses one whose bin dir is
   // not on PATH; a private PNPM_HOME keeps the live install out of reach.
-  const installed = run(['pnpm', 'add', '-g', `@deepseek-ai/dsh@${version}`], {
+  const installed = run(plan.argv, {
     cwd: homedir(),
     env: { ...process.env, PNPM_HOME: work, PATH: `${join(work, 'bin')}:${process.env.PATH ?? ''}` },
   })
   const shim = join(work, 'bin', 'dsh')
-  if (installed.status !== 0 || !existsSync(shim)) abort(`pnpm could not install ${version}: ${`${installed.stdout}${installed.stderr}`.trim().slice(-800)}`)
+  const installOutput = `${installed.stdout}${installed.stderr}`
+  if (installed.status !== 0 || !existsSync(shim)) abort(`pnpm could not install ${version}: ${installOutput.trim().slice(-800)}`)
+  const ignoredBuilds = /Ignored build scripts:\s*([^\n]+)/.exec(installOutput)?.[1]
+  if (ignoredBuilds !== undefined) {
+    abort(
+      `pnpm skipped build scripts dsh ${version} needs (${ignoredBuilds.trim()}); add them to allowBuilds in ${liveGlobal}/pnpm-workspace.yaml and run \`pnpm install\` there first`,
+    )
+  }
   const candidateGlobal = globalRootOfShim(shim)
   const candidateVersion = dshVersionAt(candidateGlobal)
   if (candidateVersion !== version) abort(`pnpm installed ${candidateVersion ?? 'nothing'} instead of ${version}`)
@@ -784,11 +823,10 @@ const upgrade = async (version, { turnModel } = {}) => {
   }
   rmSync(work, { recursive: true, force: true })
 
-  const liveVersion = dshVersionAt(installedGlobalRoot())
   if (liveVersion === version) log(`dsh-lkg: dsh ${version} is already the live install`)
   else {
     log(`dsh-lkg: dsh ${version} passed; installing it globally (was ${liveVersion ?? 'unknown'})`)
-    const live = spawnSync('pnpm', ['add', '-g', `@deepseek-ai/dsh@${version}`], { cwd: homedir(), stdio: 'inherit' })
+    const live = spawnSync(plan.argv[0], plan.argv.slice(1), { cwd: homedir(), stdio: 'inherit' })
     if (live.status !== 0) fail(`the global install of ${version} failed; dsh-recover still starts ${before.id}`)
   }
   const after = await snapshot({ label: `dsh ${version}`, ifChanged: true })
@@ -891,10 +929,11 @@ const usage = () => {
   verify [<id>|current] [--turn] [--turn-model <provider/model>]
                               re-run the health check on a version; --turn
                               also sends one real prompt on a clone of ~/.dsh
-  upgrade <version> [--turn-model <provider/model>]
+  upgrade <version> [--turn-model <provider/model>] [--drop-patches]
                               install @deepseek-ai/dsh@<version> globally only
                               after an isolated candidate passes every check,
-                              including --turn
+                              including --turn; refuses while the live install
+                              carries pnpm patches unless --drop-patches
   reap [--keep <n>]           drop old versions (default ${DEFAULT_KEEP})
   unlock <id>                 clear immutable flags for maintenance
   remove <id>                 drop one version (never the current one)
@@ -928,7 +967,7 @@ const main = async () => {
       await verify(positional(), { turn: rest.includes('--turn') || flag('--turn-model') !== undefined ? { model: turnModel() } : undefined })
       return
     case 'upgrade':
-      await upgrade(positional(), { turnModel: turnModel() })
+      await upgrade(positional(), { turnModel: turnModel(), dropPatches: rest.includes('--drop-patches') })
       return
     case 'reap':
       reap(Number.parseInt(flag('--keep') ?? String(DEFAULT_KEEP), 10))
@@ -950,4 +989,4 @@ const main = async () => {
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()
 
-export { classifyTurn, cloneTree, healthCheck, snapshot }
+export { classifyTurn, cloneTree, globalInstallPlan, healthCheck, snapshot }
