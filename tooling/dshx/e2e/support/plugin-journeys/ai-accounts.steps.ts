@@ -579,6 +579,7 @@ Then('the exhausted turn offers an inline route switch and one-minute auto-resum
     await expect(autoResume).not.toBeChecked()
     // The route switch renders only once the Host stored this turn's recovery.
     const expand = page.getByRole('button', { name: 'Resume with another model', exact: true })
+    await expect(expand).toHaveAttribute('data-variant', 'outline')
     await expect(expand).toBeEnabled({ timeout: 30_000 })
     await expand.click()
     await expect(page.getByRole('combobox', { name: 'Provider or account', exact: true })).toBeVisible()

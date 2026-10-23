@@ -1,5 +1,6 @@
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { QuotaRecoveryModelSwitchButton } from './quota-recovery-model-switch-button.js'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -112,15 +113,11 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
         <>
           {/* Auto-resume is the checkbox beside Resume on this turn; this notice keeps the route switch. */}
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <Button
+            <QuotaRecoveryModelSwitchButton
               disabled={busy || catalogQuery.isFetching || catalogQuery.data === undefined}
+              expanded={showSelector}
               onClick={() => setShowSelector(value => !value)}
-              size="xs"
-              type="button"
-              variant={showSelector ? 'outline' : 'default'}
-            >
-              {showSelector ? 'Hide model options' : 'Resume with another model'}
-            </Button>
+            />
             <Button disabled={busy} onClick={() => dismiss.mutate()} size="xs" type="button" variant="ghost">
               {dismiss.isPending ? 'Dismissing…' : 'Dismiss'}
             </Button>
