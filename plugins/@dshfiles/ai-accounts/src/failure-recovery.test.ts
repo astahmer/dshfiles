@@ -188,6 +188,17 @@ describe('failure recovery through the account pool', () => {
     expect(pool.isHealthy('codex', NOW + 61_000)).toBe(true)
   })
 
+  it('resets the transport-failure streak once the account serves a reply', () => {
+    const { pool, recovery, fail } = setup()
+
+    fail(transport, 1)
+    fail(transport, 2)
+    recovery.noteServed('codex')
+    fail(transport, 3)
+
+    expect(pool.isHealthy('codex', NOW)).toBe(true)
+  })
+
   it('retries transport failures in place first and numbers every attempt of one chain under one retry id', () => {
     const { fail } = setup()
     const first = fail(transport)

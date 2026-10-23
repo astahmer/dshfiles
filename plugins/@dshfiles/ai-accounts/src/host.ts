@@ -672,7 +672,15 @@ export default definePlugin({
           // Credited only after the upstream answers, so a failed attempt is never "used",
           // and to the account a fail-over put on the wire rather than the chosen route.
           if (!routes.has(options.provider)) return next()
-          return explainSilentRejections(creditServedAttempt(next(), { pool, accountId: accountForRequest(options) }), options)
+          return explainSilentRejections(creditServedAttempt(next(), {
+              pool: {
+                noteServed: accountId => {
+                  pool.noteServed(accountId)
+                  recovery.noteServed(accountId)
+                },
+              },
+              accountId: accountForRequest(options),
+            }), options)
         }),
       )
 

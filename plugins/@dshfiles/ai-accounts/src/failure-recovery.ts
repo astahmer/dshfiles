@@ -265,6 +265,11 @@ const createFailureRecovery = (deps: {
       }
     },
 
+    /** A served reply ends the account's transport-failure streak, so scattered timeouts never add up to a cooldown. */
+    noteServed: (accountId: string): void => {
+      transportFailures.delete(accountId)
+    },
+
     forget: (conversationKey: string): void => {
       steps.delete(conversationKey)
       deps.pool.unbind(conversationKey)
