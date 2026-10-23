@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { workingThreadIds } from './working-threads.js'
 
 describe('working thread view', () => {
-  it('includes only currently running roots, including parents working through a child', () => {
+  it('includes only threads whose own turn is running, not parents waiting on a running child', () => {
     expect(
       workingThreadIds([
-        { id: 'idle', running: false },
-        { id: 'running', running: true },
-        { id: 'parent-with-running-child', running: true },
+        { session: { id: 'idle', running: false } },
+        { session: { id: 'running', running: true } },
+        { session: { id: 'parent-with-running-child', running: false } },
       ]),
-    ).toEqual(new Set(['running', 'parent-with-running-child']))
+    ).toEqual(new Set(['running']))
   })
 })

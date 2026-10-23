@@ -50,7 +50,7 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     id: WORKING_VIEW_ID,
     name: null,
     groupBy: 'status',
-    statusFilters: ['working', 'interrupted'],
+    statusFilters: ['working'],
     sourceFilter: 'all',
     enabled: true,
   },
@@ -58,7 +58,7 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     id: DONE_VIEW_ID,
     name: null,
     groupBy: 'status',
-    statusFilters: ['inactive', 'interrupted'],
+    statusFilters: ['inactive', 'interrupted', 'needs-resume'],
     sourceFilter: 'main',
     enabled: true,
   },
@@ -89,6 +89,12 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
 
 export const doneViewFilterMigration = createStoredValue({
   key: 'dshfiles.thread-sidebar.done-view-filters.v1',
+  schema: z.boolean(),
+  fallback: false,
+})
+
+export const shippedViewFiltersMigration = createStoredValue({
+  key: 'dshfiles.thread-sidebar.shipped-view-filters.v2',
   schema: z.boolean(),
   fallback: false,
 })
@@ -304,10 +310,36 @@ const matchesDefaultPresets = (settings: ThreadViewSettings, presets: readonly T
     )
   })
 
+/**
+ * The status filters an earlier build shipped for its built-in Working and Done views. Working also listed
+ * interrupted threads, which are not running; Done left out the threads a usage limit stopped.
+ */
+const PREVIOUS_SHIPPED_VIEW_FILTERS: Readonly<Record<string, readonly ThreadStatusFilter[]>> = {
+  [WORKING_VIEW_ID]: ['working', 'interrupted'],
+  [DONE_VIEW_ID]: ['inactive', 'interrupted'],
+}
+
+const sameStatusFilters = (left: readonly ThreadStatusFilter[], right: readonly ThreadStatusFilter[]): boolean =>
+  left.length === right.length && left.every(filter => right.includes(filter))
+
+/** Move built-in Working and Done views still on an earlier shipped filter set to today's; edited and custom views stay. */
+const upgradeShippedViewFilters = (settings: ThreadViewSettings): ThreadViewSettings => {
+  let changed = false
+  const views = settings.views.map(view => {
+    const previous = view.name === null ? PREVIOUS_SHIPPED_VIEW_FILTERS[view.id] : undefined
+    const current = DEFAULT_THREAD_VIEW_PRESETS.find(preset => preset.id === view.id)
+    if (previous === undefined || current === undefined || !sameStatusFilters(view.statusFilters, previous)) return view
+    changed = true
+    return { ...view, statusFilters: [...current.statusFilters] }
+  })
+  return changed ? { ...settings, views } : settings
+}
+
 const isDefaultThreadViewSettings = (settings: ThreadViewSettings): boolean =>
   settings.showGroupControl &&
   settings.showFilterControl &&
-  [DEFAULT_THREAD_VIEW_PRESETS, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS].some(presets => matchesDefaultPresets(settings, presets)) &&
+  (matchesDefaultPresets(upgradeShippedViewFilters(settings), DEFAULT_THREAD_VIEW_PRESETS) ||
+    matchesDefaultPresets(settings, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS)) &&
   settings.views.some(view => view.id === settings.activeViewId)
 
 const migrateDoneViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => {
@@ -401,6 +433,7 @@ export class ThreadViewPreferencesModel {
   static readonly ensureDoneViewIncludesInactiveAndInterrupted = ensureDoneViewIncludesInactiveAndInterrupted
   static readonly isDefaultThreadViewSettings = isDefaultThreadViewSettings
   static readonly migrateDoneViewSettings = migrateDoneViewSettings
+  static readonly upgradeShippedViewFilters = upgradeShippedViewFilters
   static readonly activeThreadView = activeThreadView
   static readonly attentionLabelForPreset = attentionLabelForPreset
   static readonly unreadCountForPreset = unreadCountForPreset

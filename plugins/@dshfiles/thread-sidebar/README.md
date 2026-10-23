@@ -146,13 +146,18 @@ v1 browser copy this plugin wrote migrates into it once. Stored v1 view
 preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
-without opening the manager. The shipped views are **All threads**, **Working** (running or interrupted
-threads), **Done** (Inactive + Interrupted main threads), **Inbox** (everything
+without opening the manager. The shipped views are **All threads**, **Working** (threads
+whose own turn is running; a parent that only waits on a running subagent is not
+listed), **Done** (Inactive + Interrupted + Needs resume main threads, so threads a
+usage limit stopped land here), **Inbox** (everything
 waiting on you: approval needed, input needed, turn finished, needs resume,
 interrupted) and **Gone** (the storage states: muted, settled, archived). A
-one-time update adds Done to unchanged older defaults, extends Working with
-Interrupted, and adds Inactive + Interrupted to existing custom views named Done
-while keeping their other filters. A preset that is not All threads shows `(N)`
+one-time update adds Done to unchanged older defaults and adds Inactive +
+Interrupted to existing custom views named Done while keeping their other
+filters. A second one-time update moves built-in Working and Done views still on
+the earlier shipped filters (Working + Interrupted; Inactive + Interrupted) to
+today's; a built-in view whose filters or name you changed, and every custom
+view, stays as it is. A preset that is not All threads shows `(N)`
 beside its name: Working shows the running-thread count, while every other
 view counts the unread threads it lists, so Inbox says how many waiting threads
 still hold an unacknowledged finish on the Host (opening one clears it

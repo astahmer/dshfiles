@@ -2003,3 +2003,28 @@ Then('every view tab fits without scrolling and keeps its full name as tooltip a
   await expect(viewTabs.locator('button[title="Done"]')).toHaveAttribute('aria-pressed', 'true')
   await finishJourneyAssertions(page)
 })
+
+When('the shipped Working and Done views are opened in the view manager', async ({ page }: { page: Page }) => {
+  await openSidebarSettings(page)
+  await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+})
+
+Then('Working selects only running threads and Done also selects threads that need a resume', async ({ page }: { page: Page }) => {
+  const viewManager = page.getByRole('dialog')
+  await viewManager.getByRole('button', { name: 'Edit view Working', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-shipped-working-view-runs-only', async () => {
+    await expect(viewManager.getByRole('checkbox', { name: 'Working', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Interrupted', exact: true })).not.toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Needs resume', exact: true })).not.toBeChecked()
+  })
+  await viewManager.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await viewManager.getByRole('button', { name: 'Edit view Done', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-shipped-done-view-includes-usage-limits', async () => {
+    await expect(viewManager.getByRole('checkbox', { name: 'Inactive', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Interrupted', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Needs resume', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Working', exact: true })).not.toBeChecked()
+  })
+  await finishJourneyAssertions(page)
+})

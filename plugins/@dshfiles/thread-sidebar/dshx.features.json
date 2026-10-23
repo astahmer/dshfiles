@@ -284,7 +284,7 @@
         {
           "key": "statusFilters",
           "defaultValue": "[]",
-          "constraints": "Browser-local view preference: an empty list for every status, or any combination of working, attention, unread, approval-needed, input-needed, turn-finished, needs-resume, interrupted, inactive, muted, settled, and archived. A saved not-working filter from an earlier version decodes to input-needed + turn-finished + interrupted. The default Working view also includes Interrupted so an interrupted row can match both Working and Done.",
+          "constraints": "Browser-local view preference: an empty list for every status, or any combination of working, attention, unread, approval-needed, input-needed, turn-finished, needs-resume, interrupted, inactive, muted, settled, and archived. A saved not-working filter from an earlier version decodes to input-needed + turn-finished + interrupted. Working matches only a thread whose own turn runs, not a parent waiting on a running subagent.",
           "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
@@ -296,7 +296,7 @@
         },
         {
           "key": "views",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"inactive\",\"interrupted\"],\"sourceFilter\":\"main\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"inactive\",\"interrupted\",\"needs-resume\"],\"sourceFilter\":\"main\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
@@ -322,7 +322,7 @@
         },
         {
           "key": "viewPresets",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"inactive\",\"interrupted\"],\"sourceFilter\":\"main\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"inactive\",\"interrupted\",\"needs-resume\"],\"sourceFilter\":\"main\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
@@ -355,9 +355,9 @@
         "hidden"
       ],
       "failureModes": [
-        "Each attention status filter matches the row label the user already sees (approval needed, input needed, turn finished, needs resume, interrupted), alone or combined; Inactive is selectable in the same filter group and matches the existing idle-section classifier. The shipped Done view explicitly selects Inactive + Interrupted; Inactive stays out of Inbox so Inbox does not list every idle thread.",
+        "Each attention status filter matches the row label the user already sees (approval needed, input needed, turn finished, needs resume, interrupted), alone or combined; Inactive is selectable in the same filter group and matches the existing idle-section classifier. The shipped Working view selects only Working, so an interrupted or usage-limited thread that is not running stays off it, and a parent counts as working only while its own turn runs; the shipped Done view selects Inactive + Interrupted + Needs resume, so usage-limited threads are listed there. Inactive stays out of Inbox so Inbox does not list every idle thread.",
         "Attention dots appear only on matching non-All-threads views, use one highest-priority selected attention color, and do not borrow an unrelated color from Inactive alone; the shipped Inbox remains scoped to attention states instead of every idle thread, and Gone lists the storage states.",
-        "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled; a one-time update adds Done to unchanged shipped defaults and adds Inactive + Interrupted to existing named Done views, while preserving other custom filters.",
+        "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled; a one-time update adds Done to unchanged shipped defaults and adds Inactive + Interrupted to existing named Done views, while preserving other custom filters; a second one-time update moves built-in Working and Done views still on the earlier shipped filters (Working + Interrupted, Inactive + Interrupted) to Working alone and Inactive + Interrupted + Needs resume, leaving edited, renamed and custom views as they are.",
         "When the view tab row is narrower than every full tab needs, built-in views show their icon and custom views their initial, with the count kept and the full name as tooltip and accessible name, so every tab fits without horizontal scroll; a row wide enough keeps the full names unchanged."
       ],
       "externalDependencies": [],
@@ -371,6 +371,29 @@
           "kind": "gherkin",
           "id": "thread-sidebar.custom-views",
           "featureFile": "tooling/dshx/e2e/features/thread-view-presets.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.shipped-view-filters",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.shipped-view-filters-unit-migration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
+          "testName": "restricts the shipped Working view to running threads and adds usage-limit threads to the shipped Done view"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.shipped-view-filters-unit-keeps-edited",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
+          "testName": "keeps built-in Working and Done views the user edited or renamed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.shipped-view-filters-unit-own-running",
+          "file": "plugins/@dshfiles/thread-sidebar/src/working-threads.test.ts",
+          "testName": "includes only threads whose own turn is running, not parents waiting on a running child"
         },
         {
           "kind": "gherkin",

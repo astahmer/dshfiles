@@ -27,8 +27,8 @@ describe('thread view preferences', () => {
     expect(DEFAULT_THREAD_VIEW_SETTINGS).toMatchObject({
       views: [
         { id: ALL_THREADS_VIEW_ID, name: null, groupBy: 'status', statusFilters: [], sourceFilter: 'all', enabled: true },
-        { id: WORKING_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['working', 'interrupted'], sourceFilter: 'all', enabled: true },
-        { id: DONE_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['inactive', 'interrupted'], sourceFilter: 'main', enabled: true },
+        { id: WORKING_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all', enabled: true },
+        { id: DONE_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['inactive', 'interrupted', 'needs-resume'], sourceFilter: 'main', enabled: true },
         {
           id: INBOX_VIEW_ID,
           name: null,
@@ -62,12 +62,82 @@ describe('thread view preferences', () => {
       views: [
         { id: ALL_THREADS_VIEW_ID },
         { id: WORKING_VIEW_ID },
-        { id: DONE_VIEW_ID, statusFilters: ['inactive', 'interrupted'], sourceFilter: 'main' },
+        { id: DONE_VIEW_ID, statusFilters: ['inactive', 'interrupted', 'needs-resume'], sourceFilter: 'main' },
         { id: INBOX_VIEW_ID },
         { id: GONE_VIEW_ID },
       ],
       activeViewId: WORKING_VIEW_ID,
     })
+  })
+
+  it('restricts the shipped Working view to running threads and adds usage-limit threads to the shipped Done view', () => {
+    const laterView: ThreadViewPreset = {
+      id: 'later',
+      name: 'Later',
+      enabled: true,
+      groupBy: 'date',
+      statusFilters: ['working', 'interrupted'],
+      sourceFilter: 'all',
+    }
+    const previousShipped: ThreadViewSettings = {
+      ...DEFAULT_THREAD_VIEW_SETTINGS,
+      views: [
+        DEFAULT_THREAD_VIEW_PRESETS[0],
+        { ...DEFAULT_THREAD_VIEW_PRESETS[2], statusFilters: ['interrupted', 'inactive'], enabled: false },
+        { ...DEFAULT_THREAD_VIEW_PRESETS[1], statusFilters: ['working', 'interrupted'] },
+        laterView,
+      ],
+      activeViewId: DONE_VIEW_ID,
+      showFilterControl: false,
+    }
+
+    const upgraded = ThreadViewPreferencesModel.upgradeShippedViewFilters(previousShipped)
+
+    expect(upgraded).toMatchObject({
+      views: [
+        { id: ALL_THREADS_VIEW_ID, statusFilters: [] },
+        { id: DONE_VIEW_ID, statusFilters: ['inactive', 'interrupted', 'needs-resume'], enabled: false },
+        { id: WORKING_VIEW_ID, statusFilters: ['working'] },
+        laterView,
+      ],
+      activeViewId: DONE_VIEW_ID,
+      showFilterControl: false,
+    })
+    expect(ThreadViewPreferencesModel.upgradeShippedViewFilters(upgraded)).toBe(upgraded)
+    expect(
+      ThreadViewPreferencesModel.isDefaultThreadViewSettings({
+        ...DEFAULT_THREAD_VIEW_SETTINGS,
+        views: [
+          DEFAULT_THREAD_VIEW_PRESETS[0],
+          { ...DEFAULT_THREAD_VIEW_PRESETS[1], statusFilters: ['working', 'interrupted'] },
+          { ...DEFAULT_THREAD_VIEW_PRESETS[2], statusFilters: ['inactive', 'interrupted'] },
+          DEFAULT_THREAD_VIEW_PRESETS[3],
+          DEFAULT_THREAD_VIEW_PRESETS[4],
+        ],
+      }),
+    ).toBe(true)
+  })
+
+  it('badges Done for a usage-limit thread and keeps a stopped interrupted thread off Working', () => {
+    const usageLimited = { thread: {}, attentionLabel: 'threadSidebarNeedsResume', running: false, archived: false, settled: false, muted: false } as const
+    const interrupted = { thread: {}, attentionLabel: 'threadSidebarInterrupted', running: false, archived: false, settled: false, muted: false } as const
+
+    expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[2], [usageLimited])).toBe('threadSidebarNeedsResume')
+    expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[1], [usageLimited, interrupted])).toBeUndefined()
+  })
+
+  it('keeps built-in Working and Done views the user edited or renamed', () => {
+    const edited: ThreadViewSettings = {
+      ...DEFAULT_THREAD_VIEW_SETTINGS,
+      views: [
+        { ...DEFAULT_THREAD_VIEW_PRESETS[1], statusFilters: ['working', 'interrupted', 'unread'] },
+        { ...DEFAULT_THREAD_VIEW_PRESETS[2], name: 'Finished', statusFilters: ['inactive', 'interrupted'] },
+      ],
+      activeViewId: WORKING_VIEW_ID,
+    }
+
+    expect(ThreadViewPreferencesModel.upgradeShippedViewFilters(edited)).toBe(edited)
+    expect(ThreadViewPreferencesModel.isDefaultThreadViewSettings(edited)).toBe(false)
   })
 
   it('adds Inactive and Interrupted once to a saved view named Done', () => {
@@ -208,8 +278,8 @@ describe('thread view preferences', () => {
     expect(ThreadViewPreferencesModel.decodeThreadViewSettings({ groupBy: 'date', statusFilter: 'archived', sourceFilter: 'main' })).toMatchObject({
       views: [
         { id: ALL_THREADS_VIEW_ID, groupBy: 'status', statusFilters: [], sourceFilter: 'all' },
-        { id: WORKING_VIEW_ID, groupBy: 'status', statusFilters: ['working', 'interrupted'], sourceFilter: 'all' },
-        { id: DONE_VIEW_ID, groupBy: 'status', statusFilters: ['inactive', 'interrupted'], sourceFilter: 'main' },
+        { id: WORKING_VIEW_ID, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all' },
+        { id: DONE_VIEW_ID, groupBy: 'status', statusFilters: ['inactive', 'interrupted', 'needs-resume'], sourceFilter: 'main' },
         {
           id: INBOX_VIEW_ID,
           groupBy: 'status',

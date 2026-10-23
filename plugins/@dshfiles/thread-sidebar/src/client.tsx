@@ -162,7 +162,13 @@ import {
   type ThreadSourceFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
-import { doneViewFilterMigration, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
+import {
+  doneViewFilterMigration,
+  shippedViewFiltersMigration,
+  ThreadViewPreferencesModel,
+  threadViewPreferences,
+  type ThreadViewSettings,
+} from './thread-view-preferences.js'
 import {
   ThreadViewManager,
   threadStatusFilterGroupLabelKeys,
@@ -1982,11 +1988,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       !ThreadViewPreferencesModel.isDefaultThreadViewSettings(legacy) && ThreadViewPreferencesModel.isDefaultThreadViewSettings(preferences.threadViews)
     const source = adoptLegacy ? legacy : preferences.threadViews
     const shouldMigrateDone = adoptLegacy || !doneViewFilterMigration.get() || ThreadViewPreferencesModel.isDefaultThreadViewSettings(source)
-    const migrated = shouldMigrateDone ? ThreadViewPreferencesModel.migrateDoneViewSettings(source) : source
+    const shouldUpgradeShippedFilters = adoptLegacy || !shippedViewFiltersMigration.get() || ThreadViewPreferencesModel.isDefaultThreadViewSettings(source)
+    const doneMigrated = shouldMigrateDone ? ThreadViewPreferencesModel.migrateDoneViewSettings(source) : source
+    const migrated = shouldUpgradeShippedFilters ? ThreadViewPreferencesModel.upgradeShippedViewFilters(doneMigrated) : doneMigrated
     const needsWrite = adoptLegacy || migrated !== source
     if (!needsWrite) {
       threadViewPreferences.remove()
       doneViewFilterMigration.set(true)
+      shippedViewFiltersMigration.set(true)
       return
     }
     doneViewMigrationTarget.current = migrated
@@ -1999,6 +2008,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (JSON.stringify(preferences.threadViews) !== JSON.stringify(target)) return
     doneViewMigrationTarget.current = null
     doneViewFilterMigration.set(true)
+    shippedViewFiltersMigration.set(true)
     if (removeLegacyViewsAfterMigration.current) threadViewPreferences.remove()
     removeLegacyViewsAfterMigration.current = false
   }, [hostBacked, isPrimarySurface, preferences.threadViews, storageWarning, threadViewWritePending])
@@ -2699,7 +2709,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return sectionEntries
   }, [childThreadEntries, sectionEntries, threadView.sourceFilter])
   const sourceFilteredThreadIds = useMemo(() => new Set(sourceFilteredThreadEntries.map(entry => entry.session.id)), [sourceFilteredThreadEntries])
-  const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries.map(entry => entry.activity)), [sectionEntries])
+  const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries), [sectionEntries])
   const inactiveThreadIds = useMemo(
     () =>
       new Set(
@@ -2732,15 +2742,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const workingThreadCountsBySource = useMemo(
     () => ({
-      all: sectionEntries.filter(entry => entry.activity.running).length + detachedThreadEntries.filter(entry => entry.activity.running).length,
-      main: sectionEntries.filter(entry => entry.activity.running && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
+      all: currentWorkingThreadIds.size + detachedThreadEntries.filter(entry => entry.session.running).length,
+      main: sectionEntries.filter(entry => currentWorkingThreadIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
       subagents: [
         ...childThreadEntries,
         ...detachedThreadEntries,
         ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
-      ].filter(entry => entry.activity.running).length,
+      ].filter(entry => entry.session.running).length,
     }),
-    [childThreadEntries, detachedThreadEntries, sectionEntries],
+    [childThreadEntries, currentWorkingThreadIds, detachedThreadEntries, sectionEntries],
   )
   const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
@@ -2943,7 +2953,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         thread: entry.session,
         attentionLabel,
         unread: attention.records.has(entry.session.id),
-        running: entry.activity.running,
+        running: entry.session.running,
         inactive: inactiveThreadIds.has(entry.session.id),
         archived: archivedSessionIds.has(entry.session.id),
         settled: settledSessionIds.has(entry.session.id),

@@ -239,3 +239,9 @@ Feature: Thread sidebar journeys
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When the thread sidebar is narrowed to its minimum width
     Then every view tab fits without scrolling and keeps its full name as tooltip and accessible name
+
+  @scenario:thread-sidebar.shipped-view-filters
+  Scenario: The shipped Working view lists running threads and Done includes usage-limited threads
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the shipped Working and Done views are opened in the view manager
+    Then Working selects only running threads and Done also selects threads that need a resume
