@@ -34,6 +34,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
+import { itemTransitionName } from './view-transition.js'
 
 type GroupBy = 'status' | 'kind' | 'project' | 'attention'
 type Entry =
@@ -164,7 +165,7 @@ const Row = (props: {
         }}
         onDoubleClick={rename.renameOnDoubleClick}
         onMouseMove={() => props.hover(item.id)}
-        style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
+        style={{ viewTransitionName: itemTransitionName('row', item.id) }}
         className={cn(
           columns,
           'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',

@@ -12,7 +12,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
-import { withViewTransition } from './view-transition.js'
+import { itemTransitionName, withViewTransition } from './view-transition.js'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 /** Cards mounted per column before scrolling near the end reveals another batch. */
@@ -154,7 +154,7 @@ const BoardCard = (props: {
         aria-selected={props.selected}
         onPointerDown={event => props.startDrag(event, item, rename.openSoon, event.shiftKey, event.metaKey || event.ctrlKey)}
         onDoubleClick={rename.renameOnDoubleClick}
-        style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
+        style={{ viewTransitionName: itemTransitionName('card', item.id) }}
         className={cn(
           cardClass,
           'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',

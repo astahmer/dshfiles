@@ -581,8 +581,8 @@ export const BacklogPanel = (props: {
     if (view === 'inbox') void api.acknowledge({ ids: [id] }).then(() => inbox.refetch())
   }
   const switchView = (next: View): void => {
-    // Rows and cards share a view-transition name per item, so Items ↔ Board morphs instead of cutting. The browser
-    // snapshots every named element, so a large backlog switches instantly instead.
+    // Switching views cross-fades the two layouts; item names stay per-view so no row stretches into a card. The
+    // browser snapshots every named element, so a large backlog switches instantly instead.
     if (items.length <= MAX_ANIMATED_ITEMS) withViewTransition(() => setPreference({ view: next }))
     else setPreference({ view: next })
     setSearch(SearchScopes.leaveResults)
