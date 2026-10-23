@@ -284,7 +284,7 @@
         {
           "key": "statusFilters",
           "defaultValue": "[]",
-          "constraints": "Browser-local view preference: an empty list for every status, or any combination of working, attention, unread, approval-needed, input-needed, turn-finished, needs-resume, interrupted, inactive, muted, settled, and archived. A saved not-working filter from an earlier version decodes to input-needed + turn-finished + interrupted. Working matches only a thread whose own turn runs, not a parent waiting on a running subagent.",
+          "constraints": "Browser-local view preference: an empty list for every status, or any combination of working, attention, unread, approval-needed, input-needed, turn-finished, needs-resume, interrupted, inactive, muted, settled, and archived. A saved not-working filter from an earlier version decodes to input-needed + turn-finished + interrupted. Working matches a thread whose own turn runs and a parent whose subagent runs.",
           "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
@@ -355,10 +355,10 @@
         "hidden"
       ],
       "failureModes": [
-        "Each attention status filter matches the row label the user already sees (approval needed, input needed, turn finished, needs resume, interrupted), alone or combined; Inactive is selectable in the same filter group and matches the existing idle-section classifier. The shipped Working view selects only Working, so an interrupted or usage-limited thread that is not running stays off it, and a parent counts as working only while its own turn runs; the shipped Done view selects Inactive + Interrupted + Needs resume, so usage-limited threads are listed there. Inactive stays out of Inbox so Inbox does not list every idle thread.",
+        "Each attention status filter matches the row label the user already sees (approval needed, input needed, turn finished, needs resume, interrupted), alone or combined; Inactive is selectable in the same filter group and matches the existing idle-section classifier. The shipped Working view selects only Working, so an interrupted or usage-limited thread that is not running stays off it, and a parent counts as working while its own turn or one of its subagents runs; the shipped Done view selects Inactive + Interrupted + Needs resume, so usage-limited threads are listed there. Inactive stays out of Inbox so Inbox does not list every idle thread.",
         "Attention dots appear only on matching non-All-threads views, use one highest-priority selected attention color, and do not borrow an unrelated color from Inactive alone; the shipped Inbox remains scoped to attention states instead of every idle thread, and Gone lists the storage states.",
         "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled; a one-time update adds Done to unchanged shipped defaults and adds Inactive + Interrupted to existing named Done views, while preserving other custom filters; a second one-time update moves built-in Working and Done views still on the earlier shipped filters (Working + Interrupted, Inactive + Interrupted) to Working alone and Inactive + Interrupted + Needs resume, leaving edited, renamed and custom views as they are.",
-        "When the view tab row is narrower than every full tab needs, built-in views show their icon and custom views their initial, with the count kept and the full name as tooltip and accessible name, so every tab fits without horizontal scroll; a row wide enough keeps the full names unchanged."
+        "When the view tab row is narrower than the full tabs measure (an invisible copy of the row with every full name), built-in views show their icon and custom views their initial, with the count kept and the full name as tooltip and accessible name, so every tab fits without horizontal scroll; a row wide enough keeps the full names unchanged."
       ],
       "externalDependencies": [],
       "verification": [
@@ -393,7 +393,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.shipped-view-filters-unit-own-running",
           "file": "plugins/@dshfiles/thread-sidebar/src/working-threads.test.ts",
-          "testName": "includes only threads whose own turn is running, not parents waiting on a running child"
+          "testName": "includes threads whose own turn runs and parents whose subagent runs"
         },
         {
           "kind": "gherkin",
@@ -401,10 +401,15 @@
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "thread-sidebar.full-view-tabs",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "thread-sidebar.compact-view-tabs-unit-threshold",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-tabs.test.ts",
-          "testName": "keeps full names while every tab fits and switches to compact labels once the row is narrower"
+          "testName": "keeps full names while the measured full tabs fit and switches to compact labels once the row is narrower"
         },
         {
           "kind": "unit-test",

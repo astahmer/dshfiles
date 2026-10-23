@@ -2986,7 +2986,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [threadViewAttentionEntries, threadViewSettings.views],
   )
   const [viewTabRow, setViewTabRow] = useState<HTMLDivElement | null>(null)
-  const compactViewTabs = useCompactViewTabs(viewTabRow, threadViewSettings.views.filter(view => view.enabled).length)
+  const [fullViewTabs, setFullViewTabs] = useState<HTMLDivElement | null>(null)
+  const compactViewTabs = useCompactViewTabs(viewTabRow, fullViewTabs)
+  const viewTabs = threadViewSettings.views
+    .filter(view => view.enabled)
+    .map(view => {
+      const hasOnlyWorkingStatuses =
+        view.statusFilters.every(status => status === 'working' || status === 'interrupted') && view.statusFilters.includes('working')
+      const workingCount = hasOnlyWorkingStatuses ? workingThreadCountsBySource[view.sourceFilter] : null
+      const unreadCount = unreadCountByViewId.get(view.id) ?? 0
+      return {
+        view,
+        label: threadViewPresetLabel(view, props.tSidebar),
+        attentionLabel: attentionLabelByViewId.get(view.id),
+        visibleCount: workingCount ?? (unreadCount > 0 ? unreadCount : null),
+      }
+    })
   const visibleThreadEntries = useMemo(
     () =>
       sourceFilteredThreadEntries.filter(entry =>
@@ -4153,70 +4168,78 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             onKeyDown={event => navigateThreadList(event.nativeEvent)}
             hidden={isBoard}
           >
-            {threadViewSettings.views
-              .filter(view => view.enabled)
-              .map(view => {
-                const label = threadViewPresetLabel(view, props.tSidebar)
-                const compactLabel = threadViewPresetCompactLabel(view)
-                const attentionLabel = attentionLabelByViewId.get(view.id)
-                const hasOnlyWorkingStatuses =
-                  view.statusFilters.every(status => status === 'working' || status === 'interrupted') && view.statusFilters.includes('working')
-                const workingCount = hasOnlyWorkingStatuses ? workingThreadCountsBySource[view.sourceFilter] : null
-                const unreadCount = unreadCountByViewId.get(view.id) ?? 0
-                const visibleCount = workingCount ?? (unreadCount > 0 ? unreadCount : null)
-                const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
-                const accessibleLabel =
-                  attentionLabel === undefined && visibleCount === null
-                    ? undefined
-                    : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
-                return (
-                  <Button
-                    key={view.id}
-                    type="button"
-                    data-thread-list-view-button=""
-                    variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className={cn('dshx:flex-1', compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-20 dshx:shrink-0')}
-                    title={label}
-                    aria-label={accessibleLabel}
-                    aria-pressed={view.id === listThreadView.id}
-                    onClick={() => selectThreadViewPreset(view.id)}
-                  >
-                    {compactViewTabs ? (
-                      <>
-                        <span className="dshx:sr-only">{label}</span>
-                        {compactLabel.kind === 'icon' ? (
-                          <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
-                        ) : (
-                          <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
-                            {compactLabel.initial}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="dshx:truncate">{label}</span>
-                    )}
-                    {attentionLabel === undefined ? null : (
-                      <span
-                        aria-hidden="true"
-                        data-testid="thread-view-attention-dot"
-                        className={cn(
-                          'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
-                          ThreadAttentionPresentationModel.attentionDotClass({
-                            attentionLabel,
-                            attentionColors: preferences.attentionColors,
-                            unread: false,
-                            running: false,
-                          }),
-                        )}
-                      />
-                    )}
-                    {visibleCount === null ? null : (
-                      <span className="dshx:shrink-0">{compactViewTabs ? visibleCount : `(${visibleCount})`}</span>
-                    )}
-                  </Button>
-                )
-              })}
+            {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
+              const compactLabel = threadViewPresetCompactLabel(view)
+              const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
+              const accessibleLabel =
+                attentionLabel === undefined && visibleCount === null
+                  ? undefined
+                  : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
+              return (
+                <Button
+                  key={view.id}
+                  type="button"
+                  data-thread-list-view-button=""
+                  variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className={cn('dshx:flex-1', compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-20 dshx:shrink-0')}
+                  title={label}
+                  aria-label={accessibleLabel}
+                  aria-pressed={view.id === listThreadView.id}
+                  onClick={() => selectThreadViewPreset(view.id)}
+                >
+                  {compactViewTabs ? (
+                    <>
+                      <span className="dshx:sr-only">{label}</span>
+                      {compactLabel.kind === 'icon' ? (
+                        <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
+                      ) : (
+                        <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
+                          {compactLabel.initial}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="dshx:truncate">{label}</span>
+                  )}
+                  {attentionLabel === undefined ? null : (
+                    <span
+                      aria-hidden="true"
+                      data-testid="thread-view-attention-dot"
+                      className={cn(
+                        'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
+                        ThreadAttentionPresentationModel.attentionDotClass({
+                          attentionLabel,
+                          attentionColors: preferences.attentionColors,
+                          unread: false,
+                          running: false,
+                        }),
+                      )}
+                    />
+                  )}
+                  {visibleCount === null ? null : <span className="dshx:shrink-0">{compactViewTabs ? visibleCount : `(${visibleCount})`}</span>}
+                </Button>
+              )
+            })}
+          </div>
+          {/* The full-name tabs at their natural width, clipped to nothing: the row compacts only when it is narrower. */}
+          <div aria-hidden="true" className="dshx:relative dshx:h-0 dshx:w-0 dshx:overflow-hidden" hidden={isBoard}>
+            <div
+              ref={setFullViewTabs}
+              data-thread-view-tab-measure=""
+              className="dshx:invisible dshx:absolute dshx:top-0 dshx:left-0 dshx:flex dshx:w-max dshx:gap-1"
+            >
+              {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
+                <span
+                  key={view.id}
+                  className="dshx:inline-flex dshx:h-7 dshx:min-w-20 dshx:items-center dshx:justify-center dshx:gap-1.5 dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap"
+                >
+                  {label}
+                  {attentionLabel === undefined ? null : <span className="dshx:size-1.5 dshx:shrink-0" />}
+                  {visibleCount === null ? null : <span className="dshx:shrink-0">({visibleCount})</span>}
+                </span>
+              ))}
+            </div>
           </div>
           {showGroupControl || showFilterControl ? (
             <div

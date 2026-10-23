@@ -5,16 +5,15 @@ import { DEFAULT_THREAD_VIEW_PRESETS } from './thread-view-preferences.js'
 import { viewTabsNeedCompactLabels } from './thread-view-tabs.js'
 
 describe('view tab row', () => {
-  it('keeps full names while every tab fits and switches to compact labels once the row is narrower', () => {
-    expect(viewTabsNeedCompactLabels({ rowWidth: 600, tabCount: 4 })).toBe(false)
-    expect(viewTabsNeedCompactLabels({ rowWidth: 492, tabCount: 4 })).toBe(false)
-    expect(viewTabsNeedCompactLabels({ rowWidth: 415, tabCount: 4 })).toBe(true)
-    expect(viewTabsNeedCompactLabels({ rowWidth: 240, tabCount: 5 })).toBe(true)
+  it('keeps full names while the measured full tabs fit and switches to compact labels once the row is narrower', () => {
+    expect(viewTabsNeedCompactLabels({ rowWidth: 400, requiredWidth: 330 })).toBe(false)
+    expect(viewTabsNeedCompactLabels({ rowWidth: 330, requiredWidth: 330 })).toBe(false)
+    expect(viewTabsNeedCompactLabels({ rowWidth: 329, requiredWidth: 330 })).toBe(true)
   })
 
-  it('never compacts a hidden or empty row', () => {
-    expect(viewTabsNeedCompactLabels({ rowWidth: 0, tabCount: 5 })).toBe(false)
-    expect(viewTabsNeedCompactLabels({ rowWidth: 200, tabCount: 0 })).toBe(false)
+  it('never compacts a hidden row or before the full tabs are measured', () => {
+    expect(viewTabsNeedCompactLabels({ rowWidth: 0, requiredWidth: 330 })).toBe(false)
+    expect(viewTabsNeedCompactLabels({ rowWidth: 200, requiredWidth: 0 })).toBe(false)
   })
 
   it('gives built-in views an icon and custom views their initial', () => {

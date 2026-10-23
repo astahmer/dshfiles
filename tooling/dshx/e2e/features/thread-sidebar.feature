@@ -240,6 +240,12 @@ Feature: Thread sidebar journeys
     When the thread sidebar is narrowed to its minimum width
     Then every view tab fits without scrolling and keeps its full name as tooltip and accessible name
 
+  @scenario:thread-sidebar.full-view-tabs
+  Scenario: View tabs keep their names when the sidebar is wide enough for them
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the view tab row is 480 pixels wide
+    Then every view tab shows its full name
+
   @scenario:thread-sidebar.shipped-view-filters
   Scenario: The shipped Working view lists running threads and Done includes usage-limited threads
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

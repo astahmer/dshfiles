@@ -1978,6 +1978,30 @@ When('the thread sidebar is narrowed to its minimum width', async ({ page }: { p
   }, MINIMUM_SIDEBAR_WIDTH)
 })
 
+// The isolated profile has no resizable frame column; widening the row itself measures the real tabs and fonts.
+When('the view tab row is {int} pixels wide', async ({ page }: { page: Page }, width: number) => {
+  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
+  await expect(viewTabs).toBeVisible()
+  await viewTabs.evaluate((row, rowWidth) => {
+    if (!(row instanceof HTMLElement)) throw new Error('The view tab row is not an HTML element.')
+    row.style.width = `${rowWidth}px`
+    row.style.flexShrink = '0'
+  }, width)
+})
+
+Then('every view tab shows its full name', async ({ page }: { page: Page }) => {
+  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
+  await recordAssertion(page, 'thread-sidebar-full-view-tabs', async () => {
+    await expect(viewTabs).not.toHaveAttribute('data-compact-view-tabs')
+    await expect(viewTabs.getByTestId('thread-view-compact-initial')).toHaveCount(0)
+    await expect(viewTabs.getByTestId('thread-view-compact-icon')).toHaveCount(0)
+    for (const name of ['All threads', 'Working', 'Done', 'Gone']) {
+      await expect(viewTabs.locator(`button[title="${name}"]`)).toContainText(name)
+    }
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('every view tab fits without scrolling and keeps its full name as tooltip and accessible name', async ({ page }: { page: Page }) => {
   const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
   const tabs = viewTabs.locator('button[data-thread-list-view-button]')

@@ -1,22 +1,26 @@
 import { useLayoutEffect, useState } from 'react'
 
-/** The width one view tab needs to show its full name, attention dot and count without truncating. */
-const FULL_VIEW_TAB_WIDTH = 120
-const VIEW_TAB_GAP = 4
+/**
+ * A row narrower than the full tabs need swaps names for icons, so every tab stays visible without scrolling. The
+ * required width is measured from the full labels themselves, so a row that fits them keeps the names.
+ */
+export const viewTabsNeedCompactLabels = (input: { readonly rowWidth: number; readonly requiredWidth: number }): boolean =>
+  input.rowWidth > 0 && input.requiredWidth > 0 && input.rowWidth < input.requiredWidth
 
-/** A row too narrow for every full tab swaps names for icons, so every tab stays visible without scrolling. */
-export const viewTabsNeedCompactLabels = (input: { readonly rowWidth: number; readonly tabCount: number }): boolean =>
-  input.tabCount > 0 && input.rowWidth > 0 && input.rowWidth < input.tabCount * FULL_VIEW_TAB_WIDTH + (input.tabCount - 1) * VIEW_TAB_GAP
-
-export const useCompactViewTabs = (row: HTMLElement | null, tabCount: number): boolean => {
+/**
+ * Whether the tab row shows compact labels. `fullTabs` is an invisible copy of the row with every full name, laid out
+ * at its natural width; its width is what the visible row needs.
+ */
+export const useCompactViewTabs = (row: HTMLElement | null, fullTabs: HTMLElement | null): boolean => {
   const [compact, setCompact] = useState(false)
   useLayoutEffect(() => {
-    if (row === null) return
-    const measure = (rowWidth: number) => setCompact(viewTabsNeedCompactLabels({ rowWidth, tabCount }))
-    measure(row.clientWidth)
-    const observer = new ResizeObserver(entries => measure(entries.at(-1)?.contentRect.width ?? row.clientWidth))
+    if (row === null || fullTabs === null) return
+    const measure = () => setCompact(viewTabsNeedCompactLabels({ rowWidth: row.clientWidth, requiredWidth: fullTabs.scrollWidth }))
+    measure()
+    const observer = new ResizeObserver(measure)
     observer.observe(row)
+    observer.observe(fullTabs)
     return () => observer.disconnect()
-  }, [row, tabCount])
+  }, [row, fullTabs])
   return compact
 }
