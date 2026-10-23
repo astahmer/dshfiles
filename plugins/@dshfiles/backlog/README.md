@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Configure Jev triage from the Backlog panel](docs/screenshots/jev-settings.png)
+
 ![Set up a missing Jev key from chat](docs/screenshots/jev-secret-setup.png)
 
 ![Write descriptions and replies like a capture](docs/screenshots/rich-item-text.png)
@@ -169,6 +171,13 @@ For reply-worthy text without attachments, _Smart reply answers_ (on by default)
 _Thread start notifications_ selects off, in-app, browser system, or both. The in-app notice offers **Open**. Browser
 system notices are sent only if this browser already grants notification permission; Backlog never prompts or enables it
 without an explicit browser action. The notice contains only the item id and title, not the submitted message.
+
+## Backlog settings
+
+The panel's **Settings** tab gives quick access to the backlog's Jev controls: turn Jev on, enable automatic
+triage, and bind the TypeSafe key by its Secret Catalog reference. The same `dshfiles-backlog` settings remain
+available in the usual DSH Settings screen. Only the reference is stored; leave it blank to use
+`TYPESAFE_API_KEY` from the Host environment.
 
 ## Automatic triage
 

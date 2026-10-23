@@ -58,6 +58,51 @@
       ]
     },
     {
+      "id": "jev-settings",
+      "title": "Configure Jev from the Backlog panel",
+      "summary": "Configure the backlog's Jev switch, automatic triage and TypeSafe secret reference in a dedicated panel tab; the same settings remain available in DSH Settings.",
+      "reach": [
+        "click button \"Backlog\"",
+        "click button \"Backlog settings\"",
+        "expect text \"Jev triage\"",
+        "expect checkbox \"Enable Jev\"",
+        "expect checkbox \"Triage new items automatically\"",
+        "expect textbox \"TypeSafe API key reference\"",
+        "expect button \"Save Jev settings\""
+      ],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.jevEnabled",
+          "defaultValue": "false",
+          "constraints": "Boolean; Jev calls are disabled unless enabled.",
+          "coveredBy": ["backlog.jev-settings-panel"]
+        },
+        {
+          "key": "dshfiles-backlog.autoTriage",
+          "defaultValue": "false",
+          "constraints": "Boolean; background triage for new items is opt-in.",
+          "coveredBy": ["backlog.jev-settings-panel"]
+        },
+        {
+          "key": "dshfiles-backlog.jevSecret",
+          "defaultValue": "",
+          "constraints": "Secret Catalog reference only; value resolves on the Host.",
+          "coveredBy": ["backlog.jev-settings-panel"]
+        }
+      ],
+      "states": ["settings-view", "secret-reference-only"],
+      "failureModes": ["Settings remain read-only while the namespace is unavailable.", "The UI stores a Secret Catalog reference, never a credential value."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.jev-settings-panel",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        }
+      ]
+    },
+    {
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
       "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",

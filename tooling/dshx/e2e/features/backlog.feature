@@ -4,6 +4,15 @@ Feature: Backlog
   board by status, with a peek beside them. These journeys use a fresh
   isolated profile and never call a model provider.
 
+  @scenario:backlog.jev-settings-panel
+  Scenario: Configure Jev from the Backlog panel
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And the Backlog settings are opened
+    Then the Jev settings controls are available
+    When Jev settings are saved with a secret reference
+    Then the Jev settings show a successful save
+
   @scenario:backlog.capture-triage
   Scenario: Capture free text and find it again
     Given the isolated plugin profile "@dshfiles/backlog" is booted

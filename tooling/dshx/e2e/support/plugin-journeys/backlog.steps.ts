@@ -131,6 +131,29 @@ When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
 })
 
+When('the Backlog settings are opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Jev triage', exact: true })).toBeVisible()
+})
+
+Then('the Jev settings controls are available', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('checkbox', { name: 'Enable Jev' })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'Triage new items automatically' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveAttribute('data-secret-input', 'reference')
+  await expect(page.getByRole('button', { name: 'Save Jev settings', exact: true })).toBeEnabled()
+})
+
+When('Jev settings are saved with a secret reference', async ({ page }: { page: Page }) => {
+  await page.getByRole('checkbox', { name: 'Enable Jev' }).check()
+  await page.getByRole('textbox', { name: 'TypeSafe API key reference' }).fill('secret:DSH_TEST_JEV')
+  await page.getByRole('button', { name: 'Save Jev settings', exact: true }).click()
+})
+
+Then('the Jev settings show a successful save', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('status').filter({ hasText: 'Jev settings saved.' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveValue('secret:DSH_TEST_JEV')
+})
+
 When('two images are attached to the capture', async ({ page }: { page: Page }) => {
   const captureForm = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'Capture', exact: true }) })
   await captureForm.locator('input[type="file"]').setInputFiles([join(attachmentFixtures, 'red.png'), join(attachmentFixtures, 'blue.png')])

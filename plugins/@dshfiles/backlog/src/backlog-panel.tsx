@@ -1,6 +1,7 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -28,6 +29,7 @@ import {
   PlusIcon,
   Rows3Icon,
   SearchIcon,
+  Settings2Icon,
   WandSparklesIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -267,6 +269,130 @@ export interface StartThreadPorts {
   readonly start: (request: StartThreadRequest) => Promise<StartThreadOutcome>
 }
 
+const BacklogSettingsPanel = (): JSX.Element => {
+  const settings = useSettings(backlogSettings)
+  const [jevEnabled, setJevEnabled] = useState(settings.value?.jevEnabled ?? false)
+  const [autoTriage, setAutoTriage] = useState(settings.value?.autoTriage ?? false)
+  const [jevSecret, setJevSecret] = useState(settings.value?.jevSecret ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false)
+
+  useEffect(() => {
+    if (dirty || settings.status !== 'ready') return
+    setJevEnabled(settings.value?.jevEnabled ?? false)
+    setAutoTriage(settings.value?.autoTriage ?? false)
+    setJevSecret(settings.value?.jevSecret ?? '')
+  }, [dirty, settings.status, settings.value?.autoTriage, settings.value?.jevEnabled, settings.value?.jevSecret])
+
+  const save = async (): Promise<void> => {
+    setError(null)
+    setSaved(false)
+    try {
+      if (settings.status !== 'ready' || !settings.writable) throw new Error('Backlog settings are not writable right now.')
+      if (!(await settings.set('jevEnabled', jevEnabled))) throw new Error('Backlog could not save Jev settings.')
+      if (!(await settings.set('autoTriage', autoTriage))) throw new Error('Backlog could not save automatic triage settings.')
+      if (!(await settings.set('jevSecret', jevSecret.trim()))) throw new Error('Backlog could not save the Jev secret reference.')
+      setDirty(false)
+      setSaved(true)
+    } catch (cause) {
+      setError(errorMessage(cause, 'Could not save Jev settings.'))
+    }
+  }
+
+  return (
+    <section className="dshx-root dshx:mx-auto dshx:w-full dshx:max-w-2xl dshx:p-5 dshx:@max-pane-narrow:p-3" aria-labelledby="backlog-jev-settings-title">
+      <h3 id="backlog-jev-settings-title" className="dshx:text-base dshx:font-semibold">
+        Jev triage
+      </h3>
+      <p className="dshx:mt-1 dshx:text-sm dshx:text-muted-foreground">
+        Configure the TypeSafe Jev connection used for backlog triage and reply routing. These are the same settings shown in DSH Settings.
+      </p>
+      <form
+        className="dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-4"
+        onSubmit={event => {
+          event.preventDefault()
+          void save()
+        }}
+      >
+        <label className="dshx:flex dshx:items-start dshx:gap-3 dshx:text-sm">
+          <input
+            type="checkbox"
+            aria-label="Enable Jev"
+            checked={jevEnabled}
+            disabled={!settings.writable || settings.status !== 'ready'}
+            onChange={event => {
+              setJevEnabled(event.currentTarget.checked)
+              setDirty(true)
+              setSaved(false)
+            }}
+            className="dshx:mt-0.5"
+          />
+          <span className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className="dshx:font-medium">Enable Jev</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">Use Jev for triage, duplicate detection, and classifying backlog replies.</span>
+          </span>
+        </label>
+        <label className="dshx:flex dshx:items-start dshx:gap-3 dshx:text-sm">
+          <input
+            type="checkbox"
+            aria-label="Triage new items automatically"
+            checked={autoTriage}
+            disabled={!settings.writable || settings.status !== 'ready'}
+            onChange={event => {
+              setAutoTriage(event.currentTarget.checked)
+              setDirty(true)
+              setSaved(false)
+            }}
+            className="dshx:mt-0.5"
+          />
+          <span className="dshx:flex dshx:flex-col dshx:gap-1">
+            <span className="dshx:font-medium">Triage new items automatically</span>
+            <span className="dshx:text-xs dshx:text-muted-foreground">Run configured triage in the background when an item is captured.</span>
+          </span>
+        </label>
+        <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
+          <span className="dshx:font-medium">TypeSafe API key reference</span>
+          <span className="dshx:text-xs dshx:text-muted-foreground">
+            Enter a Secret Catalog reference, such as secret:TYPESAFE_API_KEY. The key value stays in the Host vault.
+          </span>
+          <input
+            type="text"
+            data-secret-input="reference"
+            aria-label="TypeSafe API key reference"
+            placeholder="secret:TYPESAFE_API_KEY"
+            value={jevSecret}
+            disabled={!settings.writable || settings.status !== 'ready'}
+            onChange={event => {
+              setJevSecret(event.currentTarget.value)
+              setDirty(true)
+              setSaved(false)
+            }}
+            className="dshx:font-mono! dshx:h-9 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-3 dshx:text-sm dshx:outline-none dshx:focus-visible:border-ring"
+          />
+          <span className="dshx:text-xs dshx:text-muted-foreground">Leave blank to use TYPESAFE_API_KEY from the DSH Host environment.</span>
+        </label>
+        {error === null ? null : (
+          <p className="dshx:text-sm dshx:text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        {saved ? (
+          <p className="dshx:text-sm dshx:text-success" role="status">
+            Jev settings saved.
+          </p>
+        ) : null}
+        <div>
+          <Button type="submit" size="sm" disabled={!settings.writable || settings.status !== 'ready' || settings.mutation.pending}>
+            Save Jev settings
+          </Button>
+        </div>
+      </form>
+      {!settings.writable ? <p className="dshx:mt-3 dshx:text-xs dshx:text-muted-foreground">Backlog settings are currently read-only.</p> : null}
+    </section>
+  )
+}
+
 export const BacklogPanel = (props: {
   readonly openThread: OpenThread
   readonly listThreads: () => readonly ComposerThread[]
@@ -320,6 +446,7 @@ export const BacklogPanel = (props: {
   const setOpenId = useCallback((id: number | null): void => setOpenIds(selection => setBacklogViewSelection(selection, view, id)), [view])
   const setCursorId = useCallback((id: number | null): void => setCursorIds(selection => setBacklogViewSelection(selection, view, id)), [view])
   const [expanded, setExpanded] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
@@ -667,29 +794,48 @@ export const BacklogPanel = (props: {
           <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
           <button
             type="button"
-            aria-label="Backfill triage"
-            title="Triage items captured before triage was set up"
-            onClick={() => setBackfillOpen(true)}
-            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+            aria-label={showSettings ? 'Backlog views' : 'Backlog settings'}
+            title={showSettings ? 'Back to backlog' : 'Backlog settings'}
+            onClick={() => setShowSettings(value => !value)}
+            aria-pressed={showSettings}
+            className={cn(
+              'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent',
+              showSettings ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+            )}
           >
-            <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-            <span className="dshx:@max-[72rem]:sr-only">Backfill</span>
+            <Settings2Icon aria-hidden className="dshx:size-3.5" />
+            <span className="dshx:@max-[72rem]:sr-only">{showSettings ? 'Backlog' : 'Settings'}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => startCapture(null)}
-            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:bg-primary dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-primary-foreground dshx:transition-[opacity,transform] dshx:hover:opacity-90 dshx:active:scale-[0.98]"
-          >
-            <PlusIcon className="dshx:size-3.5" />
-            <span className="dshx:@max-pane-narrow:sr-only">New</span>
-          </button>
+          {showSettings ? null : (
+            <>
+              <button
+                type="button"
+                aria-label="Backfill triage"
+                title="Triage items captured before triage was set up"
+                onClick={() => setBackfillOpen(true)}
+                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+              >
+                <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
+                <span className="dshx:@max-[72rem]:sr-only">Backfill</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => startCapture(null)}
+                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:bg-primary dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-primary-foreground dshx:transition-[opacity,transform] dshx:hover:opacity-90 dshx:active:scale-[0.98]"
+              >
+                <PlusIcon className="dshx:size-3.5" />
+                <span className="dshx:@max-pane-narrow:sr-only">New</span>
+              </button>
+            </>
+          )}
         </div>
       </header>
       {list.isError ? (
         <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(list.error, 'The backlog is unavailable.')}</p>
       ) : null}
       <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
-        {showsResults ? (
+        {showSettings ? <BacklogSettingsPanel /> : null}
+        {showSettings ? null : showsResults ? (
           <>
             <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
               <SearchResults
@@ -848,24 +994,26 @@ export const BacklogPanel = (props: {
           Backfill running: {backfillJob.completed}/{backfillJob.total}
         </button>
       ) : null}
-      <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
-        <div className="dshx:mx-auto dshx:max-w-4xl">
-          <Composer
-            variant="chat"
-            draftKey="feed"
-            placeholder="Capture a thought, a task, a bug… like sending a message"
-            tags={tags}
-            threads={threads}
-            projects={projectPaths}
-            projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
-            reuseProject={settings.value?.reuseCaptureProject ?? true}
-            status={captureStatus}
-            onClearStatus={() => setCaptureStatus(null)}
-            inputRef={captureComposer}
-            onNavigateUp={navigateToNearestItem}
-          />
+      {showSettings ? null : (
+        <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
+          <div className="dshx:mx-auto dshx:max-w-4xl">
+            <Composer
+              variant="chat"
+              draftKey="feed"
+              placeholder="Capture a thought, a task, a bug… like sending a message"
+              tags={tags}
+              threads={threads}
+              projects={projectPaths}
+              projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
+              reuseProject={settings.value?.reuseCaptureProject ?? true}
+              status={captureStatus}
+              onClearStatus={() => setCaptureStatus(null)}
+              inputRef={captureComposer}
+              onNavigateUp={navigateToNearestItem}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </main>
   )
 }
