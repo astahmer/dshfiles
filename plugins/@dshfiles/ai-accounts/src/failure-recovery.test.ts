@@ -3,7 +3,9 @@ import { createAssistantMessage, createUserMessage, ReasoningEffortId, type LlmF
 import { describe, expect, it } from 'vitest'
 import { createAccountPool } from './account-pool.js'
 import { DEFAULT_RECOVERY_POLICY, type RecoveryPolicy } from './failure-policy.js'
+import { assertReleasedV4Relationships } from '@deepseek-ai/dsh-session-format-v3-to-v4'
 import { FailureRecoveryModel } from './failure-recovery.js'
+import { isRetryId, retryNotice } from './retry-notice.js'
 
 const NOW = 1_000_000
 
@@ -197,6 +199,61 @@ describe('failure recovery through the account pool', () => {
       ['failover', 3, 'retry-1'],
     ])
     expect(fail(transport, 2)).toMatchObject({ kind: 'retry', attempt: 1, retryId: 'retry-2', step: { kind: 'retry' } })
+  })
+
+  it('starts a fresh retry chain on the provider a fail-over opened, and the core validator admits the log', () => {
+    const { recovery } = setup()
+    const failOn = (provider: string) =>
+      recovery.recover({ conversationKey: 'session', turn: 1, step: 1, provider, requestProvider: provider, model: 'gpt-6', failure: transport, canShrink: false, now: NOW })
+    const onCodex = [failOn('codex'), failOn('codex'), failOn('codex')]
+    const onWork = failOn('codex_work')
+    const rows = [...onCodex, onWork].map((action, index) => {
+      if (action.kind !== 'retry' || !isRetryId(action.retryId)) throw new Error(`expected a retry, got ${action.kind}`)
+      return retryNotice(action, {
+        retryId: action.retryId,
+        turn: 1,
+        step: 1,
+        provider: index < onCodex.length ? 'codex' : 'codex_work',
+        failure: transport,
+        label: id => id,
+      })
+    })
+    expect(rows.map(row => [row.provider, row.retry, row.retryId, row.failure.code])).toEqual([
+      ['codex', 1, 'retry-1', 'TRANSPORT'],
+      ['codex', 2, 'retry-1', 'TRANSPORT'],
+      ['codex', 3, 'retry-1', 'ACCOUNT_FAILOVER'],
+      ['codex_work', 1, 'retry-2', 'TRANSPORT'],
+    ])
+
+    const header = (provider: string) => ({ type: 'request/header', data: { header: { config: { provider, model: 'gpt-6' } } } })
+    const retried = (row: (typeof rows)[number]) => [
+      { type: 'llm/retry', data: row },
+      { type: 'llm/retry-started', data: { retryId: row.retryId, turn: 1, step: 1, retry: row.retry } },
+    ]
+    const [first, second, third, fourth] = rows
+    if (first === undefined || second === undefined || third === undefined || fourth === undefined) throw new Error('expected four rows')
+    const events = [
+      { type: 'turn/start', data: { turn: 1 } },
+      { type: 'step/start', data: { turn: 1, step: 1 } },
+      header('codex'),
+      ...retried(first),
+      header('codex'),
+      ...retried(second),
+      header('codex'),
+      ...retried(third),
+      header('codex_work'),
+      ...retried(fourth),
+      { type: 'step/end', data: { turn: 1, step: 1 } },
+      { type: 'turn/end', data: { turn: 1 } },
+    ].map((event, seq) => ({ ...event, seq }))
+    const known = new Set(events.map(event => event.type))
+    const artifact = { header: { id: 'session', version: 4 }, inheritedEventCount: 0, events }
+    // @ts-expect-error -- the test builds only the fields the relationship validator reads.
+    expect(() => assertReleasedV4Relationships(artifact, known)).not.toThrow()
+
+    const continued = events.map(event => (event.data === fourth ? { ...event, data: { ...fourth, retry: 4, retryId: first.retryId } } : event))
+    // @ts-expect-error -- same partial artifact, with the chain the old numbering wrote.
+    expect(() => assertReleasedV4Relationships({ ...artifact, events: continued }, known)).toThrow('llm/retry skips its policy attempt sequence')
   })
 
   it('gives each failure kind of one step its own retry id and attempt sequence', () => {

@@ -101,23 +101,28 @@ const selectionAfter = (input: {
 }
 
 /**
- * One DSH retry chain: a step's failure kind owns its own attempt sequence and
- * its own `retryId`. DSH validates a stored log chain by chain — keyed by turn,
- * step, provider and policy key — so sharing either across failure kinds makes
- * the whole log unreadable and fails every session-content search.
+ * One DSH retry chain: the `retryId` and attempt numbering of one failure kind
+ * under one request-header provider. DSH validates a stored log chain by chain —
+ * keyed by turn, step, provider and policy key — so continuing a chain after a
+ * fail-over opened a request on another provider, or sharing a chain across
+ * failure kinds, makes the whole log unreadable and fails every session-content search.
  */
-interface ChainState {
+interface RetryChain {
   readonly retryId: string
   attempts: number
-  progress: RecoveryProgress
 }
 
 interface StepState {
   readonly turn: number
   readonly step: number
   shrink: boolean
-  readonly chains: Map<FailureKind, ChainState>
+  /** The policy allowance spent per failure kind, shared across providers so a fail-over never resets it. */
+  readonly progress: Map<FailureKind, RecoveryProgress>
+  /** Keyed by {@link retryChainKey}. */
+  readonly chains: Map<string, RetryChain>
 }
+
+const retryChainKey = (failureKind: FailureKind, provider: string): string => JSON.stringify([failureKind, provider])
 
 /**
  * Applies the policy against the live pool: which account actually served a
@@ -162,16 +167,17 @@ const createFailureRecovery = (deps: {
   const stateFor = (conversationKey: string, turn: number, step: number): StepState => {
     const existing = steps.get(conversationKey)
     if (existing !== undefined && existing.turn === turn && existing.step === step) return existing
-    const fresh: StepState = { turn, step, shrink: false, chains: new Map() }
+    const fresh: StepState = { turn, step, shrink: false, progress: new Map(), chains: new Map() }
     steps.set(conversationKey, fresh)
     return fresh
   }
 
-  const chainFor = (state: StepState, failureKind: FailureKind): ChainState => {
-    const existing = state.chains.get(failureKind)
+  const chainFor = (input: { readonly state: StepState; readonly failureKind: FailureKind; readonly provider: string }): RetryChain => {
+    const key = retryChainKey(input.failureKind, input.provider)
+    const existing = input.state.chains.get(key)
     if (existing !== undefined) return existing
-    const chain: ChainState = { retryId: deps.newRetryId(), attempts: 0, progress: NO_PROGRESS }
-    state.chains.set(failureKind, chain)
+    const chain: RetryChain = { retryId: deps.newRetryId(), attempts: 0 }
+    input.state.chains.set(key, chain)
     return chain
   }
 
@@ -189,6 +195,8 @@ const createFailureRecovery = (deps: {
       readonly turn: number
       readonly step: number
       readonly provider: string
+      /** The provider of the open request header the `llm/retry` row names; `provider` when omitted. */
+      readonly requestProvider?: string
       readonly routedAccountId?: string
       readonly model: string | undefined
       readonly failure: LlmFailure
@@ -219,16 +227,15 @@ const createFailureRecovery = (deps: {
       const candidates = !policy.failover
         ? []
         : (chainCandidates ?? deps.failoverCandidates({ from: account, model: input.model }).filter(id => id !== account && deps.pool.isHealthy(id, now)))
-      const chain = chainFor(state, failureKind)
       const decision = decideRecovery({
         policy,
-        progress: chain.progress,
+        progress: state.progress.get(failureKind) ?? NO_PROGRESS,
         retryAfterMs: input.failure.providerRetryAfterMs,
         lunaReserveAvailable: policy.lunaReserve && deps.lunaReserve.available(account),
         failoverTo: candidates[0],
         canShrink: input.canShrink,
       })
-      chain.progress = decision.progress
+      state.progress.set(failureKind, decision.progress)
       const step = decision.step
 
       if (step.kind === 'give-up') {
@@ -243,6 +250,7 @@ const createFailureRecovery = (deps: {
         else deps.chain?.bind({ conversationKey: input.conversationKey, to: step.to })
       }
       if (step.kind === 'shrink') state.shrink = true
+      const chain = chainFor({ state, failureKind, provider: input.requestProvider ?? input.provider })
       chain.attempts += 1
       const plannedAttempts =
         policy.retries + (policy.lunaReserve ? 1 : 0) + candidates.length * (policy.retries + 1) + (policy.waitSeconds > 0 ? 1 : 0) + (policy.shrink ? 1 : 0)

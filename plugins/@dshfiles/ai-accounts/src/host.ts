@@ -761,11 +761,13 @@ export default definePlugin({
                 const surface = agent.session.deriveMessages()
                 const active = activeAccountRoutes.get(id)
                 const routedAccountId = active?.turn === turn && active.step === step && active.provider === provider ? active.accountId : undefined
+                const requestProvider = agent.session.requestHeader()?.config.provider ?? provider
                 const action = recovery.recover({
                   conversationKey: id,
                   turn,
                   step,
                   provider,
+                  requestProvider,
                   ...(routedAccountId === undefined ? {} : { routedAccountId }),
                   model: agent.session.requestHeader()?.config.model,
                   failure,
@@ -797,7 +799,6 @@ export default definePlugin({
                 }
                 const retryId = action.retryId
                 if (!isRetryId(retryId)) return next()
-                const requestProvider = agent.session.requestHeader()?.config.provider ?? provider
                 const notice = retryNotice(action, {
                   retryId,
                   turn,
