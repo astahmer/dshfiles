@@ -258,6 +258,23 @@ const readWorkspaceSessionActivity = (sessionIds: readonly string[], signal: Abo
     signal,
     getRunning: sessionId => context.agents.get(SessionId(sessionId))?.status === 'running',
     readProjections: sessionId => controller.projections({ sessionId: SessionId(sessionId) }, signal),
+    readFallback: async sessionIds => {
+      const result = await controller.list({ projections: SESSION_ACTIVITY_PROJECTIONS }, signal)
+      const wanted = new Set(sessionIds)
+      return new Map(
+        result.items
+          .filter(item => wanted.has(item.sessionId))
+          .map(item => [
+            item.sessionId,
+            {
+              running: item.running,
+              pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(item.projections?.values),
+              title: item.projections?.values.title ?? undefined,
+              blank: item.blank,
+            },
+          ]),
+      )
+    },
   })
 }
 

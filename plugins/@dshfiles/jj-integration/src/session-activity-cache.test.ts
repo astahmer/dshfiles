@@ -44,6 +44,62 @@ describe('session activity cache', () => {
     expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['waiting-session'], activity)).toBe(false)
   })
 
+  test('an absent Session remains unknown for the workspace guard', async () => {
+    const activity = await readWorkspaceSessionActivity({
+      sessionIds: ['readable-session', 'absent-session'],
+      signal: new AbortController().signal,
+      getRunning: () => false,
+      readProjections: async sessionId => (sessionId === 'absent-session' ? null : { values: { userQuestions: { active: [] } } }),
+    })
+
+    expect(activity.get('absent-session')).toEqual({ running: undefined, pendingUserQuestion: undefined })
+    expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['readable-session', 'absent-session'], activity)).toBeUndefined()
+  })
+
+  test('an unavailable scoped read falls back to the full activity snapshot', async () => {
+    let fallbackReads = 0
+    const activity = await readWorkspaceSessionActivity({
+      sessionIds: ['readable-session', 'unavailable-session'],
+      signal: new AbortController().signal,
+      getRunning: () => false,
+      readProjections: async sessionId => {
+        if (sessionId === 'unavailable-session') throw new Error('projection read unavailable')
+        return { values: { userQuestions: { active: [] } } }
+      },
+      readFallback: async sessionIds => {
+        fallbackReads += 1
+        expect(sessionIds).toEqual(['unavailable-session'])
+        return new Map([['unavailable-session', { running: false, pendingUserQuestion: false }]])
+      },
+    })
+
+    expect(activity.get('readable-session')).toEqual({ running: false, pendingUserQuestion: false, title: undefined, blank: undefined })
+    expect(activity.get('unavailable-session')).toEqual({ running: false, pendingUserQuestion: false })
+    expect(fallbackReads).toBe(1)
+    expect(ThreadRebaseEligibilityModel.canRebaseIfKnown(['readable-session', 'unavailable-session'], activity)).toBe(true)
+    expect(activity.size).toBe(2)
+  })
+
+  test('a workspace activity read bounds concurrent projection requests', async () => {
+    let concurrentReads = 0
+    let maximumConcurrentReads = 0
+    const activity = await readWorkspaceSessionActivity({
+      sessionIds: Array.from({ length: 8 }, (_, index) => `session-${String(index)}`),
+      signal: new AbortController().signal,
+      getRunning: () => false,
+      readProjections: async () => {
+        concurrentReads += 1
+        maximumConcurrentReads = Math.max(maximumConcurrentReads, concurrentReads)
+        await new Promise(resolve => setTimeout(resolve, 0))
+        concurrentReads -= 1
+        return { values: { userQuestions: { active: [] } } }
+      },
+    })
+
+    expect(activity.size).toBe(8)
+    expect(maximumConcurrentReads).toBe(4)
+  })
+
   test('a workspace guard reads only its Sessions without replacing the full display snapshot', async () => {
     let fullReads = 0
     const guardedSessions: string[][] = []

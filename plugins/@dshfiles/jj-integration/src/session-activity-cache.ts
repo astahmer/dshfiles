@@ -9,28 +9,63 @@ interface WorkspaceSessionProjections {
   readonly sessionListMetadata?: { readonly blank: boolean } | null | undefined
 }
 
+const WORKSPACE_ACTIVITY_READ_CONCURRENCY = 4
+
 export const readWorkspaceSessionActivity = async (input: {
   readonly sessionIds: readonly string[]
   readonly signal: AbortSignal
   readonly getRunning: (sessionId: string) => boolean | undefined
   readonly readProjections: (sessionId: string, signal: AbortSignal) => Promise<{ readonly values: WorkspaceSessionProjections } | null>
+  readonly readFallback?: (sessionIds: readonly string[], signal: AbortSignal) => Promise<SessionActivity | undefined>
 }): Promise<SessionActivity> => {
   const activity = new Map<string, ThreadSessionActivity>()
-  await Promise.all(
-    [...new Set(input.sessionIds)].map(async sessionId => {
+  const sessionIds = [...new Set(input.sessionIds)]
+  let nextIndex = 0
+  const unavailableSessionIds: string[] = []
+  const readNext = async (): Promise<void> => {
+    while (nextIndex < sessionIds.length) {
       input.signal.throwIfAborted()
-      const projections = await input.readProjections(sessionId, input.signal)
+      const sessionId = sessionIds[nextIndex]
+      if (sessionId === undefined) return
+      nextIndex += 1
+      try {
+        const projections = await input.readProjections(sessionId, input.signal)
+        input.signal.throwIfAborted()
+        activity.set(
+          sessionId,
+          projections === null
+            ? { running: undefined, pendingUserQuestion: undefined }
+            : {
+                running: input.getRunning(sessionId),
+                pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(
+                  projections.values.userQuestions == null ? undefined : { userQuestions: projections.values.userQuestions },
+                ),
+                title: projections.values.title ?? undefined,
+                blank: projections.values.sessionListMetadata?.blank,
+              },
+        )
+      } catch (error) {
+        input.signal.throwIfAborted()
+        if (error instanceof Error && error.name === 'AbortError') throw error
+        unavailableSessionIds.push(sessionId)
+        activity.set(sessionId, { running: undefined, pendingUserQuestion: undefined })
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(WORKSPACE_ACTIVITY_READ_CONCURRENCY, sessionIds.length) }, () => readNext()))
+  input.signal.throwIfAborted()
+  if (unavailableSessionIds.length > 0 && input.readFallback !== undefined) {
+    try {
+      const fallbackActivity = await input.readFallback(unavailableSessionIds, input.signal)
       input.signal.throwIfAborted()
-      activity.set(sessionId, {
-        running: input.getRunning(sessionId),
-        pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(
-          projections?.values.userQuestions == null ? undefined : { userQuestions: projections.values.userQuestions },
-        ),
-        title: projections?.values.title ?? undefined,
-        blank: projections?.values.sessionListMetadata?.blank,
-      })
-    }),
-  )
+      for (const sessionId of unavailableSessionIds) {
+        const fallback = fallbackActivity?.get(sessionId)
+        if (fallback !== undefined) activity.set(sessionId, fallback)
+      }
+    } catch {
+      input.signal.throwIfAborted()
+    }
+  }
   return activity
 }
 
