@@ -2,6 +2,7 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
 import { secretMetadataSchema, secretScopeSchema } from './secret-metadata.js'
+import { secretReferenceStatusSchema } from './secret-reference-status-schema.js'
 
 const cwdSchema = z.string().max(4096).nullable()
 const listInputSchema = z.object({ cwd: cwdSchema })
@@ -73,6 +74,27 @@ export const secretSetupApi = defineApi({
       input: createInputSchema,
       output: createOutputSchema,
       description: 'Store a Secret Catalog alias for an explicit setup flow; manual values never return to the Client.',
+    }),
+    referenceStatus: method({
+      input: z
+        .object({
+          reference: z.string().max(4096).describe('The stored reference text, e.g. secret:ALIAS or secret:ALIAS@env.'),
+          cwd: cwdSchema.describe('Folder whose project and machine-local aliases also count; null checks global aliases only, as settings resolve.'),
+          probeFolders: z
+            .array(z.string().max(4096))
+            .max(16)
+            .optional()
+            .describe('Project folders to search when the alias is missing, so the answer can say it exists only there.'),
+        })
+        .strict(),
+      output: secretReferenceStatusSchema,
+      description:
+        'Check whether one secret:ALIAS[@env] reference resolves on this Host and, when it does not, name the reason (alias missing from every scope or only in a project, environment missing, several scopes, unreadable or empty vault value, secret CLI missing, timed out or failing) and whether a global write would land in a symlinked (e.g. Nix-managed) config. Reads the value on the Host to prove it, never returns it. Read-only.',
+      tool: {
+        name: 'secret_reference_status',
+        readOnly: true,
+        render: status => `${status.reference ?? '(no reference)'}: ${status.state}${status.scope === null ? '' : ` · ${status.scope}`}`,
+      },
     }),
   },
 })

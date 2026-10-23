@@ -4,6 +4,8 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import { defineHost } from '@dshfiles/dshx/host'
 import { secretCatalogApi, secretSetupApi } from './api.js'
 import { createSecretCatalogOperations, type SecretCatalogOperations, type SecretCreateInput } from './secret-operations.js'
+import { checkSecretReference } from './secret-reference-status.js'
+import { inspectGlobalSecretConfig } from './secret-global-config.js'
 import { runSecretCli } from './secret-cli-runner.js'
 import { createSecretTools } from './secret-tools.js'
 import { secretCatalogSettings } from './settings.js'
@@ -50,6 +52,14 @@ const api = secretCatalogApi.host({
 const setupApi = secretSetupApi.host({
   list: ({ input, ctx }) => listSecretMetadata(input.cwd, ctx),
   create: ({ input, ctx }) => createCatalogSecret(input, ctx),
+  referenceStatus: ({ input, ctx }) =>
+    checkSecretReference({
+      operations: operationsFor(ctx),
+      referenceText: input.reference,
+      cwd: input.cwd,
+      probeFolders: input.probeFolders ?? [],
+      inspectGlobalConfig: () => inspectGlobalSecretConfig(),
+    }),
 })
 
 let hostContext: Context | undefined
