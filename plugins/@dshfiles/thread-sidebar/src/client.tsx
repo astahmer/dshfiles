@@ -1157,7 +1157,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          {nearViewport ? (
+          {nearViewport && !props.renaming ? (
             <div
               data-testid="thread-row-actions"
               className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
