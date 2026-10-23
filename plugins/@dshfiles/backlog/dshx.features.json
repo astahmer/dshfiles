@@ -284,11 +284,6 @@
       "verification": [
         { "kind": "gherkin", "id": "backlog.item-context-actions", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
         {
-          "kind": "gherkin",
-          "id": "backlog.board-multi-select",
-          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
-        },
-        {
           "kind": "unit-test",
           "id": "backlog.selection-open-item-seed",
           "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
