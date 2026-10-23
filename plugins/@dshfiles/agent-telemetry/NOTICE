@@ -1,0 +1,21 @@
+@dshfiles/agent-telemetry
+
+This package is a TypeScript port of @loongsuite/dsh-plugin 0.1.3
+(https://github.com/loongsuite/dsh-plugin, tag v0.1.3, commit
+f44ccfcd2255186bfcfe1c9f8c7db047204865b7), Copyright 2026 LoongSuite
+Contributors, and reproduces span names and attribute rules from
+@loongsuite/otel-util-genai 0.1.1
+(https://github.com/alibaba/loongsuite-js/tree/main/opentelemetry-util-genai),
+Copyright The OpenTelemetry Authors. Both are licensed under the Apache
+License, Version 2.0; the full text is in LICENSE.
+
+Changes from the original, summarized in UPSTREAM.md:
+
+- spans are recorded and exported through @dshfiles/dshx/tracing instead of
+  the OpenTelemetry JS SDK, and no metrics are exported;
+- tool bodies and model streams run with their span active, subagent turns join
+  their parent's trace, and model calls with a purpose, compaction, approval
+  and retry waits and background jobs get spans;
+- span status messages carry an error type or code, never a message;
+- the row is always loaded and records nothing until a trace destination
+  exists.

@@ -1,0 +1,5 @@
+# Forked from @loongsuite/dsh-plugin (row `loongsuite-observability`); the scope stays in the id because Loader ids
+# share one namespace per profile. No `disabled` gate: spans are no-ops until dshx tracing has a destination.
+- insert:
+    - id: dshfiles-agent-telemetry
+      name: '@dshfiles/agent-telemetry'

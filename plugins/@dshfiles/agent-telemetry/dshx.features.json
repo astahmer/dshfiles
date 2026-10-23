@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "agent-turn-spans",
+      "title": "GenAI spans for every agent turn",
+      "summary": "Each DSH turn becomes enter_ai_application_system → invoke_agent <agent> → react step → chat <model> and execute_tool <tool> spans with the GenAI semantic-convention attributes LoongSuite emitted (gen_ai.*, dsh.session.id/turn/step), exported through dshx tracing to the OTLP endpoint or the traces plugin's in-process receiver. Spans are no-ops until a destination exists; no launch environment gates the row.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+        "press Enter",
+        "expect text \"Child trace*\"",
+        "click button \"Traces\"",
+        "fill textbox \"Search traces\" \"execute_tool subagent\"",
+        "click row \"dshfiles enter_ai_application_system\"",
+        "expect tree \"Span waterfall\""
+      ],
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["no-destination", "recording", "turn-completed", "turn-failed", "turn-aborted"],
+      "failureModes": [
+        "A telemetry failure (malformed event, unexpected payload) is logged and never changes the model, tool or session path.",
+        "Without an OTLP endpoint or a published in-process receiver, tools and model streams pass through untouched and no span is recorded.",
+        "Span status messages carry an error type or code, never a provider or tool message."
+      ],
+      "externalDependencies": [
+        {
+          "id": "dsh-host-events",
+          "boundary": "DSH session/created, session/event, session/disposed, the tools/execute around-dispatch waterfall and the llm/stream interceptor (0.2.1-rc.2).",
+          "deterministicFake": "Unit tests drive the coordinator with recorded event shapes and the dshx recordSpans() test kit; the browser journey runs real turns on the e2e fake Command Code provider."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.loongsuite-parity",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "emits enter → invoke_agent → react step → chat and execute_tool with the GenAI attributes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.failure-types",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "marks an aborted turn, a failed model attempt and a failed tool as errors with a type, never a message"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.failure-containment",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "never throws into DSH on malformed events and keeps the stream and tool results unchanged"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.stream-early-return",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "returns the inner iterator to the provider when the consumer stops early"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.no-destination",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "passes tools and model streams through untouched and records nothing"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-telemetry.turn-trace-journey",
+          "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
+        }
+      ]
+    },
+    {
+      "id": "nested-tool-spans",
+      "title": "Plugin work nests under the tool and model call that caused it",
+      "summary": "The tools/execute wrapper runs every agent tool body with its execute_tool span active, and the llm/stream interceptor pulls every model chunk with its chat span active, so dshx API dispatches, jj runs, secret lookups, Jev and multi-host calls land in the same trace without per-plugin code. A run_code sub-dispatch gets its own execute_tool span under the outer one.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["tool-running", "nested-dispatch", "tool-failed"],
+      "failureModes": ["tools/execute may run before the tool/call event: the span is opened at dispatch and adopted by the event, never duplicated."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.tool-body-active-span",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "runs the tool body with its execute_tool span active, so plugin spans nest under it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.nested-dispatch",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "gives a nested run_code sub-dispatch its own span under the active tool"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.dispatch-before-event",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "opens the tool span at dispatch when tools/execute runs before the tool/call event"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-telemetry.tool-nesting-journey",
+          "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
+        }
+      ]
+    },
+    {
+      "id": "subagent-traces",
+      "title": "Subagents join their parent's trace",
+      "summary": "A subagent session's turns are parented under the parent's subagent/subagent_fork/workflow tool span: the span active where DSH started the turn, else the one active when the session was created, else the parent's running delegation tool, else the parent's turn. dsh.trace.parent_link records which. Top-level threads and user forks keep one trace per turn.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["async-context", "created-in-tool", "running-tool", "parent-turn", "root"],
+      "failureModes": ["A subagent whose parent is gone starts its own trace instead of attaching to an ended one at random."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.subagent-async-context",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "puts a subagent created inside the parent tool body under that execute_tool span, in one trace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.subagent-created-in-tool",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "keeps the creation-time tool span for a later child turn started outside it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.subagent-fallbacks",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "falls back to the parent session running delegation tool, then its turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.fork-own-trace",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "keeps a user fork of a thread in its own trace"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-telemetry.subagent-trace-journey",
+          "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
+        }
+      ]
+    },
+    {
+      "id": "auxiliary-and-wait-spans",
+      "title": "Purpose model calls and wait spans",
+      "summary": "Model calls with a purpose (session-title, compaction) and any model call outside a step become chat spans with dsh.llm.purpose; compaction, approval waits, model retry waits and background jobs get spans from their DSH events, and input spliced into a running turn is counted on its invoke_agent span.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["compaction", "approval-wait", "llm-retry-wait", "background-job"],
+      "failureModes": ["Approval reasons, job labels and retry failure messages are free text and never recorded."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.purpose-calls",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "records a compaction call under its compaction span and a title call under the turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.standalone-calls",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "parents a session-less model call to the active plugin span, or starts a trace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.wait-spans",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "records approval, model retry and background job waits under the right parent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.spliced-input",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "counts input spliced into a running turn"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-telemetry.background-job-journey",
+          "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agent-telemetry.wait-spans-browser",
+          "reason": "Approval waits need an approval-policy prompt, retry waits an upstream failure and compaction a context overflow; the loopback fake provider produces none of them deterministically. The recorded event shapes are driven through the coordinator in src/coordinator.test.ts; the journey covers the background-job span a real bash call opens."
+        }
+      ]
+    },
+    {
+      "id": "content-capture",
+      "title": "Metadata only unless content capture is switched on",
+      "summary": "No prompt, reply, system prompt, tool argument or tool result leaves the Host by default. The captureContent setting (or OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY|SPAN_AND_EVENT while it follows the environment) puts them on spans as GenAI JSON, each value cut to 1,024 characters with a valid truncation marker.",
+      "surfaces": ["host", "integration"],
+      "configuration": [
+        {
+          "key": "captureContent",
+          "defaultValue": "environment",
+          "constraints": "environment: follow OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT; off: metadata only; on: content on spans. Applies live.",
+          "choices": ["environment", "off", "on"],
+          "coveredBy": ["agent-telemetry.content-off", "agent-telemetry.content-on"]
+        }
+      ],
+      "states": ["metadata-only", "content-captured"],
+      "failureModes": ["Content longer than the dshx 1,024-character attribute bound becomes a {truncated, original_characters} marker, never cut JSON."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.content-off",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "keeps prompts, replies, tool arguments and results off spans by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.content-on",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "puts content on spans when switched on, as bounded JSON"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agent-telemetry.content-capture-browser",
+          "reason": "Content capture changes only span attribute values, and the Traces viewer stores GenAI content as its size while redactGenAiContent is on (its default), so a browser journey would show the same panel either way. Both modes are asserted on recorded spans in src/coordinator.test.ts."
+        }
+      ]
+    }
+  ]
+}
