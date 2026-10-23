@@ -71,8 +71,6 @@ declare module '@deepseek-ai/cordis' {
 const MAX_OUTPUT = 512 * 1024
 const MAX_STDERR = 64 * 1024
 const JJ_TIMEOUT_MS = 120_000
-/** Retain rebased workspaces for this long after their last land before sweeping finished threads. */
-const SWEEP_GRACE_MS = 15 * 60_000
 /** A cleanup deletes node_modules trees, which can take minutes on a slow disk. */
 const CLEANUP_TIMEOUT_MS = 5 * 60_000
 const execFileAsync = promisify(execFile)
@@ -1125,11 +1123,11 @@ const cleanupWorkspaces = async (input: CleanupRequest & { readonly apply: boole
 }
 
 const sweepFinishedThreads = async (): Promise<void> => {
-  const removeFinished = readSettings().removeFinishedThreads
+  const settings = readSettings()
   for (const repository of await listRepositories()) {
     for (const thread of repository.threads) {
       if (!thread.finished) continue
-      if (!removeFinished || thread.unlanded.length > 0) {
+      if (!settings.removeFinishedThreads || thread.unlanded.length > 0) {
         await cleanKeptThread(thread.path)
         continue
       }
@@ -1139,7 +1137,7 @@ const sweepFinishedThreads = async (): Promise<void> => {
           unlandedCount: thread.unlanded.length,
           rebasedAt: thread.rebasedAt,
           now: Date.now(),
-          graceMs: SWEEP_GRACE_MS,
+          graceMs: settings.removeFinishedThreadsAfterMinutes * 60_000,
         })
       )
         continue

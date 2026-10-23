@@ -410,7 +410,8 @@ revisions a live workspace still builds on.
 | `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                           |
 | `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                           |
 | `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                |
-| `removeFinishedThreads`               | `true`    | Remove finished thread workspaces without revisions to rebase.                                                                             |
+| `removeFinishedThreads`               | `true`    | Enable automatic removal of inactive, rebased thread workspaces after the configured grace period.                                         |
+| `removeFinishedThreadsAfterMinutes`   | `15`      | Minutes after the latest rebase to retain a finished workspace; accepts 1–1440.                                                            |
 | `autoCleanup`                         | object    | `{ enabled: true, kinds: ['empty', 'integrated'], olderThanHours: 24, intervalMinutes: 60 }`; see [Automatic cleanup](#automatic-cleanup). |
 
 The settings keys `askAgentToFixLanding` and `syncWorkspaceAfterLand` retain

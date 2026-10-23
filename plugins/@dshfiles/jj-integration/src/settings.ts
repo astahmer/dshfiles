@@ -49,7 +49,12 @@ export const jjIntegrationSettings = defineSettings({
       ),
     removeFinishedThreads: Schema.boolean()
       .default(true)
-      .description('Remove a thread workspace once all its threads are archived and it holds no revisions to rebase. Work is never deleted.'),
+      .description('Automatically remove rebased thread workspaces once all their threads are archived and they hold no revisions to rebase.'),
+    removeFinishedThreadsAfterMinutes: Schema.natural()
+      .min(1)
+      .max(24 * 60)
+      .default(15)
+      .description('Minutes after the latest rebase to retain an inactive, finished thread workspace before removing it.'),
     autoCleanup: Schema.object({
       enabled: Schema.boolean().default(true).description('Run “Clean up thread workspaces” on its own, on the interval below.'),
       kinds: Schema.array(

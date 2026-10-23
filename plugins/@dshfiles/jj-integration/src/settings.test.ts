@@ -18,6 +18,19 @@ const eligibleWorkspace = {
   excludedRepositoryRoots: noExcludedRepositories,
 }
 
+describe('finished thread cleanup settings', () => {
+  it('defaults to enabled with a fifteen-minute grace period and validates the configurable delay', () => {
+    expect(defaultJjIntegrationSettings.removeFinishedThreads).toBe(true)
+    expect(defaultJjIntegrationSettings.removeFinishedThreadsAfterMinutes).toBe(15)
+    expect(jjIntegrationSettings.schema({ removeFinishedThreads: false, removeFinishedThreadsAfterMinutes: 30 })).toMatchObject({
+      removeFinishedThreads: false,
+      removeFinishedThreadsAfterMinutes: 30,
+    })
+    expect(() => jjIntegrationSettings.schema({ removeFinishedThreadsAfterMinutes: 0 })).toThrow()
+    expect(() => jjIntegrationSettings.schema({ removeFinishedThreadsAfterMinutes: 24 * 60 + 1 })).toThrow()
+  })
+})
+
 describe('automatic integration scope', () => {
   it('defaults to manual integration and opt-in thread isolation', () => {
     const settings = jjIntegrationSettings.schema({})
