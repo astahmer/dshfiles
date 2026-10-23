@@ -1,3 +1,4 @@
+import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import type { JevUsageView } from './api.js'
 import { UsageFormattingModel } from './format.js'
@@ -31,6 +32,7 @@ const Tile = (props: { readonly label: string; readonly value: string; readonly 
 
 export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; readonly error: unknown; readonly failed: boolean }): JSX.Element => {
   const credentialRows = props.usage?.byCredential ?? []
+  const maximumInputTokens = Math.max(0, ...credentialRows.map(row => row.inputTokens))
   return (
     <Panel title="Jev API usage" description="DSH-local estimated usage · $0.042 per 1M input tokens · output free. Not provider account balance.">
       {props.failed ? (
@@ -40,25 +42,44 @@ export const JevUsageCard = (props: { readonly usage: JevUsageView | undefined; 
       ) : (
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
           <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2">
-            <Tile label="Jev calls" value={props.usage.calls.toLocaleString()} detail={`${props.usage.failed.toLocaleString()} failed`} />
             <Tile
-              label="Input tokens"
+              label="Jev calls this month"
+              value={props.usage.calls.toLocaleString()}
+              detail={`${props.usage.failed.toLocaleString()} failed · DSH-observed`}
+            />
+            <Tile
+              label="Input tokens this month"
               value={UsageFormattingModel.formatCount(props.usage.inputTokens)}
               detail={`${UsageFormattingModel.formatCount(props.usage.outputTokens)} output tokens · free`}
             />
-            <Tile label="Estimated cost" value={UsageFormattingModel.formatCost(props.usage.estimatedCostUsd)} detail="Input-token list-price estimate" />
+            <Tile
+              label="Estimated cost this month"
+              value={UsageFormattingModel.formatCost(props.usage.estimatedCostUsd)}
+              detail="Input-token list-price estimate"
+            />
           </div>
-          <div className="dshx:flex dshx:flex-col dshx:gap-1">
-            <p className="dshx:text-xs dshx:font-medium dshx:text-foreground">Usage by configured credential</p>
-            {credentialRows.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">No Jev requests recorded in this period.</p> : null}
+          <div className="dshx:flex dshx:flex-col dshx:gap-2">
+            <p className="dshx:text-xs dshx:font-medium dshx:text-foreground">Usage by API key · calendar month to date</p>
+            {credentialRows.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">No Jev requests recorded this month.</p> : null}
             {credentialRows.map(row => (
-              <p className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" key={row.credential}>
-                <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-foreground">{row.credential}</span>
-                <span className="dshx:shrink-0">
-                  {row.calls.toLocaleString()} calls · {UsageFormattingModel.formatCount(row.inputTokens)} input ·{' '}
-                  {UsageFormattingModel.formatCost(row.estimatedCostUsd)} · Backlog {row.backlogCalls} / Memory {row.memoryCalls}
-                </span>
-              </p>
+              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1" key={row.credential}>
+                <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-xs">
+                  <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-foreground">{row.credential}</span>
+                  <strong className="dshx:shrink-0 dshx:font-semibold dshx:tabular-nums dshx:text-foreground">
+                    {UsageFormattingModel.formatCost(row.estimatedCostUsd)} · {row.calls.toLocaleString()} {row.calls === 1 ? 'request' : 'requests'}
+                  </strong>
+                </div>
+                <Progress
+                  aria-label={`${row.credential} share of input tokens this month`}
+                  className="dshx:h-1.5 dshx:bg-muted"
+                  value={maximumInputTokens === 0 ? 0 : (row.inputTokens / maximumInputTokens) * 100}
+                  aria-valuetext={`${UsageFormattingModel.formatCount(row.inputTokens)} input tokens; ${row.calls.toLocaleString()} requests; ${UsageFormattingModel.formatCost(row.estimatedCostUsd)} estimated cost this month; bars are relative to the most-used credential`}
+                />
+                <p className="dshx:text-[11px] dshx:text-muted-foreground">
+                  {UsageFormattingModel.formatCount(row.inputTokens)} input tokens · {UsageFormattingModel.formatCount(row.outputTokens)} output · Backlog{' '}
+                  {row.backlogCalls} / Memory {row.memoryCalls}
+                </p>
+              </div>
             ))}
           </div>
           <p className="dshx:text-xs dshx:text-muted-foreground">

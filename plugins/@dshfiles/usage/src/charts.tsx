@@ -130,12 +130,17 @@ export const UsageCharts = (props: {
     refetchInterval: 60_000,
     retry: 1,
   })
-  const jevRange = { from: props.range.from, to: props.range.to }
+  const now = new Date()
+  const jevRange = {
+    from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
+    to: new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(),
+  }
   const jevUsage = useQuery({
-    queryKey: ['dshfiles-usage', 'jev', jevRange],
+    queryKey: ['dshfiles-usage', 'jev', jevRange.from],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.jevUsage(jevRange, { signal: hostSignal }) }),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
     retry: 1,
   })
   const view = charts.data

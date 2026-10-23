@@ -32,7 +32,7 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
     const insert = jevDatabase.prepare(
       'INSERT INTO jev_requests (request_id, source, started_at, duration_ms, outcome, input_tokens, output_tokens, credential) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     )
-    const startedAt = Date.UTC(2026, 9, 22, 12)
+    const startedAt = Date.now() - 60_000
     insert.run('00000000-0000-4000-8000-000000000001', 'memory', startedAt, 320, 'success', 100_000, 30, 'secret:MEMORY_JEV')
     insert.run('00000000-0000-4000-8000-000000000002', 'backlog', startedAt + 1_000, 280, 'success', 50_000, 10, 'secret:BACKLOG_JEV')
     insert.run('00000000-0000-4000-8000-000000000003', 'backlog', startedAt + 2_000, 120, 'failure', null, null, 'secret:BACKLOG_JEV')
@@ -129,14 +129,17 @@ Then('the Jev usage card shows DSH-local token estimates', async ({ page }: { pa
     await expect(
       card.getByText('DSH-local estimated usage · $0.042 per 1M input tokens · output free. Not provider account balance.', { exact: true }),
     ).toBeVisible()
-    await expect(card.getByText('Jev calls', { exact: true })).toBeVisible()
+    await expect(card.getByText('Jev calls this month', { exact: true })).toBeVisible()
     await expect(card.getByText('3', { exact: true })).toBeVisible()
     await expect(card.getByText('150K', { exact: true })).toBeVisible()
     await expect(card.getByText('$0.0063', { exact: true })).toBeVisible()
     await expect(card.getByText('secret:BACKLOG_JEV')).toBeVisible()
     await expect(card.getByText('secret:MEMORY_JEV')).toBeVisible()
-    await expect(card.getByText('2 calls · 50K input · $0.0021 · Backlog 2 / Memory 0')).toBeVisible()
-    await expect(card.getByText('1 calls · 100K input · $0.0042 · Backlog 0 / Memory 1')).toBeVisible()
+    await expect(card.getByText('$0.0021 · 2 requests')).toBeVisible()
+    await expect(card.getByText('$0.0042 · 1 request')).toBeVisible()
+    await expect(card.getByText('Usage by API key · calendar month to date')).toBeVisible()
+    await expect(card.getByLabel('secret:BACKLOG_JEV share of input tokens this month')).toHaveAttribute('aria-valuetext', /50K input tokens/u)
+    await expect(card.getByLabel('secret:MEMORY_JEV share of input tokens this month')).toHaveAttribute('aria-valuetext', /100K input tokens/u)
     await expect(card.getByText(/DSH-observed requests only; does not include outside DSH/u)).toBeVisible()
   })
 })

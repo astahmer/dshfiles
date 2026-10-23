@@ -147,8 +147,13 @@
     {
       "id": "usage-jev-card",
       "title": "Jev API usage card",
-      "summary": "The Charts tab shows DSH-origin Jev calls reported by Backlog and Memory, grouped by configured secret-reference label or the TYPESAFE_API_KEY environment-variable label, with provider-reported per-call tokens and a TypeSafe list-price estimate. Labels are local references, not provider-verified identity; this is not account balance or usage outside DSH.",
-      "reach": ["click button \"Usage analytics\"", "click tab \"Charts\"", "expect text \"Jev API usage\""],
+      "summary": "The Charts tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Bars compare each label's input-token volume with the busiest label this month; they do not represent quota remaining. Labels are local, not provider-verified identity, and usage excludes calls outside DSH.",
+      "reach": [
+        "click button \"Usage analytics\"",
+        "click tab \"Charts\"",
+        "expect text \"Jev API usage\"",
+        "expect text \"Usage by API key · calendar month to date\""
+      ],
       "surfaces": ["host", "storage", "integration", "client"],
       "configuration": [],
       "states": ["empty", "recorded", "failed", "missing-token-usage"],
@@ -157,6 +162,7 @@
         "Configured credential labels are local references, not proof of provider billing identity; provider account-wide balance/history are not documented API capabilities.",
         "The dshx caller package id is cooperative in-process attribution, not authentication against malicious installed plugins.",
         "Calls without input-token usage remain counted but do not contribute to the estimate.",
+        "Per-key bars normalize input tokens to the busiest configured credential in the current calendar month, not to a provider quota or spending cap.",
         "The estimate uses TypeSafe's published $0.042 per million input-token price; update the constant if pricing changes."
       ],
       "externalDependencies": [

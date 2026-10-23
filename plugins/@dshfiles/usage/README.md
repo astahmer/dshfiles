@@ -18,9 +18,11 @@ built from the session logs DSH already writes. Observation only.
   hourly or daily. Charts use TanStack Charts from `@dshfiles/plugin-ui`.
 - **Jev API usage**: DSH-origin calls from Backlog and Memory, grouped by the
   configured secret reference (or the `TYPESAFE_API_KEY` environment-variable
-  label), with provider-reported tokens and a TypeSafe list-price estimate.
-  Labels are local configuration references, not verified billing identity. The
-  card is not a TypeSafe account balance and excludes calls made outside DSH.
+  label), with provider-reported tokens, request counts and a TypeSafe
+  list-price estimate. Calendar month-to-date spend, request count and tokens
+  are shown per label, with bars comparing input-token volume to the most-used
+  label this month. These are DSH-local observations, not provider account billing, and
+  exclude calls outside DSH; labels are not verified billing identities.
 
 ## Data
 
