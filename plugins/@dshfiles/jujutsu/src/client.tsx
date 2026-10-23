@@ -77,7 +77,7 @@ import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
-import { repositoryLoadingState } from './repository-loading.js'
+import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell, type GraphMetrics } from './revision-graph-cell.js'
 import { ANCESTOR_COUNT_OPTIONS, usePreferences, type GraphDensity, type RevisionDate } from './preferences.js'
@@ -255,6 +255,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const diffLayout: PatchLayout =
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
+  const recoveredRepositoryPath = useRef<string | null>(null)
   const repositoryRootsById = useRef(new Map<string, string>())
   const scope = props.scope
   const [initialRequest] = useState(() => {
@@ -416,6 +417,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       storedRepoHistory.set(nextHistory)
       PanelScopes.remember(scope, { path: registered.root })
       if (scope === DEFAULT_PANEL_SCOPE) storedRepoPath.set(registered.root)
+      void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(registered.root) })
     },
   })
 
@@ -435,6 +437,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     ...autoRefresh.queryOptions,
   })
   const state = stateQuery.data
+  useEffect(() => {
+    if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
+    recoveredRepositoryPath.current = path
+    registerMutation.reset()
+    registerMutation.mutate(path)
+  }, [path, registerMutation.mutate, registerMutation.reset, repoId, stateQuery.error])
+  useEffect(() => {
+    if (state !== undefined) recoveredRepositoryPath.current = null
+  }, [state])
   const debouncedSearch = useDebouncedValue({ value: textFilter.trim(), delayMs: 250 })
   const debouncedSearchRef = useRef(debouncedSearch)
   debouncedSearchRef.current = debouncedSearch
