@@ -3,9 +3,11 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-llm'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
+import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
-import { usageApi } from './api.js'
+import { resolveActivityQuery, resolveOtelMetricsRange, usageApi } from './api.js'
+import type { ToolSourceMetadata } from './fold.js'
 import { createJevUsageRecorder, jevSourceOf } from './jev-usage-recorder.js'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
@@ -24,10 +26,15 @@ const sessionsRoot = (context: Context): string => {
   return parsed.success ? parsed.data.config.root : dshHomePath('sessions')
 }
 
+interface ToolRegistrySnapshot {
+  readonly toolSources: ReadonlyMap<string, ToolSourceMetadata>
+}
+
 interface UsageRuntime {
   readonly store: UsageStore
   readonly pricer: ReturnType<typeof createRatePricer>
   readonly root: string
+  readonly readToolRegistry: () => Promise<ToolRegistrySnapshot | undefined>
   pass: Promise<void> | null
   lastIndexedAt: number | null
   lastError: string | null
@@ -44,7 +51,13 @@ const runPass = (active: UsageRuntime): Promise<void> => {
   if (active.pass !== null) return active.pass
   const pass = (async () => {
     try {
-      await usageIndexService.indexSessionLogs({ store: active.store, root: active.root })
+      active.store.pruneTelemetry()
+      const toolRegistry = await active.readToolRegistry()
+      if (toolRegistry !== undefined)
+        active.store.syncToolSources(
+          new Map([...toolRegistry.toolSources].map(([name, source]) => [name, { category: source.source, owner: source.owner }] as const)),
+        )
+      await usageIndexService.indexSessionLogs({ store: active.store, root: active.root, ...toolRegistry })
       active.store.reconcileLiveCalls(Date.now())
       await active.pricer.update()
       active.lastIndexedAt = Date.now()
@@ -85,11 +98,24 @@ const api = usageApi.host({
     await runPass(active)
     return status(active)
   },
+  activity: ({ input }) => {
+    const query = resolveActivityQuery(input)
+    return requireRuntime().store.activity({ ...query, eventLimit: query.eventLimit ?? 50 })
+  },
+  otelMetrics: ({ input }) => requireRuntime().store.otelMetrics(resolveOtelMetricsRange(input)),
 })
 
 const setupHost = (context: Context): Effect<void> => {
   const store = openUsageStore(dshHomePath('plugins', 'usage', 'usage.db'))
   const accounts = createHostApiClient(context, aiAccountsApi, '@dshfiles/usage')
+  const registry = createHostApiClient(context, dshxRegistryApi, '@dshfiles/usage')
+  const readToolRegistry = async (): Promise<ToolRegistrySnapshot | undefined> => {
+    const result = await registry.safe.list({})
+    if (!result.ok) return undefined
+    return {
+      toolSources: new Map(result.value.tools.map(tool => [tool.name, { source: tool.source, owner: tool.owner?.slice(0, 120) ?? null }] as const)),
+    }
+  }
   const accountKinds = async (): Promise<ReadonlyMap<string, string>> => {
     const file = await accounts.safe.read()
     return new Map(file.ok ? file.value.accounts.map(account => [account.instanceId, account.kind] as const) : [])
@@ -98,6 +124,7 @@ const setupHost = (context: Context): Effect<void> => {
     store,
     pricer: createRatePricer({ store, accountKinds }),
     root: sessionsRoot(context),
+    readToolRegistry,
     pass: null,
     lastIndexedAt: null,
     lastError: null,

@@ -11,6 +11,7 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useState } from 'react'
 import { z } from 'zod'
 import { purposeSchema, usageApi } from './api.js'
+import { UsageActivityReport } from './activity-report.js'
 import { UsageCharts } from './charts.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
@@ -19,7 +20,7 @@ import { RequestLog } from './request-log.js'
 const DAY_MS = 86_400_000
 
 const preferencesSchema = z.object({
-  tab: z.enum(['log', 'charts']).catch('log'),
+  tab: z.enum(['log', 'charts', 'activity']).catch('log'),
   preset: z.enum(['today', '7d', '30d', 'custom']).catch('7d'),
   customFrom: z.string().catch(''),
   customTo: z.string().catch(''),
@@ -208,10 +209,15 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
         ))}
       </div>
 
-      <Tabs value={preferences.tab} onValueChange={value => update({ tab: value === 'charts' ? 'charts' : 'log' })} className="dshx:min-h-0 dshx:flex-1">
+      <Tabs
+        value={preferences.tab}
+        onValueChange={value => update({ tab: value === 'charts' || value === 'activity' ? value : 'log' })}
+        className="dshx:min-h-0 dshx:flex-1"
+      >
         <TabsList>
           <TabsTrigger value="log">Request log</TabsTrigger>
           <TabsTrigger value="charts">Charts</TabsTrigger>
+          <TabsTrigger value="activity">Tools & Jev</TabsTrigger>
         </TabsList>
         <TabsContent value="log" className="dshx:min-h-0">
           <RequestLog range={range} purposes={purposes} search={logSearch} onSearch={setLogSearch} openThread={props.openThread} />
@@ -229,6 +235,9 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
             }}
             openThread={props.openThread}
           />
+        </TabsContent>
+        <TabsContent value="activity">
+          <UsageActivityReport range={range} />
         </TabsContent>
       </Tabs>
     </section>

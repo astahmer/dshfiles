@@ -1,3 +1,4 @@
+import type { RegistryToolSource } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import type { LogRecord } from './session-log.js'
 
@@ -61,7 +62,29 @@ export interface SessionMeta {
   readonly title: string | null
 }
 
+export type ToolCategory = RegistryToolSource | 'skill' | 'other'
+
+export interface ToolSourceMetadata {
+  readonly source: RegistryToolSource
+  readonly owner: string | null
+}
+
+export interface ToolExecutionRow {
+  readonly id: string
+  readonly sessionId: string
+  readonly seq: number
+  readonly turn: number | null
+  readonly step: number | null
+  readonly name: string
+  readonly category: ToolCategory
+  readonly owner: string | null
+  readonly startedAt: number
+  readonly endedAt: number | null
+  readonly outcome: 'success' | 'error' | 'interrupted' | 'unknown' | 'pending'
+}
+
 const stepKey = (turn: number, step: number): string => `${String(turn)}:${String(step)}`
+const MAX_OPEN_TOOL_CALLS = 2_000
 
 const foldStateSchema = z.object({
   session: z
@@ -82,9 +105,30 @@ const foldStateSchema = z.object({
   pendingTitle: z.object({ seq: z.number(), startedAt: z.number(), provider: z.string(), model: z.string() }).nullable(),
   /** Attempts that ended without a finish chunk: a retry or the turn's end says whether they failed or were aborted. */
   openAttempts: z.array(z.object({ key: z.string(), row: z.custom<RequestRow>(value => typeof value === 'object' && value !== null) })),
+  openTools: z
+    .array(
+      z.object({
+        callId: z.string(),
+        seq: z.number(),
+        turn: z.number().nullable(),
+        step: z.number().nullable(),
+        name: z.string(),
+        category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+        owner: z.string().nullable(),
+        startedAt: z.number(),
+      }),
+    )
+    .max(MAX_OPEN_TOOL_CALLS),
+  activeTurn: z.number().nullable(),
 })
 
 export type FoldState = z.infer<typeof foldStateSchema>
+
+interface FoldRecordsResult {
+  readonly state: FoldState
+  readonly rows: RequestRow[]
+  readonly tools: ToolExecutionRow[]
+}
 
 const headerSchema = z.object({
   id: z.string(),
@@ -151,7 +195,11 @@ const toUsage = (sample: z.infer<typeof usageSchema>): TokenUsage => ({
 })
 
 /** pi-ai's names for the finish kinds DSH records, so settled and failed rows read alike. */
-const STOP_REASON_BY_FINISH: Readonly<Record<string, string>> = { 'tool-calls': 'toolUse', stop: 'stop', 'max-tokens': 'length' }
+const STOP_REASON_BY_FINISH = new Map<string, string>([
+  ['tool-calls', 'toolUse'],
+  ['stop', 'stop'],
+  ['max-tokens', 'length'],
+])
 
 const ABORTED_TURN_REASONS = new Set(['aborted', 'interrupted'])
 
@@ -168,6 +216,8 @@ export class UsageFoldModel {
     compactionStarts: {},
     pendingTitle: null,
     openAttempts: [],
+    openTools: [],
+    activeTurn: null,
   })
 
   /** A stored state that no longer decodes restarts the fold from the file's first byte. */
@@ -183,18 +233,159 @@ export class UsageFoldModel {
   static readonly foldRecords = (input: {
     readonly state: FoldState
     readonly records: readonly LogRecord[]
-    /** Fallback session id when the header record was folded in an earlier pass (always in state then). */
     readonly sessionId: string
-  }): { readonly state: FoldState; readonly rows: RequestRow[] } => {
+    readonly toolSources?: ReadonlyMap<string, ToolSourceMetadata>
+  }): FoldRecordsResult => {
     const state: FoldState = structuredClone(input.state)
     const rows: RequestRow[] = []
+    const tools: ToolExecutionRow[] = []
     const sessionId = (): string => state.session?.id ?? input.sessionId
     const agentPurpose = (): RequestPurpose => (state.session?.subagent === true ? 'subagent' : 'agent')
+    const classifyTool = (name: string, args?: string): Pick<ToolExecutionRow, 'name' | 'category' | 'owner'> => {
+      if (/^(?:functions\.)?(?:skill|load_skill|read_skill)$/.test(name)) {
+        if (args !== undefined && args.length <= 4_096) {
+          let parsedArguments: unknown
+          try {
+            parsedArguments = JSON.parse(args)
+          } catch {
+            parsedArguments = undefined
+          }
+          const skill = z
+            .object({ name: z.string().regex(/^[\w.-]{1,80}$/) })
+            .strict()
+            .safeParse(parsedArguments)
+          if (skill.success) return { name: skill.data.name, category: 'skill', owner: null }
+        }
+        return { name: 'skill', category: 'skill', owner: null }
+      }
+      const registered = input.toolSources?.get(name)
+      const category = registered?.source ?? (name.startsWith('mcp__') ? 'mcp' : 'other')
+      return {
+        name: name.replace(/[^\w.-]/g, '_').slice(0, 120) || 'other',
+        category,
+        owner: registered?.owner ?? null,
+      }
+    }
+    const trackOpenTool = (call: FoldState['openTools'][number]): void => {
+      const previous = state.openTools.findIndex(open => open.callId === call.callId)
+      if (previous >= 0) {
+        const replaced = state.openTools.splice(previous, 1)[0]
+        if (replaced !== undefined)
+          tools.push({
+            id: `${sessionId()}#${String(replaced.seq)}`,
+            sessionId: sessionId(),
+            seq: replaced.seq,
+            turn: replaced.turn,
+            step: replaced.step,
+            name: replaced.name,
+            category: replaced.category,
+            owner: replaced.owner,
+            startedAt: replaced.startedAt,
+            endedAt: null,
+            outcome: 'unknown',
+          })
+      }
+      state.openTools.push(call)
+      if (state.openTools.length <= MAX_OPEN_TOOL_CALLS) return
+      const dropped = state.openTools.shift()
+      if (dropped !== undefined)
+        tools.push({
+          id: `${sessionId()}#${String(dropped.seq)}`,
+          sessionId: sessionId(),
+          seq: dropped.seq,
+          turn: dropped.turn,
+          step: dropped.step,
+          name: dropped.name,
+          category: dropped.category,
+          owner: dropped.owner,
+          startedAt: dropped.startedAt,
+          endedAt: null,
+          outcome: 'unknown',
+        })
+    }
 
     for (const record of input.records) {
       const time = typeof record.time === 'number' ? record.time : null
       const seq = typeof record.seq === 'number' ? record.seq : null
       switch (record.type) {
+        case 'tool/call': {
+          const parsed = z
+            .object({
+              callId: z.string().min(1).max(256),
+              name: z.string().min(1).max(256),
+              arguments: z.string().max(4_096).optional(),
+              turn: z.number().optional(),
+              step: z.number().optional(),
+            })
+            .safeParse(record.data)
+          if (!parsed.success || seq === null || time === null) break
+          trackOpenTool({
+            callId: parsed.data.callId,
+            seq,
+            turn: parsed.data.turn ?? null,
+            step: parsed.data.step ?? null,
+            ...classifyTool(parsed.data.name, parsed.data.arguments),
+            startedAt: time,
+          })
+          break
+        }
+        case 'tool/result': {
+          const parsed = z.object({ message: z.object({ toolCallId: z.string().min(1).max(256), isError: z.boolean().optional() }) }).safeParse(record.data)
+          if (!parsed.success || seq === null || time === null) break
+          const index = state.openTools.findIndex(call => call.callId === parsed.data.message.toolCallId)
+          if (index < 0) break
+          const [call] = state.openTools.splice(index, 1)
+          if (call === undefined) break
+          tools.push({
+            id: `${sessionId()}#${String(call.seq)}`,
+            sessionId: sessionId(),
+            seq: call.seq,
+            turn: call.turn,
+            step: call.step,
+            name: call.name,
+            category: call.category,
+            owner: call.owner,
+            startedAt: call.startedAt,
+            endedAt: time,
+            outcome: parsed.data.message.isError === true ? 'error' : parsed.data.message.isError === false ? 'success' : 'unknown',
+          })
+          break
+        }
+        case 'tool/ptc-dispatch-start': {
+          const parsed = z.object({ subCallId: z.string().min(1).max(256), name: z.string().min(1).max(256) }).safeParse(record.data)
+          if (!parsed.success || seq === null || time === null) break
+          trackOpenTool({
+            callId: parsed.data.subCallId,
+            seq,
+            turn: state.activeTurn,
+            step: null,
+            ...classifyTool(parsed.data.name),
+            startedAt: time,
+          })
+          break
+        }
+        case 'tool/ptc-dispatch': {
+          const parsed = z.object({ subCallId: z.string().min(1).max(256), isError: z.boolean().optional() }).safeParse(record.data)
+          if (!parsed.success || seq === null || time === null) break
+          const index = state.openTools.findIndex(call => call.callId === parsed.data.subCallId)
+          if (index < 0) break
+          const [call] = state.openTools.splice(index, 1)
+          if (call === undefined) break
+          tools.push({
+            id: `${sessionId()}#${String(call.seq)}`,
+            sessionId: sessionId(),
+            seq: call.seq,
+            turn: call.turn,
+            step: call.step,
+            name: call.name,
+            category: call.category,
+            owner: call.owner,
+            startedAt: call.startedAt,
+            endedAt: time,
+            outcome: parsed.data.isError === true ? 'error' : parsed.data.isError === false ? 'success' : 'unknown',
+          })
+          break
+        }
         case 'session': {
           const header = headerSchema.safeParse(record)
           if (!header.success) break
@@ -221,7 +412,10 @@ export class UsageFoldModel {
         }
         case 'step/start': {
           const parsed = turnStepSchema.safeParse(record.data)
-          if (parsed.success && time !== null) state.stepStarts[stepKey(parsed.data.turn, parsed.data.step)] = time
+          if (parsed.success && time !== null) {
+            state.stepStarts[stepKey(parsed.data.turn, parsed.data.step)] = time
+            state.activeTurn = parsed.data.turn
+          }
           break
         }
         case 'assistant/message':
@@ -264,7 +458,7 @@ export class UsageFoldModel {
             ttftMs: stepStart !== undefined && firstChunkAt !== null ? Math.max(0, firstChunkAt - stepStart) : null,
             usage,
             status: failed ? 'failed' : aborted ? 'aborted' : 'ok',
-            stopReason: source?.replayState?.response?.stopReason ?? (finish === null ? null : (STOP_REASON_BY_FINISH[finish.kind] ?? finish.kind)),
+            stopReason: source?.replayState?.response?.stopReason ?? (finish === null ? null : (STOP_REASON_BY_FINISH.get(finish.kind) ?? finish.kind)),
             errorCode: finish?.code ?? null,
           }
           if (record.type === 'assistant/attempt' && finish === null) state.openAttempts.push({ key, row })
@@ -294,6 +488,24 @@ export class UsageFoldModel {
           const parsed = turnEndSchema.safeParse(record.data)
           if (!parsed.success) break
           const reason = parsed.data.reason?.kind ?? null
+          if (state.activeTurn === parsed.data.turn) state.activeTurn = null
+          const turnTools = state.openTools.filter(tool => tool.turn === parsed.data.turn)
+          for (const tool of turnTools)
+            tools.push({
+              id: `${sessionId()}#${String(tool.seq)}`,
+              sessionId: sessionId(),
+              seq: tool.seq,
+              turn: tool.turn,
+              step: tool.step,
+              name: tool.name,
+              category: tool.category,
+              owner: tool.owner,
+              startedAt: tool.startedAt,
+              endedAt: time,
+              outcome: ABORTED_TURN_REASONS.has(reason ?? '') ? 'interrupted' : 'unknown',
+            })
+          const turnToolIds = new Set(turnTools.map(tool => tool.callId))
+          state.openTools = state.openTools.filter(tool => !turnToolIds.has(tool.callId))
           const turnPrefix = `${String(parsed.data.turn)}:`
           for (const open of state.openAttempts.filter(attempt => attempt.key.startsWith(turnPrefix))) {
             const aborted = reason !== null && ABORTED_TURN_REASONS.has(reason)
@@ -384,7 +596,21 @@ export class UsageFoldModel {
         }
       }
     }
-    return { state, rows }
+    for (const call of state.openTools)
+      tools.push({
+        id: `${sessionId()}#${String(call.seq)}`,
+        sessionId: sessionId(),
+        seq: call.seq,
+        turn: call.turn,
+        step: call.step,
+        name: call.name,
+        category: call.category,
+        owner: call.owner,
+        startedAt: call.startedAt,
+        endedAt: null,
+        outcome: 'pending',
+      })
+    return { state, rows, tools }
   }
 }
 

@@ -23,3 +23,8 @@ Feature: Usage analytics
     Then the headline tiles, the charts and the top threads show the indexed usage
     And the Jev usage card shows DSH-local token estimates
     And selecting a model in the cost breakdown shows its requests in the log
+
+  @scenario:usage.activity-report-browser-journey
+  Scenario: Read tool and Jev activity
+    When the Tools & Jev tab is opened
+    Then the tool execution report and Jev call report are visible

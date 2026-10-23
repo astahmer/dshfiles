@@ -4,8 +4,8 @@
   "features": [
     {
       "id": "usage-index",
-      "title": "Incremental request index from session logs",
-      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, reading only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
+      "title": "Incremental request and tool index from session logs",
+      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations/outcomes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
       "surfaces": ["host", "storage", "integration"],
       "configuration": [],
       "states": ["empty", "first-index", "incremental", "torn-frame", "unpriced-route", "catalog-refreshed"],
@@ -206,6 +206,78 @@
           "id": "usage.jev-usage-card-rendering",
           "file": "plugins/@dshfiles/usage/src/jev-usage-card.test.tsx",
           "testName": "renders the DSH-only estimate and source counts"
+        }
+      ]
+    },
+    {
+      "id": "usage-activity-report",
+      "title": "Tool and Jev activity report",
+      "summary": "Local tool-use counts by Skill, Plugin API, Plugin, MCP, DSH and other sources, with per-tool/plugin counts, error/interruption outcomes and latency statistics, plus Jev request outcomes, durations and tokens per calling plugin (read from the same jev_requests rows as the Jev usage card) over the selected date range. Tool categories come from the dshx registry; arguments, outputs, prompts, credentials and raw errors are not stored.",
+      "reach": ["click button \"Usage analytics\"", "click tab \"Tools & Jev\"", "expect heading \"Jev requests\"", "expect heading \"Tool executions\""],
+      "surfaces": ["client", "storage", "integration"],
+      "configuration": [],
+      "states": ["empty", "loading", "populated", "filtered-range"],
+      "failureModes": [
+        "Tool records with no result remain unknown or interrupted, not assumed successful.",
+        "Jev figures cover only calls Backlog and Memory record through recordJevUsage; calls made while Usage analytics is not loaded are not counted."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "usage.activity-report-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.tool-fold-privacy",
+          "file": "plugins/@dshfiles/usage/src/fold.test.ts",
+          "testName": "folds privacy-reduced tool executions and marks missing results by turn outcome"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.tool-source-counts",
+          "file": "plugins/@dshfiles/usage/src/fold.test.ts",
+          "testName": "counts skill, plugin API, plugin, MCP and DSH tool calls by registry source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.activity-report-store",
+          "file": "plugins/@dshfiles/usage/src/activity.test.ts",
+          "testName": "reports tool executions and Jev outcomes without storing sensitive payloads"
+        }
+      ]
+    },
+    {
+      "id": "usage-otel-export",
+      "title": "OTLP metrics export",
+      "summary": "The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It never makes a network request; quota and Fast-mode history remain in AI Accounts storage.",
+      "surfaces": ["host", "storage", "integration"],
+      "configuration": [],
+      "states": ["empty", "populated", "bounded-range", "source-cap"],
+      "failureModes": [
+        "An export range wider than 365 days is rejected.",
+        "Named tool source points cap at 500 while category totals remain exact.",
+        "OTLP output is delta temporality; overlapping imports can double count, so consumers must select non-overlapping intervals."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "usage.otel-metrics-export",
+          "file": "plugins/@dshfiles/usage/src/otel-metrics.test.ts",
+          "testName": "exports bounded aggregate metrics in OTLP JSON without local identifiers or payloads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.otel-range-validation",
+          "file": "plugins/@dshfiles/usage/src/api-tools.test.ts",
+          "testName": "resolves bounded OTLP export ranges and exposes only a local read tool"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "usage.otel-no-browser-ui",
+          "reason": "This capability is a Host-only read API for Agent tools; it adds no browser UI or GUI workflow."
         }
       ]
     }

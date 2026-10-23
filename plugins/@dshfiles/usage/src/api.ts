@@ -1,7 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { UsageFoldModel } from './fold.js'
-import { jevUsageQuerySchema, jevUsageRecordSchema, jevUsageViewSchema } from './jev-usage.js'
+import { jevUsageOutcomeSchema, jevUsageQuerySchema, jevUsageRecordSchema, jevUsageSourceSchema, jevUsageViewSchema } from './jev-usage.js'
+import { otlpMetricsRequestSchema } from './otel-metrics.js'
 
 export { JEV_INPUT_USD_PER_MILLION } from './jev-usage.js'
 export type { JevUsageBreakdown, JevUsageQuery, JevUsageRecord, JevUsageView } from './jev-usage.js'
@@ -138,6 +139,178 @@ export const chartViewSchema = z.object({
 
 export type ChartView = z.infer<typeof chartViewSchema>
 
+const DAY_MS = 24 * 60 * 60 * 1_000
+const toolCategorySchema = z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other'])
+export const activityInputSchema = z
+  .object({
+    from: z.number().int().min(0).optional().describe('Optional range start, Unix milliseconds. Omit from and to to use a rolling range.'),
+    to: z.number().int().min(0).optional().describe('Optional range end, Unix milliseconds. Omit from and to to use a rolling range.'),
+    days: z.number().int().min(1).max(365).optional().describe('Rolling range length when from and to are omitted; defaults to 30 days.'),
+    category: toolCategorySchema.optional().describe('Optionally limit ranked tool rows to a source category.'),
+    limit: z.number().int().min(1).max(100).optional().describe('Maximum ranked tool rows; defaults to 10.'),
+    eventLimit: z.number().int().min(1).max(200).optional().describe('Maximum recent tool and Jev event rows; defaults to 50.'),
+  })
+  .strict()
+
+type ResolvedActivityQuery = {
+  from: number
+  to: number
+  category?: z.infer<typeof toolCategorySchema>
+  limit: number
+  eventLimit?: number
+}
+
+export const resolveActivityQuery = (input: z.infer<typeof activityInputSchema>, now = Date.now()): ResolvedActivityQuery => {
+  if (input.days !== undefined && (input.from !== undefined || input.to !== undefined)) throw new Error('days cannot be combined with from/to.')
+  if ((input.from === undefined) !== (input.to === undefined)) throw new Error('Provide both from and to, or neither.')
+  const to = input.to ?? now
+  if (to < (input.from ?? 0)) throw new Error('to must be at or after from.')
+  const query: ResolvedActivityQuery = { from: input.from ?? to - (input.days ?? 30) * DAY_MS, to, limit: input.limit ?? 10 }
+  if (input.category !== undefined) query.category = input.category
+  if (input.eventLimit !== undefined) query.eventLimit = input.eventLimit
+  return query
+}
+
+const latencyStatsSchema = z.object({
+  averageMs: z.number().int().nullable(),
+  p50Ms: z.number().int().nullable(),
+  p90Ms: z.number().int().nullable(),
+  maxMs: z.number().int().nullable(),
+})
+const activityOutcomeSchema = z.object({
+  successes: z.number().int(),
+  errors: z.number().int(),
+  interrupted: z.number().int(),
+  unknown: z.number().int(),
+  pending: z.number().int(),
+})
+
+export const activityReportSchema = z.object({
+  range: z.object({ from: z.number().int(), to: z.number().int() }).optional(),
+  categories: z
+    .array(z.object({ category: toolCategorySchema, calls: z.number().int() }))
+    .max(6)
+    .default([]),
+  categoryOutcomes: z
+    .array(
+      z.object({
+        category: toolCategorySchema,
+        calls: z.number().int(),
+        successes: z.number().int(),
+        errors: z.number().int(),
+        interrupted: z.number().int(),
+        unknown: z.number().int(),
+        pending: z.number().int(),
+        successRate: z.number().min(0).max(1),
+        durationMs: latencyStatsSchema,
+      }),
+    )
+    .max(6)
+    .default([]),
+  tools: z
+    .array(
+      z.object({
+        name: z.string(),
+        category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']).default('other'),
+        owner: z.string().nullable().default(null),
+        calls: z.number().int(),
+        successes: z.number().int().default(0),
+        successRate: z.number().min(0).max(1).optional(),
+        errors: z.number().int(),
+        interrupted: z.number().int(),
+        unknown: z.number().int(),
+        pending: z.number().int().default(0),
+        outcomes: activityOutcomeSchema.optional(),
+        timestamps: z
+          .object({
+            firstStarted: z.number().int().nullable(),
+            lastStarted: z.number().int().nullable(),
+            firstEnded: z.number().int().nullable(),
+            lastEnded: z.number().int().nullable(),
+          })
+          .optional(),
+        durationMs: latencyStatsSchema.optional(),
+        averageDurationMs: z.number().int().nullable(),
+      }),
+    )
+    .max(100),
+  events: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.object({
+          kind: z.literal('tool'),
+          at: z.number().int(),
+          endedAt: z.number().int().nullable(),
+          durationMs: z.number().int().nullable(),
+          category: toolCategorySchema,
+          name: z.string(),
+          owner: z.string().nullable(),
+          outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
+          turn: z.number().int().nullable(),
+          step: z.number().int().nullable(),
+        }),
+        z.object({
+          kind: z.literal('jev'),
+          at: z.number().int(),
+          endedAt: z.number().int(),
+          durationMs: z.number().int(),
+          source: jevUsageSourceSchema,
+          outcome: jevUsageOutcomeSchema,
+        }),
+      ]),
+    )
+    .max(200)
+    .default([]),
+  jev: z
+    .object({
+      calls: z.number().int(),
+      successes: z.number().int(),
+      failures: z.number().int(),
+      averageDurationMs: z.number().int().nullable(),
+      inputTokens: z.number().int().default(0),
+      outputTokens: z.number().int().default(0),
+      byOutcome: z.array(z.object({ outcome: jevUsageOutcomeSchema, calls: z.number().int() })).default([]),
+      successRate: z.number().min(0).max(1).optional(),
+      bySource: z
+        .array(
+          z.object({
+            source: jevUsageSourceSchema,
+            calls: z.number().int(),
+            successes: z.number().int(),
+            failures: z.number().int(),
+            successRate: z.number().min(0).max(1),
+            inputTokens: z.number().int(),
+            outputTokens: z.number().int(),
+            durationMs: latencyStatsSchema,
+          }),
+        )
+        .default([]),
+      durationMs: latencyStatsSchema.optional(),
+    })
+    .refine(report => report.calls === report.successes + report.failures),
+})
+export type ActivityReport = z.infer<typeof activityReportSchema>
+
+export const otelMetricsInputSchema = z
+  .object({
+    from: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    to: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+    days: z.number().int().min(1).max(365).optional(),
+  })
+  .strict()
+
+export const resolveOtelMetricsRange = (input: z.infer<typeof otelMetricsInputSchema>, now = Date.now()) => {
+  if (input.days !== undefined && (input.from !== undefined || input.to !== undefined)) throw new Error('days cannot be combined with from/to.')
+  if ((input.from === undefined) !== (input.to === undefined)) throw new Error('Provide both from and to, or neither.')
+  const to = input.to ?? now
+  const from = input.from ?? Math.max(0, to - (input.days ?? 30) * DAY_MS)
+  if (to <= from) throw new Error('to must be after from.')
+  if (to - from > 365 * DAY_MS) throw new Error('OTLP export range cannot exceed 365 days.')
+  return { from, to }
+}
+
+export const otelMetricsOutputSchema = otlpMetricsRequestSchema
+
 export const indexStatusSchema = z.object({
   indexedFiles: z.number().int(),
   requests: z.number().int(),
@@ -193,6 +366,20 @@ export const usageApi = defineApi({
       output: indexStatusSchema,
       description: 'Index whatever the session logs gained since the last pass, then report the new status. Call only when the user asked to re-index.',
       tool: { name: 'usage_reindex', render: compactJson },
+    }),
+    activity: method({
+      input: activityInputSchema,
+      output: activityReportSchema,
+      description:
+        'Read local tool-use statistics, Jev request totals by calling plugin (backlog, memory), and recent tool/Jev events. Omit inputs for the last 30 days, or specify days (1–365), or from/to Unix milliseconds. Ranked rows include individual skill names, MCP tools and plugin owners; category can filter rankings. Includes successes, errors, interruptions, unknowns, timestamps, durations and recent outcomes. Use this to answer “which skills or tools are used most?” or “what failed recently?”. No prompts, arguments, results or secrets are stored. Tool times are filtered by start time in the half-open [from, to) range; recent tool and Jev events are combined and capped by eventLimit.',
+      tool: { name: 'usage_activity_report', readOnly: true, render: compactJson },
+    }),
+    otelMetrics: method({
+      input: otelMetricsInputSchema,
+      output: otelMetricsOutputSchema,
+      description:
+        'Read an OTLP/HTTP JSON ExportMetricsServiceRequest built from the local SQLite usage ledger. Omit inputs for the last 30 days, specify days (1–365), or provide from/to Unix milliseconds. Returns aggregate model-request/token, tool-category/source and Jev request/token counters plus latency histograms; the 500 most-used tool sources are included, while category totals remain exact. Contains no session IDs, paths, prompts, arguments, results, credentials or raw errors. Read-only and makes no network request; SQLite remains the source of truth.',
+      tool: { name: 'usage_otel_metrics', readOnly: true, render: compactJson },
     }),
   },
 })

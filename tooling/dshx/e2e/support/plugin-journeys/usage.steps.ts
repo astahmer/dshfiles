@@ -1,5 +1,6 @@
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { DatabaseSync } from 'node:sqlite'
+import { zstdCompressSync } from 'node:zlib'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
@@ -39,6 +40,39 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
   } finally {
     jevDatabase.close()
   }
+  const sampleTime = Date.UTC(2026, 9, 12, 12)
+  const sampleCalls = [
+    { id: 'synthetic-bash', name: 'bash', arguments: 'private command' },
+    { id: 'synthetic-plugin-api', name: 'usage_activity_report' },
+    { id: 'synthetic-mcp', name: 'mcp__fixture__search' },
+    { id: 'synthetic-skill', name: 'skill', arguments: JSON.stringify({ name: 'verify-dsh' }) },
+  ]
+  const toolLog =
+    [
+      { type: 'session', id: 'session-tool-activity', createdAt: Date.UTC(2026, 9, 12), cwd: '/home/user/dev/sample' },
+      ...sampleCalls.flatMap((call, index) => {
+        const callSeq = index * 2 + 1
+        return [
+          {
+            type: 'tool/call',
+            seq: callSeq,
+            time: sampleTime + index * 2_000,
+            data: { callId: call.id, name: call.name, arguments: call.arguments, turn: 1, step: index + 1 },
+          },
+          {
+            type: 'tool/result',
+            seq: callSeq + 1,
+            time: sampleTime + index * 2_000 + 1_500,
+            data: { message: { toolCallId: call.id, isError: false, content: [{ type: 'text', text: 'private output' }] } },
+          },
+        ]
+      }),
+    ]
+      .map(record => JSON.stringify(record))
+      .join('\n') + '\n'
+  const toolSession = join(home, 'sessions', '-home-user-dev-sample', 'session-tool-activity')
+  await mkdir(toolSession, { recursive: true })
+  await writeFile(join(toolSession, 'session.v1.jsonl.zstd'), zstdCompressSync(toolLog))
 })
 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
@@ -152,6 +186,26 @@ Then('selecting a model in the cost breakdown shows its requests in the log', as
   await recordAssertion(page, 'usage-breakdown-filters-the-log', async () => {
     await expect(page.getByRole('textbox', { name: 'Search requests', exact: true })).toHaveValue('gpt-6.1-sol')
     await expect.poll(async () => requestButton(page, /deepseek/).count()).toBe(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Tools & Jev tab is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('tab', { name: 'Tools & Jev', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Jev requests', exact: true })).toBeVisible()
+})
+
+Then('the tool execution report and Jev call report are visible', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'usage-tool-and-jev-report-visible', async () => {
+    await expect(page.getByRole('heading', { name: 'Tool executions', exact: true })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Avg / p50 / p90 / max', exact: true })).toBeVisible()
+    await expect(page.locator('dl').getByText('Skills', { exact: true }).locator('..')).toContainText('1')
+    await expect(page.locator('dl').getByText('Plugin API tools', { exact: true }).locator('..')).toContainText('1')
+    await expect(page.locator('dl').getByText('MCP tools', { exact: true }).locator('..')).toContainText('1')
+    await expect(page.locator('dl').getByText('DSH tools', { exact: true }).locator('..')).toContainText('1')
+    await expect(page.getByRole('table').getByRole('row', { name: /DSH tools\s+—\s+bash\s+1\s+1\s+\(100%\)\s+0\s+0\s+0/u })).toBeVisible()
+    await expect(page.getByRole('table').getByRole('row', { name: /Skills\s+—\s+verify-dsh\s+1/u })).toBeVisible()
+    await expect(page.getByText(/Arguments, outputs, commands, paths, and raw errors are never copied/u)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

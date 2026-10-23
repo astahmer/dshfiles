@@ -1,11 +1,12 @@
 import { basename, dirname, join } from 'node:path'
 import type { readdir, stat } from 'node:fs/promises'
-import { UsageFoldModel } from './fold.js'
+import { UsageFoldModel, type ToolSourceMetadata } from './fold.js'
 import type { readLogFrom } from './session-log.js'
 import type { UsageStore } from './store.js'
 
 const LOG_NAME = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/
 const SLICE_BYTES = 4 * 1024 * 1024
+const EMPTY_TOOL_SOURCES: ReadonlyMap<string, ToolSourceMetadata> = new Map()
 
 type UsageIndexFileSystem = {
   readonly readdir: typeof readdir
@@ -46,7 +47,15 @@ export const createUsageIndexService = (dependencies: UsageIndexDependencies) =>
     return logs
   }
 
-  const indexSessionLog = async ({ store, path }: { readonly store: UsageStore; readonly path: string }): Promise<number> => {
+  const indexSessionLog = async ({
+    store,
+    path,
+    toolSources = EMPTY_TOOL_SOURCES,
+  }: {
+    readonly store: UsageStore
+    readonly path: string
+    readonly toolSources?: ReadonlyMap<string, ToolSourceMetadata>
+  }): Promise<number> => {
     const info = await dependencies.fileSystem.stat(path).catch(() => undefined)
     if (info === undefined) return 0
     const cursor = store.fileCursor(path)
@@ -61,7 +70,12 @@ export const createUsageIndexService = (dependencies: UsageIndexDependencies) =>
       let chunk = await dependencies.readLogFrom({ path, fromOffset: offset, size: window })
       if (chunk.endOffset === offset && window < info.size) chunk = await dependencies.readLogFrom({ path, fromOffset: offset, size: info.size })
       if (chunk.endOffset === offset) break
-      const folded = UsageFoldModel.foldRecords({ state, records: chunk.records, sessionId: fallbackSessionId })
+      const folded = UsageFoldModel.foldRecords({
+        state,
+        records: chunk.records,
+        sessionId: fallbackSessionId,
+        toolSources,
+      })
       state = folded.state
       offset = chunk.endOffset
       store.commitLogSlice({
@@ -74,6 +88,7 @@ export const createUsageIndexService = (dependencies: UsageIndexDependencies) =>
         state: JSON.stringify(state),
         session: state.session,
         rows: folded.rows,
+        tools: folded.tools,
       })
       rows += folded.rows.length
       await yieldToHost()
@@ -89,6 +104,7 @@ export const createUsageIndexService = (dependencies: UsageIndexDependencies) =>
         state: JSON.stringify(state),
         session: state.session,
         rows: [],
+        tools: [],
       })
     }
     return rows
@@ -97,14 +113,20 @@ export const createUsageIndexService = (dependencies: UsageIndexDependencies) =>
   const indexSessionLogs = async ({
     store,
     root,
+    toolSources = EMPTY_TOOL_SOURCES,
   }: {
     readonly store: UsageStore
     readonly root: string
+    readonly toolSources?: ReadonlyMap<string, ToolSourceMetadata>
   }): Promise<{ readonly files: number; readonly rows: number }> => {
     const logs = await discoverSessionLogs({ root })
     let rows = 0
     for (const path of logs) {
-      rows += await indexSessionLog({ store, path })
+      rows += await indexSessionLog({
+        store,
+        path,
+        toolSources,
+      })
       await yieldToHost()
     }
     return { files: logs.length, rows }

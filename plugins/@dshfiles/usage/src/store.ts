@@ -2,6 +2,7 @@ import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { z } from 'zod'
+import type { RegistryToolSource } from '@dshfiles/dshx/api'
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import type { ChartQuery, ChartView, RequestPage, RequestQuery, RequestView } from './api.js'
 import {
@@ -11,8 +12,11 @@ import {
   type JevUsageQuery,
   type JevUsageRecord,
   type JevUsageView,
+  jevUsageOutcomeSchema,
+  jevUsageSourceSchema,
 } from './jev-usage.js'
 import { UsageFoldModel, type RequestRow, type SessionMeta } from './fold.js'
+import { createOtlpMetricsRequest, type OtlpCounterInput, type OtlpHistogramInput } from './otel-metrics.js'
 
 /**
  * The usage index: one row per model request, one per session, and one per
@@ -101,6 +105,25 @@ const MIGRATIONS: readonly string[] = [
   CREATE INDEX jev_requests_started ON jev_requests (started_at);
   `,
   `ALTER TABLE jev_requests ADD COLUMN credential TEXT NOT NULL DEFAULT 'Legacy / unknown' CHECK (length(credential) BETWEEN 1 AND 400);`,
+  `
+  CREATE TABLE tools (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    turn INTEGER,
+    step INTEGER,
+    name TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    outcome TEXT NOT NULL CHECK (outcome IN ('success', 'error', 'interrupted', 'unknown', 'pending')),
+    category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('api', 'mcp', 'plugin', 'tool', 'skill', 'other')),
+    owner TEXT
+  ) STRICT;
+  CREATE INDEX tools_started ON tools (started_at);
+  CREATE INDEX tools_name_started ON tools (name, started_at);
+  CREATE INDEX tools_category_started ON tools (category, started_at);
+  CREATE INDEX tools_outcome_started ON tools (outcome, started_at);
+  `,
 ]
 
 export interface RouteBand {
@@ -117,7 +140,7 @@ export interface Rates {
 }
 
 /** Bump whenever the fold reads a log differently. */
-const FOLD_VERSION = 1
+const FOLD_VERSION = 2
 
 /** Live side calls wait this long for the log row they duplicate before they count on their own. */
 const LIVE_MATCH_WAIT_MS = 10 * 60_000
@@ -181,6 +204,93 @@ const bucketRowSchema = z.object({
 const breakdownRowSchema = z.object({ key: z.string().nullable(), cost: z.number(), requests: z.number(), tokens: z.number() })
 const latencyRowSchema = z.object({ start: z.number(), ttft_ms: numberColumn, duration_ms: numberColumn })
 const threadRowSchema = z.object({ session_id: z.string(), title: textColumn, project: textColumn, cost: z.number(), requests: z.number() })
+const toolRowSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  seq: z.number().int(),
+  turn: z.number().int().nullable(),
+  step: z.number().int().nullable(),
+  name: z.string().min(1).max(120),
+  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+  owner: textColumn,
+  startedAt: z.number().int(),
+  endedAt: z.number().int().nullable(),
+  outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
+})
+const toolActivityRowSchema = z.object({
+  name: z.string(),
+  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+  owner: textColumn,
+  calls: z.number().int(),
+  successes: z.number().int(),
+  errors: z.number().int(),
+  interrupted: z.number().int(),
+  unknown: z.number().int(),
+  pending: z.number().int(),
+  firstStartedAt: numberColumn,
+  lastStartedAt: numberColumn,
+  firstEndedAt: numberColumn,
+  lastEndedAt: numberColumn,
+  averageDurationMs: numberColumn,
+  p50DurationMs: numberColumn,
+  p90DurationMs: numberColumn,
+  maxDurationMs: numberColumn,
+})
+const activityCategoryRowSchema = z.object({
+  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+  calls: z.number().int(),
+  successes: z.number().int(),
+  errors: z.number().int(),
+  interrupted: z.number().int(),
+  unknown: z.number().int(),
+  pending: z.number().int(),
+  averageDurationMs: numberColumn,
+  p50DurationMs: numberColumn,
+  p90DurationMs: numberColumn,
+  maxDurationMs: numberColumn,
+})
+const jevEventRowSchema = z.object({
+  at: z.number().int(),
+  endedAt: z.number().int(),
+  durationMs: z.number().int(),
+  source: jevUsageSourceSchema,
+  outcome: jevUsageOutcomeSchema,
+})
+const jevOutcomeRowSchema = z.object({ outcome: jevUsageOutcomeSchema, calls: z.number().int() })
+const jevActivityRowSchema = z.object({
+  calls: z.number().int(),
+  successes: z.number().int(),
+  failures: z.number().int(),
+  inputTokens: z.number().int(),
+  outputTokens: z.number().int(),
+  durationMs: numberColumn,
+  maxDurationMs: numberColumn,
+})
+const TOOL_RETENTION_MS = 365 * 24 * 60 * 60 * 1000
+const MAX_PENDING_MS = 24 * 60 * 60 * 1000
+const OTEL_DURATION_BOUNDS_SECONDS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60] as const
+const OTEL_DURATION_BOUNDS_MS = OTEL_DURATION_BOUNDS_SECONDS.map(seconds => seconds * 1_000)
+const OTEL_BUCKET_SELECT = OTEL_DURATION_BOUNDS_MS.map(
+  (bound, index) => `SUM(CASE WHEN duration_ms <= ${String(bound)} THEN 1 ELSE 0 END) AS bucket${String(index)}`,
+).join(', ')
+const OTEL_BUCKET_ROW_SCHEMA = z.object({
+  bucket0: z.number().int(),
+  bucket1: z.number().int(),
+  bucket2: z.number().int(),
+  bucket3: z.number().int(),
+  bucket4: z.number().int(),
+  bucket5: z.number().int(),
+  bucket6: z.number().int(),
+  bucket7: z.number().int(),
+  bucket8: z.number().int(),
+  bucket9: z.number().int(),
+  bucket10: z.number().int(),
+  bucket11: z.number().int(),
+  bucket12: z.number().int(),
+})
+const OTEL_HISTOGRAM_BASE_ROW_SCHEMA = z.object({ calls: z.number().int(), durationSumMs: z.number() }).extend(OTEL_BUCKET_ROW_SCHEMA.shape)
+const OTEL_TOOL_CATEGORIES = ['api', 'mcp', 'plugin', 'tool', 'skill', 'other'] as const
+const OTEL_TOOL_OUTCOMES = ['success', 'error', 'interrupted', 'unknown', 'pending'] as const
 
 const summaryRowSchema = z.object({
   cost: z.number(),
@@ -206,7 +316,7 @@ const FROM_SQL = `requests r
 /** Hidden: live calls folded into their log row, and live calls still waiting for one. */
 const VISIBLE_SQL = "r.merged_into IS NULL AND NOT (r.source = 'live' AND r.settled = 0)"
 
-const SORT_SQL: Readonly<Record<RequestQuery['sort'], string>> = {
+const SORT_SQL = {
   startedAt: 'r.started_at',
   cost: 'cost',
   input: 'r.input',
@@ -214,7 +324,7 @@ const SORT_SQL: Readonly<Record<RequestQuery['sort'], string>> = {
   output: 'r.output',
   durationMs: 'duration_ms',
   ttftMs: 'r.ttft_ms',
-}
+} satisfies Readonly<Record<RequestQuery['sort'], string>>
 
 const percentile = (sorted: readonly number[], fraction: number): number | null => {
   if (sorted.length === 0) return null
@@ -243,7 +353,7 @@ export const openUsageStore = (path: string) => {
   if (z.object({ value: z.string() }).optional().parse(foldVersion)?.value !== String(FOLD_VERSION)) {
     database.exec('BEGIN IMMEDIATE')
     database.exec(
-      "DELETE FROM files; DELETE FROM requests WHERE source = 'log'; UPDATE requests SET merged_into = NULL, settled = 0 WHERE purpose IN ('title', 'compaction')",
+      "DELETE FROM files; DELETE FROM requests WHERE source = 'log'; DELETE FROM tools; UPDATE requests SET merged_into = NULL, settled = 0 WHERE purpose IN ('title', 'compaction')",
     )
     database.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('foldVersion', ?)").run(String(FOLD_VERSION))
     database.exec('COMMIT')
@@ -272,6 +382,11 @@ export const openUsageStore = (path: string) => {
       database.exec('ROLLBACK')
       throw error
     }
+  }
+
+  const pruneTelemetry = (now = Date.now()): void => {
+    prepare('DELETE FROM tools WHERE started_at < ?').run(now - TOOL_RETENTION_MS)
+    prepare("UPDATE tools SET outcome = 'unknown' WHERE outcome = 'pending' AND started_at < ?").run(now - MAX_PENDING_MS)
   }
 
   const upsertRequest = (row: RequestRow, settled: boolean): void => {
@@ -318,6 +433,26 @@ export const openUsageStore = (path: string) => {
     if (usage !== null) pricedRoutes?.set(routeBandKey({ provider: row.provider, model: row.model, band }), { provider: row.provider, model: row.model, band })
   }
 
+  const upsertToolExecution = (row: z.infer<typeof toolRowSchema>): void => {
+    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE SET turn = excluded.turn, step = excluded.step, name = excluded.name,
+        started_at = excluded.started_at, ended_at = excluded.ended_at, outcome = excluded.outcome,
+        category = excluded.category, owner = excluded.owner`).run(
+      row.id,
+      row.sessionId,
+      row.seq,
+      row.turn,
+      row.step,
+      row.name,
+      row.startedAt,
+      row.endedAt,
+      row.outcome,
+      row.category,
+      row.owner,
+    )
+  }
+
   const upsertSession = (session: SessionMeta): void => {
     prepare(
       `INSERT INTO sessions (id, cwd, project, title, parent_session, subagent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -341,9 +476,12 @@ export const openUsageStore = (path: string) => {
     readonly state: string
     readonly session: SessionMeta | null
     readonly rows: readonly RequestRow[]
+    readonly tools?: readonly z.infer<typeof toolRowSchema>[]
   }): void =>
     transaction(() => {
       for (const row of slice.rows) upsertRequest(row, true)
+      for (const row of slice.tools ?? []) upsertToolExecution(row)
+      pruneTelemetry()
       if (slice.session !== null) upsertSession(slice.session)
       prepare(
         `INSERT INTO files (path, session_id, offset, size, mtime_ms, state) VALUES (?, ?, ?, ?, ?, ?)
@@ -757,6 +895,510 @@ export const openUsageStore = (path: string) => {
     return { ...totals, estimatedCostUsd: (totals.inputTokens * JEV_INPUT_USD_PER_MILLION) / 1_000_000, byCredential }
   }
 
+  const syncToolSources = (sources: ReadonlyMap<string, { readonly category: RegistryToolSource; readonly owner: string | null }>): void => {
+    transaction(() => {
+      for (const [name, source] of sources)
+        prepare("UPDATE tools SET category = ?, owner = ? WHERE name = ? AND category != 'skill'").run(source.category, source.owner, name)
+    })
+  }
+
+  const activity = (query: {
+    readonly from: number
+    readonly to: number
+    readonly category?: 'api' | 'mcp' | 'plugin' | 'tool' | 'skill' | 'other'
+    readonly limit?: number
+    readonly eventLimit?: number
+  }) => {
+    const toolRows = z.array(toolActivityRowSchema).parse(
+      prepare(`WITH durations AS (
+        SELECT category, owner, name, ended_at - started_at AS duration_ms,
+          ROW_NUMBER() OVER (PARTITION BY category, owner, name ORDER BY ended_at - started_at) AS rank,
+          COUNT(*) OVER (PARTITION BY category, owner, name) AS count
+        FROM tools WHERE started_at >= ? AND started_at < ? AND ended_at IS NOT NULL AND (? IS NULL OR category = ?)
+      ), duration_stats AS (
+        SELECT category, owner, name,
+          MAX(CASE WHEN rank = CAST(count * 0.5 AS INTEGER) + 1 THEN duration_ms END) AS p50DurationMs,
+          MAX(CASE WHEN rank = CAST(count * 0.9 AS INTEGER) + 1 THEN duration_ms END) AS p90DurationMs
+        FROM durations GROUP BY category, owner, name
+      )
+      SELECT t.name, t.category, t.owner, COUNT(*) AS calls,
+        SUM(CASE WHEN t.outcome = 'success' THEN 1 ELSE 0 END) AS successes,
+        SUM(CASE WHEN t.outcome = 'error' THEN 1 ELSE 0 END) AS errors,
+        SUM(CASE WHEN t.outcome = 'interrupted' THEN 1 ELSE 0 END) AS interrupted,
+        SUM(CASE WHEN t.outcome = 'unknown' THEN 1 ELSE 0 END) AS unknown,
+        SUM(CASE WHEN t.outcome = 'pending' THEN 1 ELSE 0 END) AS pending,
+        MIN(t.started_at) AS firstStartedAt, MAX(t.started_at) AS lastStartedAt,
+        MIN(t.ended_at) AS firstEndedAt, MAX(t.ended_at) AS lastEndedAt,
+        AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
+        ds.p50DurationMs, ds.p90DurationMs,
+        MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs
+      FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category AND ds.owner IS t.owner AND ds.name = t.name
+      WHERE t.started_at >= ? AND t.started_at < ? AND (? IS NULL OR t.category = ?)
+      GROUP BY t.category, t.owner, t.name ORDER BY calls DESC, t.category, t.owner, t.name LIMIT ?`).all(
+        query.from,
+        query.to,
+        query.category ?? null,
+        query.category ?? null,
+        query.from,
+        query.to,
+        query.category ?? null,
+        query.category ?? null,
+        query.limit ?? 100,
+      ),
+    )
+    const events = [
+      ...z
+        .array(jevEventRowSchema)
+        .parse(
+          prepare(
+            'SELECT started_at AS at, started_at + duration_ms AS endedAt, duration_ms AS durationMs, source, outcome FROM jev_requests WHERE started_at >= ? AND started_at < ? ORDER BY started_at DESC LIMIT ?',
+          ).all(query.from, query.to, query.eventLimit ?? 200),
+        )
+        .map(row => ({ kind: 'jev' as const, ...row })),
+      ...z
+        .array(
+          z.object({
+            id: z.string(),
+            session_id: z.string(),
+            seq: z.number(),
+            turn: z.number().nullable(),
+            step: z.number().nullable(),
+            name: z.string(),
+            category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+            owner: textColumn,
+            started_at: z.number(),
+            ended_at: numberColumn,
+            outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
+          }),
+        )
+        .parse(
+          prepare(`SELECT id, session_id, seq, turn, step, name, category, owner, started_at, ended_at, outcome FROM tools
+          WHERE started_at >= ? AND started_at < ?
+          ORDER BY started_at DESC LIMIT ?`).all(query.from, query.to, query.eventLimit ?? 200),
+        )
+        .map(row => ({
+          kind: 'tool' as const,
+          at: row.started_at,
+          endedAt: row.ended_at,
+          durationMs: row.ended_at === null ? null : row.ended_at - row.started_at,
+          category: row.category,
+          name: row.name,
+          owner: row.owner,
+          outcome: row.outcome,
+          turn: row.turn,
+          step: row.step,
+        })),
+    ]
+      .sort((left, right) => right.at - left.at)
+      .slice(0, query.eventLimit ?? 50)
+    const categoryOutcomes = z
+      .array(activityCategoryRowSchema)
+      .parse(
+        prepare(`WITH durations AS (
+      SELECT category, ended_at - started_at AS duration_ms,
+        ROW_NUMBER() OVER (PARTITION BY category ORDER BY ended_at - started_at) AS rank,
+        COUNT(*) OVER (PARTITION BY category) AS count
+      FROM tools WHERE started_at >= ? AND started_at < ? AND ended_at IS NOT NULL
+    ), duration_stats AS (
+      SELECT category,
+        MAX(CASE WHEN rank = CAST(count * 0.5 AS INTEGER) + 1 THEN duration_ms END) AS p50DurationMs,
+        MAX(CASE WHEN rank = CAST(count * 0.9 AS INTEGER) + 1 THEN duration_ms END) AS p90DurationMs
+      FROM durations GROUP BY category
+    )
+    SELECT t.category, COUNT(*) AS calls,
+      SUM(CASE WHEN t.outcome = 'success' THEN 1 ELSE 0 END) AS successes,
+      SUM(CASE WHEN t.outcome = 'error' THEN 1 ELSE 0 END) AS errors,
+      SUM(CASE WHEN t.outcome = 'interrupted' THEN 1 ELSE 0 END) AS interrupted,
+      SUM(CASE WHEN t.outcome = 'unknown' THEN 1 ELSE 0 END) AS unknown,
+      SUM(CASE WHEN t.outcome = 'pending' THEN 1 ELSE 0 END) AS pending,
+      AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
+      ds.p50DurationMs, ds.p90DurationMs,
+      MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs
+    FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category
+    WHERE t.started_at >= ? AND t.started_at < ? GROUP BY t.category ORDER BY t.category`).all(query.from, query.to, query.from, query.to),
+      )
+      .map(row => ({
+        category: row.category,
+        calls: row.calls,
+        successes: row.successes,
+        errors: row.errors,
+        interrupted: row.interrupted,
+        unknown: row.unknown,
+        pending: row.pending,
+        successRate: row.calls === 0 ? 0 : row.successes / row.calls,
+        durationMs: {
+          averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+          p50Ms: row.p50DurationMs,
+          p90Ms: row.p90DurationMs,
+          maxMs: row.maxDurationMs,
+        },
+      }))
+    const jev = jevActivityRowSchema.parse(
+      prepare(`SELECT COUNT(*) AS calls,
+      COALESCE(SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END), 0) AS successes,
+      COALESCE(SUM(CASE WHEN outcome != 'success' THEN 1 ELSE 0 END), 0) AS failures,
+      COALESCE(SUM(input_tokens), 0) AS inputTokens, COALESCE(SUM(output_tokens), 0) AS outputTokens,
+      AVG(duration_ms) AS durationMs, MAX(duration_ms) AS maxDurationMs FROM jev_requests WHERE started_at >= ? AND started_at < ?`).get(query.from, query.to),
+    )
+    const jevOutcomes = z
+      .array(jevOutcomeRowSchema)
+      .parse(
+        prepare(
+          'SELECT outcome, COUNT(*) AS calls FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY outcome ORDER BY calls DESC, outcome',
+        ).all(query.from, query.to),
+      )
+    const jevSources = z
+      .array(
+        z.object({
+          source: jevUsageSourceSchema,
+          calls: z.number(),
+          successes: z.number(),
+          failures: z.number(),
+          inputTokens: z.number(),
+          outputTokens: z.number(),
+          averageDurationMs: numberColumn,
+          p50DurationMs: numberColumn,
+          p90DurationMs: numberColumn,
+          maxDurationMs: numberColumn,
+        }),
+      )
+      .parse(
+        prepare(`WITH durations AS (
+      SELECT source, duration_ms,
+        ROW_NUMBER() OVER (PARTITION BY source ORDER BY duration_ms) AS rank,
+        COUNT(*) OVER (PARTITION BY source) AS count
+      FROM jev_requests WHERE started_at >= ? AND started_at < ?
+    ), duration_stats AS (
+      SELECT source,
+        MAX(CASE WHEN rank = CAST(count * 0.5 AS INTEGER) + 1 THEN duration_ms END) AS p50DurationMs,
+        MAX(CASE WHEN rank = CAST(count * 0.9 AS INTEGER) + 1 THEN duration_ms END) AS p90DurationMs
+      FROM durations GROUP BY source
+    )
+    SELECT j.source, COUNT(*) AS calls,
+      SUM(CASE WHEN j.outcome = 'success' THEN 1 ELSE 0 END) AS successes,
+      SUM(CASE WHEN j.outcome != 'success' THEN 1 ELSE 0 END) AS failures,
+      COALESCE(SUM(j.input_tokens), 0) AS inputTokens, COALESCE(SUM(j.output_tokens), 0) AS outputTokens,
+      AVG(j.duration_ms) AS averageDurationMs, ds.p50DurationMs, ds.p90DurationMs, MAX(j.duration_ms) AS maxDurationMs
+    FROM jev_requests j LEFT JOIN duration_stats ds ON ds.source = j.source
+    WHERE j.started_at >= ? AND j.started_at < ? GROUP BY j.source ORDER BY j.source`).all(query.from, query.to, query.from, query.to),
+      )
+      .map(row => ({
+        source: row.source,
+        calls: row.calls,
+        successes: row.successes,
+        failures: row.failures,
+        successRate: row.calls === 0 ? 0 : row.successes / row.calls,
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        durationMs: {
+          averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+          p50Ms: row.p50DurationMs,
+          p90Ms: row.p90DurationMs,
+          maxMs: row.maxDurationMs,
+        },
+      }))
+    const jevDurationStats = z.object({ p50DurationMs: numberColumn, p90DurationMs: numberColumn, maxDurationMs: numberColumn }).parse(
+      prepare(`WITH durations AS (
+      SELECT duration_ms, ROW_NUMBER() OVER (ORDER BY duration_ms) AS rank, COUNT(*) OVER () AS count
+      FROM jev_requests WHERE started_at >= ? AND started_at < ?
+    )
+    SELECT MAX(CASE WHEN rank = CAST(count * 0.5 AS INTEGER) + 1 THEN duration_ms END) AS p50DurationMs,
+      MAX(CASE WHEN rank = CAST(count * 0.9 AS INTEGER) + 1 THEN duration_ms END) AS p90DurationMs,
+      MAX(duration_ms) AS maxDurationMs
+    FROM durations`).get(query.from, query.to),
+    )
+
+    return {
+      range: { from: query.from, to: query.to },
+      categories: categoryOutcomes.map(row => ({ category: row.category, calls: row.calls })),
+      categoryOutcomes,
+      tools: toolRows.map(row => ({
+        name: row.name,
+        category: row.category,
+        owner: row.owner,
+        calls: row.calls,
+        successes: row.successes,
+        successRate: row.calls === 0 ? 0 : row.successes / row.calls,
+        errors: row.errors,
+        interrupted: row.interrupted,
+        unknown: row.unknown,
+        pending: row.pending,
+        outcomes: { successes: row.successes, errors: row.errors, interrupted: row.interrupted, unknown: row.unknown, pending: row.pending },
+        timestamps: { firstStarted: row.firstStartedAt, lastStarted: row.lastStartedAt, firstEnded: row.firstEndedAt, lastEnded: row.lastEndedAt },
+        durationMs: {
+          averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+          p50Ms: row.p50DurationMs,
+          p90Ms: row.p90DurationMs,
+          maxMs: row.maxDurationMs,
+        },
+        averageDurationMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+      })),
+      events,
+      jev: {
+        calls: jev.calls,
+        successes: jev.successes,
+        failures: jev.failures,
+        averageDurationMs: jev.durationMs === null ? null : Math.round(jev.durationMs),
+        inputTokens: jev.inputTokens,
+        outputTokens: jev.outputTokens,
+        byOutcome: jevOutcomes,
+        successRate: jev.calls === 0 ? 0 : jev.successes / jev.calls,
+        bySource: jevSources,
+        durationMs: {
+          averageMs: jev.durationMs === null ? null : Math.round(jev.durationMs),
+          p50Ms: jevDurationStats.p50DurationMs,
+          p90Ms: jevDurationStats.p90DurationMs,
+          maxMs: jevDurationStats.maxDurationMs,
+        },
+      },
+    }
+  }
+
+  const otelMetrics = (range: { readonly from: number; readonly to: number }) => {
+    const modelCountRows = z
+      .array(
+        z.object({
+          provider: z.string().max(200),
+          model: z.string().max(200),
+          purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
+          status: z.enum(UsageFoldModel.REQUEST_STATUSES),
+          calls: z.number().int(),
+        }),
+      )
+      .parse(
+        prepare(`SELECT provider, model, purpose, status, COUNT(*) AS calls FROM requests r
+          WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
+          GROUP BY provider, model, purpose, status ORDER BY calls DESC LIMIT 1000`).all(range.from, range.to),
+      )
+    const modelTokenRows = z
+      .array(
+        z.object({
+          provider: z.string().max(200),
+          model: z.string().max(200),
+          purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
+          input: z.number().int(),
+          cacheRead: z.number().int(),
+          cacheWrite: z.number().int(),
+          output: z.number().int(),
+          reasoning: z.number().int(),
+        }),
+      )
+      .parse(
+        prepare(`SELECT provider, model, purpose, COALESCE(SUM(input), 0) AS input,
+            COALESCE(SUM(cache_read), 0) AS cacheRead, COALESCE(SUM(cache_write), 0) AS cacheWrite,
+            COALESCE(SUM(output), 0) AS output, COALESCE(SUM(reasoning), 0) AS reasoning
+          FROM requests r WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
+          GROUP BY provider, model, purpose ORDER BY SUM(COALESCE(input, 0) + COALESCE(cache_read, 0) + COALESCE(cache_write, 0) + COALESCE(output, 0) + COALESCE(reasoning, 0)) DESC LIMIT 1000`).all(
+          range.from,
+          range.to,
+        ),
+      )
+    const modelDurationRows = z
+      .array(
+        z
+          .object({
+            provider: z.string().max(200),
+            model: z.string().max(200),
+            purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
+            status: z.enum(UsageFoldModel.REQUEST_STATUSES),
+          })
+          .extend(OTEL_HISTOGRAM_BASE_ROW_SCHEMA.shape),
+      )
+      .parse(
+        prepare(`WITH duration_rows AS (
+            SELECT provider, model, purpose, status, ended_at - started_at AS duration_ms FROM requests r
+            WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ? AND r.ended_at IS NOT NULL AND r.ended_at >= r.started_at
+          )
+          SELECT provider, model, purpose, status, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}
+          FROM duration_rows GROUP BY provider, model, purpose, status ORDER BY calls DESC LIMIT 1000`).all(range.from, range.to),
+      )
+    const toolCategoryRows = z.array(z.object({ category: z.enum(OTEL_TOOL_CATEGORIES), outcome: z.enum(OTEL_TOOL_OUTCOMES), calls: z.number().int() })).parse(
+      prepare(`SELECT category, outcome, COUNT(*) AS calls FROM tools WHERE started_at >= ? AND started_at < ?
+          GROUP BY category, outcome ORDER BY category, outcome`).all(range.from, range.to),
+    )
+    const toolSourceRows = z
+      .array(z.object({ category: z.enum(OTEL_TOOL_CATEGORIES), name: z.string().min(1).max(120), owner: textColumn, calls: z.number().int() }))
+      .parse(
+        prepare(`SELECT category, name, owner, COUNT(*) AS calls FROM tools WHERE started_at >= ? AND started_at < ?
+          GROUP BY category, name, owner ORDER BY calls DESC, category, owner, name LIMIT 500`).all(range.from, range.to),
+      )
+    const toolDurationRows = z
+      .array(z.object({ category: z.enum(OTEL_TOOL_CATEGORIES), outcome: z.enum(OTEL_TOOL_OUTCOMES) }).extend(OTEL_HISTOGRAM_BASE_ROW_SCHEMA.shape))
+      .parse(
+        prepare(`WITH duration_rows AS (
+            SELECT category, outcome, ended_at - started_at AS duration_ms FROM tools
+            WHERE started_at >= ? AND started_at < ? AND ended_at IS NOT NULL AND ended_at >= started_at
+          )
+          SELECT category, outcome, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}
+          FROM duration_rows GROUP BY category, outcome ORDER BY category, outcome`).all(range.from, range.to),
+      )
+    const jevCountRows = z.array(z.object({ source: jevUsageSourceSchema, outcome: jevUsageOutcomeSchema, calls: z.number().int() })).parse(
+      prepare(`SELECT source, outcome, COUNT(*) AS calls FROM jev_requests WHERE started_at >= ? AND started_at < ?
+          GROUP BY source, outcome ORDER BY source, outcome`).all(range.from, range.to),
+    )
+    const jevTokenRows = z.array(z.object({ source: jevUsageSourceSchema, input: z.number().int(), output: z.number().int() })).parse(
+      prepare(`SELECT source, COALESCE(SUM(input_tokens), 0) AS input, COALESCE(SUM(output_tokens), 0) AS output
+          FROM jev_requests WHERE started_at >= ? AND started_at < ? GROUP BY source ORDER BY source`).all(range.from, range.to),
+    )
+    const jevDurationRows = z
+      .array(z.object({ source: jevUsageSourceSchema, outcome: jevUsageOutcomeSchema }).extend(OTEL_HISTOGRAM_BASE_ROW_SCHEMA.shape))
+      .parse(
+        prepare(`WITH duration_rows AS (
+            SELECT source, outcome, duration_ms FROM jev_requests WHERE started_at >= ? AND started_at < ?
+          )
+          SELECT source, outcome, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}
+          FROM duration_rows GROUP BY source, outcome ORDER BY source, outcome`).all(range.from, range.to),
+      )
+
+    const counters: OtlpCounterInput[] = []
+    if (modelCountRows.length > 0)
+      counters.push({
+        name: 'dsh.model.request.count',
+        description: 'Recorded model requests by provider, model, purpose, and outcome.',
+        unit: '{request}',
+        points: modelCountRows.map(row => ({
+          attributes: {
+            'gen_ai.provider.name': row.provider,
+            'gen_ai.request.model': row.model,
+            'dsh.request.purpose': row.purpose,
+            'dsh.request.outcome': row.status,
+          },
+          value: row.calls,
+        })),
+      })
+    const tokenPoints = modelTokenRows.flatMap(row =>
+      [
+        { type: 'input', value: row.input },
+        { type: 'cache_read', value: row.cacheRead },
+        { type: 'cache_write', value: row.cacheWrite },
+        { type: 'output', value: row.output },
+        { type: 'reasoning', value: row.reasoning },
+      ]
+        .filter(token => token.value > 0)
+        .map(token => ({
+          attributes: {
+            'gen_ai.provider.name': row.provider,
+            'gen_ai.request.model': row.model,
+            'dsh.request.purpose': row.purpose,
+            'gen_ai.token.type': token.type,
+          },
+          value: token.value,
+        })),
+    )
+    if (tokenPoints.length > 0)
+      counters.push({ name: 'dsh.model.token.usage', description: 'Recorded model tokens by token type.', unit: '{token}', points: tokenPoints })
+    if (toolCategoryRows.length > 0)
+      counters.push({
+        name: 'dsh.tool.execution.count',
+        description: 'Recorded tool executions by source category and outcome; exact for the selected interval.',
+        unit: '{execution}',
+        points: toolCategoryRows.map(row => ({ attributes: { 'dsh.tool.category': row.category, 'dsh.tool.outcome': row.outcome }, value: row.calls })),
+      })
+    if (toolSourceRows.length > 0)
+      counters.push({
+        name: 'dsh.tool.source.execution.count',
+        description: 'Recorded tool executions for up to the 500 most-used named tool sources; category totals are exported separately.',
+        unit: '{execution}',
+        points: toolSourceRows.map(row => {
+          const point = {
+            attributes: { 'dsh.tool.category': row.category, 'dsh.tool.name': row.name },
+            value: row.calls,
+          }
+          if (row.owner === null) return point
+          return { attributes: { ...point.attributes, 'dsh.tool.owner': row.owner }, value: point.value }
+        }),
+      })
+    if (jevCountRows.length > 0)
+      counters.push({
+        name: 'dsh.jev.request.count',
+        description: 'Recorded Jev requests by calling plugin and outcome.',
+        unit: '{request}',
+        points: jevCountRows.map(row => ({ attributes: { 'dsh.jev.source': row.source, 'dsh.jev.outcome': row.outcome }, value: row.calls })),
+      })
+    const jevTokenPoints = jevTokenRows.flatMap(row =>
+      [
+        { type: 'input', value: row.input },
+        { type: 'output', value: row.output },
+      ]
+        .filter(token => token.value > 0)
+        .map(token => ({ attributes: { 'dsh.jev.source': row.source, 'gen_ai.token.type': token.type }, value: token.value })),
+    )
+    if (jevTokenPoints.length > 0)
+      counters.push({
+        name: 'dsh.jev.token.usage',
+        description: 'Provider-reported Jev tokens by calling plugin and token type.',
+        unit: '{token}',
+        points: jevTokenPoints,
+      })
+
+    const bucketCountsOf = (row: z.infer<typeof OTEL_HISTOGRAM_BASE_ROW_SCHEMA>): number[] => {
+      const cumulative = [
+        row.bucket0,
+        row.bucket1,
+        row.bucket2,
+        row.bucket3,
+        row.bucket4,
+        row.bucket5,
+        row.bucket6,
+        row.bucket7,
+        row.bucket8,
+        row.bucket9,
+        row.bucket10,
+        row.bucket11,
+        row.bucket12,
+        row.calls,
+      ]
+      return cumulative.map((value, index) => value - (cumulative[index - 1] ?? 0))
+    }
+    const histograms: OtlpHistogramInput[] = []
+    if (modelDurationRows.length > 0)
+      histograms.push({
+        name: 'dsh.model.request.duration',
+        description: 'Recorded model request duration distribution.',
+        unit: 's',
+        bounds: OTEL_DURATION_BOUNDS_SECONDS,
+        points: modelDurationRows.map(row => ({
+          attributes: {
+            'gen_ai.provider.name': row.provider,
+            'gen_ai.request.model': row.model,
+            'dsh.request.purpose': row.purpose,
+            'dsh.request.outcome': row.status,
+          },
+          count: row.calls,
+          sum: row.durationSumMs / 1_000,
+          bucketCounts: bucketCountsOf(row),
+        })),
+      })
+    if (toolDurationRows.length > 0)
+      histograms.push({
+        name: 'dsh.tool.execution.duration',
+        description: 'Recorded tool execution duration distribution by category and outcome.',
+        unit: 's',
+        bounds: OTEL_DURATION_BOUNDS_SECONDS,
+        points: toolDurationRows.map(row => ({
+          attributes: { 'dsh.tool.category': row.category, 'dsh.tool.outcome': row.outcome },
+          count: row.calls,
+          sum: row.durationSumMs / 1_000,
+          bucketCounts: bucketCountsOf(row),
+        })),
+      })
+    if (jevDurationRows.length > 0)
+      histograms.push({
+        name: 'dsh.jev.request.duration',
+        description: 'Recorded Jev request duration distribution by calling plugin and outcome.',
+        unit: 's',
+        bounds: OTEL_DURATION_BOUNDS_SECONDS,
+        points: jevDurationRows.map(row => ({
+          attributes: { 'dsh.jev.source': row.source, 'dsh.jev.outcome': row.outcome },
+          count: row.calls,
+          sum: row.durationSumMs / 1_000,
+          bucketCounts: bucketCountsOf(row),
+        })),
+      })
+
+    return createOtlpMetricsRequest({ from: range.from, to: range.to, counters, histograms })
+  }
+
   const counts = () =>
     z
       .object({ files: z.number(), requests: z.number() })
@@ -767,6 +1409,7 @@ export const openUsageStore = (path: string) => {
     commitLogSlice,
     insertLiveCall,
     reconcileLiveCalls,
+    pruneTelemetry: (now?: number) => transaction(() => pruneTelemetry(now)),
     routeBands,
     unratedRouteBands,
     writeRates,
@@ -776,6 +1419,9 @@ export const openUsageStore = (path: string) => {
     charts,
     recordJevUsage,
     jevUsage,
+    activity,
+    otelMetrics,
+    syncToolSources,
     counts,
     close: () => database.close(),
   }
