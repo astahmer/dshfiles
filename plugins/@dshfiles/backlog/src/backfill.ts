@@ -1,6 +1,6 @@
 import type { BacklogItem, BacklogStatus } from './item.js'
 
-const openStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing']
+const openStatuses: readonly BacklogStatus[] = ['inbox', 'todo']
 const DEFAULT_LIMIT = 25
 const MAX_LIMIT = 100
 
@@ -17,7 +17,7 @@ export interface BackfillSelection {
   readonly ids: readonly number[]
   /** Every eligible item in scope, before the limit. */
   readonly total: number
-  /** Eligible items this run leaves for a later one. */
+  /** Inbox/todo tasks left after applying the limit. */
   readonly remaining: number
 }
 
@@ -28,6 +28,16 @@ export interface BackfillRun {
   readonly triage: (id: number) => Promise<TriageOutcome>
   /** Records that triage found nothing to change, so the next run skips the item. */
   readonly markTriaged: (id: number) => Promise<void>
+  readonly onProgress?: (progress: BackfillProgress) => void
+}
+
+export interface BackfillProgress {
+  readonly completed: number
+  readonly total: number
+  readonly applied: number
+  readonly proposed: number
+  readonly unchanged: number
+  readonly failed: number
 }
 
 export interface BackfillReport {
@@ -36,14 +46,17 @@ export interface BackfillReport {
   readonly proposed: number
   readonly unchanged: number
   readonly failed: number
-  /** Eligible items a later run still has to look at. */
+  /** Inbox/todo tasks a later run still has to look at. */
   readonly remaining: number
 }
 
 const triaged = (item: BacklogItem): boolean => item.events.some(event => event.kind === 'triaged')
 
 const eligible = (item: BacklogItem, scope: BackfillScope): boolean =>
-  (scope.statuses === undefined || scope.statuses.includes(item.status)) && (scope.retriage === true || !triaged(item))
+  item.kind === 'task' &&
+  openStatuses.includes(item.status) &&
+  (scope.statuses === undefined || scope.statuses.includes(item.status)) &&
+  (scope.retriage === true || !triaged(item))
 
 /** Oldest first, so repeated runs move through the backlog instead of chasing whatever was captured last. */
 const oldestFirst = (left: BacklogItem, right: BacklogItem): number => left.createdAt - right.createdAt || left.id - right.id
@@ -58,7 +71,7 @@ const select = (items: readonly BacklogItem[], scope: BackfillScope): BackfillSe
 /** One pass over a selection, one item at a time: an item that fails stays eligible for the next run. */
 const run = async (request: BackfillRun): Promise<BackfillReport> => {
   const counts = { applied: 0, proposed: 0, unchanged: 0, failed: 0 }
-  for (const id of request.selection.ids) {
+  for (const [index, id] of request.selection.ids.entries()) {
     const outcome = await request.triage(id).catch(() => 'failed' as const)
     if (outcome === 'applied') counts.applied += 1
     if (outcome === 'proposed') counts.proposed += 1
@@ -67,6 +80,7 @@ const run = async (request: BackfillRun): Promise<BackfillReport> => {
       counts.unchanged += 1
       await request.markTriaged(id)
     }
+    request.onProgress?.({ completed: index + 1, total: request.selection.ids.length, ...counts })
   }
   const handled = counts.applied + counts.proposed + counts.unchanged
   return { considered: request.selection.ids.length, ...counts, remaining: Math.max(0, request.selection.total - handled) }

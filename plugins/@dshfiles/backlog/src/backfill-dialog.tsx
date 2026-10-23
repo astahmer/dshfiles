@@ -7,10 +7,11 @@ import { useState } from 'react'
 import type { BacklogBackfillResult } from './api.js'
 
 const summaryOf = (result: BacklogBackfillResult): string => {
-  if (result.considered === 0) return result.remaining === 0 ? 'Nothing left to backfill.' : `${String(result.remaining)} items are waiting to be triaged.`
+  if (result.reason !== null) return result.reason
+  if (result.completed === 0) return result.remaining === 0 ? 'Nothing left to backfill.' : `${String(result.remaining)} tasks are waiting to be triaged.`
   const failed = result.failed === 0 ? '' : `, ${String(result.failed)} failed`
   const left = result.remaining === 0 ? ' Nothing left to backfill.' : ` ${String(result.remaining)} still untriaged.`
-  return `Triaged ${String(result.considered)}: ${String(result.applied)} applied, ${String(result.proposed)} waiting as suggestions, ${String(result.unchanged)} unchanged${failed}.${left}`
+  return `Triaged ${String(result.completed)}: ${String(result.applied)} applied, ${String(result.proposed)} waiting as suggestions, ${String(result.unchanged)} unchanged${failed}.${left}`
 }
 
 /**
@@ -18,34 +19,36 @@ const summaryOf = (result: BacklogBackfillResult): string => {
  * own. One bounded batch at a time, with the outcome kept on screen so a repeated run is an informed choice.
  */
 export const BackfillDialog = (props: {
+  readonly open: boolean
+  readonly progress: BacklogBackfillResult | null
+  readonly error: string | null
+  readonly onError: (message: string) => void
   readonly triageOff: boolean
-  readonly run: (request: { readonly retriage: boolean }) => Promise<BacklogBackfillResult>
+  readonly run: (request: { readonly retriage: boolean }) => Promise<void>
   readonly close: () => void
 }): JSX.Element => {
   const [retriage, setRetriage] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<BacklogBackfillResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const job = props.progress
+  const error = props.error
   const submit = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
+    props.onError('')
     try {
-      setResult(await props.run({ retriage }))
+      await props.run({ retriage })
     } catch (caught) {
-      setError(errorMessage(caught, 'The backfill failed.'))
-    } finally {
-      setBusy(false)
+      props.onError(errorMessage(caught, 'The backfill could not be started.'))
     }
   }
+  const busy = job !== null && (job.state === 'queued' || job.state === 'running')
+  const result = job !== null && (job.state === 'completed' || job.state === 'failed') ? job : null
 
   return (
-    <Dialog open onOpenChange={open => (open ? undefined : props.close())}>
+    <Dialog open={props.open} onOpenChange={open => (open ? undefined : props.close())}>
       <DialogContent className="dshx-root dshx:sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Backfill triage</DialogTitle>
           <DialogDescription>
-            Runs Jev and the configured triage model on the oldest open items that no triage has looked at yet, up to 25 per run. A confident answer applies; a
-            hesitant one waits in the Inbox.
+            Runs Jev and the configured triage model on inbox/todo tasks only, up to 25 per run. It continues in the background, so you can close this dialog
+            and check progress later. A confident answer applies; a hesitant one waits in the Inbox.
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3">
@@ -56,20 +59,27 @@ export const BackfillDialog = (props: {
           {props.triageOff ? (
             <p className="dshx:text-xs dshx:text-warning">Triage is off. Turn on Jev or pick a provider and model in Settings → Backlog before backfilling.</p>
           ) : null}
+          {job !== null && busy ? (
+            <div className="dshx:flex dshx:flex-col dshx:gap-1.5" role="status" aria-live="polite">
+              <p className="dshx:text-xs dshx:text-muted-foreground">
+                {job.completed}/{job.total} tasks checked · {job.applied} applied · {job.proposed} suggestions · {job.failed} failed
+              </p>
+              <progress className="dshx:w-full dshx:accent-primary" value={job.completed} max={Math.max(1, job.total)} aria-label="Backfill progress" />
+            </div>
+          ) : null}
           {result === null ? null : (
-            <p className={result.configured ? 'dshx:text-xs dshx:text-muted-foreground' : 'dshx:text-xs dshx:text-warning'}>
-              {result.configured ? summaryOf(result) : result.reason}
-            </p>
+            <p className={result.configured ? 'dshx:text-xs dshx:text-muted-foreground' : 'dshx:text-xs dshx:text-warning'}>{summaryOf(result)}</p>
           )}
           {error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{error}</p>}
+          {props.error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{props.error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={props.close} disabled={busy}>
-            {result === null ? 'Cancel' : 'Close'}
+          <Button variant="outline" onClick={props.close}>
+            {busy ? 'Close and keep running' : result === null ? 'Cancel' : 'Close'}
           </Button>
           <Button onClick={() => void submit()} disabled={busy || props.triageOff}>
             {busy ? <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:animate-spin" /> : <WandSparklesIcon aria-hidden className="dshx:size-3.5" />}
-            Run backfill
+            {busy ? 'Running…' : 'Run backfill'}
           </Button>
         </DialogFooter>
       </DialogContent>

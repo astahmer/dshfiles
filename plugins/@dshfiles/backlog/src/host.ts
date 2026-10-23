@@ -227,36 +227,113 @@ const triageItem = async (ctx: Context, id: number) => {
  * Runs triage over the items that existed before it was switched on: oldest open items that no triage looked at yet,
  * one at a time so a rate limit or a bad key does not burst. Nothing is triaged while both services are missing.
  */
-const backfillTriage = async (
-  ctx: Context,
-  request: { readonly includeClosed?: boolean | undefined; readonly retriage?: boolean | undefined; readonly limit?: number | undefined },
-) => {
-  const settings = currentSettings()
-  const setup = await triageSetup(ctx, settings)
-  const store = await backlogFor(ctx)
-  const baseScope = { retriage: request.retriage === true, limit: request.limit ?? BacklogBackfill.defaultLimit }
-  const scope = request.includeClosed === true ? baseScope : { ...baseScope, statuses: BacklogBackfill.openStatuses }
-  if (setup.reason !== null)
-    return {
-      configured: false,
-      reason: setup.reason,
-      considered: 0,
-      applied: 0,
-      proposed: 0,
-      unchanged: 0,
-      failed: 0,
-      remaining: store.triageCandidates({ ...scope, limit: 0 }).total,
+interface BackfillJob {
+  readonly jobId: string
+  readonly retriage: boolean
+  configured: boolean
+  reason: string | null
+  state: 'queued' | 'running' | 'completed' | 'failed'
+  total: number
+  completed: number
+  applied: number
+  proposed: number
+  unchanged: number
+  failed: number
+  remaining: number
+}
+
+const backfillJobs = new Map<string, BackfillJob>()
+const MAX_BACKFILL_JOBS = 20
+
+const backfillSnapshot = (job: BackfillJob) => ({ ...job })
+
+const backfillTriageStatus = (jobId: string) => {
+  const job = backfillJobs.get(jobId)
+  if (job !== undefined) return backfillSnapshot(job)
+  return {
+    jobId: null,
+    retriage: false,
+    configured: false,
+    reason: 'This backfill is no longer available in this Host process.',
+    state: 'failed' as const,
+    total: 0,
+    completed: 0,
+    applied: 0,
+    proposed: 0,
+    unchanged: 0,
+    failed: 0,
+    remaining: 0,
+  }
+}
+
+const backfillTriage = async (ctx: Context, request: { readonly retriage?: boolean | undefined; readonly limit?: number | undefined }) => {
+  const jobId = randomUUID()
+  const job: BackfillJob = {
+    jobId,
+    retriage: request.retriage === true,
+    configured: true,
+    reason: null,
+    state: 'queued',
+    total: 0,
+    completed: 0,
+    applied: 0,
+    proposed: 0,
+    unchanged: 0,
+    failed: 0,
+    remaining: 0,
+  }
+  const runningJob = Array.from(backfillJobs.values()).find(existingJob => existingJob.state === 'queued' || existingJob.state === 'running')
+  if (runningJob !== undefined) throw new Error('A backlog backfill is already running.')
+  if (backfillJobs.size >= MAX_BACKFILL_JOBS) {
+    for (const [existingId, existingJob] of backfillJobs) {
+      if (existingJob.state === 'completed' || existingJob.state === 'failed') backfillJobs.delete(existingId)
+      if (backfillJobs.size < MAX_BACKFILL_JOBS) break
     }
-  const report = await BacklogBackfill.run({
-    selection: store.triageCandidates(scope),
-    triage: id =>
-      passTriage(ctx, id, { settings, services: setup.services }).catch(error => {
-        logFailure('Backlog backfill triage failed')(error)
-        return 'failed' as const
-      }),
-    markTriaged: id => store.markTriaged(id),
-  })
-  return { configured: true, reason: null, ...report }
+  }
+  if (backfillJobs.size >= MAX_BACKFILL_JOBS) throw new Error('Too many backfill jobs are active. Try again when one has finished.')
+  backfillJobs.set(jobId, job)
+  void (async () => {
+    try {
+      job.state = 'running'
+      const settings = currentSettings()
+      const setup = await triageSetup(ctx, settings)
+      const store = await backlogFor(ctx)
+      const scope = { retriage: request.retriage === true, limit: request.limit ?? BacklogBackfill.defaultLimit, statuses: BacklogBackfill.openStatuses }
+      if (setup.reason !== null) {
+        job.configured = false
+        job.reason = setup.reason
+        job.remaining = store.triageCandidates({ ...scope, limit: 0 }).total
+        job.state = 'completed'
+        return
+      }
+      const selection = store.triageCandidates(scope)
+      job.total = selection.ids.length
+      job.remaining = selection.remaining
+      const report = await BacklogBackfill.run({
+        selection,
+        triage: id =>
+          passTriage(ctx, id, { settings, services: setup.services }).catch(error => {
+            logFailure('Backlog backfill triage failed')(error)
+            return 'failed' as const
+          }),
+        markTriaged: id => store.markTriaged(id),
+        onProgress: progress => {
+          job.completed = progress.completed
+          job.applied = progress.applied
+          job.proposed = progress.proposed
+          job.unchanged = progress.unchanged
+          job.failed = progress.failed
+        },
+      })
+      job.remaining = report.remaining
+      job.state = 'completed'
+    } catch (error) {
+      logFailure('Backlog backfill failed')(error)
+      job.reason = 'The backfill failed before it could finish.'
+      job.state = 'failed'
+    }
+  })()
+  return { ...backfillSnapshot(job), state: 'queued' as const }
 }
 
 const logFailure = (what: string) => (error: unknown) => console.error(what, { error: error instanceof Error ? error.message.slice(0, 200) : String(error) })
@@ -650,6 +727,7 @@ const backlogApiHost = backlogApi.host({
   },
   triage: async ({ ctx, input }) => triageItem(ctx, input.id),
   backfillTriage: async ({ ctx, input }) => backfillTriage(ctx, input),
+  backfillTriageStatus: async ({ input }) => backfillTriageStatus(input.jobId),
   acknowledge: async ({ ctx, input }) => (await backlogFor(ctx)).acknowledge(input),
   applyProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).applyProposal({ id: input.id, actor: actorOf(caller) }),
   dismissProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).dismissProposal({ id: input.id, actor: actorOf(caller) }),

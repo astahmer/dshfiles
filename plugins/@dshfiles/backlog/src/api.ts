@@ -109,9 +109,13 @@ const listOutputSchema = z.object({ revision: z.number(), total: z.number().int(
 
 const backfillOutputSchema = z
   .object({
+    retriage: z.boolean(),
+    jobId: z.string().min(1).nullable(),
     configured: z.boolean(),
     reason: z.string().max(500).nullable(),
-    considered: z.number().int().nonnegative(),
+    state: z.enum(['queued', 'running', 'completed', 'failed']),
+    total: z.number().int().nonnegative(),
+    completed: z.number().int().nonnegative(),
     applied: z.number().int().nonnegative(),
     proposed: z.number().int().nonnegative(),
     unchanged: z.number().int().nonnegative(),
@@ -336,14 +340,19 @@ export const backlogApi = defineApi({
     backfillTriage: method({
       input: z
         .object({
-          limit: z.number().int().min(1).max(100).optional().describe('How many items one run may triage, oldest first; defaults to 25.'),
-          includeClosed: z.boolean().optional().describe('Also triage done and dropped items; the default covers open ones only.'),
-          retriage: z.boolean().optional().describe('Also triage items triage already looked at, e.g. after changing the prompt or model.'),
+          limit: z.number().int().min(1).max(100).optional().describe('How many inbox/todo tasks one run may triage, oldest first; defaults to 25.'),
+          retriage: z.boolean().optional().describe('Also re-triage inbox/todo tasks already looked at, e.g. after changing the prompt or model.'),
         })
         .strict(),
       output: backfillOutputSchema,
-      description: `Triage the backlog items that were captured before triage was set up, oldest first (Jev and the configured cheap model). A confident answer applies; a hesitant one waits on the item as a suggestion. Reports what it did and how many items it leaves for a later run. ${writeNote}`,
+      description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. ${writeNote}`,
       tool: { name: 'backlog_triage_backfill', readOnly: false },
+    }),
+    backfillTriageStatus: method({
+      input: z.object({ jobId: z.string().min(1).max(100) }).strict(),
+      output: backfillOutputSchema.nullable(),
+      description: 'Read progress for one backlog triage backfill job by its returned job id.',
+      tool: { name: 'backlog_triage_backfill_status', readOnly: true },
     }),
     applyProposal: method({
       input: z.object({ id: idSchema }).strict(),

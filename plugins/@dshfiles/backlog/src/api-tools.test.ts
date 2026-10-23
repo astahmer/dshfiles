@@ -22,6 +22,7 @@ describe('backlog tool exposure', () => {
       'backlog_start_thread',
       'backlog_triage',
       'backlog_triage_backfill',
+      'backlog_triage_backfill_status',
       'backlog_update',
     ])
   })
@@ -31,7 +32,15 @@ describe('backlog tool exposure', () => {
       .filter(method => method.tool?.readOnly === true)
       .map(method => method.tool?.name)
       .sort()
-    expect(readOnly).toEqual(['backlog_get', 'backlog_get_many', 'backlog_list', 'backlog_projects', 'backlog_read_file', 'backlog_referencing'])
+    expect(readOnly).toEqual([
+      'backlog_get',
+      'backlog_get_many',
+      'backlog_list',
+      'backlog_projects',
+      'backlog_read_file',
+      'backlog_referencing',
+      'backlog_triage_backfill_status',
+    ])
   })
 
   test('every tool explains itself', () => {

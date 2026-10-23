@@ -48,16 +48,26 @@ const item = (id: number, overrides: Partial<BacklogItem> = {}): BacklogItem => 
 })
 
 describe('backfill selection', () => {
-  const items = [item(4, { events: [{ at: 40, actor: 'user', kind: 'created', detail: '' }, triaged] }), item(2, { status: 'done' }), item(3), item(1), item(5)]
+  const items = [
+    item(4, { events: [{ at: 40, actor: 'user', kind: 'created', detail: '' }, triaged] }),
+    item(2, { status: 'done' }),
+    item(3),
+    item(1),
+    item(5),
+    item(6, { kind: 'bug' }),
+    item(7, { status: 'doing' }),
+  ]
 
-  it('takes open items nothing triaged yet, oldest first, and says how many a later run leaves', () => {
+  it('selects only inbox/todo tasks, oldest first, and says how many a later run leaves', () => {
     expect(BacklogBackfill.select(items, { statuses: BacklogBackfill.openStatuses, limit: 2 })).toEqual({ ids: [1, 3], total: 3, remaining: 1 })
   })
 
-  it('re-triages what triage already looked at, and reaches closed items when no status is scoped', () => {
+  it('re-triages only inbox/todo tasks it already looked at', () => {
     expect(BacklogBackfill.select(items, { statuses: BacklogBackfill.openStatuses, retriage: true, limit: 100 }).ids).toEqual([1, 3, 4, 5])
-    expect(BacklogBackfill.select(items, { limit: 100 }).ids).toEqual([1, 2, 3, 5])
-    expect(BacklogBackfill.select(items, { retriage: true, limit: 100 }).ids).toEqual([1, 2, 3, 4, 5])
+    expect(BacklogBackfill.select(items, { statuses: BacklogBackfill.openStatuses, retriage: true, limit: 100 }).ids).not.toContain(6)
+    expect(BacklogBackfill.select(items, { statuses: BacklogBackfill.openStatuses, retriage: true, limit: 100 }).ids).not.toContain(7)
+    expect(BacklogBackfill.select(items, { limit: 100 }).ids).toEqual([1, 3, 5])
+    expect(BacklogBackfill.select(items, { retriage: true, limit: 100 }).ids).toEqual([1, 3, 4, 5])
   })
 
   it('asks only how much is in scope when the limit is zero', () => {
@@ -66,8 +76,9 @@ describe('backfill selection', () => {
 })
 
 describe('backfill run', () => {
-  it('counts what each item became, marks only the unchanged ones, and leaves failures for the next run', async () => {
+  it('counts what each item became, reports progress, marks only unchanged ones, and leaves failures for later', async () => {
     const marked: number[] = []
+    const progress: { completed: number; total: number; applied: number; proposed: number; unchanged: number; failed: number }[] = []
     const outcomes = new Map<number, TriageOutcome>([
       [1, 'applied'],
       [2, 'proposed'],
@@ -80,10 +91,12 @@ describe('backfill run', () => {
       markTriaged: async id => {
         marked.push(id)
       },
+      onProgress: report => progress.push(report),
     })
 
     expect(report).toEqual({ considered: 4, applied: 1, proposed: 1, unchanged: 1, failed: 1, remaining: 3 })
     expect(marked).toEqual([3])
+    expect(progress.at(-1)).toEqual({ completed: 4, total: 4, applied: 1, proposed: 1, unchanged: 1, failed: 1 })
   })
 
   it('counts a throwing or vanished item as failed instead of stopping the run', async () => {

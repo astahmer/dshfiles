@@ -34,7 +34,7 @@ import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfi
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
-import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
+import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
 import { BoardView } from './board-view.js'
 import { BacklogFocusModel } from './backlog-focus.js'
@@ -272,6 +272,36 @@ export const BacklogPanel = (props: {
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
+  const [backfillJob, setBackfillJob] = useState<BacklogBackfillResult | null>(null)
+  const [backfillError, setBackfillError] = useState<string | null>(null)
+  const backfillJobId = backfillJob?.jobId
+  const backfillJobState = backfillJob?.state
+  useEffect(() => {
+    if (backfillJobId === undefined || backfillJobId === null || backfillJobState === 'completed' || backfillJobState === 'failed') return
+    let stopped = false
+    let timer: number | undefined
+    const refresh = async (): Promise<void> => {
+      try {
+        const next = await api.backfillTriageStatus({ jobId: backfillJobId })
+        if (stopped) return
+        if (next === null) {
+          setBackfillError('This backfill is no longer available in this Host process.')
+          return
+        }
+        setBackfillJob(next)
+        if (next.state === 'queued' || next.state === 'running') timer = window.setTimeout(() => void refresh(), 1_000)
+      } catch (error) {
+        if (stopped) return
+        setBackfillError(errorMessage(error, 'Could not read backfill progress.'))
+        timer = window.setTimeout(() => void refresh(), 5_000)
+      }
+    }
+    timer = window.setTimeout(() => void refresh(), 1_000)
+    return () => {
+      stopped = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [api, backfillJobId, backfillJobState])
   const stored = preferences.useValue()
   const view = stored.view
   const setPreference = (change: Partial<typeof stored>): void => {
@@ -725,8 +755,29 @@ export const BacklogPanel = (props: {
           close={() => setStartThreadItems(null)}
         />
       )}
-      {backfillOpen ? (
-        <BackfillDialog triageOff={triageOff} run={request => actions.backfillTriage.mutateAsync(request)} close={() => setBackfillOpen(false)} />
+      <BackfillDialog
+        open={backfillOpen}
+        triageOff={triageOff}
+        progress={backfillJob}
+        error={backfillError}
+        onError={message => setBackfillError(message.length === 0 ? null : message)}
+        run={async request => {
+          setBackfillError(null)
+          setBackfillJob(null)
+          const started = await actions.backfillTriage.mutateAsync(request)
+          setBackfillJob(started)
+          void queryClient.invalidateQueries({ queryKey: [BacklogQueries.key] })
+        }}
+        close={() => setBackfillOpen(false)}
+      />
+      {backfillJob !== null && !backfillOpen && (backfillJob.state === 'queued' || backfillJob.state === 'running') ? (
+        <button
+          type="button"
+          className="dshx:fixed dshx:bottom-5 dshx:right-5 dshx:z-40 dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:px-3 dshx:py-2 dshx:text-xs dshx:shadow-lg"
+          onClick={() => setBackfillOpen(true)}
+        >
+          Backfill running: {backfillJob.completed}/{backfillJob.total}
+        </button>
       ) : null}
       <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
         <div className="dshx:mx-auto dshx:max-w-4xl">
