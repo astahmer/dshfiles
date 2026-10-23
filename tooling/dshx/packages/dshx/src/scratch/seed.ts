@@ -647,6 +647,121 @@ const seedMultiHostHosts = async (state: ScratchState): Promise<void> => {
   await writeFile(path, `${JSON.stringify(directory, null, 2)}\n`, { mode: 0o600 })
 }
 
+const OTLP_SAMPLE_TRACE_ID = '5ca1ab1e0000400080000000000d5e11'
+
+const otlpSampleExport = (): unknown => {
+  const startNs = BigInt(Date.now() - 60_000) * 1_000_000n
+  const at = (offsetMs: number): string => (startNs + BigInt(offsetMs) * 1_000_000n).toString()
+  const text = (key: string, value: string) => ({ key, value: { stringValue: value } })
+  const span = (input: {
+    readonly spanId: string
+    readonly parentSpanId?: string
+    readonly name: string
+    readonly kind: number
+    readonly from: number
+    readonly to: number
+    readonly attributes?: readonly ReturnType<typeof text>[]
+    readonly status?: { readonly code: number; readonly message?: string }
+  }) => ({
+    traceId: OTLP_SAMPLE_TRACE_ID,
+    spanId: input.spanId,
+    ...(input.parentSpanId === undefined ? {} : { parentSpanId: input.parentSpanId }),
+    name: input.name,
+    kind: input.kind,
+    startTimeUnixNano: at(input.from),
+    endTimeUnixNano: at(input.to),
+    attributes: input.attributes ?? [],
+    status: input.status ?? { code: 1 },
+  })
+  return {
+    resourceSpans: [
+      {
+        resource: { attributes: [text('service.name', 'dshx-sample'), text('deployment.environment', 'scratch')] },
+        scopeSpans: [
+          {
+            scope: { name: 'dshx-dev-seed' },
+            spans: [
+              span({
+                spanId: '00000000000000a1',
+                name: 'POST /orders',
+                kind: 2,
+                from: 0,
+                to: 240,
+                attributes: [text('http.request.method', 'POST')],
+                status: { code: 2, message: 'order failed' },
+              }),
+              span({
+                spanId: '00000000000000a2',
+                parentSpanId: '00000000000000a1',
+                name: 'load cart',
+                kind: 3,
+                from: 8,
+                to: 46,
+                attributes: [text('db.system', 'sqlite')],
+              }),
+              span({
+                spanId: '00000000000000a3',
+                parentSpanId: '00000000000000a1',
+                name: 'charge card',
+                kind: 3,
+                from: 52,
+                to: 210,
+                attributes: [text('peer.service', 'dshx-payments'), text('error.type', 'CardDeclined')],
+                status: { code: 2, message: 'card declined' },
+              }),
+            ],
+          },
+        ],
+      },
+      {
+        resource: { attributes: [text('service.name', 'dshx-payments')] },
+        scopeSpans: [
+          {
+            scope: { name: 'dshx-dev-seed' },
+            spans: [
+              span({ spanId: '00000000000000b1', parentSpanId: '00000000000000a3', name: 'authorize', kind: 2, from: 60, to: 190 }),
+              span({ spanId: '00000000000000b2', parentSpanId: '00000000000000b1', name: 'risk score', kind: 1, from: 70, to: 120 }),
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+/** Post the sample export to the receiver the Traces panel reports, so the trace list and waterfall have real data. */
+const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
+  if (!state.bundles.includes('@dshfiles/traces')) {
+    throw new ScratchError(
+      'seed-needs-plugin',
+      'Seed otlp-sample-trace needs @dshfiles/traces.',
+      'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/traces ...".',
+    )
+  }
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Traces', exact: true }).click({ timeout: timeoutMs })
+  const badge = page.getByTestId('traces-receiver-state')
+  await badge.waitFor({ state: 'visible', timeout: timeoutMs })
+  await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {
+    timeout: timeoutMs,
+  })
+  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('title') : null
+  if (endpoint === null) {
+    throw new ScratchError(
+      'seed-receiver-not-listening',
+      `The traces receiver is not listening (${(await badge.textContent()) ?? 'unknown state'}).`,
+      'Open the Traces panel for its message; a scratch binds a free port, so a failure here is a receiver bug.',
+    )
+  }
+  const response = await fetch(`${endpoint}/v1/traces`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(otlpSampleExport()),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok)
+    throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(response.status)}.`, 'Read the Traces panel status.')
+}
+
 /** Apply one seed: the checkout file it changed and the process it started, if any. */
 const applySeed = async (input: {
   readonly state: ScratchState
@@ -665,6 +780,10 @@ const applySeed = async (input: {
   }
   if (input.seed === 'multi-host-hosts') {
     await seedMultiHostHosts(input.state)
+    return {}
+  }
+  if (input.seed === 'otlp-sample-trace') {
+    await seedOtlpSampleTrace(input.state, input.page, input.timeoutMs)
     return {}
   }
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }

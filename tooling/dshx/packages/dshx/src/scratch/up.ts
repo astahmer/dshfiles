@@ -83,6 +83,14 @@ const stopGroup = async (pid: number): Promise<void> => {
   }
 }
 
+/**
+ * Loader rows a scratch Host needs that the bundles do not compose. The traces receiver (@dshfiles/traces) defaults to the
+ * standard OTLP port 4318, which the live Host or an external viewer may own; a scratch takes any free port instead and
+ * its panel shows which one.
+ */
+const scratchCordisPatch = (packageIds: readonly string[]): { readonly cordisPatch?: string } =>
+  packageIds.includes('@dshfiles/traces') ? { cordisPatch: '- id: dshfiles-traces\n  config:\n    port: 0\n' } : {}
+
 export const scratchUp = async (
   options: ScratchUpOptions,
 ): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[]; readonly warned: readonly WarnedScratch[] }> => {
@@ -137,7 +145,10 @@ export const scratchUp = async (
     }
   }
   options.onProgress('installing the scratch profile')
-  const prepared = await prepareComposedBootProfile([firstBundle, ...otherBundles], { additionalBundleIds: options.bundles })
+  const prepared = await prepareComposedBootProfile([firstBundle, ...otherBundles], {
+    additionalBundleIds: options.bundles,
+    ...scratchCordisPatch(bundles.map(bundle => bundle.packageId)),
+  })
   const home = prepared.homeRoot
   let hostPid: number | undefined
   let browserPid: number | undefined

@@ -71,7 +71,10 @@ holds a `` `jj:main` `` code span, so a chat link is really rendered; needs
 aliases; needs `up --fake-secret-cli`, which puts the e2e fake `secret` first on
 the Host's PATH so Secret Catalog never reaches a real vault), and
 `backlog-jev-enabled` (turns Jev on in scratch Settings only when off, keeps
-auto-triage off, and stores no key; needs `@dshfiles/backlog`). `attach "<repo file>"`
+auto-triage off, and stores no key; needs `@dshfiles/backlog`), and
+`otlp-sample-trace` (posts one synthetic two-service OTLP trace with a failing
+nested span to the Traces receiver; needs `@dshfiles/traces`, whose scratch row
+binds a free port instead of 4318 so it never competes with the live Host). `attach "<repo file>"`
 hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next
