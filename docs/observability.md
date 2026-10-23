@@ -1,67 +1,72 @@
 # Observability: OpenTelemetry traces
 
-The `web` profile can export OpenTelemetry spans for every agent turn, ReAct
-step, model call and tool call. It uses the marketplace plugin
-[`@loongsuite/dsh-plugin`](https://www.npmjs.com/package/@loongsuite/dsh-plugin)
-(adopted, not ported or built), and exports nothing unless the Host process
-starts with `OTEL_EXPORTER_OTLP_ENDPOINT` set.
+The `web` profile exports OpenTelemetry spans for every agent turn, ReAct step, model call and tool call through
+[`@dshfiles/agent-telemetry`](../plugins/@dshfiles/agent-telemetry/README.md) (row `dshfiles-agent-telemetry`), a port
+of the marketplace plugin [`@loongsuite/dsh-plugin`](https://github.com/loongsuite/dsh-plugin) 0.1.3 onto
+`@dshfiles/dshx/tracing`. Spans go to the `OTEL_EXPORTER_OTLP_*` endpoint when one is set, otherwise to the in-process
+receiver of the traces plugin; with neither, nothing is recorded.
 
 Four sources answer different questions; pick the one that owns the question before adding another:
 
-| Question                                                          | Source                                                                                                     |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| What did a thread, its tools, Jev or an integration do, in order? | Activity Timeline plugin (`activity_timeline_*` agent tools): retained, condensed events.                  |
-| How many requests, tokens, what cost, which tools fail?           | Usage plugin: SQLite ledger, `usage_report`, and its OTLP metrics push (below).                            |
-| Why is the live GUI slow right now?                               | [`live-performance-audit`](performance.md) probes against :3080; measure before fixing.                    |
-| Where did the time of one turn or call go, across plugins?        | Traces: LoongSuite spans for turns, model calls and tools; dshx spans for our own code (below), one trace. |
+| Question                                                          | Source                                                                                                    |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| What did a thread, its tools, Jev or an integration do, in order? | Activity Timeline plugin (`activity_timeline_*` agent tools): retained, condensed events.                 |
+| How many requests, tokens, what cost, which tools fail?           | Usage plugin: SQLite ledger, `usage_report`, and its OTLP metrics push (below).                           |
+| Why is the live GUI slow right now?                               | [`live-performance-audit`](performance.md) probes against :3080; measure before fixing.                   |
+| Where did the time of one turn or call go, across plugins?        | Traces: agent-telemetry spans for turns, model calls and tools with our plugins' spans nested, one trace. |
 
 The **Traces** panel ([in-DSH viewer](#in-dsh-viewer-dshfilestraces)) browses those spans without leaving DSH.
 
 ## Turning it on
 
-The seed (`profiles/web/package.json` and the managed region of
-`profiles/web/cordis.patch.yml`) installs the plugin and gates its Loader row:
+Nothing to turn on. The seed installs `@dshfiles/agent-telemetry` with no `disabled` gate, and every span is a no-op
+until dshx tracing has a destination, checked at each span:
 
-```yaml
-- id: loongsuite-observability
-  disabled: !!js '!process.env.OTEL_EXPORTER_OTLP_ENDPOINT'
-```
+- the traces plugin's receiver, published in-process once it listens (no variable, no restart when it binds later);
+- or the standard variables in the `dsh web` environment, which win over it:
 
-The `!!js` expression is evaluated once at boot, so set the variables in the
-environment of the `dsh web` process (the nixfiles supervisor), then restart
-the DSH Host process. Without the variable the row stays disabled and nothing
-is collected or sent.
+| Variable                                                          | Effect                                                                                                                                      |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                                     | OTLP/HTTP base URL, e.g. `http://127.0.0.1:4318`; `/v1/traces` is appended.                                                                 |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`                              | Full traces URL, used as given.                                                                                                             |
+| `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | `key=value,…` headers, e.g. a collector token; never sent to the in-process receiver. Keep the value in the environment, never the profile. |
+| `OTEL_SERVICE_NAME`                                               | `service.name`, default `dshfiles`.                                                                                                         |
+| `OTEL_SDK_DISABLED=true`                                          | Everything off.                                                                                                                             |
+| `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`              | Opt-in content capture while the `captureContent` setting is `environment` (its default): `SPAN_ONLY` or `SPAN_AND_EVENT`.                  |
 
-The plugin reads the standard OpenTelemetry exporter variables:
-
-| Variable                                                    | Effect                                                                                                                                                 |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`                               | OTLP/HTTP base URL, e.g. `http://127.0.0.1:4318`; `/v1/traces` and `/v1/metrics` are appended. Required here: it also enables the row.                 |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` / `…_METRICS_ENDPOINT` | Per-signal full URLs, overriding the base.                                                                                                             |
-| `OTEL_EXPORTER_OTLP_HEADERS`                                | `key=value,…` headers, e.g. a collector token. Keep the value in the environment, never in the profile.                                                |
-| `OTEL_METRICS_EXPORTER=none`                                | Traces only.                                                                                                                                           |
-| `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`        | Opt-in content capture: `SPAN_ONLY` or `SPAN_AND_EVENT` put prompts, completions, tool arguments and tool results on spans. Unset means metadata only. |
-
-The wire format is OTLP/HTTP protobuf (`application/x-protobuf`), so the in-DSH
-viewer below, any OTLP collector, Jaeger, Grafana Tempo, Langfuse's OTLP endpoint
-or `comma otel-desktop-viewer` can receive it. The exporter is
-`@opentelemetry/exporter-trace-otlp-proto`, so `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`
-does not switch it to JSON. Traces go only where the endpoint points; the plugin
-has no default remote backend.
+Variables are read by the Host process, so setting them takes a DSH Host restart. The wire format is OTLP/HTTP JSON,
+which the in-DSH viewer, any OTLP collector, Jaeger, Grafana Tempo, Langfuse's OTLP endpoint or
+`comma otel-desktop-viewer` accept. Traces go only where the endpoint points; there is no default remote backend.
 
 ## What a span carries
 
-Per turn one `invoke_agent deepseek-harness` span, with `react step`,
-`chat <model>` (one per LLM attempt, retries included) and
-`execute_tool <name>` children. Attributes follow the GenAI semantic
-conventions: `gen_ai.request.model`, `gen_ai.provider.name`,
-`gen_ai.usage.*_tokens`, `gen_ai.response.finish_reasons`,
-`gen_ai.response.time_to_first_token`, `gen_ai.tool.name`, `gen_ai.tool.call.id`,
-`error.type`, plus `dsh.session.id`, `dsh.turn`, `dsh.step` and
-`dsh.session.cwd` (the Session's working directory — a local path). Token and
-duration metrics go to `/v1/metrics`.
+Per turn, one trace (a subagent's turns join their parent's):
 
-By default no message text, tool argument or tool result leaves the Host.
+```text
+enter_ai_application_system (server)
+└─ invoke_agent <agent> (client)              turn totals: gen_ai.usage.*, finish reason, dsh.turn.end_reason
+   └─ react step                               gen_ai.react.round / finish_reason
+      ├─ chat <model> (client)                 one per attempt, retries included; dsh.llm.attempt, TTFT
+      ├─ llm retry wait                        dsh.llm.retry, delay, error.type
+      └─ execute_tool <tool>                   the tool body runs with this span active
+         ├─ <api id>/<method> (server)         a dshx API the tool called, then its jj / secret / Jev spans
+         ├─ approval wait                      dsh.approval.outcome
+         ├─ job <kind> (producer)              a background job the tool started, until it settles
+         └─ enter_ai_application_system        a subagent's turn (subagent, subagent_fork, workflow tools)
+```
+
+Also `compaction`, `chat <model>` with `dsh.llm.purpose` for title and compaction calls and with
+`dsh.llm.standalone` for a plugin's own model call (under the span that made it), and `execute_tool <name>` for a
+`run_code` sub-dispatch. Attributes follow the GenAI semantic conventions LoongSuite used: `gen_ai.operation.name`,
+`gen_ai.span.kind`, `gen_ai.request.model`, `gen_ai.provider.name`, `gen_ai.usage.*_tokens` (cache buckets summed into
+input), `gen_ai.response.finish_reasons`, `gen_ai.response.time_to_first_token`, `gen_ai.tool.name`,
+`gen_ai.tool.call.id`, `error.type`, plus `dsh.session.id` (on every span), `dsh.turn`, `dsh.step`,
+`dsh.session.parent_id`, `dsh.trace.parent_link` and `dsh.session.cwd` (the Session's working directory — a local
+path).
+
+By default no message text, tool argument, tool result, approval reason, job label or provider error message leaves
+the Host; span status messages are error types or codes. The `captureContent` setting
+(`dshfiles-agent-telemetry`) or the variable above puts content on spans, each value cut to 1,024 characters.
 
 ## Usage ledger metrics
 
@@ -72,20 +77,20 @@ by category and source, Jev requests, duration histograms) to `/v1/metrics` as
 OTLP/HTTP JSON every 60 s, cumulative since Host start. Its metrics are named
 `dsh.*` under the `@dshfiles/usage` instrumentation scope and carry
 `service.name` from `OTEL_SERVICE_NAME` (default `dshfiles`).
-`OTEL_METRICS_EXPORTER=none` turns off both this export and LoongSuite's
-metrics. Details and the full variable list are in the
+`OTEL_METRICS_EXPORTER=none` turns it off. Details and the full variable list are in the
 [usage README](../plugins/@dshfiles/usage/README.md#periodic-export-opt-in).
 
 ## Spans from our own code (dshx)
 
-LoongSuite sees DSH core: turns, steps, model calls, tool calls. It cannot see
-what an owned plugin does inside a tool or a browser click. For that, dshx
-ships `@dshfiles/dshx/tracing` (no dependency, OTLP/HTTP JSON to `/v1/traces`).
-It sends to the same `OTEL_EXPORTER_OTLP_ENDPOINT` /
-`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` variables (`OTEL_SERVICE_NAME`, default
-`dshfiles`; `OTEL_SDK_DISABLED=true` forces it off) and, without one, to the
-in-DSH receiver below, which publishes its address in-process
-(`publishLocalOtlpEndpoint`). With neither, every span is a shared no-op.
+Agent telemetry sees DSH core: turns, steps, model calls, tool calls. What an
+owned plugin does inside a tool or a browser click comes from
+`@dshfiles/dshx/tracing` (no dependency, OTLP/HTTP JSON to `/v1/traces`), the
+same tracer agent-telemetry records through, with the same destinations: the
+`OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` variables
+(`OTEL_SERVICE_NAME`, default `dshfiles`; `OTEL_SDK_DISABLED=true` forces it
+off) and, without one, the in-DSH receiver below, which publishes its address
+in-process (`publishLocalOtlpEndpoint`). With neither, every span is a shared
+no-op.
 
 - Every dshx API dispatch (browser, plugin or agent tool) is a server span
   `<api id>/<method>`: package, API id, method, caller kind, outcome code and
@@ -97,9 +102,12 @@ in-DSH receiver below, which publishes its address in-process
   `jj-integration workspace sync`.
 - `dshx checkout sync` records its own span, continuing a `TRACEPARENT`
   environment variable when set.
-- A dshx span opened while a LoongSuite span is active (an `execute_tool`
-  span, for instance) becomes its child, so a tool call and the plugin work it
-  caused land in one trace.
+- A dshx span opened while an agent-telemetry span is active becomes its child:
+  the `tools/execute` hook runs every tool body with its `execute_tool` span
+  active and every model stream is pulled with its `chat` span active, so a
+  tool call and the plugin work it caused land in one trace with no per-plugin
+  code. To add a span of your own, see
+  [Add tracing to a plugin](../tooling/dshx/docs/guides/tracing.md#add-tracing-to-a-plugin).
 
 Spans carry identities, outcome codes, counts and durations only: no API
 arguments or results, command positionals or flag values, secret values,
@@ -121,21 +129,20 @@ Agents get the same reads as `traces_*` tools. It accepts any OTLP/HTTP sender,
 JSON or protobuf, not only DSH.
 
 In `plugin` and `both` modes the receiver publishes its bound address to the
-Host process (`@dshfiles/dshx/tracing`), so dshx tracing and the usage metrics
-push deliver to it **without any environment variable**, re-reading the target
-at every export; any span producer built on `otlpExportTarget` does the same.
-An explicit `OTEL_EXPORTER_OTLP_ENDPOINT` always wins. LoongSuite's turn, step,
-model and tool spans still need the variable in the `dsh web` environment at
-launch: its Loader row is gated on it at boot.
+Host process (`@dshfiles/dshx/tracing`), so agent telemetry, dshx tracing and
+the usage metrics push deliver to it **without any environment variable**,
+re-reading the target at every export; any span producer built on
+`otlpExportTarget` does the same. An explicit `OTEL_EXPORTER_OTLP_ENDPOINT`
+always wins.
 
-The environment trap: the DSH UI's restart button respawns the Host with the
-environment of the nixfiles `dsh-web` supervisor, so a variable added to the
-launcher (`nixapply`) after the supervisor started never reaches the Host.
-Restart `dsh-web` itself from a terminal after changing the launcher
-environment. `traces_status` and the panel say which case applies (`diagnosis`:
-`waiting`, `receiving`, `exporting-elsewhere`, `no-exporter`, `port-in-use`,
-`external-mode`, `failed`) and where this process's spans and metrics go
-(`exporters`). Its `mode` setting decides who owns the port:
+The environment trap, when you do set a variable: the DSH UI's restart button
+respawns the Host with the environment of the nixfiles `dsh-web` supervisor, so
+a variable added to the launcher (`nixapply`) after the supervisor started never
+reaches the Host. Restart `dsh-web` itself from a terminal after changing the
+launcher environment. `traces_status` and the panel say which case applies
+(`diagnosis`: `waiting`, `receiving`, `exporting-elsewhere`, `no-exporter`,
+`port-in-use`, `external-mode`, `failed`) and where this process's spans and
+metrics go (`exporters`). Its `mode` setting decides who owns the port:
 
 | `mode`             | Receiver                      | `OTEL_EXPORTER_OTLP_ENDPOINT` points at          |
 | ------------------ | ----------------------------- | ------------------------------------------------ |
@@ -148,7 +155,7 @@ When another process already holds the port, the panel and `traces_status` say
 GenAI content attributes (prompts, messages, tool payloads, only present when
 content capture is opted into) are stored as their size unless
 `redactGenAiContent` is turned off. `/v1/metrics` is stored too, so the usage
-ledger push and LoongSuite's token metrics chart in the Metrics tab. Details, settings and decisions are in the
+ledger push charts in the Metrics tab. Details, settings and decisions are in the
 [traces README](../plugins/@dshfiles/traces/README.md).
 
 Each thread also has a **Traces** tab in its conversation view, after
@@ -162,11 +169,43 @@ thread's own plugin work shows even without an agent telemetry exporter. Agents
 read the same through `traces_session_summary`, and `traces_search` /
 `traces_search_logs` with `sessionId`.
 
-## Decision (2026-10-23, b:299)
+## Decision (2026-10-24): fork LoongSuite as `@dshfiles/agent-telemetry`
+
+LoongSuite was adopted on 2026-10-23 (below) and replaced the next day by a port, because reading its source on DSH
+0.2.1-rc.2 showed what it could not do here:
+
+1. It never set an active OpenTelemetry context: spans were built after the fact from session events on a private
+   tracer provider, so nothing a tool triggered could nest under the tool span, and dshx's "nest under the active
+   OpenTelemetry span" (removed with this change) never fired in a real DSH.
+2. Every turn started a new root trace, and a subagent was a separate trace linked only by a
+   `dsh.session.parent_id` attribute.
+3. Model calls with a `purpose` (title, compaction) were skipped.
+4. No span for waits (approvals, model retries, background jobs).
+5. Its row was gated on `OTEL_EXPORTER_OTLP_ENDPOINT` at launch: a UI restart that reused an old environment exported
+   nothing.
+6. It brought the whole OpenTelemetry SDK and protobuf exporters (with an unmet peer warning) next to our
+   dependency-free dshx exporter.
+
+The port keeps its span names and GenAI attributes, its metadata-only default and content switch, and its failure
+containment, and fixes the six points: dshx tracing is the only exporter, the `tools/execute` hook and the
+`llm/stream` interceptor run tool bodies and model streams with their span active, subagent turns parent under the
+delegation tool span (shown in one trace in a real scratch DSH: `execute_tool subagent` → the child's
+`enter_ai_application_system` with `dsh.trace.parent_link=async-context`), and the row has no environment gate.
+Provenance and the update policy are in its [UPSTREAM.md](../plugins/@dshfiles/agent-telemetry/UPSTREAM.md); the
+Host events it cannot reach are in [Host gaps](../plans/dsh-host-gaps.md).
+
+Agent telemetry's `llm/stream` interceptor and `tools/execute` wrapper sit in the model and tool paths and pass them
+through untouched when there is no destination; if a model or tool call misbehaves only with it, disable the
+`dshfiles-agent-telemetry` row in Settings (takes effect live).
+
+Dropped with LoongSuite: its GenAI metrics (`gen_ai.client.operation.duration`, `gen_ai.client.token.usage`); the
+usage ledger push covers tokens and durations.
+
+## Earlier decision (2026-10-23, b:299)
 
 Two marketplace plugins export DSH spans. Both read on DSH 0.2.1-rc.2:
 
-|                     | `@loongsuite/dsh-plugin` 0.1.3 (adopted)                                                                                                                        | `dsh-observe` 0.2.25                                                                                                  |
+|                     | `@loongsuite/dsh-plugin` 0.1.3 (adopted, then forked)                                                                                                           | `dsh-observe` 0.2.25                                                                                                  |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Source / license    | [loongsuite/dsh-plugin](https://github.com/loongsuite/dsh-plugin), Apache-2.0                                                                                   | [PerryLink/dsh-observe](https://github.com/PerryLink/dsh-observe), Apache-2.0                                         |
 | DSH contract        | No peer ranges; injects `sessions`, `llm`; listens to `session/created`, `session/event`, `session/disposed` and wraps `llm/stream` — all present in 0.2.1-rc.2 | Peer ranges include `>=0.2.1-0 <0.3.0`; injects `storageDomain`; reads `session/event`, `tokenMeter`                  |
@@ -198,16 +237,14 @@ disabled.
   scratch port with the variable set and no activation failures
   (`pnpm profile:boot`).
 
-### Known caveats
+### Known caveats (LoongSuite, resolved by the fork)
 
-- pnpm reports unmet peers: the OpenTelemetry SDK 2.x packages want
-  `@opentelemetry/api <1.10.0` and 1.10.0 resolves. The export works; revisit if
-  the SDK misbehaves.
-- The `llm/stream` interceptor sits in the model stream path; if a model request
-  misbehaves only with the plugin enabled, unset the variable and restart.
+- pnpm reported unmet peers: the OpenTelemetry SDK 2.x packages want
+  `@opentelemetry/api <1.10.0` and 1.10.0 resolved.
 
 ## Update policy
 
-The version is pinned exactly in the seed. To upgrade, read the new release's
-`dist/config.js` and `dist/coordinator.js` for content defaults, rerun the
-headless receiver probe above, then bump the pin.
+`@dshfiles/agent-telemetry` follows LoongSuite by reading, not by version pin: on a new release, diff its
+`src/coordinator.ts` and `src/mapping.ts` against the commit recorded in
+[UPSTREAM.md](../plugins/@dshfiles/agent-telemetry/UPSTREAM.md), port span and attribute changes, and rerun the
+plugin's tests and its journey.

@@ -31,11 +31,10 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
 ```
 
 DSH itself needs no variable: in `plugin` and `both` modes the receiver publishes its bound address to its own Host
-process through `@dshfiles/dshx/tracing` (`publishLocalOtlpEndpoint`), and dshx tracing (plugin API, jj, secret, Jev
-spans) and the usage plugin's metrics push deliver there, re-reading the target at every export. The address is
+process through `@dshfiles/dshx/tracing` (`publishLocalOtlpEndpoint`), and agent telemetry (turn, step, model and tool spans), dshx
+tracing (plugin API, jj, secret, Jev spans) and the usage plugin's metrics push deliver there, re-reading the target at every export. The address is
 withdrawn when the receiver stops, loses its port or switches to `external`. An explicit `OTEL_EXPORTER_OTLP_ENDPOINT`
-in the Host environment always wins. The adopted LoongSuite plugin (turn, step, model and tool spans) is still gated on
-that variable at launch; see [observability](../../../docs/observability.md#in-dsh-viewer-dshfilestraces).
+in the Host environment always wins; see [observability](../../../docs/observability.md#in-dsh-viewer-dshfilestraces).
 
 When nothing arrives, the panel and `traces_status` carry a `diagnosis` (`waiting`, `receiving`, `exporting-elsewhere`,
 `no-exporter`, `port-in-use`, `external-mode`, `failed`) and `exporters` (where this process's spans and metrics go
@@ -62,7 +61,7 @@ turn count even without the attribute.
 
 Agent-tool calls into dshx APIs carry the calling Session as `dsh.session.id` on their dispatch span, so the plugin
 work a thread's agent triggers shows up even without an agent telemetry exporter. Turn, step, model and tool spans come
-from an agent telemetry exporter (LoongSuite, or a fork keeping its attribute names). The tab reads
+from [`@dshfiles/agent-telemetry`](../agent-telemetry/README.md) (or any exporter keeping LoongSuite's attribute names). The tab reads
 `traces_session_summary`, `traces_search` with `sessionId` and `traces_search_logs` with `sessionId`, so an agent sees
 the same data.
 
@@ -138,7 +137,7 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
   summaries as one row per data point (value, or count and sum for distributions), without buckets. The Metrics tab
   charts one metric at a time per attribute set (20 series, 500 points): a cumulative monotonic sum as its increase
   between exports (a reset restarts from the new value), a distribution as its mean. The service/operation overview
-  still comes from spans. The usage plugin's ledger push and LoongSuite's token metrics land here.
+  still comes from spans. The usage plugin's ledger push lands here.
 
 ## Follow-ups
 

@@ -65,6 +65,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | hmr-gate | 1 | 1 (`hmr_gate_status`) | 0 | 0 |
 | traces | 12 | 11 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_metrics`, `traces_get_metric`, `traces_list_services`, `traces_error_groups`, `traces_session_summary`, `traces_status`, `traces_clear`) | 0 | 0 |
+| agent-telemetry | 0 | 0 | 0 | 0 |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
 | send-after-upload                                                                                                                                 | 2                    | 0                                                                                                        | 1             | 1         |
@@ -373,6 +374,12 @@ Still missing, because they write secrets or need a browser:
   that and nothing else. No verb destroys data; `dropped` closes an item and
   every change is an event naming its actor. The Feed/Board switch and filters
   are presentation-only.
+
+### agent-telemetry
+
+No user verb, so no tool: the plugin records spans for turns, model calls and tools and has one setting
+(`captureContent`, namespace `dshfiles-agent-telemetry`) that the generic `settings_set` tool already writes. Its
+output is read through the `traces_*` tools.
 
 ### traces
 
