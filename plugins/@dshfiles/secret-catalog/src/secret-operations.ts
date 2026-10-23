@@ -94,13 +94,37 @@ const metadataEditArguments = (scope: SecretScope, cwd: string | null): string[]
 
 const environmentArguments = (environment: string): string[] => ['--env', environmentSchema.parse(environment)]
 
-export const createSecretCatalogOperations = (run: SecretCliRunner): SecretCatalogOperations => {
+const readOnlyCommands = new Set(['print', 'get'])
+
+export const createSecretCatalogOperations = (runCli: SecretCliRunner): SecretCatalogOperations => {
   const validatedAlias = (inputAlias: string): string => aliasSchema.parse(inputAlias)
+  // Panel, picker, setup offer and reference checks list the same folder at once; one CLI process serves them all.
+  // A write drops the shared read, so a list asked for after a write never sees the config from before it.
+  const pendingLists = new Map<string, Promise<readonly SecretMetadata[]>>()
+  const run: SecretCliRunner = async request => {
+    if (readOnlyCommands.has(request.args[0] ?? '')) return runCli(request)
+    pendingLists.clear()
+    try {
+      return await runCli(request)
+    } finally {
+      pendingLists.clear()
+    }
+  }
   const list = async (cwd: string | null): Promise<readonly SecretMetadata[]> => {
     const canonicalCwd = validateCwd(cwd)
+    const key = canonicalCwd ?? ''
+    const pending = pendingLists.get(key)
+    if (pending !== undefined) return pending
     const args = canonicalCwd === null ? ['print', 'global', '--json'] : ['print', '--all', '--json']
-    const stdout = await run({ args, cwd: canonicalCwd, captureStdout: true })
-    return parseSecretPrintMetadata(stdout, canonicalCwd === null ? 'global' : 'unknown')
+    const read = run({ args, cwd: canonicalCwd, captureStdout: true }).then(stdout =>
+      parseSecretPrintMetadata(stdout, canonicalCwd === null ? 'global' : 'unknown'),
+    )
+    pendingLists.set(key, read)
+    const forget = (): void => {
+      if (pendingLists.get(key) === read) pendingLists.delete(key)
+    }
+    read.then(forget, forget)
+    return read
   }
 
   const getArguments = (alias: string, scope: SecretScope, cwd: string | null, environment?: string): string[] => {

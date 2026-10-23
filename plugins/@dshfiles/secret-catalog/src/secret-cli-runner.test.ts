@@ -1,7 +1,7 @@
 import { Writable } from 'node:stream'
 import type { SubprocessHandle, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { describe, expect, it, vi } from 'vitest'
-import { runSecretCli } from './secret-cli-runner.js'
+import { runSecretCli, SecretCliError } from './secret-cli-runner.js'
 
 interface Harness {
   readonly runtime: Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'>
@@ -114,5 +114,19 @@ describe('managed secret CLI runner', () => {
       runSecretCli(test.runtime, { args: ['set', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: false, stdin: 'synthetic-secret-value' }, {}),
     ).rejects.toThrow('Secret CLI command failed.')
     await new Promise(resolve => setTimeout(resolve, 0))
+  })
+
+  it('tags each failure with a stable code', async () => {
+    const failed = harness({ exitCode: 1 })
+    await expect(runSecretCli(failed.runtime, { args: ['print', '--json'], cwd: null, captureStdout: true }, {})).rejects.toMatchObject({
+      code: 'cli-failed',
+    })
+
+    const missing = harness()
+    vi.mocked(missing.runtime.resolveExecutable).mockRejectedValueOnce(new Error('ENOENT'))
+    const missingFailure = runSecretCli(missing.runtime, { args: ['print', '--json'], cwd: null, captureStdout: true }, {})
+    await expect(missingFailure).rejects.toBeInstanceOf(SecretCliError)
+    await expect(missingFailure).rejects.toMatchObject({ code: 'cli-missing', message: 'Secret CLI executable could not be found on the Host PATH.' })
+    expect(missing.runtime.spawn).not.toHaveBeenCalled()
   })
 })

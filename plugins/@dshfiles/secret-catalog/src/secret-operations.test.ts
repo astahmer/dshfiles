@@ -45,6 +45,34 @@ describe('Secret Catalog metadata and exact alias actions', () => {
     expect(run).toHaveBeenLastCalledWith({ args: ['print', '--all', '--json'], cwd: '/tmp/demo', captureStdout: true })
   })
 
+  it('shares one CLI read among concurrent lists and drops it once a write starts', async () => {
+    const releases: (() => void)[] = []
+    let holding = true
+    let printed = 0
+    const run = vi.fn(async (request: SecretCliRequest) => {
+      if (request.args[0] !== 'print') return ''
+      printed += 1
+      // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: later lists bump the counter before this one returns.
+      const generation = printed
+      if (holding) await new Promise<void>(resolve => releases.push(resolve))
+      return JSON.stringify([{ alias: `SYNTHETIC_${generation}` }])
+    })
+    const operations = createSecretCatalogOperations(run)
+    const first = operations.list(null)
+    const second = operations.list(null)
+    await vi.waitFor(() => expect(printed).toBe(1))
+    await operations.removeAlias('SYNTHETIC_1', 'global', null)
+    const afterWrite = operations.list(null)
+    await vi.waitFor(() => expect(printed).toBe(2))
+    holding = false
+    for (const release of releases) release()
+    expect((await first)[0]?.alias).toBe('SYNTHETIC_1')
+    expect((await second)[0]?.alias).toBe('SYNTHETIC_1')
+    expect((await afterWrite)[0]?.alias).toBe('SYNTHETIC_2')
+    expect(await operations.list(null)).toHaveLength(1)
+    expect(printed).toBe(3)
+  })
+
   it('refuses metadata a CLI would read as another flag, before running anything', async () => {
     const requests: SecretCliRequest[] = []
     const operations = createSecretCatalogOperations(async request => {

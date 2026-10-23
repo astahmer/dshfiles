@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { defineHost } from '@dshfiles/dshx/host'
 import { secretCatalogApi, secretSetupApi } from './api.js'
-import { createSecretCatalogOperations, type SecretCreateInput } from './secret-operations.js'
+import { createSecretCatalogOperations, type SecretCatalogOperations, type SecretCreateInput } from './secret-operations.js'
 import { runSecretCli } from './secret-cli-runner.js'
 import { createSecretTools } from './secret-tools.js'
 import { secretCatalogSettings } from './settings.js'
@@ -12,7 +12,15 @@ import { createSecretCatalogValues } from './secret-reference-resolver.js'
 
 export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from './credential-bridge.js'
 
-const operationsFor = (ctx: Context) => createSecretCatalogOperations(request => runSecretCli(ctx.subprocess, request))
+const operationsByContext = new WeakMap<Context, SecretCatalogOperations>()
+/** One operations instance per Host context, so concurrent metadata reads share one CLI process. */
+const operationsFor = (ctx: Context): SecretCatalogOperations => {
+  const existing = operationsByContext.get(ctx)
+  if (existing !== undefined) return existing
+  const operations = createSecretCatalogOperations(request => runSecretCli(ctx.subprocess, request))
+  operationsByContext.set(ctx, operations)
+  return operations
+}
 const cwdForScope = (scope: string, requestedCwd: string | null): string | null => {
   if (scope === 'global') return requestedCwd ?? homedir()
   if (scope === 'project' || scope === 'local') {

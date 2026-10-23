@@ -8,6 +8,24 @@ const MAX_STDOUT_BYTES = 1_000_000
 const COMMAND_TIMEOUT_MS = 15_000
 const RANGE_WAIT_MS = 5_000
 
+export type SecretCliFailureCode = 'cli-missing' | 'cli-timeout' | 'cli-failed'
+
+const failureMessages = {
+  'cli-missing': 'Secret CLI executable could not be found on the Host PATH.',
+  'cli-timeout': 'Secret CLI command timed out.',
+  'cli-failed': 'Secret CLI command failed.',
+} as const satisfies Record<SecretCliFailureCode, string>
+
+/** A CLI failure with a stable code, so callers can say what went wrong without parsing message text. */
+export class SecretCliError extends Error {
+  readonly code: SecretCliFailureCode
+  constructor(code: SecretCliFailureCode) {
+    super(failureMessages[code])
+    this.name = 'SecretCliError'
+    this.code = code
+  }
+}
+
 type SecretSubprocess = Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'>
 type SecretSessionEnvironment = Partial<Pick<NodeJS.ProcessEnv, 'BW_SESSION' | 'SECRET_SESSION_FILE'>>
 
@@ -31,10 +49,12 @@ export const runSecretCli = async (
     controller.abort()
   }, COMMAND_TIMEOUT_MS)
   let handle: SubprocessHandle | undefined
+  let resolved = false
   try {
     const env = sessionEnvironment(environment)
     const executable = await runtime.resolveExecutable('secret', env, controller.signal)
     if (!isAbsolute(executable) || executable.includes('\0')) throw new Error('Secret CLI executable could not be resolved.')
+    resolved = true
     handle = runtime.spawn({
       argv: [executable, ...request.args],
       cwd: request.cwd ?? homedir(),
@@ -65,7 +85,8 @@ export const runSecretCli = async (
     if (handle !== undefined) {
       await terminateManagedProcess({ handle, timeoutMs: RANGE_WAIT_MS })
     }
-    throw new Error(timedOut ? 'Secret CLI command timed out.' : 'Secret CLI command failed.')
+    if (timedOut) throw new SecretCliError('cli-timeout')
+    throw new SecretCliError(resolved ? 'cli-failed' : 'cli-missing')
   } finally {
     clearTimeout(timeout)
   }
