@@ -3,7 +3,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, type ReactNode } from 'react'
 
 import { useApi } from '@dshfiles/dshx/client'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
@@ -111,6 +111,7 @@ const ItemLine = (props: {
 
 const Overview = (props: {
   readonly project: Project
+  readonly query: string
   readonly back: () => void
   readonly select: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
@@ -121,9 +122,12 @@ const Overview = (props: {
   const actions = useBacklogActions()
   const project = props.project
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', 'project', project.key],
+    queryKey: [BacklogQueries.key, 'list', 'project', project.key, props.query],
     queryFn: async ({ signal }) =>
-      BacklogViews.list(await api.list({ project: project.key === NO_PROJECT ? null : project.key, freshness: 'all', limit: 500 }, { signal })),
+      BacklogViews.list(
+        await api.list({ project: project.key === NO_PROJECT ? null : project.key, query: props.query, freshness: 'all', limit: 500 }, { signal }),
+      ),
+    placeholderData: keepPreviousData,
   })
   const projectItems = list.data?.items ?? []
   const open = projectItems.filter(item => item.status !== 'done' && item.status !== 'dropped')
@@ -295,6 +299,9 @@ const Overview = (props: {
 
 /** Projects come from where work was captured; nobody creates or administers them. */
 export const ProjectsView = (props: {
+  readonly query: string
+  /** Projects holding an item that matches the search; null when nothing is searched. */
+  readonly matchingProjects: ReadonlySet<string> | null
   readonly selectedProject: string | null
   readonly setSelectedProject: (project: string | null) => void
   readonly select: (id: number) => void
@@ -312,12 +319,15 @@ export const ProjectsView = (props: {
         .sort((left, right) => Number(left.key === NO_PROJECT) - Number(right.key === NO_PROJECT) || right.lastActivityAt - left.lastActivityAt),
     [query.data],
   )
+  const matchingProjects = props.matchingProjects
+  const shown = matchingProjects === null ? projects : projects.filter(project => matchingProjects.has(project.key))
   const selected = projects.find(project => project.key === props.selectedProject)
   return (
     <div className="dshx:@container dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
       {selected !== undefined ? (
         <Overview
           project={selected}
+          query={props.query}
           triageOff={props.triageOff}
           back={() => props.setSelectedProject(null)}
           select={props.select}
@@ -328,10 +338,13 @@ export const ProjectsView = (props: {
         <div className="dshx:mx-auto dshx:flex dshx:max-w-6xl dshx:flex-col dshx:gap-4 dshx:px-6 dshx:py-5">
           <div>
             <h2 className="dshx:text-lg dshx:font-semibold dshx:tracking-tight">Projects</h2>
-            <p className="dshx:text-xs dshx:text-muted-foreground">Grouped from the repositories items were captured in. {projects.length} in total.</p>
+            <p className="dshx:text-xs dshx:text-muted-foreground">
+              Grouped from the repositories items were captured in.{' '}
+              {matchingProjects === null ? `${String(projects.length)} in total.` : `${String(shown.length)} of ${String(projects.length)} match the search.`}
+            </p>
           </div>
           <div className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:@min-[40rem]:grid-cols-2 dshx:@min-[64rem]:grid-cols-3">
-            {projects.map(project => {
+            {shown.map(project => {
               const recent = props.now - project.lastActivityAt < 7 * DAY_MS
               return (
                 <button

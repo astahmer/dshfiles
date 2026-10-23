@@ -32,6 +32,18 @@ Feature: Backlog
     When the "Inbox" status search filter is cleared
     Then search results list both "composer chip in progress" and "composer chip in inbox"
 
+  @scenario:backlog.search-filters-view
+  Scenario: Typing a search filters the board in place and Enter opens all results
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "composer chip on the board" is captured
+    And "weekly digest of dormant items" is captured
+    And the Board view is opened
+    When the backlog search is typed "composer"
+    Then the board shows only the card for b:1
+    When the backlog search is submitted
+    Then search results list only "composer chip on the board"
+
   @scenario:backlog.board-links
   Scenario: Move an item on the board and follow its backlinks
     Given the isolated plugin profile "@dshfiles/backlog" is booted

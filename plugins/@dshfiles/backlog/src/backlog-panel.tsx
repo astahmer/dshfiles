@@ -53,6 +53,7 @@ import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
 import { ProjectFilterPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
+import { SearchScopes, type SearchScope } from './search-scope.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
 import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
@@ -308,7 +309,8 @@ export const BacklogPanel = (props: {
   const setPreference = (change: Partial<typeof stored>): void => {
     preferences.set({ ...preferences.get(), ...change })
   }
-  const [query, setQuery] = useState('')
+  const [search, setSearch] = useState<SearchScope>(SearchScopes.idle)
+  const query = search.query
   const [kinds, setKinds] = useState<BacklogKind[]>([])
   const [openIds, setOpenIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null })
   const [cursorIds, setCursorIds] = useState<BacklogViewSelection>({ feed: null, inbox: null, items: null, board: null, projects: null })
@@ -327,6 +329,7 @@ export const BacklogPanel = (props: {
   const panelRoot = useRef<HTMLElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
+  const showsResults = SearchScopes.showsResults({ query: debounced, submitted: search.submitted })
 
   const queryClient = useQueryClient()
   // A cheap number that changes with any write; lists and details refetch only when it moves.
@@ -360,10 +363,10 @@ export const BacklogPanel = (props: {
   // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
   const scoped = projectFilters.length === 0 ? {} : { projects: projectFilters }
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, debounced === '' ? [] : stored.statuses],
+    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, showsResults ? stored.statuses : []],
     queryFn: async ({ signal }) => {
-      const input: Parameters<typeof api.list>[0] = { query: debounced, kinds, ...scoped, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }
-      if (debounced !== '' && stored.statuses.length > 0) input.statuses = stored.statuses
+      const input: Parameters<typeof api.list>[0] = { query: debounced, kinds, ...scoped, freshness: 'all', limit: showsResults ? 200 : 2_000 }
+      if (showsResults && stored.statuses.length > 0) input.statuses = stored.statuses
       return BacklogViews.list(await api.list(input, { signal }))
     },
     placeholderData: keepPreviousData,
@@ -381,11 +384,12 @@ export const BacklogPanel = (props: {
       for (const [status, count] of counts) totals[status] = count
       return totals
     },
-    enabled: debounced !== '',
+    enabled: showsResults,
   })
   const inbox = useQuery({
-    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilters],
-    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, ...scoped, freshness: 'all', limit: 200 }, { signal })),
+    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilters, debounced],
+    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, query: debounced, ...scoped, freshness: 'all', limit: 200 }, { signal })),
+    placeholderData: keepPreviousData,
   })
   const projectCatalog = useQuery({
     queryKey: [BacklogQueries.key, 'projects'],
@@ -413,8 +417,8 @@ export const BacklogPanel = (props: {
   const now = list.dataUpdatedAt
   const all = useMemo(() => list.data?.items ?? [], [list.data])
   const items = useMemo(
-    () => (stored.showDormant || debounced !== '' ? all : all.filter(item => isVisible(item, now))),
-    [all, stored.showDormant, debounced, now],
+    () => (stored.showDormant || showsResults ? all : all.filter(item => isVisible(item, now))),
+    [all, stored.showDormant, showsResults, now],
   )
   const filteredItems = useMemo(() => FeedStatus.filter(items, stored.statuses), [items, stored.statuses])
   const statusTotals = useMemo(() => FeedStatus.counts(items), [items])
@@ -450,6 +454,7 @@ export const BacklogPanel = (props: {
     // snapshots every named element, so a large backlog switches instantly instead.
     if (items.length <= MAX_ANIMATED_ITEMS) withViewTransition(() => setPreference({ view: next }))
     else setPreference({ view: next })
+    setSearch(SearchScopes.leaveResults)
     setExpanded(false)
   }
   const startCapture = (status: BacklogStatus | null): void => {
@@ -459,7 +464,7 @@ export const BacklogPanel = (props: {
 
   const sort: BacklogSort = view === 'feed' || view === 'inbox' || view === 'items' ? stored.sort[view] : 'updated'
   const viewOrder = () => {
-    if (debounced !== '') return all
+    if (showsResults) return all
     if (view === 'inbox') return inboxOrder(inboxItems, 'all', sort)
     if (view === 'items') return itemsOrder(filteredItems, stored.groupBy, collapsed, sort)
     if (view === 'feed')
@@ -586,22 +591,37 @@ export const BacklogPanel = (props: {
           })}
         </nav>
         <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <label className="dshx:flex dshx:h-7 dshx:min-w-24 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
+          <label className="dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
             <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
             <input
               ref={searchInput}
               aria-label="Search backlog"
               placeholder="Search items, tags, links…"
+              title="Filters this view; press Enter for all results"
               value={query}
-              onChange={event => setQuery(event.currentTarget.value)}
+              onChange={event => {
+                const next = event.currentTarget.value
+                setSearch(scope => SearchScopes.type(scope, next))
+              }}
               onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  setSearch(SearchScopes.submit)
+                  return
+                }
                 if (event.key !== 'Escape') return
-                setQuery('')
+                setSearch(SearchScopes.idle)
                 event.currentTarget.blur()
               }}
               className="dshx:w-44 dshx:min-w-0 dshx:bg-transparent dshx:text-xs dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground dshx:@max-pane-compact:w-24"
             />
-            {query === '' ? <Kbd className="dshx:@max-pane-compact:hidden">/</Kbd> : null}
+            {query === '' ? (
+              <Kbd className="dshx:@max-pane-compact:hidden">/</Kbd>
+            ) : search.submitted ? null : (
+              <Kbd title="Press Enter for all results" className="dshx:@max-pane-compact:hidden">
+                ↵
+              </Kbd>
+            )}
           </label>
           <SavedViews
             views={savedViews}
@@ -613,8 +633,8 @@ export const BacklogPanel = (props: {
               void settings.set('savedViews', views).catch(() => setPendingViews(null))
             }}
             apply={saved => {
-              setQuery(saved.query)
               switchView(saved.view)
+              setSearch(scope => SearchScopes.type(SearchScopes.leaveResults(scope), saved.query))
             }}
           />
           <ProjectFilter projects={projectFilters} projectPaths={projectPaths} onPick={projects => setPreference({ projects: [...projects], project: null })} />
@@ -672,7 +692,7 @@ export const BacklogPanel = (props: {
         <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(list.error, 'The backlog is unavailable.')}</p>
       ) : null}
       <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
-        {debounced !== '' ? (
+        {showsResults ? (
           <>
             <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
               <SearchResults
@@ -770,6 +790,8 @@ export const BacklogPanel = (props: {
               )}
               {view === 'projects' && (
                 <ProjectsView
+                  query={debounced}
+                  matchingProjects={debounced === '' ? null : SearchScopes.matchingProjects(items)}
                   triageOff={triageOff}
                   selectedProject={selectedProject}
                   setSelectedProject={setSelectedProject}

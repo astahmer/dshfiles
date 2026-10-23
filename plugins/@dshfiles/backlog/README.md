@@ -277,9 +277,12 @@ dropping the rest of the draft.
 
 ## Search and saved views
 
-The header search ranks by relevance and says where each result matched (title, tag, description, comment,
-original capture, project, link), with the matching words highlighted. It covers dormant and archived
-items. Words must all match; `"quoted phrases"` stay whole. Operators combine freely:
+Typing in the header search filters the view you are on: the feed, Items, Board, Inbox and Projects keep
+their layout and show only matching items (dormant ones stay hidden unless the filter menu includes them). Press
+`Enter` to open the full results view, which ranks by relevance and says where each result matched (title,
+tag, description, comment, original capture, project, link), with the matching words highlighted, and covers
+dormant and archived items. Picking a view leaves the results and keeps the words as its filter; `Esc`
+clears them. Words must all match; `"quoted phrases"` stay whole. Operators combine freely:
 
 | Operator                | Example                                                  |
 | ----------------------- | -------------------------------------------------------- |

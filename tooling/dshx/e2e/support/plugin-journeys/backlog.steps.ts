@@ -38,6 +38,7 @@ const contextTarget = async (page: Page, id: number, view: string): Promise<Loca
   }
   if (view === 'search') {
     await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill(`b:${String(id)}`)
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).press('Enter')
     return searchResults(page).getByRole('listitem', { name: itemName, exact: true })
   }
   if (view === 'inbox') {
@@ -151,8 +152,28 @@ Then('the feed shows {string} as a bug in the inbox', async ({ page }: { page: P
   })
 })
 
+const searchInput = (page: Page) => page.getByRole('textbox', { name: 'Search backlog', exact: true })
+
 When('the backlog is searched for {string}', async ({ page }: { page: Page }, query: string) => {
-  await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill(query)
+  await searchInput(page).fill(query)
+  await searchInput(page).press('Enter')
+})
+
+When('the backlog search is typed {string}', async ({ page }: { page: Page }, query: string) => {
+  await searchInput(page).fill(query)
+})
+
+When('the backlog search is submitted', async ({ page }: { page: Page }) => {
+  await searchInput(page).press('Enter')
+})
+
+Then('the board shows only the card for b:{int}', async ({ page }: { page: Page }, id: number) => {
+  await recordAssertion(page, 'backlog-search-filters-board', async () => {
+    await expect(page.locator('[data-backlog-column]')).toHaveCount(5)
+    await expect(page.getByRole('article', { name: /^Card b:/ })).toHaveCount(1)
+    await expect(page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })).toBeVisible()
+    await expect(searchResults(page)).toHaveCount(0)
+  })
 })
 
 Then('the feed lists only {string}', async ({ page }: { page: Page }, title: string) => {
