@@ -2,7 +2,7 @@ import { isContextWindowExceededError, isQuotaExceededError, type LlmCallConfig,
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { AccountPool } from './account-pool.js'
 import { decideRecovery, NO_PROGRESS, type FailureKind, type RecoveryPolicy, type RecoveryProgress, type RecoveryStep } from './failure-policy.js'
-import { declaredResetWaitMs } from './reset-hint.js'
+import { declaredResetWaitMs, MAX_RESET_WAIT_MS } from './reset-hint.js'
 
 const EXHAUSTED_CODES: ReadonlySet<string> = new Set([
   'QUOTA',
@@ -23,8 +23,8 @@ const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large
  * Spent-plan wording that carries no `usage limit exceeded` phrase to match, e.g.
  * ChatGPT's "You have hit your ChatGPT usage limit (plus plan). Try again in ~151 min."
  * or Claude's "You've hit your limit · resets 3:00 PM". `isQuotaExceededError` needs the
- * limit word followed by exceeded/exhausted/reached, so this lands as `PI_AI_ERROR` and
- * a retry only spends another attempt on a plan that is already spent.
+ * limit word followed by exceeded/exhausted/reached; recognize Anthropic's explicit
+ * monthly-spend wording separately because it says the spend limit would be exceeded.
  */
 const SPENT_PLAN_HINT =
   /\byou(?:'ve| have)\s+(?:hit|reached)\s+(?:your|the)\s+(?:(?:\w+\s+){0,2}(?:usage|weekly|daily|monthly|plan|message|spend|cost|credit|token|quota)\s+)?limits?\b/i
@@ -39,7 +39,12 @@ const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'
   ) {
     return 'oversized'
   }
-  if (EXHAUSTED_CODES.has(failure.code) || isQuotaExceededError(`${failure.code} ${failure.message}`) || SPENT_PLAN_HINT.test(failure.message)) {
+  if (
+    EXHAUSTED_CODES.has(failure.code) ||
+    isQuotaExceededError(`${failure.code} ${failure.message}`) ||
+    SPENT_PLAN_HINT.test(failure.message) ||
+    (failure.status === 429 && /\bmonthly spend limit\b/i.test(failure.message))
+  ) {
     return 'exhausted'
   }
   if (RATE_LIMIT_CODES.has(failure.code) || failure.status === 429) return 'rateLimit'
@@ -157,11 +162,18 @@ const createFailureRecovery = (deps: {
   /** Cool until the reset the failure text declares, or for the configured cooldown when it names none. */
   const cool = (account: string, failure: Pick<LlmFailure, 'message' | 'providerRetryAfterMs'>, now: number): void => {
     const declared = declaredResetWaitMs(failure.message, now)
-    if (declared === undefined) {
-      deps.pool.noteRateLimited(account, failure.providerRetryAfterMs, now)
+    const retryAfter = failure.providerRetryAfterMs
+    const monthlySpendLimit = /\bmonthly spend limit\b/i.test(failure.message)
+    const wait = Math.max(
+      declared ?? 0,
+      retryAfter !== undefined && Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 0,
+      monthlySpendLimit ? MAX_RESET_WAIT_MS : 0,
+    )
+    if (wait > 0) {
+      deps.pool.noteDeclaredReset(account, Math.min(wait, MAX_RESET_WAIT_MS), now)
       return
     }
-    deps.pool.noteDeclaredReset(account, Math.max(declared, failure.providerRetryAfterMs ?? 0), now)
+    deps.pool.noteRateLimited(account, undefined, now)
   }
 
   const stateFor = (conversationKey: string, turn: number, step: number): StepState => {

@@ -15,11 +15,13 @@ const setup = (options: { readonly policy?: RecoveryPolicy; readonly lunaReserve
   pool.put({ id: 'codex_work', kind: 'codex', label: 'Codex Work' })
   pool.put({ id: 'codex_spare', kind: 'codex', label: 'Codex Spare' })
   pool.put({ id: 'claude', kind: 'claude', label: 'Claude' })
+  pool.put({ id: 'claude_alt', kind: 'claude', label: 'Claude Alternate' })
   const kinds = new Map([
     ['codex', 'codex'],
     ['codex_work', 'codex'],
     ['codex_spare', 'codex'],
     ['claude', 'claude'],
+    ['claude_alt', 'claude'],
   ])
   const engaged: string[] = []
   let retryIds = 0
@@ -52,6 +54,7 @@ const spentPlan: readonly LlmFailure[] = [
     code: 'PI_AI_ERROR',
   },
   { message: "You've hit your limit · resets 3:00 PM", code: 'PI_AI_ERROR' },
+  { message: "429 This request would exceed your account's monthly spend limit. Please try again later.", code: 'PI_AI_ERROR', status: 429 },
 ]
 
 describe('classifyFailure', () => {
@@ -72,6 +75,24 @@ describe('classifyFailure', () => {
 
   it('treats a spent plan as exhausted even without the upstream exceeded wording', () => {
     for (const failure of spentPlan) expect(FailureRecoveryModel.classifyFailure(failure)).toBe('exhausted')
+  })
+
+  it('cools a monthly Claude spend limit for a day even without a reset hint', () => {
+    const { pool, recovery } = setup()
+    const action = recovery.recover({
+      conversationKey: 'session',
+      turn: 1,
+      step: 1,
+      provider: 'claude',
+      model: 'claude-opus-5-5',
+      failure: spentPlan.at(-1) ?? { message: '', code: 'PI_AI_ERROR' },
+      canShrink: false,
+      now: NOW,
+    })
+
+    expect(action).toMatchObject({ kind: 'retry', step: { kind: 'failover', to: 'claude_alt' } })
+    expect(pool.isHealthy('claude', NOW + 23 * 60 * 60_000)).toBe(false)
+    expect(pool.isHealthy('claude', NOW + 25 * 60 * 60_000)).toBe(true)
   })
 
   it('leaves warnings and unrelated wording alone', () => {
@@ -215,7 +236,17 @@ describe('failure recovery through the account pool', () => {
   it('starts a fresh retry chain on the provider a fail-over opened, and the core validator admits the log', () => {
     const { recovery } = setup()
     const failOn = (provider: string) =>
-      recovery.recover({ conversationKey: 'session', turn: 1, step: 1, provider, requestProvider: provider, model: 'gpt-6', failure: transport, canShrink: false, now: NOW })
+      recovery.recover({
+        conversationKey: 'session',
+        turn: 1,
+        step: 1,
+        provider,
+        requestProvider: provider,
+        model: 'gpt-6',
+        failure: transport,
+        canShrink: false,
+        now: NOW,
+      })
     const onCodex = [failOn('codex'), failOn('codex'), failOn('codex')]
     const onWork = failOn('codex_work')
     const rows = [...onCodex, onWork].map((action, index) => {

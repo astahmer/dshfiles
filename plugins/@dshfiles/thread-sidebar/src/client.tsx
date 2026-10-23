@@ -378,6 +378,7 @@ const toggleSetMember = (values: ReadonlySet<string>, value: string): ReadonlySe
 
 const restartRecoveryQueryKey = ['thread-sidebar', 'restart-recovery', 'pending'] as const
 const usageLimitQueryKey = ['thread-sidebar', 'usage-limit', 'recoveries'] as const
+const QUOTA_CONTINUATION_UPDATED_EVENT = 'dshfiles:ai-accounts:quota-continuation-updated'
 /** Stable empty list, so a loading query never hands the selector a fresh array. */
 const EMPTY_CONTINUATIONS: readonly QuotaContinuation[] = []
 
@@ -1300,6 +1301,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     refetchInterval: query => (isPrimarySurface && !isApiOwnerMissing(query.state.error) ? 15_000 : false),
     retry: false,
   })
+  useEffect(() => {
+    const refresh = (): void => void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+    window.addEventListener(QUOTA_CONTINUATION_UPDATED_EVENT, refresh)
+    return () => window.removeEventListener(QUOTA_CONTINUATION_UPDATED_EVENT, refresh)
+  }, [queryClient])
   const [usageLimitBusyIds, setUsageLimitBusyIds] = useState<ReadonlySet<string>>(() => new Set())
   const [usageLimitResumeAllBusy, setUsageLimitResumeAllBusy] = useState(false)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
@@ -1716,6 +1722,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           sessionId: input.sessionId,
           enabled: input.enabled,
         })
+        window.dispatchEvent(new Event(QUOTA_CONTINUATION_UPDATED_EVENT))
       }
       await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
     } catch {
