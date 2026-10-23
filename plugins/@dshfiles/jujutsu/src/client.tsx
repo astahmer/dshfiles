@@ -64,7 +64,7 @@ import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
 import { ChatReferenceModel } from './chat-reference.js'
@@ -96,6 +96,7 @@ import { WorkspaceCleanupTrail } from './workspace-cleanup-trail.js'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, usePanelScopeState } from './panel-scope.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
+import { GraphRowAnchorModel, type GraphRowAnchor } from './graph-row-anchor.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
 
@@ -467,20 +468,22 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (repoId !== null && debouncedSearch.length > 0) requestGraphPage({ repoId, query: debouncedSearch, excludeCommitIds: [] })
   }, [repoId, debouncedSearch, state?.graphHasMore, requestGraphPage])
 
+  const graphPageIsCurrent = graphPageState.repoId === repoId && graphPageState.query === debouncedSearch
+  const graphPageRevisions = useMemo(() => (graphPageIsCurrent ? graphPageState.revisions : EMPTY_REVISIONS), [graphPageIsCurrent, graphPageState.revisions])
+  // Older history arrives page by page, and those rows are selectable too: selection resolves against every loaded
+  // revision, not just the first page the repository query returned.
+  const graphRowsInput = useMemo(
+    () => (debouncedSearch.length > 0 ? graphPageRevisions : [...(state?.revisions ?? []), ...graphPageRevisions]),
+    [debouncedSearch, graphPageRevisions, state?.revisions],
+  )
   const navigation = useGraphNavigation({
     repoId,
     root: path,
     refreshedAt: stateQuery.dataUpdatedAt,
     selected: selection ?? undefined,
     comparison: comparisonSelection ?? undefined,
-    revisions: state?.revisions ?? [],
+    revisions: graphRowsInput,
   })
-  const graphPageIsCurrent = graphPageState.repoId === repoId && graphPageState.query === debouncedSearch
-  const graphPageRevisions = useMemo(() => (graphPageIsCurrent ? graphPageState.revisions : EMPTY_REVISIONS), [graphPageIsCurrent, graphPageState.revisions])
-  const graphRowsInput = useMemo(
-    () => (debouncedSearch.length > 0 ? graphPageRevisions : [...(state?.revisions ?? []), ...graphPageRevisions]),
-    [debouncedSearch, graphPageRevisions, state?.revisions],
-  )
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
   const editTimeCommitIds = useMemo(
     () =>
@@ -664,17 +667,34 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingFocusIndex = useRef<number | null>(null)
   const scrolledToWorkingCopy = useRef<string | null>(null)
+  const interactedRow = useRef<Omit<GraphRowAnchor, 'rowHeight'> | null>(null)
+  const rowAnchor = useRef<GraphRowAnchor | null>(null)
+  const captureInteractedRow = (event: { readonly currentTarget: HTMLElement; readonly target: EventTarget | null }): void => {
+    if (!(event.target instanceof Element)) return
+    const container = event.currentTarget
+    const row = event.target.closest('[data-commit-id]')
+    const commitId = row?.getAttribute('data-commit-id') ?? null
+    if (!(row instanceof HTMLElement) || commitId === null || !container.contains(row)) return
+    interactedRow.current = {
+      commitId,
+      top: row.getBoundingClientRect().top - container.getBoundingClientRect().top,
+      viewportHeight: container.clientHeight,
+    }
+  }
+  /** Anything that scrolls on purpose drops the anchor, so a restore never fights the locate or arrow-key scroll. */
+  const clearRowAnchor = (): void => {
+    interactedRow.current = null
+    rowAnchor.current = null
+  }
   const dragSourceIndex = dragSource === null ? -1 : listItems.findIndex(item => item.key === dragSource)
   const workingCopyIndex = listItems.findIndex(item => item.kind === 'revision' && item.revision.workingCopy)
   const listVirtualizer = useVirtualizer({
     count: listItems.length,
     getScrollElement: () => listScrollRef.current,
     getItemKey: index => listItems[index]?.key ?? index,
-    estimateSize: index => {
-      const item = listItems[index]
-      if (item === undefined || item.kind !== 'revision') return 18
-      return item.key === selectedRevision?.commitId ? rowHeight + 320 : rowHeight
-    },
+    // Collapsed rows and day headings have an exact height, so an unmeasured row never shifts the rows around it.
+    // An expanded row is measured by its own ref; guessing its panel height is what made the list jump while it settled.
+    estimateSize: index => (listItems[index]?.kind === 'revision' ? rowHeight : 18),
     overscan: 12,
     paddingEnd: 16,
     // The sticky day heading and a dragged row stay mounted: unmounting the drag source would drop its dragend.
@@ -768,6 +788,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const index = listItems.findIndex(item => item.kind === 'revision' && item.revision.commitId === pendingLocateId)
     if (index < 0) return
     scrolledToWorkingCopy.current = repoId
+    clearRowAnchor()
     listVirtualizer.scrollToIndex(index, { align: 'center' })
     const target = listScrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"] [data-row-focus]`)
     if (target === null || target === undefined) return
@@ -785,6 +806,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (repoId === null || workingCopyIndex < 0 || listScrollRef.current === null || scrolledToWorkingCopy.current === repoId) return
     scrolledToWorkingCopy.current = repoId
+    clearRowAnchor()
     listVirtualizer.scrollToIndex(workingCopyIndex, { align: 'center' })
   }, [repoId, workingCopyIndex, view, listVirtualizer])
 
@@ -805,6 +827,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setMoveSource(null)
       return
     }
+    // Any key can scroll the list (Page Down, Enter on a focused row), so none of them keep a restore pending.
+    clearRowAnchor()
     if (!(event.target instanceof HTMLElement) || !event.target.hasAttribute('data-row-focus')) return
     const current = pendingFocusIndex.current ?? Number(event.target.closest('[data-index]')?.getAttribute('data-index'))
     if (!Number.isInteger(current)) return
@@ -874,6 +898,38 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     }
   })()
   const rowConfirmAnchorId = confirmAnchorId !== null && visibleRevisions.some(revision => revision.commitId === confirmAnchorId) ? confirmAnchorId : null
+  // Every way a row grows (selection, confirmation, workspace panel, diff) is opened from inside that row, so the row's
+  // last measured place before the click is what the list restores once the panel changed its height.
+  const expandedRowSignature = [
+    selectedRevision?.commitId ?? '',
+    fullDiff?.commitId ?? '',
+    rowConfirmAnchorId ?? '',
+    workspaceRemoval?.commitId ?? '',
+    workspaceBase?.commitId ?? '',
+    bookmarkDraft?.commitId ?? '',
+  ].join('|')
+  const expandedRowSignatureRef = useRef(expandedRowSignature)
+  useLayoutEffect(() => {
+    const expandedChanged = expandedRowSignatureRef.current !== expandedRowSignature
+    expandedRowSignatureRef.current = expandedRowSignature
+    if (expandedChanged && interactedRow.current !== null) {
+      rowAnchor.current = { ...interactedRow.current, rowHeight }
+      interactedRow.current = null
+    }
+    const anchor = rowAnchor.current
+    const container = listScrollRef.current
+    if (anchor === null || container === null) return
+    const element = container.querySelector<HTMLElement>(`[data-commit-id="${anchor.commitId}"]`)
+    // The row left the rendered window: whatever moved it now belongs to scrolling, not to the expansion that opened it.
+    if (element === null) {
+      rowAnchor.current = null
+      return
+    }
+    const currentTop = element.getBoundingClientRect().top - container.getBoundingClientRect().top
+    const delta = GraphRowAnchorModel.scrollDelta({ anchor, currentTop })
+    if (!GraphRowAnchorModel.shouldScroll(delta)) return
+    container.scrollTop += delta
+  })
   const inlineConfirm =
     actionPreview === undefined ? null : (
       <InlineActionConfirm busy={actionBusy} onCancel={() => sendAction({ type: 'cancel' })} onConfirm={confirmPreview} preview={actionPreview} />
@@ -1495,13 +1551,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           aria-label="Revisions"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
           data-loaded-revisions={loadedGraphRevisions}
+          onClickCapture={captureInteractedRow}
+          onContextMenuCapture={captureInteractedRow}
           onDragEnd={endDrag}
+          onFocusCapture={clearRowAnchor}
           onKeyDown={moveRowFocus}
+          onPointerDown={clearRowAnchor}
           onScroll={event => {
             const element = event.currentTarget
             if (GraphPagingModel.needsAnotherPage({ scrollTop: element.scrollTop, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight }))
               loadMoreGraphRevisions()
           }}
+          onWheel={clearRowAnchor}
           ref={listScrollRef}
           role="region"
         >
