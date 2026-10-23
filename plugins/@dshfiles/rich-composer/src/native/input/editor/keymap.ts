@@ -153,6 +153,7 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
         if (indent === undefined || marker === undefined) return false
         selection.insertParagraph()
         selection.insertText(unordered === null ? `${indent}${String(Number(marker) + 1)}. ` : `${indent}${marker} `)
+        event.preventDefault()
         return true
       }
       if (event !== null && isComposingEvent(event, recentlyComposing)) {
