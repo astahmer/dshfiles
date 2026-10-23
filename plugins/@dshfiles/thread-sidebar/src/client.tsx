@@ -228,6 +228,8 @@ type InjectedActions = {
   /** Show the remote thread view; set when the layout service is available. */
   openRemoteThreads?: () => void
   openRemoteSession?: (sessionId: string) => void
+  /** Open the thread a page-load link names without closing a panel the user opened while the list was loading. */
+  openLinkedSession?: (sessionId: SessionSummary['id']) => void
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
   /** Fork the thread into another project and settle it; resolves to the continuing thread and whether it settled. */
   continueInProject: (
@@ -1434,6 +1436,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
+  // The page-load link resolves once the thread list is ready; Back and Forward are explicit thread navigations.
+  const routeFromPageLoad = useRef(routeRequest !== null)
   const suppressUrlForSession = useRef<string | null>(null)
   const migrationStarted = useRef(false)
   const attentionRefreshed = useRef(false)
@@ -1919,7 +1923,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [acknowledgeAttention, acknowledgeManualUnread, isPrimarySurface, selectedAttention, selectedSessionId])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
-  const selectThread = (sessionId: SessionSummary['id']): void => {
+  const selectThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     const opened = attention.records.get(sessionId)
     if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)
@@ -1931,7 +1935,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ? undefined
         : (realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession))
     window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
-    props.open(sessionId)
+    if (options.linked === true && props.openLinkedSession !== undefined) props.openLinkedSession(sessionId)
+    else props.open(sessionId)
   }
 
   /**
@@ -1939,15 +1944,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
    * Session from the main view on every list change, so opening one without restoring it fails as a
    * released Session reference — restoring is the one click that replaces that retry fight.
    */
-  const openThread = (sessionId: SessionSummary['id']): void => {
+  const openThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (archivedSessionIds.has(sessionId)) {
       void props.unarchiveSession(sessionId).then(
-        () => selectThread(sessionId),
+        () => selectThread(sessionId, options),
         () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }),
       )
       return
     }
-    selectThread(sessionId)
+    selectThread(sessionId, options)
   }
   const openThreadRef = useRef(openThread)
   openThreadRef.current = openThread
@@ -1958,6 +1963,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const requested = readThreadUrl(window.location.href)?.sessionId ?? null
       suppressUrlForSession.current = requested === null ? (selectedSession?.id ?? null) : null
       openedRouteId.current = null
+      routeFromPageLoad.current = false
       setRouteRequest(requested)
     }
     window.addEventListener('popstate', onPopState)
@@ -1980,7 +1986,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     if (openedRouteId.current === routeRequest) return
     openedRouteId.current = routeRequest
-    openThreadRef.current(target.id)
+    openThreadRef.current(target.id, { linked: routeFromPageLoad.current })
   }, [archivedSessionIds, isPrimarySurface, props, routeRequest, sessions, sessionState.phase, setNotice])
 
   useEffect(() => {
@@ -2979,11 +2985,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         muted: mutedSessionIds.has(entry.session.id),
       }
     }
-    return [
-      ...sectionEntries.map(entryFor),
-      ...childThreadEntries.map(entryFor),
-      ...detachedThreadEntries.map(entryFor),
-    ]
+    return [...sectionEntries.map(entryFor), ...childThreadEntries.map(entryFor), ...detachedThreadEntries.map(entryFor)]
   }, [
     archivedSessionIds,
     attention.records,

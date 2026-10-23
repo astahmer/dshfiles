@@ -807,6 +807,11 @@ export default defineClient({
       startFollowUp,
       continueInProject,
       open: openThread,
+      openLinkedSession: (sessionId: SessionSummary['id']) => {
+        const activePanelId = ctx.layout.panelInfo.getSnapshot().activePanelId
+        openThread(sessionId)
+        if (activePanelId !== null) ctx.layout.selectPanel(activePanelId)
+      },
       openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
       openRemoteSession: (sessionId: string) => openThread(SessionId(sessionId)),
     })
