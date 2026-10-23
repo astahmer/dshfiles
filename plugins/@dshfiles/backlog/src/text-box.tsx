@@ -5,6 +5,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 
 import { AttachFilesButton, AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './composer-attachments.js'
+import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'
 
@@ -52,16 +53,13 @@ export const BacklogTextBox = (props: {
 
   const pick = (suggestion: MentionSuggestion): void => {
     if (completion.token === null) return
-    const element = input.current
-    const end = element?.selectionEnd ?? caret
-    const next = `${props.value.slice(0, completion.token.start)}${suggestion.insert}${props.value.slice(end)}`
-    const position = completion.token.start + suggestion.insert.length
+    const { text: next, caret: position } = InlineCompletion.applyPick({ text: props.value, token: completion.token, insert: suggestion.insert })
     props.onChange(next)
     setCaret(position)
     setDismissed(true)
     requestAnimationFrame(() => {
-      element?.focus()
-      element?.setSelectionRange(position, position)
+      input.current?.focus()
+      input.current?.setSelectionRange(position, position)
     })
   }
 

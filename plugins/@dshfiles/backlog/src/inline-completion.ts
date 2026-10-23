@@ -1,10 +1,13 @@
-/** A `#tag` or `@query` token right before the caret, with the source scope it names when it has one. */
+import { prefixedTokenAt } from '@dshfiles/input-trigger/caret-token'
+
+/** The `#tag` or `@query` token the caret is on, with the source scope it names when it has one. */
 export interface InlineToken {
   readonly trigger: '#' | '@'
   /** The text a source matches against: the whole query for plain `@`, the part after `scope:` for a scoped one. */
   readonly query: string
-  /** Start offset of the token in the text, so a pick replaces exactly what was typed. */
+  /** Offsets of the whole token (`[start, end)`), so a pick replaces exactly that token. */
   readonly start: number
+  readonly end: number
   /** The lowercase scope before `:`, or null for a plain token. */
   readonly scope: string | null
 }
@@ -22,6 +25,12 @@ export interface InlineAgentRow {
   readonly insert: string
 }
 
+/** The draft after a pick, and where the caret goes. */
+export interface InlinePick {
+  readonly text: string
+  readonly caret: number
+}
+
 export interface InlineProjectRow {
   readonly path: string
   readonly insert: string
@@ -36,21 +45,30 @@ const OTHER_SCOPES: readonly string[] = ['thread', 't', 'file', 'f', 'skill', 'm
  * meaning a backlog item or thread reference instead of opening an agent list.
  */
 export class InlineCompletion {
-  /** The token being typed right before the caret, if any. */
+  /** The token the caret is on, resolved with the rich composer's Codex rules: one whitespace-delimited token. */
   static tokenAt(text: string, caret: number): InlineToken | null {
-    const match = /(^|\s)([#@])([\w./:-]*(?:\s+[\w./:-]+)*)$/u.exec(text.slice(0, caret))
-    if (match === null || match[2] === undefined) return null
-    const trigger = match[2] === '#' ? '#' : '@'
-    const rawBody = match[3] ?? ''
-    const body = rawBody.trimEnd()
-    const start = caret - rawBody.length - 1
-    if (trigger === '#') {
-      if (/\s/u.test(body)) return null
-      return { trigger, query: body, start, scope: null }
-    }
-    const scope = /^([a-z]+):/iu.exec(body)?.[1]?.toLowerCase() ?? null
-    if (scope === null) return { trigger, query: body, start, scope }
-    return { trigger, query: body.slice(scope.length + 1), start, scope }
+    const tag = prefixedTokenAt({ text, caret, prefix: '#' })
+    const mention = prefixedTokenAt({ text, caret, prefix: '@' })
+    // Like Codex arbitrating `$` against `@`, the token that starts later is the one being typed.
+    if (tag !== null && (mention === null || tag.start > mention.start)) return { trigger: '#', query: tag.query, start: tag.start, end: tag.end, scope: null }
+    if (mention === null) return null
+    const scope = /^([a-z]+):/iu.exec(mention.query)?.[1]?.toLowerCase() ?? null
+    const query = scope === null ? mention.query : mention.query.slice(scope.length + 1)
+    return { trigger: '@', query, start: mention.start, end: mention.end, scope }
+  }
+
+  /**
+   * The text and caret after picking a row (Codex's completion separator): the token is replaced and the caret lands after
+   * one space. A space already there is reused, unless a word follows it directly, which keeps its own separator.
+   */
+  static applyPick(input: { readonly text: string; readonly token: InlineToken; readonly insert: string }): InlinePick {
+    const inserted = input.insert.trimEnd()
+    const rest = input.text.slice(input.token.end)
+    const reuseSeparator = /^[^\S\r\n](?:\s|$)/u.test(rest)
+    const separator = reuseSeparator ? '' : ' '
+    const text = `${input.text.slice(0, input.token.start)}${inserted}${separator}${rest}`
+    const pick: InlinePick = { text, caret: input.token.start + inserted.length + 1 }
+    return pick
   }
 
   /** Agents to offer for one token: none under another source's scope or a quoted file path. */

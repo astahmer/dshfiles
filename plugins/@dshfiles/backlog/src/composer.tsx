@@ -36,6 +36,7 @@ import { AttachmentTray, pasteFiles, useComposerFiles, useFileDrop } from './com
 import { audioBase64, startVoiceCapture, type VoiceCapture } from './composer-audio.js'
 import { composerLinkLabel } from './composer-link-label.js'
 import { fileInput } from './composer-files.js'
+import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -288,8 +289,7 @@ export const Composer = (props: {
       return
     }
     if (mention.token === null) return
-    const next = `${text.slice(0, mention.token.start)}${suggestion.insert}${text.slice(caret)}`
-    const position = mention.token.start + suggestion.insert.length
+    const { text: next, caret: position } = InlineCompletion.applyPick({ text, token: mention.token, insert: suggestion.insert })
     setNavigated(false)
     setText(next)
     requestAnimationFrame(() => {
