@@ -5,6 +5,8 @@ import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
   THREAD_STATUS_FILTER_OPTIONS,
+  THREAD_STORAGE_FILTERS,
+  THREAD_WAITING_ON_YOU_FILTERS,
   ThreadViewModel,
   upgradeLegacyStatusFilters,
   type ThreadStatusFilter,
@@ -14,11 +16,12 @@ import {
 
 export const ALL_THREADS_VIEW_ID = 'all-threads'
 export const WORKING_VIEW_ID = 'working'
-export const DONE_VIEW_ID = 'done'
+export const INBOX_VIEW_ID = 'inbox'
+export const GONE_VIEW_ID = 'gone'
 export const LEGACY_CURRENT_VIEW_ID = 'legacy-current'
 export const MAX_THREAD_VIEWS = 12
 /** Built-in views ship with a translated name instead of a stored one. */
-const BUILT_IN_VIEW_IDS = [ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, DONE_VIEW_ID, LEGACY_CURRENT_VIEW_ID]
+const BUILT_IN_VIEW_IDS = [ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, INBOX_VIEW_ID, GONE_VIEW_ID, LEGACY_CURRENT_VIEW_ID]
 
 export interface ThreadViewPreset extends ThreadViewPreferences {
   readonly id: string
@@ -51,14 +54,22 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     enabled: true,
   },
   {
-    id: DONE_VIEW_ID,
+    id: INBOX_VIEW_ID,
     name: null,
     groupBy: 'status',
-    statusFilters: ['turn-finished'],
+    statusFilters: [...THREAD_WAITING_ON_YOU_FILTERS],
     sourceFilter: 'all',
     enabled: true,
   },
-] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
+  {
+    id: GONE_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: [...THREAD_STORAGE_FILTERS],
+    sourceFilter: 'all',
+    enabled: true,
+  },
+] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
 
 export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   views: [...DEFAULT_THREAD_VIEW_PRESETS],

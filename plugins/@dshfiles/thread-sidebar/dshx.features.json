@@ -287,7 +287,7 @@
         },
         {
           "key": "views",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"turn-finished\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
@@ -313,7 +313,7 @@
         },
         {
           "key": "viewPresets",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"turn-finished\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
@@ -345,7 +345,7 @@
       ],
       "failureModes": [
         "Each attention status filter matches the row label the user already sees (approval needed, input needed, turn finished, needs resume, interrupted), alone or combined; a running row keeps its label, and Attention matches any of them. Unread excludes archived and settled rows.",
-        "Attention dots appear only on matching non-All-threads views and use one highest-priority attention color; the shipped Done view lists turn finished and counts unread finished threads.",
+        "Attention dots appear only on matching non-All-threads views and use one highest-priority attention color; the shipped Inbox view lists every waiting-on-you label and counts the unread threads it lists, and Gone lists the storage states.",
         "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled, and a saved not-working filter decodes to input-needed + turn-finished + interrupted."
       ],
       "externalDependencies": [],
@@ -412,7 +412,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.view-controls-unit-preference-defaults",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
-          "testName": "ships All threads, Working and Done defaults"
+          "testName": "ships All threads, Working, Inbox and Gone defaults"
         },
         {
           "kind": "unit-test",

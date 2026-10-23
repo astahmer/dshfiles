@@ -978,7 +978,7 @@ When('a thread finishes its turn and the browser hands its unfinished marker to 
       ),
     [LEGACY_NOTIFICATION_STORAGE_KEY, targetThreadId],
   )
-  // The shipped Done view is already in the view row and lists finished turns; nothing to create.
+  // The shipped Inbox view is already in the view row and lists every waiting-on-you label; nothing to create.
   finishedTurnJourneys.set(page, { targetThreadId })
 })
 
@@ -990,9 +990,9 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     await page.reload()
     await expect(finishedLabel(page)).toBeVisible({ timeout: 60_000 })
     const tabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
-    const doneTab = tabs.getByRole('button', { name: 'Done (1), Turn finished', exact: true })
-    await expect(doneTab).toBeVisible()
-    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-success/)
+    const inboxTab = tabs.getByRole('button', { name: 'Inbox (1), Turn finished', exact: true })
+    await expect(inboxTab).toBeVisible()
+    await expect(inboxTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-success/)
     await expect(tabs.getByRole('button', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
   })
   const otherTab = await page.context().newPage()
@@ -1001,23 +1001,23 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     await recordAssertion(page, 'thread-sidebar-turn-finished-is-shared-across-tabs', async () => {
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
-        threadSidebar(otherTab).getByRole('button', { name: 'Done (1), Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
+        threadSidebar(otherTab).getByRole('button', { name: 'Inbox (1), Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
       ).toBeVisible()
       await otherTab.reload()
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
-        threadSidebar(otherTab).getByRole('button', { name: 'Done (1), Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
+        threadSidebar(otherTab).getByRole('button', { name: 'Inbox (1), Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
       ).toBeVisible()
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
       await openThreadRow(threadRow(otherTab, journey.targetThreadId))
       await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
-      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
-      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Done', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Inbox (1), Turn finished', exact: true })).toHaveCount(0)
+      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Inbox', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
       await page.bringToFront()
       await page.reload()
       await expect(finishedLabel(page)).toHaveCount(0, { timeout: 30_000 })
-      await expect(threadSidebar(page).getByRole('button', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0)
+      await expect(threadSidebar(page).getByRole('button', { name: 'Inbox (1), Turn finished', exact: true })).toHaveCount(0)
     })
   } finally {
     await otherTab.close()
@@ -1312,14 +1312,14 @@ const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
   await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
   const viewManager = page.getByRole('dialog')
-  // Working and the shipped Done view both become plain lists, so every tab in the row holds the same two rows.
-  for (const name of ['Working', 'Done']) {
+  // The non-All built-in views all become plain lists, so every tab in the row holds the same two rows.
+  for (const name of ['Working', 'Inbox', 'Gone']) {
     await viewManager.getByRole('button', { name: `Edit view ${name}`, exact: true }).click()
     await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
     await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
   }
   await viewManager.getByRole('button', { name: 'Add view', exact: true }).click()
-  await viewManager.getByLabel('View name').fill('Gone')
+  await viewManager.getByLabel('View name').fill('Later')
   await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
   await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
   await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
@@ -1331,7 +1331,7 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
   if (journey === undefined) throw new Error('No Host-created thread history was recorded for this browser page.')
   await prepareKeyboardNavigationViews(page)
   const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
-  for (const viewName of ['All threads', 'Working', 'Done', 'Gone']) {
+  for (const viewName of ['All threads', 'Working', 'Inbox', 'Gone', 'Later']) {
     await viewTabs.getByRole('button', { name: viewName, exact: true }).click()
     const rows = threadSidebar(page).locator('button[data-thread-main-action][data-thread-id]')
     await expect(rows).toHaveCount(2)

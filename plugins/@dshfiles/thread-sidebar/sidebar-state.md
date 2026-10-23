@@ -109,15 +109,18 @@ shows, and several combine as OR (they are grouped as Activity, Waiting on you,
 and Storage in the menu): **All**, **Working** (running), **Needs attention**
 (any label), **Unread**, one per attention label — **Approval needed**, **Input
 needed**, **Turn finished**, **Needs resume**, **Interrupted** — and the storage
-states **Muted**, **Settled**, **Archived**. For example, the Working filter
+states **Muted**, **Settled**, **Archived**. The shipped views are **All
+threads** (no filter), **Working** (Working), **Inbox** (all five Waiting on you
+labels) and **Gone** (Muted, Settled, Archived). For example, the Working filter
 hides a finished thread when neither it nor its child work is running, even if
 its attention display is configured as a group. A label filter matches the badge
 the row shows, including a label a root row inherits from a finished or waiting
 child, so Turn finished lists a parent whose child finished. Unread and the
 attention filters hide muted, archived, and settled threads: all three are
 storage rather than work in progress, so only the unfiltered list shows them,
-each in its own section. A saved view from an earlier build that still asks for
-**Not working** decodes to Input needed + Turn finished + Interrupted. A listed
+each in its own section. **Gone** is explicit about listing them instead. A saved
+view from an earlier build that still asks for **Not working** decodes to Input
+needed + Turn finished + Interrupted. A listed
 thread keeps its own child list whatever the filters say: children follow the
 parent row they belong to, folded while none of them is working and unfolded
 when a subagent runs. **Filter: None** means no additional status filter.

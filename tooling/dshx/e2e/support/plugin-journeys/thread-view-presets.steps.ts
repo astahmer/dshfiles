@@ -42,9 +42,9 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await expect(dialog.getByRole('button', { name: 'Edit view Needs focus', exact: true })).toBeVisible()
   await expect(dialog.getByRole('listitem').filter({ hasText: 'Needs focus' })).toContainText('Needs attention, Archived')
 
-  await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
+  for (let step = 0; step < 4; step += 1) {
+    await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
+  }
   await dialog.getByRole('button', { name: 'Edit view All threads', exact: true }).click()
   await dialog.getByLabel('View name').fill('Everything')
   await dialog.getByRole('button', { name: 'Save view', exact: true }).click()
@@ -53,7 +53,8 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await workingEnabled.click()
   await expect(workingEnabled).toHaveAttribute('aria-checked', 'false')
   await dialog.getByRole('button', { name: 'Remove view Working', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Remove view Done', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Remove view Inbox', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Remove view Gone', exact: true }).click()
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 
   const sidebar = threadSidebar(page)

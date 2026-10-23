@@ -31,11 +31,23 @@ export const THREAD_ATTENTION_FILTER_LABELS = {
 } as const satisfies Partial<Record<ThreadStatusFilter, ThreadAttentionLabel>>
 export type ThreadAttentionFilter = keyof typeof THREAD_ATTENTION_FILTER_LABELS
 
+/** Every state that waits on the user, in menu order; an Inbox view lists exactly these. */
+export const THREAD_WAITING_ON_YOU_FILTERS = [
+  'approval-needed',
+  'input-needed',
+  'turn-finished',
+  'needs-resume',
+  'interrupted',
+] as const satisfies readonly ThreadStatusFilter[]
+
+/** Every state that stores a thread away instead of leaving it in the list. */
+export const THREAD_STORAGE_FILTERS = ['muted', 'settled', 'archived'] as const satisfies readonly ThreadStatusFilter[]
+
 /** Filter menu order: what a thread is doing, then why it waits, then where it is stored. */
 export const THREAD_STATUS_FILTER_GROUPS = [
   { id: 'activity', filters: ['working', 'attention', 'unread'] },
-  { id: 'attention', filters: ['approval-needed', 'input-needed', 'turn-finished', 'needs-resume', 'interrupted'] },
-  { id: 'storage', filters: ['muted', 'settled', 'archived'] },
+  { id: 'attention', filters: THREAD_WAITING_ON_YOU_FILTERS },
+  { id: 'storage', filters: THREAD_STORAGE_FILTERS },
 ] as const satisfies readonly { readonly id: string; readonly filters: readonly ThreadStatusFilter[] }[]
 
 /**

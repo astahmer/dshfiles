@@ -128,21 +128,22 @@ preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
 without opening the manager. The shipped views are **All threads**, **Working**
-(running threads) and **Done** (turns that finished and still wait to be
-reviewed). A preset that is not All threads shows `(N)` beside its name: the
-Working view counts running threads, and every other view counts the unread
-threads it lists, so Done says how many finished threads still hold an
-unacknowledged turn on the Host (opening one clears it everywhere). The colored
-dot signals any attention label matched by the view; it is not itself an
-unread-finish count. A status filter names a state the row already shows, and
-several combine as OR: **Working**, **Needs attention** (any label), **Unread**,
-one filter per attention label (**Approval needed**, **Input needed**, **Turn
-finished**, **Needs resume**, **Interrupted**), and the storage states
-**Muted**, **Settled** and **Archived**. Unread leaves archived and settled rows
-out, and the attention filters see the label a root row shows for itself or a
-child. A saved view from an earlier build that still asks for **Not working**
-decodes to **Input needed** + **Turn finished** + **Interrupted**, the states it
-used to stand for. Muted,
+(running threads), **Inbox** (everything waiting on you: approval needed, input
+needed, turn finished, needs resume, interrupted) and **Gone** (the storage
+states: muted, settled, archived). A preset that is not All threads shows `(N)`
+beside its name: the Working view counts running threads, and every other view
+counts the unread threads it lists, so Inbox says how many waiting threads still
+hold an unacknowledged finish on the Host (opening one clears it everywhere).
+The colored dot signals any attention label matched by the view; it is not
+itself an unread-finish count. A status filter names a state the row already
+shows, and several combine as OR: **Working**, **Needs attention** (any label),
+**Unread**, one filter per attention label (**Approval needed**, **Input
+needed**, **Turn finished**, **Needs resume**, **Interrupted**), and the storage
+states **Muted**, **Settled** and **Archived**. Unread leaves archived and
+settled rows out, and the attention filters see the label a root row shows for
+itself or a child. A saved view from an earlier build that still asks for **Not
+working** decodes to **Input needed** + **Turn finished** + **Interrupted**, the
+states it used to stand for. Muted,
 archived, and settled threads are omitted from attention and unread filters,
 because all three are storage rather than work in progress. **Group headers
 collapse their rows** in the Project and
