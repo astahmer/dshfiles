@@ -52,6 +52,13 @@ summary line names how many plugins wait for a Host restart; its page lists them
 and says what a restart applies. This is the notice, not a gate bypass: the
 browser keeps running the last-good code either way.
 
+![Plugins → HMR updates, one plugin waiting for a Host restart](docs/screenshots/plugins-row-deferred.png)
+
+With nothing pending the page says so; the row clears by itself once the Host
+artifact on disk matches the loaded one again:
+
+![Plugins → HMR updates, every rebuilt plugin in step](docs/screenshots/plugins-row-in-step.png)
+
 ## Limits
 
 - The browser half uses a same-origin `EventSource` on `plugins/events`. A shell

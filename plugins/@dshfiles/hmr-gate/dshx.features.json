@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "plugins-row",
+      "title": "Plugin updates waiting for a Host restart",
+      "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
+      "reach": [
+        "click button \"Plugins\"",
+        "click button \"View HMR updates\"",
+        "expect text \"Nothing is waiting*\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "settings"
+      ],
+      "configuration": [],
+      "states": [
+        "in-step",
+        "deferred",
+        "released"
+      ],
+      "failureModes": [
+        "A rebuilt client bundle whose Host half did not change applies immediately, as before.",
+        "A rebuilt client bundle whose Host half changed is announced as deferred; the browser keeps the last-good code and the row names the package until a Host restart.",
+        "A Host that reloads the package in-process releases the deferral and announces the rebuild."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-defers-stale-host-half",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/gate.test.ts",
+          "testName": "defers while the Host half on disk is not the loaded one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-releases-after-host-reload",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/gate.test.ts",
+          "testName": "releases a deferral when the Host reloaded that artifact"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.plugins-row-unit-resolves-owned-entry",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/gate.test.ts",
+          "testName": "reads an owned bundle entry from exports"
+        }
+      ]
+    }
+  ]
+}
