@@ -47,7 +47,6 @@ const RESOLUTION_THRESHOLD = 0.5
 
 const modelAnswerSchema = z.object({
   kind: BacklogItems.kindSchema.optional().catch(undefined),
-  status: BacklogItems.statusSchema.optional().catch(undefined),
   title: z.string().min(1).max(BacklogItems.maxTitleChars).optional().catch(undefined),
   tags: z.array(z.string().max(60)).max(20).optional().catch(undefined),
   duplicateOf: z.number().int().positive().nullable().optional().catch(undefined),
@@ -94,9 +93,9 @@ const correctionsFrom = (items: readonly BacklogItem[]): TriageCorrection[] =>
 
 const systemPrompt = `You triage one backlog item for a developer's personal backlog.
 Answer with one JSON object and nothing else:
-{"kind": "task"|"bug"|"idea"|"note"|"question", "status": "todo"|"doing"|"done"|"dropped", "title": string, "tags": string[], "duplicateOf": number|null, "confidence": number, "reason": string}
+{"kind": "task"|"bug"|"idea"|"note"|"question", "title": string, "tags": string[], "duplicateOf": number|null, "confidence": number, "reason": string}
 - kind: task = work to do, bug = something broken, idea = possible future work, note = knowledge to keep, question = needs an answer.
-- status: usually "todo"; "done" only when the text says it already happened.
+- Do not change the item's status. Captures start in inbox; the user chooses when to move them.
 - title: a short, clear title; keep the author's wording when it is already clear.
 - tags: at most 3 lowercase single-word topics; reuse tags from similar items.
 - duplicateOf: the id of a similar item describing the same work, else null.
@@ -144,8 +143,7 @@ const changesOnly = (item: BacklogItem, proposal: BacklogProposal): BacklogPropo
 }
 
 /**
- * One triage pass: Jev settles the cheap yes/no questions (actionable? same work as the closest item?), the model
- * proposes the full shape when one is configured. A failing service is skipped, never fatal.
+ * One triage pass: use the model for the full shape when configured; otherwise Jev answers actionable and duplicate questions. A failing service is skipped, never fatal.
  */
 const run = async (request: {
   readonly item: BacklogItem
@@ -157,21 +155,21 @@ const run = async (request: {
   const candidates = candidatesFor(item, request.others)
   const text = `${item.title}\n${item.body}`.trim()
   let fromJev: BacklogProposal | undefined
-  if (request.services.jev !== undefined) {
+  if (request.services.jev !== undefined && request.services.complete === undefined) {
     const ask = request.services.jev
-    const probability = await ask({ question: actionable, text }).catch(() => undefined)
+    const probability =
+      item.kind === 'task' && !item.humanFields.includes('kind') ? await ask({ question: actionable, text }).catch(() => undefined) : undefined
     const closest = candidates[0]
     const duplicate = closest === undefined ? undefined : await ask({ question: sameWork(closest.title), text }).catch(() => undefined)
-    if (probability !== undefined) {
-      const isWork = probability >= 0.5
+    if (probability !== undefined || (closest !== undefined && duplicate !== undefined)) {
+      const isWork = probability === undefined || probability >= 0.5
       fromJev = {
-        status: 'todo',
-        confidence: Math.max(probability, 1 - probability),
-        reason: isWork ? 'Reads as work to do.' : 'Reads as something to keep, not work to do.',
+        confidence: probability === undefined ? (duplicate ?? 0) : Math.max(probability, 1 - probability),
+        reason: probability === undefined ? 'May duplicate an existing item.' : isWork ? 'Reads as work to do.' : 'Reads as something to keep, not work to do.',
         source: 'jev',
         at: request.now,
       }
-      if (!isWork && item.kind === 'task') fromJev.kind = 'note'
+      if (probability !== undefined && !isWork && item.kind === 'task') fromJev.kind = 'note'
       if (closest !== undefined && duplicate !== undefined && duplicate >= DUPLICATE_THRESHOLD) fromJev.duplicateOf = closest.id
     }
   }
@@ -184,7 +182,6 @@ const run = async (request: {
     if (answer !== undefined) {
       const model: BacklogProposal = { confidence: answer.confidence, reason: answer.reason, source: 'model', at: request.now }
       if (answer.kind !== undefined) model.kind = answer.kind
-      if (answer.status !== undefined) model.status = answer.status
       if (answer.title !== undefined) model.title = answer.title
       if (answer.tags !== undefined) model.tags = answer.tags
       const duplicate = candidates.find(candidate => candidate.id === answer.duplicateOf)

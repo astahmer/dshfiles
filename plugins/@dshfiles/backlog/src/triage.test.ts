@@ -28,14 +28,31 @@ const jevAnswering =
     request.question.instructions.startsWith('Is `content` work') ? answers.actionable : (answers.duplicate ?? 0)
 
 describe('triage', () => {
-  it('moves work out of the inbox with Jev alone and reports its confidence', async () => {
+  it('does not ask Jev to move a newly captured task out of the inbox', async () => {
     const proposal = await BacklogTriage.run({
       item: item(1, 'Fix the paste handler'),
       others: [],
       services: { jev: jevAnswering({ actionable: 0.9 }) },
       now: 5,
     })
-    expect(proposal).toEqual({ status: 'todo', confidence: 0.9, reason: 'Reads as work to do.', source: 'jev', at: 5 })
+    expect(proposal).toBeNull()
+  })
+
+  it('skips the actionable question when the kind was explicitly chosen', async () => {
+    let jevCalls = 0
+    const proposal = await BacklogTriage.run({
+      item: item(1, 'Fix the paste handler', { humanFields: ['kind'] }),
+      others: [],
+      services: {
+        jev: async () => {
+          jevCalls += 1
+          return 0.9
+        },
+      },
+      now: 5,
+    })
+    expect(proposal).toBeNull()
+    expect(jevCalls).toBe(0)
   })
 
   it('turns a plain capture Jev reads as knowledge into a note', async () => {
@@ -79,17 +96,21 @@ describe('triage', () => {
     })
   })
 
-  it('lowers confidence when Jev and the model disagree on the kind', async () => {
-    const complete: TriageServices['complete'] = async () => '{"kind": "idea", "status": "todo", "confidence": 0.95, "reason": "A possible feature."}'
+  it('uses the configured model without making a redundant Jev request or changing status', async () => {
+    let jevCalls = 0
+    const complete: TriageServices['complete'] = async () => '{"kind": "idea", "status": "doing", "confidence": 0.95, "reason": "A possible feature."}'
+    const jev: TriageServices['jev'] = async () => {
+      jevCalls += 1
+      return 0.4
+    }
     const proposal = await BacklogTriage.run({
       item: item(1, 'A weekly digest of dormant items'),
       others: [],
-      services: { jev: jevAnswering({ actionable: 0.4 }), complete },
+      services: { jev, complete },
       now: 5,
     })
-    expect(proposal?.kind).toBe('idea')
-    expect(proposal?.source).toBe('jev+model')
-    expect(proposal?.confidence).toBe(0.6)
+    expect(proposal).toEqual({ kind: 'idea', confidence: 0.95, reason: 'A possible feature.', source: 'model', at: 5 })
+    expect(jevCalls).toBe(0)
   })
 
   it('proposes nothing when every service fails or nothing would change', async () => {
