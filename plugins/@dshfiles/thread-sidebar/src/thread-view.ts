@@ -14,6 +14,7 @@ export const THREAD_STATUS_FILTER_OPTIONS = [
   'turn-finished',
   'needs-resume',
   'interrupted',
+  'inactive',
   'muted',
   'settled',
   'archived',
@@ -30,6 +31,13 @@ export const THREAD_ATTENTION_FILTER_LABELS = {
   interrupted: 'threadSidebarInterrupted',
 } as const satisfies Partial<Record<ThreadStatusFilter, ThreadAttentionLabel>>
 export type ThreadAttentionFilter = keyof typeof THREAD_ATTENTION_FILTER_LABELS
+const THREAD_ATTENTION_FILTER_FOR_LABEL = {
+  threadSidebarApprovalNeeded: 'approval-needed',
+  threadSidebarInputNeeded: 'input-needed',
+  threadSidebarTurnFinished: 'turn-finished',
+  threadSidebarNeedsResume: 'needs-resume',
+  threadSidebarInterrupted: 'interrupted',
+} satisfies Record<ThreadAttentionLabel, ThreadAttentionFilter>
 
 /** Every state that waits on the user, in menu order; an Inbox view lists exactly these. */
 export const THREAD_WAITING_ON_YOU_FILTERS = [
@@ -46,7 +54,7 @@ export const THREAD_STORAGE_FILTERS = ['muted', 'settled', 'archived'] as const 
 /** Filter menu order: what a thread is doing, then why it waits, then where it is stored. */
 export const THREAD_STATUS_FILTER_GROUPS = [
   { id: 'activity', filters: ['working', 'attention', 'unread'] },
-  { id: 'attention', filters: THREAD_WAITING_ON_YOU_FILTERS },
+  { id: 'attention', filters: [...THREAD_WAITING_ON_YOU_FILTERS, 'inactive'] },
   { id: 'storage', filters: THREAD_STORAGE_FILTERS },
 ] as const satisfies readonly { readonly id: string; readonly filters: readonly ThreadStatusFilter[] }[]
 
@@ -91,6 +99,7 @@ export interface ThreadViewAttentionEntry {
   /** The Host still holds an unacknowledged finish (or a hand unread mark) for this thread. */
   readonly unread?: boolean
   readonly running: boolean
+  readonly inactive?: boolean
   readonly archived: boolean
   readonly settled: boolean
   readonly muted: boolean
@@ -114,9 +123,18 @@ const matchesThreadSourceFilter = (thread: Partial<Pick<SessionSummary, 'origin'
   return sourceFilter === 'subagents' ? isSubagent : !isSubagent
 }
 
+const matchesAttentionSourceFilter = (options: {
+  readonly thread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>>
+  readonly rootThread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>> | undefined
+  readonly sourceFilter: ThreadSourceFilter
+}): boolean =>
+  matchesThreadSourceFilter(options.thread, options.sourceFilter) ||
+  (options.sourceFilter === 'main' && options.rootThread !== undefined && matchesThreadSourceFilter(options.rootThread, 'main'))
+
 const matchesThreadStatusFilter = (options: {
   readonly filters: ThreadStatusFilters
   readonly running: boolean
+  readonly inactive?: boolean
   readonly labels: readonly ThreadAttentionLabel[]
   readonly unread: boolean
   readonly archived: boolean
@@ -127,6 +145,7 @@ const matchesThreadStatusFilter = (options: {
   return options.filters.some(filter => {
     if (filter === 'muted') return options.muted
     if (filter === 'working') return options.running
+    if (filter === 'inactive') return options.inactive === true
     if (filter === 'attention') return options.labels.length > 0
     if (filter === 'unread') return options.unread && !options.archived && !options.settled
     if (filter === 'settled') return options.settled
@@ -160,9 +179,18 @@ const attentionLabelForView = (input: {
   const labels = input.entries.flatMap(entry => {
     if (entry.attentionLabel === undefined || !matchesThreadSourceFilter(entry.thread, input.sourceFilter)) return []
     if (
+      !input.filters.includes('attention') &&
+      !input.filters.includes('unread') &&
+      !(input.filters.includes('working') && entry.running) &&
+      !input.filters.includes(THREAD_ATTENTION_FILTER_FOR_LABEL[entry.attentionLabel])
+    ) {
+      return []
+    }
+    if (
       !matchesThreadStatusFilter({
         filters: input.filters,
         running: entry.running,
+        inactive: entry.inactive === true,
         labels: [entry.attentionLabel],
         unread: entry.unread === true,
         archived: entry.archived,
@@ -191,6 +219,7 @@ const unreadCountForView = (input: {
       !matchesThreadStatusFilter({
         filters: input.filters,
         running: entry.running,
+        inactive: entry.inactive === true,
         labels: entry.attentionLabel === undefined ? [] : [entry.attentionLabel],
         unread: entry.unread === true,
         archived: entry.archived,
@@ -268,6 +297,7 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
 export class ThreadViewModel {
   static readonly isSideChat = isSideChat
   static readonly matchesSourceFilter = matchesThreadSourceFilter
+  static readonly matchesAttentionSourceFilter = matchesAttentionSourceFilter
   static readonly matchesStatusFilter = matchesThreadStatusFilter
   static readonly mostUrgentAttentionLabel = mostUrgentAttentionLabel
   static readonly attentionLabelForView = attentionLabelForView

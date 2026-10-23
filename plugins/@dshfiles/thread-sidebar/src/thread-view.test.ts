@@ -1,8 +1,12 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { ThreadViewModel, type ThreadViewAttentionEntry } from './thread-view.js'
+import { THREAD_STATUS_FILTER_GROUPS, ThreadViewModel, type ThreadViewAttentionEntry } from './thread-view.js'
 
 describe('thread view grouping', () => {
+  it('offers Inactive in the attention filter group', () => {
+    expect(THREAD_STATUS_FILTER_GROUPS.find(group => group.id === 'attention')?.filters).toContain('inactive')
+  })
+
   it('groups repositories alphabetically and keeps newest threads first', () => {
     const groups = ThreadViewModel.groupEntries({
       groupBy: 'project',
@@ -137,6 +141,23 @@ describe('thread view attention markers', () => {
     expect(ThreadViewModel.attentionLabelForView({ filters: ['input-needed'], sourceFilter: 'all', entries: [runningFinishedChild] })).toBeUndefined()
   })
 
+  it('does not badge an inactive view with unrelated attention colors', () => {
+    const interrupted = {
+      thread: {},
+      attentionLabel: 'threadSidebarInterrupted',
+      running: false,
+      inactive: true,
+      archived: false,
+      settled: false,
+      muted: false,
+    } as const
+
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['inactive'], sourceFilter: 'all', entries: [interrupted] })).toBeUndefined()
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['inactive', 'interrupted'], sourceFilter: 'all', entries: [interrupted] })).toBe(
+      'threadSidebarInterrupted',
+    )
+  })
+
   it('only considers attention threads that match the tab source and status', () => {
     const entries = [
       {
@@ -222,6 +243,8 @@ describe('thread view filters', () => {
   it('filters supported activity states', () => {
     expect(ThreadViewModel.matchesStatusFilter(filterState())).toBe(true)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working'], running: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['inactive'], inactive: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['inactive'], inactive: false }))).toBe(false)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working'] }))).toBe(false)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['attention'], labels: ['threadSidebarInputNeeded'] }))).toBe(true)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['attention'] }))).toBe(false)
@@ -249,6 +272,14 @@ describe('thread view filters', () => {
     expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'], archived: true })).toBe(false)
     expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'], settled: true })).toBe(false)
     expect(ThreadViewModel.matchesStatusFilter({ ...finished, filters: ['unread'], unread: false })).toBe(false)
+  })
+
+  it('keeps recovery children of main threads visible in main-source views', () => {
+    const interruptedChild = { origin: 'subagent', parentId: SessionId('main-root') } as const
+
+    expect(ThreadViewModel.matchesAttentionSourceFilter({ thread: interruptedChild, rootThread: {}, sourceFilter: 'main' })).toBe(true)
+    expect(ThreadViewModel.matchesAttentionSourceFilter({ thread: interruptedChild, rootThread: { origin: 'subagent' }, sourceFilter: 'main' })).toBe(false)
+    expect(ThreadViewModel.matchesAttentionSourceFilter({ thread: interruptedChild, rootThread: undefined, sourceFilter: 'main' })).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {

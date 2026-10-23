@@ -1,6 +1,7 @@
 # Thread Sidebar
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
+![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
 
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
@@ -132,19 +133,22 @@ v1 browser copy this plugin wrote migrates into it once. Stored v1 view
 preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
-without opening the manager. The shipped views are **All threads**, **Working**
-(running threads), **Inbox** (everything waiting on you: approval needed, input
-needed, turn finished, needs resume, interrupted) and **Gone** (the storage
-states: muted, settled, archived). A preset that is not All threads shows `(N)`
-beside its name: the Working view counts running threads, and every other view
-counts the unread threads it lists, so Inbox says how many waiting threads still
-hold an unacknowledged finish on the Host (opening one clears it everywhere).
-The colored dot signals any attention label matched by the view; it is not
-itself an unread-finish count. A status filter names a state the row already
+without opening the manager. The shipped views are **All threads**, **Working** (running or interrupted
+threads), **Done** (Inactive + Interrupted main threads), **Inbox** (everything
+waiting on you: approval needed, input needed, turn finished, needs resume,
+interrupted) and **Gone** (the storage states: muted, settled, archived). A
+one-time update adds Done to unchanged older defaults, extends Working with
+Interrupted, and adds Inactive + Interrupted to existing custom views named Done
+while keeping their other filters. A preset that is not All threads shows `(N)`
+beside its name: Working shows the running-thread count, while every other
+view counts the unread threads it lists, so Inbox says how many waiting threads
+still hold an unacknowledged finish on the Host (opening one clears it
+everywhere). The colored dot signals only attention labels matched by that
+view's selected statuses; it is not itself an unread-finish count. A status filter names a state the row already
 shows, and several combine as OR: **Working**, **Needs attention** (any label),
 **Unread**, one filter per attention label (**Approval needed**, **Input
-needed**, **Turn finished**, **Needs resume**, **Interrupted**), and the storage
-states **Muted**, **Settled** and **Archived**. Unread leaves archived and
+needed**, **Turn finished**, **Needs resume**, **Interrupted**), **Inactive**,
+and the storage states **Muted**, **Settled** and **Archived**. Unread leaves archived and
 settled rows out, and the attention filters see the label a root row shows for
 itself or a child. A saved view from an earlier build that still asks for **Not
 working** decodes to **Input needed** + **Turn finished** + **Interrupted**, the

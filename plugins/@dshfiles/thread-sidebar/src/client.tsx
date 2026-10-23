@@ -160,7 +160,7 @@ import {
   type ThreadSourceFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
-import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
+import { doneViewFilterMigration, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
 import { ThreadViewManager, threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion, ThreadMentionDrag } from './thread-mention.js'
 import {
@@ -241,6 +241,7 @@ const emptyThreadsMessage = {
   'turn-finished': 'threadSidebarNoTurnFinishedThreads',
   'needs-resume': 'threadSidebarNoNeedsResumeThreads',
   interrupted: 'threadSidebarNoInterruptedThreads',
+  inactive: 'threadSidebarNoWorkingThreads',
   muted: 'threadSidebarNoMutedThreads',
   settled: 'threadSidebarNoSettledThreads',
   archived: 'threadSidebarNoArchivedThreads',
@@ -1207,7 +1208,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, hostBacked, setSelectedThreadId, threadTitle } = useSidebarState()
+  const { preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, setSelectedThreadId, threadTitle } = useSidebarState()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
   const pendingQuestionsApi = useApi(threadSidebarPendingQuestionsApi)
   const recoveryApi = useApi(threadSidebarRecoveryApi)
@@ -1573,10 +1574,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => allNeedsResumeRows.filter(session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter)),
     [allNeedsResumeRows, threadView.sourceFilter],
   )
-  const interruptedRows = useMemo(
-    () => allInterruptedRows.filter(session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter)),
-    [allInterruptedRows, threadView.sourceFilter],
-  )
   const allUsageLimitRows = useMemo(
     () =>
       UsageLimitRowsModel.select({
@@ -1920,17 +1917,37 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [updatePreferences],
   )
 
-  // Saved views moved from browser storage to Host settings: hand the browser copy over once, then drop it.
   const viewsMigrationStarted = useRef(false)
+  const doneViewMigrationTarget = useRef<ThreadViewSettings | null>(null)
+  const removeLegacyViewsAfterMigration = useRef(false)
   useEffect(() => {
-    if (!isPrimarySurface || !hostBacked || viewsMigrationStarted.current) return
+    if (!isPrimarySurface || !hostBacked || viewsMigrationStarted.current || threadViewWritePending) return
     viewsMigrationStarted.current = true
     const legacy = threadViewPreferences.get()
-    threadViewPreferences.remove()
-    if (JSON.stringify(legacy) === JSON.stringify(DEFAULT_THREAD_VIEW_SETTINGS)) return
-    if (JSON.stringify(preferences.threadViews) !== JSON.stringify(DEFAULT_THREAD_VIEW_SETTINGS)) return
-    changePreferences({ threadViews: legacy })
-  }, [changePreferences, hostBacked, isPrimarySurface, preferences.threadViews])
+    const adoptLegacy =
+      !ThreadViewPreferencesModel.isDefaultThreadViewSettings(legacy) && ThreadViewPreferencesModel.isDefaultThreadViewSettings(preferences.threadViews)
+    const source = adoptLegacy ? legacy : preferences.threadViews
+    const shouldMigrateDone = adoptLegacy || !doneViewFilterMigration.get() || ThreadViewPreferencesModel.isDefaultThreadViewSettings(source)
+    const migrated = shouldMigrateDone ? ThreadViewPreferencesModel.migrateDoneViewSettings(source) : source
+    const needsWrite = adoptLegacy || migrated !== source
+    if (!needsWrite) {
+      threadViewPreferences.remove()
+      doneViewFilterMigration.set(true)
+      return
+    }
+    doneViewMigrationTarget.current = migrated
+    removeLegacyViewsAfterMigration.current = true
+    changePreferences({ threadViews: migrated })
+  }, [changePreferences, hostBacked, isPrimarySurface, preferences.threadViews, threadViewWritePending])
+  useEffect(() => {
+    const target = doneViewMigrationTarget.current
+    if (!isPrimarySurface || !hostBacked || target === null || threadViewWritePending || storageWarning) return
+    if (JSON.stringify(preferences.threadViews) !== JSON.stringify(target)) return
+    doneViewMigrationTarget.current = null
+    doneViewFilterMigration.set(true)
+    if (removeLegacyViewsAfterMigration.current) threadViewPreferences.remove()
+    removeLegacyViewsAfterMigration.current = false
+  }, [hostBacked, isPrimarySurface, preferences.threadViews, storageWarning, threadViewWritePending])
 
   // Group collapse moved from browser storage to Host settings: hand the browser copy over once, then drop it.
   const groupsMigrationStarted = useRef(false)
@@ -2628,6 +2645,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [childThreadEntries, sectionEntries, threadView.sourceFilter])
   const sourceFilteredThreadIds = useMemo(() => new Set(sourceFilteredThreadEntries.map(entry => entry.session.id)), [sourceFilteredThreadEntries])
   const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries.map(entry => entry.activity)), [sectionEntries])
+  const inactiveThreadIds = useMemo(
+    () =>
+      new Set(
+        [...sectionEntries, ...childThreadEntries].flatMap(entry =>
+          SidebarOrganization.sectionForSession({
+            session: entry.activity,
+            archivedSessionIds,
+            pinnedSessionIds,
+            parkedSessionIds,
+            settledSessionIds,
+            idleSectionOverrides: preferences.idleSectionOverrides,
+            now,
+            idleMinutes: preferences.idleMinutes,
+          }) === 'inactive'
+            ? [entry.session.id]
+            : [],
+        ),
+      ),
+    [
+      archivedSessionIds,
+      childThreadEntries,
+      now,
+      parkedSessionIds,
+      pinnedSessionIds,
+      preferences.idleMinutes,
+      preferences.idleSectionOverrides,
+      sectionEntries,
+      settledSessionIds,
+    ],
+  )
   const workingThreadCountsBySource = useMemo(
     () => ({
       all: sectionEntries.filter(entry => entry.activity.running).length + detachedThreadEntries.filter(entry => entry.activity.running).length,
@@ -2842,6 +2889,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         attentionLabel,
         unread: attention.records.has(entry.session.id),
         running: entry.activity.running,
+        inactive: inactiveThreadIds.has(entry.session.id),
         archived: archivedSessionIds.has(entry.session.id),
         settled: settledSessionIds.has(entry.session.id),
         muted: mutedSessionIds.has(entry.session.id),
@@ -2857,6 +2905,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     attention.records,
     attentionLabelsBySession,
     childThreadEntries,
+    inactiveThreadIds,
     detachedThreadEntries,
     mutedSessionIds,
     sectionEntries,
@@ -2881,6 +2930,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           labels: attentionLabelsByRow.get(entry.session.id) ?? [],
           unread: attention.records.has(entry.session.id),
           running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
+          inactive: inactiveThreadIds.has(entry.session.id),
           archived: archivedSessionIds.has(entry.session.id),
           settled: settledSessionIds.has(entry.session.id),
           muted: mutedSessionIds.has(entry.session.id),
@@ -2892,6 +2942,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       attention.records,
       attentionLabelsByRow,
       currentWorkingThreadIds,
+      inactiveThreadIds,
       mutedSessionIds,
       sourceFilteredThreadEntries,
       threadView.sourceFilter,
@@ -2961,9 +3012,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       threadView.statusFilters,
     ],
   )
+  const sourceFilteredInterruptedRows = useMemo(
+    () =>
+      allInterruptedRows.filter(session => {
+        if (threadView.sourceFilter !== 'main') return ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter)
+        const rootId = Array.from(threadTree.childrenByRoot).find(([, children]) => children.some(child => child.id === session.id))?.[0]
+        const root = sectionEntries.find(entry => entry.session.id === rootId)?.session
+        return ThreadViewModel.matchesAttentionSourceFilter({ thread: session, rootThread: root, sourceFilter: threadView.sourceFilter })
+      }),
+    [allInterruptedRows, sectionEntries, threadTree, threadView.sourceFilter],
+  )
   const statusFilteredInterruptedRows = useMemo(
     () =>
-      interruptedRows.filter(session =>
+      sourceFilteredInterruptedRows.filter(session =>
         ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
@@ -2979,7 +3040,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       attention.records,
       settledSessionIds,
       currentWorkingThreadIds,
-      interruptedRows,
+      sourceFilteredInterruptedRows,
       mutedSessionIds,
       threadView.sourceFilter,
       threadView.statusFilters,
@@ -3941,8 +4002,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               .map(view => {
                 const label = threadViewPresetLabel(view, props.tSidebar)
                 const attentionLabel = attentionLabelByViewId.get(view.id)
-                const workingCount =
-                  view.statusFilters.length === 1 && view.statusFilters[0] === 'working' ? workingThreadCountsBySource[view.sourceFilter] : null
+                const hasOnlyWorkingStatuses =
+                  view.statusFilters.every(status => status === 'working' || status === 'interrupted') && view.statusFilters.includes('working')
+                const workingCount = hasOnlyWorkingStatuses ? workingThreadCountsBySource[view.sourceFilter] : null
                 const unreadCount = unreadCountByViewId.get(view.id) ?? 0
                 const visibleCount = workingCount ?? (unreadCount > 0 ? unreadCount : null)
                 const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`

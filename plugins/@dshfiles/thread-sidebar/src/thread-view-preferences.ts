@@ -16,12 +16,13 @@ import {
 
 export const ALL_THREADS_VIEW_ID = 'all-threads'
 export const WORKING_VIEW_ID = 'working'
+export const DONE_VIEW_ID = 'done'
 export const INBOX_VIEW_ID = 'inbox'
 export const GONE_VIEW_ID = 'gone'
 export const LEGACY_CURRENT_VIEW_ID = 'legacy-current'
 export const MAX_THREAD_VIEWS = 12
 /** Built-in views ship with a translated name instead of a stored one. */
-const BUILT_IN_VIEW_IDS = [ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, INBOX_VIEW_ID, GONE_VIEW_ID, LEGACY_CURRENT_VIEW_ID]
+const BUILT_IN_VIEW_IDS = [ALL_THREADS_VIEW_ID, WORKING_VIEW_ID, DONE_VIEW_ID, INBOX_VIEW_ID, GONE_VIEW_ID, LEGACY_CURRENT_VIEW_ID]
 
 export interface ThreadViewPreset extends ThreadViewPreferences {
   readonly id: string
@@ -49,8 +50,16 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     id: WORKING_VIEW_ID,
     name: null,
     groupBy: 'status',
-    statusFilters: ['working'],
+    statusFilters: ['working', 'interrupted'],
     sourceFilter: 'all',
+    enabled: true,
+  },
+  {
+    id: DONE_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: ['inactive', 'interrupted'],
+    sourceFilter: 'main',
     enabled: true,
   },
   {
@@ -69,7 +78,7 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     sourceFilter: 'all',
     enabled: true,
   },
-] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
+] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
 
 export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   views: [...DEFAULT_THREAD_VIEW_PRESETS],
@@ -77,6 +86,12 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   showGroupControl: true,
   showFilterControl: true,
 }
+
+export const doneViewFilterMigration = createStoredValue({
+  key: 'dshfiles.thread-sidebar.done-view-filters.v1',
+  schema: z.boolean(),
+  fallback: false,
+})
 
 const groupBySchema = z.enum(THREAD_GROUP_BY_OPTIONS)
 const statusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS)
@@ -225,6 +240,83 @@ const decodeThreadViewSettings = (value: unknown): ThreadViewSettings | null => 
   return result.success ? result.data : null
 }
 
+const DONE_VIEW_REQUIRED_FILTERS = ['inactive', 'interrupted'] satisfies readonly ThreadStatusFilter[]
+
+const ensureDoneViewIncludesInactiveAndInterrupted = (settings: ThreadViewSettings): ThreadViewSettings => {
+  let changed = false
+  const views = settings.views.map(view => {
+    if (view.name?.trim().toLowerCase() !== 'done') return view
+    const statusFilters = [...new Set<ThreadStatusFilter>([...view.statusFilters, ...DONE_VIEW_REQUIRED_FILTERS])]
+    if (statusFilters.length === view.statusFilters.length) return view
+    changed = true
+    return { ...view, statusFilters }
+  })
+  return changed ? { ...settings, views } : settings
+}
+
+const PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS = [
+  {
+    id: ALL_THREADS_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: [],
+    sourceFilter: 'all',
+    enabled: true,
+  },
+  {
+    id: WORKING_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: ['working'],
+    sourceFilter: 'all',
+    enabled: true,
+  },
+  {
+    id: INBOX_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: [...THREAD_WAITING_ON_YOU_FILTERS],
+    sourceFilter: 'all',
+    enabled: true,
+  },
+  {
+    id: GONE_VIEW_ID,
+    name: null,
+    groupBy: 'status',
+    statusFilters: [...THREAD_STORAGE_FILTERS],
+    sourceFilter: 'all',
+    enabled: true,
+  },
+] as const satisfies readonly ThreadViewPreset[]
+
+const matchesDefaultPresets = (settings: ThreadViewSettings, presets: readonly ThreadViewPreset[]): boolean =>
+  settings.views.length === presets.length &&
+  settings.views.every((view, index) => {
+    const preset = presets[index]
+    return (
+      preset !== undefined &&
+      view.id === preset.id &&
+      view.name === preset.name &&
+      view.groupBy === preset.groupBy &&
+      view.sourceFilter === preset.sourceFilter &&
+      view.enabled === preset.enabled &&
+      JSON.stringify(view.statusFilters) === JSON.stringify(preset.statusFilters)
+    )
+  })
+
+const isDefaultThreadViewSettings = (settings: ThreadViewSettings): boolean =>
+  settings.showGroupControl &&
+  settings.showFilterControl &&
+  [DEFAULT_THREAD_VIEW_PRESETS, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS].some(presets => matchesDefaultPresets(settings, presets)) &&
+  settings.views.some(view => view.id === settings.activeViewId)
+
+const migrateDoneViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => {
+  const upgradedDefaults = matchesDefaultPresets(settings, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS)
+    ? { ...settings, views: [...DEFAULT_THREAD_VIEW_PRESETS] }
+    : settings
+  return ensureDoneViewIncludesInactiveAndInterrupted(upgradedDefaults)
+}
+
 const activeThreadView = (settings: ThreadViewSettings): ThreadViewPreset =>
   settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled) ?? DEFAULT_THREAD_VIEW_PRESETS[0]
 
@@ -306,6 +398,9 @@ const updateThreadViewSettings = (settings: ThreadViewSettings): ThreadViewSetti
 export class ThreadViewPreferencesModel {
   static readonly decodeThreadViewPreferences = decodeThreadViewPreferences
   static readonly decodeThreadViewSettings = decodeThreadViewSettings
+  static readonly ensureDoneViewIncludesInactiveAndInterrupted = ensureDoneViewIncludesInactiveAndInterrupted
+  static readonly isDefaultThreadViewSettings = isDefaultThreadViewSettings
+  static readonly migrateDoneViewSettings = migrateDoneViewSettings
   static readonly activeThreadView = activeThreadView
   static readonly attentionLabelForPreset = attentionLabelForPreset
   static readonly unreadCountForPreset = unreadCountForPreset

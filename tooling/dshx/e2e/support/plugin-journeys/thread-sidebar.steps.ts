@@ -1339,7 +1339,9 @@ Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', asy
   await prepareKeyboardNavigationViews(page)
   const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
   for (const viewName of ['All threads', 'Working', 'Inbox', 'Gone', 'Later']) {
-    await viewTabs.getByRole('button', { name: viewName, exact: true }).click()
+    const viewButton =
+      viewName === 'Working' ? viewTabs.getByRole('button', { name: /^Working(?: \(\d+\))?$/ }) : viewTabs.getByRole('button', { name: viewName, exact: true })
+    await viewButton.click()
     const rows = threadSidebar(page).locator('button[data-thread-main-action][data-thread-id]')
     await expect(rows).toHaveCount(2)
     const visibleIds = await rows.evaluateAll(buttons => buttons.map(button => button.getAttribute('data-thread-id')))

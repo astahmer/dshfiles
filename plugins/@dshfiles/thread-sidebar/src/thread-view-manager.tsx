@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, type ThreadSidebarLocaleKey } from './locales.js'
 import {
   ALL_THREADS_VIEW_ID,
+  DONE_VIEW_ID,
   GONE_VIEW_ID,
   INBOX_VIEW_ID,
   LEGACY_CURRENT_VIEW_ID,
@@ -42,6 +43,7 @@ export const threadStatusFilterLabelKeys = {
   'turn-finished': 'threadSidebarTurnFinished',
   'needs-resume': 'threadSidebarNeedsResume',
   interrupted: 'threadSidebarInterrupted',
+  inactive: 'threadSidebarInactive',
   muted: 'threadSidebarFilterMuted',
   settled: 'threadSidebarSettled',
   archived: 'threadSidebarArchived',
@@ -63,6 +65,7 @@ export const threadViewPresetLabel = (view: ThreadViewPreset, t: ThreadSidebarTr
   if (view.name !== null) return view.name
   if (view.id === ALL_THREADS_VIEW_ID) return t('threadSidebarAllThreads')
   if (view.id === WORKING_VIEW_ID) return t('threadSidebarWorking')
+  if (view.id === DONE_VIEW_ID) return t('threadSidebarDone')
   if (view.id === INBOX_VIEW_ID) return t('threadSidebarInbox')
   if (view.id === GONE_VIEW_ID) return t('threadSidebarGone')
   return t('threadSidebarCurrentView')

@@ -38,6 +38,7 @@ const useOptionalSettings = (): ThreadSidebarSettingsState | null => {
  */
 export const usePreferences = (): PreferencesSnapshot & {
   hostBacked: boolean
+  threadViewWritePending: boolean
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
 } => {
   const settings = useOptionalSettings()
@@ -98,6 +99,7 @@ export const usePreferences = (): PreferencesSnapshot & {
     preferences,
     storageWarning: hostBacked ? snapshot.context.hostWriteFailed : snapshot.context.localWriteFailed,
     hostBacked,
+    threadViewWritePending: snapshot.context.pendingOperationIds.threadViews !== undefined,
     updatePreferences,
   }
 }
@@ -106,6 +108,7 @@ interface SidebarState {
   preferences: SidebarPreferences
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
   storageWarning: boolean
+  threadViewWritePending: boolean
   /** True while DSH Settings serves the sidebar namespace and accepts writes. */
   hostBacked: boolean
   openPalette: (mode: PaletteMode) => void
@@ -126,7 +129,7 @@ export const useSidebarState = (): SidebarState => {
 }
 
 export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX.Element => {
-  const { preferences, storageWarning, hostBacked, updatePreferences } = usePreferences()
+  const { preferences, storageWarning, hostBacked, threadViewWritePending, updatePreferences } = usePreferences()
   const [selectedThreadId, setSelectedThreadId] = useState<SessionSummary['id'] | null>(null)
   const threadTitle = useRef<(sessionId: SessionSummary['id']) => string | undefined>(() => undefined)
 
@@ -136,13 +139,14 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
       updatePreferences,
       storageWarning,
       hostBacked,
+      threadViewWritePending,
       openPalette: PaletteApi.open,
       closePalette: PaletteApi.close,
       selectedThreadId,
       setSelectedThreadId,
       threadTitle,
     }),
-    [preferences, updatePreferences, storageWarning, hostBacked, selectedThreadId],
+    [preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, selectedThreadId],
   )
 
   return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>
