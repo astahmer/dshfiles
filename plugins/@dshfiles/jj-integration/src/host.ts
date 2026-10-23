@@ -17,6 +17,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 import { workspaceScriptsApi } from '@dshfiles/memory/workspace-scripts-api'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
 import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/completion-event'
@@ -205,7 +206,38 @@ const safePromptField = (value: string, maximumLength: number): string =>
     .replaceAll('`', "'")
     .slice(0, maximumLength)
 
-const createExecutor =
+/** jj flags whose next argument is a value (a path, an operation id, a template) and must stay out of span attributes. */
+const JJ_VALUE_FLAGS = [
+  '-R',
+  '--repository',
+  '--at-operation',
+  '--at-op',
+  '--config',
+  '--config-toml',
+  '--config-file',
+  '-T',
+  '--template',
+  '-r',
+  '--revisions',
+  '-m',
+  '--message',
+]
+
+const createExecutor = (context: Context): JjExecutor => {
+  const execute = createUntracedExecutor(context)
+  return input => {
+    if (!tracingEnabled()) return execute(input)
+    const attributes = commandAttributes({ executable: 'jj', args: input.args, valueFlags: JJ_VALUE_FLAGS })
+    return withSpan(`jj ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }, async span => {
+      const result = await execute(input)
+      span.setAttributes({ 'process.exit.code': result.exitCode, 'jj.output.truncated': result.stdoutLossy })
+      if (result.exitCode !== 0) span.setStatus('error', `exit ${String(result.exitCode)}`)
+      return result
+    })
+  }
+}
+
+const createUntracedExecutor =
   (context: Context): JjExecutor =>
   async input => {
     const executable = await context.subprocess.resolveExecutable('jj', undefined, input.signal)
@@ -603,7 +635,24 @@ const workspaceSyncView = (input: WorkspaceSyncInput, state: WorkspaceSyncView['
   finishedAt: state === 'running' ? null : new Date().toISOString(),
 })
 
-const runWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyncView> => {
+const runWorkspaceSync = (input: WorkspaceSyncInput): Promise<WorkspaceSyncView> =>
+  withSpan(
+    'jj-integration workspace sync',
+    { attributes: { 'dshx.checkout.workspace': input.workspace, 'dshx.checkout.bookmark': input.bookmark } },
+    async span => {
+      const view = await runUntracedWorkspaceSync(input)
+      span.setAttributes({
+        'dshx.checkout.state': view.state,
+        'dshx.checkout.status': view.status ?? undefined,
+        'dshx.checkout.rebuilt_plugins': view.pluginsRebuilt.length,
+        'dshx.checkout.restart_needed': view.restartNeeded,
+      })
+      if (view.state === 'failed') span.setStatus('error', 'sync failed')
+      return view
+    },
+  )
+
+const runUntracedWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyncView> => {
   const failed = (message: string): WorkspaceSyncView => workspaceSyncView(input, 'failed', message)
   let argv: readonly string[]
   try {

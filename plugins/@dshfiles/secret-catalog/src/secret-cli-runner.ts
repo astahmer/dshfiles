@@ -1,4 +1,5 @@
 import { waitForManagedExit, terminateManagedProcess } from '@dshfiles/dshx/host'
+import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
@@ -37,11 +38,15 @@ const sessionEnvironment = (source: SecretSessionEnvironment): Record<string, st
 }
 
 /** Run the fixed secret CLI through DSH's managed process boundary. */
-export const runSecretCli = async (
-  runtime: SecretSubprocess,
-  request: SecretCliRequest,
-  environment: SecretSessionEnvironment = process.env,
-): Promise<string> => {
+export const runSecretCli = (runtime: SecretSubprocess, request: SecretCliRequest, environment: SecretSessionEnvironment = process.env): Promise<string> => {
+  if (!tracingEnabled()) return runUntracedSecretCli(runtime, request, environment)
+  const attributes = { ...commandAttributes({ executable: 'secret', args: request.args }), 'process.command.verb': request.args[0] ?? '' }
+  return withSpan(`secret ${attributes['process.command.verb']}`.trim(), { kind: 'client', attributes }, () =>
+    runUntracedSecretCli(runtime, request, environment),
+  )
+}
+
+const runUntracedSecretCli = async (runtime: SecretSubprocess, request: SecretCliRequest, environment: SecretSessionEnvironment): Promise<string> => {
   const controller = new AbortController()
   let timedOut = false
   const timeout = setTimeout(() => {

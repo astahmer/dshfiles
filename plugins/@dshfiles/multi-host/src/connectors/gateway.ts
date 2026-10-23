@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer'
 import { WebSocket } from 'ws'
 import { z } from 'zod'
 import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
+import { traceparent, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 
 const maxNativeResponseBytes = 32 * 1024 * 1024
 const maxNativeRequestBytes = 48 * 1024 * 1024
@@ -374,21 +375,34 @@ const streamFrames = async function* ({
   }
 }
 
-const attemptRun = async ({
-  origin,
-  cookie,
-  namespace,
-  method,
-  args,
-  signal,
-}: {
+type RunRequest = {
   readonly origin: string
   readonly cookie: string
   readonly namespace: string
   readonly method: string
   readonly args: Record<string, unknown>
   readonly signal?: AbortSignal | undefined
-}): Promise<GatewayOutcome> => {
+}
+
+/** One span per native runtime request: endpoint and outcome code only, never the arguments or the reply. */
+const attemptRun = (request: RunRequest): Promise<GatewayOutcome> => {
+  if (!tracingEnabled()) return attemptUntracedRun(request)
+  return withSpan(
+    `${request.namespace}/${request.method}`,
+    {
+      kind: 'client',
+      attributes: { 'rpc.system': 'dsh-native', 'rpc.service': request.namespace, 'rpc.method': request.method, 'dshx.plugin.package': '@dshfiles/multi-host' },
+    },
+    async span => {
+      const outcome = await attemptUntracedRun(request)
+      span.setAttribute('multi_host.outcome', outcome.ok ? 'ok' : outcome.code)
+      if (!outcome.ok) span.setStatus('error', outcome.code)
+      return outcome
+    },
+  )
+}
+
+const attemptUntracedRun = async ({ origin, cookie, namespace, method, args, signal }: RunRequest): Promise<GatewayOutcome> => {
   if (!/^[A-Za-z][A-Za-z0-9-]*$/.test(namespace) || !/^[A-Za-z][A-Za-z0-9-]*$/.test(method)) {
     return { ok: false, code: 'invalid-endpoint', message: 'The requested runtime API endpoint is invalid.' }
   }
@@ -397,12 +411,15 @@ const attemptRun = async ({
   if (Buffer.byteLength(requestBody, 'utf8') > maxNativeRequestBytes) {
     return { ok: false, code: 'request-too-large', message: 'The runtime API request exceeded the 48 MB transport limit.' }
   }
+  const headers = new Headers({ 'content-type': 'application/json', cookie })
+  const parent = traceparent()
+  if (parent !== undefined) headers.set('traceparent', parent)
   let response: Response
   try {
     response = await fetch(origin + '/api/' + encodeURIComponent(namespace) + '/' + encodeURIComponent(method), {
       method: 'POST',
       redirect: 'error',
-      headers: { 'content-type': 'application/json', cookie },
+      headers,
       body: requestBody,
       ...(signal === undefined ? {} : { signal }),
     })

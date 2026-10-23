@@ -1,4 +1,5 @@
 import type { SecretCatalogValues, SecretReference } from '@dshfiles/credential-port'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import type { SecretMetadata } from './secret-metadata.js'
 import { secretScopeSchema } from './secret-metadata.js'
 import type { SecretCatalogOperations } from './secret-operations.js'
@@ -23,9 +24,15 @@ const uniqueMatch = (rows: readonly SecretMetadata[], reference: SecretReference
  * resolve, so a settings field never picks up an unrelated project's secret.
  */
 export const createSecretCatalogValues = (input: { readonly operations: Pick<SecretCatalogOperations, 'list' | 'reveal'> }): SecretCatalogValues => ({
-  resolve: async ({ reference, cwd }) => {
-    const match = uniqueMatch(await input.operations.list(cwd), reference)
-    const scope = secretScopeSchema.parse(match.scope)
-    return input.operations.reveal(reference.alias, scope, cwd, reference.environment)
-  },
+  resolve: ({ reference, cwd }) =>
+    withSpan(
+      'secret resolve',
+      { attributes: { 'secret.alias': reference.alias, 'secret.environment': reference.environment, 'secret.project_scoped': cwd !== null } },
+      async span => {
+        const match = uniqueMatch(await input.operations.list(cwd), reference)
+        const scope = secretScopeSchema.parse(match.scope)
+        span.setAttribute('secret.scope', scope)
+        return input.operations.reveal(reference.alias, scope, cwd, reference.environment)
+      },
+    ),
 })

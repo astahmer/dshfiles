@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import type { JevUsageRecord } from '@dshfiles/usage/api'
 import type { TriageQuestion } from './triage.js'
 
@@ -42,24 +43,40 @@ export const JevClient = {
       }
     }
 
-    try {
-      const response = await (request.fetch ?? fetch)('https://api.typesafe.ai/v1/systemone', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${request.apiKey}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: 'jev-latest',
-          state: { role: 'user', content: request.text.slice(0, 8_000) },
-          questions: { verdict: { type: 'noul', ...request.question } },
-        }),
-        signal: AbortSignal.timeout(4_000),
-      })
-      if (!response.ok) throw new Error(`Jev answered ${String(response.status)}`)
-      const answer = jevAnswerSchema.parse(await response.json())
-      await record('success', answer.usage?.input_tokens ?? null, answer.usage?.output_tokens ?? null)
-      return answer.answers.verdict.noul
-    } catch (error) {
-      await record('failure', null, null)
-      throw error
-    }
+    return withSpan(
+      'jev classify',
+      {
+        kind: 'client',
+        attributes: {
+          'gen_ai.operation.name': 'classify',
+          'gen_ai.provider.name': 'typesafe',
+          'gen_ai.request.model': 'jev-latest',
+          'dshx.plugin.package': '@dshfiles/backlog',
+        },
+      },
+      async span => {
+        try {
+          const response = await (request.fetch ?? fetch)('https://api.typesafe.ai/v1/systemone', {
+            method: 'POST',
+            headers: { authorization: `Bearer ${request.apiKey}`, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              model: 'jev-latest',
+              state: { role: 'user', content: request.text.slice(0, 8_000) },
+              questions: { verdict: { type: 'noul', ...request.question } },
+            }),
+            signal: AbortSignal.timeout(4_000),
+          })
+          span.setAttribute('http.response.status_code', response.status)
+          if (!response.ok) throw new Error(`Jev answered ${String(response.status)}`)
+          const answer = jevAnswerSchema.parse(await response.json())
+          span.setAttributes({ 'gen_ai.usage.input_tokens': answer.usage?.input_tokens, 'gen_ai.usage.output_tokens': answer.usage?.output_tokens })
+          await record('success', answer.usage?.input_tokens ?? null, answer.usage?.output_tokens ?? null)
+          return answer.answers.verdict.noul
+        } catch (error) {
+          await record('failure', null, null)
+          throw error
+        }
+      },
+    )
   },
 }

@@ -1,4 +1,5 @@
 import { defineHost, definePromptSection, waitForManagedExit } from '@dshfiles/dshx/host'
+import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
@@ -80,7 +81,41 @@ const resolveJjExecutable = async (ctx: Context, signal: AbortSignal): Promise<s
   return fixedJjExecutable
 }
 
-const runAt = async (
+/** jj flags whose next argument is a value (a path, an operation id, a template) and must stay out of span attributes. */
+const JJ_VALUE_FLAGS = [
+  '-R',
+  '--repository',
+  '--at-operation',
+  '--at-op',
+  '--config',
+  '--config-toml',
+  '--config-file',
+  '-T',
+  '--template',
+  '-r',
+  '--revisions',
+  '-m',
+  '--message',
+]
+
+const runAt = (
+  ctx: Context,
+  cwd: string,
+  expectedIdentity: string | undefined,
+  args: readonly string[],
+  signal: AbortSignal | undefined,
+  options: { readonly outputLimit?: number; readonly timeoutMs?: number } = {},
+): Promise<ProcessResult> => {
+  if (!tracingEnabled()) return runJjAt(ctx, cwd, expectedIdentity, args, signal, options)
+  const attributes = commandAttributes({ executable: 'jj', args, valueFlags: JJ_VALUE_FLAGS })
+  return withSpan(`jj ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }, async span => {
+    const result = await runJjAt(ctx, cwd, expectedIdentity, args, signal, options)
+    span.setAttribute('jj.output.truncated', result.truncated)
+    return result
+  })
+}
+
+const runJjAt = async (
   ctx: Context,
   cwd: string,
   expectedIdentity: string | undefined,
