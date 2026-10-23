@@ -10,10 +10,38 @@ import { BacklogItems } from './item.js'
 export const fileSizeLabel = (bytes: number): string =>
   bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${String(Math.max(1, Math.round(bytes / 1024)))} KB`
 
+// Attachment bytes can exceed localStorage quotas; this cache keeps them across in-app composer unmounts only.
+const storedDraftFiles = new Map<string, readonly ComposerFile[]>()
+
+export const composerDraftFiles = {
+  get: (draftKey: string): readonly ComposerFile[] => storedDraftFiles.get(draftKey) ?? [],
+  set: (draftKey: string, files: readonly ComposerFile[]): void => {
+    if (files.length === 0) storedDraftFiles.delete(draftKey)
+    else storedDraftFiles.set(draftKey, files)
+  },
+}
+
 /** Reading, capping and removing the files a text box holds before it saves them with the item. */
-export const useComposerFiles = (props: { readonly onError: (message: string | null) => void; readonly initial?: readonly ComposerFile[] }) => {
+export const useComposerFiles = (props: {
+  readonly draftKey?: string
+  readonly onError: (message: string | null) => void
+  readonly initial?: readonly ComposerFile[]
+}) => {
   const { onError } = props
-  const [files, setFiles] = useState<readonly ComposerFile[]>(props.initial ?? [])
+  const localDraftKey = useId()
+  const draftKey = props.draftKey ?? localDraftKey
+  const [files, setFiles] = useState<readonly ComposerFile[]>(() => {
+    if (props.initial === undefined) return composerDraftFiles.get(draftKey)
+    composerDraftFiles.set(draftKey, props.initial)
+    return props.initial
+  })
+  const replaceFiles = useCallback(
+    (next: readonly ComposerFile[]): void => {
+      composerDraftFiles.set(draftKey, next)
+      setFiles(next)
+    },
+    [draftKey],
+  )
   const remaining = Math.max(0, BacklogItems.maxAttachments - files.length)
   const add = useCallback(
     async (dropped: readonly File[]): Promise<void> => {
@@ -22,16 +50,21 @@ export const useComposerFiles = (props: { readonly onError: (message: string | n
       try {
         const next: ComposerFile[] = []
         for (const file of dropped.slice(0, remaining)) next.push(await readComposerFile(file))
-        setFiles(current => [...current, ...next].slice(0, BacklogItems.maxAttachments))
+        replaceFiles([...composerDraftFiles.get(draftKey), ...next].slice(0, BacklogItems.maxAttachments))
       } catch (error) {
         onError(errorMessage(error, 'That file could not be read.'))
       }
     },
-    [onError, remaining],
+    [draftKey, onError, remaining, replaceFiles],
   )
-  const remove = useCallback((id: string) => setFiles(current => current.filter(file => file.id !== id)), [])
-  const clear = useCallback(() => setFiles([]), [])
-  const restore = useCallback((next: readonly ComposerFile[]) => setFiles(current => (current.length === 0 ? next : current)), [])
+  const remove = useCallback((id: string) => replaceFiles(composerDraftFiles.get(draftKey).filter(file => file.id !== id)), [draftKey, replaceFiles])
+  const clear = useCallback(() => replaceFiles([]), [replaceFiles])
+  const restore = useCallback(
+    (next: readonly ComposerFile[]) => {
+      if (composerDraftFiles.get(draftKey).length === 0) replaceFiles(next)
+    },
+    [draftKey, replaceFiles],
+  )
   return { files, add, remove, clear, restore }
 }
 
