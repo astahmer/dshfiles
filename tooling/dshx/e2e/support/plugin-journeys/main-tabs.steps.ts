@@ -114,6 +114,7 @@ Then('the thread tab context menu copies its ID and clean link', async ({ page }
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
 
   await threadTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Copy', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Copy thread ID', exact: true }).click()
   await recordAssertion(page, 'main-tabs-context-menu-copies-thread-id', async () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(sessionId)
@@ -121,6 +122,7 @@ Then('the thread tab context menu copies its ID and clean link', async ({ page }
   })
 
   await threadTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Copy', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Copy thread link', exact: true }).click()
   const copiedLink = new URL(await page.evaluate(() => navigator.clipboard.readText()))
   await recordAssertion(page, 'main-tabs-context-menu-copies-clean-thread-link', async () => {
@@ -260,10 +262,7 @@ Then('the side panel hosts that thread beside the main view', async ({ page }: {
 When('a kept thread tab is present while text is typed into Backlog', async ({ page }: { page: Page }) => {
   const sessionId = await startSidebarThread(page, 'Backlog capture typing')
   await threadTab(page, sessionId).dblclick()
-  await page
-    .getByRole('navigation', { name: 'Sidebar navigation', exact: true })
-    .getByRole('button', { name: 'Backlog', exact: true })
-    .click()
+  await page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: 'Backlog', exact: true }).click()
   await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
   await capture.pressSequentially('Keyboard capture from Backlog')

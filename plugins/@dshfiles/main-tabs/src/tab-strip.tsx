@@ -429,32 +429,42 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                     <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId, ThreadMentionDrag.activeComposerSessionId())}>
                       {t('mentionThread')}
                     </ContextMenuItem>
-                    <ContextMenuItem disabled={tab.status === 'running'} onSelect={() => requestThreadSettle(tab.sessionId)}>
-                      {t('settleThread')}
-                    </ContextMenuItem>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>{t('threadStatus')}</ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+                        <ContextMenuItem disabled={tab.status === 'running'} onSelect={() => requestThreadSettle(tab.sessionId)}>
+                          {t('settleThread')}
+                        </ContextMenuItem>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
                     <ContextMenuItem onSelect={() => openAside(tab.sessionId)}>
                       <PanelRightOpenIcon aria-hidden="true" />
                       {t('openInSidePanel')}
                     </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void copy(tab.sessionId, 'threadIdCopied')}>
-                      <CopyIcon aria-hidden="true" />
-                      {t('copyThreadId')}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onSelect={() =>
-                        void copy(
-                          buildThreadTabLink({
-                            currentUrl: window.location.href,
-                            sessionId: tab.sessionId,
-                            workspaceId: tab.workspaceId,
-                          }),
-                          'threadLinkCopied',
-                        )
-                      }
-                    >
-                      <CopyIcon aria-hidden="true" />
-                      {t('copyThreadLink')}
-                    </ContextMenuItem>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>{t('copy')}</ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+                        <ContextMenuItem onSelect={() => void copy(tab.sessionId, 'threadIdCopied')}>
+                          <CopyIcon aria-hidden="true" />
+                          {t('copyThreadId')}
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          onSelect={() =>
+                            void copy(
+                              buildThreadTabLink({
+                                currentUrl: window.location.href,
+                                sessionId: tab.sessionId,
+                                workspaceId: tab.workspaceId,
+                              }),
+                              'threadLinkCopied',
+                            )
+                          }
+                        >
+                          <CopyIcon aria-hidden="true" />
+                          {t('copyThreadLink')}
+                        </ContextMenuItem>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
                     <ContextMenuSeparator />
                   </>
                 ) : null}

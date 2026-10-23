@@ -756,12 +756,17 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       )}
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
-      <ContextMenuItem
-        onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
-      >
-        {t('threadSidebarCopyLink')}
-      </ContextMenuItem>
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{t('threadSidebarCopy')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+          <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
+          >
+            {t('threadSidebarCopyLink')}
+          </ContextMenuItem>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
       {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
       {!archived && sidePanelDefinitions.length > 0 ? (
         <ContextMenuSub>
@@ -854,15 +859,23 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
             {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
           </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleParked(session.id)}>
-            {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleSettled(session.id)}>
-            {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
-            {t('threadSidebarArchive')}
-          </ContextMenuItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>{t('threadSidebarChangeStatus')}</ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
+                {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+              </ContextMenuItem>
+              <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleParked(session.id)}>
+                {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+              </ContextMenuItem>
+              <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleSettled(session.id)}>
+                {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
+              </ContextMenuItem>
+              <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
+                {t('threadSidebarArchive')}
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
         </>
       )}
     </>

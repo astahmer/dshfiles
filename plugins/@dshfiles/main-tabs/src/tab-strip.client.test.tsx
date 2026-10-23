@@ -13,6 +13,8 @@ import type { TabsEvent } from './tabs-machine.js'
 const labels = {
   mentionThread: '@Mention thread',
   settleThread: 'Settle thread',
+  threadStatus: 'Change status',
+  copy: 'Copy',
   closeTab: 'Close tab',
   copyThreadId: 'Copy thread ID',
   copyThreadLink: 'Copy thread link',
@@ -135,9 +137,14 @@ describe('TabStrip thread actions', () => {
     mount()
 
     openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
-    await screen.findByRole('menuitem', { name: 'Copy thread ID' })
+    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Change status' })).toBeDefined()
+    expect(screen.queryByRole('menuitem', { name: 'Copy thread ID' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Settle thread' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy' }))
+    expect(await screen.findByRole('menuitem', { name: 'Copy thread ID' })).toBeDefined()
     expect(screen.getByRole('menuitem', { name: 'Copy thread link' })).toBeDefined()
-    expect(screen.getByRole('menuitem', { name: 'Settle thread' }).getAttribute('aria-disabled')).toBe('true')
   })
 
   it('settles an idle thread from its tab menu through thread-sidebar', async () => {
@@ -150,6 +157,7 @@ describe('TabStrip thread actions', () => {
     )
 
     openContextMenu(screen.getByRole('tab', { name: 'Thread' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change status' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Settle thread' }))
 
     expect(settleRequests).toEqual([{ detail: { sessionId: 'thread-1' }, cancelable: true }])
@@ -237,6 +245,7 @@ describe('TabStrip thread actions', () => {
     mount()
 
     openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
+    fireEvent.keyDown(await screen.findByRole('menuitem', { name: 'Copy' }), { key: 'ArrowRight' })
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy thread ID' }))
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Could not access the clipboard.'))

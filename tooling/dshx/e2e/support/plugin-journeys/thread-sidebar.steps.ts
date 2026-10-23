@@ -366,6 +366,7 @@ When('a nonblank Host thread is settled from its context menu', async ({ page }:
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
+  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
 })
