@@ -1996,7 +1996,7 @@ Then('every view tab shows its full name', async ({ page }: { page: Page }) => {
     await expect(viewTabs).not.toHaveAttribute('data-compact-view-tabs')
     await expect(viewTabs.getByTestId('thread-view-compact-initial')).toHaveCount(0)
     await expect(viewTabs.getByTestId('thread-view-compact-icon')).toHaveCount(0)
-    for (const name of ['All threads', 'Working', 'Done', 'Gone']) {
+    for (const name of ['All threads', 'Working', 'Done']) {
       await expect(viewTabs.locator(`button[title="${name}"]`)).toContainText(name)
     }
   })
@@ -2012,7 +2012,7 @@ Then('every view tab fits without scrolling and keeps its full name as tooltip a
     await expect(viewTabs.getByTestId('thread-view-compact-icon').first()).toBeVisible()
   })
   const names = await tabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('title') ?? ''))
-  expect(names).toEqual(expect.arrayContaining(['All threads', 'Working', 'Done', 'Gone']))
+  expect(names).toEqual(expect.arrayContaining(['All threads', 'Working', 'Done']))
   const rowBox = await viewTabs.boundingBox()
   if (rowBox === null) throw new Error('The view tab row has no layout box.')
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-names', async () => {
@@ -2046,9 +2046,11 @@ Then('Working selects only running threads and Done also selects threads that ne
   await viewManager.getByRole('button', { name: 'Cancel', exact: true }).click()
   await viewManager.getByRole('button', { name: 'Edit view Done', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-shipped-done-view-includes-usage-limits', async () => {
-    await expect(viewManager.getByRole('checkbox', { name: 'Inactive', exact: true })).toBeChecked()
-    await expect(viewManager.getByRole('checkbox', { name: 'Interrupted', exact: true })).toBeChecked()
-    await expect(viewManager.getByRole('checkbox', { name: 'Needs resume', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Not running', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Needs attention', exact: true })).toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Inactive', exact: true })).not.toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Interrupted', exact: true })).not.toBeChecked()
+    await expect(viewManager.getByRole('checkbox', { name: 'Needs resume', exact: true })).not.toBeChecked()
     await expect(viewManager.getByRole('checkbox', { name: 'Working', exact: true })).not.toBeChecked()
   })
   await finishJourneyAssertions(page)

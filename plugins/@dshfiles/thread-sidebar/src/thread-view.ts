@@ -7,6 +7,7 @@ export type ThreadGroupBy = (typeof THREAD_GROUP_BY_OPTIONS)[number]
 export const THREAD_STATUS_FILTER_OPTIONS = [
   'all',
   'working',
+  'not-running',
   'attention',
   'unread',
   'approval-needed',
@@ -53,19 +54,15 @@ export const THREAD_STORAGE_FILTERS = ['muted', 'settled', 'archived'] as const 
 
 /** Filter menu order: what a thread is doing, then why it waits, then where it is stored. */
 export const THREAD_STATUS_FILTER_GROUPS = [
-  { id: 'activity', filters: ['working', 'attention', 'unread'] },
+  { id: 'activity', filters: ['working', 'not-running', 'attention', 'unread'] },
   { id: 'attention', filters: [...THREAD_WAITING_ON_YOU_FILTERS, 'inactive'] },
   { id: 'storage', filters: THREAD_STORAGE_FILTERS },
 ] as const satisfies readonly { readonly id: string; readonly filters: readonly ThreadStatusFilter[] }[]
 
-/**
- * The filter this plugin used to ship. It named no state the user could see, so it is gone: a saved view that still
- * asks for it keeps the attention states it used to stand for, and its owner can edit the view from there.
- */
 const LEGACY_NOT_WORKING_FILTER = 'not-working'
-export const NOT_WORKING_REPLACEMENT_FILTERS = ['input-needed', 'turn-finished', 'interrupted'] as const satisfies readonly ThreadStatusFilter[]
+export const NOT_WORKING_REPLACEMENT_FILTERS = ['not-running'] as const satisfies readonly ThreadStatusFilter[]
 
-/** Rewrite a saved filter list from before `not-working` split into the attention states it stood for. */
+/** Preserve the idle-thread intent of the retired `not-working` selector. */
 export const upgradeLegacyStatusFilters = (filters: readonly unknown[]): readonly unknown[] => {
   const upgraded: unknown[] = []
   for (const filter of filters) {
@@ -145,6 +142,7 @@ const matchesThreadStatusFilter = (options: {
   return options.filters.some(filter => {
     if (filter === 'muted') return options.muted
     if (filter === 'working') return options.running
+    if (filter === 'not-running') return !options.running && !options.archived && !options.settled && !options.muted
     if (filter === 'inactive') return options.inactive === true
     if (filter === 'attention') return options.labels.length > 0
     if (filter === 'unread') return options.unread && !options.archived && !options.settled
@@ -182,6 +180,7 @@ const attentionLabelForView = (input: {
       !input.filters.includes('attention') &&
       !input.filters.includes('unread') &&
       !(input.filters.includes('working') && entry.running) &&
+      !(input.filters.includes('not-running') && !entry.running && !entry.archived && !entry.settled && !entry.muted) &&
       !input.filters.includes(THREAD_ATTENTION_FILTER_FOR_LABEL[entry.attentionLabel])
     ) {
       return []

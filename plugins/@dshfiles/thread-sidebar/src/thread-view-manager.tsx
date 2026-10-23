@@ -49,6 +49,7 @@ const groupLabelKeys = {
 export const threadStatusFilterLabelKeys = {
   all: 'threadSidebarAllThreads',
   working: 'threadSidebarWorking',
+  'not-running': 'threadSidebarFilterNotRunning',
   attention: 'threadSidebarFilterAttention',
   unread: 'threadSidebarUnread',
   'approval-needed': 'threadSidebarApprovalNeeded',

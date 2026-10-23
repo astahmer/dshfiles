@@ -26,6 +26,7 @@ import { underSettledSession } from './settled-gate.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 import { setThreadActionsContext, threadActionsHost, threadActionCommands } from './thread-actions-host.js'
 import { threadQueueHost } from './queue-host.js'
+import { threadViewsHost } from './thread-views-host.js'
 
 const restartRecoveryStore = createRestartRecoveryStore()
 const inflightTurns = InflightTurns.open()
@@ -258,6 +259,7 @@ export default defineHost({
     sessionArchiveApi,
     threadActionsHost,
     threadQueueHost,
+    threadViewsHost,
   ],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.

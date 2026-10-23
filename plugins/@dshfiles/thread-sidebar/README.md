@@ -138,6 +138,8 @@ Right-click or hold either arrow, or click the ▾ beside them, for the recent
 history menu (newest first, current entry marked); picking an entry jumps there
 and keeps the rest for Back and Forward.
 
+![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
+
 **Saved views.** The view row above the thread list is backed by validated view
 presets (`src/thread-view-preferences.ts`): each preset carries a name, order,
 and the grouping/status/source filters it applies. The whole document is the
@@ -146,20 +148,19 @@ v1 browser copy this plugin wrote migrates into it once. Stored v1 view
 preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
-without opening the manager. The shipped views are **All threads**, **Working** (threads
-whose own turn is running, and parents whose subagent is running, shown with that
-child under them), **Done** (Inactive + Interrupted + Needs resume main threads, so threads a
-usage limit stopped land here), **Inbox** (everything
-waiting on you: approval needed, input needed, turn finished, needs resume,
-interrupted) and **Gone** (the storage states: muted, settled, archived). A
-one-time update adds Done to unchanged older defaults and adds Inactive +
-Interrupted to existing custom views named Done while keeping their other
-filters. A second one-time update moves built-in Working and Done views still on
-the earlier shipped filters (Working + Interrupted; Inactive + Interrupted) to
-today's; a built-in view whose filters or name you changed, and every custom
-view, stays as it is. A preset that is not All threads shows `(N)`
+without opening the manager. The three shipped views are **All threads** (status grouping,
+all sources), **Working** (status grouping, all sources, running own turns or
+parents with running descendants), and the initially selected **Done** (date
+grouping, main threads, **Not running** OR **Needs attention**). Not running
+includes recent, pinned and parked idle rows, but excludes muted, settled and
+archived rows; Inactive still uses the idle threshold. Explicit storage selectors
+remain available. Legacy **Not working** decodes to **Not running**, retaining
+any other selected filters. Custom view IDs, order, grouping, source, enabled
+state and active selection survive migration; removed Inbox/Gone tabs are not
+restored. Earlier unedited built-in Working/Done filter sets upgrade without
+rewriting custom views. A preset that is not All threads shows `(N)`
 beside its name: Working shows the running-thread count, while every other
-view counts the unread threads it lists, so Inbox says how many waiting threads
+view counts the unread threads it lists, showing how many listed threads
 still hold an unacknowledged finish on the Host (opening one clears it
 everywhere). The colored dot signals only attention labels matched by that
 view's selected statuses; it is not itself an unread-finish count. When the
@@ -167,14 +168,13 @@ sidebar is too narrow for every full tab (`src/thread-view-tabs.ts` measures the
 row), built-in views show their icon and custom views their initial beside the
 count; the full name stays the tooltip and accessible name, so every tab fits
 without scrolling. A row wide enough keeps the full names. A status filter names a state the row already
-shows, and several combine as OR: **Working**, **Needs attention** (any label),
+shows, and several combine as OR: **Working**, **Not running**, **Needs attention** (any label),
 **Unread**, one filter per attention label (**Approval needed**, **Input
 needed**, **Turn finished**, **Needs resume**, **Interrupted**), **Inactive**,
 and the storage states **Muted**, **Settled** and **Archived**. Unread leaves archived and
 settled rows out, and the attention filters see the label a root row shows for
 itself or a child. A saved view from an earlier build that still asks for **Not
-working** decodes to **Input needed** + **Turn finished** + **Interrupted**, the
-states it used to stand for. Muted,
+working** decodes to **Not running** without removing its other selectors. Muted,
 archived, and settled threads are omitted from attention and unread filters,
 because all three are storage rather than work in progress. **Group headers
 collapse their rows** in the Project and
@@ -600,6 +600,8 @@ experiment was reverted: the option, its two build dependencies and this
 plugin's `react-compiler-runtime` dependency are gone.
 
 ## Agent tools
+
+Saved views use the `thread-sidebar-views` API over the same `thread-sidebar.threadViews` Host settings the GUI edits. `thread_views_list` and `thread_view_get` return the actual view definitions, order, selection and revision. `thread_view_create`, `thread_view_update`, `thread_view_delete`, `thread_view_move` and `thread_view_select` create, rename, enable, filter, reorder, remove and select views; select also changes group/filter control visibility. Delete requires explicit `confirm: true`. Invalid or missing targets, duplicate names or ids, the twelve-view limit and removing the last enabled view are rejected. Writes update only the view document and use the settings revision to refuse concurrent edits instead of overwriting them.
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to

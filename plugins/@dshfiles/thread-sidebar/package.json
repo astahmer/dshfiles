@@ -21,6 +21,10 @@
       "types": "./src/attention-api.ts",
       "default": "./dist/attention-api.js"
     },
+    "./thread-views-api": {
+      "types": "./src/thread-views-api.ts",
+      "default": "./dist/thread-views-api.js"
+    },
     "./snapshots": {
       "types": "./src/snapshots.ts",
       "default": "./dist/snapshots.js"

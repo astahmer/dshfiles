@@ -256,6 +256,59 @@ describe('thread view filters', () => {
     expect(ThreadViewModel.isSideChat({})).toBe(false)
   })
 
+  it('admits recent, pinned and parked idle rows without changing inactive semantics', () => {
+    for (const row of [
+      { title: 'Linearize jj history from main origin', inactive: false },
+      { title: 'Pinned idle', inactive: false, pinned: true },
+      { title: 'Parked idle', inactive: false, parked: true },
+      { title: 'Old idle', inactive: true },
+    ]) {
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running'], inactive: row.inactive })), row.title).toBe(true)
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['inactive'], inactive: row.inactive })), row.title).toBe(row.inactive)
+    }
+    expect(THREAD_STATUS_FILTER_GROUPS[0].filters).toContain('not-running')
+  })
+
+  it('excludes effectively running own turns and parents, but preserves attention OR matching', () => {
+    for (const kind of ['own turn', 'parent with running descendant']) {
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running'], running: true })), kind).toBe(false)
+      expect(
+        ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running', 'attention'], running: true, labels: ['threadSidebarInputNeeded'] })),
+        kind,
+      ).toBe(true)
+    }
+  })
+
+  it('requires explicit selectors to admit stored idle rows', () => {
+    for (const storage of ['muted', 'settled', 'archived'] as const) {
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running'], [storage]: true }))).toBe(false)
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running', storage], [storage]: true }))).toBe(true)
+    }
+  })
+
+  it('counts and badges exactly matching not-running rows', () => {
+    const idle = {
+      thread: {},
+      attentionLabel: 'threadSidebarTurnFinished',
+      unread: true,
+      running: false,
+      archived: false,
+      settled: false,
+      muted: false,
+    } as const
+    const entries = [
+      idle,
+      { ...idle, running: true },
+      { ...idle, archived: true },
+      { ...idle, settled: true },
+      { ...idle, muted: true },
+      { ...idle, thread: { origin: 'subagent' } },
+    ] as const
+    expect(ThreadViewModel.unreadCountForView({ filters: ['not-running'], sourceFilter: 'main', entries })).toBe(1)
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-running'], sourceFilter: 'main', entries: [idle] })).toBe('threadSidebarTurnFinished')
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-running'], sourceFilter: 'main', entries: entries.slice(1) })).toBeUndefined()
+  })
+
   it('filters supported activity states', () => {
     expect(ThreadViewModel.matchesStatusFilter(filterState())).toBe(true)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working'], running: true }))).toBe(true)

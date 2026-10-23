@@ -57,32 +57,16 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
   {
     id: DONE_VIEW_ID,
     name: null,
-    groupBy: 'status',
-    statusFilters: ['inactive', 'interrupted', 'needs-resume'],
+    groupBy: 'date',
+    statusFilters: ['not-running', 'attention'],
     sourceFilter: 'main',
     enabled: true,
   },
-  {
-    id: INBOX_VIEW_ID,
-    name: null,
-    groupBy: 'status',
-    statusFilters: [...THREAD_WAITING_ON_YOU_FILTERS],
-    sourceFilter: 'all',
-    enabled: true,
-  },
-  {
-    id: GONE_VIEW_ID,
-    name: null,
-    groupBy: 'status',
-    statusFilters: [...THREAD_STORAGE_FILTERS],
-    sourceFilter: 'all',
-    enabled: true,
-  },
-] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
+] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset, ThreadViewPreset]
 
 export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
   views: [...DEFAULT_THREAD_VIEW_PRESETS],
-  activeViewId: ALL_THREADS_VIEW_ID,
+  activeViewId: DONE_VIEW_ID,
   showGroupControl: true,
   showFilterControl: true,
 }
@@ -246,19 +230,7 @@ const decodeThreadViewSettings = (value: unknown): ThreadViewSettings | null => 
   return result.success ? result.data : null
 }
 
-const DONE_VIEW_REQUIRED_FILTERS = ['inactive', 'interrupted'] satisfies readonly ThreadStatusFilter[]
-
-const ensureDoneViewIncludesInactiveAndInterrupted = (settings: ThreadViewSettings): ThreadViewSettings => {
-  let changed = false
-  const views = settings.views.map(view => {
-    if (view.name?.trim().toLowerCase() !== 'done') return view
-    const statusFilters = [...new Set<ThreadStatusFilter>([...view.statusFilters, ...DONE_VIEW_REQUIRED_FILTERS])]
-    if (statusFilters.length === view.statusFilters.length) return view
-    changed = true
-    return { ...view, statusFilters }
-  })
-  return changed ? { ...settings, views } : settings
-}
+const ensureDoneViewIncludesInactiveAndInterrupted = (settings: ThreadViewSettings): ThreadViewSettings => settings
 
 const PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS = [
   {
@@ -328,26 +300,43 @@ const upgradeShippedViewFilters = (settings: ThreadViewSettings): ThreadViewSett
   const views = settings.views.map(view => {
     const previous = view.name === null ? PREVIOUS_SHIPPED_VIEW_FILTERS[view.id] : undefined
     const current = DEFAULT_THREAD_VIEW_PRESETS.find(preset => preset.id === view.id)
-    if (previous === undefined || current === undefined || !sameStatusFilters(view.statusFilters, previous)) return view
+    if (previous === undefined || current === undefined) return view
+    const matchesPrevious =
+      sameStatusFilters(view.statusFilters, previous) ||
+      (view.id === DONE_VIEW_ID && sameStatusFilters(view.statusFilters, ['inactive', 'interrupted', 'needs-resume']))
+    if (!matchesPrevious) return view
     changed = true
     return { ...view, statusFilters: [...current.statusFilters] }
   })
   return changed ? { ...settings, views } : settings
 }
 
+const matchesPreviousFiveViewDefaults = (settings: ThreadViewSettings): boolean =>
+  ([['working'], ['working', 'interrupted']] satisfies readonly (readonly ThreadStatusFilter[])[]).some(workingFilters =>
+    (
+      [
+        ['inactive', 'interrupted'],
+        ['inactive', 'interrupted', 'needs-resume'],
+      ] satisfies readonly (readonly ThreadStatusFilter[])[]
+    ).some(doneFilters =>
+      matchesDefaultPresets(settings, [
+        DEFAULT_THREAD_VIEW_PRESETS[0],
+        { ...DEFAULT_THREAD_VIEW_PRESETS[1], statusFilters: workingFilters },
+        { id: DONE_VIEW_ID, name: null, enabled: true, groupBy: 'status', sourceFilter: 'main', statusFilters: doneFilters },
+        ...PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS.slice(2),
+      ]),
+    ),
+  )
+
 const isDefaultThreadViewSettings = (settings: ThreadViewSettings): boolean =>
   settings.showGroupControl &&
   settings.showFilterControl &&
   (matchesDefaultPresets(upgradeShippedViewFilters(settings), DEFAULT_THREAD_VIEW_PRESETS) ||
-    matchesDefaultPresets(settings, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS)) &&
+    matchesDefaultPresets(settings, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS) ||
+    matchesPreviousFiveViewDefaults(settings)) &&
   settings.views.some(view => view.id === settings.activeViewId)
 
-const migrateDoneViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => {
-  const upgradedDefaults = matchesDefaultPresets(settings, PREVIOUS_DEFAULT_THREAD_VIEW_PRESETS)
-    ? { ...settings, views: [...DEFAULT_THREAD_VIEW_PRESETS] }
-    : settings
-  return ensureDoneViewIncludesInactiveAndInterrupted(upgradedDefaults)
-}
+const migrateDoneViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => upgradeShippedViewFilters(settings)
 
 const activeThreadView = (settings: ThreadViewSettings): ThreadViewPreset =>
   settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled) ?? DEFAULT_THREAD_VIEW_PRESETS[0]
