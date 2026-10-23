@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { MoreVerticalIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { MoreVerticalIcon, RefreshCwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ThreadSidebarLocaleKey } from './locales.js'
 import { UsageLimitRowsModel, type UsageLimitRow } from './usage-limit-rows.js'
@@ -35,6 +35,7 @@ export interface UsageLimitSectionProps<Thread extends UsageLimitThread> {
   readonly onSnooze: (input: { readonly continuationId: string; readonly duration: UsageLimitSnooze }) => void
   readonly onAutoRetry: (input: { readonly continuationId: string; readonly sessionId: string; readonly enabled: boolean }) => void
   readonly onResumeAll: () => void
+  readonly onDismiss: (input: { readonly continuationId: string }) => void
   /** Wraps a row in the thread's own right-click menu. */
   readonly withThreadMenu: (thread: Thread, row: JSX.Element) => JSX.Element
 }
@@ -75,7 +76,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
         <span className="dshx:whitespace-nowrap dshx:font-medium dshx:text-warning/80">{t('threadSidebarUsageLimit')}</span>
         <span className="dshx:text-xs dshx:tabular-nums">({props.rows.length})</span>
         <span aria-hidden="true" className="dshx:h-px dshx:flex-1 dshx:bg-border" />
-        <Button disabled={props.resumeAllBusy || allBusy} onClick={props.onResumeAll} size="xs" type="button" variant="outline">
+        <Button disabled={props.resumeAllBusy || allBusy} onClick={props.onResumeAll} size="xs" type="button">
           {props.resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
           {t('threadSidebarUsageLimitResumeAll')}
         </Button>
@@ -121,6 +122,17 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
             >
               {busy ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
             </Button>
+            <Button
+              aria-label={t('threadSidebarUsageLimitDismiss')}
+              className="dshx:opacity-0 dshx:group-hover/usage:opacity-100 dshx:focus-visible:opacity-100"
+              disabled={busy}
+              onClick={() => props.onDismiss({ continuationId: row.continuation.continuationId })}
+              size="icon-xs"
+              type="button"
+              variant="ghost"
+            >
+              <XIcon className="dshx:size-3.5" />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button aria-label={t('threadSidebarUsageLimitOptions')} disabled={busy} size="icon-xs" type="button" variant="ghost">
@@ -151,6 +163,11 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
                 >
                   {t('threadSidebarUsageLimitAutoRetry')}
                 </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={busy} onSelect={() => props.onDismiss({ continuationId: row.continuation.continuationId })}>
+                  <XIcon className="dshx:size-3.5" />
+                  {t('threadSidebarUsageLimitDismiss')}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>,

@@ -619,6 +619,17 @@ export const aiAccountsApi = defineApi({
         render: output => (output.updated ? 'Updated the continuation snooze.' : 'That continuation was not found.'),
       },
     }),
+    /** Drop a waiting recovery the user does not want; the thread itself is untouched and can still be prompted by hand. */
+    dismissQuotaContinuation: method({
+      input: z.object({ continuationId: z.string().uuid() }),
+      output: z.object({ dismissed: z.boolean() }),
+      description:
+        'Dismiss one quota-blocked thread from the usage-limit list without resuming it: its stored continuation and any automatic retry are cancelled; the thread stays as it is. Call only when the user asked to dismiss that blocked thread.',
+      tool: {
+        name: 'ai_accounts_dismiss_continuation',
+        render: output => (output.dismissed ? 'Dismissed the stored continuation.' : 'That continuation was not waiting.'),
+      },
+    }),
   },
 })
 export const baseModelName = AccountsRules.baseModelName

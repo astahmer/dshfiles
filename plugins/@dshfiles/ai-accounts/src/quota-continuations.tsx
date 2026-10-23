@@ -25,7 +25,11 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
 
   // The busy row stays disabled until the reread lands, so its state never flickers back.
   const action = useMutation({
-    mutationFn: async (input: { readonly continuationId: string; readonly duration?: SnoozeDuration }): Promise<string> => {
+    mutationFn: async (input: { readonly continuationId: string; readonly duration?: SnoozeDuration; readonly dismiss?: boolean }): Promise<string> => {
+      if (input.dismiss === true) {
+        const result = await accounts.dismissQuotaContinuation({ continuationId: input.continuationId })
+        return result.dismissed ? 'Recovery dismissed.' : 'This recovery is already queued or no longer active.'
+      }
       if (input.duration === undefined) {
         const result = await accounts.resumeQuotaContinuation({ continuationId: input.continuationId })
         return result.accepted ? 'Recovery prompt queued.' : 'This recovery was superseded or its Session is unavailable.'
@@ -34,7 +38,14 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
       return result.updated ? 'Recovery timing updated.' : 'This recovery is already queued or no longer active.'
     },
     onSuccess: message => setNotice(message),
-    onError: (_error, input) => setNotice(input.duration === undefined ? 'Could not queue this recovery.' : 'Could not update recovery timing.'),
+    onError: (_error, input) =>
+      setNotice(
+        input.dismiss === true
+          ? 'Could not dismiss this recovery.'
+          : input.duration === undefined
+            ? 'Could not queue this recovery.'
+            : 'Could not update recovery timing.',
+      ),
     onSettled: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.quotaContinuations }),
   })
   const busyId = action.isPending ? action.variables.continuationId : null
@@ -132,6 +143,15 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                         Unsnooze
                       </Button>
                     )}
+                    <Button
+                      disabled={busyId !== null}
+                      onClick={() => action.mutate({ continuationId: item.continuationId, dismiss: true })}
+                      size="xs"
+                      type="button"
+                      variant="ghost"
+                    >
+                      Dismiss
+                    </Button>
                   </ItemActions>
                 ) : null}
               </Item>

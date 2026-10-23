@@ -116,4 +116,27 @@ describe('quota continuation storage', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('dismisses a waiting recovery once and drops it from the list', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-continuation-dismiss-'))
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => null })
+      await service.recordFailure(failureAgent, 'codex_work', false)
+      const [record] = (await service.list()).continuations
+      if (record === undefined) throw new Error('Quota continuation was not stored.')
+
+      expect(await service.dismiss(record.continuationId)).toEqual({ dismissed: true })
+      await expect(service.list()).resolves.toMatchObject({ continuations: [] })
+      expect(await service.dismiss(record.continuationId)).toEqual({ dismissed: false })
+      expect(await service.resume(record.continuationId)).toEqual({ accepted: false })
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

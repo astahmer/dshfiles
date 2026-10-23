@@ -77,6 +77,14 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.quotaContinuations }),
   })
+  const dismiss = useMutation({
+    mutationFn: async () => {
+      if (continuation === undefined) throw new Error('Quota recovery is not available.')
+      const result = await accounts.dismissQuotaContinuation({ continuationId: continuation.continuationId })
+      if (!result.dismissed) throw new Error('Quota recovery is no longer waiting.')
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.quotaContinuations }),
+  })
   const showNotice = showsQuotaRecoveryNotice({
     showChoice: preferences.showQuotaRetryChoice,
     failoverEnabled: preferences.failureRecovery.exhausted.failover,
@@ -93,7 +101,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
     : 'Quota exhausted. Reset details are unavailable; retry manually.'
   const recoveryStatus = continuation === undefined ? pendingStatus : exhaustedStatus
   const status = continuationsQuery.isError ? 'Quota exhausted. Retry when your provider limit resets.' : recoveryStatus
-  const busy = resume.isPending
+  const busy = resume.isPending || dismiss.isPending
 
   return (
     <div className="dshx-root dshx:@container dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-warning/40 dshx:bg-warning/10 dshx:px-3 dshx:py-2.5">
@@ -109,9 +117,12 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
               onClick={() => setShowSelector(value => !value)}
               size="xs"
               type="button"
-              variant="outline"
+              variant={showSelector ? 'outline' : 'default'}
             >
               {showSelector ? 'Hide model options' : 'Resume with another model'}
+            </Button>
+            <Button disabled={busy} onClick={() => dismiss.mutate()} size="xs" type="button" variant="ghost">
+              {dismiss.isPending ? 'Dismissing…' : 'Dismiss'}
             </Button>
             {catalogQuery.isError ? <span className="dshx:text-xs dshx:text-muted-foreground">Model options are unavailable.</span> : null}
           </div>
@@ -191,7 +202,7 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
           ) : null}
         </>
       )}
-      {resume.isError ? (
+      {resume.isError || dismiss.isError ? (
         <p className="dshx:text-xs dshx:text-destructive" role="alert">
           Could not update quota recovery. Refresh the AI Accounts panel and try again.
         </p>

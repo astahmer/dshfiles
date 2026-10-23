@@ -325,7 +325,7 @@ as agent tools`): read-only `ai_accounts_identity`, `ai_accounts_catalog`,
 `ai_accounts_refresh_quota`, `ai_accounts_collect_usage`,
 `ai_accounts_set_distribution`, `ai_accounts_move_account`,
 `ai_accounts_resume_continuation`, `ai_accounts_snooze_continuation`,
-`ai_accounts_set_auto_retry`, `ai_accounts_set_native_provider` and
+`ai_accounts_dismiss_continuation`, `ai_accounts_set_auto_retry`, `ai_accounts_set_native_provider` and
 `ai_accounts_refresh_pricing`.
 
 The Fast mode API (`ai-accounts-model-fast-mode`, imported by the composer model

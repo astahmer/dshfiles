@@ -8,6 +8,7 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_catalog',
       'ai_accounts_collect_usage',
       'ai_accounts_continuations',
+      'ai_accounts_dismiss_continuation',
       'ai_accounts_fast_mode_history',
       'ai_accounts_history',
       'ai_accounts_identity',

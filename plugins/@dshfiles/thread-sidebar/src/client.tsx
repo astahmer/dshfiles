@@ -1712,9 +1712,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     readonly duration?: UsageLimitSnooze
     readonly sessionId?: string
     readonly enabled?: boolean
+    readonly dismiss?: boolean
   }): Promise<void> => {
     setUsageLimitBusyIds(current => new Set(current).add(input.continuationId))
     try {
+      if (input.dismiss === true) await accountsApi.dismissQuotaContinuation({ continuationId: input.continuationId })
       if (input.duration !== undefined) await accountsApi.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
       if (input.enabled !== undefined && input.sessionId !== undefined) {
         await accountsApi.setQuotaContinuationAutoRetry({
@@ -4634,6 +4636,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             busyIds={usageLimitBusyIds}
             now={now}
             onAutoRetry={input => void changeUsageLimitRecovery(input)}
+            onDismiss={input => void changeUsageLimitRecovery({ continuationId: input.continuationId, dismiss: true })}
             onResume={input => void resumeUsageLimitThread(input)}
             onResumeAll={() => void resumeAllUsageLimits()}
             onSnooze={input => void changeUsageLimitRecovery(input)}

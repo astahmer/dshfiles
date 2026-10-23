@@ -36,6 +36,7 @@ const labels = new Map<ThreadSidebarLocaleKey, string>([
   ['threadSidebarUsageLimitSnoozeOff', 'Unsnooze'],
   ['threadSidebarUsageLimitAutoRetry', 'Retry automatically'],
   ['threadSidebarUsageLimitRecovery', 'Recovery'],
+  ['threadSidebarUsageLimitDismiss', 'Dismiss'],
 ])
 
 const translate = (key: ThreadSidebarLocaleKey, params?: Readonly<Record<string, string | number>>): string => {
@@ -53,6 +54,7 @@ const fill = (input: {
 }) => {
   const onResume = vi.fn()
   const onResumeAll = vi.fn()
+  const onDismiss = vi.fn()
   const open = vi.fn()
   const titles = input.titles ?? input.continuations.map((_, index) => `Blocked ${String(index + 1)}`)
   render(
@@ -62,6 +64,7 @@ const fill = (input: {
       onAutoRetry={vi.fn()}
       onResume={onResume}
       onResumeAll={onResumeAll}
+      onDismiss={onDismiss}
       onSnooze={vi.fn()}
       open={open}
       selectedSessionId={input.selectedSessionId}
@@ -78,7 +81,7 @@ const fill = (input: {
       )}
     />,
   )
-  return { onResume, onResumeAll, open }
+  return { onResume, onResumeAll, onDismiss, open }
 }
 
 afterEach(cleanup)
@@ -92,6 +95,7 @@ describe('usage limit section', () => {
         onAutoRetry={vi.fn()}
         onResume={vi.fn()}
         onResumeAll={vi.fn()}
+        onDismiss={vi.fn()}
         onSnooze={vi.fn()}
         open={vi.fn()}
         resumeAllBusy={false}
@@ -158,11 +162,21 @@ describe('usage limit section', () => {
     expect(open).toHaveBeenCalledWith('blocked')
   })
 
+  it('dismisses one blocked thread without resuming it, and leads with a primary Resume all', () => {
+    const { onDismiss, onResume } = fill({ continuations: [continuation()] })
+
+    expect(screen.getByRole('button', { name: 'Resume all' }).getAttribute('data-variant')).toBe('default')
+    screen.getByRole('button', { name: 'Dismiss' }).click()
+    expect(onDismiss).toHaveBeenCalledWith({ continuationId: '11111111-1111-4111-8111-111111111111' })
+    expect(onResume).not.toHaveBeenCalled()
+  })
+
   it('disables the row actions while its own recovery is in flight', () => {
     fill({ continuations: [continuation()], busy: ['11111111-1111-4111-8111-111111111111'] })
 
     expect(screen.getByRole('button', { name: 'Resume this thread' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'Usage limit options' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Dismiss' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'Resume all' }).hasAttribute('disabled')).toBe(true)
   })
 })

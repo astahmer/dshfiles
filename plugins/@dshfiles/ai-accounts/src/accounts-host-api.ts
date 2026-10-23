@@ -234,6 +234,7 @@ export const accountsHostApi = aiAccountsApi.host({
   },
   setQuotaContinuationAutoRetry: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).setAutoRetry(input.continuationId, input.sessionId, input.enabled),
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
+  dismissQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).dismiss(input.continuationId),
 })
 
 /** Provider reads are independent; bound them so a profile with 64 accounts is not a 64-request burst. */

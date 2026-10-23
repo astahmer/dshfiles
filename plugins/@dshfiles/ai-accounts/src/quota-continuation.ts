@@ -74,6 +74,7 @@ type QuotaContinuationService = {
   resume(continuationId: string, selection?: ModelSelection): Promise<{ accepted: boolean }>
   setAutoRetry(continuationId: string, sessionId: string, enabled: boolean): Promise<{ updated: boolean }>
   snooze(continuationId: string, duration: SnoozeDuration): Promise<{ updated: boolean }>
+  dismiss(continuationId: string): Promise<{ dismissed: boolean }>
 }
 
 declare module '@deepseek-ai/dsh-workspace/types' {
@@ -605,6 +606,19 @@ const createQuotaContinuationService = ({
     })
   }
 
+  const dismiss = async (continuationId: string): Promise<{ dismissed: boolean }> => {
+    const storage = await table()
+    const record = storage.get(continuationId)
+    if (record === undefined || record.state !== 'waiting') return { dismissed: false }
+
+    return serialize(record.sessionId, async () => {
+      const current = storage.get(continuationId)
+      if (current === undefined || current.state !== 'waiting') return { dismissed: false }
+      await invalidate(current)
+      return { dismissed: true }
+    })
+  }
+
   const stopSession = async (sessionId: string): Promise<void> => {
     await serialize(sessionId, async () => {
       for (const record of await activeForSession(sessionId)) await invalidate(record)
@@ -666,7 +680,7 @@ const createQuotaContinuationService = ({
     await closing
   }
 
-  return { start, close, list, recordFailure, resume, setAutoRetry, snooze }
+  return { start, close, list, recordFailure, resume, setAutoRetry, snooze, dismiss }
 }
 
 export { createQuotaContinuationService, type QuotaContinuationService, type QuotaFailureAgent, type SnoozeDuration }
