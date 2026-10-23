@@ -98,5 +98,8 @@
         "@dshfiles/shared-runtime"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

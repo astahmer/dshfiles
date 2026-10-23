@@ -6,22 +6,10 @@
       "id": "plugins-row",
       "title": "Plugin updates waiting for a Host restart",
       "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
-      "reach": [
-        "click button \"Plugins\"",
-        "click button \"View HMR updates\"",
-        "expect text \"Nothing is waiting*\""
-      ],
-      "surfaces": [
-        "client",
-        "host",
-        "settings"
-      ],
+      "reach": ["click button \"Plugins\"", "click button \"View HMR updates\"", "expect text \"Nothing is waiting*\""],
+      "surfaces": ["client", "host", "settings"],
       "configuration": [],
-      "states": [
-        "in-step",
-        "deferred",
-        "released"
-      ],
+      "states": ["in-step", "deferred", "released"],
       "failureModes": [
         "A rebuilt client bundle whose Host half did not change applies immediately, as before.",
         "A rebuilt client bundle whose Host half changed is announced as deferred; the browser keeps the last-good code and the row names the package until a Host restart.",
@@ -46,6 +34,11 @@
           "id": "hmr-gate.plugins-row-unit-resolves-owned-entry",
           "file": "plugins/@dshfiles/hmr-gate/src/host/gate.test.ts",
           "testName": "reads an owned bundle entry from exports"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "hmr-gate.plugins-row-no-gherkin-journey",
+          "reason": "A deferral needs a plugin whose Host half is rebuilt on disk while the Host keeps the old one loaded; no Gherkin scenario sets that up yet. The feature's reach steps open the empty row on a scratch DSH with dshx dev open, and the defer and release decisions are unit-tested in src/host/gate.test.ts."
         }
       ]
     }
