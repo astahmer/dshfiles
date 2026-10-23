@@ -1,6 +1,6 @@
 import { defineClient } from '@dshfiles/dshx/client'
 
-// The native card (dsh-client-ui-user-questions) hashes its CSS-module classes, so these rules key on its stable
+// The question card (@dshfiles/user-questions, a fork of dsh-client-ui-user-questions) hashes its CSS-module classes, so these rules key on its stable
 // data attributes, element structure and class-name suffixes. A DSH update that reshapes the card drops them silently.
 const questionCardSheet = `
 [data-question-key]{container:dshfiles-question-card/inline-size}

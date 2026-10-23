@@ -21,6 +21,7 @@ const astGrepVendored = [
   'plugins/@dshfiles/subprocess-local/src/host.ts',
   'plugins/@dshfiles/session-controller/typert/**',
   'plugins/@dshfiles/frame-layout/src/native/**',
+  'plugins/@dshfiles/user-questions/src/native/**',
 ]
 
 const ruleCapsSchema = z.record(z.string(), z.number().int().nonnegative())

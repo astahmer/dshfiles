@@ -63,6 +63,7 @@
     "tooling/antislop/index.mjs",
     "output/**",
     "plugins/@dshfiles/frame-layout/src/native/**",
+    "plugins/@dshfiles/user-questions/src/native/**",
     "plugins/@dshfiles/rich-composer/src/native/**",
     "plugins/@dshfiles/chat/src/native/**",
     "plugins/@dshfiles/session-controller/src/native/**",

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "answered-question-stays-closed",
+      "title": "An answered question form stays closed while its reply waits for admission",
+      "summary": "Answering a continued ask_user_question form queues a user-question-reply in the Inbox. The step boundary claims that reply, emptying the Inbox several awaits before the admitted user message settles the question, and the native client republished the form for that gap, so the panel closed, came back, then closed. The fork records each call this Client answered until the Host stops listing it and keeps that form out of the composer seat; the tool call row can still reveal it.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["answered-queued", "reply-claimed", "settled", "reply-discarded"],
+      "failureModes": [
+        "A reply that never reaches admission keeps its card, so the tool call row can still reveal the form.",
+        "A projection with no value for the Session leaves the answered record in place instead of treating the call as settled."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "user-questions.answered-stays-closed-upstream",
+          "reason": "src/native/index.ts is upstream revision 69f2241e of packages/client/ui-user-questions verbatim, whose browser-plugin.client.spec.ts covers both states (an answered form stays closed across the claimed-reply gap; a discarded reply stays revealable). The vendored components import browser-only native bundles this repository's Vitest cannot load; scripts/native-fork-diff.mjs proves every other vendored file equals the pinned tag."
+        }
+      ]
+    }
+  ]
+}
