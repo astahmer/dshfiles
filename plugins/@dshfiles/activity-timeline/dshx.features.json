@@ -101,6 +101,7 @@
       "failureModes": [
         "A summary always carries the ids of its underlying events so it stays traceable.",
         "Attention events are never folded into a routine group.",
+        "A burst of same-cause checkout sync refusals (same checkout and reason within thirty minutes) reads as one attention row with a count; its event ids stay attached and Detailed shows each one, without any retry or rebase.",
         "Condensation is deterministic, so repeated renders produce the same feed."
       ],
       "externalDependencies": [],
@@ -139,6 +140,12 @@
           "id": "activity-timeline.condensation-adapters",
           "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
           "testName": "maps adapters with authoritative levels"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.condensation-repeated-refusals",
+          "file": "plugins/@dshfiles/activity-timeline/src/condensation.test.ts",
+          "testName": "fold a burst with one cause into one attention row that counts them and keeps every event id"
         }
       ]
     },

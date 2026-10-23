@@ -1,7 +1,20 @@
 import type { ActivityEvent, CondensedItem } from './types.js'
 
 const ROUTINE_GROUP_WINDOW_MS = 10 * 60 * 1000
+const REPEATED_ATTENTION_WINDOW_MS = 30 * 60 * 1000
 const MAX_GROUP_MEMBERS = 500
+
+/** Attention events whose repeats share one cause and one remedy, so a burst reads as one row instead of many failures. */
+const REPEATABLE_ATTENTION = new Set(['workspace.sync_refused'])
+
+const repeatedCauseKey = (event: ActivityEvent): string | null =>
+  event.level === 'attention' && REPEATABLE_ATTENTION.has(event.type) ? JSON.stringify([event.type, event.workspaceId, event.detail ?? event.summary]) : null
+
+interface RepeatedAttentionBurst {
+  readonly startedAt: number
+  readonly members: ActivityEvent[]
+  slot: number
+}
 
 const ALWAYS_INDIVIDUAL = new Set([
   'session.error',
@@ -45,6 +58,7 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
   'workspace.created': 'workspace registered',
   'workspace.ready': 'workspace ready',
   'workspace.missing': 'workspace missing',
+  'workspace.sync_refused': 'checkout sync refused (local work kept)',
 }
 
 export class ActivityTimelineCondensation {
@@ -91,13 +105,30 @@ export class ActivityTimelineCondensation {
     const sorted = [...events].sort((left, right) => left.at - right.at || left.id.localeCompare(right.id))
     if (options.detailed === true) return sorted.map(ActivityTimelineCondensation.toItem)
 
-    const items: CondensedItem[] = []
+    const slots: (CondensedItem | RepeatedAttentionBurst | null)[] = []
+    const bursts = new Map<string, RepeatedAttentionBurst>()
     let index = 0
     while (index < sorted.length) {
       const current = sorted[index]
       if (current === undefined) break
+      const causeKey = repeatedCauseKey(current)
+      if (causeKey !== null) {
+        const burst = bursts.get(causeKey)
+        if (burst === undefined || current.at - burst.startedAt > REPEATED_ATTENTION_WINDOW_MS) {
+          const started: RepeatedAttentionBurst = { startedAt: current.at, members: [current], slot: slots.length }
+          bursts.set(causeKey, started)
+          slots.push(started)
+        } else {
+          burst.members.push(current)
+          slots[burst.slot] = null
+          burst.slot = slots.length
+          slots.push(burst)
+        }
+        index += 1
+        continue
+      }
       if (current.level === 'attention' || ALWAYS_INDIVIDUAL.has(current.type)) {
-        items.push(ActivityTimelineCondensation.toItem(current))
+        slots.push(ActivityTimelineCondensation.toItem(current))
         index += 1
         continue
       }
@@ -113,17 +144,50 @@ export class ActivityTimelineCondensation {
           cursor += 1
         }
         if (run.length > 1) {
-          items.push(ActivityTimelineCondensation.toGroup(run))
+          slots.push(ActivityTimelineCondensation.toGroup(run))
           index = cursor
           continue
         }
         index += 1
         continue
       }
-      items.push(ActivityTimelineCondensation.toItem(current))
+      slots.push(ActivityTimelineCondensation.toItem(current))
       index += 1
     }
-    return ActivityTimelineCondensation.groupByCorrelation(items)
+    const condensed = slots.flatMap(slot => {
+      if (slot === null) return []
+      if (!('members' in slot)) return [slot]
+      const [only] = slot.members
+      return [
+        slot.members.length === 1 && only !== undefined
+          ? ActivityTimelineCondensation.toItem(only)
+          : ActivityTimelineCondensation.toRepeatedAttention(slot.members),
+      ]
+    })
+    return ActivityTimelineCondensation.groupByCorrelation(condensed)
+  }
+
+  /** One attention row for a burst of same-cause events; each member's details stay one expansion away (Detailed). */
+  private static toRepeatedAttention = (members: readonly ActivityEvent[]): CondensedItem => {
+    const first = members[0]
+    const last = members[members.length - 1]
+    if (first === undefined || last === undefined) throw new Error('Cannot condense an empty burst.')
+    const sessions = new Set(members.map(member => member.sessionId ?? 'unknown'))
+    const scope = sessions.size === 1 ? '' : ` · across ${String(sessions.size)} agents`
+    return {
+      kind: 'group',
+      id: `repeated:${first.id}`,
+      at: last.at,
+      source: last.source,
+      type: last.type,
+      level: 'attention',
+      sessionId: sessions.size === 1 ? last.sessionId : null,
+      correlationId: null,
+      summary: `${String(members.length)}× ${last.summary}${scope}`.slice(0, 500),
+      count: members.length,
+      eventIds: members.slice(-MAX_GROUP_MEMBERS).map(member => member.id),
+      references: [...last.references],
+    }
   }
 
   static groupByCorrelation = (items: readonly CondensedItem[]): CondensedItem[] => {

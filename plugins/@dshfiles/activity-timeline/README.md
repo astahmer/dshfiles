@@ -51,8 +51,13 @@ minutes collapse into a traceable group (`N× label for <session>`); consecutive
 notable events sharing a correlation id collapse into a related group. Attention
 events and named milestones (`session.error`, `session.input`,
 `communication.message`, all `integration.*`, `verification.cancelled`, and
-`workspace.ready|missing`) are always individual. Every group carries the ids of its members, and the
-`detailed` filter expands every retained event.
+`workspace.ready|missing`) are always individual. The one exception is a burst
+of `workspace.sync_refused` events (jj-integration's safe "checkout kept as is"
+refusals): those with the same checkout and the same reason within thirty
+minutes fold into one attention row (`N× <summary>`), placed at the newest one.
+Selecting it shows the count, and **Detailed** expands each event. Folding is
+read-only: nothing is retried or rebased. Every group carries the ids of its
+members, and the `detailed` filter expands every retained event.
 
 ## UI
 
