@@ -72,7 +72,8 @@ export interface ReachPosition {
 
 /**
  * One user step toward a feature, run by `dshx dev open` from the app root:
- * `click|rightclick|hover <role|text|label|title> "<name>"`, `fill <role|label> "<name>" "<value>"`,
+ * `click|rightclick|hover <role|text|label|title> "<name>"`, `fill <role|label> "<name>" "<value>"` (the value may carry
+ * `\"` and `\\` escapes, e.g. a tool directive whose JSON arguments need quotes),
  * `expect <role|text|label|title> "<name>"`, `press <key>` (Playwright key names, e.g. `Meta+K`), `attach "<file>"`, which
  * hands a repository file (path from the repository root) to the page's file input as the composer's file picker does,
  * or `seed <seed>` (before every other step). Names match exactly; a trailing `*` (`"sample*"`) matches a case-insensitive substring.
@@ -80,7 +81,7 @@ export interface ReachPosition {
  * (its action strip) intercepts the element's centre, while the row's left half is what a reader clicks.
  */
 const reachStepPattern = new RegExp(
-  `^(?:(?:click|rightclick|hover) [a-z]+ "[^"]+"(?: at \\d+,\\d+)?|expect [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
+  `^(?:(?:click|rightclick|hover) [a-z]+ "[^"]+"(?: at \\d+,\\d+)?|expect [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "(?:[^"\\\\]|\\\\.)*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
 )
 
 export const parseReachStep = (
@@ -99,7 +100,7 @@ export const parseReachStep = (
   if (press?.[1] !== undefined) return { action: 'press', key: press[1] }
   const seed = REACH_SEEDS.find(candidate => step === `seed ${candidate}`)
   if (seed !== undefined) return { action: 'seed', seed }
-  const match = /^(click|rightclick|hover|expect|fill) ([a-z]+) "([^"]+)"(?: "([^"]*)")?(?: at (\d+),(\d+))?$/.exec(step)
+  const match = /^(click|rightclick|hover|expect|fill) ([a-z]+) "([^"]+)"(?: "((?:[^"\\]|\\.)*)")?(?: at (\d+),(\d+))?$/.exec(step)
   const action = match?.[1]
   if (match === null || match[2] === undefined || match[3] === undefined) return undefined
   if (action !== 'click' && action !== 'rightclick' && action !== 'hover' && action !== 'expect' && action !== 'fill') return undefined
@@ -109,7 +110,7 @@ export const parseReachStep = (
     const y = match[6]
     return { action, by: match[2], name: match[3], ...(x === undefined || y === undefined ? {} : { position: { x: Number(x), y: Number(y) } }) }
   }
-  return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4] }) }
+  return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4].replace(/\\(.)/gu, '$1') }) }
 }
 
 const reachSchema = z

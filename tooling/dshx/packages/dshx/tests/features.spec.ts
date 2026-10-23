@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { featureCatalogIssues } from '../src/project/features.js'
+import { featureCatalogIssues, parseReachStep } from '../src/project/features.js'
 
 const feature = {
   id: 'reorder-message',
@@ -81,6 +81,16 @@ describe('plugin feature metadata', () => {
     expect(withReach(['seed a-thread', 'expect text "x"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
     expect(withReach(['click button "New thread"', 'seed rebase-ready-thread', 'expect text "x"'])).toEqual(
       expect.arrayContaining([expect.stringContaining('seed steps come first')]),
+    )
+  })
+
+  it('reads escaped quotes and backslashes in a fill value, so a tool directive can carry JSON', () => {
+    const step = String.raw`fill textbox "Message" "[[call bash {\"command\":\"echo \\u0041\"}]]"`
+    expect(parseReachStep(step)).toEqual({ action: 'fill', by: 'textbox', name: 'Message', value: String.raw`[[call bash {"command":"echo \u0041"}]]` })
+    const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
+    expect(withReach([step, 'expect text "x"'])).toEqual([])
+    expect(withReach(['fill textbox "Message" "an "unescaped" quote"', 'expect text "x"'])).toEqual(
+      expect.arrayContaining([expect.stringContaining('reach steps are')]),
     )
   })
 
