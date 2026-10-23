@@ -2391,7 +2391,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (layoutMode === 'list') {
       changePreferences({
         ...nextPreferences,
-        collapsedSections: SidebarPreferencesModel.toggleCollapsedSection(preferences.collapsedSections, section),
+        // A drop opens the destination instead of folding it: the section the row was dragged inside is already open,
+        // so toggling would fold it and hide the row that just landed.
+        collapsedSections: [...nextCollapsedSections],
       })
     } else {
       changePreferences(nextPreferences)
