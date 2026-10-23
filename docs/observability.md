@@ -50,6 +50,18 @@ duration metrics go to `/v1/metrics`.
 
 By default no message text, tool argument or tool result leaves the Host.
 
+## Usage ledger metrics
+
+`@dshfiles/usage` reads the same variables and, when an endpoint is set, also
+POSTs its SQLite ledger aggregates (model requests and tokens, tool executions
+by category and source, Jev requests, duration histograms) to `/v1/metrics` as
+OTLP/HTTP JSON every 60 s, cumulative since Host start. Its metrics are named
+`dsh.*` under the `@dshfiles/usage` instrumentation scope and carry
+`service.name` from `OTEL_SERVICE_NAME` (default `dshfiles`).
+`OTEL_METRICS_EXPORTER=none` turns off both this export and LoongSuite's
+metrics. Details and the full variable list are in the
+[usage README](../plugins/@dshfiles/usage/README.md#periodic-export-opt-in).
+
 ## Decision (2026-10-23, b:299)
 
 Two marketplace plugins export DSH spans. Both read on DSH 0.2.1-rc.2:

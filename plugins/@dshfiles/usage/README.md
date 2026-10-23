@@ -108,7 +108,9 @@ the resource carries `service.name`, and the scope is `@dshfiles/usage`.
 
 The Host can also push the same metrics to an OTLP/HTTP collector. It is off
 unless one of these is set in the DSH Host's environment (read once at
-activation, so a change needs a **Host restart**):
+activation, so a change needs a **Host restart**). They are the same variables
+the LoongSuite span exporter reads, so one endpoint receives both; see
+[observability](../../../docs/observability.md#usage-ledger-metrics).
 
 | Variable                                                           | Effect                                                                                 |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
