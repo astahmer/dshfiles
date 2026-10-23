@@ -96,6 +96,41 @@ owning plugin's README — this file is only the decision register.
 | 76  | Per-package compatibility for a rebuilt client      | @dshfiles/hmr-gate              | host   | upstream | `client-hmr` offers only `pollIntervalMs`, and `ReleaseChangeGate` compares the DSH build (`version`+`commit`), which a plugin rebuild never changes. Announcing a rebuild only when its Host half is loaded needs a row fork; we ship one.                                                                                                       |
 | 77  | Keep a live provider until its replacement applies  | dshx, profiles/web              | host   | upstream | `ClientEntries.replace()` tears the old entry fiber down before the replacement imports (`lib/client.js:492-505`, #6883), so a slot that renders in that window reads a missing service — the 2026-10-22 composer crash. We make injects tolerant; the runtime should keep the last provider.                                                     |
 
+| 76  | Answered native question form flashes back          | agent-questions                 | core   | upstream | Cause confirmed (b:270): answering a `continued` form queues a `user-question-reply` in the Inbox, and the step boundary's `claim()` empties it several awaits before the admitted `user/message` settles the `userQuestions` projection. `publishContinuedQuestions` republishes the card for that gap, so the panel closes, reappears, then closes. Client-only fix, source revision ready to file upstream: `jj:69f2241e`. Patched locally in the installed `lib/client.js` (needs a Host restart; lost on a `dsh` upgrade). Recurring after that? Fork the package — see the row 76 detail below. |
+
+### Row 76 detail — answered native question form flashes back
+
+Only a `continued` question can flash: `publishContinuedQuestions` creates a card solely for `continued`
+projection rows, while an `open` row only updates a card that already exists. A pre-deadline submit answers
+through the waterfall, never queues an Inbox reply, and closes exactly once.
+
+1. Submitting a `continued` form answers over the Remote path, which splices a `user-question-reply` into the
+   durable Inbox and withdraws the panel.
+2. `ReactLoopInbox.claim` splices that reply out of the Inbox at the step boundary — several `await`s before
+   `step()` appends the admitted `user/message` that settles the question in the `userQuestions` projection.
+3. Across that gap the projection still offers the call as answerable while the Inbox no longer holds the
+   reply, so reconcile called `cards.ensure(...)` and republished the editable card: reopen, then close on
+   settle.
+
+Fix (client-only, ~25 lines): remember the calls this Client answered through the Remote path until the Host
+stops listing them, and create that card without claiming the composer seat. The panel stays withdrawn and the
+card keeps its identity, so a discarded reply is still revealable from its tool row.
+
+- Source: workspace `~/dev/dsh-core-question-flash`, `jj:69f2241e`, tests in
+  `packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts` (124 pass; the claim-gap test fails
+  without the fix).
+- Live patch: a real `pnpm patch`, declared in the global install the `dsh` shim points at
+  (`~/.local/share/pnpm/global/v11/<dir>`, whose `499c6f07…` alias symlinks to the same tree):
+  `patches/@deepseek-ai__dsh-client-ui-user-questions@0.2.1-rc.2.patch` + `patchedDependencies` in its
+  `pnpm-workspace.yaml` and lockfile. pnpm applies it as a patched link-store copy, and
+  `@deepseek-ai/dsh-web-app`'s dependency link resolves there, so the served bundle carries it.
+  The same delta is recorded in this repo as [b270-question-flash.patch](../docs/patches/b270-question-flash.patch)
+  so it can be re-applied — nothing here applies it.
+  Client bundles are read once at activation: it applies on the next Host restart, not a page refresh.
+  A `dsh` upgrade installs into a new global dir, so re-apply the patch there (or drop it once upstream ships).
+- Durable route if it recurs: fork `@deepseek-ai/dsh-client-ui-user-questions` the way `chat` or
+  `rich-composer` do ([native forks](../docs/native-forks.md)), recording the same files as the delta.
+
 ## Upstream tracker
 
 Reports the community already filed against the installed runtime. Read these
@@ -136,7 +171,7 @@ before filing a new one; add a comment with our measurement when it is additive.
 ## Upstream asks we still have to file
 
 Rows marked `upstream` with no discussion above: 1, 5, 13, 14, 16, 17, 18, 19, 21,
-24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75. File the smallest of them with a
+24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75, 76. File the smallest of them with a
 measurement, not a feature wish.
 
 ## Triage, 2026-10-19
