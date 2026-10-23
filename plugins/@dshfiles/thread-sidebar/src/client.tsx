@@ -2964,14 +2964,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return labels
   }, [attentionLabelsBySession, sectionEntries, threadTree])
   const threadViewAttentionEntries = useMemo(() => {
-    const entryFor = (
-      entry: (typeof sectionEntries)[number] | (typeof childThreadEntries)[number] | (typeof detachedThreadEntries)[number],
-      isRoot: boolean,
-    ) => {
-      const childLabels = isRoot
-        ? (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => attentionLabelsBySession.get(child.id) ?? [])
-        : []
-      const attentionLabel = ThreadViewModel.mostUrgentAttentionLabel([...(attentionLabelsBySession.get(entry.session.id) ?? []), ...childLabels])
+    // A tab's dot follows the dots its rows draw, and a row's dot shows only its own state: a child's label lights
+    // the tab only in views that list that child.
+    const entryFor = (entry: (typeof sectionEntries)[number] | (typeof childThreadEntries)[number] | (typeof detachedThreadEntries)[number]) => {
+      const attentionLabel = ThreadViewModel.mostUrgentAttentionLabel(attentionLabelsBySession.get(entry.session.id) ?? [])
       return {
         thread: entry.session,
         attentionLabel,
@@ -2984,9 +2980,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       }
     }
     return [
-      ...sectionEntries.map(entry => entryFor(entry, true)),
-      ...childThreadEntries.map(entry => entryFor(entry, false)),
-      ...detachedThreadEntries.map(entry => entryFor(entry, false)),
+      ...sectionEntries.map(entryFor),
+      ...childThreadEntries.map(entryFor),
+      ...detachedThreadEntries.map(entryFor),
     ]
   }, [
     archivedSessionIds,
@@ -2998,7 +2994,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     mutedSessionIds,
     sectionEntries,
     settledSessionIds,
-    threadTree,
   ])
   const attentionLabelByViewId = useMemo(
     () => new Map(threadViewSettings.views.map(view => [view.id, ThreadViewPreferencesModel.attentionLabelForPreset(view, threadViewAttentionEntries)])),
@@ -3014,9 +3009,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const viewTabs = threadViewSettings.views
     .filter(view => view.enabled)
     .map(view => {
-      const hasOnlyWorkingStatuses =
-        view.statusFilters.every(status => status === 'working' || status === 'interrupted') && view.statusFilters.includes('working')
-      const workingCount = hasOnlyWorkingStatuses ? workingThreadCountsBySource[view.sourceFilter] : null
+      // A view that lists working threads counts them, whatever else it also lists; an unread count there read as a
+      // wrong number of working threads.
+      const workingCount = view.statusFilters.includes('working') ? workingThreadCountsBySource[view.sourceFilter] : null
       const unreadCount = unreadCountByViewId.get(view.id) ?? 0
       return {
         view,
