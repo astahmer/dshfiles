@@ -72,7 +72,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 OTEL_SERVICE_NAME=dsh-verify \
 
 Owned plugins add child spans: `jj <subcommand>` (jujutsu, jj-integration), `secret <verb>` and `secret resolve`
 (secret-catalog), `jev classify` (backlog, memory), `<namespace>/<method>` gateway requests (multi-host) and
-`jj-integration workspace sync`. See [observability](../../../../docs/observability.md#spans-from-our-own-code-dshx), which also covers the adopted LoongSuite plugin's core spans.
+`jj-integration workspace sync`. See [observability](../../../../docs/observability.md#spans-from-our-own-code-dshx), which also covers the agent turn, model and tool spans of `@dshfiles/agent-telemetry`.
 
 Never recorded: API inputs and outputs, command positionals and flag values (paths, revisions, messages, file
 contents), secret values, prompt text, error messages. A thrown error marks the span `error` with its class and string
@@ -95,15 +95,67 @@ const run = (args: readonly string[]) =>
 
 | Export                                                 | Purpose                                                                                                                                                                  |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `withSpan(name, options, run)`                         | Runs `run` inside a span; nested spans (in any plugin of the process) become its children; ends when `run` settles.                                                      |
+| `withSpan(name, options?, run)`                        | Runs `run` inside a span; nested spans (in any plugin of the process) become its children; ends when `run` settles.                                                      |
 | `startSpan(name, options?)`                            | A span the caller must `end()`; parented to the active span unless `options.parent` is given (`null` = new trace).                                                       |
 | `tracingEnabled()`                                     | Skip building expensive attributes when export is off.                                                                                                                   |
 | `commandAttributes({ executable, args, valueFlags? })` | Executable name, up to two adjacent leading subcommand words, flag names without values, argument count. Name every flag whose next argument is a value in `valueFlags`. |
 | `traceparent()` / `parseTraceparent()`                 | W3C `traceparent` header for the active span, to continue a trace in another process; incoming API routes read it.                                                       |
 | `activeSpanContext()`, `flushTracing()`                | The active `{ traceId, spanId }`; send everything queued now (never rejects).                                                                                            |
+| `withActiveSpan(span, run)`                            | Run `run` (sync or async) with an existing span as the active parent; the caller still ends the span.                                                                    |
+| `traced(name, fn, options?)`                           | `fn` wrapped so each call runs in a span; `options` may be a function of the call's arguments.                                                                           |
+| `pluginAttributes({ plugin, attributes })`             | `{ 'dshx.<plugin>.<key>': value }`; throws on a non-kebab plugin or a non-`snake_case` key.                                                                              |
+| `redactIdentifier`, `contentSize`, `truncateText`      | Keep a value only when it is one bounded identifier token; record a payload's size instead of it; cut deliberate text.                                                   |
+| `recordSpans()`                                        | In-memory recorder of every span ended in the process, endpoint or not: `span(name)`, `named()`, `children()`, `stop()` / `using`.                                       |
 
 `Span` has `setAttribute`, `setAttributes`, `setStatus('ok' | 'error', message?)`, `recordFailure(error)` and `end()`;
 `recording` is false on the no-op span.
+
+## Add tracing to a plugin
+
+**What you get for free.** With `@dshfiles/agent-telemetry` in the profile, no plugin code is needed for:
+
+- every dshx API method the plugin serves (`<api id>/<method>`, server span), whoever calls it;
+- every agent tool it registers, dshx-bound or `defineTool` (`execute_tool <name>`, from the `tools/execute` hook,
+  keyed by tool name, nothing per plugin);
+- every model stream it opens through `ctx.llm` (`chat <model>`, with `dsh.llm.purpose` when one is set);
+- the shared process helpers it calls: `jj` runs (jujutsu), `secret` lookups (secret-catalog), Jev requests, multi-host
+  gateway calls.
+
+They nest: a tool that calls a plugin API that runs `jj` shows as `execute_tool` → `<api>/<method>` → `jj <verb>`.
+
+**One-line custom span** at a work-unit boundary (one per unit of work, not per loop iteration):
+
+```ts
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
+
+const result = await withSpan('backlog triage', { attributes: pluginAttributes({ plugin: 'backlog', attributes: { items: ids.length } }) }, () => triage(ids))
+// or wrap the function once: export const triage = traced('backlog triage', run, ids => ({ attributes: … }))
+```
+
+It parents to whatever is active (the tool call, the API dispatch, the turn's model call), and a throw marks it failed
+with the error class and string `code` only.
+
+**Conventions.**
+
+- Span name: `<subject> <verb>` in lowercase (`backlog triage`, `jj log`, `secret resolve`), at most 128 characters;
+  put identifiers in attributes, not in the name (except the GenAI `chat <model>` / `execute_tool <tool>` forms).
+- Attributes: the standard key when one exists (`gen_ai.*` for model and tool facts, `process.*` for subprocesses,
+  `rpc.*`, `error.type`, `dsh.session.id` for a thread); otherwise `dshx.<plugin>.<key>` through `pluginAttributes`.
+- Values: identities (`redactIdentifier`), counts, sizes (`contentSize`), durations, outcome codes. Never arguments,
+  results, prompts, file contents, paths a user typed, secret values or error messages.
+
+**Test kit.** Assert spans in a unit test without an endpoint:
+
+```ts
+import { recordSpans } from '@dshfiles/dshx/tracing'
+
+using recorder = recordSpans()
+await triage(['b:1'])
+expect(recorder.span('backlog triage').attributes['dshx.backlog.items']).toBe(1)
+```
+
+`recorder.children(span)` checks nesting; the recorder sees spans from every dshx copy in the process, so a test of
+one plugin also sees the API and process spans its call caused.
 
 ## Runtime model
 
@@ -111,11 +163,10 @@ const run = (args: readonly string[]) =>
   `Symbol.for('@dshfiles/dshx.tracing.v2')`: all copies share one `AsyncLocalStorage` and one export queue, and a span
   opened while plugin A serves a call parents the spans plugin B opens. A change to the shared tracer shape needs a new
   symbol version (v2: a tracer created before the receiver was published starts recording once it is).
-- With no dshx span active, a new span takes the active OpenTelemetry API span as its parent (read through the
-  `Symbol.for('opentelemetry.js.api.1')` global and the `OpenTelemetry Context Key SPAN` context key that
-  `@opentelemetry/api` 1.x shares across copies, without depending on it). Under the adopted LoongSuite plugin, a dshx
-  API call made by an agent tool therefore nests under that tool's `execute_tool` span. Verified against
-  `@opentelemetry/api` 1.9.1; 1.10.0 uses the same keys.
+- Agent work is in the same context: `@dshfiles/agent-telemetry` runs every agent tool body and every model stream
+  with its `execute_tool` / `chat` span active (`withActiveSpan`), so a dshx span opened by a tool nests under it. dshx
+  no longer reads the `@opentelemetry/api` global context; a span from another OpenTelemetry SDK in the process does
+  not parent dshx spans (W3C `traceparent` across processes still does).
 - The exporter batches up to 512 spans every 5 s, holds at most 2,048 (newer spans drop when full), retries
   `429/502/503/504` and network failures with jittered exponential backoff (1 s doubling to 60 s, 5 attempts), drops
   other failures, and times a request out after 10 s. It never throws into the code that ended a span.

@@ -1,8 +1,18 @@
+import { TracingHelpers } from './helpers.js'
 import { LocalOtlpEndpointRegistry, type LocalOtlpEndpoint, type OtlpExportTarget, type OtlpSignal } from './local-endpoint.js'
 import { TracerModel, type Span, type SpanAttributes, type SpanContext, type StartSpanOptions } from './tracer.js'
 
 export type { LocalOtlpEndpoint, OtlpExportTarget, OtlpSignal } from './local-endpoint.js'
 export type { Span, SpanAttributes, SpanAttributeValue, SpanContext, SpanKind, SpanStatusCode, StartSpanOptions } from './tracer.js'
+export type { RecordedSpan, SpanRecorder } from './recorder.js'
+
+export const withActiveSpan = TracingHelpers.withActiveSpan
+export const traced = TracingHelpers.traced
+export const recordSpans = TracingHelpers.recordSpans
+export const pluginAttributes = TracingHelpers.pluginAttributes
+export const redactIdentifier = TracingHelpers.redactIdentifier
+export const contentSize = TracingHelpers.contentSize
+export const truncateText = TracingHelpers.truncateText
 
 /**
  * True when spans are recorded now: an OTLP endpoint is configured for this process, or (without one) an in-process
@@ -30,12 +40,25 @@ export const otlpExportTarget = (input: { readonly signal: OtlpSignal }): OtlpEx
 /** Start a span the caller must `end()`. Prefer `withSpan`, which also scopes it as the parent of nested spans. */
 export const startSpan = (name: string, options?: StartSpanOptions): Span => TracerModel.process().startSpan(name, options)
 
+interface WithSpan {
+  <T>(name: string, run: (span: Span) => Promise<T>): Promise<T>
+  <T>(name: string, options: StartSpanOptions, run: (span: Span) => Promise<T>): Promise<T>
+}
+
 /**
  * Run `run` inside a span: nested spans (in any plugin of this process) become its children, a throw marks it failed
  * with the error class only, and it ends when `run` settles. Record metadata only, never arguments or results.
+ * `options` (kind, attributes, an explicit parent) may be omitted.
  */
-export const withSpan = <T>(name: string, options: StartSpanOptions, run: (span: Span) => Promise<T>): Promise<T> =>
-  TracerModel.process().withSpan(name, options, run)
+export const withSpan: WithSpan = <T>(
+  name: string,
+  optionsOrRun: StartSpanOptions | ((span: Span) => Promise<T>),
+  run?: (span: Span) => Promise<T>,
+): Promise<T> => {
+  if (typeof optionsOrRun === 'function') return TracerModel.process().withSpan(name, {}, optionsOrRun)
+  if (run === undefined) return Promise.reject(new TypeError('withSpan needs a callback'))
+  return TracerModel.process().withSpan(name, optionsOrRun, run)
+}
 
 export const activeSpanContext = (): SpanContext | undefined => TracerModel.process().activeContext()
 

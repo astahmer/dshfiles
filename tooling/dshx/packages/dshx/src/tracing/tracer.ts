@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { LocalOtlpEndpointRegistry } from './local-endpoint.js'
+import { SpanRecorders } from './recorder.js'
 import {
   OtlpTraceExport,
   type BatchExporter,
@@ -37,10 +38,7 @@ export interface Span {
 export interface StartSpanOptions {
   readonly kind?: SpanKind
   readonly attributes?: SpanAttributes
-  /**
-   * Explicit parent; `null` starts a new trace. Defaults to the dshx span active in the current async context, then to
-   * the active OpenTelemetry API span (another instrumentation's), so both land in one trace.
-   */
+  /** Explicit parent; `null` starts a new trace. Defaults to the dshx span active in the current async context. */
   readonly parent?: SpanContext | null
 }
 
@@ -51,8 +49,11 @@ export interface Tracer {
   activeContext(): SpanContext | undefined
   /** The W3C `traceparent` header for the active span, to continue the trace in another process. */
   traceparent(): string | undefined
-  /** Run `run` with a remote span (from an incoming `traceparent`) as the parent of the spans it opens. */
-  runWithParent<T>(parent: SpanContext | undefined, run: () => Promise<T>): Promise<T>
+  /**
+   * Run `run` with `parent` (a remote span from an incoming `traceparent`, or a span this process started and owns) as
+   * the parent of the spans it opens, synchronously or not; `undefined` runs it in the current context.
+   */
+  runWithParent<T>(parent: SpanContext | undefined, run: () => T): T
   flush(): Promise<void>
 }
 
@@ -93,39 +94,6 @@ const nonZeroHex = (bytes: number): string => {
   for (;;) {
     const id = randomBytes(bytes).toString('hex')
     if (/[^0]/u.test(id)) return id
-  }
-}
-
-const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
-const OTEL_SPAN_KEY = Symbol.for('OpenTelemetry Context Key SPAN')
-
-interface OtelApiGlobal {
-  readonly context?: { active(): { getValue(key: symbol): unknown } }
-}
-
-interface OtelSpanLike {
-  spanContext(): unknown
-}
-
-const otelSpanContextSchema = z.object({ traceId: z.string().regex(/^[0-9a-f]{32}$/u), spanId: z.string().regex(/^[0-9a-f]{16}$/u) })
-
-/**
- * The span active in the OpenTelemetry JS API's global context, e.g. the `execute_tool` span of the adopted
- * LoongSuite plugin, so a dshx span opened inside it joins the same trace. Read through the symbols @opentelemetry/api
- * 1.x registers for cross-copy sharing (`opentelemetry.js.api.1`, `OpenTelemetry Context Key SPAN`), without a
- * dependency; any other shape means no parent.
- */
-const otelActiveContext = (): SpanContext | undefined => {
-  try {
-    // SAFETY: @opentelemetry/api 1.x registers its globals under this symbol; another shape throws into the catch.
-    const api = (globalThis as { [OTEL_API_KEY]?: OtelApiGlobal })[OTEL_API_KEY]
-    const span = api?.context?.active().getValue(OTEL_SPAN_KEY)
-    if (span === undefined) return undefined
-    // SAFETY: the OpenTelemetry span key only holds a Span; another shape throws into the catch.
-    const parsed = otelSpanContextSchema.safeParse((span as OtelSpanLike).spanContext())
-    return parsed.success && /[^0]/u.test(parsed.data.traceId) ? parsed.data : undefined
-  } catch {
-    return undefined
   }
 }
 
@@ -207,27 +175,26 @@ class RecordingSpan implements Span {
   }
 }
 
-const createDisabledTracer = (): Tracer => ({
-  enabled: false,
-  startSpan: () => NOOP_SPAN,
-  withSpan: (_name, _options, run) => run(NOOP_SPAN),
-  activeContext: () => undefined,
-  traceparent: () => undefined,
-  runWithParent: (_parent, run) => run(),
-  flush: async () => undefined,
-})
-
-/** `isEnabled` gates every new span, so a tracer waiting for an in-process receiver costs nothing until it appears. */
-const createRecordingTracer = (exporter: BatchExporter, isEnabled: () => boolean): Tracer => {
+/**
+ * `exportEnabled` gates every new span, so a tracer waiting for an in-process receiver costs nothing until it appears.
+ * An active `recordSpans()` recorder also turns spans on, and receives each ended span; only spans with an export
+ * target are queued for export.
+ */
+const createRecordingTracer = (exporter: BatchExporter | undefined, exportEnabled: () => boolean): Tracer => {
   const storage = new AsyncLocalStorage<SpanContext>()
+  const isEnabled = (): boolean => exportEnabled() || SpanRecorders.active()
+  const onEnd = (finished: FinishedSpan): void => {
+    if (exporter !== undefined && exportEnabled()) exporter.enqueue(finished)
+    SpanRecorders.deliver(finished)
+  }
   const startSpan = (name: string, options: StartSpanOptions = {}): Span => {
     if (!isEnabled()) return NOOP_SPAN
     try {
       const span = new RecordingSpan({
         name,
         kind: options.kind ?? 'internal',
-        parent: options.parent === null ? undefined : (options.parent ?? storage.getStore() ?? otelActiveContext()),
-        onEnd: finished => exporter.enqueue(finished),
+        parent: options.parent === null ? undefined : (options.parent ?? storage.getStore()),
+        onEnd,
       })
       if (options.attributes !== undefined) span.setAttributes(options.attributes)
       return span
@@ -257,7 +224,7 @@ const createRecordingTracer = (exporter: BatchExporter, isEnabled: () => boolean
       return active === undefined ? undefined : `00-${active.traceId}-${active.spanId}-01`
     },
     runWithParent: (parent, run) => (parent === undefined ? run() : storage.run(parent, run)),
-    flush: () => exporter.flush(),
+    flush: async () => exporter?.flush(),
   }
 }
 
@@ -272,19 +239,20 @@ const createTracer = (input: {
   readonly fetch?: typeof fetch | undefined
   readonly scheduleDelayMs?: number | undefined
 }): Tracer => {
-  if (OtlpTraceExport.sdkDisabled(input.env)) return createDisabledTracer()
+  const disabled = (): Tracer => createRecordingTracer(undefined, () => false)
+  if (OtlpTraceExport.sdkDisabled(input.env)) return disabled()
   const exporterOf = (config: () => ExportConfig | undefined) =>
     OtlpTraceExport.createBatchExporter({ config, fetch: input.fetch, scheduleDelayMs: input.scheduleDelayMs })
   if (OtlpTraceExport.environmentEndpointSet(input.env)) {
     const config = OtlpTraceExport.configFrom(input.env)
-    if (config === undefined) return createDisabledTracer()
+    if (config === undefined) return disabled()
     return createRecordingTracer(
       exporterOf(() => config),
       () => true,
     )
   }
   const localEndpoint = input.localEndpoint
-  if (localEndpoint === undefined) return createDisabledTracer()
+  if (localEndpoint === undefined) return disabled()
   return createRecordingTracer(
     exporterOf(() => OtlpTraceExport.configFrom(input.env, localEndpoint())),
     () => localEndpoint() !== undefined,

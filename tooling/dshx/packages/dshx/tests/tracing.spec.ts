@@ -4,7 +4,22 @@ import { z } from 'zod'
 import { defineApi, method } from '../src/api/index.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { ApiProtocolModel } from '../src/api/common.js'
-import { commandAttributes, localOtlpEndpoint, otlpExportTarget, publishLocalOtlpEndpoint } from '../src/tracing/index.js'
+import {
+  commandAttributes,
+  contentSize,
+  localOtlpEndpoint,
+  otlpExportTarget,
+  pluginAttributes,
+  publishLocalOtlpEndpoint,
+  recordSpans,
+  redactIdentifier,
+  startSpan,
+  traced,
+  tracingEnabled,
+  truncateText,
+  withActiveSpan,
+  withSpan,
+} from '../src/tracing/index.js'
 import { LocalOtlpEndpointRegistry } from '../src/tracing/local-endpoint.js'
 import { OtlpTraceExport, type FinishedSpan } from '../src/tracing/otlp-exporter.js'
 import { TracerModel, type Tracer } from '../src/tracing/tracer.js'
@@ -304,40 +319,104 @@ describe('span parenting', () => {
   })
 })
 
-describe('OpenTelemetry API interop', () => {
-  const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
-  const OTEL_SPAN_KEY = Symbol.for('OpenTelemetry Context Key SPAN')
+describe('plugin helpers', () => {
+  it('records spans in memory without an endpoint, with parents, attributes and failures', async () => {
+    using recorder = recordSpans()
+    await withSpan('outer', async () => {
+      await withSpan('inner', { attributes: { 'dshx.test.items': 2 } }, async () => undefined)
+      await expect(
+        withSpan('broken', async () => {
+          throw Object.assign(new RangeError('private detail'), { code: 'too-many' })
+        }),
+      ).rejects.toThrow(RangeError)
+    })
+    const outer = recorder.span('outer')
+    expect(recorder.children(outer).map(span => span.name)).toEqual(['inner', 'broken'])
+    expect(recorder.span('inner').attributes).toEqual({ 'dshx.test.items': 2 })
+    expect(recorder.span('broken').status).toEqual({ code: 'error', message: 'RangeError:too-many' })
+    expect(JSON.stringify(recorder.spans.map(span => span.attributes))).not.toContain('private detail')
+    expect(() => recorder.span('missing')).toThrow(/no ended span named "missing"/u)
+    recorder.stop()
+    await withSpan('after stop', async () => undefined)
+    expect(recorder.named('after stop')).toHaveLength(0)
+    expect(tracingEnabled()).toBe(false)
+  })
 
-  it('parents a span under the active OpenTelemetry API span when no dshx span is active', async () => {
-    const sink = collector()
-    const tracer = TracerModel.create({ env: ENDPOINT_ENV, fetch: sink.fetch })
+  it('makes an event-owned span the active parent, synchronously or across awaits', async () => {
+    using recorder = recordSpans()
+    const call = startSpan('execute_tool bash', { parent: null })
+    const value = withActiveSpan(call, () => {
+      startSpan('sync child').end()
+      return 'sync'
+    })
+    await withActiveSpan(call.context, async () => {
+      await new Promise(resolve => setTimeout(resolve, 1))
+      await withSpan('jj log', async () => undefined)
+    })
+    await withActiveSpan(undefined, async () => withSpan('unparented', { parent: null }, async () => undefined))
+    call.end()
+    expect(value).toBe('sync')
+    const tool = recorder.span('execute_tool bash')
+    expect(recorder.children(tool).map(span => span.name)).toEqual(['sync child', 'jj log'])
+    expect(recorder.span('unparented').parentSpanId).toBeUndefined()
+  })
+
+  it('wraps a function in a span computed from its arguments', async () => {
+    using recorder = recordSpans()
+    const triage = traced(
+      'backlog triage',
+      async (items: readonly string[]) => items.length,
+      items => ({
+        attributes: pluginAttributes({ plugin: 'backlog', attributes: { items: items.length } }),
+      }),
+    )
+    await expect(triage(['a', 'b'])).resolves.toBe(2)
+    expect(recorder.span('backlog triage').attributes).toEqual({ 'dshx.backlog.items': 2 })
+  })
+
+  it('names plugin attributes by convention and rejects malformed names', () => {
+    expect(pluginAttributes({ plugin: 'jj-integration', attributes: { 'workspace.count': 3, dry_run: false, skipped: undefined } })).toEqual({
+      'dshx.jj-integration.workspace.count': 3,
+      'dshx.jj-integration.dry_run': false,
+      'dshx.jj-integration.skipped': undefined,
+    })
+    expect(() => pluginAttributes({ plugin: 'JJ', attributes: {} })).toThrow(TypeError)
+    expect(() => pluginAttributes({ plugin: 'jj', attributes: { 'Bad Key': 1 } })).toThrow(TypeError)
+    expect(() => pluginAttributes({ plugin: 'jj', attributes: { '': 1 } })).toThrow(TypeError)
+  })
+
+  it('keeps identities, sizes payloads and bounds deliberate text', () => {
+    expect(redactIdentifier('kilo-auto/free')).toBe('kilo-auto/free')
+    expect(redactIdentifier('@dshfiles/backlog')).toBe('@dshfiles/backlog')
+    expect(redactIdentifier('rm -rf /')).toBeUndefined()
+    expect(redactIdentifier('x'.repeat(129))).toBeUndefined()
+    expect(redactIdentifier(undefined)).toBeUndefined()
+    expect(contentSize('hello')).toBe(5)
+    expect(contentSize([1, 2, 3])).toBe(3)
+    expect(contentSize({ a: 1 })).toBe(7)
+    expect(contentSize(undefined)).toBe(0)
+    const cyclic: Record<string, unknown> = {}
+    cyclic.self = cyclic
+    expect(contentSize(cyclic)).toBe(0)
+    expect(truncateText({ text: 'abcdef', maxLength: 4 })).toBe('abc…')
+    expect(truncateText({ text: 'abc', maxLength: 4 })).toBe('abc')
+  })
+
+  it('no longer reads the OpenTelemetry API global: a dshx span without an active dshx parent is a root', async () => {
+    const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
     const foreign = { spanContext: () => ({ traceId: '5b8efff798038103d269b633813fc60c', spanId: 'eee19b7ec3c1b174', traceFlags: 1 }) }
     // SAFETY: the test owns this symbol for its duration and restores it.
     const holder = globalThis as { [OTEL_API_KEY]?: unknown }
     const previous = holder[OTEL_API_KEY]
-    holder[OTEL_API_KEY] = { version: '1.9.1', context: { active: () => ({ getValue: (key: symbol) => (key === OTEL_SPAN_KEY ? foreign : undefined) }) } }
+    holder[OTEL_API_KEY] = { context: { active: () => ({ getValue: () => foreign }) } }
+    using recorder = recordSpans()
     try {
-      await tracer.withSpan('tool work', {}, async () => {
-        await tracer.withSpan('nested', {}, async () => undefined)
-      })
-      await tracer.withSpan('fresh', { parent: null }, async () => undefined)
+      await withSpan('tool work', async () => undefined)
     } finally {
       if (previous === undefined) delete holder[OTEL_API_KEY]
       else holder[OTEL_API_KEY] = previous
     }
-    holder[OTEL_API_KEY] = { context: { active: () => ({ getValue: () => ({ spanContext: () => 'not a span context' }) }) } }
-    try {
-      await tracer.withSpan('malformed', {}, async () => undefined)
-    } finally {
-      if (previous === undefined) delete holder[OTEL_API_KEY]
-      else holder[OTEL_API_KEY] = previous
-    }
-    await tracer.flush()
-    const byName = new Map(sink.spans().map(span => [span.name, span]))
-    expect(byName.get('tool work')).toMatchObject({ traceId: '5b8efff798038103d269b633813fc60c', parentSpanId: 'eee19b7ec3c1b174' })
-    expect(byName.get('nested')?.parentSpanId).toBe(byName.get('tool work')?.spanId)
-    expect(byName.get('fresh')?.parentSpanId).toBeUndefined()
-    expect(byName.get('malformed')?.parentSpanId).toBeUndefined()
+    expect(recorder.span('tool work').parentSpanId).toBeUndefined()
   })
 })
 
