@@ -368,6 +368,7 @@ Feature: Backlog
     And backlog item b:1 is opened
     When the comment box searches for the backlog item mention
     Then the comment suggestions include "A target for a composer reference"
+    And the comment suggestions fit the viewport and scroll when needed
     When the backlog item mention is picked
     Then the comment box contains "b:1 "
 

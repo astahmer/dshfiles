@@ -160,7 +160,7 @@ export const MentionMenu = (props: {
     <ul
       role="listbox"
       aria-label={props.label}
-      className="dshx:absolute dshx:bottom-full dshx:left-2 dshx:z-30 dshx:mb-1.5 dshx:w-80 dshx:max-w-[calc(100%-1rem)] dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-1"
+      className="dshx:absolute dshx:bottom-full dshx:left-2 dshx:z-30 dshx:mb-1.5 dshx:w-80 dshx:max-w-[calc(100%-1rem)] dshx:max-h-[min(420px,calc(100vh-96px))] dshx:overflow-x-hidden dshx:overflow-y-auto dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-1"
     >
       {props.suggestions.map((suggestion, index) => (
         <li

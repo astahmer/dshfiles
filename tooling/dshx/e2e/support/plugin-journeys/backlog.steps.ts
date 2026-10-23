@@ -1082,6 +1082,19 @@ Then('the comment suggestions include {string}', async ({ page }: { page: Page }
   })
 })
 
+Then('the comment suggestions fit the viewport and scroll when needed', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-mention-menu-viewport', async () => {
+    const menu = peek(page).getByRole('listbox', { name: 'Reply suggestions', exact: true })
+    await expect(menu).toHaveCSS('overflow-y', 'auto')
+    const dimensions = await menu.evaluate(element => ({
+      maxHeight: Number.parseFloat(getComputedStyle(element).maxHeight),
+      viewportHeight: window.innerHeight,
+    }))
+    expect(dimensions.maxHeight).toBeGreaterThan(0)
+    expect(dimensions.maxHeight).toBeLessThan(dimensions.viewportHeight)
+  })
+})
+
 When('the backlog item mention is picked', async ({ page }: { page: Page }) => {
   await peek(page)
     .getByRole('option', { name: /A target for a composer reference/ })
