@@ -28,10 +28,10 @@ Feature: Thread sidebar journeys
     Then the thread is settled, opens read-only and unsettles to reply
 
   @scenario:thread-sidebar.board-view
-  Scenario: Open the thread board as a page with its own grouping and filters
+  Scenario: Open the thread board as a page of columns with its own grouping and filters
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When the thread board page is opened
-    Then the board groups and filters independently from the sidebar list
+    When separate remote threads are enabled and the thread board page is opened
+    Then the board shows only columns, grouped and filtered independently from the sidebar list
 
   @scenario:thread-sidebar.continue-in-project
   Scenario: Continue a thread in another project and settle the original

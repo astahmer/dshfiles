@@ -42,6 +42,11 @@ full-width page opened from the thread board row in the sidebar's panel list (or
 the "Thread board" command in the palette). It renders the same thread rows with
 each section as a column: it defaults to the six status lanes (including empty
 ones), and can also group its columns by project, date, or no grouping. The board
+shows only columns: the list's Interrupted, Needs resume, Usage limit and attention
+groups stay sidebar-only, and their threads sit in their status column with the
+same attention label inline; remote threads join their columns even when the
+list keeps them in a separate Remote group; branches whose parent is gone get a
+column of their own; empty drafts stay in the sidebar. The board
 has independent grouping, status/source filters, project scope, and collapsed
 groups from the list, and keeps them in this browser across reloads; the sidebar
 list keeps its own saved views. Thread row actions are unchanged, and dragging

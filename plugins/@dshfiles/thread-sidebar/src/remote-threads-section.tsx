@@ -45,11 +45,10 @@ export const RemoteThreadsSection = (props: {
   readonly title?: string | undefined
   readonly dragging?: boolean | undefined
   readonly keepEmpty?: boolean | undefined
-  readonly containerClassName?: string | undefined
 }): JSX.Element | null => {
   if (props.threads.length === 0 && !props.keepEmpty) return null
   return (
-    <section className={cn('dshx:mt-1', props.containerClassName)} data-remote-threads="">
+    <section className="dshx:mt-1" data-remote-threads="">
       <button
         ref={props.onHeaderRef}
         type="button"

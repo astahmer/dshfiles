@@ -469,9 +469,7 @@ Then('the continuation opens in that project with the conversation and the origi
   })
   await recordAssertion(page, 'thread-sidebar-host-holds-the-original-settled', async () => {
     const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
-    const listed = z
-      .object({ threads: z.array(z.object({ sessionId: z.string(), settled: z.boolean() })) })
-      .parse(await call('list', {}))
+    const listed = z.object({ threads: z.array(z.object({ sessionId: z.string(), settled: z.boolean() })) }).parse(await call('list', {}))
     // The Host's settled set is what blocks the original's next model step, whatever the browser shows.
     expect(listed.threads.find(thread => thread.sessionId === journey.sourceThreadId)?.settled).toBe(true)
     expect(listed.threads.find(thread => thread.sessionId === continuedThreadId)?.settled).toBe(false)
@@ -610,14 +608,23 @@ Then('the settled thread archives itself without a click', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
-When('the thread board page is opened', async ({ page }: { page: Page }) => {
+When('separate remote threads are enabled and the thread board page is opened', async ({ page }: { page: Page }) => {
+  await openSidebarSettings(page)
+  await sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' }).check()
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await expect(threadSidebar(page).locator('[data-remote-threads]')).toHaveCount(1)
   await openThreadBoard(page)
 })
 
-Then('the board groups and filters independently from the sidebar list', async ({ page }: { page: Page }) => {
+Then('the board shows only columns, grouped and filtered independently from the sidebar list', async ({ page }: { page: Page }) => {
   const board = threadBoard(page)
-  await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
+  await recordAssertion(page, 'thread-sidebar-board-shows-only-columns', async () => {
     await expect(board.getByRole('region', { name: /column$/u })).toHaveCount(6)
+    // Recovery, attention, draft and remote groups belong to the sidebar list; on the board their threads sit in columns.
+    await expect(board.locator('[data-remote-threads]')).toHaveCount(0)
+    await expect(board.getByTestId('thread-sidebar-scroll').locator(':scope > section')).toHaveCount(0)
+  })
+  await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
     // The sidebar keeps the list; the page carries the board's own view controls.
     await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
     await expect(board.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()

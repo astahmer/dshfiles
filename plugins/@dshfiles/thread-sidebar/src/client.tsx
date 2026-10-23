@@ -138,7 +138,7 @@ import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
-import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.js'
+import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from './usage-limit-rows.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
@@ -1226,6 +1226,8 @@ type SidebarGroupedViewEntry = {
 }
 
 const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set()
+const EMPTY_HOISTED_SESSIONS: readonly SessionSummary[] = []
+const EMPTY_HOISTED_USAGE_LIMIT_ROWS: readonly UsageLimitRow<SessionSummary>[] = []
 
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const surface = props.surface ?? 'sidebar'
@@ -2997,7 +2999,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const groupedAttentionRows = useMemo(() => {
     const filterRows = (rows: readonly SessionSummary[], label: ThreadAttentionLabel): SessionSummary[] => {
-      if (threadView.groupBy !== 'status') return []
+      if (threadView.groupBy !== 'status' || isBoard) return []
       return rows.filter(
         session =>
           sourceFilteredThreadIds.has(session.id) &&
@@ -3024,6 +3026,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     approvalNeededRows,
     attention.records,
     currentWorkingThreadIds,
+    isBoard,
     needsInputRows,
     preferences.approvalNeededDisplay,
     preferences.inputNeededDisplay,
@@ -3116,9 +3119,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       usageLimitRows,
     ],
   )
+  // The board shows only columns: recovery threads stay in their status column instead of a group above it.
+  const hoistedInterruptedRows = isBoard ? EMPTY_HOISTED_SESSIONS : statusFilteredInterruptedRows
+  const hoistedNeedsResumeRows = isBoard ? EMPTY_HOISTED_SESSIONS : statusFilteredNeedsResumeRows
+  const hoistedUsageLimitRows = isBoard ? EMPTY_HOISTED_USAGE_LIMIT_ROWS : statusFilteredUsageLimitRows
   const statusFilteredRecoveryRows = useMemo(
-    () => [...statusFilteredInterruptedRows, ...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
-    [statusFilteredInterruptedRows, statusFilteredNeedsResumeRows, statusFilteredUsageLimitRows],
+    () => [...hoistedInterruptedRows, ...hoistedNeedsResumeRows, ...hoistedUsageLimitRows.map(row => row.session)],
+    [hoistedInterruptedRows, hoistedNeedsResumeRows, hoistedUsageLimitRows],
   )
   const attentionIds = useStableValue(
     useMemo(
@@ -3138,6 +3145,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const inlineAttentionLabels = useStableValue(
     useMemo(() => {
       const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
+      if (isBoard) {
+        for (const [sessionId, sessionLabels] of attentionLabelsBySession) {
+          const label = ThreadViewModel.mostUrgentAttentionLabel(sessionLabels)
+          if (label !== undefined) labels.set(sessionId, label)
+        }
+        return labels
+      }
       if (threadView.groupBy !== 'status' || preferences.approvalNeededDisplay === 'label') {
         for (const session of approvalNeededRows) labels.set(session.id, 'threadSidebarApprovalNeeded')
       }
@@ -3150,6 +3164,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return labels
     }, [
       approvalNeededRows,
+      attentionLabelsBySession,
+      isBoard,
       needsInputRows,
       preferences.approvalNeededDisplay,
       preferences.inputNeededDisplay,
@@ -3218,9 +3234,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ])
 
   const orderedSections = useMemo(() => SidebarOrganization.orderSections(preferences.sectionOrder), [preferences.sectionOrder])
+  // The board has no separate Remote threads group: remote threads join the columns they belong to.
+  const separatesRemoteThreads = preferences.separateRemoteThreads && !isBoard
   const visibleRemoteThreads = useMemo(
     () =>
-      preferences.separateRemoteThreads || threadView.sourceFilter === 'subagents'
+      separatesRemoteThreads || threadView.sourceFilter === 'subagents'
         ? []
         : remoteThreads.filter(thread =>
             ThreadViewModel.matchesStatusFilter({
@@ -3233,7 +3251,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               muted: false,
             }),
           ),
-    [preferences.separateRemoteThreads, remoteThreads, threadView.sourceFilter, threadView.statusFilters],
+    [separatesRemoteThreads, remoteThreads, threadView.sourceFilter, threadView.statusFilters],
   )
   const remoteRowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, RemoteSidebarThread[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
@@ -4487,7 +4505,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarLoading')}
             </div>
           ) : null}
-          {statusFilteredInterruptedRows.length > 0 ? (
+          {hoistedInterruptedRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInterrupted')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
                 <span
@@ -4498,24 +4516,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 >
                   {props.tSidebar('threadSidebarInterrupted')}
                 </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({statusFilteredInterruptedRows.length})</span>
+                <span className="dshx:text-xs dshx:tabular-nums">({hoistedInterruptedRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  disabled={resumeAllBusy}
-                  onClick={() => void resumeAllRecoveries(statusFilteredInterruptedRows)}
-                >
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries(hoistedInterruptedRows)}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
               </div>
               <p className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarInterruptedHint')}</p>
-              {statusFilteredInterruptedRows.map(session => renderThreadRow(session, 'threadSidebarInterrupted'))}
+              {hoistedInterruptedRows.map(session => renderThreadRow(session, 'threadSidebarInterrupted'))}
             </section>
           ) : null}
-          {statusFilteredNeedsResumeRows.length > 0 ? (
+          {hoistedNeedsResumeRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
                 <span
@@ -4526,20 +4538,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 >
                   {props.tSidebar('threadSidebarNeedsResume')}
                 </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({statusFilteredNeedsResumeRows.length})</span>
+                <span className="dshx:text-xs dshx:tabular-nums">({hoistedNeedsResumeRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  disabled={resumeAllBusy}
-                  onClick={() => void resumeAllRecoveries(statusFilteredNeedsResumeRows)}
-                >
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries(hoistedNeedsResumeRows)}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
               </div>
-              {statusFilteredNeedsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
+              {hoistedNeedsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
             </section>
           ) : null}
           <UsageLimitSection
@@ -4552,7 +4558,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             open={openThread}
             selectedSessionId={selectedSessionId}
             resumeAllBusy={usageLimitResumeAllBusy}
-            rows={statusFilteredUsageLimitRows}
+            rows={hoistedUsageLimitRows}
             translate={props.tSidebar}
             withThreadMenu={(session, row) => (
               <ThreadContextMenu
@@ -4625,19 +4631,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
             {threadView.groupBy === 'status'
-              ? (isBoard
-                  ? orderedSections.filter(section => section !== 'remote' || (preferences.separateRemoteThreads && props.openRemoteThreads !== undefined))
-                  : renderedSections
-                ).map((section, index) => {
+              ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
                   if (section === 'remote') {
                     return !preferences.separateRemoteThreads || props.openRemoteThreads === undefined ? null : (
                       <RemoteThreadsSection
                         key="remote"
                         threads={remoteThreads}
                         headerClassName={stickyHeaderClass}
-                        containerClassName={
-                          isBoard ? 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5' : undefined
-                        }
                         onOpen={props.openRemoteThreads}
                         onOpenSession={props.openRemoteSession}
                         title={props.tSidebar('threadSidebarSectionReorderHint')}
@@ -4857,70 +4857,71 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     </section>
                   )
                 })}
-          </div>
-          {detachedThreadGroups.map(group => {
-            const branchAction = group.branchAction
-            const branchBusy = detachedBranchBusy.has(group.missingAncestorId)
-            return (
-              <section
-                className="dshx:mt-1"
-                key={`detached:${group.missingAncestorId}`}
-                aria-label={`${props.tSidebar('threadSidebarMissingParent')} ${group.missingAncestorId}`}
-              >
-                <div
+            {detachedThreadGroups.map(group => {
+              const branchAction = group.branchAction
+              const branchBusy = detachedBranchBusy.has(group.missingAncestorId)
+              return (
+                <section
                   className={cn(
-                    stickyHeaderClass,
-                    'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground',
+                    'dshx:mt-1',
+                    isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:rounded-md dshx:bg-muted/45 dshx:p-1.5',
                   )}
+                  data-thread-board-column={isBoard ? `detached:${group.missingAncestorId}` : undefined}
+                  key={`detached:${group.missingAncestorId}`}
+                  aria-label={`${props.tSidebar('threadSidebarMissingParent')} ${group.missingAncestorId}`}
                 >
-                  <span className="dshx:shrink-0 dshx:whitespace-nowrap">{props.tSidebar('threadSidebarMissingParent')}</span>
-                  <span className="dshx:min-w-0 dshx:truncate dshx:text-xs" title={group.missingAncestorId}>
-                    {shortSessionId(group.missingAncestorId)}
-                  </span>
-                  <span className="dshx:text-xs dshx:tabular-nums">({group.count})</span>
-                  <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                  {branchAction === null ? null : (
-                    <Button
-                      size="icon-xs"
-                      variant="ghost"
-                      className="dshx:shrink-0"
-                      aria-label={props.tSidebar(branchAction === 'restore' ? 'threadSidebarMissingParentRestore' : 'threadSidebarMissingParentArchive')}
-                      title={props.tSidebar(branchAction === 'restore' ? 'threadSidebarMissingParentRestoreHint' : 'threadSidebarMissingParentArchiveHint')}
-                      disabled={branchBusy}
-                      onClick={() =>
-                        void mutateDetachedBranch({ missingAncestorId: group.missingAncestorId, threadIds: group.threadIds, action: branchAction })
-                      }
-                    >
-                      {branchAction === 'restore' ? <IconUnarchiveOutlineRegular size={13} /> : <IconArchiveOutlineRegular size={13} />}
-                    </Button>
-                  )}
-                </div>
-                <ChildThreadList
-                  parentId={group.missingAncestorId}
-                  childThreads={group.live}
-                  finishedChildThreads={group.finished}
-                  unreadSessionIds={unreadSessionIds}
-                  allShown={expandedParents.has(group.missingAncestorId)}
-                  selectedChildId={group.selectedChildId}
-                  attentionLabels={inlineAttentionLabels}
-                  rowStyle={rowStyle}
-                  actions={rowActions}
-                />
-              </section>
-            )
-          })}
-          {threadView.groupBy !== 'status' && preferences.separateRemoteThreads && props.openRemoteThreads !== undefined ? (
+                  <div
+                    className={cn(
+                      stickyHeaderClass,
+                      'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground',
+                    )}
+                  >
+                    <span className="dshx:shrink-0 dshx:whitespace-nowrap">{props.tSidebar('threadSidebarMissingParent')}</span>
+                    <span className="dshx:min-w-0 dshx:truncate dshx:text-xs" title={group.missingAncestorId}>
+                      {shortSessionId(group.missingAncestorId)}
+                    </span>
+                    <span className="dshx:text-xs dshx:tabular-nums">({group.count})</span>
+                    <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                    {branchAction === null ? null : (
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        className="dshx:shrink-0"
+                        aria-label={props.tSidebar(branchAction === 'restore' ? 'threadSidebarMissingParentRestore' : 'threadSidebarMissingParentArchive')}
+                        title={props.tSidebar(branchAction === 'restore' ? 'threadSidebarMissingParentRestoreHint' : 'threadSidebarMissingParentArchiveHint')}
+                        disabled={branchBusy}
+                        onClick={() =>
+                          void mutateDetachedBranch({ missingAncestorId: group.missingAncestorId, threadIds: group.threadIds, action: branchAction })
+                        }
+                      >
+                        {branchAction === 'restore' ? <IconUnarchiveOutlineRegular size={13} /> : <IconArchiveOutlineRegular size={13} />}
+                      </Button>
+                    )}
+                  </div>
+                  <ChildThreadList
+                    parentId={group.missingAncestorId}
+                    childThreads={group.live}
+                    finishedChildThreads={group.finished}
+                    unreadSessionIds={unreadSessionIds}
+                    allShown={expandedParents.has(group.missingAncestorId)}
+                    selectedChildId={group.selectedChildId}
+                    attentionLabels={inlineAttentionLabels}
+                    rowStyle={rowStyle}
+                    actions={rowActions}
+                  />
+                </section>
+              )
+            })}
+          </div>
+          {threadView.groupBy !== 'status' && separatesRemoteThreads && props.openRemoteThreads !== undefined ? (
             <RemoteThreadsSection
               threads={remoteThreads}
               headerClassName={stickyHeaderClass}
-              containerClassName={
-                isBoard ? 'dshx:flex dshx:min-h-[24rem] dshx:w-72 dshx:shrink-0 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5' : undefined
-              }
               onOpen={props.openRemoteThreads}
               onOpenSession={props.openRemoteSession}
             />
           ) : null}
-          {draftSessions.length === 0 ? null : (
+          {isBoard || draftSessions.length === 0 ? null : (
             <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>
               <div
                 className={cn(
@@ -4961,7 +4962,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             </section>
           )}
           {sessionState.phase === 'ready' &&
-          draftSessions.length === 0 &&
+          (isBoard || draftSessions.length === 0) &&
           detachedThreadGroups.length === 0 &&
           statusFilteredRecoveryRows.length === 0 &&
           groupedAttentionRows.approvalNeeded.length === 0 &&
