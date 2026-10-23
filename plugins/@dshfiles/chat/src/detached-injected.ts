@@ -1,6 +1,6 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { ChatPresentationPolicy } from '../presentation-policy.ts'
-import type { ChatFlowDataInjected, ChatViewInjected } from '../contract/slots.ts'
+import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
+import type { ChatFlowDataInjected, ChatViewInjected } from './native/contract/slots.ts'
 
 /**
  * Injected faces used while a Session has no retained binding.

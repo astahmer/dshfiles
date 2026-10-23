@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
  */
 describe('conversation service registration order', () => {
   it('registers the controller before the slots that inject it', () => {
-    const source = readFileSync(fileURLToPath(new URL('./apply.ts', import.meta.url)), 'utf8')
+    const source = readFileSync(fileURLToPath(new URL('./native/apply.ts', import.meta.url)), 'utf8')
     const controller = source.indexOf('ctx.plugin(ConversationController')
     const slots = source.indexOf("slots.inject('main'")
 

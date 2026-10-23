@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { detachedFlow, detachedView } from './detached-injected.ts'
-import type { ChatPresentationPolicy } from '../presentation-policy.ts'
+import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
 
 const policy: ChatPresentationPolicy = {
   mode: 'standard',

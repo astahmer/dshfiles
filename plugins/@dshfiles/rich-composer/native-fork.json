@@ -30,6 +30,8 @@
     "src/native/conversation/location-index.ts",
     "src/native/input/hub.ts",
     "src/native/skeleton/ConversationSession.tsx",
-    "src/native/skeleton/ConversationRoot.module.css"
+    "src/native/skeleton/ConversationRoot.module.css",
+    "src/native/queue/QueueDock.tsx",
+    "src/native/service.ts"
   ]
 }
