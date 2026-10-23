@@ -2,7 +2,7 @@
 
 This plugin vendors DSH's `packages/client/ui-input-trigger` from the `dsh-v0.2.0-rc.2` tag of [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness), commit `639ed015397290b3745d163aafe02ffee4aa3f84`. The upstream package is MIT-licensed; the corresponding license text is retained in [`UPSTREAM-LICENSE`](./UPSTREAM-LICENSE).
 
-The behavioral delta is intentionally narrow: the `@` detector accepts an unquoted same-line query containing spaces, while keeping the existing quoted grammar, `@` token boundary, slash-token behavior, controller lifecycle, menu, keyboard routing, and source contract. Relative TypeScript imports are normalized to `.js` for this workspace's NodeNext build and published type surface. The client bundles browser-safe `dsh-util-values` locally because that utility is not materialized by every DSH profile's client module table.
+The behavioral delta is intentionally narrow: the unquoted `@` detector resolves the caret token with Codex's completion-target rules (`src/caret-token.ts`, ported from openai/codex, Apache-2.0) and spans the whole token, while keeping the existing quoted grammar, `@` token boundary, slash-token behavior, controller lifecycle, menu, keyboard routing, and source contract. Relative TypeScript imports are normalized to `.js` for this workspace's NodeNext build and published type surface. The client bundles browser-safe `dsh-util-values` locally because that utility is not materialized by every DSH profile's client module table.
 
 ## Carried from a later upstream revision
 

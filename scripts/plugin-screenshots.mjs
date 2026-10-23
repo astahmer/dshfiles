@@ -42,7 +42,7 @@ const primaryFeatures = {
   'ai-accounts': ['credential-recovery'],
   backlog: ['capture-and-triage'],
   'command-palette': ['action-registry'],
-  'input-trigger': ['multiword-at-queries'],
+  'input-trigger': ['codex-at-tokens'],
   'jj-integration': ['thread-workspaces-panel'],
   'multi-host': ['host-management'],
   'queue-reorder': ['queued-attachment-previews'],

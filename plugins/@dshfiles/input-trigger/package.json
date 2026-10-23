@@ -2,7 +2,7 @@
   "name": "@dshfiles/input-trigger",
   "version": "0.1.0",
   "private": true,
-  "description": "Owned MIT fork of DSH's shared / and @ autocomplete engine with unquoted multiword @ queries.",
+  "description": "Owned MIT fork of DSH's shared / and @ autocomplete engine with Codex-style @ token targeting.",
   "license": "MIT",
   "files": [
     "dist",
@@ -22,6 +22,10 @@
     "./client": {
       "types": "./src/client/index.ts",
       "default": "./dist/client.js"
+    },
+    "./caret-token": {
+      "types": "./src/caret-token.ts",
+      "default": "./dist/caret-token.js"
     }
   },
   "scripts": {

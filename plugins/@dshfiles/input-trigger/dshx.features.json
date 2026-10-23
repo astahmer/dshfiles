@@ -3,9 +3,9 @@
   "kind": "bundle",
   "features": [
     {
-      "id": "multiword-at-queries",
-      "title": "Unquoted multiword @ autocomplete",
-      "summary": "The shared tokenizer sends an unquoted, same-line phrase and the exact caret span to registered @ sources while preserving quoted @ and slash-command behavior.",
+      "id": "codex-at-tokens",
+      "title": "Codex-style @ token targeting",
+      "summary": "The shared tokenizer resolves the whitespace-delimited @ token the caret touches the way Codex's composer does, sends its whole span to registered @ sources and closes on whitespace; a quoted @\"… phrase still searches titles and paths with spaces. Slash-command behavior is unchanged.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"deploy\"",
@@ -18,27 +18,34 @@
         "expect text \"This turn failed\"",
         "expect text \"fix the deploy script\"",
         "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@fix the\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@fix\"",
         "expect option \"fix the deploy script*\""
       ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["unquoted-multiword", "quoted-multiword", "email-boundary", "slash-command"],
+      "states": ["caret-token", "separator-closes", "quoted-multiword", "email-boundary", "slash-command"],
       "failureModes": [
-        "A typed multiword query is limited to the current line and stops at the caret.",
+        "An unquoted @ query never spans whitespace: a title with spaces is found by one of its words or by a quoted @\"… phrase.",
         "The change does not reduce the separate Host session-search latency."
       ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "unit-test",
-          "id": "input-trigger.unquoted-query",
+          "id": "input-trigger.caret-token",
+          "file": "plugins/@dshfiles/input-trigger/tests/caret-token.test.ts",
+          "testName": "does not search a sentence typed after the sigil"
+        },
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.separator-closes",
           "file": "plugins/@dshfiles/input-trigger/tests/detect.test.ts",
-          "testName": "keeps an unquoted multiword @ query active through the caret"
+          "testName": "does not keep an unquoted @ query open past whitespace"
         },
         {
           "kind": "gherkin",
-          "id": "input-trigger.unquoted-multiword",
+          "id": "input-trigger.quoted-multiword",
           "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
         }
       ]

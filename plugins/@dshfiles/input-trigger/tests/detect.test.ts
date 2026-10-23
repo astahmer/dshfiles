@@ -7,27 +7,31 @@ const plain: TriggerGuard = { tier: 'plain' }
 const detect = (draft: string, caret = draft.length, tier: TriggerGuard = plain) => detectTrigger(draft, caret, tier)
 
 describe('shared input trigger detection', () => {
-  it('keeps an unquoted multiword @ query active through the caret', () => {
-    const draft = 'Find @fix the deploy script'
-    const at = draft.indexOf('@')
+  it('detects the unquoted @ token at the caret', () => {
+    const draft = 'Find @deploy'
 
     expect(detect(draft)).toMatchObject({
       trigger: '@',
-      query: 'fix the deploy script',
+      query: 'deploy',
       quoted: false,
       position: 'inline',
-      span: { start: at, end: draft.length, draftRev: 0 },
+      span: { start: 5, end: draft.length, draftRev: 0 },
     })
   })
 
-  it('uses the caret, not trailing draft text, for a multiword span', () => {
-    const draft = '@deploy script later'
-    const caret = '@deploy scr'.length
-
-    expect(detect(draft, caret)).toMatchObject({
-      query: 'deploy scr',
-      span: { start: 0, end: caret },
+  it('spans the whole token when the caret is inside it', () => {
+    expect(detect('@deploy later', '@dep'.length)).toMatchObject({
+      query: 'deploy',
+      position: 'leading',
+      span: { start: 0, end: '@deploy'.length },
     })
+  })
+
+  it('does not keep an unquoted @ query open past whitespace', () => {
+    expect(detect('Find @fix the deploy script')).toBeNull()
+    expect(detect('we should be able to @ stuff etc also')).toBeNull()
+    expect(detect('@dsh trying to select it')).toBeNull()
+    expect(detect('@a thread title ')).toBeNull()
   })
 
   it('keeps quoted multiword @ queries supported', () => {
@@ -46,14 +50,6 @@ describe('shared input trigger detection', () => {
     expect(detect('Follow-up after @session:session-example !')).toBeNull()
   })
 
-  it('keeps multiword title search active while the caret is in its final word', () => {
-    expect(detect('Find @a thread title')).toMatchObject({
-      trigger: '@',
-      query: 'a thread title',
-      quoted: false,
-    })
-  })
-
   it('keeps colons inside the active mention token', () => {
     expect(detect('@session:session-example')).toMatchObject({
       trigger: '@',
@@ -62,16 +58,13 @@ describe('shared input trigger detection', () => {
     })
   })
 
-  it('does not keep a query active after its trailing separator whitespace', () => {
-    expect(detect('@a thread title ')).toBeNull()
-  })
-
-  it('does not let an unquoted query cross a newline', () => {
-    expect(detect('@fix the\ndeploy script')).toBeNull()
+  it('does not let an @ token reach across a newline', () => {
+    expect(detect('@fix\ndeploy')).toBeNull()
   })
 
   it('does not treat an email address as an @ query', () => {
     expect(detect('Contact user@example.com about this')).toBeNull()
+    expect(detect('Contact user@example.com')).toBeNull()
   })
 
   it('preserves slash-command detection and guard behavior', () => {
