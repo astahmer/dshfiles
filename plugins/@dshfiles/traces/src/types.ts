@@ -140,6 +140,44 @@ export type LogRecord = z.infer<typeof logRecordSchema>
 export const logListSchema = z.object({ logs: z.array(logRecordSchema), nextCursor: z.string().nullable() }).strict()
 export type LogList = z.infer<typeof logListSchema>
 
+export const metricTypeSchema = z.enum(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
+
+export const metricSummarySchema = z
+  .object({
+    service: z.string(),
+    name: z.string(),
+    type: metricTypeSchema,
+    unit: z.string().nullable(),
+    description: z.string().nullable(),
+    points: z.number().int().nonnegative(),
+    series: z.number().int().nonnegative(),
+    lastMs: z.number(),
+    lastValue: z.number().nullable(),
+  })
+  .strict()
+export type MetricSummary = z.infer<typeof metricSummarySchema>
+
+export const metricSeriesSchema = z
+  .object({
+    service: z.string(),
+    name: z.string(),
+    type: metricTypeSchema,
+    unit: z.string().nullable(),
+    description: z.string().nullable(),
+    valueKind: z.enum(['value', 'increase', 'mean']),
+    series: z.array(
+      z
+        .object({
+          attributes: attributesSchema,
+          points: z.array(z.object({ timeMs: z.number(), value: z.number() }).strict()),
+        })
+        .strict(),
+    ),
+    truncatedSeries: z.number().int().nonnegative(),
+  })
+  .strict()
+export type MetricSeries = z.infer<typeof metricSeriesSchema>
+
 export const receiverStateSchema = z.enum(['starting', 'listening', 'port-in-use', 'disabled', 'failed'])
 export type ReceiverState = z.infer<typeof receiverStateSchema>
 
@@ -178,11 +216,13 @@ export const receiverStatusSchema = z
         spans: z.number().int().nonnegative(),
         traces: z.number().int().nonnegative(),
         logs: z.number().int().nonnegative(),
+        metricPoints: z.number().int().nonnegative(),
         oldestMs: z.number().nullable(),
         newestMs: z.number().nullable(),
         retentionHours: z.number().int().positive(),
         retentionSpans: z.number().int().positive(),
         retentionLogs: z.number().int().positive(),
+        retentionMetricPoints: z.number().int().positive(),
       })
       .strict(),
   })

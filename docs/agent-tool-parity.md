@@ -64,7 +64,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | backlog                                                                                                                                           | 16                   | 16                                                                                                       | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | hmr-gate | 1 | 1 (`hmr_gate_status`) | 0 | 0 |
-| traces | 9 | 8 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_services`, `traces_error_groups`, `traces_status`, `traces_clear`) | 0 | 0 |
+| traces | 11 | 10 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_metrics`, `traces_get_metric`, `traces_list_services`, `traces_error_groups`, `traces_status`, `traces_clear`) | 0 | 0 |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
 | send-after-upload                                                                                                                                 | 2                    | 0                                                                                                        | 1             | 1         |
@@ -378,7 +378,8 @@ Still missing, because they write secrets or need a browser:
 
 Bound at creation: every panel read is a read-only tool (`traces_search` with the
 list filters, `traces_get` for the waterfall and span panel, `traces_list_services`
-for the overview strip and Operations tab, `traces_search_logs` for the Logs tab, `traces_service_map` for the map,
+for the overview strip and Operations tab, `traces_search_logs` for the Logs tab, `traces_service_map` for the map, `traces_list_metrics`
+and `traces_get_metric` for the Metrics tab,
 `traces_error_groups`, `traces_status`
 for the receiver badge), and the Clear button is `traces_clear`, which requires
 `confirm: true`. Receiver settings (`mode`, `port`, `forwardUrl`, retention,

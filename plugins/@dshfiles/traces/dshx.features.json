@@ -50,7 +50,8 @@
         "A port held by another process (another collector, dsh-traces) leaves stored traces browsable and says so in the panel.",
         "A non-loopback listen address is refused unless explicitly allowed.",
         "A forward URL that points back at the receiver is ignored, so telemetry never loops.",
-        "GenAI content attributes are stored as their size unless redaction is turned off."
+        "GenAI content attributes are stored as their size unless redaction is turned off.",
+        "An unknown length-delimited protobuf field is skipped past its length prefix, so the next field still decodes."
       ],
       "externalDependencies": [
         {
@@ -130,6 +131,12 @@
           "id": "traces.store-retention",
           "file": "plugins/@dshfiles/traces/src/store.test.ts",
           "testName": "drops whole traces past the age and span limits, and clears everything"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-skip-length",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
+          "testName": "skips unknown length-delimited fields past their own length prefix"
         }
       ]
     },
@@ -336,6 +343,53 @@
           "id": "traces.service-map-cycle",
           "file": "plugins/@dshfiles/traces/src/service-map-layout.test.ts",
           "testName": "terminates on a cycle and keeps isolated services"
+        }
+      ]
+    },
+    {
+      "id": "metric-charts",
+      "title": "Metric list with one chart per metric",
+      "summary": "The receiver stores POST /v1/metrics (JSON or protobuf): gauges, sums, histograms, exponential histograms and summaries. The Metrics tab lists every metric per service with type, series count and last value, and charts the selected one per attribute set: gauges and sums as their value, cumulative counters as their increase between exports, distributions as their mean.",
+      "reach": ["seed otlp-sample-trace", "click button \"Traces\"", "click tab \"Metrics\"", "expect img \"Chart of*\""],
+      "surfaces": ["client", "host", "tool", "storage"],
+      "configuration": [
+        {
+          "key": "retentionMetricPoints",
+          "defaultValue": "200000",
+          "constraints": "1,000 to 2,000,000 data points; the oldest go first, alongside retentionHours.",
+          "coveredBy": ["traces.metrics-browser-journey"]
+        }
+      ],
+      "states": ["empty", "listed", "charted", "counter-increase", "mean", "truncated-series"],
+      "failureModes": [
+        "A metric without a known data type or a point without a time is rejected and counted.",
+        "A counter reset (the value drops) starts the increase again from the new value instead of charting a negative step.",
+        "More than 20 series are cut and the chart says how many were not shown."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.metrics-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-metrics-sdk",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode-metrics.test.ts",
+          "testName": "decodes SDK metrics from protobuf into the same points as from JSON"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-metrics-fields",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode-metrics.test.ts",
+          "testName": "keeps the metric type, temporality, value and attributes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-metric-series",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "lists metrics and charts a cumulative counter as its increase, per attribute set"
         }
       ]
     }

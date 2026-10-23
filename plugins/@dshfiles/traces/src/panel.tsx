@@ -31,9 +31,10 @@ import { tracesKeys, tracesQueries } from './queries.js'
 import { EmptyStoreGuide, ReceiverBadge, ReceiverMessage } from './receiver-status.js'
 import { TraceDetailView } from './trace-detail.js'
 import { LogsView, type LogCorrelation } from './log-list.js'
+import { MetricsView } from './metrics-view.js'
 import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
-import { storedTracesView, WINDOW_OPTIONS, type TracesView } from './view-state.js'
+import { storedTracesView, tracesViewSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
 
 const ALL = '__all__'
 
@@ -99,7 +100,7 @@ export const TracesPanel = (props: {
   const status = statusQuery.data
   const traces = listQuery.data?.pages.flatMap(page => page.traces) ?? []
   const filtered = search.length > 0 || view.service !== null || view.operation !== null || view.status !== 'all' || view.minDurationMs !== null
-  const storeEmpty = status !== undefined && status.store.traces === 0 && status.store.logs === 0
+  const storeEmpty = status !== undefined && status.store.traces === 0 && status.store.logs === 0 && status.store.metricPoints === 0
   const services = statsQuery.data?.services.map(service => service.service) ?? []
 
   return (
@@ -158,16 +159,13 @@ export const TracesPanel = (props: {
         <ServiceStrip stats={statsQuery.data} onPick={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
       )}
 
-      <Tabs
-        value={view.tab}
-        onValueChange={value => update({ tab: value === 'operations' || value === 'errors' || value === 'logs' || value === 'map' ? value : 'traces' })}
-        className="dshx:min-h-0 dshx:flex-1"
-      >
+      <Tabs value={view.tab} onValueChange={value => update({ tab: tracesViewSchema.shape.tab.parse(value) })} className="dshx:min-h-0 dshx:flex-1">
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
           <TabsList>
             <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>
             <TabsTrigger value="logs">{t('tabLogs')}</TabsTrigger>
             <TabsTrigger value="map">{t('tabMap')}</TabsTrigger>
+            <TabsTrigger value="metrics">{t('tabMetrics')}</TabsTrigger>
             <TabsTrigger value="operations">{t('tabOperations')}</TabsTrigger>
             <TabsTrigger value="errors">{t('tabErrors')}</TabsTrigger>
           </TabsList>
@@ -317,6 +315,8 @@ export const TracesPanel = (props: {
             <ServiceMapView map={mapQuery.data} onPickService={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
           )}
         </TabsContent>
+
+        <TabsContent value="metrics">{view.tab === 'metrics' ? <MetricsView client={client} windowMinutes={view.windowMinutes} t={t} /> : null}</TabsContent>
 
         <TabsContent value="operations">
           {statsQuery.data === undefined ? null : (

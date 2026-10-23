@@ -1,5 +1,15 @@
 import type { AttributeValue } from '../types.js'
-import type { OtlpAnyValue, OtlpKeyValue, OtlpLogRecord, OtlpLogsRequest, OtlpSpan, OtlpTraceRequest } from './json-schema.js'
+import type {
+  OtlpAnyValue,
+  OtlpKeyValue,
+  OtlpLogRecord,
+  OtlpLogsRequest,
+  OtlpMetric,
+  OtlpMetricPoint,
+  OtlpMetricsRequest,
+  OtlpSpan,
+  OtlpTraceRequest,
+} from './json-schema.js'
 
 export const SPAN_BOUNDS = {
   name: 256,
@@ -332,7 +342,106 @@ const normalizeLogsRequest = (request: OtlpLogsRequest, options: NormalizeOption
   return { logs, rejected }
 }
 
+export type MetricType = 'gauge' | 'sum' | 'histogram' | 'exponentialHistogram' | 'summary'
+export type MetricTemporality = 'unspecified' | 'delta' | 'cumulative'
+
+export type NormalizedMetricPoint = {
+  readonly name: string
+  readonly description: string | null
+  readonly unit: string | null
+  readonly type: MetricType
+  readonly monotonic: boolean
+  readonly temporality: MetricTemporality
+  readonly service: string
+  readonly scope: string | null
+  readonly timeUs: number
+  readonly value: number | null
+  readonly count: number | null
+  readonly sum: number | null
+  readonly min: number | null
+  readonly max: number | null
+  readonly attributes: Readonly<Record<string, AttributeValue>>
+}
+
+export type NormalizeMetricsResult = { readonly points: readonly NormalizedMetricPoint[]; readonly rejected: number }
+
+const finiteOf = (value: number | string | undefined): number | null => {
+  if (value === undefined) return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+const temporalityOf = (value: number | string | undefined): MetricTemporality => {
+  if (value === 1 || value === 'AGGREGATION_TEMPORALITY_DELTA') return 'delta'
+  if (value === 2 || value === 'AGGREGATION_TEMPORALITY_CUMULATIVE') return 'cumulative'
+  return 'unspecified'
+}
+
+const metricData = (metric: OtlpMetric) => {
+  if (metric.gauge !== undefined) return { type: 'gauge' as const, data: metric.gauge }
+  if (metric.sum !== undefined) return { type: 'sum' as const, data: metric.sum }
+  if (metric.histogram !== undefined) return { type: 'histogram' as const, data: metric.histogram }
+  if (metric.exponentialHistogram !== undefined) return { type: 'exponentialHistogram' as const, data: metric.exponentialHistogram }
+  if (metric.summary !== undefined) return { type: 'summary' as const, data: metric.summary }
+  return null
+}
+
+/** A number point's value; for a distribution, its mean (sum / count) so every metric charts as one line. */
+const pointValue = (
+  type: MetricType,
+  point: OtlpMetricPoint,
+): { readonly value: number | null; readonly count: number | null; readonly sum: number | null } => {
+  if (type === 'gauge' || type === 'sum') return { value: finiteOf(point.asDouble) ?? finiteOf(point.asInt), count: null, sum: null }
+  const count = finiteOf(point.count)
+  const sum = finiteOf(point.sum)
+  return { value: count !== null && count > 0 && sum !== null ? sum / count : null, count, sum }
+}
+
+const normalizeMetricsRequest = (request: OtlpMetricsRequest, options: NormalizeOptions): NormalizeMetricsResult => {
+  const points: NormalizedMetricPoint[] = []
+  let rejected = 0
+  for (const resourceMetrics of request.resourceMetrics ?? []) {
+    const resource = attributesOf(resourceMetrics.resource?.attributes, options)
+    const service = truncate(stringAttribute(resource, 'service.name') ?? 'unknown_service', SPAN_BOUNDS.name)
+    for (const scopeMetrics of resourceMetrics.scopeMetrics ?? []) {
+      const scope = scopeMetrics.scope?.name === undefined || scopeMetrics.scope.name.length === 0 ? null : truncate(scopeMetrics.scope.name, SPAN_BOUNDS.name)
+      for (const metric of scopeMetrics.metrics ?? []) {
+        const data = metricData(metric)
+        const name = truncate(metric.name ?? '', SPAN_BOUNDS.name)
+        if (data === null || name.length === 0) {
+          rejected += 1
+          continue
+        }
+        for (const point of data.data.dataPoints ?? []) {
+          const timeUs = nanosToMicros(point.timeUnixNano)
+          if (timeUs === null) {
+            rejected += 1
+            continue
+          }
+          points.push({
+            name,
+            description: metric.description === undefined || metric.description.length === 0 ? null : truncate(metric.description, SPAN_BOUNDS.statusMessage),
+            unit: metric.unit === undefined || metric.unit.length === 0 ? null : truncate(metric.unit, 32),
+            type: data.type,
+            monotonic: data.data.isMonotonic ?? false,
+            temporality: temporalityOf(data.data.aggregationTemporality),
+            service,
+            scope,
+            timeUs,
+            ...pointValue(data.type, point),
+            min: finiteOf(point.min),
+            max: finiteOf(point.max),
+            attributes: attributesOf(point.attributes, options),
+          })
+        }
+      }
+    }
+  }
+  return { points, rejected }
+}
+
 export class SpanNormalizer {
+  static readonly normalizeMetrics = normalizeMetricsRequest
   static readonly normalizeTraces = normalizeTraceRequest
   static readonly normalizeLogs = normalizeLogsRequest
   static readonly isContentAttribute = isContentAttribute

@@ -8,6 +8,8 @@ describe('traces agent tools', () => {
       'traces_clear',
       'traces_error_groups',
       'traces_get',
+      'traces_get_metric',
+      'traces_list_metrics',
       'traces_list_services',
       'traces_search',
       'traces_search_logs',

@@ -759,7 +759,44 @@ const otlpSampleLogs = (): unknown => {
   }
 }
 
-/** Post the sample export and its logs to the receiver the Traces panel reports, so the trace list, waterfall and logs have real data. */
+const otlpSampleMetrics = (offsetMs: number, requests: number): unknown => {
+  const timeNs = ((BigInt(Date.now()) + BigInt(offsetMs)) * 1_000_000n).toString()
+  const route = (value: string) => [{ key: 'http.route', value: { stringValue: value } }]
+  return {
+    resourceMetrics: [
+      {
+        resource: { attributes: [{ key: 'service.name', value: { stringValue: 'dshx-sample' } }] },
+        scopeMetrics: [
+          {
+            scope: { name: 'dshx-dev-seed' },
+            metrics: [
+              {
+                name: 'http.server.requests',
+                description: 'Requests served',
+                unit: '{request}',
+                sum: {
+                  aggregationTemporality: 2,
+                  isMonotonic: true,
+                  dataPoints: [
+                    { attributes: route('/orders'), timeUnixNano: timeNs, asInt: String(requests) },
+                    { attributes: route('/health'), timeUnixNano: timeNs, asInt: String(Math.round(requests / 3)) },
+                  ],
+                },
+              },
+              {
+                name: 'process.cpu.utilization',
+                unit: '1',
+                gauge: { dataPoints: [{ attributes: [], timeUnixNano: timeNs, asDouble: 0.2 + (requests % 7) / 20 }] },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+/** Post the sample export, its logs and a few metric exports to the receiver the Traces panel reports, so every tab has real data. */
 const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
   if (!state.bundles.includes('@dshfiles/traces')) {
     throw new ScratchError(
@@ -798,6 +835,21 @@ const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: n
   })
   if (!logs.ok)
     throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(logs.status)} to logs.`, 'Read the Traces panel status.')
+  for (const [offsetMs, requests] of [
+    [-50_000, 120],
+    [-35_000, 180],
+    [-20_000, 205],
+    [-5_000, 290],
+  ] as const) {
+    const metrics = await fetch(`${endpoint}/v1/metrics`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(otlpSampleMetrics(offsetMs, requests)),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!metrics.ok)
+      throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(metrics.status)} to metrics.`, 'Read the Traces panel status.')
+  }
 }
 
 /** Apply one seed: the checkout file it changed and the process it started, if any. */

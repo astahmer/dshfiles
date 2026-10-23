@@ -2,13 +2,13 @@ import { describe, expect, test } from 'vitest'
 import { OtlpBody } from './decode.js'
 import { SpanNormalizer } from './normalize.js'
 import { OtlpProtobuf } from './protobuf.js'
-import { sdkLogsFixture } from './sdk-fixture.test-support.js'
+import { SdkFixtures } from './sdk-fixture.test-support.js'
 
 const REDACT = { redactContent: true }
 
 describe('OTLP log decoding', () => {
   test('decodes SDK log records from protobuf into the same records as from JSON', async () => {
-    const fixture = await sdkLogsFixture()
+    const fixture = await SdkFixtures.logs()
     const fromProtobuf = SpanNormalizer.normalizeLogs(OtlpBody.decodeLogs({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' }), REDACT)
     const fromJson = SpanNormalizer.normalizeLogs(OtlpBody.decodeLogs({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' }), REDACT)
     expect(fromProtobuf.rejected).toBe(0)
@@ -17,7 +17,7 @@ describe('OTLP log decoding', () => {
   })
 
   test('keeps severity, body, attributes, event name and the trace correlation', async () => {
-    const fixture = await sdkLogsFixture()
+    const fixture = await SdkFixtures.logs()
     const [warn, failed, genAi] = SpanNormalizer.normalizeLogs(OtlpProtobuf.decodeLogs(fixture.protobuf), REDACT).logs
     expect(warn).toMatchObject({
       severityNumber: 13,
@@ -35,7 +35,7 @@ describe('OTLP log decoding', () => {
   })
 
   test('keeps GenAI event bodies when redaction is off, and rejects records without a time', async () => {
-    const fixture = await sdkLogsFixture()
+    const fixture = await SdkFixtures.logs()
     const logs = SpanNormalizer.normalizeLogs(OtlpProtobuf.decodeLogs(fixture.protobuf), { redactContent: false }).logs
     expect(logs[2]?.body).toBe('user said hello')
     const result = SpanNormalizer.normalizeLogs({ resourceLogs: [{ scopeLogs: [{ logRecords: [{ body: { stringValue: 'no time' } }] }] }] }, REDACT)

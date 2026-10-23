@@ -113,8 +113,8 @@ OTLP/HTTP receiver on `127.0.0.1:4318`, stores spans in
 `$DSH_HOME/plugins/traces/traces.db` (72 h / 100k spans by default) and serves the
 **Traces** panel: a trace list with filters, a span waterfall with a per-span
 attribute and resource panel, a service/operation overview with error rate and
-p50/p95/p99, error groups, a service map, and `/v1/logs` log search correlated with
-traces and spans.
+p50/p95/p99, error groups, a service map, `/v1/logs` log search correlated with traces and
+spans, and `/v1/metrics` charts.
 Agents get the same reads as `traces_*` tools. It accepts any OTLP/HTTP sender,
 JSON or protobuf, not only DSH.
 
@@ -132,8 +132,8 @@ When another process already holds the port, the panel and `traces_status` say
 `port in use`, stored traces stay browsable, and the receiver retries every 30 s.
 GenAI content attributes (prompts, messages, tool payloads, only present when
 content capture is opted into) are stored as their size unless
-`redactGenAiContent` is turned off. `/v1/metrics` is accepted and forwarded but
-not stored yet. Details, settings and decisions are in the
+`redactGenAiContent` is turned off. `/v1/metrics` is stored too, so the usage
+ledger push and LoongSuite's token metrics chart in the Metrics tab. Details, settings and decisions are in the
 [traces README](../plugins/@dshfiles/traces/README.md).
 
 ## Decision (2026-10-23, b:299)

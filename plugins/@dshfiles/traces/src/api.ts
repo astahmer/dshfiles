@@ -1,6 +1,16 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { errorGroupSchema, logListSchema, receiverStatusSchema, serviceMapSchema, traceDetailSchema, traceListSchema, traceStatsSchema } from './types.js'
+import {
+  errorGroupSchema,
+  logListSchema,
+  metricSeriesSchema,
+  metricSummarySchema,
+  receiverStatusSchema,
+  serviceMapSchema,
+  traceDetailSchema,
+  traceListSchema,
+  traceStatsSchema,
+} from './types.js'
 
 const windowMinutesSchema = z
   .number()
@@ -104,6 +114,32 @@ export const tracesApi = defineApi({
       description: 'Per service and per operation (span name) over a window: span count, error count and rate, p50/p95/p99 and max duration in ms. Read-only.',
       tool: { name: 'traces_list_services', readOnly: true, render: compactJson },
     }),
+    metrics: method({
+      input: z
+        .object({
+          windowMinutes: windowMinutesSchema,
+          service: z.string().min(1).max(256).optional().describe('Only metrics from this service.name.'),
+          search: z.string().trim().min(1).max(200).optional().describe('Literal text matched against metric names and descriptions.'),
+        })
+        .strict(),
+      output: z.object({ metrics: z.array(metricSummarySchema) }).strict(),
+      description:
+        'Stored OpenTelemetry metrics received on /v1/metrics, per service and name: type, unit, description, point and series counts, last time and last value. Read-only.',
+      tool: { name: 'traces_list_metrics', readOnly: true, render: compactJson },
+    }),
+    metric: method({
+      input: z
+        .object({
+          name: z.string().min(1).max(256).describe('Metric name as listed by traces_list_metrics.'),
+          service: z.string().min(1).max(256).describe('The service.name that reported it.'),
+          windowMinutes: windowMinutesSchema,
+        })
+        .strict(),
+      output: metricSeriesSchema,
+      description:
+        'One metric over a window as series per attribute set (at most 20 series of 500 points): gauges and sums as their value, cumulative counters as their increase between points, histograms and summaries as their mean. Read-only.',
+      tool: { name: 'traces_get_metric', readOnly: true, render: compactJson },
+    }),
     serviceMap: method({
       input: z.object({ windowMinutes: windowMinutesSchema }).strict(),
       output: serviceMapSchema,
@@ -140,10 +176,15 @@ export const tracesApi = defineApi({
     clear: method({
       input: z.object({ confirm: z.literal(true).describe('Must be true: deleting stored telemetry cannot be undone.') }).strict(),
       output: z
-        .object({ removedSpans: z.number().int().nonnegative(), removedTraces: z.number().int().nonnegative(), removedLogs: z.number().int().nonnegative() })
+        .object({
+          removedSpans: z.number().int().nonnegative(),
+          removedTraces: z.number().int().nonnegative(),
+          removedLogs: z.number().int().nonnegative(),
+          removedMetricPoints: z.number().int().nonnegative(),
+        })
         .strict(),
       description:
-        'Delete every stored trace and log record. Run only when the user asked to clear stored telemetry, and pass confirm: true; the receiver keeps running.',
+        'Delete every stored trace, log record and metric point. Run only when the user asked to clear stored telemetry, and pass confirm: true; the receiver keeps running.',
       tool: { name: 'traces_clear', readOnly: false, render: compactJson },
     }),
   },

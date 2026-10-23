@@ -15,6 +15,8 @@ export const tracesKeys = {
   stats: (windowMinutes: number) => ['traces', 'stats', windowMinutes] as const,
   errors: (windowMinutes: number) => ['traces', 'errors', windowMinutes] as const,
   serviceMap: (windowMinutes: number) => ['traces', 'service-map', windowMinutes] as const,
+  metrics: (windowMinutes: number, search: string) => ['traces', 'metrics', windowMinutes, search] as const,
+  metric: (input: { readonly name: string; readonly service: string; readonly windowMinutes: number }) => ['traces', 'metric', input] as const,
 }
 
 const POLL_MS = 5_000
@@ -66,6 +68,24 @@ export const tracesQueries = {
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.stats({ windowMinutes, limit: 100 }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
       retry: 1,
+    }),
+  metrics: (client: TracesClient, windowMinutes: number, search: string) =>
+    queryOptions({
+      queryKey: tracesKeys.metrics(windowMinutes, search),
+      queryFn: ({ signal }) =>
+        runHostRequest({
+          signal,
+          request: hostSignal => client.metrics(search.length === 0 ? { windowMinutes } : { windowMinutes, search }, { signal: hostSignal }),
+        }),
+      refetchInterval: POLL_MS * 2,
+      retry: 1,
+    }),
+  metric: (client: TracesClient, input: { readonly name: string; readonly service: string; readonly windowMinutes: number }) =>
+    queryOptions({
+      queryKey: tracesKeys.metric(input),
+      queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.metric({ ...input }, { signal: hostSignal }) }),
+      refetchInterval: POLL_MS * 2,
+      retry: false,
     }),
   serviceMap: (client: TracesClient, windowMinutes: number) =>
     queryOptions({

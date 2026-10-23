@@ -1,4 +1,4 @@
-import type { OtlpAnyValue, OtlpKeyValue, OtlpLogsRequest, OtlpTraceRequest } from './json-schema.js'
+import type { OtlpAnyValue, OtlpKeyValue, OtlpLogsRequest, OtlpMetricsRequest, OtlpTraceRequest } from './json-schema.js'
 
 /**
  * A minimal decoder for `opentelemetry.proto.collector.{trace,logs}.v1.Export*ServiceRequest` (opentelemetry-proto v1.x
@@ -341,7 +341,118 @@ const decodeLogsRequest = (bytes: Uint8Array): OtlpLogsRequest => {
   return { resourceLogs }
 }
 
+type MutablePoint = {
+  attributes: OtlpKeyValue[]
+  timeUnixNano?: string
+  asDouble?: number
+  asInt?: string
+  count?: string
+  sum?: number
+  min?: number
+  max?: number
+}
+
+/** NumberDataPoint, HistogramDataPoint, ExponentialHistogramDataPoint and SummaryDataPoint share these fields. */
+const decodePoint = (bytes: Uint8Array, kind: 'number' | 'histogram' | 'exponential' | 'summary'): MutablePoint => {
+  const point: MutablePoint = { attributes: [] }
+  const attributesField = kind === 'histogram' ? 9 : kind === 'exponential' ? 1 : 7
+  const minField = kind === 'exponential' ? 12 : 11
+  const maxField = kind === 'exponential' ? 13 : 12
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === attributesField && wireType === WIRE_LENGTH) point.attributes.push(decodeKeyValue(reader.bytes()))
+    else if (field === 3 && wireType === WIRE_FIXED64) point.timeUnixNano = reader.fixed64().toString()
+    else if (kind === 'number' && field === 4 && wireType === WIRE_FIXED64) point.asDouble = reader.double()
+    else if (kind === 'number' && field === 6 && wireType === WIRE_FIXED64) point.asInt = BigInt.asIntN(64, reader.fixed64()).toString()
+    else if (kind !== 'number' && field === 4 && wireType === WIRE_FIXED64) point.count = reader.fixed64().toString()
+    else if (kind !== 'number' && field === 5 && wireType === WIRE_FIXED64) point.sum = reader.double()
+    else if ((kind === 'histogram' || kind === 'exponential') && field === minField && wireType === WIRE_FIXED64) point.min = reader.double()
+    else if ((kind === 'histogram' || kind === 'exponential') && field === maxField && wireType === WIRE_FIXED64) point.max = reader.double()
+    else return false
+    return true
+  })
+  return point
+}
+
+type DecodedData = { dataPoints: MutablePoint[]; aggregationTemporality?: number; isMonotonic?: boolean }
+
+const decodeData = (bytes: Uint8Array, kind: 'number' | 'histogram' | 'exponential' | 'summary', withSumFields: boolean): DecodedData => {
+  const data: DecodedData = { dataPoints: [] }
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_LENGTH) data.dataPoints.push(decodePoint(reader.bytes(), kind))
+    else if (withSumFields && field === 2 && wireType === WIRE_VARINT) data.aggregationTemporality = Number(reader.varint())
+    else if (withSumFields && field === 3 && wireType === WIRE_VARINT) data.isMonotonic = reader.varint() !== 0n
+    else return false
+    return true
+  })
+  return data
+}
+
+type DecodedMetric = {
+  name?: string
+  description?: string
+  unit?: string
+  gauge?: DecodedData
+  sum?: DecodedData
+  histogram?: DecodedData
+  exponentialHistogram?: DecodedData
+  summary?: DecodedData
+}
+
+const decodeMetric = (bytes: Uint8Array): DecodedMetric => {
+  const metric: DecodedMetric = {}
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_LENGTH) metric.name = toText(reader.bytes())
+    else if (field === 2 && wireType === WIRE_LENGTH) metric.description = toText(reader.bytes())
+    else if (field === 3 && wireType === WIRE_LENGTH) metric.unit = toText(reader.bytes())
+    else if (field === 5 && wireType === WIRE_LENGTH) metric.gauge = decodeData(reader.bytes(), 'number', false)
+    else if (field === 7 && wireType === WIRE_LENGTH) metric.sum = decodeData(reader.bytes(), 'number', true)
+    else if (field === 9 && wireType === WIRE_LENGTH) metric.histogram = decodeData(reader.bytes(), 'histogram', true)
+    else if (field === 10 && wireType === WIRE_LENGTH) metric.exponentialHistogram = decodeData(reader.bytes(), 'exponential', true)
+    else if (field === 11 && wireType === WIRE_LENGTH) metric.summary = decodeData(reader.bytes(), 'summary', false)
+    else return false
+    return true
+  })
+  return metric
+}
+
+type DecodedScopeMetrics = { scope?: DecodedScope; metrics: DecodedMetric[] }
+
+const decodeScopeMetrics = (bytes: Uint8Array): DecodedScopeMetrics => {
+  const scopeMetrics: DecodedScopeMetrics = { metrics: [] }
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_LENGTH) scopeMetrics.scope = decodeScope(reader.bytes())
+    else if (field === 2 && wireType === WIRE_LENGTH) scopeMetrics.metrics.push(decodeMetric(reader.bytes()))
+    else return false
+    return true
+  })
+  return scopeMetrics
+}
+
+const decodeResourceMetrics = (bytes: Uint8Array) => {
+  const attributes: OtlpKeyValue[] = []
+  const scopeMetrics: DecodedScopeMetrics[] = []
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_LENGTH) attributes.push(...decodeResourceAttributes(reader.bytes()))
+    else if (field === 2 && wireType === WIRE_LENGTH) scopeMetrics.push(decodeScopeMetrics(reader.bytes()))
+    else return false
+    return true
+  })
+  return { resource: { attributes }, scopeMetrics }
+}
+
+const decodeMetricsRequest = (bytes: Uint8Array): OtlpMetricsRequest => {
+  const resourceMetrics: ReturnType<typeof decodeResourceMetrics>[] = []
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field !== 1) return false
+    expectWire(wireType, WIRE_LENGTH)
+    resourceMetrics.push(decodeResourceMetrics(reader.bytes()))
+    return true
+  })
+  return { resourceMetrics }
+}
+
 export class OtlpProtobuf {
   static readonly decodeTraces = decodeTraceRequest
   static readonly decodeLogs = decodeLogsRequest
+  static readonly decodeMetrics = decodeMetricsRequest
 }

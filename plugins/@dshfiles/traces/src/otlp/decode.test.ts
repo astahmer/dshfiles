@@ -3,7 +3,7 @@ import { OtlpBody } from './decode.js'
 import { otlpTraceRequestSchema } from './json-schema.js'
 import { SPAN_BOUNDS, SpanNormalizer } from './normalize.js'
 import { OtlpProtobuf, ProtobufDecodeError } from './protobuf.js'
-import { sdkFixture } from './sdk-fixture.test-support.js'
+import { SdkFixtures } from './sdk-fixture.test-support.js'
 
 const REDACT = { redactContent: true }
 
@@ -11,7 +11,7 @@ const byName = <Span extends { readonly name: string }>(spans: readonly Span[]) 
 
 describe('OTLP trace decoding', () => {
   test('decodes a protobuf body from the official SDK serializer into the same spans as its JSON body', async () => {
-    const fixture = await sdkFixture()
+    const fixture = await SdkFixtures.traces()
     const fromProtobuf = SpanNormalizer.normalizeTraces(OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf), wire: 'protobuf' }), REDACT)
     const fromJson = SpanNormalizer.normalizeTraces(OtlpBody.decodeTraces({ body: Buffer.from(JSON.stringify(fixture.json)), wire: 'json' }), REDACT)
     expect(fromProtobuf.rejected).toBe(0)
@@ -20,7 +20,7 @@ describe('OTLP trace decoding', () => {
   })
 
   test('keeps ids, times, kinds, status, every attribute type, events and resource from the SDK', async () => {
-    const fixture = await sdkFixture()
+    const fixture = await SdkFixtures.traces()
     const spans = byName(SpanNormalizer.normalizeTraces(OtlpProtobuf.decodeTraces(fixture.protobuf), REDACT).spans)
     const sdkRoot = fixture.spans.find(span => span.name === 'GET /checkout')
     const root = spans.get('GET /checkout')
@@ -55,7 +55,7 @@ describe('OTLP trace decoding', () => {
   })
 
   test('rejects a truncated protobuf body', async () => {
-    const fixture = await sdkFixture()
+    const fixture = await SdkFixtures.traces()
     expect(() => OtlpProtobuf.decodeTraces(fixture.protobuf.subarray(0, fixture.protobuf.length - 7))).toThrow(ProtobufDecodeError)
     expect(() => OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf.subarray(0, 20)), wire: 'protobuf' })).toThrow(/Truncated|wire type|varint/)
   })

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import type { NormalizedLog, NormalizedSpan } from './otlp/normalize.js'
+import type { NormalizedLog, NormalizedMetricPoint, NormalizedSpan } from './otlp/normalize.js'
 import { openTraceStore } from './store.js'
 
 const NOW = 1_700_000_000_000
-const retention = { maxAgeHours: 24, maxSpans: 10_000, maxLogs: 10_000 }
+const retention = { maxAgeHours: 24, maxSpans: 10_000, maxLogs: 10_000, maxMetricPoints: 10_000 }
 
 const traceId = (index: number): string => index.toString(16).padStart(32, '0')
 const spanId = (index: number): string => index.toString(16).padStart(16, '0')
@@ -169,15 +169,20 @@ describe('trace store', () => {
     clock.now += 1_000
     store.ingest([makeSpan({ traceId: traceId(2), spanId: spanId(3) })], retention)
     clock.now += 1_000
-    const pruned = store.ingest([makeSpan({ traceId: traceId(3), spanId: spanId(4) })], { maxAgeHours: 24, maxSpans: 2, maxLogs: 10_000 })
+    const pruned = store.ingest([makeSpan({ traceId: traceId(3), spanId: spanId(4) })], {
+      maxAgeHours: 24,
+      maxSpans: 2,
+      maxLogs: 10_000,
+      maxMetricPoints: 10_000,
+    })
     expect(pruned.prunedTraces).toBe(1)
     expect(store.list({}).traces.map(trace => trace.traceId)).toEqual([traceId(3), traceId(2)].sort().reverse())
     clock.now += 25 * 3_600_000
     expect(store.prune(retention)).toBe(2)
     expect(store.summary()).toMatchObject({ spans: 0, traces: 0 })
     store.ingest([makeSpan({ traceId: traceId(4), spanId: spanId(5) })], retention)
-    expect(store.clear()).toEqual({ removedSpans: 1, removedTraces: 1, removedLogs: 0 })
-    expect(store.summary()).toEqual({ spans: 0, traces: 0, logs: 0, oldestMs: null, newestMs: null })
+    expect(store.clear()).toEqual({ removedSpans: 1, removedTraces: 1, removedLogs: 0, removedMetricPoints: 0 })
+    expect(store.summary()).toEqual({ spans: 0, traces: 0, logs: 0, metricPoints: 0, oldestMs: null, newestMs: null })
   })
 
   test('searches logs by service, severity, text, attribute, trace and span, newest first with paging', () => {
@@ -265,5 +270,54 @@ describe('trace store', () => {
       ['web', 'payments', 2, 1, 40],
       ['payments', 'db', 1, 0, 10],
     ])
+  })
+
+  test('lists metrics and charts a cumulative counter as its increase, per attribute set', () => {
+    const store = openStore()
+    const point = (
+      offsetSeconds: number,
+      value: number,
+      attributes: Record<string, string>,
+      overrides: Partial<NormalizedMetricPoint> = {},
+    ): NormalizedMetricPoint => ({
+      name: 'http.requests',
+      description: 'Requests served',
+      unit: '{request}',
+      type: 'sum',
+      monotonic: true,
+      temporality: 'cumulative',
+      service: 'web',
+      scope: null,
+      timeUs: (NOW - 120_000 + offsetSeconds * 1000) * 1000,
+      value,
+      count: null,
+      sum: null,
+      min: null,
+      max: null,
+      attributes,
+      ...overrides,
+    })
+    store.ingestMetrics(
+      [
+        point(0, 10, { route: '/a' }),
+        point(10, 15, { route: '/a' }),
+        point(20, 3, { route: '/a' }),
+        point(0, 1, { route: '/b' }),
+        point(0, 0.4, {}, { name: 'cpu.usage', type: 'gauge', monotonic: false, temporality: 'unspecified', unit: '1' }),
+      ],
+      retention,
+    )
+    expect(store.listMetrics({ windowMinutes: 60 }).map(metric => [metric.name, metric.type, metric.points, metric.series, metric.lastValue])).toEqual([
+      ['cpu.usage', 'gauge', 1, 1, 0.4],
+      ['http.requests', 'sum', 4, 2, 3],
+    ])
+    const series = store.metricSeries({ name: 'http.requests', service: 'web', windowMinutes: 60 })
+    expect(series.valueKind).toBe('increase')
+    expect(series.series.map(entry => [entry.attributes, entry.points.map(sample => sample.value)])).toEqual([
+      [{ route: '/a' }, [5, 3]],
+      [{ route: '/b' }, []],
+    ])
+    expect(store.metricSeries({ name: 'cpu.usage', service: 'web', windowMinutes: 60 }).valueKind).toBe('value')
+    expect(() => store.metricSeries({ name: 'missing', service: 'web', windowMinutes: 60 })).toThrow(/No points/)
   })
 })

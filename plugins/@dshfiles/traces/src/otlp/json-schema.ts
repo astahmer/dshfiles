@@ -139,3 +139,68 @@ export const otlpLogsRequestSchema = z
 export type OtlpLogsRequest = z.infer<typeof otlpLogsRequestSchema>
 export type OtlpLogRecord = z.infer<typeof otlpLogRecordSchema>
 export type OtlpSpan = z.infer<typeof otlpSpanSchema>
+
+const numericSchema = z.union([z.number(), z.enum(['NaN', 'Infinity', '-Infinity'])])
+
+const otlpPointSchema = z
+  .object({
+    attributes: attributesSchema,
+    timeUnixNano: unixNanoSchema.optional(),
+    asDouble: numericSchema.optional(),
+    asInt: int64Schema.optional(),
+    count: z.union([z.string().regex(/^\d{1,20}$/), z.number().int().nonnegative()]).optional(),
+    sum: numericSchema.optional(),
+    min: numericSchema.optional(),
+    max: numericSchema.optional(),
+  })
+  .loose()
+
+const otlpDataSchema = z
+  .object({
+    dataPoints: z.array(otlpPointSchema).optional(),
+    aggregationTemporality: z.union([z.number().int(), z.string()]).optional(),
+    isMonotonic: z.boolean().optional(),
+  })
+  .loose()
+
+const otlpMetricSchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    unit: z.string().optional(),
+    gauge: otlpDataSchema.optional(),
+    sum: otlpDataSchema.optional(),
+    histogram: otlpDataSchema.optional(),
+    exponentialHistogram: otlpDataSchema.optional(),
+    summary: otlpDataSchema.optional(),
+  })
+  .loose()
+
+/** The OTLP/HTTP JSON mapping of `ExportMetricsServiceRequest`, limited to the fields the metric charts read. */
+export const otlpMetricsRequestSchema = z
+  .object({
+    resourceMetrics: z
+      .array(
+        z
+          .object({
+            resource: z.object({ attributes: attributesSchema }).loose().optional(),
+            scopeMetrics: z
+              .array(
+                z
+                  .object({
+                    scope: z.object({ name: z.string().optional(), version: z.string().optional() }).loose().optional(),
+                    metrics: z.array(otlpMetricSchema).optional(),
+                  })
+                  .loose(),
+              )
+              .optional(),
+          })
+          .loose(),
+      )
+      .optional(),
+  })
+  .loose()
+
+export type OtlpMetricsRequest = z.infer<typeof otlpMetricsRequestSchema>
+export type OtlpMetric = z.infer<typeof otlpMetricSchema>
+export type OtlpMetricPoint = z.infer<typeof otlpPointSchema>

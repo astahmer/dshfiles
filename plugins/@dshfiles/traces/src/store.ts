@@ -3,13 +3,15 @@ import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { z } from 'zod'
-import type { NormalizedLog, NormalizedSpan } from './otlp/normalize.js'
+import type { NormalizedLog, NormalizedMetricPoint, NormalizedSpan } from './otlp/normalize.js'
 import { buildSpanTree } from './span-tree.js'
 import { LatencyStats } from './stats.js'
 import {
   attributeValueSchema,
   type ErrorGroup,
   type LogList,
+  type MetricSeries,
+  type MetricSummary,
   type ServiceMap,
   type SpanKind,
   type SpanStatus,
@@ -80,9 +82,29 @@ const MIGRATIONS = [
   CREATE INDEX logs_trace ON logs (trace_id, span_id);
   CREATE INDEX logs_received ON logs (received_ms);
   `,
+  `
+  CREATE TABLE metric_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    service TEXT NOT NULL,
+    type TEXT NOT NULL,
+    unit TEXT,
+    description TEXT,
+    monotonic INTEGER NOT NULL,
+    temporality TEXT NOT NULL,
+    attributes TEXT NOT NULL,
+    time_us INTEGER NOT NULL,
+    value REAL,
+    count REAL,
+    sum REAL,
+    received_ms INTEGER NOT NULL
+  );
+  CREATE INDEX metric_points_series ON metric_points (service, name, time_us);
+  CREATE INDEX metric_points_received ON metric_points (received_ms);
+  `,
 ]
 
-export type Retention = { readonly maxAgeHours: number; readonly maxSpans: number; readonly maxLogs: number }
+export type Retention = { readonly maxAgeHours: number; readonly maxSpans: number; readonly maxLogs: number; readonly maxMetricPoints: number }
 
 export type TraceListQuery = {
   readonly service?: string | undefined
@@ -102,10 +124,16 @@ type StoreSummary = {
   readonly spans: number
   readonly traces: number
   readonly logs: number
+  readonly metricPoints: number
   readonly oldestMs: number | null
   readonly newestMs: number | null
 }
-type ClearResult = { readonly removedSpans: number; readonly removedTraces: number; readonly removedLogs: number }
+type ClearResult = { readonly removedSpans: number; readonly removedTraces: number; readonly removedLogs: number; readonly removedMetricPoints: number }
+
+const MAX_METRIC_SERIES = 20
+const MAX_SERIES_POINTS = 500
+
+const metricTypeSchema = z.enum(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
 
 export type LogSearchQuery = {
   readonly service?: string | undefined
@@ -328,6 +356,9 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     const expiredLogs = Number(prepare('DELETE FROM logs WHERE received_ms < ?').run(cutoff).changes)
     const excessLogs = logCount() - retention.maxLogs
     const droppedLogs = excessLogs > 0 ? Number(prepare('DELETE FROM logs WHERE id IN (SELECT id FROM logs ORDER BY id LIMIT ?)').run(excessLogs).changes) : 0
+    prepare('DELETE FROM metric_points WHERE received_ms < ?').run(cutoff)
+    const excessPoints = metricPointCount() - retention.maxMetricPoints
+    if (excessPoints > 0) prepare('DELETE FROM metric_points WHERE id IN (SELECT id FROM metric_points ORDER BY id LIMIT ?)').run(excessPoints)
     if (removed > 0 || expiredLogs + droppedLogs > 0)
       prepare('DELETE FROM resources WHERE id NOT IN (SELECT resource_id FROM spans UNION SELECT resource_id FROM logs)').run()
     return removed
@@ -435,6 +466,138 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         resource: row.resource === null ? {} : attributesJsonSchema.parse(JSON.parse(row.resource)),
       })),
       nextCursor: rows.length > limit && last !== undefined ? `${String(last.time_us)}:${String(last.id)}` : null,
+    }
+  }
+
+  const metricPointCount = (): number => countSchema.parse(prepare('SELECT COUNT(*) AS count FROM metric_points').get()).count
+
+  const ingestMetrics = (points: readonly NormalizedMetricPoint[], retention: Retention): number => {
+    if (points.length === 0) return 0
+    const receivedMs = now()
+    transaction(() => {
+      for (const point of points)
+        prepare(
+          `INSERT INTO metric_points (name, service, type, unit, description, monotonic, temporality, attributes, time_us, value, count, sum, received_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          point.name,
+          point.service,
+          point.type,
+          point.unit,
+          point.description,
+          point.monotonic ? 1 : 0,
+          point.temporality,
+          JSON.stringify(point.attributes),
+          point.timeUs,
+          point.value,
+          point.count,
+          point.sum,
+          receivedMs,
+        )
+    })
+    prune(retention)
+    return points.length
+  }
+
+  const listMetrics = (query: {
+    readonly windowMinutes: number
+    readonly service?: string | undefined
+    readonly search?: string | undefined
+  }): MetricSummary[] => {
+    const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
+    const conditions = ['m.time_us >= ?']
+    const parameters: SQLInputValue[] = [sinceUs]
+    if (query.service !== undefined) {
+      conditions.push('m.service = ?')
+      parameters.push(query.service)
+    }
+    if (query.search !== undefined) {
+      conditions.push("(m.name LIKE ? ESCAPE '\\' OR m.description LIKE ? ESCAPE '\\')")
+      parameters.push(`%${escapeLike(query.search)}%`, `%${escapeLike(query.search)}%`)
+    }
+    return z
+      .array(
+        z.object({
+          service: z.string(),
+          name: z.string(),
+          type: metricTypeSchema,
+          unit: z.string().nullable(),
+          description: z.string().nullable(),
+          points: z.number(),
+          series: z.number(),
+          last_us: z.number(),
+          last_value: z.number().nullable(),
+        }),
+      )
+      .parse(
+        prepare(
+          `SELECT m.service, m.name, MAX(m.type) AS type, MAX(m.unit) AS unit, MAX(m.description) AS description, COUNT(*) AS points,
+             COUNT(DISTINCT m.attributes) AS series, MAX(m.time_us) AS last_us,
+             (SELECT l.value FROM metric_points l WHERE l.service = m.service AND l.name = m.name ORDER BY l.time_us DESC, l.id DESC LIMIT 1) AS last_value
+           FROM metric_points m WHERE ${conditions.join(' AND ')} GROUP BY m.service, m.name ORDER BY m.service, m.name LIMIT 500`,
+        ).all(...parameters),
+      )
+      .map(row => ({
+        service: row.service,
+        name: row.name,
+        type: row.type,
+        unit: row.unit,
+        description: row.description,
+        points: row.points,
+        series: row.series,
+        lastMs: usToMs(row.last_us),
+        lastValue: row.last_value,
+      }))
+  }
+
+  /**
+   * One metric's series over a window, at most 20 series of 500 points. A cumulative monotonic sum (a counter) becomes
+   * its increase between points, since its raw value only ever climbs; a reset (the value drops) starts again from it.
+   */
+  const metricSeries = (query: { readonly name: string; readonly service: string; readonly windowMinutes: number }): MetricSeries => {
+    const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
+    const rows = z
+      .array(
+        z.object({
+          type: metricTypeSchema,
+          unit: z.string().nullable(),
+          description: z.string().nullable(),
+          monotonic: z.number(),
+          temporality: z.string(),
+          attributes: z.string(),
+          time_us: z.number(),
+          value: z.number().nullable(),
+        }),
+      )
+      .parse(
+        prepare(
+          `SELECT type, unit, description, monotonic, temporality, attributes, time_us, value FROM metric_points
+           WHERE service = ? AND name = ? AND time_us >= ? ORDER BY attributes, time_us`,
+        ).all(query.service, query.name, sinceUs),
+      )
+    const first = rows[0]
+    if (first === undefined) throw new TraceStoreError('not-found', `No points for metric ${query.name} of ${query.service} in this window.`)
+    const counter = first.type === 'sum' && first.monotonic === 1 && first.temporality === 'cumulative'
+    const valueKind = counter ? 'increase' : first.type === 'gauge' || first.type === 'sum' ? 'value' : 'mean'
+    const grouped = [...LatencyStats.groupBy(rows, row => row.attributes).entries()]
+    return {
+      service: query.service,
+      name: query.name,
+      type: first.type,
+      unit: first.unit,
+      description: first.description,
+      valueKind,
+      truncatedSeries: Math.max(0, grouped.length - MAX_METRIC_SERIES),
+      series: grouped.slice(0, MAX_METRIC_SERIES).map(([attributes, points]) => {
+        const values = points.flatMap(point => (point.value === null ? [] : [{ timeMs: usToMs(point.time_us), value: point.value }]))
+        const charted = counter
+          ? values.slice(1).map((point, index) => {
+              const previous = values[index]?.value ?? 0
+              return { timeMs: point.timeMs, value: point.value >= previous ? point.value - previous : point.value }
+            })
+          : values
+        return { attributes: attributesJsonSchema.parse(JSON.parse(attributes)), points: charted.slice(-MAX_SERIES_POINTS) }
+      }),
     }
   }
 
@@ -687,6 +850,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       spans: spanCount(),
       traces: row.traces,
       logs: logCount(),
+      metricPoints: metricPointCount(),
       oldestMs: row.oldest === null ? null : usToMs(row.oldest),
       newestMs: row.newest === null ? null : usToMs(row.newest),
     }
@@ -695,13 +859,16 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   const clear = (): ClearResult =>
     transaction(() => {
       const before = summary()
-      database.exec('DELETE FROM spans; DELETE FROM traces; DELETE FROM logs; DELETE FROM resources;')
-      return { removedSpans: before.spans, removedTraces: before.traces, removedLogs: before.logs }
+      database.exec('DELETE FROM spans; DELETE FROM traces; DELETE FROM logs; DELETE FROM metric_points; DELETE FROM resources;')
+      return { removedSpans: before.spans, removedTraces: before.traces, removedLogs: before.logs, removedMetricPoints: before.metricPoints }
     })
 
   return {
     ingest,
     ingestLogs,
+    ingestMetrics,
+    listMetrics,
+    metricSeries,
     searchLogs,
     prune,
     list,

@@ -1,12 +1,20 @@
 import { SpanKind, SpanStatusCode, context, trace } from '@opentelemetry/api'
 import { SeverityNumber } from '@opentelemetry/api-logs'
-import { JsonLogsSerializer, JsonTraceSerializer, ProtobufLogsSerializer, ProtobufTraceSerializer } from '@opentelemetry/otlp-transformer'
+import {
+  JsonLogsSerializer,
+  JsonMetricsSerializer,
+  JsonTraceSerializer,
+  ProtobufLogsSerializer,
+  ProtobufMetricsSerializer,
+  ProtobufTraceSerializer,
+} from '@opentelemetry/otlp-transformer'
 import { resourceFromAttributes } from '@opentelemetry/resources'
+import { MeterProvider, MetricReader } from '@opentelemetry/sdk-metrics'
 import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs'
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider, type ReadableSpan } from '@opentelemetry/sdk-trace'
 
 /** Spans recorded by the official OpenTelemetry JS SDK, the exporter LoongSuite uses, serialized both ways. */
-export const sdkFixture = async (): Promise<{ readonly spans: readonly ReadableSpan[]; readonly protobuf: Uint8Array; readonly json: unknown }> => {
+const sdkFixture = async (): Promise<{ readonly spans: readonly ReadableSpan[]; readonly protobuf: Uint8Array; readonly json: unknown }> => {
   const exporter = new InMemorySpanExporter()
   const provider = new TracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'checkout-api', 'deployment.environment': 'test' }),
@@ -44,7 +52,7 @@ export const sdkFixture = async (): Promise<{ readonly spans: readonly ReadableS
 }
 
 /** Log records from the official logs SDK, correlated with a span, serialized both ways. */
-export const sdkLogsFixture = async (): Promise<{
+const sdkLogsFixture = async (): Promise<{
   readonly traceId: string
   readonly spanId: string
   readonly protobuf: Uint8Array
@@ -76,4 +84,34 @@ export const sdkLogsFixture = async (): Promise<{
   if (protobuf === undefined || json === undefined) throw new Error('The SDK logs serializer returned nothing.')
   await provider.shutdown()
   return { traceId: span.spanContext().traceId, spanId: span.spanContext().spanId, protobuf, json: JSON.parse(new TextDecoder().decode(json)) }
+}
+
+class CollectingReader extends MetricReader {
+  protected override onShutdown = async (): Promise<void> => undefined
+  protected override onForceFlush = async (): Promise<void> => undefined
+}
+
+/** A counter, a gauge, an up-down counter and a histogram from the official metrics SDK, serialized both ways. */
+const sdkMetricsFixture = async (): Promise<{ readonly protobuf: Uint8Array; readonly json: unknown }> => {
+  const reader = new CollectingReader()
+  const provider = new MeterProvider({ resource: resourceFromAttributes({ 'service.name': 'checkout-api' }), readers: [reader] })
+  const meter = provider.getMeter('fixture-meter', '1.0.0')
+  meter.createCounter('http.requests', { unit: '{request}', description: 'Requests served' }).add(3, { route: '/a' })
+  meter.createUpDownCounter('queue.depth').add(-2)
+  meter.createGauge('cpu.usage', { unit: '1' }).record(0.25)
+  const latency = meter.createHistogram('http.duration', { unit: 'ms' })
+  latency.record(10, { route: '/a' })
+  latency.record(30, { route: '/a' })
+  const collected = await reader.collect()
+  const protobuf = ProtobufMetricsSerializer.serializeRequest(collected.resourceMetrics)
+  const json = JsonMetricsSerializer.serializeRequest(collected.resourceMetrics)
+  if (protobuf === undefined || json === undefined) throw new Error('The SDK metrics serializer returned nothing.')
+  await provider.shutdown()
+  return { protobuf, json: JSON.parse(new TextDecoder().decode(json)) }
+}
+
+export class SdkFixtures {
+  static readonly traces = sdkFixture
+  static readonly logs = sdkLogsFixture
+  static readonly metrics = sdkMetricsFixture
 }

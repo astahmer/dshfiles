@@ -287,3 +287,68 @@ Then('picking a service on the map filters the trace list by it', async ({ page 
   })
   await finishJourneyAssertions(page)
 })
+
+const metricsExport = (offsetMs: number, requests: number) => {
+  const timeNs = (BigInt(Date.now() - 30_000 + offsetMs) * 1_000_000n).toString()
+  const route = [{ key: 'http.route', value: { stringValue: '/orders' } }]
+  return {
+    resourceMetrics: [
+      {
+        resource: { attributes: [{ key: 'service.name', value: { stringValue: 'e2e-checkout' } }] },
+        scopeMetrics: [
+          {
+            scope: { name: 'e2e-meter' },
+            metrics: [
+              {
+                name: 'http.server.requests',
+                unit: '{request}',
+                sum: { aggregationTemporality: 2, isMonotonic: true, dataPoints: [{ attributes: route, timeUnixNano: timeNs, asInt: String(requests) }] },
+              },
+              { name: 'process.cpu.utilization', unit: '1', gauge: { dataPoints: [{ attributes: [], timeUnixNano: timeNs, asDouble: 0.42 }] } },
+              {
+                name: 'http.server.duration',
+                unit: 'ms',
+                histogram: { aggregationTemporality: 2, dataPoints: [{ attributes: route, timeUnixNano: timeNs, count: '4', sum: 100 }] },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+When('two synthetic OTLP JSON metric exports are posted to the receiver', async ({ page }: { page: Page }) => {
+  const endpoint = await receiverEndpoint(page)
+  for (const [offsetMs, requests] of [
+    [0, 10],
+    [10_000, 17],
+  ] as const) {
+    const response = await fetch(`${endpoint}/v1/metrics`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(metricsExport(offsetMs, requests)),
+    })
+    expect(response.status).toBe(200)
+  }
+})
+
+Then('the Metrics tab lists each metric with its type and last value', async ({ page }: { page: Page }) => {
+  await page.getByRole('tab', { name: 'Metrics', exact: true }).click()
+  const table = page.getByRole('table', { name: 'Metrics' })
+  await recordAssertion(page, 'traces-metrics-list', async () => {
+    await expect(table.locator('tr[data-metric="http.server.requests"]')).toContainText('17', { timeout: 15_000 })
+    await expect(table.locator('tr[data-metric="http.server.requests"]')).toContainText('sum')
+    await expect(table.locator('tr[data-metric="process.cpu.utilization"]')).toContainText('0.420')
+    await expect(table.locator('tr[data-metric="http.server.duration"]')).toContainText('25 ms')
+  })
+})
+
+Then('selecting a counter charts its increase between exports', async ({ page }: { page: Page }) => {
+  await page.getByRole('table', { name: 'Metrics' }).locator('tr[data-metric="http.server.requests"]').click()
+  await recordAssertion(page, 'traces-metric-chart-shows-counter-increase', async () => {
+    await expect(page.getByRole('img', { name: 'Chart of http.server.requests' })).toBeVisible()
+    await expect(page.locator('figcaption').getByText('increase between exports (cumulative counter)', { exact: false })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

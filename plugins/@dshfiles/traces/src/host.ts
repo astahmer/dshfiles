@@ -34,6 +34,7 @@ const retentionOf = (settings: TracesSettings): Retention => ({
   maxAgeHours: settings.retentionHours,
   maxSpans: settings.retentionSpans,
   maxLogs: settings.retentionLogs,
+  maxMetricPoints: settings.retentionMetricPoints,
 })
 
 const receiverConfigOf = (settings: TracesSettings): ReceiverConfig => ({
@@ -77,10 +78,15 @@ const api = tracesApi.host({
         retentionHours: settings.retentionHours,
         retentionSpans: settings.retentionSpans,
         retentionLogs: settings.retentionLogs,
+        retentionMetricPoints: settings.retentionMetricPoints,
       },
     }
   },
   logs: ({ input }) => requireRuntime().store.searchLogs(input),
+  metrics: ({ input }) => ({
+    metrics: requireRuntime().store.listMetrics({ windowMinutes: input.windowMinutes ?? 60, service: input.service, search: input.search }),
+  }),
+  metric: ({ input }) => requireRuntime().store.metricSeries({ name: input.name, service: input.service, windowMinutes: input.windowMinutes ?? 60 }),
   serviceMap: ({ input }) => requireRuntime().store.serviceMap({ windowMinutes: input.windowMinutes ?? 60 }),
   clear: () => requireRuntime().store.clear(),
 })
@@ -101,7 +107,12 @@ const setupHost = (context: Context): Effect<void> => {
         store.ingestLogs(normalized.logs, retentionOf(settings))
         return { accepted: normalized.logs.length, rejected: normalized.rejected }
       },
-      metrics: () => ({ accepted: 0, rejected: 0 }),
+      metrics: input => {
+        const settings = currentSettings()
+        const normalized = SpanNormalizer.normalizeMetrics(OtlpBody.decodeMetrics(input), { redactContent: settings.redactGenAiContent })
+        store.ingestMetrics(normalized.points, retentionOf(settings))
+        return { accepted: normalized.points.length, rejected: normalized.rejected }
+      },
     },
     onWarning: warning => logger.warn(warning),
   })

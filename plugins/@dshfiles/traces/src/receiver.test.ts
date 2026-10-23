@@ -3,7 +3,7 @@ import { gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, test } from 'vitest'
 import { OtlpBody } from './otlp/decode.js'
 import { SpanNormalizer, type NormalizedLog, type NormalizedSpan } from './otlp/normalize.js'
-import { sdkFixture, sdkLogsFixture } from './otlp/sdk-fixture.test-support.js'
+import { SdkFixtures } from './otlp/sdk-fixture.test-support.js'
 import { MAX_BODY_BYTES, OtlpReceiver, type Receiver, type ReceiverConfig } from './receiver.js'
 
 const REDACT = { redactContent: true }
@@ -32,7 +32,10 @@ const startReceiver = async (config: Partial<ReceiverConfig> = {}) => {
         storedLogs.push(...normalized.logs)
         return { accepted: normalized.logs.length, rejected: normalized.rejected }
       },
-      metrics: () => ({ accepted: 0, rejected: 0 }),
+      metrics: input => {
+        const normalized = SpanNormalizer.normalizeMetrics(OtlpBody.decodeMetrics(input), REDACT)
+        return { accepted: normalized.points.length, rejected: normalized.rejected }
+      },
     },
   })
   receivers.push(receiver)
@@ -59,7 +62,7 @@ const listen = async (handler: (request: IncomingMessage, body: Buffer) => void)
 
 describe('OTLP/HTTP receiver', () => {
   test('stores protobuf, gzip protobuf and JSON trace bodies and answers in kind', async () => {
-    const fixture = await sdkFixture()
+    const fixture = await SdkFixtures.traces()
     const { receiver, stored, url } = await startReceiver()
     const protobuf = await fetch(url('/v1/traces'), {
       method: 'POST',
@@ -86,7 +89,7 @@ describe('OTLP/HTTP receiver', () => {
   })
 
   test('stores protobuf and JSON log bodies on /v1/logs', async () => {
-    const fixture = await sdkLogsFixture()
+    const fixture = await SdkFixtures.logs()
     const { receiver, storedLogs, url } = await startReceiver()
     const protobuf = await fetch(url('/v1/logs'), {
       method: 'POST',
@@ -130,7 +133,7 @@ describe('OTLP/HTTP receiver', () => {
   test('forwards the raw body to the external viewer and never to itself', async () => {
     const forwarded: { readonly path: string | undefined; readonly type: string | undefined; readonly bytes: number }[] = []
     const upstreamPort = await listen((request, body) => forwarded.push({ path: request.url, type: request.headers['content-type'], bytes: body.length }))
-    const fixture = await sdkFixture()
+    const fixture = await SdkFixtures.traces()
     const { receiver, url } = await startReceiver({ forwardUrl: `http://127.0.0.1:${String(upstreamPort)}/` })
     await fetch(url('/v1/traces'), { method: 'POST', headers: { 'content-type': 'application/x-protobuf' }, body: new Uint8Array(fixture.protobuf) })
     await fetch(url('/v1/metrics'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"resourceMetrics":[]}' })

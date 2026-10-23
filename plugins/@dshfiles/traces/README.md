@@ -4,8 +4,8 @@
 
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
-list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, a
-service/operation overview and error groups.
+list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, metric
+charts, a service/operation overview and error groups.
 
 It is a generic viewer: anything that speaks OTLP/HTTP can send to it, with any `service.name`, resource, scope,
 span kind or attribute key. DSH-specific touches are enrichments only: a span carrying `dsh.session.id` gets an
@@ -29,18 +29,19 @@ takes a DSH Host restart; see [observability](../../../docs/observability.md#in-
 
 ## Settings (`dshfiles-traces`)
 
-| Setting              | Default     | Effect                                                                                                                                  |
-| -------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`               | `plugin`    | `plugin`: the receiver owns the port. `external`: receiver off, another viewer owns it. `both`: store here and forward to `forwardUrl`. |
-| `host`               | `127.0.0.1` | Listen address.                                                                                                                         |
-| `allowNonLoopback`   | `false`     | A non-loopback `host` is refused unless this is on.                                                                                     |
-| `port`               | `4318`      | OTLP/HTTP port; `0` picks a free one (the panel shows it).                                                                              |
-| `forwardUrl`         | empty       | `both` mode: the external viewer's OTLP base URL, e.g. `http://127.0.0.1:4319`. The raw body is forwarded to `/v1/<signal>`.            |
-| `externalViewerUrl`  | empty       | Linked from the panel in `external` and `both` modes, e.g. `http://127.0.0.1:8000` for otel-desktop-viewer.                             |
-| `redactGenAiContent` | `true`      | Store GenAI message, prompt and tool-payload attributes as `[redacted: N chars]`. The span panel says when a value was redacted.        |
-| `retentionHours`     | `72`        | Drop telemetry received longer ago.                                                                                                     |
-| `retentionSpans`     | `100000`    | Keep at most this many spans; whole traces drop, oldest first.                                                                          |
-| `retentionLogs`      | `100000`    | Keep at most this many log records, oldest first.                                                                                       |
+| Setting                 | Default     | Effect                                                                                                                                  |
+| ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`                  | `plugin`    | `plugin`: the receiver owns the port. `external`: receiver off, another viewer owns it. `both`: store here and forward to `forwardUrl`. |
+| `host`                  | `127.0.0.1` | Listen address.                                                                                                                         |
+| `allowNonLoopback`      | `false`     | A non-loopback `host` is refused unless this is on.                                                                                     |
+| `port`                  | `4318`      | OTLP/HTTP port; `0` picks a free one (the panel shows it).                                                                              |
+| `forwardUrl`            | empty       | `both` mode: the external viewer's OTLP base URL, e.g. `http://127.0.0.1:4319`. The raw body is forwarded to `/v1/<signal>`.            |
+| `externalViewerUrl`     | empty       | Linked from the panel in `external` and `both` modes, e.g. `http://127.0.0.1:8000` for otel-desktop-viewer.                             |
+| `redactGenAiContent`    | `true`      | Store GenAI message, prompt and tool-payload attributes as `[redacted: N chars]`. The span panel says when a value was redacted.        |
+| `retentionHours`        | `72`        | Drop telemetry received longer ago.                                                                                                     |
+| `retentionSpans`        | `100000`    | Keep at most this many spans; whole traces drop, oldest first.                                                                          |
+| `retentionLogs`         | `100000`    | Keep at most this many log records, oldest first.                                                                                       |
+| `retentionMetricPoints` | `200000`    | Keep at most this many metric data points, oldest first.                                                                                |
 
 Settings apply live: changing `mode`, `host` or `port` restarts the receiver without a Host restart.
 
@@ -60,10 +61,12 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 | `traces_get`           | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.          |
 | `traces_list_services` | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window.               |
 | `traces_search_logs`   | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, time. |
+| `traces_list_metrics`  | Metrics per service and name: type, unit, points, series, last value.                                   |
+| `traces_get_metric`    | One metric's series per attribute set over a window (value, counter increase, or distribution mean).    |
 | `traces_service_map`   | Services with span count, error rate and latency; cross-service parent → child calls with counts.       |
 | `traces_error_groups`  | Error spans grouped by service, operation, error type and message shape, with a sample trace.           |
 | `traces_status`        | Receiver mode, address, state, counters, forwarding and store size.                                     |
-| `traces_clear`         | Deletes every stored trace and log record; requires `confirm: true`.                                    |
+| `traces_clear`         | Deletes every stored trace, log record and metric point; requires `confirm: true`.                      |
 
 ## Decisions
 
@@ -91,10 +94,13 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 - **Service map.** An edge is a span whose parent belongs to another service (no `peer.service` guessing), so it
   only shows calls both sides exported. The SVG lays services out in columns by their longest incoming call chain;
   no graph library is involved.
-- **Metrics.** `/v1/metrics` is accepted (200) and forwarded in `both` mode but not stored yet; the overview is
-  computed from spans.
+- **Metrics.** `POST /v1/metrics` (JSON or protobuf) stores gauges, sums, histograms, exponential histograms and
+  summaries as one row per data point (value, or count and sum for distributions), without buckets. The Metrics tab
+  charts one metric at a time per attribute set (20 series, 500 points): a cumulative monotonic sum as its increase
+  between exports (a reset restarts from the new value), a distribution as its mean. The service/operation overview
+  still comes from spans. The usage plugin's ledger push and LoongSuite's token metrics land here.
 
 ## Follow-ups
 
-- Stored metrics with one chart per metric.
+- Histogram bucket heatmaps and p95 from buckets; multiple metrics on one chart.
 - Out of scope: alerting, dashboards and a query builder, session replay.

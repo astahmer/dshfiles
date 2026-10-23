@@ -39,3 +39,11 @@ Feature: Traces
     And a synthetic OTLP JSON export is posted to the receiver
     Then the service map shows both services and the call between them
     And picking a service on the map filters the trace list by it
+
+  @scenario:traces.metrics-browser-journey
+  Scenario: Exported metrics list with one chart each
+    Given the isolated Traces profile is booted with the receiver on a free port
+    When the Traces panel is opened
+    And two synthetic OTLP JSON metric exports are posted to the receiver
+    Then the Metrics tab lists each metric with its type and last value
+    And selecting a counter charts its increase between exports
