@@ -204,6 +204,41 @@ zero console errors, and the Host creates the Session afterwards. Wall clock on 
 the change only reaches `:3080` after the profile restarts, so the click-to-composer number is still the RPC's 1.7–9.5 s
 budget removed from the click path, not a re-measured latency.
 
+## E2E HTTP cache cost (2026-10-23; scratch, not live GUI)
+
+Playwright 1.56.1 / Chromium 141.0.7390.37 disables HTTP cache whenever HTTP
+routing is enabled. The shared E2E origin guard intentionally retains routing.
+No product optimization or isolation change was made.
+
+The controlled local fixture (`pnpm --dir tooling/dshx run benchmark:browser-cache`)
+loads 12 cacheable scripts three times in each fresh context:
+
+| Context | First load asset hits / transfer bytes | Repeated load asset hits / transfer bytes |
+| --- | --- | --- |
+| Route-free controlled fixture | 12 / 101,904 | 0 / 0 |
+| Exact-origin route guard | 12 / 101,904 | 12 / 101,904 |
+| Unrelated API route | 12 / 101,904 | 12 / 101,904 |
+
+A separate scratch sample booted `home` + `multi-host` using `dshx dev up
+--plugin @dshfiles/home --plugin @dshfiles/multi-host --skip-build`, with its own
+state root, home and port. Four root navigations retained an exact-origin HTTP
+guard throughout. The page's Navigation Timing load duration was 1,272 ms on
+first visit and 352.2 / 564.1 / 441.4 ms on repeats. Each visit made one expected
+document navigation and zero unexpected reloads. Every sample recorded at least
+2 script-initiated assets (335,118 transfer bytes), 2 CSS URLs (27,473 bytes),
+and no font URLs. Total resource entries were 34 / 35 / 35 / 35.
+
+These asset counts are **lower bounds**: the sample classified JavaScript by
+script initiator and omitted fetch-loaded plugin bundles. These are not whole-app
+byte totals, suite-wide savings, or warm-cache timings. The machine had 10 logical
+CPUs and load rose from 9.93 to 20.71. A network-idle wait timed out at 15 seconds
+because DSH keeps making requests; that wall duration is not readiness latency.
+Use explicit client readiness for future samples, classify fetched bundles by
+URL/content type, and collect representative journey reload counts before
+estimating suite savings. Scratch doctor passed; all fixture-owned processes
+were stopped. Token-free raw sample and measurement script were retained under
+`/private/tmp/dsh-nav-measure.dU0QZm/` (temporary local evidence only).
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the

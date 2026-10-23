@@ -47,6 +47,19 @@ including popups and redirects, before replacing the guard. Until then, retain
 routing for isolation and measure user-facing warm-cache performance separately
 in a controlled browser without HTTP routes.
 
+Run the real Chromium regression independently with
+`pnpm --dir tooling/dshx run test:browser-cache` (also included in tooling tests).
+It checks cold and repeated loads against a fixture-owned loopback server for
+three fresh contexts: no routes, an exact-origin guard, and an unrelated API
+route. Assertions use server hits and transfer bytes, not flaky timing budgets.
+
+Run `pnpm --dir tooling/dshx run benchmark:browser-cache` for a separate JSON
+report with navigation duration, asset requests, transfer bytes and server hits.
+Only the route-free context's repeated loads are labeled warm; routed repeats
+are explicitly labeled cache-disabled. The route-free probe serves only local
+static fixture content, never DSH, credentials or arbitrary URLs. Do not remove
+the functional journeys' guard to obtain a warm-cache number.
+
 Sources: [Playwright routing contract](https://playwright.dev/docs/api/class-browsercontext#browser-context-route)
 and [upstream cache discussion](https://github.com/microsoft/playwright/issues/22865#issuecomment-6357778607).
 

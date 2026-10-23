@@ -31,7 +31,7 @@
     "test:selection": "node --test scripts/test-selection.test.mjs",
     "test:changed": "node scripts/test-selection.mjs changed",
     "test:related": "node scripts/test-selection.mjs related",
-    "test:tooling": "pnpm --dir tooling/dshx run test:evidence && pnpm --dir tooling/dshx run test:inventory && pnpm --dir tooling/dshx run test:feature-coverage && pnpm --dir tooling/dshx run test:browser-tasks",
+    "test:tooling": "pnpm --dir tooling/dshx run test:browser-cache && pnpm --dir tooling/dshx run test:evidence && pnpm --dir tooling/dshx run test:inventory && pnpm --dir tooling/dshx run test:feature-coverage && pnpm --dir tooling/dshx run test:browser-tasks",
     "test:scripts": "node --test scripts/*.test.mjs scripts/dsh-lkg/*.test.mjs",
     "screenshots": "node scripts/plugin-screenshots.mjs",
     "check:screenshots": "node scripts/plugin-screenshots.mjs --check"
