@@ -245,6 +245,9 @@
 # See docs/observability.md.
 - id: loongsuite-observability
   disabled: !!js '!process.env.OTEL_EXPORTER_OTLP_ENDPOINT'
+# @dshfiles/traces (row dshfiles-traces) is the in-DSH viewer: in its default `plugin` mode it listens on
+# 127.0.0.1:4318, so OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 sends LoongSuite, dshx and usage telemetry to
+# this same Host. Its `mode` setting hands the port to an external viewer (`external`) or forwards to one (`both`).
 # Brave replaces DeepSeek's server-side search: the same key the Models page manages
 # for chat is a chat key, not a search key. The Brave key is bound in
 # dshfiles-web-search-brave settings as secret:brave-api-key; fetch stays anonymous HTTP.

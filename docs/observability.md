@@ -15,6 +15,8 @@ Four sources answer different questions; pick the one that owns the question bef
 | Why is the live GUI slow right now?                               | [`live-performance-audit`](performance.md) probes against :3080; measure before fixing.                    |
 | Where did the time of one turn or call go, across plugins?        | Traces: LoongSuite spans for turns, model calls and tools; dshx spans for our own code (below), one trace. |
 
+The **Traces** panel ([in-DSH viewer](#in-dsh-viewer-dshfilestraces)) browses those spans without leaving DSH.
+
 ## Turning it on
 
 The seed (`profiles/web/package.json` and the managed region of
@@ -40,10 +42,12 @@ The plugin reads the standard OpenTelemetry exporter variables:
 | `OTEL_METRICS_EXPORTER=none`                                | Traces only.                                                                                                                                           |
 | `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`        | Opt-in content capture: `SPAN_ONLY` or `SPAN_AND_EVENT` put prompts, completions, tool arguments and tool results on spans. Unset means metadata only. |
 
-The wire format is OTLP/HTTP protobuf (`application/x-protobuf`), so any OTLP
-collector, Jaeger, Grafana Tempo, Langfuse's OTLP endpoint or
-`comma otel-desktop-viewer` can receive it. Traces go only where the endpoint
-points; the plugin has no default remote backend.
+The wire format is OTLP/HTTP protobuf (`application/x-protobuf`), so the in-DSH
+viewer below, any OTLP collector, Jaeger, Grafana Tempo, Langfuse's OTLP endpoint
+or `comma otel-desktop-viewer` can receive it. The exporter is
+`@opentelemetry/exporter-trace-otlp-proto`, so `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`
+does not switch it to JSON. Traces go only where the endpoint points; the plugin
+has no default remote backend.
 
 ## What a span carries
 
@@ -101,6 +105,34 @@ prompts or error messages. Attributes, bounds and the exporter's retry and
 drop policy are in the [dshx tracing guide](../tooling/dshx/docs/guides/tracing.md).
 Add a span at a work-unit boundary in an owned plugin with `withSpan`; do not
 log the same event a second way.
+
+## In-DSH viewer (`@dshfiles/traces`)
+
+The seed installs `@dshfiles/traces` (row `dshfiles-traces`). Its Host runs an
+OTLP/HTTP receiver on `127.0.0.1:4318`, stores spans in
+`$DSH_HOME/plugins/traces/traces.db` (72 h / 100k spans by default) and serves the
+**Traces** panel: a trace list with filters, a span waterfall with a per-span
+attribute and resource panel, a service/operation overview with error rate and
+p50/p95/p99, and error groups. Agents get the same reads as `traces_*` tools.
+It accepts any OTLP/HTTP sender, JSON or protobuf, not only DSH.
+
+With `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` in the `dsh web`
+environment, LoongSuite, dshx tracing and the usage metrics push all send to the
+Host's own receiver. Its `mode` setting decides who owns the port:
+
+| `mode`             | Receiver                      | `OTEL_EXPORTER_OTLP_ENDPOINT` points at          |
+| ------------------ | ----------------------------- | ------------------------------------------------ |
+| `plugin` (default) | on, `host:port` from settings | the receiver, `http://127.0.0.1:4318`            |
+| `external`         | off                           | the external viewer (dsh-traces, a collector)    |
+| `both`             | on, forwards raw bodies       | the receiver; the viewer listens on `forwardUrl` |
+
+When another process already holds the port, the panel and `traces_status` say
+`port in use`, stored traces stay browsable, and the receiver retries every 30 s.
+GenAI content attributes (prompts, messages, tool payloads, only present when
+content capture is opted into) are stored as their size unless
+`redactGenAiContent` is turned off. `/v1/metrics` is accepted and forwarded but
+not stored yet. Details, settings and decisions are in the
+[traces README](../plugins/@dshfiles/traces/README.md).
 
 ## Decision (2026-10-23, b:299)
 
