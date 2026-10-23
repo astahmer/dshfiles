@@ -51,7 +51,7 @@ import { BacklogPeek } from './item-peek.js'
 import { ItemsView, itemsOrder } from './items-view.js'
 import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
-import { BacklogProjects, ProjectFilterPicker, ProjectPicker } from './project-picker.js'
+import { ProjectFilterPicker } from './project-picker.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
@@ -357,11 +357,10 @@ export const BacklogPanel = (props: {
       : stored.project === null
         ? []
         : [stored.project === '' ? null : stored.project]
-  const projectFilterKey = projectFilters
   // `undefined` is not a JSON value, so an unfiltered list omits the key instead of carrying the scope along.
   const scoped = projectFilters.length === 0 ? {} : { projects: projectFilters }
   const list = useQuery({
-    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilterKey, debounced === '' ? [] : stored.statuses],
+    queryKey: [BacklogQueries.key, 'list', debounced, kinds, projectFilters, debounced === '' ? [] : stored.statuses],
     queryFn: async ({ signal }) => {
       const input: Parameters<typeof api.list>[0] = { query: debounced, kinds, ...scoped, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }
       if (debounced !== '' && stored.statuses.length > 0) input.statuses = stored.statuses
@@ -370,7 +369,7 @@ export const BacklogPanel = (props: {
     placeholderData: keepPreviousData,
   })
   const searchStatusCounts = useQuery({
-    queryKey: [BacklogQueries.key, 'search-status-counts', debounced, kinds, projectFilterKey],
+    queryKey: [BacklogQueries.key, 'search-status-counts', debounced, kinds, projectFilters],
     queryFn: async ({ signal }) => {
       const counts = await Promise.all(
         BacklogItems.statuses.map(async status => {
@@ -385,7 +384,7 @@ export const BacklogPanel = (props: {
     enabled: debounced !== '',
   })
   const inbox = useQuery({
-    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilterKey],
+    queryKey: [BacklogQueries.key, 'list', 'inbox', projectFilters],
     queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, ...scoped, freshness: 'all', limit: 200 }, { signal })),
   })
   const projectCatalog = useQuery({
