@@ -321,6 +321,41 @@ describe('Threads tab project scope', () => {
   const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1, section: 'parked' as const }
   const archived = { id: 'session-archived', title: 'Archived work', project: 'welii', cwd: '/dev/welii', updatedAt: 1, section: 'archived' as const }
 
+  it('shows sidebar section and update date on content-search results', async () => {
+    const searchContent = vi.fn(async () => [
+      {
+        sessionId: 'session-content',
+        title: 'Content result',
+        project: 'dshfiles',
+        cwd: '/dev/dshfiles',
+        updatedAt: 1_704_067_200_000,
+        snippet: 'needle in the thread body',
+      },
+    ])
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[]}
+        threadSections={new Map([['session-content', 'parked']])}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={searchContent}
+        onAsk={vi.fn(async () => {})}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '#needle' } })
+    const result = await screen.findByRole('option', { name: /needle in the thread body/ })
+    expect(result.textContent).toContain('Parked')
+    expect(result.textContent).toContain('Updated:')
+    expect(searchContent).toHaveBeenCalledWith('needle', expect.any(AbortSignal))
+  })
+
   it('filters threads by sidebar section and shows their update date', async () => {
     render(
       <ThreadPalette

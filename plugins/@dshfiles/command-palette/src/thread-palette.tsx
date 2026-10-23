@@ -286,7 +286,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               updatedAt: hit.updatedAt ?? 0,
               ...(section === undefined ? {} : { section }),
             })
-      if (thread === undefined || props.archivedSessionIds?.has(hit.sessionId) === true || section === 'archived' || thread.section === 'archived') return []
+      if (thread === undefined || props.archivedSessionIds?.has(hit.sessionId) === true || section === 'archived' || thread.section === 'archived')
+        return []
       return [{ thread, snippet: hit.snippet }]
     })
   }, [content.hits, props.archivedSessionIds, props.threadSections, props.threads, view])
