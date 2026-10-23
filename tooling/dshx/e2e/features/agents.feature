@@ -19,6 +19,12 @@ Feature: Persistent agents
     Then the item links the @dsh thread "Mention the reviewer"
     And the start thread dialog offers the agent "@dsh"
 
+  @scenario:agents.thread-workspace-picker
+  Scenario: Start-thread workspace picker uses the shared Combobox and excludes thread workspaces
+    Given the isolated plugin profile "@dshfiles/agents" is booted
+    When the built-in agent's start-thread workspace picker is opened
+    Then the workspace picker is a Combobox listing registered projects only
+
   @scenario:agents.create-agent
   Scenario: Create an agent and keep its instructions
     Given the isolated plugin profile "@dshfiles/agents" is booted

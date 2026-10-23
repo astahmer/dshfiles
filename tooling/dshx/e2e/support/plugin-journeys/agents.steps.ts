@@ -71,6 +71,23 @@ Then('the agent {string} may only message {string}', async ({ page }: { page: Pa
   await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
 })
 
+When("the built-in agent's start-thread workspace picker is opened", async ({ page }: { page: Page }) => {
+  await openAgentsPanel(page)
+  await page.getByText('@dsh', { exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Prompt', exact: true })).toBeVisible()
+})
+
+Then('the workspace picker is a Combobox listing registered projects only', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'agents-thread-workspace-picker', async () => {
+    const picker = page.getByRole('combobox', { name: 'Thread workspace', exact: true })
+    await expect(picker).toHaveJSProperty('tagName', 'BUTTON')
+    await picker.click()
+    await expect(page.getByRole('option', { name: 'Host default workspace', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: /thread-[0-9a-f]{6}/u })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the Agents panel lists {string} with those instructions', async ({ page }: { page: Page }, name: string) => {
   await recordAssertion(page, 'agents-registry-persists-a-new-agent', async () => {
     const row = page.getByRole('button', { name: new RegExp(`@${name.toLowerCase()}$`, 'u') })
