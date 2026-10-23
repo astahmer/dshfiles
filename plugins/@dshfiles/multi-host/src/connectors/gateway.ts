@@ -150,7 +150,10 @@ export const connectGateway = async ({
     closed,
     run: async (namespace, method, args, callSignal) => {
       const result = await attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal })
-      if (!result.ok) throw new GatewayRequestError(result.code, result.message)
+      if (!result.ok) {
+        if (result.code === 'gateway-unreachable') throw new GatewayUnavailableError(result.code, result.message)
+        throw new GatewayRequestError(result.code, result.message)
+      }
       return result.value
     },
     runSafe: (namespace, method, args, callSignal) => attemptRun({ origin: transport.origin, cookie, namespace, method, args, signal: callSignal ?? signal }),
