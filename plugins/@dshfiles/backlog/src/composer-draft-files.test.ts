@@ -1,6 +1,8 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { composerDraftFiles } from './composer-attachments.js'
+import { composerDraftFiles, useComposerFiles } from './composer-attachments.js'
 import type { ComposerFile } from './composer-files.js'
 
 const draftKey = 'feed-test'
@@ -21,8 +23,16 @@ describe('backlog composer attachment drafts', () => {
     }
 
     composerDraftFiles.set(draftKey, [file])
+    const AttachmentNames = () => {
+      const attachments = useComposerFiles({ draftKey, onError: () => undefined })
+      return createElement('span', null, attachments.files.map(attachment => attachment.name).join(', '))
+    }
 
-    expect(composerDraftFiles.get(draftKey)).toEqual([file])
+    const beforeUnmount = renderToStaticMarkup(createElement(AttachmentNames))
+    const afterRemount = renderToStaticMarkup(createElement(AttachmentNames))
+
+    expect(beforeUnmount).toContain(file.name)
+    expect(afterRemount).toContain(file.name)
     expect(composerDraftFiles.get(draftKey)[0]?.dataUrl).toBe(file.dataUrl)
   })
 
