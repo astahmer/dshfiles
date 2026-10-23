@@ -38,7 +38,9 @@ it('disables Resume while pending, reports errors, and hides after acceptance', 
       <ResumeInterruptedAction sessionId="latest-task" seq={8} api={api} />
     </PluginQueryProvider>,
   )
-  fireEvent.click(await screen.findByRole('button', { name: 'Resume' }))
+  const resumeButton = await screen.findByRole('button', { name: 'Resume' })
+  expect(resumeButton.getAttribute('data-variant')).toBe('default')
+  fireEvent.click(resumeButton)
   await waitFor(() => expect(screen.getByRole('button', { name: 'Resuming…' }).hasAttribute('disabled')).toBe(true))
   expect(attempts).toBe(1)
   rejectRequest?.(new Error('offline'))

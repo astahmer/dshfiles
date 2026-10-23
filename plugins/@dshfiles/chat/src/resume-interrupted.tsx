@@ -41,7 +41,7 @@ export const ResumeInterruptedAction = (
   if (available.data?.available !== true) return null
   return (
     <span className="dshx-root dshx:flex dshx:flex-col dshx:gap-1">
-      <Button size="sm" variant="outline" disabled={resume.isPending} onClick={() => resume.mutate()}>
+      <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate()}>
         {resume.isPending ? 'Resuming…' : 'Resume'}
       </Button>
       {resume.isError && (
