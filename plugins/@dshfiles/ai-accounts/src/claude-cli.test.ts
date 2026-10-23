@@ -109,6 +109,68 @@ it('holds a tool call until DSH answers it, then continues the same claude proce
   expect(processOf(fourth)).toBe(processOf(third))
 })
 
+/** A `claude` that answers "done" at once and never answers "hold", so a held request stays in flight. */
+const SLOW_CLAUDE = `#!/usr/bin/env node
+const { createInterface } = require('node:readline')
+const out = value => process.stdout.write(JSON.stringify(value) + '\\n')
+const event = value => out({ type: 'stream_event', event: value })
+createInterface({ input: process.stdin }).on('line', line => {
+  if (JSON.parse(line).message.content.some(block => (block.text ?? '').includes('hold'))) return
+  event({ type: 'message_start', message: { usage: { input_tokens: 1, output_tokens: 0 } } })
+  event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+  event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'done' } })
+  event({ type: 'content_block_stop', index: 0 })
+  event({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } })
+  event({ type: 'message_stop' })
+  out({ type: 'result', subtype: 'success', is_error: false })
+})
+`
+
+const slowCli = () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-slow-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(executable, SLOW_CLAUDE)
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => join(directory, '.claude'), executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const request = (sessionId: string, text: string) =>
+    cli.stream(model, normalizeContext({ systemPrompt: 'You are inside DSH.', messages: [{ role: 'user', content: text, timestamp: 1 }] }), { sessionId })
+  return { cli, request }
+}
+
+it('never evicts a process whose request is still streaming, so a seventh conversation cannot end a live Turn', async () => {
+  const { cli, request } = slowCli()
+  const events: string[] = []
+  const held = Array.from({ length: 6 }, (_, index) => {
+    const stream = request(`session-held-${String(index)}`, 'hold this request')
+    void (async () => {
+      for await (const event of stream) if (event.type === 'error') events.push(`${String(index)}:${event.error.errorMessage ?? ''}`)
+    })()
+    return stream
+  })
+
+  const seventh = await finished(request('session-seventh', 'answer now'))
+
+  expect(textOf(seventh)).toBe('done')
+  expect(held).toHaveLength(6)
+  expect(cli.processCount).toBe(7)
+  await new Promise(resolve => setTimeout(resolve, 200))
+  expect(events).toEqual([])
+})
+
+it('evicts the least recently used settled process once the cap is reached', async () => {
+  const { cli, request } = slowCli()
+  for (let index = 0; index < 6; index += 1) await finished(request(`session-settled-${String(index)}`, 'answer now'))
+  expect(cli.processCount).toBe(6)
+
+  await finished(request('session-next', 'answer now'))
+
+  expect(cli.processCount).toBe(6)
+})
+
 /** A `claude` that writes a stray non-JSON line before every answer, as a CLI warning would. */
 const NOISY_CLAUDE = `#!/usr/bin/env node
 const { createInterface } = require('node:readline')

@@ -243,6 +243,15 @@ export class ClaudeCliSessions {
     return stream
   }
 
+  /** The number of live `claude` processes, for tests and diagnostics. */
+  get processCount(): number {
+    return this.sessions.size
+  }
+
+  private static settled(session: Session): boolean {
+    return session.sink === undefined && session.held.size === 0 && session.unmatchedCalls.length === 0
+  }
+
   dispose(): void {
     for (const session of this.sessions.values()) this.stop(session)
     this.sessions.clear()
@@ -268,10 +277,11 @@ export class ClaudeCliSessions {
       return existing
     }
     if (existing !== undefined) this.stopKey(key)
-    while (this.sessions.size >= MAX_PROCESSES) {
-      const oldest = this.sessions.keys().next().value
-      if (oldest === undefined) break
-      this.stopKey(oldest)
+    // The cap is soft: a process that is streaming or holding a tool call is a live Turn, and killing it ends that
+    // Turn with exit 143, so only settled processes are evicted, least recently used first.
+    for (const candidate of [...this.sessions.values()]) {
+      if (this.sessions.size < MAX_PROCESSES) break
+      if (ClaudeCliSessions.settled(candidate)) this.stopKey(candidate.key)
     }
     const session = this.spawn({ key, signature, model, system, tools, effort, provider: model.provider })
     this.sessions.set(key, session)
