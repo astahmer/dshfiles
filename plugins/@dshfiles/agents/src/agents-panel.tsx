@@ -8,13 +8,23 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { PlusIcon, RotateCcwIcon, SendIcon, TrashIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 
-import { AGENT_DELEGATION_UNRESTRICTED, agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute, type AgentThread } from './agent.js'
+import { AgentFocusModel } from './agent-focus.js'
+import {
+  AGENT_DELEGATION_UNRESTRICTED,
+  agentLimits,
+  Agents,
+  AGENTS_QUERY_ROOT,
+  type Agent,
+  type AgentDraft,
+  type AgentRoute,
+  type AgentThread,
+} from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
 import type { AgentCatalog, AgentDispatchRequest, AgentThreadTarget } from './dispatch.js'
 
-const QUERY_ROOT = 'dshfiles-agents'
+const QUERY_ROOT = AGENTS_QUERY_ROOT
 
 export interface AgentsPanelProject {
   readonly id: WorkspaceId
@@ -80,6 +90,18 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const [prompt, setPrompt] = useState('')
   const [target, setTarget] = useState<string>('default')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const focus = useSyncExternalStore(AgentFocusModel.subscribe, AgentFocusModel.read, () => null)
+
+  // A mention preview's "Open in Agents" lands here: select that agent, then drop the request.
+  useEffect(() => {
+    if (focus === null) return
+    setCreating(false)
+    setSelected(focus)
+    setConfirmingDelete(false)
+    setNotice(null)
+    const timer = window.setTimeout(AgentFocusModel.clear, 0)
+    return () => window.clearTimeout(timer)
+  }, [focus])
 
   const projects = props.listProjects()
   const current = useMemo(() => agents.find(agent => agent.handle === selected) ?? null, [agents, selected])
@@ -101,7 +123,8 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   }, [creating, current])
 
   const save = useMutation({
-    mutationFn: () => api.save({ agent: Agents.normalizeDraft(draft, { creating }) }),
+    // The first open shows the new-agent form without the plus button's state, so no selected agent means creating.
+    mutationFn: () => api.save({ agent: Agents.normalizeDraft(draft, { creating: current === null }) }),
     onSuccess: async result => {
       await client.invalidateQueries({ queryKey: [QUERY_ROOT, 'list'] })
       if (result.kind === 'limit') {

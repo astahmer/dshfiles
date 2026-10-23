@@ -22,6 +22,8 @@ export const MAX_THREADS_PER_AGENT = 50
 export const MAX_MESSAGE_CHARS = 4_000
 /** `agent:` and `a:` scope the shared `@` menu to agents; the other sources stay empty for them. */
 export const AGENT_MENTION_SCOPES: readonly string[] = ['agent', 'a']
+/** The panel and the mention preview read one Host snapshot, so they share a query key. */
+export const AGENTS_QUERY_ROOT = 'dshfiles-agents'
 
 const handleSchema = z.string().regex(AGENT_HANDLE_PATTERN)
 const timestampSchema = z.number().int().nonnegative()

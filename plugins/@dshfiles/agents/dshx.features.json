@@ -160,6 +160,67 @@
         }
       ],
       "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"", "expect text \"@dsh\""]
+    },
+    {
+      "id": "agent-mention-preview",
+      "title": "Preview an agent from its mention",
+      "summary": "Every rendered @handle that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the mention with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the mention while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["known-agent", "disabled-agent", "removed-agent", "many-mentions", "thread-history"],
+      "failureModes": [
+        "An unknown handle stays plain text.",
+        "A removed agent's mention stays plain text until the registry list refreshes.",
+        "A mention inside a code block or an already-linked span is left alone."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.reference-matches",
+          "file": "plugins/@dshfiles/agents/src/agent-reference.test.ts",
+          "testName": "finds a known mention in prose, at a sentence start and after punctuation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.reference-leaves-text",
+          "file": "plugins/@dshfiles/agents/src/agent-reference.test.ts",
+          "testName": "leaves an email address, a menu scope, an unknown handle and a longer slug alone"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.reference-links-render",
+          "file": "plugins/@dshfiles/agents/src/agent-reference-links.test.tsx",
+          "testName": "links a known mention in a sent message and in a compact Markdown comment"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.reference-links-request",
+          "file": "plugins/@dshfiles/agents/src/agent-reference-links.test.tsx",
+          "testName": "asks for a preview when one of those links is clicked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.reference-native-chip",
+          "file": "plugins/@dshfiles/agents/src/agent-reference-links.test.tsx",
+          "testName": "opens the card from the native mention chip a sent message renders"
+        }
+      ],
+      "reach": [
+        "click button \"Agents\"",
+        "fill textbox \"Name\" \"Luna\"",
+        "click button \"Save\"",
+        "expect text \"@luna\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Preview the agent mention\"",
+        "press Enter",
+        "click text \"Preview the agent mention\"",
+        "expect textbox \"Comment\"",
+        "fill textbox \"Comment\" \"Ping @luna about b:1\"",
+        "click button \"Reply\"",
+        "click text \"@luna\"",
+        "expect button \"Open in Agents\""
+      ]
     }
   ]
 }

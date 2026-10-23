@@ -1,4 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -8,7 +10,9 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+import { AgentFocusModel } from './agent-focus.js'
 import { AgentMentions } from './agent-mentions.js'
+import { AgentReferenceOverlay } from './agent-reference-overlay.jsx'
 import { AgentsPanel, type AgentsPanelProps } from './agents-panel.js'
 import { agentsApi } from './api.js'
 import { AgentDispatch, type AgentDispatchRequest, type AgentModelSelection, type AgentThreadCreation } from './dispatch.js'
@@ -29,7 +33,7 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 
 export default defineClient({
   name: '@dshfiles/agents',
-  inject: ['slots', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'inputTriggers'],
+  inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'inputTriggers'],
   setup(ctx, decorate) {
     const api = createApiClient(ctx, agentsApi)
 
@@ -107,9 +111,24 @@ export default defineClient({
         <AgentsPanel {...panelProps} />
       </PluginQueryProvider>
     )
+    const ReferenceOverlay = (): JSX.Element => (
+      <PluginQueryProvider>
+        <AgentReferenceOverlay
+          openInAgents={handle => {
+            AgentFocusModel.request(handle)
+            // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
+            ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+          }}
+          openThread={sessionId => ctx.uiWorkspace.openSession(asSessionId(sessionId))}
+        />
+      </PluginQueryProvider>
+    )
 
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: 'Agents' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-agents-reference-preview', order: 122 }, decorate(ReferenceOverlay)),
+    )
   },
 })
 

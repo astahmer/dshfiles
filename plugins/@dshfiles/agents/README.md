@@ -1,5 +1,7 @@
 # @dshfiles/agents
 
+![Preview an agent from its mention](docs/screenshots/agent-mention-preview.png)
+
 ![Manage persistent agents](docs/screenshots/agent-registry.png)
 
 Persistent, mentionable agents. An agent is saved configuration — identity, instructions, model
@@ -22,6 +24,12 @@ where a thread starts.
   reads, because a preset and system prompt are fixed when the thread is created.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
+- **Every mention is a preview.** A rendered `@handle` that names a saved agent is a link: clicking it
+  (or pressing Enter) opens a card above the mention with its glyph, name, description, model route,
+  tool preset, memory scope, delegation, routine, instructions and recent threads, plus **Open in
+  Agents**. Sent messages both ways are covered — the conversation's own `@handle` chip and the plain
+  mention in Markdown, so a backlog item's comments work too. An unknown, misspelled or removed handle
+  stays plain text, and a code block or the composer is left alone.
 - **A memory scope of its own.** An agent may name a memory scope (`agent:<handle>` by default). `@dshfiles/memory`
   reads it through this plugin's contract for every thread the agent started, and a subagent inherits it from the
   thread that spawned it, so those threads carry the project block plus that scope's notes; memory keeps one store and
@@ -50,6 +58,7 @@ where a thread starts.
 | Agents sidebar panel | List, create, edit, enable/disable and remove agents (the built-in `@dsh` is not removable), start a thread, and open a thread the agent started. |
 | `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                     |
 | Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                     |
+| Mention preview      | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                               |
 
 ## Decisions
 
