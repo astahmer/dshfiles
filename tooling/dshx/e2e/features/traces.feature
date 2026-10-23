@@ -47,3 +47,22 @@ Feature: Traces
     And two synthetic OTLP JSON metric exports are posted to the receiver
     Then the Metrics tab lists each metric with its type and last value
     And selecting a counter charts its increase between exports
+
+  @scenario:traces.self-telemetry-browser-journey
+  Scenario: The Host's own telemetry arrives without an OTEL environment variable
+    Given the isolated Traces profile with "@dshfiles/usage" is booted with the receiver on a free port
+    When the Traces panel is opened
+    Then this Host's own plugin spans arrive without any OTEL environment variable
+
+  @scenario:traces.thread-tab-browser-journey
+  Scenario: A thread's Traces tab shows only that thread's telemetry
+    Given the isolated Traces profile with "@dshfiles/ai-accounts" is booted with the receiver on a free port
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model is asked "first question"
+    And the thread Traces tab is opened
+    Then the thread Traces tab says nothing was exported for this thread yet
+    When synthetic agent turn spans tagged with this thread are posted to the receiver
+    Then the thread Traces tab summarizes only this thread's telemetry
+    And a turn opens its span waterfall with the plugin span nested under the tool call
+    And the thread logs list only its own records
+    And the thread Traces tab fits a 480 px wide window

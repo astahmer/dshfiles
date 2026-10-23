@@ -74,7 +74,10 @@ the Host's PATH so Secret Catalog never reaches a real vault), and
 auto-triage off, and stores no key; needs `@dshfiles/backlog`), and
 `otlp-sample-trace` (posts one synthetic two-service OTLP trace with a failing
 nested span to the Traces receiver; needs `@dshfiles/traces`, whose scratch row
-binds a free port instead of 4318 so it never competes with the live Host). `attach "<repo file>"`
+binds a free port instead of 4318 so it never competes with the live Host), and
+`otlp-session-turns` (posts two synthetic agent turns tagged with the open thread's
+`dsh.session.id` for its Traces tab; list a thread seed such as `tool-call-thread`
+before it, and it re-runs on every `open`). `attach "<repo file>"`
 hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next

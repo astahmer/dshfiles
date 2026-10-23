@@ -95,6 +95,16 @@ Given('the isolated Traces profile is booted with the receiver on a free port', 
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Given('the isolated Traces profile with {string} is booted with the receiver on a free port', async ({ page }: { page: Page }, companions: string) => {
+  const companionIds = companions.split(',').map(packageId => packageId.trim())
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/traces', ...companionIds],
+    profileLabel: `traces+${companionIds.join('+')}`,
+    cordisPatch: freePortPatch,
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 When('the Traces panel is opened', async ({ page }: { page: Page }) => {
   await openTraces(page)
 })
@@ -102,7 +112,10 @@ When('the Traces panel is opened', async ({ page }: { page: Page }) => {
 Then('the receiver shows where it listens and how to send it telemetry', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'traces-receiver-listens-on-loopback', async () => {
     const endpoint = await receiverEndpoint(page)
-    await expect(page.getByTestId('traces-empty-guide')).toContainText(`OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}`)
+    const guide = page.getByTestId('traces-empty-guide')
+    // The Host's own plugin spans need no environment variable and may already be stored, which retires the empty guide.
+    await expect(guide.or(page.locator('tr[aria-label^="dshfiles "]').first())).toBeVisible()
+    if (await guide.isVisible()) await expect(guide).toContainText(`OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}`)
   })
 })
 
@@ -349,6 +362,171 @@ Then('selecting a counter charts its increase between exports', async ({ page }:
   await recordAssertion(page, 'traces-metric-chart-shows-counter-increase', async () => {
     await expect(page.getByRole('img', { name: 'Chart of http.server.requests' })).toBeVisible()
     await expect(page.locator('figcaption').getByText('increase between exports (cumulative counter)', { exact: false })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then("this Host's own plugin spans arrive without any OTEL environment variable", async ({ page }: { page: Page }) => {
+  // The scratch Host environment is an allowlist without OTEL_*, so only the in-process hand-off can deliver these.
+  await recordAssertion(page, 'traces-self-telemetry-without-env', async () => {
+    await expect(page.locator('tr[aria-label^="dshfiles "]').first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('traces-store-summary')).not.toContainText(/^0 traces/)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const sessionView = (page: Page) => page.getByTestId('traces-session-view')
+const conversationTab = (page: Page, name: string) => page.locator('[data-conversation-tabs]').getByRole('tab', { name, exact: true })
+
+When('the thread Traces tab is opened', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'traces-thread-tab-follows-trajectory', async () => {
+    const names = await page.locator('[data-conversation-tabs]').getByRole('tab').allTextContents()
+    expect(names.indexOf('Traces')).toBeGreaterThan(names.indexOf('Chat'))
+    if (names.includes('Trajectory')) expect(names.indexOf('Traces')).toBe(names.indexOf('Trajectory') + 1)
+  })
+  await conversationTab(page, 'Traces').click()
+  await expect(sessionView(page)).toBeVisible()
+})
+
+Then('the thread Traces tab says nothing was exported for this thread yet', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'traces-thread-tab-empty-state', async () => {
+    await expect(page.getByTestId('traces-session-empty')).toContainText('No telemetry for this thread yet')
+    await expect(page.getByTestId('traces-session-empty').getByTestId('traces-empty-guide')).toBeVisible()
+  })
+})
+
+const posted = new WeakMap<Page, { readonly traceId: string }>()
+
+When('synthetic agent turn spans tagged with this thread are posted to the receiver', async ({ page }: { page: Page }) => {
+  await expect(sessionView(page)).toHaveAttribute('data-receiver-endpoint', /^http:\/\/127\.0\.0\.1:\d+$/, { timeout: 30_000 })
+  const sessionId = (await sessionView(page).getAttribute('data-session-id')) ?? ''
+  const endpoint = (await sessionView(page).getAttribute('data-receiver-endpoint')) ?? ''
+  const traceId = hex(16)
+  const ids = { root: hex(8), chat: hex(8), tool: hex(8), plugin: hex(8) }
+  const startNs = BigInt(Date.now() - 10_000) * 1_000_000n
+  const at = (offsetMs: number): string => (startNs + BigInt(offsetMs) * 1_000_000n).toString()
+  const attribute = (key: string, value: string | number) =>
+    typeof value === 'string' ? { key, value: { stringValue: value } } : { key, value: { intValue: String(value) } }
+  const agentSpan = (spanId: string, parentSpanId: string | null, name: string, from: number, to: number, extra: readonly ReturnType<typeof attribute>[]) => ({
+    traceId,
+    spanId,
+    ...(parentSpanId === null ? {} : { parentSpanId }),
+    name,
+    kind: 1,
+    startTimeUnixNano: at(from),
+    endTimeUnixNano: at(to),
+    attributes: [attribute('dsh.session.id', sessionId), ...extra],
+    status: { code: 0 },
+  })
+  const traces = {
+    resourceSpans: [
+      {
+        resource: { attributes: [attribute('service.name', 'deepseek-harness')] },
+        scopeSpans: [
+          {
+            spans: [
+              agentSpan(ids.root, null, 'invoke_agent deepseek-harness', 0, 3_000, [attribute('gen_ai.operation.name', 'invoke_agent')]),
+              agentSpan(ids.chat, ids.root, 'chat fake-model', 10, 1_200, [
+                attribute('gen_ai.operation.name', 'chat'),
+                attribute('gen_ai.usage.input_tokens', 1_200),
+                attribute('gen_ai.usage.output_tokens', 80),
+              ]),
+              agentSpan(ids.tool, ids.root, 'execute_tool bash', 1_300, 2_900, [attribute('gen_ai.operation.name', 'execute_tool')]),
+              {
+                ...agentSpan(hex(8), null, 'invoke_agent deepseek-harness', 0, 500, []),
+                traceId: hex(16),
+                attributes: [attribute('dsh.session.id', 'session-elsewhere')],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        resource: { attributes: [attribute('service.name', 'dshfiles')] },
+        scopeSpans: [
+          {
+            spans: [
+              {
+                traceId,
+                spanId: ids.plugin,
+                parentSpanId: ids.tool,
+                name: 'jujutsu/status',
+                kind: 2,
+                startTimeUnixNano: at(1_400),
+                endTimeUnixNano: at(1_600),
+                attributes: [],
+                status: { code: 0 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+  const logs = {
+    resourceLogs: [
+      {
+        resource: { attributes: [attribute('service.name', 'dshfiles')] },
+        scopeLogs: [
+          {
+            logRecords: [
+              { timeUnixNano: at(1_500), severityNumber: 9, body: { stringValue: 'tool ran for this thread' }, attributes: [], traceId, spanId: ids.tool },
+              { timeUnixNano: at(1_500), severityNumber: 9, body: { stringValue: 'another thread' }, attributes: [], traceId: hex(16) },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+  for (const [signal, body] of [
+    ['traces', traces],
+    ['logs', logs],
+  ] as const) {
+    const response = await fetch(`${endpoint}/v1/${signal}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    expect(response.status).toBe(200)
+  }
+  posted.set(page, { traceId })
+})
+
+Then("the thread Traces tab summarizes only this thread's telemetry", async ({ page }: { page: Page }) => {
+  const summary = page.getByRole('region', { name: 'Thread telemetry summary', exact: true })
+  await recordAssertion(page, 'traces-thread-tab-summary', async () => {
+    await expect(summary.locator('[data-stat="statTraces"]')).toContainText('1', { timeout: 15_000 })
+    await expect(summary.locator('[data-stat="statSpans"]')).toContainText('4')
+    await expect(summary.locator('[data-stat="statModelCalls"]')).toContainText('1')
+    await expect(summary.locator('[data-stat="statToolCalls"]')).toContainText('1')
+    await expect(summary.locator('[data-stat="statTokens"]')).toContainText('1.2K · 80')
+    await expect(sessionView(page).locator('tr[data-trace-id]')).toHaveCount(1)
+  })
+})
+
+Then('a turn opens its span waterfall with the plugin span nested under the tool call', async ({ page }: { page: Page }) => {
+  const traceId = posted.get(page)?.traceId ?? ''
+  await sessionView(page).locator(`tr[data-trace-id="${traceId}"]`).click()
+  const waterfall = sessionView(page).getByRole('tree', { name: 'Span waterfall' })
+  await recordAssertion(page, 'traces-thread-tab-waterfall', async () => {
+    await expect(waterfall.getByRole('treeitem')).toHaveCount(4)
+    await expect(waterfall.getByRole('treeitem', { level: 3 })).toContainText('jujutsu/status')
+    await expect(sessionView(page).getByRole('button', { name: 'Open thread' })).toHaveCount(0)
+  })
+})
+
+Then('the thread logs list only its own records', async ({ page }: { page: Page }) => {
+  await sessionView(page).getByRole('radio', { name: 'Logs', exact: true }).click()
+  const rows = sessionView(page).getByRole('list', { name: 'Logs', exact: true }).getByRole('listitem')
+  await recordAssertion(page, 'traces-thread-tab-logs', async () => {
+    await expect(rows).toHaveCount(1, { timeout: 15_000 })
+    await expect(rows).toContainText('tool ran for this thread')
+  })
+})
+
+Then('the thread Traces tab fits a 480 px wide window', async ({ page }: { page: Page }) => {
+  await page.setViewportSize({ width: 480, height: 900 })
+  await sessionView(page).getByRole('radio', { name: 'Turns', exact: true }).click()
+  await recordAssertion(page, 'traces-thread-tab-narrow', async () => {
+    await expect(page.getByRole('region', { name: 'Thread telemetry summary', exact: true })).toBeVisible()
+    const overflow = await sessionView(page).evaluate(element => element.scrollWidth - element.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(1)
   })
   await finishJourneyAssertions(page)
 })

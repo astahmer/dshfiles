@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -796,12 +797,224 @@ const otlpSampleMetrics = (offsetMs: number, requests: number): unknown => {
   }
 }
 
-/** Post the sample export, its logs and a few metric exports to the receiver the Traces panel reports, so every tab has real data. */
-const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
-  if (!state.bundles.includes('@dshfiles/traces')) {
+/**
+ * A LoongSuite-shaped turn of the open thread (invoke_agent, react steps, chat attempts with GenAI token usage, an
+ * execute_tool call with a nested dshx plugin span) plus a second turn whose first model attempt failed, every span
+ * carrying that thread's dsh.session.id, so the thread's Traces tab has the data an agent telemetry exporter sends.
+ */
+const otlpSessionTurns = (sessionId: string) => {
+  const hex = (bytes: number): string => randomBytes(bytes).toString('hex')
+  const value = (input: string | number) => (typeof input === 'string' ? { stringValue: input } : { intValue: String(input) })
+  const attributes = (record: Readonly<Record<string, string | number>>) => Object.entries(record).map(([key, entry]) => ({ key, value: value(entry) }))
+  const turn = (input: { readonly turn: number; readonly startMsAgo: number; readonly failedAttempt: boolean }) => {
+    const traceId = hex(16)
+    const startNs = BigInt(Date.now() - input.startMsAgo) * 1_000_000n
+    const at = (offsetMs: number): string => (startNs + BigInt(offsetMs) * 1_000_000n).toString()
+    const ids = { root: hex(8), step1: hex(8), chat1: hex(8), tool: hex(8), step2: hex(8), chat2: hex(8), retry: hex(8) }
+    const session = { 'dsh.session.id': sessionId, 'dsh.turn': input.turn }
+    const agentSpan = (span: {
+      readonly spanId: string
+      readonly parentSpanId?: string
+      readonly name: string
+      readonly from: number
+      readonly to: number
+      readonly attributes: Readonly<Record<string, string | number>>
+      readonly error?: string
+    }) => ({
+      traceId,
+      spanId: span.spanId,
+      ...(span.parentSpanId === undefined ? {} : { parentSpanId: span.parentSpanId }),
+      name: span.name,
+      kind: span.name.startsWith('chat') ? 3 : 1,
+      startTimeUnixNano: at(span.from),
+      endTimeUnixNano: at(span.to),
+      attributes: attributes({ ...session, ...span.attributes }),
+      status: span.error === undefined ? { code: 0 } : { code: 2, message: span.error },
+    })
+    const chat = (spanId: string, parentSpanId: string, from: number, to: number, usage: { readonly input: number; readonly output: number }) =>
+      agentSpan({
+        spanId,
+        parentSpanId,
+        name: 'chat fake-model',
+        from,
+        to,
+        attributes: {
+          'gen_ai.operation.name': 'chat',
+          'gen_ai.provider.name': 'fake',
+          'gen_ai.request.model': 'fake-model',
+          'gen_ai.usage.input_tokens': usage.input,
+          'gen_ai.usage.output_tokens': usage.output,
+          'gen_ai.usage.cache_read.input_tokens': Math.round(usage.input / 2),
+        },
+      })
+    const spans = [
+      agentSpan({
+        spanId: ids.root,
+        name: 'invoke_agent deepseek-harness',
+        from: 0,
+        to: 6_400,
+        attributes: { 'gen_ai.operation.name': 'invoke_agent', 'gen_ai.usage.input_tokens': 2_480, 'gen_ai.usage.output_tokens': 504 },
+      }),
+      agentSpan({ spanId: ids.step1, parentSpanId: ids.root, name: 'react step', from: 20, to: 4_300, attributes: { 'dsh.step': 1 } }),
+      ...(input.failedAttempt
+        ? [
+            agentSpan({
+              spanId: ids.retry,
+              parentSpanId: ids.step1,
+              name: 'chat fake-model',
+              from: 30,
+              to: 420,
+              attributes: { 'gen_ai.operation.name': 'chat', 'gen_ai.request.model': 'fake-model', 'error.type': 'upstream_503' },
+              error: 'HTTP 503 from the provider',
+            }),
+          ]
+        : []),
+      chat(ids.chat1, ids.step1, input.failedAttempt ? 450 : 30, 1_900, { input: 1_840, output: 312 }),
+      agentSpan({
+        spanId: ids.tool,
+        parentSpanId: ids.step1,
+        name: 'execute_tool bash',
+        from: 1_950,
+        to: 4_250,
+        attributes: { 'gen_ai.operation.name': 'execute_tool', 'gen_ai.tool.name': 'bash', 'gen_ai.tool.call.id': hex(6) },
+      }),
+      agentSpan({ spanId: ids.step2, parentSpanId: ids.root, name: 'react step', from: 4_320, to: 6_380, attributes: { 'dsh.step': 2 } }),
+      chat(ids.chat2, ids.step2, 4_330, 6_370, { input: 640, output: 192 }),
+    ]
+    const pluginSpan = {
+      traceId,
+      spanId: hex(8),
+      parentSpanId: ids.tool,
+      name: 'jujutsu/status',
+      kind: 2,
+      startTimeUnixNano: at(2_000),
+      endTimeUnixNano: at(2_180),
+      attributes: attributes({
+        'dshx.api.id': 'jujutsu',
+        'dshx.api.method': 'status',
+        'dshx.api.caller': 'agent',
+        'dshx.api.outcome': 'ok',
+        'dsh.session.id': sessionId,
+      }),
+      status: { code: 0 },
+    }
+    return {
+      traceId,
+      toolSpanId: ids.tool,
+      logTime: at(2_100),
+      resourceSpans: [
+        { resource: { attributes: attributes({ 'service.name': 'deepseek-harness' }) }, scopeSpans: [{ scope: { name: 'loongsuite-dsh' }, spans }] },
+        { resource: { attributes: attributes({ 'service.name': 'dshfiles' }) }, scopeSpans: [{ scope: { name: '@dshfiles/dshx' }, spans: [pluginSpan] }] },
+      ],
+    }
+  }
+  const first = turn({ turn: 1, startMsAgo: 90_000, failedAttempt: false })
+  const second = turn({ turn: 2, startMsAgo: 30_000, failedAttempt: true })
+  return {
+    traces: { resourceSpans: [...first.resourceSpans, ...second.resourceSpans] },
+    logs: {
+      resourceLogs: [
+        {
+          resource: { attributes: attributes({ 'service.name': 'dshfiles' }) },
+          scopeLogs: [
+            {
+              scope: { name: '@dshfiles/jujutsu' },
+              logRecords: [
+                {
+                  timeUnixNano: first.logTime,
+                  severityNumber: 9,
+                  body: { stringValue: 'jj status read the working copy' },
+                  traceId: first.traceId,
+                  spanId: first.toolSpanId,
+                  attributes: [],
+                },
+                {
+                  timeUnixNano: second.logTime,
+                  severityNumber: 13,
+                  body: { stringValue: 'provider answered 503, retrying' },
+                  traceId: second.traceId,
+                  attributes: attributes({ 'dsh.session.id': sessionId }),
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  }
+}
+
+const postOtlp = async (input: {
+  readonly endpoint: string
+  readonly signal: 'traces' | 'logs'
+  readonly body: unknown
+  readonly timeoutMs: number
+}): Promise<void> => {
+  const response = await fetch(`${input.endpoint}/v1/${input.signal}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input.body),
+    signal: AbortSignal.timeout(input.timeoutMs),
+  })
+  if (!response.ok)
+    throw new ScratchError(
+      'seed-otlp-rejected',
+      `The traces receiver answered HTTP ${String(response.status)} to ${input.signal}.`,
+      'Read the Traces panel status.',
+    )
+}
+
+/**
+ * Tag two synthetic agent turns with the open thread's session id and post them. The thread's own Traces tab names both
+ * the Session id and the receiver endpoint, so the page stays on that thread (back on its Chat tab).
+ */
+const seedOtlpSessionTurns = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
+  if (!state.bundles.includes('@dshfiles/traces'))
     throw new ScratchError(
       'seed-needs-plugin',
-      'Seed otlp-sample-trace needs @dshfiles/traces.',
+      'Seed otlp-session-turns needs @dshfiles/traces.',
+      'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/traces ...".',
+    )
+  const tabs = page.locator('[data-conversation-tabs]')
+  try {
+    await tabs.getByRole('tab', { name: 'Traces', exact: true }).click({ timeout: timeoutMs })
+  } catch {
+    throw new ScratchError(
+      'seed-needs-thread',
+      'Seed otlp-session-turns needs an open thread with a conversation.',
+      'List a thread seed before it, e.g. "seed tool-call-thread" (needs @dshfiles/ai-accounts).',
+    )
+  }
+  const view = page.getByTestId('traces-session-view')
+  await page.waitForFunction(() => document.querySelector('[data-testid="traces-session-view"]')?.hasAttribute('data-receiver-endpoint') === true, undefined, {
+    timeout: timeoutMs,
+  })
+  const sessionId = await view.getAttribute('data-session-id')
+  const endpoint = await view.getAttribute('data-receiver-endpoint')
+  if (sessionId === null || endpoint === null)
+    throw new ScratchError(
+      'seed-receiver-not-listening',
+      'The thread Traces tab names no Session or receiver.',
+      'Open the Traces panel for the receiver state.',
+    )
+  const payload = otlpSessionTurns(sessionId)
+  await postOtlp({ endpoint, signal: 'traces', body: payload.traces, timeoutMs })
+  await postOtlp({ endpoint, signal: 'logs', body: payload.logs, timeoutMs })
+  await tabs.getByRole('tab', { name: 'Chat', exact: true }).click({ timeout: timeoutMs })
+}
+
+/** Open the Traces panel and read the endpoint its receiver badge shows; a scratch binds a free port. */
+const tracesReceiverEndpoint = async (input: {
+  readonly state: ScratchState
+  readonly page: Page
+  readonly timeoutMs: number
+  readonly seed: ReachSeed
+}): Promise<string> => {
+  const { page, timeoutMs } = input
+  if (!input.state.bundles.includes('@dshfiles/traces')) {
+    throw new ScratchError(
+      'seed-needs-plugin',
+      `Seed ${input.seed} needs @dshfiles/traces.`,
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/traces ...".',
     )
   }
@@ -819,22 +1032,14 @@ const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: n
       'Open the Traces panel for its message; a scratch binds a free port, so a failure here is a receiver bug.',
     )
   }
-  const response = await fetch(`${endpoint}/v1/traces`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(otlpSampleExport()),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
-  if (!response.ok)
-    throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(response.status)}.`, 'Read the Traces panel status.')
-  const logs = await fetch(`${endpoint}/v1/logs`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(otlpSampleLogs()),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
-  if (!logs.ok)
-    throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(logs.status)} to logs.`, 'Read the Traces panel status.')
+  return endpoint
+}
+
+/** Post the sample export, its logs and a few metric exports to the receiver the Traces panel reports, so every tab has real data. */
+const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
+  const endpoint = await tracesReceiverEndpoint({ state, page, timeoutMs, seed: 'otlp-sample-trace' })
+  await postOtlp({ endpoint, signal: 'traces', body: otlpSampleExport(), timeoutMs })
+  await postOtlp({ endpoint, signal: 'logs', body: otlpSampleLogs(), timeoutMs })
   for (const [offsetMs, requests] of [
     [-50_000, 120],
     [-35_000, 180],
@@ -874,6 +1079,10 @@ const applySeed = async (input: {
   }
   if (input.seed === 'otlp-sample-trace') {
     await seedOtlpSampleTrace(input.state, input.page, input.timeoutMs)
+    return {}
+  }
+  if (input.seed === 'otlp-session-turns') {
+    await seedOtlpSessionTurns(input.state, input.page, input.timeoutMs)
     return {}
   }
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }

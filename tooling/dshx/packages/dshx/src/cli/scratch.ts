@@ -91,7 +91,7 @@ Notice and provider-setup dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
   hover <role|text|label|title> "<name>"       (leaves the pointer there, for hover-only UI)
-  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|jev-setup-chat-thread|quota-blocked-thread|chat-reference-thread|credential-recovery|fake-secret-cli|backlog-jev-enabled|multi-host-hosts|queue-preview-thread|otlp-sample-trace>
+  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|jev-setup-chat-thread|quota-blocked-thread|chat-reference-thread|credential-recovery|fake-secret-cli|backlog-jev-enabled|multi-host-hosts|queue-preview-thread|otlp-sample-trace|otlp-session-turns>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
 A click, rightclick or hover may end with "at <x>,<y>" to hit that point of the element's own box
@@ -109,7 +109,9 @@ fake-secret-cli resets the synthetic aliases of a Host started with "up --fake-s
 backlog-jev-enabled uses Settings to turn on Jev only when it is off, without entering a key;
 chat-reference-thread adds a rendered jj:main link to a fake-provider transcript, and multi-host-hosts
 writes synthetic host data for the Hosts page; queue-preview-thread holds a fake-provider turn while queuing an image and file;
-otlp-sample-trace posts one synthetic OTLP trace to the traces receiver (needs @dshfiles/traces).
+otlp-sample-trace posts one synthetic OTLP trace to the traces receiver (needs @dshfiles/traces);
+otlp-session-turns posts two synthetic agent turns tagged with the open thread's dsh.session.id (list a
+thread seed such as tool-call-thread before it) and returns to that thread.
 A failing step stops the walk, saves a screenshot and exits 1: fix the catalog when the UI path
 moved, report a regression when the feature broke (skill maintain-verify-dsh).
 

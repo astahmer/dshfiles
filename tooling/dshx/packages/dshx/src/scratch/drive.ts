@@ -150,7 +150,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         if (parsed.action === 'seed') {
           const alreadySeeded = seeded.some(applied => applied.seed === parsed.seed)
           // Thread-scoped state can drift between reaches, so these seeds recreate and select a fresh target each time.
-          if (!alreadySeeded || parsed.seed === 'tool-call-thread' || parsed.seed === 'rebase-ready-thread') {
+          if (!alreadySeeded || parsed.seed === 'tool-call-thread' || parsed.seed === 'rebase-ready-thread' || parsed.seed === 'otlp-session-turns') {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
             const outcome = await ScratchSeedRuntime.applySeed({ state, seed: parsed.seed, page, timeoutMs })
             if (outcome.changedFile !== undefined) applied.changedFile = outcome.changedFile
