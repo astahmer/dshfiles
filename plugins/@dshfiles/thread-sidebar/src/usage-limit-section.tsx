@@ -71,7 +71,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
   const allBusy = busyCount === props.rows.length
 
   return (
-    <section aria-label={t('threadSidebarUsageLimit')} className="dshx:mt-1">
+    <section aria-label={t('threadSidebarUsageLimit')} className="dshx:mt-1 dshx:mb-2">
       <div className={cn('dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-background dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
         <span className="dshx:whitespace-nowrap dshx:font-medium dshx:text-warning/80">{t('threadSidebarUsageLimit')}</span>
         <span className="dshx:text-xs dshx:tabular-nums">({props.rows.length})</span>
@@ -90,9 +90,13 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
         return props.withThreadMenu(
           row.session,
           <div
-            className="dshx:group/usage dshx:flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:hover:bg-accent/40"
+            className="dshx:group/usage dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:hover:bg-accent/40"
             key={row.continuation.continuationId}
           >
+            <span
+              aria-hidden="true"
+              className={cn('dshx:size-2 dshx:shrink-0 dshx:self-start dshx:mt-1.5 dshx:rounded-full', snoozed ? 'dshx:bg-muted-foreground/45' : 'dshx:bg-warning')}
+            />
             <button
               draggable
               className="dshx:min-w-0 dshx:flex-1 dshx:text-left"

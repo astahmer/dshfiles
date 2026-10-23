@@ -3175,6 +3175,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const hoistedInterruptedRows = isBoard ? EMPTY_HOISTED_SESSIONS : statusFilteredInterruptedRows
   const hoistedNeedsResumeRows = isBoard ? EMPTY_HOISTED_SESSIONS : statusFilteredNeedsResumeRows
   const hoistedUsageLimitRows = isBoard ? EMPTY_HOISTED_USAGE_LIMIT_ROWS : statusFilteredUsageLimitRows
+  const hasHoistedGroups = hoistedInterruptedRows.length > 0 || hoistedNeedsResumeRows.length > 0 || hoistedUsageLimitRows.length > 0
   const statusFilteredRecoveryRows = useMemo(
     () => [...hoistedInterruptedRows, ...hoistedNeedsResumeRows, ...hoistedUsageLimitRows.map(row => row.session)],
     [hoistedInterruptedRows, hoistedNeedsResumeRows, hoistedUsageLimitRows],
@@ -4899,7 +4900,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   )
                 })
               : groupedThreadEntries.map(group => {
-                  const groupCollapsed = group.showHeader && collapsedGroups.includes(group.key)
+                  // A flat list under a hoisted group (Usage limit, Interrupted…) gets its own header, so its rows do
+                  // not read as part of the group above.
+                  const showHeader = group.showHeader || (!isBoard && hasHoistedGroups)
+                  const groupLabel =
+                    group.label || (viewTabs.find(tab => tab.view.id === threadViewSettings.activeViewId)?.label ?? props.tSidebar('threadSidebarAllThreads'))
+                  const groupCollapsed = showHeader && collapsedGroups.includes(group.key)
                   return (
                     <section
                       className={cn(
@@ -4908,9 +4914,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       )}
                       key={group.key}
                       data-thread-board-column={isBoard ? group.key : undefined}
-                      aria-label={isBoard ? `${group.label || props.tSidebar('threadSidebarAllThreads')} column` : group.showHeader ? group.label : undefined}
+                      aria-label={isBoard ? `${group.label || props.tSidebar('threadSidebarAllThreads')} column` : showHeader ? groupLabel : undefined}
                     >
-                      {group.showHeader ? (
+                      {showHeader ? (
                         <button
                           type="button"
                           data-thread-section-header=""
@@ -4921,7 +4927,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           aria-expanded={!groupCollapsed}
                           onClick={() => toggleGroup(group.key)}
                         >
-                          <span className="dshx:whitespace-nowrap">{group.label}</span>
+                          <span className="dshx:whitespace-nowrap">{groupLabel}</span>
                           <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
                           <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
                           <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
