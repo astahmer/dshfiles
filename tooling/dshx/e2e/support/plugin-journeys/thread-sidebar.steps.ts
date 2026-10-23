@@ -180,6 +180,7 @@ When('a blank Host thread is started', async ({ page }: { page: Page }) => {
 })
 
 When('a nonblank Host thread is archived and immediately undone', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }) => {
+  await showThreadsByStatus(page)
   const prompt = 'thread sidebar archive undo e2e'
   if (currentThreadId(page) === null) await startBlankThread(page)
   await page.getByRole('textbox').first().fill(prompt)
@@ -283,6 +284,7 @@ Then('the thread is restored from the archive notice', async ({ page }: { page: 
 })
 
 When('archive undo settings are changed and threads are archived', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   await openSidebarSettings(page)
   const undoEnabled = sidebarSettings(page).getByRole('checkbox', { name: 'Show an undo notice after archiving' })
   const undoDuration = sidebarSettings(page).getByRole('spinbutton', { name: 'Undo notice duration (seconds)' })
@@ -330,6 +332,7 @@ Then('archive undo settings control the temporary notice', async ({ page }: { pa
 })
 
 When('an archived thread is opened from the Archived section', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   if (currentThreadId(page) === null) await startBlankThread(page)
   const prompt = 'thread sidebar archived open e2e'
   await page.getByRole('textbox').first().fill(prompt)
@@ -366,6 +369,7 @@ Then('the thread is restored and open with no archived banner', async ({ page }:
 let settledThreadId: string | null = null
 
 When('a nonblank Host thread is settled from its context menu', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
   await composer.fill('thread sidebar settle e2e target')
@@ -439,6 +443,7 @@ const continueInJourneys = new WeakMap<Page, ContinueInJourney>()
 const CONTINUE_TARGET_PROJECT = 'continue-target'
 
 When('a nonblank Host thread is continued in another registered project from its context menu', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   const prompt = 'thread sidebar continue in project e2e'
   await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
@@ -495,6 +500,7 @@ Then('the continuation opens in that project with the conversation and the origi
 })
 
 When('an archived thread and a settled thread fill the bottom sections', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   // Both threads are created while a workspace is still selected: the picker resets once the only
   // active thread is archived, so organizing happens after the second one exists.
   const sendPrompt = async (prompt: string): Promise<string> => {
@@ -580,6 +586,7 @@ const selectSettledArchiveDelay = async (page: Page, value: string): Promise<voi
 }
 
 When('a thread is settled with a one-week settled-archive delay', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
   await composer.fill('thread sidebar settled archive e2e target')
@@ -621,6 +628,7 @@ Then('the settled thread archives itself without a click', async ({ page }: { pa
 })
 
 When('separate remote threads are enabled and the thread board page is opened', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' }).check()
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
@@ -860,6 +868,7 @@ Then('the thread stays pinned after reload', async ({ page }: { page: Page }) =>
 let mutedThreadId: string | null = null
 
 When('a thread is snoozed until tomorrow morning from its sidebar row', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
   await composer.fill('thread sidebar mute e2e target')
@@ -912,6 +921,7 @@ Then('unmuting it from the session header clears the marker', async ({ page }: {
 })
 
 When('the Active section is folded and reopened', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   const activeSection = threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })
   await expect(activeSection).toHaveAttribute('aria-expanded', 'true')
   await activeSection.click()
@@ -931,6 +941,7 @@ Then('the sidebar keeps the blank session out of classified thread rows', async 
 })
 
 When('a Host thread is archived and the view is grouped and filtered', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   const prompt = 'thread sidebar view filter e2e target'
   const displayTitle = 'thread sidebar view filter e2e'
   if (currentThreadId(page) === null) await startBlankThread(page)
@@ -1794,6 +1805,7 @@ const referencedByRows = (page: Page) =>
   page.getByRole('menu', { name: 'Referenced by', exact: true }).getByRole('menuitem').filter({ hasText: 'References this thread' })
 
 When('another thread references a visible Host thread from its composer', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
   const targetThreadId = await startBlankThread(page)
   const targetComposer = page.getByRole('textbox').first()
   await targetComposer.fill('thread sidebar referenced-by e2e target')
@@ -1930,6 +1942,7 @@ Then('the blocked session is listed only in the Usage limit group when grouped b
     const sessionId = currentThreadId(page)
     if (sessionId === null) throw new Error('The blocked thread is not selected.')
 
+    await showThreadsByStatus(page)
     await selectThreadViewValue(page, 'Group: Status', 'Date')
     await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
     const group = page.getByRole('region', { name: 'Usage limit', exact: true })
