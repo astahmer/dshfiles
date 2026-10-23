@@ -47,6 +47,49 @@ describe('reference graph', () => {
     expect(graphCall.join(' ')).toContain('default@')
   })
 
+  it('returns the listed rows and the revisions joining them for a lane graph', async () => {
+    const elided = 'c'.repeat(40)
+    const revision = (commitId: string, parents: readonly string[]) =>
+      JSON.stringify({
+        commitId,
+        changeId: 'f'.repeat(32),
+        shortestChangeId: 'kz',
+        description: 'First line\nbody',
+        author: 'a',
+        authorTime: '2026-10-23T00:00:00Z',
+        parents,
+        bookmarks: [],
+        localBookmarks: [],
+        tags: [],
+        workspaces: [],
+        workingCopy: false,
+        mine: true,
+        immutable: false,
+        divergent: false,
+        empty: false,
+        conflict: false,
+        changeOffset: 0,
+        evolved: false,
+      })
+    const calls: (readonly string[])[] = []
+    const run: JjRun = async args => {
+      calls.push(args)
+      const joined = args.join(' ')
+      if (joined.includes('separate(')) return { stdout: `${COMMIT}\n${CHANGE}\nBase\n`, truncated: false }
+      if (args.includes('workspace')) return { stdout: 'thread-a\n', truncated: false }
+      if (joined.includes('connected('))
+        return { stdout: [revision(COMMIT, [elided]), revision(elided, [DEFAULT_COMMIT]), revision(DEFAULT_COMMIT, [])].join('\n'), truncated: false }
+      if (joined.includes('commit_id ++ "\\n"')) return { stdout: `${COMMIT}\n${DEFAULT_COMMIT}\n`, truncated: false }
+      return { stdout: '', truncated: false }
+    }
+    const result = await ReferenceGraphModel.read({ run, reference: 'main' })
+
+    expect(result.listedCommitIds).toEqual([COMMIT, DEFAULT_COMMIT])
+    expect(result.revisions.map(row => row.commitId)).toEqual([COMMIT, elided, DEFAULT_COMMIT])
+    expect(result.revisions[0]?.description).toBe('First line')
+    expect(calls.find(call => call.join(' ').includes('connected('))?.join(' ')).toContain(`connected(${COMMIT} | ${DEFAULT_COMMIT})`)
+  })
+
   it('refuses a reference that is not a revision or a bookmark name', async () => {
     const { run } = runner()
     await expect(ReferenceGraphModel.read({ run, reference: 'main; rm -rf /' })).rejects.toThrow()

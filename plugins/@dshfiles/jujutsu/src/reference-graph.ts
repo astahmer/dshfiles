@@ -1,9 +1,14 @@
 import { z } from 'zod'
+import { revisionSchema, type Revision } from './api.js'
+import { JujutsuOutputModel } from './core.js'
+import { REVISION_TEMPLATE } from './jj-templates.js'
 import type { JjRun } from './revision-reads.js'
 
 const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
 const ROW_LIMIT = 20
 const NEIGHBOURHOOD = 4
+/** Revisions between the listed rows: enough to join two listed rows across an elided stretch, never a whole history. */
+const CONNECTION_LIMIT = 400
 
 export interface ReferenceGraph {
   /** The reference exactly as the reader saw it in chat. */
@@ -13,6 +18,11 @@ export interface ReferenceGraph {
   /** First-line description used as the chat link label; empty for undescribed revisions. */
   readonly description: string
   readonly graph: string
+  /** The listed rows, newest first, as the panel's graph lays them out. */
+  readonly listedCommitIds: string[]
+  /** The listed rows plus the elided revisions joining them, so a link through hidden history stays one lane. */
+  readonly revisions: Revision[]
+  readonly defaultCommitId: string | null
 }
 
 /**
@@ -101,7 +111,29 @@ const readReferenceGraph = async (input: { readonly run: JjRun; readonly referen
     '-T',
     template({ commitId, defaultCommitId }),
   ])
-  return { label: input.reference, commitId, changeId, description, graph: graph.trimEnd() }
+  const listedCommitIds = rows(
+    await read(['log', '--no-graph', '--limit', String(ROW_LIMIT), '-r', revset({ reference, hasDefaultWorkspace }), '-T', 'commit_id ++ "\\n"']),
+  ).filter(row => commitIdSchema.safeParse(row).success)
+  const revisions =
+    listedCommitIds.length === 0
+      ? []
+      : JujutsuOutputModel.parseJsonLines(
+          await read(['log', '--no-graph', '--limit', String(CONNECTION_LIMIT), '-r', `connected(${listedCommitIds.join(' | ')})`, '-T', REVISION_TEMPLATE]),
+          value => {
+            const revision = revisionSchema.parse(value)
+            return { ...revision, description: revision.description.split('\n')[0] ?? '' }
+          },
+        )
+  return {
+    label: input.reference,
+    commitId,
+    changeId,
+    description,
+    graph: graph.trimEnd(),
+    listedCommitIds,
+    revisions,
+    defaultCommitId: defaultCommitId ?? null,
+  }
 }
 
 export class ReferenceGraphModel {

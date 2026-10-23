@@ -176,6 +176,10 @@ export const referenceGraphSchema = z.object({
   /** Older Hosts omit it; use the identifier as the chat label until title metadata is available. */
   description: z.string().max(255).optional(),
   graph: z.string().max(20_000),
+  /** Older Hosts send only the text graph; the preview falls back to it. */
+  listedCommitIds: z.array(commitIdSchema).max(20).optional(),
+  revisions: z.array(revisionSchema).max(400).optional(),
+  defaultCommitId: commitIdSchema.nullable().optional(),
 })
 
 export type GraphSlice = z.infer<typeof graphSliceSchema>

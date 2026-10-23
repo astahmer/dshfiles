@@ -6,6 +6,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel } from './chat-reference.js'
+import { ReferenceGraphView } from './reference-graph-view.js'
 import {
   chatReferencePreviewDismissEvent,
   chatReferencePreviewEvent,
@@ -227,7 +228,14 @@ export const ChatReferenceOverlay = (): JSX.Element => {
                 {failure}
               </p>
             )}
-            {rendered === undefined ? null : (
+            {referenceGraph?.revisions !== undefined && referenceGraph.listedCommitIds !== undefined && referenceGraph.listedCommitIds.length > 0 ? (
+              <ReferenceGraphView
+                defaultCommitId={referenceGraph.defaultCommitId ?? null}
+                listedCommitIds={referenceGraph.listedCommitIds}
+                referencedCommitId={referenceGraph.commitId}
+                revisions={referenceGraph.revisions}
+              />
+            ) : rendered === undefined ? null : (
               <pre aria-label="Revision graph" className="dshx:max-h-72 dshx:overflow-auto dshx:font-mono dshx:text-xs dshx:leading-4">
                 {rendered}
               </pre>
