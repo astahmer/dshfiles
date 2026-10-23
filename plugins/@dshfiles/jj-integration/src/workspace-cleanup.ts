@@ -57,6 +57,14 @@ const decide = (input: {
 /** A folder can sit unregistered for a moment while a workspace is created, so a younger one is never untracked. */
 const UNTRACKED_MIN_AGE_MS = 60 * 60_000
 
+const isFinishedWorkspaceReadyToRemove = (input: {
+  readonly finished: boolean
+  readonly unlandedCount: number
+  readonly rebasedAt: number | undefined
+  readonly now: number
+  readonly graceMs: number
+}): boolean => input.finished && input.unlandedCount === 0 && input.rebasedAt !== undefined && input.now - input.rebasedAt >= input.graceMs
+
 const isStaleUntracked = (input: {
   readonly modifiedAt: number
   readonly now: number
@@ -67,4 +75,5 @@ const isStaleUntracked = (input: {
 export class WorkspaceCleanupModel {
   static readonly decide = decide
   static readonly isStaleUntracked = isStaleUntracked
+  static readonly isFinishedWorkspaceReadyToRemove = isFinishedWorkspaceReadyToRemove
 }

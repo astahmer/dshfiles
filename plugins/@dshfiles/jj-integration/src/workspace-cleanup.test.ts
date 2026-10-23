@@ -24,6 +24,19 @@ const decide = (thread: CleanupThread, options: { readonly archived?: readonly s
     kinds: ['empty', 'integrated'],
   })
 
+describe('WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove', () => {
+  const graceMs = 15 * 60_000
+
+  it('removes only finished, landed workspaces after the grace period since rebase', () => {
+    const rebasedAt = now - graceMs
+    expect(WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({ finished: true, unlandedCount: 0, rebasedAt, now, graceMs })).toBe(true)
+    expect(WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({ finished: true, unlandedCount: 1, rebasedAt, now, graceMs })).toBe(false)
+    expect(WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({ finished: false, unlandedCount: 0, rebasedAt, now, graceMs })).toBe(false)
+    expect(WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({ finished: true, unlandedCount: 0, rebasedAt: undefined, now, graceMs })).toBe(false)
+    expect(WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({ finished: true, unlandedCount: 0, rebasedAt: now - graceMs + 1, now, graceMs })).toBe(false)
+  })
+})
+
 describe('WorkspaceCleanupModel.decide', () => {
   it('removes an idle empty workspace unused for longer than the threshold', () => {
     expect(decide(idleThread())).toEqual({ action: 'remove', kind: 'empty', lastUsedAt: now - 10 * HOUR })

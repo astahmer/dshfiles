@@ -71,7 +71,7 @@ declare module '@deepseek-ai/cordis' {
 const MAX_OUTPUT = 512 * 1024
 const MAX_STDERR = 64 * 1024
 const JJ_TIMEOUT_MS = 120_000
-/** A thread younger than this may still be waiting for its first Session to attach. */
+/** Retain rebased workspaces for this long after their last land before sweeping finished threads. */
 const SWEEP_GRACE_MS = 15 * 60_000
 /** A cleanup deletes node_modules trees, which can take minutes on a slow disk. */
 const CLEANUP_TIMEOUT_MS = 5 * 60_000
@@ -1133,9 +1133,16 @@ const sweepFinishedThreads = async (): Promise<void> => {
         await cleanKeptThread(thread.path)
         continue
       }
-      const createdAt = thread.workspaceId === null ? undefined : registryOf().get(WorkspaceId(thread.workspaceId))?.createdAt
-      const bornAt = createdAt === undefined ? (existsSync(thread.path) ? statSync(thread.path).mtimeMs : 0) : Date.parse(createdAt)
-      if (Date.now() - bornAt < SWEEP_GRACE_MS) continue
+      if (
+        !WorkspaceCleanupModel.isFinishedWorkspaceReadyToRemove({
+          finished: thread.finished,
+          unlandedCount: thread.unlanded.length,
+          rebasedAt: thread.rebasedAt,
+          now: Date.now(),
+          graceMs: SWEEP_GRACE_MS,
+        })
+      )
+        continue
       await discardThread({ path: thread.path, force: false }).catch(error => {
         hostContext?.logger.warn('jj-integration: could not remove finished thread %s: %s', thread.name, error instanceof Error ? error.message : String(error))
       })
