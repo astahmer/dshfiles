@@ -55,3 +55,28 @@ want kept in sync after a Host restart.
 
 Report the stages separately: source validated, web seed updated, profile synced,
 live runtime confirmed. If the active profile was not synced, say so.
+
+## A slot `inject` callback must not throw
+
+`ClientEntries.replace()` tears the old client fiber down **before** the
+replacement imports and applies (`@deepseek-ai/dsh-client-modules`
+`lib/client.js:492-505`, DSH #6883). A slash-menu overlay, a queue dock or the
+transcript can render inside that window. A slot `inject` callback that throws
+when its provider is momentarily missing therefore crashes the entry, and the
+renderer logs `slot entry crashed in '<slot>'` — the shape of the 2026-10-22
+composer crash.
+
+Resolve a Session-scoped service where the value is **used**, not while `inject`
+builds its face, and render a degraded/empty face while it is absent. The
+2026-10-23 audit fixed every owned site that threw from `inject`:
+
+| Site | Before | Now |
+| ---- | ------ | --- |
+| `queue-reorder` dock | threw on missing scope/`conversation` | resolves per call, rejects the action with "reconnecting" |
+| `rich-composer` composer bar | `concreteConversation` threw during inject | controller registered before the slots |
+| `rich-composer` queue dock | threw on missing scope/`conversation` | same per-call guard as `queue-reorder` |
+| `chat` view + flow | threw on a missing `ctx.sessions.binding` | detached empty faces (`src/native/chat/detached-injected.ts`) |
+| `input-trigger` slash menu | threw when the Session scope was absent | closed-menu face |
+
+Throwing **after** an await inside a user action (rename, pin, archive) is not
+this problem: the error propagates through the action that owns it.

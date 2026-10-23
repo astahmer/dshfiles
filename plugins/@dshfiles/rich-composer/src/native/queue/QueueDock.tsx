@@ -386,6 +386,9 @@ export function QueueDock({ useSession, useProjection, updateQueue, notify, load
   )
 }
 
+/** Shown when the dock's Session scope or its conversation provider is between hot replacements. */
+const QUEUE_RECONNECTING_MESSAGE = 'The queue is reconnecting; try again in a moment.'
+
 /** Registers queue actions backed by the session-scoped conversation service. */
 export const queueDockEntry = {
   name: 'conversation-queue-dock',
@@ -396,17 +399,25 @@ export const queueDockEntry = {
       id: 'queue',
       order: 20,
       locale: NS,
-      inject: (sessionId: SessionId): QueueDockInjected => {
-        const actx = ctx.sessions.scope(sessionId)
-        if (actx === undefined) throw new Error(`queue dock: session "${sessionId}" resolved no scope`)
-        const conversation = actx.get('conversation')
-        if (conversation === undefined) throw new Error('queue dock: conversation service unavailable')
-        return {
-          updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
-          notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
-          loadImage: attachment => ctx.uiConversation.imageUrl(sessionId, attachment),
-        }
-      },
+      // Resolved per call: a hot replacement tears the Session scope and the
+      // conversation provider down before the replacement applies, and a throw
+      // from `inject` takes the whole dock with it. A transient gap surfaces
+      // through the action's own error path instead.
+      inject: (sessionId: SessionId): QueueDockInjected => ({
+        updateQueue: (itemId, action) => {
+          const actx = ctx.sessions.scope(sessionId)
+          const conversation = actx?.get('conversation')
+          if (actx === undefined || conversation === undefined) return Promise.reject(new Error(QUEUE_RECONNECTING_MESSAGE))
+          return conversation.updateQueue(itemId, action)
+        },
+        notify: (level, text) => {
+          const actx = ctx.sessions.scope(sessionId)
+          const conversation = actx?.get('conversation')
+          if (actx === undefined || conversation === undefined) return
+          conversation.input.for(actx).notify(level, text)
+        },
+        loadImage: attachment => ctx.uiConversation.imageUrl(sessionId, attachment),
+      }),
     }, QueueDock))
   },
 }

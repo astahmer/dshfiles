@@ -10,7 +10,10 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { InputTriggerService } from './service.js'
+import type { MenuState } from '../core/contract.js'
+import type { InputTriggerCrumb } from '../types.js'
 import type { MenuViewInjected } from './slots.js'
 import { MenuView } from './MenuView.js'
 import { en, zh, type MenuKey } from './locales.js'
@@ -78,6 +81,16 @@ export const inject = ['sessions', 'locale']
  * input overlay once its declarer is up.
  * @param ctx - client root context.
  */
+/** Closed menu face used while a Session has no scope: the overlay renders nothing. */
+const CLOSED_MENU_FACE: MenuViewInjected = {
+  menu: createSnapshotStore<MenuState>({ open: false, hit: null, generation: 0, groups: [], highlight: null }),
+  headers: createSnapshotStore<ReadonlyMap<string, readonly InputTriggerCrumb[]>>(new Map()),
+  onPick: () => {},
+  onHover: () => {},
+  onCrumb: () => {},
+  onDismiss: () => {},
+}
+
 export function apply(ctx: ClientContext): void {
   ctx.plugin(InputTriggerService)
   ctx.effect(() => ctx.locale.register(MENU_NS, { zh, en }), 'ui-input-trigger: menu dictionaries')
@@ -94,8 +107,10 @@ export function apply(ctx: ClientContext): void {
           inject: (sessionId): MenuViewInjected => {
             // Session-scoped slot: resolve this session's controller (the slot
             // frame hands ids, not ctx — the registered id→ctx interchange).
+            // No scope means the Session scope is between hot replacements, so
+            // render the closed menu instead of throwing out of `inject`.
             const actx = sessions.scope(sessionId)
-            if (actx === undefined) throw new Error(`ui-input-trigger: session "${String(sessionId)}" resolved no scope`)
+            if (actx === undefined) return CLOSED_MENU_FACE
             const controller = inputTriggers.sessionOf(actx)
             return {
               menu: controller.menu,

@@ -30,6 +30,7 @@ import { EMPTY_CHAT_SNAPSHOT } from './contract/snapshot.ts'
 import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
 import { ChatView } from './chat/ChatView.tsx'
 import { ChatFlow } from './chat/ChatFlow.tsx'
+import { detachedFlow, detachedView } from './chat/detached-injected.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
 import { UserContent } from './chat/UserContent.tsx'
 import { ActivityPill, UsagePill } from './chat/StatsPills.tsx'
@@ -219,7 +220,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     },
     inject: (sessionId: SessionId): ChatFlowDataInjected => {
       const binding = ctx.sessions.binding(sessionId)
-      if (binding === undefined) throw new Error(`ui-chat: unknown session "${sessionId}"`)
+      if (binding === undefined) return detachedFlow(presentation)
       return nodeSources(binding)
     },
   }, ChatFlow))
@@ -237,7 +238,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       store: chatStore,
       inject: (sessionId: SessionId): ChatViewInjected => {
         const binding = ctx.sessions.binding(sessionId)
-        if (binding === undefined) throw new Error(`ui-chat: unknown session "${sessionId}"`)
+        if (binding === undefined) return detachedView(presentation)
         const session = binding.session
         const chat = chatSource(binding)
         return {

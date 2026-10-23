@@ -17,7 +17,7 @@
 | S1 Prove the gate's inputs (loaded-vs-disk, scratch DSH)   | partial     | `src/host/gate.test.ts` (8 tests): `exports`/`main` resolution, digest, apply/defer/release; scratch run open |
 | S2 Gate: defer a rebuilt client frame while its Host half is stale | shipped | `plugins/@dshfiles/hmr-gate` (Host transport + gate + `deferred` frame + `hmr_gate_status`); typecheck, tests, build, host import check |
 | S3 Surface: notice, retry, page reload                    | shipped (notice) | `plugins.item` row "HMR updates" in Settings → Plugins; retry/reload actions open |
-| S4 Containment: slot `inject` callbacks never throw       | shipped     | `rich-composer` registers `ConversationController` before slots (+ `apply-order.test.ts`); `queue-reorder` resolves `conversation` per call |
+| S4 Containment: slot `inject` callbacks never throw       | shipped     | every owned throwing site fixed: `rich-composer` ordering + both queue docks, `chat` detached faces (+ test), `input-trigger` closed-menu face; audit table in [docs/plugin-reload.md](../../docs/plugin-reload.md#a-slot-inject-callback-must-not-throw) |
 | S5 Verification (scratch DSH, both skews, two builds)     | partial     | boot check green (full web profile); scratch DSH: deferred row after a Host+client rebuild, cleared after restore, 0 console/page/request errors. Client-only rebuild applies (unit-tested apply path; not observed live) |
 | S6 Docs and Host-gap rows                                 | shipped     | `docs/plugin-reload.md`, `docs/native-forks.md`, plan, plugin README/UPSTREAM, gaps 76/77, profile seed row |
 
