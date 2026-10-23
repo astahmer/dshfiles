@@ -39,6 +39,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { ActivityDescription } from './activity-description.js'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
@@ -385,39 +386,6 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
 
 type ConversationRun = { readonly kind: 'comment'; readonly event: BacklogEvent } | { readonly kind: 'changes'; readonly events: BacklogEvent[] }
 
-const ActivityDescription = (props: {
-  readonly event: BacklogEvent
-  readonly attention: BacklogAttention
-  readonly threadId: string | undefined
-  readonly threadLabel: ThreadLabel
-  readonly openThread: OpenThread
-}): JSX.Element => {
-  const description = ItemGlyphs.describeEvent(props.event, props.attention)
-  const threadId = props.threadId
-  if (threadId === undefined) return <>{description}</>
-  const reference = BacklogActivityReferences.threadReferenceRange(description, threadId)
-  if (reference === undefined) return <>{description}</>
-  const label = props.threadLabel(threadId)
-  const text = reference.text.startsWith('thread:')
-    ? `the thread “${label}”`
-    : `${reference.text.toLowerCase().startsWith('a ') ? 'a' : 'the'} thread “${label}”`
-  return (
-    <>
-      {description.slice(0, reference.start)}
-      <button
-        type="button"
-        aria-label={`Open thread ${label}`}
-        title={`Open thread ${label}`}
-        className="dshx:inline dshx:appearance-none dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:font-medium dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground"
-        onClick={() => props.openThread(threadId)}
-      >
-        {text}
-      </button>
-      {description.slice(reference.end)}
-    </>
-  )
-}
-
 /** Comments read as messages; every other event folds into one "made N changes" line per actor run, opened on demand. */
 const Conversation = (props: {
   readonly events: readonly BacklogEvent[]
@@ -477,8 +445,7 @@ const Conversation = (props: {
                     <p key={String(position)}>
                       <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
                       <ActivityDescription
-                        event={event}
-                        attention={attention}
+                        description={ItemGlyphs.describeEvent(event, attention)}
                         threadId={threadId}
                         threadLabel={props.threadLabel}
                         openThread={props.openThread}
