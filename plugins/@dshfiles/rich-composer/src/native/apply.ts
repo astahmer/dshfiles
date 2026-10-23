@@ -143,9 +143,14 @@ function scopedConversation(sessions: ISessions, id: SessionId): IConversation {
   return conversation
 }
 
-/** Resolve package-internal attachment operations from the public service. */
+/** Package-internal attachment operations from the public service, absent while a hot replacement swaps it. */
+function liveConversation(ctx: Context): ConversationController | undefined {
+  return ctx.get('conversation') as ConversationController | undefined
+}
+
+/** Resolve package-internal attachment operations from the public service, failing loud inside a user action. */
 function concreteConversation(ctx: Context): ConversationController {
-  const conversation = ctx.get('conversation') as ConversationController | undefined
+  const conversation = liveConversation(ctx)
   if (conversation === undefined) throw new Error('ui-conversation: conversation service unavailable')
   return conversation
 }
@@ -472,7 +477,10 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.composer.dock': { kind: 'list', scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
-      if (sessionId === undefined) {
+      // Never thrown from here: this slot can render while a hot replacement swaps the Session generation or the
+      // controller, and a throw takes the whole composer with it. Without a binding it renders the absent face; each
+      // action resolves the controller when it runs, and the upload list stays empty meanwhile.
+      if (sessionId === undefined || sessions.binding(sessionId) === undefined) {
         return {
           keyboard: undefined,
           insertReference: undefined,
@@ -492,7 +500,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           },
         }
       }
-      const conversation = concreteConversation(ctx)
       const shell = inputHub.shell(sessionId)
       const inputTriggers = inputHub.inputTriggers(sessionId)
       const bridge = hostPathBridge()
@@ -500,11 +507,13 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         keyboard: shell,
         insertReference: (reference, span) => {
           const sessionContext = sessions.scope(sessionId)
-          if (sessionContext === undefined) return false
+          const conversation = liveConversation(ctx)
+          if (sessionContext === undefined || conversation === undefined) return false
           return conversation.input.for(sessionContext).insertReference(reference, span)
         },
         addFiles: (files, directories = new Set()) => {
-          if (sessions.binding(sessionId) === undefined) return t('file.sessionUnavailable')
+          const conversation = liveConversation(ctx)
+          if (sessions.binding(sessionId) === undefined || conversation === undefined) return t('file.sessionUnavailable')
           if (shell.snapshot.phase === 'adjudicating' || shell.snapshot.phase === 'submitting') {
             return t('attachment.dropBlocked')
           }
@@ -543,11 +552,11 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           }
         },
         removeAttachment: (id) => {
-          if (shell.removeAttachment(id)) conversation.releaseDraftAttachment(id)
+          if (shell.removeAttachment(id)) liveConversation(ctx)?.releaseDraftAttachment(id)
         },
-        resolveDraftAttachments: ids => conversation.resolveDraftAttachments(ids),
+        resolveDraftAttachments: ids => liveConversation(ctx)?.resolveDraftAttachments(ids) ?? [],
         retryFileUpload: (id) => {
-          if (sessions.binding(sessionId) !== undefined) conversation.retryFileUpload(sessionId, id)
+          if (sessions.binding(sessionId) !== undefined) liveConversation(ctx)?.retryFileUpload(sessionId, id)
         },
         toggleCommandMenu: inputTriggers === undefined
           ? undefined
@@ -566,7 +575,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         hooks: {
           stopShortcut,
           busyEnter: submissionPolicy.busyEnter,
-          fileUploads: conversation.fileUploads,
+          fileUploads: liveConversation(ctx)?.fileUploads ?? ABSENT_FILE_UPLOADS,
           notices: shell.notices,
           lexicon: shell.lexicon,
           menuLauncher: inputTriggers?.launcher ?? ABSENT_MENU_LAUNCHER,

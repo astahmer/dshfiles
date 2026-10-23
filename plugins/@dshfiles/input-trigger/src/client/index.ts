@@ -107,10 +107,12 @@ export function apply(ctx: ClientContext): void {
           inject: (sessionId): MenuViewInjected => {
             // Session-scoped slot: resolve this session's controller (the slot
             // frame hands ids, not ctx — the registered id→ctx interchange).
-            // No scope means the Session scope is between hot replacements, so
-            // render the closed menu instead of throwing out of `inject`.
+            // No scope, or a scope whose generation is no longer the retained
+            // binding, means the Session is between hot replacements and
+            // `sessionOf` would throw: render the closed menu instead.
             const actx = sessions.scope(sessionId)
-            if (actx === undefined) return CLOSED_MENU_FACE
+            const session = actx === undefined ? undefined : sessions.sessionOf(actx)
+            if (actx === undefined || session === undefined || sessions.binding(sessionId)?.session !== session) return CLOSED_MENU_FACE
             const controller = inputTriggers.sessionOf(actx)
             return {
               menu: controller.menu,

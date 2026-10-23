@@ -27,6 +27,7 @@ import { SessionInputShell } from './facade.ts'
 import { reportMessageSubmission } from './submission-analytics.ts'
 import { readConversationDraft } from '../stores.ts'
 import { AgentWarmup } from '../../agent-warmup.ts'
+import { isRetainedScope } from '../../retained-scope.ts'
 
 /** Structural command face for per-session popup resolution. */
 interface CommandFace {
@@ -270,7 +271,8 @@ export class InputHub implements SessionInputResolver {
   }
 
   private controller(actx: Context): InputTriggerController | undefined {
-    if (this.sessions().sessionOf(actx) === undefined) return undefined
+    // Runs while the composer bar renders.
+    if (!isRetainedScope(this.sessions(), actx)) return undefined
     const inputTriggers = this.rootCtx.get('inputTriggers') as InputTriggerServiceFace | undefined
     return inputTriggers?.sessionOf(actx)
   }

@@ -73,10 +73,19 @@ builds its face, and render a degraded/empty face while it is absent. The
 | Site | Before | Now |
 | ---- | ------ | --- |
 | `queue-reorder` dock | threw on missing scope/`conversation` | resolves per call, rejects the action with "reconnecting" |
-| `rich-composer` composer bar | `concreteConversation` threw during inject | controller registered before the slots |
+| `rich-composer` composer bar | `concreteConversation` threw during inject; `inputHub.shell` threw without a binding | controller registered before the slots, and the bar renders its absent face without a binding and resolves `conversation` per action |
+| `rich-composer` input hub | `inputTriggers.sessionOf` threw for a scope of a replaced generation | `isRetainedScope` (`src/retained-scope.ts`) checks the binding first |
 | `rich-composer` queue dock | threw on missing scope/`conversation` | same per-call guard as `queue-reorder` |
-| `chat` view + flow | threw on a missing `ctx.sessions.binding` | detached empty faces (`src/native/chat/detached-injected.ts`) |
-| `input-trigger` slash menu | threw when the Session scope was absent | closed-menu face |
+| `chat` view + flow | threw on a missing `ctx.sessions.binding` | detached empty faces (`src/detached-injected.ts`) |
+| `input-trigger` slash menu | threw when the Session scope was absent or no longer the retained binding | closed-menu face |
+
+Registration order alone does not close the window: the old fiber, and its
+`conversation` service, is gone while a stale entry can still render. Keep the
+guard in the `inject` itself.
+
+Owned helpers for a native fork live **outside** its vendored directory
+(`src/`, not `src/native/`): `scripts/native-fork-diff.mjs` reports any file it
+cannot map to upstream as drift.
 
 Throwing **after** an await inside a user action (rename, pin, archive) is not
 this problem: the error propagates through the action that owns it.
