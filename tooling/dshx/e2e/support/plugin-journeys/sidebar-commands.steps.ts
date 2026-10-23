@@ -46,7 +46,7 @@ Then('\\/goto offers palette actions, registered panels and only the nonblank re
     await expect(goToGroup(page, 'Actions').getByRole('option')).toHaveText([/^Open command palette/, /^Search threads/])
   })
   await recordAssertion(page, 'sidebar-commands-panels-follow-registered-panels', async () => {
-    await expect(goToGroup(page, 'Panels').getByRole('option')).toHaveText([/^AI Accounts/, /^Plugins/, /^Usage history/])
+    await expect(goToGroup(page, 'Panels').getByRole('option')).toHaveText([/^AI Accounts/, /^Automation tasks/, /^Plugins/, /^Quota forecast/, /^Usage history/])
   })
   await recordAssertion(page, 'sidebar-commands-recent-sessions-skip-blank-threads', async () => {
     await expect(goToGroup(page, 'Sessions').getByRole('option')).toHaveCount(1)
