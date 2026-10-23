@@ -24,7 +24,7 @@ import { createRestartController, readLaunchUrl } from './restart.js'
 import { RestartResumeSetting, settledSessionIdsFromHost, threadSidebarHostSettings } from './settings.js'
 import { underSettledSession } from './settled-gate.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
-import { setThreadActionsContext, threadActionsHost } from './thread-actions-host.js'
+import { setThreadActionsContext, threadActionsHost, threadActionCommands } from './thread-actions-host.js'
 import { threadQueueHost } from './queue-host.js'
 
 const restartRecoveryStore = createRestartRecoveryStore()
@@ -235,6 +235,7 @@ interface ClientModuleRegistrySurface {
 
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
+  commands: threadActionCommands,
   settings: [threadSidebarHostSettings],
   inject: [
     'connection',

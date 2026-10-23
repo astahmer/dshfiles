@@ -5,7 +5,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { createHostApiClient } from '@dshfiles/dshx/host'
+import { createHostApiClient, defineCommand, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { continuationApi } from '@dshfiles/session-controller/continuation-api'
 import { createThreadActions, type ThreadActionDeps } from './thread-actions.js'
@@ -153,4 +153,50 @@ const dependencies: ThreadActionDeps = {
 }
 
 /** The thread and project lifecycle tools, wired to the live Host services on each call. */
-export const threadActionsHost = threadActionsApi.host(createThreadActions(dependencies))
+const actions = createThreadActions(dependencies)
+
+export const threadActionsHost = threadActionsApi.host(actions)
+
+const settleCommand = defineCommand({
+  name: 'settle',
+  description: 'Settle this thread so it will not run another model step until unsettled.',
+  handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
+    if (invocation.rawInput.trim().length > 0) return { kind: 'error', text: 'Usage: /settle' }
+    try {
+      const result = await actions.settle({
+        input: {},
+        caller: { kind: 'agent', sessionId: invocation.agent.id },
+        signal: invocation.signal,
+      })
+      return { kind: 'success', text: `Settled thread ${result.sessionId}.` }
+    } catch (error) {
+      return { kind: 'error', text: error instanceof Error ? error.message : String(error) }
+    }
+  },
+})
+
+const archiveCommand = defineCommand({
+  name: 'archive',
+  description: 'Archive this thread without stopping any running work.',
+  handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
+    if (invocation.rawInput.trim().length > 0) return { kind: 'error', text: 'Usage: /archive' }
+    try {
+      const result = await actions.archive({
+        input: {},
+        caller: { kind: 'agent', sessionId: invocation.agent.id },
+        signal: invocation.signal,
+      })
+      if (result.status === 'refused-active') {
+        return {
+          kind: 'error',
+          text: `Cannot archive thread ${result.sessionId} while it has running work (${result.activity.join(', ') || 'activity unknown'}). Stop it first, then run /archive again.`,
+        }
+      }
+      return { kind: 'success', text: `Archived thread ${result.sessionId}.` }
+    } catch (error) {
+      return { kind: 'error', text: error instanceof Error ? error.message : String(error) }
+    }
+  },
+})
+
+export const threadActionCommands = [settleCommand, archiveCommand]
