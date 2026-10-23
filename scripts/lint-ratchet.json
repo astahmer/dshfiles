@@ -9,7 +9,8 @@
     "antislop(require-safety-comment-for-type-assertion)": 338,
     "react-hooks(exhaustive-deps)": 17,
     "react(purity)": 13,
-    "antislop(no-export-bag)": 0
+    "antislop(no-export-bag)": 0,
+    "ui-guidance(no-native-title)": 307
   },
   "ast-grep": {
     "no-deeply-nested-ternary": 2,

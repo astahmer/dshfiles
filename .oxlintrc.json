@@ -4,6 +4,10 @@
     {
       "name": "antislop",
       "specifier": "./tooling/antislop/index.mjs"
+    },
+    {
+      "name": "ui-guidance",
+      "specifier": "./tooling/antislop/repo-rules/no-native-title.mjs"
     }
   ],
   "categories": {
@@ -49,6 +53,12 @@
     "antislop/no-unknown-type-aliases": "warn",
     "antislop/no-widen-then-assert": "warn",
     "antislop/require-safety-comment-for-type-assertion": "warn",
+    "ui-guidance/no-native-title": [
+      "warn",
+      {
+        "allowComponents": ["AlertDialog", "ChartFrame", "Dialog", "Modal", "OnboardingModal", "Panel", "Section", "TitleField"]
+      }
+    ],
     "no-unused-vars": [
       "error",
       {

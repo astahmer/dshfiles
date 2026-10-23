@@ -1137,7 +1137,10 @@
         "click button \"Start thread\"",
         "click combobox \"Thread project\"",
         "expect option \"sample*\"",
-        "expect checkbox \"Open the thread when it is created\""
+        "expect checkbox \"Open the thread when it is created\"",
+        "click button \"Cancel\"",
+        "hover button \"Start thread\"",
+        "expect tooltip \"Start a thread for this item\""
       ],
       "surfaces": ["client", "settings", "tool"],
       "configuration": [],

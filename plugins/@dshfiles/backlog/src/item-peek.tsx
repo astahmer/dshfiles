@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   AlarmClockIcon,
   ArrowRightLeftIcon,
@@ -702,25 +703,38 @@ const AgentThreadChip = (props: {
   const name = agentQuery.data?.name ?? ItemGlyphs.actorName(props.actorId)
   if (thread === undefined) {
     return (
-      <span title={name} className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:px-1.5 dshx:py-1 dshx:text-xs">
-        <ItemGlyphs.ActorAvatar actorId={props.actorId} className="dshx:size-4 dshx:ring-0" />
-        {name}
-      </span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:px-1.5 dshx:py-1 dshx:text-xs">
+              <ItemGlyphs.ActorAvatar actorId={props.actorId} className="dshx:size-4 dshx:ring-0" />
+              {name}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{name}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     )
   }
   return (
-    <Button
-      type="button"
-      size="xs"
-      variant="outline"
-      title={`${name} · ${thread.title}`}
-      aria-label={`Open ${name}'s thread: ${thread.title}`}
-      onClick={() => props.openThread(thread.id)}
-      className="dshx:h-7 dshx:max-w-48 dshx:gap-1.5 dshx:px-1.5"
-    >
-      <ItemGlyphs.ActorAvatar actorId={props.actorId} className="dshx:size-4 dshx:ring-0" />
-      <span className="dshx:truncate">{agentQuery.data === null ? thread.title : name}</span>
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            aria-label={`Open ${name}'s thread: ${thread.title}`}
+            onClick={() => props.openThread(thread.id)}
+            className="dshx:h-7 dshx:max-w-48 dshx:gap-1.5 dshx:px-1.5"
+          >
+            <ItemGlyphs.ActorAvatar actorId={props.actorId} className="dshx:size-4 dshx:ring-0" />
+            <span className="dshx:truncate">{agentQuery.data === null ? thread.title : name}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{`${name} · ${thread.title}`}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -784,47 +798,57 @@ const PeekBody = (props: {
           <span className="dshx:font-mono! dshx:text-foreground">b:{item.id}</span>
           {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
         </nav>
-        <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Start thread"
-            title="Start a thread for this item"
-            onClick={() => props.startThread([startThreadItemOf({ id: item.id, title: item.title, project: item.project, preview: item.body })])}
-          >
-            <MessagesSquareIcon />
-          </Button>
-          {props.triageOff ? null : (
+        <TooltipProvider>
+          <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Start thread"
+                  onClick={() => props.startThread([startThreadItemOf({ id: item.id, title: item.title, project: item.project, preview: item.body })])}
+                >
+                  <MessagesSquareIcon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Start a thread for this item</TooltipContent>
+            </Tooltip>
+            {props.triageOff ? null : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Run triage"
+                    disabled={actions.triage.isPending}
+                    onClick={() => actions.triage.mutate(item.id)}
+                    className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
+                  >
+                    <WandSparklesIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Run triage</TooltipContent>
+              </Tooltip>
+            )}
+            <SnoozeMenu id={item.id} snoozedUntil={item.snoozedUntil ?? null} />
             <Button
               variant="ghost"
               size="icon-xs"
-              aria-label="Run triage"
-              title="Run triage"
-              disabled={actions.triage.isPending}
-              onClick={() => actions.triage.mutate(item.id)}
-              className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
+              aria-label={item.pinned ? 'Unpin' : 'Pin'}
+              aria-pressed={item.pinned}
+              className={cn(item.pinned && 'dshx:text-warning')}
+              onClick={() => actions.update.mutate({ id: item.id, pinned: !item.pinned })}
             >
-              <WandSparklesIcon />
+              <PinIcon className={cn(item.pinned && 'dshx:fill-current')} />
             </Button>
-          )}
-          <SnoozeMenu id={item.id} snoozedUntil={item.snoozedUntil ?? null} />
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={item.pinned ? 'Unpin' : 'Pin'}
-            aria-pressed={item.pinned}
-            className={cn(item.pinned && 'dshx:text-warning')}
-            onClick={() => actions.update.mutate({ id: item.id, pinned: !item.pinned })}
-          >
-            <PinIcon className={cn(item.pinned && 'dshx:fill-current')} />
-          </Button>
-          <Button variant="ghost" size="icon-xs" aria-label={props.expanded ? 'Collapse' : 'Expand'} onClick={props.toggleExpanded}>
-            {props.expanded ? <Minimize2Icon /> : <Maximize2Icon />}
-          </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="Close" onClick={props.close}>
-            <XIcon />
-          </Button>
-        </div>
+            <Button variant="ghost" size="icon-xs" aria-label={props.expanded ? 'Collapse' : 'Expand'} onClick={props.toggleExpanded}>
+              {props.expanded ? <Minimize2Icon /> : <Maximize2Icon />}
+            </Button>
+            <Button variant="ghost" size="icon-xs" aria-label="Close" onClick={props.close}>
+              <XIcon />
+            </Button>
+          </div>
+        </TooltipProvider>
       </header>
       <div ref={scroller} className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
         <div className={cn('dshx:mx-auto dshx:flex dshx:flex-col dshx:gap-6 dshx:px-5 dshx:py-5', props.expanded && 'dshx:max-w-3xl dshx:px-8')}>

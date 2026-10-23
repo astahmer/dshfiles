@@ -288,6 +288,12 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
 
 - Every utility is `dshx:`-prefixed, a complete static string, merged with
   `cn`; `dshx-root` on each surface root; semantic colors only.
+- Avoid native JSX `title` attributes for hover help; use the shared
+  `@dshfiles/plugin-ui` Tooltip components instead, because native title
+  tooltips appear after a long delay. Keep `title` props only for components
+  whose prop is actual semantic content (such as a dialog or panel heading).
+  Oxlint enforces this with `ui-guidance/no-native-title` and its explicit
+  semantic-component allowlist.
 - `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
   after **any** class change, rebuild it and the plugin you changed.
 - Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
