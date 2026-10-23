@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "brave-web-search",
+      "title": "Answer ctx.web searches with Brave Web Search",
+      "summary": "A Brave backend for the web search seam: the API key setting holds a Secret Catalog reference resolved on the Host per search (falling back to BRAVE_API_KEY), results are stripped of markup, deduplicated by URL and mapped to sources.",
+      "surfaces": ["host", "settings", "integration"],
+      "configuration": [],
+      "states": ["searching", "answered", "credential-missing", "rejected", "aborted"],
+      "failureModes": [
+        "No resolvable key fails with WEB_PROVIDER_CREDENTIAL_MISSING.",
+        "An HTTP error, invalid JSON, an unexpected shape or no results fail with WEB_PROVIDER_ERROR instead of returning nothing.",
+        "A caller abort is reported as WEB_ABORTED."
+      ],
+      "externalDependencies": [
+        {
+          "id": "brave-search-api",
+          "boundary": "GET https://api.search.brave.com/res/v1/web/search with the resolved key, 15 s timeout.",
+          "deterministicFake": "tests/brave.test.ts injects a fetch that answers fixed Brave-shaped responses and status codes."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "web-search-brave.strip-markup",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "removes tags, decodes entities and collapses whitespace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-search-brave.map-sources",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "maps results, strips markup and dedupes by URL"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-search-brave.unexpected-shape",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "refuses an unexpected shape instead of returning nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-search-brave.endpoint",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "calls the Brave endpoint with the key and maps the response"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-search-brave.rejected-key",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "surfaces a rejected key with guidance"
+        },
+        {
+          "kind": "unit-test",
+          "id": "web-search-brave.abort",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "reports a caller abort as WEB_ABORTED"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "web-search-brave.no-browser-journey",
+          "reason": "The backend calls the fixed public Brave endpoint from the Host with no base-URL override, so a browser journey would need a real key and the live network; the request, mapping and failure paths run against an injected fetch in tests/brave.test.ts."
+        }
+      ]
+    }
+  ]
+}

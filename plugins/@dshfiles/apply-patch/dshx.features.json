@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "apply-patch-tool",
+      "title": "Edit a file the Agent inspected without the native read tool",
+      "summary": "The apply_patch agent tool reads the file itself, records that read on the Host's observation policy, applies literal replacements in order with a whitespace-tolerant fallback, and writes once; it never creates a file.",
+      "surfaces": ["host", "tool"],
+      "configuration": [],
+      "states": ["exact", "fuzzy", "ambiguous", "missing", "written"],
+      "failureModes": [
+        "An ambiguous or missing anchor fails before writing and names the candidate lines.",
+        "An empty or unchanged needle is rejected before the file is touched.",
+        "Without a working directory, or for a file that does not exist, the tool refuses instead of creating one."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.exact-match",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "replaces one literal match and reports it as exact"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.ambiguous-match",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "refuses an ambiguous literal match and names the lines"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.reindented-match",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "finds a reindented block after the literal match fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.missing-match",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "fails with missing when no literal or whitespace match exists"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.ordered-edits",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "applies edits in order so a later anchor sees the earlier result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.crlf",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "preserves CRLF line endings"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "apply-patch.no-browser-surface",
+          "reason": "apply_patch is an agent tool with no browser UI of its own; its edit semantics are covered by tests/apply-edits.test.ts and the Host bundle is import-checked after each build."
+        }
+      ]
+    }
+  ]
+}

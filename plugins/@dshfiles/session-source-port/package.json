@@ -25,5 +25,8 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

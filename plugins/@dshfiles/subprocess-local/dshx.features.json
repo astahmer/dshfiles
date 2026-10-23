@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "group-exit-backoff",
+      "title": "Wait for detached process groups without probing every 15 ms",
+      "summary": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["running", "group-alive", "exited"],
+      "failureModes": [
+        "A process group that outlives its leader is still awaited until empty, only probed less often.",
+        "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "subprocess-local.runs-command",
+          "file": "plugins/@dshfiles/subprocess-local/tests/group-exit-poll.test.ts",
+          "testName": "runs a command and reports its output"
+        },
+        {
+          "kind": "unit-test",
+          "id": "subprocess-local.group-poll-backoff",
+          "file": "plugins/@dshfiles/subprocess-local/tests/group-exit-poll.test.ts",
+          "testName": "waits for a backgrounded child without probing its group every 15 ms"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "subprocess-local.no-browser-surface",
+          "reason": "The fork replaces the Host subprocess service and renders no UI; every shell journey in the e2e suite runs through it, and the poll backoff is measured in tests/group-exit-poll.test.ts."
+        }
+      ]
+    }
+  ]
+}

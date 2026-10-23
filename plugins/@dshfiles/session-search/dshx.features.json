@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "worker-session-search",
+      "title": "Serve session search from a worker-owned index",
+      "summary": "Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.",
+      "surfaces": ["host", "storage"],
+      "configuration": [],
+      "states": ["ingesting", "indexed", "behind", "failed"],
+      "failureModes": [
+        "Filters the backend cannot serve are refused with SESSION_QUERY_INVALID_FILTER rather than silently ignored.",
+        "An interrupted ingest resumes from the stored per-log cursor instead of restarting the corpus."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-search.listing-cache",
+          "file": "plugins/@dshfiles/session-search/src/engine-listing.test.ts",
+          "testName": "lists Sessions once until one is created, disposed, or a listed header changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.title-cache",
+          "file": "plugins/@dshfiles/session-search/src/engine-titles.test.ts",
+          "testName": "folds a Session title once until that Session appends an event"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "session-search.no-browser-surface",
+          "reason": "The bundle replaces a Host service backend and renders no UI of its own; the palette and memory finder that call it are verified by their own catalogs, and the cached reads are unit-tested in src/engine-listing.test.ts and src/engine-titles.test.ts."
+        }
+      ]
+    }
+  ]
+}

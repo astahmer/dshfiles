@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "session-source-registry",
+      "title": "One Host port for Sessions that live on another runtime",
+      "summary": "A registry the Session controller provides and remote sources register into; ownership is claimed from list answers and re-checked through owns() only when a Session id is not cached.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["registered", "claimed", "unowned", "forgotten"],
+      "failureModes": [
+        "A cached claim of a source that is no longer registered is dropped before asking the remaining sources.",
+        "An id no source owns resolves to nothing, so the controller keeps it local."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-source-port.claims-follow-source",
+          "file": "plugins/@dshfiles/session-source-port/src/index.test.ts",
+          "testName": "claims follow a source and are forgotten with it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-source-port.resolve-owner",
+          "file": "plugins/@dshfiles/session-source-port/src/index.test.ts",
+          "testName": "resolveOwner asks each source only when nothing is claimed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-source-port.stale-claim",
+          "file": "plugins/@dshfiles/session-source-port/src/index.test.ts",
+          "testName": "a cached claim of an unregistered source is dropped before asking"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-source-port.unowned-id",
+          "file": "plugins/@dshfiles/session-source-port/src/index.test.ts",
+          "testName": "an id no source owns resolves to nothing"
+        }
+      ]
+    }
+  ]
+}
