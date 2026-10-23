@@ -70,7 +70,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | attachment-gallery                                                                                                                                | 5                    | 0                                                                                                        | 2             | 3         |
 | Native session / workspace / model                                                                                                                | 46                   | 15 (partly)                                                                                              | 31            | 7         |
 | Native platform / admin                                                                                                                           | 40                   | 3                                                                                                        | 30            | 11        |
-| settings-shell, plugin-marketplace, mcp-servers, secret-catalog, privacy-controls (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 53                   | 16 (`secret_list`, `secret_get`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`, `dsh_release_status`, 9 `mcp_*`) | 19            | 5         |
+| settings-shell, plugin-marketplace, mcp-servers, secret-catalog, privacy-controls (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 53                   | 17 (`secret_list`, `secret_get`, `secret_reference_status`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`, `dsh_release_status`, 9 `mcp_*`) | 19            | 5         |
 
 ## Missing tools
 
@@ -503,6 +503,11 @@ retires the one-off `*_settings_update` proposals below: a namespace write is
 now `settings_set` with that namespace, not a tool per plugin. The Settings shell
 also binds `dsh_release_status` to its fixed, read-only GitHub release check; the
 same validated version comparison and concise release highlights power the UI.
+
+Secret Catalog binds `secret_reference_status` (read-only) to the
+`secret-catalog-setup.referenceStatus` verb its reference repair card uses: why
+one `secret:ALIAS[@env]` does not resolve, as a typed state, without returning
+the value.
 
 | Proposed tool                                                                         | Owner                                                                                                    | Backing verb                                                                                                                                                                            |
 | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

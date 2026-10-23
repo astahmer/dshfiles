@@ -58,8 +58,35 @@ when it is registered, its workspace id.
   the newest completed chat turn offers Secret Catalog's compact masked setup
   flow inline. It suggests the global `TYPESAFE_API_KEY` alias; the value goes to
   the Secret Catalog Host and Backlog settings receive only the reference. A
-  configured but unresolvable reference shows a repair warning instead of a
-  duplicate-create form. The action does not enable Jev or auto-triage.
+  configured but unresolvable reference shows the reference repair card (below)
+  instead of a duplicate-create form. The action does not enable Jev or
+  auto-triage.
+
+## Repairing a reference that does not resolve
+
+`referenceStatus` (setup API; agent tool `secret_reference_status`, read-only)
+checks one `secret:ALIAS[@env]` the way a consumer resolves it and returns a
+typed state: `resolved`, `alias-missing` (with any project/local configs among
+the registered workspaces that hold the alias, which a global-only setting
+cannot read), `environment-missing` (with the environments that exist),
+`ambiguous` (several scopes), `value-unreadable`, `value-empty`, `cli-missing`
+(not on the Host's PATH), `cli-timeout` (usually a locked vault) or `cli-failed`.
+It reads the value on the Host to prove resolution and never returns it. It also
+reports when the global config is a symlink, because a global write then lands
+in the linked file (for example a Nix-managed clone) and an atomic rewrite can
+be moved aside by the tool that manages it.
+
+The repair card renders that state wherever a reference is configured: in the
+chat turn tail for Backlog's Jev key, and in the picker panel of every
+`data-secret-input="reference"` field (Backlog and Memory Jev settings
+included), which opens by itself once and marks its key button when the typed
+reference does not resolve. It names the reference and the reason, and offers
+only the fixes that reason allows: **Set value** (create the alias in the scope
+the reference resolves from, or replace an empty/unreadable value, masked, on
+the Host), **Pick another secret**, **Open in Secret Catalog** (filtered to the
+alias) and **Re-check**. Any Catalog write refreshes it; once it resolves, the
+card says so and disappears.
+
 - If a manually entered alias already exists, setup offers to bind its unique
   existing record. Ambiguous duplicates still need to be resolved in the catalog.
 - Edit supports item name, source, tags, and a two-step masked value

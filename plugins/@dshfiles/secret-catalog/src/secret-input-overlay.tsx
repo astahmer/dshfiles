@@ -1,13 +1,14 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { secretScopeSchema } from '@dshfiles/credential-port'
+import { parseSecretReference, secretScopeSchema } from '@dshfiles/credential-port'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { KeyRoundIcon, PlusIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { KeyRoundIcon, PlusIcon, SearchIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { secretCatalogApi } from './api.js'
+import { secretCatalogApi, secretSetupApi } from './api.js'
 import { JevSecretSetup } from './jev-secret-setup.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
@@ -17,6 +18,9 @@ import { placeSecretButton, placeSecretPanel } from './secret-input-placement.js
 import { SecretSetupForm } from './secret-setup-form.js'
 import type { SecretSetupTarget } from './secret-setup-form.js'
 import { SecretSetupModel } from './secret-setup-model.js'
+import { referenceStatusKey, SecretReferenceRepair } from './secret-reference-repair.js'
+
+const noProbeFolders: readonly string[] = []
 
 interface FieldAnchor {
   readonly element: HTMLInputElement | HTMLTextAreaElement
@@ -65,6 +69,7 @@ const targetOf = (element: HTMLInputElement | HTMLTextAreaElement): SecretSetupT
  */
 export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element | null => {
   const api = useApi(secretCatalogApi)
+  const setupApi = useApi(secretSetupApi)
   const queryClient = useQueryClient()
   const [anchor, setAnchor] = useState<FieldAnchor | null>(null)
   const [open, setOpen] = useState(false)
@@ -76,6 +81,8 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
   const [jevSetupOpen, setJevSetupOpen] = useState(false)
   const [jevSetupPending, setJevSetupPending] = useState(false)
   const [panelSize, setPanelSize] = useState({ width: panelWidth, height: 0 })
+  const [fieldText, setFieldText] = useState('')
+  const autoOpenedFor = useRef<string | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const toggleRef = useRef<HTMLSpanElement | null>(null)
 
@@ -137,7 +144,35 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
     return () => observer.disconnect()
   }, [open, creating, jevSetupOpen])
 
+  const anchoredElement = anchor?.element ?? null
+  useEffect(() => {
+    if (anchoredElement === null) return setFieldText('')
+    const read = (): void => setFieldText(anchoredElement.value)
+    read()
+    anchoredElement.addEventListener('input', read)
+    return () => anchoredElement.removeEventListener('input', read)
+  }, [anchoredElement])
+  const settledText = useDebouncedValue({ value: fieldText, delayMs: 400 }).trim()
+  const fieldReference = parseSecretReference(settledText) === null ? null : settledText
+
   const cwd = anchor === null ? null : targetOf(anchor.element).cwd
+  // Same key and options as the repair card, so the badge and the card share one Host check.
+  const referenceStatus = useQuery({
+    queryKey: [...referenceStatusKey, fieldReference ?? '', cwd, noProbeFolders],
+    enabled: fieldReference !== null,
+    queryFn: ({ signal }) => setupApi.referenceStatus({ reference: fieldReference ?? '', cwd, probeFolders: [] }, { signal }),
+    retry: false,
+    staleTime: 5_000,
+  })
+  const referenceState = fieldReference === null ? null : (referenceStatus.data?.state ?? null)
+  const referenceUnresolved = referenceState !== null && referenceState !== 'resolved' && referenceState !== 'empty'
+  useEffect(() => {
+    if (!referenceUnresolved || fieldReference === null || jevSetupPending || creating) return
+    if (autoOpenedFor.current === fieldReference) return
+    autoOpenedFor.current = fieldReference
+    setJevSetupOpen(false)
+    setOpen(true)
+  }, [creating, fieldReference, jevSetupPending, referenceUnresolved])
   const listQuery = useQuery({
     queryKey: ['secret-catalog', 'list', cwd],
     enabled: anchor !== null,
@@ -169,7 +204,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
     anchor.element.focus()
     anchor.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     anchor.element.blur()
-    void queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] })
+    void queryClient.invalidateQueries({ queryKey: ['secret-catalog'] })
   }
 
   const savedJevKey = (): void => {
@@ -202,7 +237,9 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
     <>
       <span className="dshx:pointer-events-auto" ref={toggleRef} style={{ position: 'fixed', left: button.left, top: button.top, zIndex: 61 }}>
         <Button
+          aria-description={referenceUnresolved ? props.t('refUnresolvedBadge') : undefined}
           aria-expanded={open}
+          data-reference-state={referenceState ?? undefined}
           aria-label={backlogJevField ? props.t('jevSetupButton') : props.t('bindSecret')}
           data-testid={backlogJevField ? 'secret-input-jev-setup' : 'secret-input-bind'}
           disabled={jevSetupPending || creating}
@@ -224,7 +261,7 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
           type="button"
           variant="ghost"
         >
-          <KeyRoundIcon />
+          {referenceUnresolved ? <TriangleAlertIcon className="dshx:text-warning" /> : <KeyRoundIcon />}
           {showJevLabel ? props.t('jevSetupButton') : null}
         </Button>
       </span>
@@ -269,9 +306,9 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
               t={props.t}
               target={targetOf(anchor.element)}
             />
-
           ) : (
             <>
+              {fieldReference !== null ? <SecretReferenceRepair className="dshx:max-w-none dshx:p-2" cwd={cwd} reference={fieldReference} t={props.t} /> : null}
               <p className="dshx:px-1 dshx:text-xs dshx:font-medium">{props.t('bindSecret')}</p>
               {backlogJevField && (
                 <Button className="dshx:w-full dshx:justify-start" onClick={() => setJevSetupOpen(true)} size="sm" type="button" variant="outline">
@@ -324,8 +361,6 @@ export const SecretInputOverlay = (props: SecretInputOverlayProps): JSX.Element 
               </Button>
             </>
           )}
-
-
         </div>
       ) : null}
     </>,

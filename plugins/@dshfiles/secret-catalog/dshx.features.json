@@ -348,9 +348,82 @@
       ]
     },
     {
+      "id": "reference-repair",
+      "title": "Repair a secret reference that does not resolve",
+      "summary": "A configured secret:ALIAS[@env] that the Host cannot resolve names the reference and the typed reason (alias missing from every scope or only in a project, environment missing, several scopes, unreadable or empty vault value, secret CLI missing, locked or failing) and offers Set value in the right scope, Pick another secret, Open in Secret Catalog on that alias, and Re-check. It warns before a global write lands in a symlinked config.",
+      "reach": [
+        "seed fake-secret-cli",
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "fill searchbox \"Search settings\" \"Memory Jev secret\"",
+        "fill textbox \"Jev secret\" \"secret:MISSING_REPAIR_ALIAS\"",
+        "expect region \"Secret reference repair\"",
+        "expect button \"Set value\""
+      ],
+      "surfaces": ["client", "host", "settings", "tool", "integration"],
+      "configuration": [],
+      "states": [
+        "resolved",
+        "alias-missing",
+        "alias-only-elsewhere",
+        "environment-missing",
+        "ambiguous",
+        "value-unreadable",
+        "value-empty",
+        "cli-missing",
+        "cli-timeout",
+        "cli-failed",
+        "symlinked-global-config",
+        "repaired"
+      ],
+      "failureModes": [
+        "A reference that resolves shows no card; one that starts resolving after a repair says so once.",
+        "CLI failures offer no write: they name the cause (PATH, locked vault, doctor) and offer Re-check.",
+        "Ambiguous aliases are never guessed; the card opens the Catalog on that alias.",
+        "A Host without the status verb shows a check-failed card with Re-check instead of a blank one."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "Metadata reads, the value read that proves resolution, and value writes.",
+          "deterministicFake": "Use the fake secret CLI with synthetic values; no real vault is read."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.backlog-jev-bound-key-unresolved",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.reference-repair-settings",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.reference-status-typed-states",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-status.test.ts",
+          "testName": "maps CLI failures to their typed codes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.reference-status-every-scope",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-status.test.ts",
+          "testName": "says the alias is missing from every scope, or names the project that holds it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.reference-repair-symlink",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-repair-model.test.ts",
+          "testName": "warns before a global write lands in a symlinked config, and only then"
+        }
+      ]
+    },
+    {
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment.",
+      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value.",
       "surfaces": ["tool", "host"],
       "configuration": [],
       "states": ["metadata-listed", "exact-value-requested", "not-found", "ambiguous"],
@@ -427,7 +500,7 @@
       "states": ["disabled-off", "key-needed-offer", "bound-reference-unresolved", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
       "failureModes": [
         "The offer is absent when Jev is disabled or its key resolves.",
-        "A configured but unresolvable reference shows a repair warning, not another create form.",
+        "A configured but unresolvable reference shows the reference repair card, not another create form.",
         "The raw key stays out of conversation content and Backlog settings; only its reference is bound.",
         "Secret CLI or Settings failures show an error without putting the key in the chat."
       ],
@@ -452,11 +525,6 @@
         {
           "kind": "gherkin",
           "id": "secret-catalog.backlog-jev-chat-setup",
-          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
-        },
-        {
-          "kind": "gherkin",
-          "id": "secret-catalog.backlog-jev-bound-key-unresolved",
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {

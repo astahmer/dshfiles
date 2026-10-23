@@ -3,12 +3,13 @@ import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/clie
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/remote'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
+import { CatalogNavigation } from './catalog-navigation.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { JevInlineSetup } from './jev-inline-setup.js'
@@ -27,12 +28,24 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 export default defineClient({
   name: '@dshfiles/secret-catalog',
   locales: [secretCatalogLocale],
-  inject: ['slots', 'conversation', 'remote', 'remote.directoryPicker', 'remote.workspace', 'workspaces'],
+  inject: ['slots', 'conversation', 'remote', 'remote.directoryPicker', 'remote.workspace', 'workspaces', 'layout'],
   setup(ctx, decorate) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const translate = ctx.locale.bind(SECRET_CATALOG_LOCALE_NAMESPACE)
     const label = (): string => translate('title')
     const workspaces = (): IWorkspaces => ctx.workspaces
+    const workspaceFolders = (): readonly string[] =>
+      ctx.workspaces.list
+        .getSnapshot()
+        .items.map(workspace => workspace.path)
+        .filter(path => path.length > 0)
+        .slice(0, 16)
+    // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
+    const isMainPanelId = (panelId: string): panelId is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === panelId)
+    CatalogNavigation.setOpener(() => {
+      if (isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+    })
+    ctx.effect(() => () => CatalogNavigation.setOpener(null), 'secret-catalog navigation')
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label, locale: SECRET_CATALOG_LOCALE_NAMESPACE }, PanelGlyph),
     )
@@ -62,7 +75,7 @@ export default defineClient({
         },
         decorate((props: { readonly sessionId: string; readonly turn: TurnLocation }) => (
           <PluginQueryProvider>
-            <JevInlineSetup {...props} t={translate} />
+            <JevInlineSetup {...props} probeFolders={workspaceFolders()} t={translate} />
           </PluginQueryProvider>
         )),
       ),

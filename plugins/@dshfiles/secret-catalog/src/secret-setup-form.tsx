@@ -81,7 +81,7 @@ export const SecretSetupForm = (props: SecretSetupFormProps): JSX.Element => {
       }),
     onSuccess: async () => {
       try {
-        await queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] })
+        await queryClient.invalidateQueries({ queryKey: ['secret-catalog'] })
       } catch {
         return
       }

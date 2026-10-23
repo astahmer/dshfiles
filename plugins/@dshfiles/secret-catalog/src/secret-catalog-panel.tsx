@@ -24,6 +24,8 @@ import type { SecretMetadata } from './secret-metadata.js'
 import { SecretCatalogTable, type RevealedSecret } from './secret-catalog-table.js'
 import { SecretQuickAddRow } from './secret-quick-add-row.js'
 import { useSecretReveal } from './use-secret-reveal.js'
+import { CatalogNavigation } from './catalog-navigation.js'
+import { referenceStatusKey } from './secret-reference-repair.js'
 
 interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
@@ -162,6 +164,16 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const error = copyMutation.isError ? t('copyFailed') : revealSnapshot.matches('failed') ? t('revealFailed') : loadError
   const machineName = machineQuery.data?.name ?? null
 
+  const focusRequest = useSyncExternalStore(CatalogNavigation.subscribe, CatalogNavigation.focus, CatalogNavigation.focus)
+  useEffect(() => {
+    if (focusRequest === null) return
+    const claimed = CatalogNavigation.claim()
+    if (claimed === null) return
+    appliedDefaultScope.current = true
+    setScope('all')
+    setSearch(claimed.alias)
+  }, [focusRequest])
+
   useEffect(() => {
     if (appliedDefaultScope.current || configuredScope === undefined) return
     appliedDefaultScope.current = true
@@ -217,7 +229,10 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const afterMutation = async (message: string): Promise<void> => {
     setNotice(message)
     setDialog(null)
-    await queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] }),
+      queryClient.invalidateQueries({ queryKey: referenceStatusKey }),
+    ])
   }
   const createMutation = useMutation({
     mutationFn: (input: SecretCreateForm) => api.create({ ...input, cwd }),
@@ -270,7 +285,10 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     await api.create({ ...input, cwd })
   }
   const onDraftSaved = async (id: number, alias: string): Promise<void> => {
-    await queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] })
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] }),
+      queryClient.invalidateQueries({ queryKey: referenceStatusKey }),
+    ])
     removeDraft(id)
     setNotice(t('added', { alias }))
   }

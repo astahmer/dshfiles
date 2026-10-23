@@ -97,13 +97,25 @@ Feature: Secret Catalog
     Then the Jev setup offer is absent while Jev is disabled
 
   @scenario:secret-catalog.backlog-jev-bound-key-unresolved
-  Scenario: Explain an unresolved configured Jev reference without offering duplicate creation
+  Scenario: Repair an unresolved configured Jev reference from the chat without creating a duplicate
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     And Backlog Jev triage is enabled without a resolvable key
     And Backlog Jev has an unresolved configured reference
     When a Command Code account backed by a local fake provider is added
     And a thread in the seeded project asks the fake model to "Reply briefly."
     Then the unresolved Jev secret is reported without a setup form
+    And the repair card names "secret:MISSING_JEV_FOR_E2E" as missing from every secret scope
+    When the missing alias value "jev-e2e-repair-value" is set from the repair card
+    Then "MISSING_JEV_FOR_E2E" is stored once as a global alias and the reference resolves
+
+  @scenario:secret-catalog.reference-repair-settings
+  Scenario: Explain an unresolved reference on its settings field and open it in the Catalog
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/backlog, @dshfiles/secret-catalog" is booted
+    And Backlog Jev triage is enabled without a resolvable key
+    And Backlog Jev has an unresolved configured reference
+    Then the settings field shows the repair card for "secret:MISSING_JEV_FOR_E2E"
+    When the repair card opens the Secret Catalog
+    Then the Secret Catalog is filtered to "MISSING_JEV_FOR_E2E"
 
   @scenario:secret-catalog.backlog-jev-bound-key-resolves
   Scenario: Hide Jev setup when its configured reference resolves

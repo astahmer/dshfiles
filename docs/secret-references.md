@@ -23,6 +23,7 @@ body or an item link can carry it without becoming a secret.
 | Reference → control mapping | `@dshfiles/settings-shell`  | `Schema.string().role('secret-ref')`                                           |
 | Vault picker                | `@dshfiles/secret-catalog`  | `shell.overlay` on `[data-secret-input="reference"]`                           |
 | Missing-key setup offer     | `@dshfiles/secret-catalog`  | `@dshfiles/secret-catalog/setup` (`SecretSetupOffer`)                          |
+| Why a reference fails       | `@dshfiles/secret-catalog`  | `secret-catalog-setup.referenceStatus`, agent tool `secret_reference_status`   |
 
 ## Consuming a reference on the Host
 
@@ -83,6 +84,17 @@ The Backlog uses this opt-in path for Jev when Jev is enabled and its Host-side
 resolver cannot produce a key. The chat composer remains ordinary prose; the
 suggestion is a separate turn-tail card, not a credential button on free-form
 chat text.
+
+## When a configured reference does not resolve
+
+Ask the Catalog why instead of reporting "does not resolve": the
+`referenceStatus` verb returns a typed state (alias missing from every scope or
+only in a project, environment missing, several scopes, unreadable or empty
+value, secret CLI missing, timed out or failing) and whether a global write would
+land in a symlinked config. The Catalog's repair card renders it on every
+reference field and in Backlog's chat tail, with Set value, Pick another secret,
+Open in Secret Catalog and Re-check. A consumer only needs the attribute or the
+`secret-ref` role; it never restates the reasons.
 
 ## What is deliberately not here
 

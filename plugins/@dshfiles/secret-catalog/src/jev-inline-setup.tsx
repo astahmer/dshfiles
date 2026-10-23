@@ -8,19 +8,22 @@ import { useLayoutEffect, useSyncExternalStore, useState } from 'react'
 import { JevChatTurnTimeline } from './jev-chat-turn-timeline.js'
 import { jevSetupView } from './jev-inline-setup-model.js'
 import { type SecretCatalogTranslate } from './locales.js'
+import { SecretReferenceRepair } from './secret-reference-repair.js'
 import { SecretSetupOffer } from './setup.js'
 import type { SecretSetupRequirement } from './setup.js'
 
-const statusQueryKey = (input: {
-  readonly enabled: boolean
-  readonly reference: string
-}): readonly ['secret-catalog', 'backlog-jev-setup-status', boolean, string] => ['secret-catalog', 'backlog-jev-setup-status', input.enabled, input.reference]
+const statusQueryKey = ['secret-catalog', 'backlog-jev-setup-status'] as const
 const jevSetupRequirements: readonly SecretSetupRequirement[] = [
   { id: 'jevSecret', label: 'TypeSafe API key', suggestedAlias: 'TYPESAFE_API_KEY', environment: 'prod', scope: 'global' },
 ]
 const chatTurnTimeline = new JevChatTurnTimeline()
 
-export const JevInlineSetup = (props: { readonly sessionId: string; readonly turn: TurnLocation; readonly t: SecretCatalogTranslate }): JSX.Element | null => {
+export const JevInlineSetup = (props: {
+  readonly sessionId: string
+  readonly turn: TurnLocation
+  readonly probeFolders: readonly string[]
+  readonly t: SecretCatalogTranslate
+}): JSX.Element | null => {
   const backlog = useApi(backlogApi)
   const settings = useSettings(backlogSettings)
   const queryClient = useQueryClient()
@@ -37,15 +40,17 @@ export const JevInlineSetup = (props: { readonly sessionId: string; readonly tur
     () => chatTurnTimeline.isLatest(props.sessionId, props.turn.turn),
     () => false,
   )
+  const turnFinished = props.turn.end !== undefined
+  // Backlog's own answer only matters while no reference is configured (the environment fallback): a configured
+  // reference is checked by its exact text below, so a settings save can never race a stale Host answer.
   const status = useQuery({
-    queryKey: statusQueryKey({ enabled: jevEnabled, reference: secretReference }),
-    enabled: jevEnabled,
+    queryKey: statusQueryKey,
+    enabled: jevEnabled && secretReference === '' && turnFinished && isLatestTurn,
     queryFn: ({ signal }) => backlog.jevSetupStatus(undefined, { signal }),
     retry: false,
     staleTime: 10_000,
   })
 
-  const turnFinished = props.turn.end !== undefined
   if (!turnFinished || !isLatestTurn) return null
   if (saved) {
     return (
@@ -57,15 +62,20 @@ export const JevInlineSetup = (props: { readonly sessionId: string; readonly tur
   }
   const setupView = jevSetupView({ enabled: jevEnabled, needsSetup: status.data?.needsSetup === true, reference: secretReference })
   if (setupView === 'hidden' || !settings.writable) return null
-  if (setupView === 'reference-unresolved') {
+  const bindReference = async (reference: string): Promise<void> => {
+    if (!settings.writable || settings.status !== 'ready') throw new Error('Backlog cannot accept a secret reference right now.')
+    if (!(await settings.set('jevSecret', reference))) throw new Error('Backlog refused the secret reference.')
+  }
+  if (setupView === 'repair') {
     return (
-      <div
-        className="dshx-root dshx:mt-3 dshx:max-w-xl dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-3 dshx:text-xs dshx:text-muted-foreground"
-        data-testid="jev-configured-secret-unresolved"
-        role="alert"
-      >
-        {props.t('jevConfiguredSecretUnresolved')}
-      </div>
+      <SecretReferenceRepair
+        className="dshx:mt-3"
+        cwd={null}
+        onBind={bindReference}
+        probeFolders={props.probeFolders}
+        reference={secretReference}
+        t={props.t}
+      />
     )
   }
 
@@ -75,10 +85,9 @@ export const JevInlineSetup = (props: { readonly sessionId: string; readonly tur
         missing={jevSetupRequirements}
         onBind={async binding => {
           if (binding.id !== 'jevSecret') throw new Error('The setup suggestion does not match the Backlog setting.')
-          if (!settings.writable || settings.status !== 'ready') throw new Error('Backlog cannot accept a secret reference right now.')
-          if (!(await settings.set('jevSecret', binding.reference))) throw new Error('Backlog refused the secret reference.')
+          await bindReference(binding.reference)
           setSaved(true)
-          void queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'backlog-jev-setup-status'] }).catch(() => undefined)
+          void queryClient.invalidateQueries({ queryKey: statusQueryKey }).catch(() => undefined)
         }}
         t={props.t}
       />

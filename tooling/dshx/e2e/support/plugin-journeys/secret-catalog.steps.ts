@@ -260,16 +260,77 @@ Then('the Jev setup offer appears on the latest completed turn only', async ({ p
 
 Then('the unresolved Jev secret is reported without a setup form', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'secret-catalog-jev-unresolved-reference-warning', async () => {
-    await expect(page.getByTestId('jev-configured-secret-unresolved')).toBeVisible()
+    await expect(page.getByTestId('secret-reference-repair')).toBeVisible()
     await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
     await expect(page.getByTestId('secret-setup-offer')).toHaveCount(0)
+  })
+})
+
+const repairCard = (page: Page) => page.getByTestId('secret-reference-repair')
+
+Then('the repair card names {string} as missing from every secret scope', async ({ page }: { page: Page }, reference: string) => {
+  await recordAssertion(page, 'secret-catalog-reference-repair-names-reason', async () => {
+    const card = repairCard(page)
+    await expect(card).toHaveAttribute('data-state', 'alias-missing')
+    await expect(card.getByRole('alert')).toContainText(reference)
+    await expect(card.getByRole('alert')).toContainText('missing from every secret scope')
+    for (const action of ['Set value', 'Pick another secret', 'Open in Secret Catalog', 'Re-check']) {
+      await expect(card.getByRole('button', { name: action, exact: true })).toBeVisible()
+    }
+  })
+})
+
+When('the missing alias value {string} is set from the repair card', async ({ page }: { page: Page }, value: string) => {
+  const card = repairCard(page)
+  await card.getByRole('button', { name: 'Set value', exact: true }).click()
+  await expect(card.getByText('Stores MISSING_JEV_FOR_E2E@prod in the global scope.', { exact: true })).toBeVisible()
+  const input = card.getByRole('textbox', { name: 'Value for MISSING_JEV_FOR_E2E', exact: true })
+  await expect(input).toHaveAttribute('type', 'password')
+  await input.fill(value)
+  await card.getByRole('button', { name: 'Save value', exact: true }).click()
+})
+
+Then('{string} is stored once as a global alias and the reference resolves', async ({ page }: { page: Page }, alias: string) => {
+  await recordAssertion(page, 'secret-catalog-reference-repair-resolves', async () => {
+    await expect(page.getByTestId('secret-reference-resolved')).toBeVisible({ timeout: 30_000 })
+    await expect(repairCard(page)).toHaveCount(0)
+    const store = await readStore(page)
+    const rows = store.rows.filter(row => row.alias === alias)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.scope).toBe('global')
+    expect(store.vault[rows[0]?.item ?? '']).toBe('jev-e2e-repair-value')
+    await expect(page.locator('body')).not.toContainText('jev-e2e-repair-value')
+    await expect(page.getByTestId('secret-setup-offer')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the settings field shows the repair card for {string}', async ({ page }: { page: Page }, reference: string) => {
+  await recordAssertion(page, 'secret-catalog-reference-repair-settings-field', async () => {
+    const field = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')
+    await field.focus()
+    await expect(page.getByTestId('secret-input-jev-setup')).toHaveAttribute('data-reference-state', 'alias-missing')
+    const card = page.getByTestId('secret-input-panel').getByTestId('secret-reference-repair')
+    await expect(card).toBeVisible()
+    await expect(card.getByRole('alert')).toContainText(reference)
+  })
+})
+
+When('the repair card opens the Secret Catalog', async ({ page }: { page: Page }) => {
+  await page.getByTestId('secret-input-panel').getByRole('button', { name: 'Open in Secret Catalog', exact: true }).click()
+})
+
+Then('the Secret Catalog is filtered to {string}', async ({ page }: { page: Page }, alias: string) => {
+  await recordAssertion(page, 'secret-catalog-reference-repair-opens-catalog', async () => {
+    await expect(catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true })).toBeVisible()
+    await expect(catalog(page).getByRole('textbox', { name: 'Filter aliases', exact: true })).toHaveValue(alias)
   })
   await finishJourneyAssertions(page)
 })
 
 Then('the Jev offer and repair warning are both absent', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'secret-catalog-jev-resolved-reference-hides-setup', async () => {
-    await expect(page.getByTestId('jev-configured-secret-unresolved')).toHaveCount(0)
+    await expect(page.getByTestId('secret-reference-repair')).toHaveCount(0)
     await expect(page.getByTestId('jev-inline-setup-offer')).toHaveCount(0)
     await expect(page.getByTestId('secret-setup-offer')).toHaveCount(0)
   })
