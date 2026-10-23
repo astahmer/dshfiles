@@ -86,6 +86,7 @@ const startHarness = async (seed?: (home: string) => Promise<void>): Promise<Har
     },
     get: (name: string) => (name === 'storageDomain' ? { open: async () => ({ table: () => table(rows), close: async () => undefined }) } : undefined),
     inject: () => undefined,
+    commands: { register: () => () => undefined },
     sessionProjections: { register: () => () => undefined },
     settings: {
       configure: () => () => undefined,
