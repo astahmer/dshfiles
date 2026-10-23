@@ -23,6 +23,33 @@ run without `--all`, so the mistake costs a second instead of an hour. Keep
 `pnpm run` where Turbo does the real work: minutes of Turbo swamp the wrapper
 either way.
 
+## Browser routing disables HTTP cache
+
+Playwright disables HTTP caching whenever `page.route()` or
+`browserContext.route()` is registered, even for an unrelated URL. Confirmed
+with installed Playwright 1.56.1 and bundled Chromium: a cacheable script loaded
+on two consecutive navigations produces zero second-navigation server hits
+without routing and one with a catch-all continue route.
+
+Our shared E2E hook in
+[`steps.ts`](../tooling/dshx/e2e/support/steps.ts) deliberately routes every HTTP
+request to block origins other than the scratch Host and explicitly admitted
+loopback fakes. Consequently, all journeys run without normal HTTP caching;
+reload timings are not representative of a user's warm browser. The additional
+routes in Settings, upload and JJ journeys hold or fail requests deterministically;
+removing those alone would not restore caching while the shared guard remains.
+
+Do not replace the guard with an `addInitScript` fetch/XHR patch: that misses
+scripts, images, frames and document navigations. Do not override cache state
+through a second CDP session or patch Playwright internals. A cache-preserving
+replacement must enforce the same origin policy across browser requests,
+including popups and redirects, before replacing the guard. Until then, retain
+routing for isolation and measure user-facing warm-cache performance separately
+in a controlled browser without HTTP routes.
+
+Sources: [Playwright routing contract](https://playwright.dev/docs/api/class-browsercontext#browser-context-route)
+and [upstream cache discussion](https://github.com/microsoft/playwright/issues/22865#issuecomment-6357778607).
+
 ## The order
 
 From `plugins/`: `node --run contract`, then the Turbo tasks `pnpm run build`,
