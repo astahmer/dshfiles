@@ -1,6 +1,6 @@
 /** Already-loaded history the graph keeps below the viewport before it asks the Host for another page. */
-const MINIMUM_LOOKAHEAD = 1200
-const LOOKAHEAD_VIEWPORTS = 3
+const MINIMUM_LOOKAHEAD = 2400
+const LOOKAHEAD_VIEWPORTS = 8
 
 export class GraphPagingModel {
   /** Revisions the graph loads before anything scrolls, so a first look is never a single page. */

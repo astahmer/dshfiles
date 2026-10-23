@@ -5,16 +5,17 @@ import { GraphPagingModel } from './graph-paging.js'
 const viewport = { scrollTop: 0, scrollHeight: 2400, clientHeight: 900 }
 const deepHistory = { scrollTop: 0, scrollHeight: 40_000, clientHeight: 900 }
 
-test('keeps three viewports of loaded history below the viewport, with a floor for a short list', () => {
-  assert.equal(GraphPagingModel.lookahead(900), 2700)
-  assert.equal(GraphPagingModel.lookahead(200), 1200)
-  assert.equal(GraphPagingModel.lookahead(0), 1200)
+test('keeps eight viewports of loaded history below the viewport, with a floor for a short list', () => {
+  assert.equal(GraphPagingModel.lookahead(900), 7200)
+  assert.equal(GraphPagingModel.lookahead(200), 2400)
+  assert.equal(GraphPagingModel.lookahead(0), 2400)
 })
 
-test('asks for another page near the end of the loaded history or when nothing fills the viewport', () => {
+test('requests pages eight viewports ahead, near the end, or when nothing fills the viewport', () => {
   assert.equal(GraphPagingModel.needsAnotherPage(viewport), true)
   assert.equal(GraphPagingModel.needsAnotherPage(deepHistory), false)
-  assert.equal(GraphPagingModel.needsAnotherPage({ scrollTop: 31_000, scrollHeight: 40_000, clientHeight: 900 }), false)
+  assert.equal(GraphPagingModel.needsAnotherPage({ scrollTop: 31_100, scrollHeight: 40_000, clientHeight: 900 }), false)
+  assert.equal(GraphPagingModel.needsAnotherPage({ scrollTop: 31_900, scrollHeight: 40_000, clientHeight: 900 }), true)
   assert.equal(GraphPagingModel.needsAnotherPage({ scrollTop: 38_000, scrollHeight: 40_000, clientHeight: 900 }), true)
   assert.equal(GraphPagingModel.needsAnotherPage({ scrollTop: 0, scrollHeight: 300, clientHeight: 300 }), true)
 })
