@@ -13,7 +13,7 @@ import { defineClient, useApi } from '@dshfiles/dshx/client'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
-import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
+import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
@@ -291,7 +291,10 @@ interface MountedPanelScope {
 const noProjects = (): null => null
 const noSession = (): undefined => undefined
 
-/** Follow the Host workspace registry so the repository picker lists every registered project. */
+/**
+ * The repository picker's folders, split by the Host into projects and thread workspaces the way the New thread picker
+ * gets them; a registration whose folder is gone is neither. Refetched when the workspace registry changes.
+ */
 const useRegisteredProjects = (workspaces: IWorkspaces | undefined): readonly RegisteredProject[] => {
   const api = useApi(jjIntegrationApi)
   const source = workspaces?.list
@@ -299,29 +302,23 @@ const useRegisteredProjects = (workspaces: IWorkspaces | undefined): readonly Re
   const getSnapshot = useCallback(() => source?.getSnapshot() ?? null, [source])
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, noProjects)
   const workspaceIds = useMemo(() => snapshot?.items.map(workspace => workspace.workspaceId).sort() ?? [], [snapshot])
-  const classification = useQuery({
-    queryKey: ['jujutsu', 'jj-workspace-classification', workspaceIds],
+  const registered = useQuery({
+    queryKey: ['jujutsu', 'registered-projects', workspaceIds],
     enabled: workspaceIds.length > 0,
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-    queryFn: async ({ signal }) => {
-      try {
-        return (await api.classifyWorkspaces({ workspaceIds }, { signal })).jjWorkspaceIds
-      } catch (error) {
-        if (signal.aborted) throw error
-        return []
-      }
-    },
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => api.projects({}, { signal }),
   })
   return useMemo(
-    () =>
-      snapshot?.items.map(workspace => ({
+    () => [
+      ...(registered.data?.projects ?? []).map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
+      ...(registered.data?.workspaces ?? []).map(workspace => ({
         workspaceId: workspace.workspaceId,
         title: workspace.title,
         canonicalPath: workspace.path,
-        isJjWorkspace: classification.data?.includes(workspace.workspaceId) === true,
-      })) ?? [],
-    [snapshot, classification.data],
+        isJjWorkspace: true,
+      })),
+    ],
+    [registered.data],
   )
 }
 
