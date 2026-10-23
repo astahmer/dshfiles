@@ -73,10 +73,11 @@ if [ "${DSH_LKG_CLEAN:-0}" != 1 ] && [ -d "$LIVE_HOME" ]; then
   done
   find "$HOME_DIR/sessions" -name session.lock -delete 2>/dev/null || true
 fi
-cp -R "$VERSION/profile" "$HOME_DIR/profiles/web"
-# The snapshot is frozen on purpose; the state this instance runs from must be
-# writable, or the Host cannot maintain its own profile.
-chflags -R nouchg "$HOME_DIR/profiles/web" 2>/dev/null || true
+# The snapshot is frozen on purpose (uchg); the state this instance runs from must
+# be writable, or the Host cannot maintain its own profile. `cp -R` carries uchg
+# over and then fails to set times on the locked copies, so copy without flags.
+mkdir "$HOME_DIR/profiles/web"
+tar -cf - -C "$VERSION/profile" . | tar -xf - --no-fflags -C "$HOME_DIR/profiles/web"
 
 echo "dsh-recover: last known good $(basename "$VERSION")"
 echo "dsh-recover: state $HOME_DIR (DSH_LKG_CLEAN=1 starts without live data)"
