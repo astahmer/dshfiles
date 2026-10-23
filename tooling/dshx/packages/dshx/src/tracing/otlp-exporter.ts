@@ -153,12 +153,19 @@ const httpUrl = (raw: string): string | undefined => {
   }
 }
 
+const sdkDisabled = (env: Environment): boolean =>
+  env.OTEL_SDK_DISABLED?.trim().toLowerCase() === 'true' || env.OTEL_TRACES_EXPORTER?.trim().toLowerCase() === 'none'
+
+const serviceNameOf = (env: Environment): string => env.OTEL_SERVICE_NAME?.trim() || 'dshfiles'
+
 /**
- * Export is configured only by the standard OTLP environment variables. The signal-specific endpoint is used as
- * given; the general one gets `/v1/traces` appended, as the specification requires. No endpoint means no export.
+ * The standard OTLP environment variables configure export: the signal-specific endpoint is used as given; the general
+ * one gets `/v1/traces` appended, as the specification requires. Without either, `localBaseUrl` (this process's own
+ * receiver, see `LocalOtlpEndpointRegistry`) is the target, without the environment's headers, which belong to a
+ * configured collector. No endpoint at all, or `OTEL_SDK_DISABLED=true`, means no export.
  */
-const exportConfigFrom = (env: Environment): ExportConfig | undefined => {
-  if (env.OTEL_SDK_DISABLED?.trim().toLowerCase() === 'true') return undefined
+const exportConfigFrom = (env: Environment, localBaseUrl?: string): ExportConfig | undefined => {
+  if (sdkDisabled(env)) return undefined
   const tracesEndpoint = env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim()
   const baseEndpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim()
   const raw =
@@ -167,17 +174,26 @@ const exportConfigFrom = (env: Environment): ExportConfig | undefined => {
       : baseEndpoint !== undefined && baseEndpoint !== ''
         ? `${baseEndpoint.replace(/\/+$/u, '')}/v1/traces`
         : undefined
-  const url = raw === undefined ? undefined : httpUrl(raw)
+  if (raw === undefined) {
+    const localUrl = localBaseUrl === undefined ? undefined : httpUrl(`${localBaseUrl.replace(/\/+$/u, '')}/v1/traces`)
+    return localUrl === undefined ? undefined : { url: localUrl, headers: new Map(), serviceName: serviceNameOf(env) }
+  }
+  const url = httpUrl(raw)
   if (url === undefined) return undefined
   return {
     url,
     headers: new Map([...parseHeaders(env.OTEL_EXPORTER_OTLP_HEADERS), ...parseHeaders(env.OTEL_EXPORTER_OTLP_TRACES_HEADERS)]),
-    serviceName: env.OTEL_SERVICE_NAME?.trim() || 'dshfiles',
+    serviceName: serviceNameOf(env),
   }
 }
 
+/** True when the environment names a traces endpoint, valid or not: it then owns export and the local receiver is ignored. */
+const environmentEndpointSet = (env: Environment): boolean =>
+  [env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, env.OTEL_EXPORTER_OTLP_ENDPOINT].some(value => value !== undefined && value.trim() !== '')
+
 export interface BatchExporterOptions {
-  readonly config: ExportConfig
+  /** Read before every request, so the target can appear, move or vanish; `undefined` drops the batch. */
+  readonly config: () => ExportConfig | undefined
   readonly fetch?: typeof fetch | undefined
   readonly maxQueueSize?: number
   readonly maxBatchSize?: number
@@ -229,12 +245,14 @@ const createBatchExporter = (options: BatchExporterOptions): BatchExporter => {
 
   const post = async (batch: readonly FinishedSpan[]): Promise<SendOutcome> => {
     try {
-      const headers = new Headers([...options.config.headers])
+      const config = options.config()
+      if (config === undefined) return 'drop'
+      const headers = new Headers([...config.headers])
       headers.set('content-type', 'application/json')
-      const response = await send(options.config.url, {
+      const response = await send(config.url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(encodeTraceRequest({ serviceName: options.config.serviceName, spans: batch })),
+        body: JSON.stringify(encodeTraceRequest({ serviceName: config.serviceName, spans: batch })),
         signal: AbortSignal.timeout(exportTimeoutMs),
       })
       await response.body?.cancel().catch(() => undefined)
@@ -324,6 +342,8 @@ const createBatchExporter = (options: BatchExporterOptions): BatchExporter => {
 
 export class OtlpTraceExport {
   static readonly configFrom = exportConfigFrom
+  static readonly sdkDisabled = sdkDisabled
+  static readonly environmentEndpointSet = environmentEndpointSet
   static readonly encode = encodeTraceRequest
   static readonly createBatchExporter = createBatchExporter
 }

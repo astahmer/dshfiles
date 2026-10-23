@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { defineApi, method } from '../src/api/index.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { ApiProtocolModel } from '../src/api/common.js'
-import { commandAttributes } from '../src/tracing/index.js'
+import { commandAttributes, localOtlpEndpoint, otlpExportTarget, publishLocalOtlpEndpoint } from '../src/tracing/index.js'
+import { LocalOtlpEndpointRegistry } from '../src/tracing/local-endpoint.js'
 import { OtlpTraceExport, type FinishedSpan } from '../src/tracing/otlp-exporter.js'
 import { TracerModel, type Tracer } from '../src/tracing/tracer.js'
 
@@ -104,6 +105,73 @@ describe('OTLP export configuration', () => {
     expect(config?.serviceName).toBe('dshfiles')
     expect(Object.fromEntries(config?.headers ?? [])).toEqual({ 'x-team': 'b', authorization: 'Basic abc' })
     expect(OtlpTraceExport.configFrom({ ...ENDPOINT_ENV, OTEL_SERVICE_NAME: 'dsh-web' })?.serviceName).toBe('dsh-web')
+  })
+})
+
+describe('in-process receiver hand-off', () => {
+  const withdrawals: (() => void)[] = []
+  afterEach(() => {
+    for (const withdraw of withdrawals.splice(0)) withdraw()
+  })
+  const publish = (baseUrl: string): (() => void) => {
+    const withdraw = publishLocalOtlpEndpoint({ baseUrl, owner: '@test/receiver' })
+    withdrawals.push(withdraw)
+    return withdraw
+  }
+
+  it('targets the published receiver per signal only while no environment endpoint is set', () => {
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'traces', env: {} })).toEqual({ source: 'off', url: null })
+    publish('http://127.0.0.1:4318/')
+    expect(localOtlpEndpoint()).toEqual({ baseUrl: 'http://127.0.0.1:4318', owner: '@test/receiver' })
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'metrics', env: {} })).toEqual({
+      source: 'local-receiver',
+      url: 'http://127.0.0.1:4318/v1/metrics',
+    })
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'traces', env: ENDPOINT_ENV })).toEqual({
+      source: 'environment',
+      url: 'http://collector.test:4318/v1/traces',
+    })
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'logs', env: { OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: 'http://logs.test/in' } }).url).toBe(
+      'http://logs.test/in',
+    )
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'traces', env: { OTEL_EXPORTER_OTLP_ENDPOINT: 'file:///tmp/x' } }).source).toBe('off')
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'traces', env: { OTEL_SDK_DISABLED: 'true' } }).source).toBe('off')
+    expect(LocalOtlpEndpointRegistry.exportTarget({ signal: 'metrics', env: { OTEL_METRICS_EXPORTER: 'none' } }).source).toBe('off')
+    expect(otlpExportTarget({ signal: 'traces' }).source).not.toBe('off')
+  })
+
+  it('ignores an invalid URL and lets only the current publication withdraw itself', () => {
+    publish('ftp://nope')
+    expect(localOtlpEndpoint()).toBeUndefined()
+    const first = publish('http://127.0.0.1:1111')
+    publish('http://127.0.0.1:2222')
+    first()
+    expect(localOtlpEndpoint()?.baseUrl).toBe('http://127.0.0.1:2222')
+  })
+
+  it('starts recording when a receiver is published after the tracer was created, without the env headers', async () => {
+    const sink = collector()
+    let baseUrl: string | undefined
+    const tracer = TracerModel.create({ env: { OTEL_EXPORTER_OTLP_HEADERS: 'x-api-key=k' }, localEndpoint: () => baseUrl, fetch: sink.fetch })
+    expect(tracer.enabled).toBe(false)
+    expect(tracer.startSpan('before')).toBe(TracerModel.noopSpan)
+    baseUrl = 'http://127.0.0.1:4318'
+    expect(tracer.enabled).toBe(true)
+    await tracer.withSpan('after', {}, async () => undefined)
+    await tracer.flush()
+    expect(sink.requests.map(request => request.url)).toEqual(['http://127.0.0.1:4318/v1/traces'])
+    expect(sink.requests[0]?.headers.get('x-api-key')).toBeNull()
+    expect(sink.spans().map(span => span.name)).toEqual(['after'])
+  })
+
+  it('keeps an environment endpoint over a published receiver and stays off when the SDK is disabled', async () => {
+    const sink = collector()
+    const tracer = TracerModel.create({ env: ENDPOINT_ENV, localEndpoint: () => 'http://127.0.0.1:4318', fetch: sink.fetch })
+    await tracer.withSpan('one', {}, async () => undefined)
+    await tracer.flush()
+    expect(sink.requests.map(request => request.url)).toEqual(['http://collector.test:4318/v1/traces'])
+    expect(TracerModel.create({ env: { OTEL_SDK_DISABLED: 'true' }, localEndpoint: () => 'http://127.0.0.1:4318' }).enabled).toBe(false)
+    expect(TracerModel.create({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: 'file:///x' }, localEndpoint: () => 'http://127.0.0.1:4318' }).enabled).toBe(false)
   })
 })
 
@@ -356,7 +424,8 @@ describe('failures and redaction', () => {
 })
 
 describe('batch exporter', () => {
-  const config = { url: 'http://collector.test/v1/traces', headers: new Map<string, string>(), serviceName: 's' }
+  const target = { url: 'http://collector.test/v1/traces', headers: new Map<string, string>(), serviceName: 's' }
+  const config = () => target
 
   it('drops new spans once the queue is full', async () => {
     const sink = collector()
@@ -410,7 +479,7 @@ const waitFor = async (condition: () => boolean): Promise<void> => {
   }
 }
 
-const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v1')
+const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v2')
 let restoreTracer: (() => void) | undefined
 afterEach(() => restoreTracer?.())
 

@@ -117,6 +117,7 @@ function createDispatch(ctx: Context, packageId: string, registration: ApiHostRe
           'dshx.api.method': endpoint,
           'dshx.api.caller': caller.kind,
           'dshx.api.caller.package': caller.kind === 'plugin' ? caller.packageId : undefined,
+          'dsh.session.id': caller.kind === 'agent' ? caller.sessionId : undefined,
         },
       },
       async span => {

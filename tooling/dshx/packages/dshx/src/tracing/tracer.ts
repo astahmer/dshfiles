@@ -1,9 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
+import { LocalOtlpEndpointRegistry } from './local-endpoint.js'
 import {
   OtlpTraceExport,
   type BatchExporter,
+  type ExportConfig,
   type FinishedSpan,
   type SpanAttributeValue,
   type SpanKind,
@@ -215,9 +217,11 @@ const createDisabledTracer = (): Tracer => ({
   flush: async () => undefined,
 })
 
-const createRecordingTracer = (exporter: BatchExporter): Tracer => {
+/** `isEnabled` gates every new span, so a tracer waiting for an in-process receiver costs nothing until it appears. */
+const createRecordingTracer = (exporter: BatchExporter, isEnabled: () => boolean): Tracer => {
   const storage = new AsyncLocalStorage<SpanContext>()
   const startSpan = (name: string, options: StartSpanOptions = {}): Span => {
+    if (!isEnabled()) return NOOP_SPAN
     try {
       const span = new RecordingSpan({
         name,
@@ -232,7 +236,9 @@ const createRecordingTracer = (exporter: BatchExporter): Tracer => {
     }
   }
   return {
-    enabled: true,
+    get enabled() {
+      return isEnabled()
+    },
     startSpan,
     withSpan: async (name, options, run) => {
       const span = startSpan(name, options)
@@ -255,31 +261,50 @@ const createRecordingTracer = (exporter: BatchExporter): Tracer => {
   }
 }
 
-/** A tracer configured from OTLP environment variables; without an endpoint every span is a shared no-op. */
+/**
+ * A tracer configured from OTLP environment variables. An environment endpoint always wins and is read once. Without
+ * one, `localEndpoint` (this process's own receiver) is consulted on every span and every export, so a receiver that
+ * binds after the first span still gets everything from then on; with neither, every span is a shared no-op.
+ */
 const createTracer = (input: {
   readonly env: Readonly<Record<string, string | undefined>>
+  readonly localEndpoint?: (() => string | undefined) | undefined
   readonly fetch?: typeof fetch | undefined
   readonly scheduleDelayMs?: number | undefined
 }): Tracer => {
-  const config = OtlpTraceExport.configFrom(input.env)
-  if (config === undefined) return createDisabledTracer()
-  return createRecordingTracer(OtlpTraceExport.createBatchExporter({ config, fetch: input.fetch, scheduleDelayMs: input.scheduleDelayMs }))
+  if (OtlpTraceExport.sdkDisabled(input.env)) return createDisabledTracer()
+  const exporterOf = (config: () => ExportConfig | undefined) =>
+    OtlpTraceExport.createBatchExporter({ config, fetch: input.fetch, scheduleDelayMs: input.scheduleDelayMs })
+  if (OtlpTraceExport.environmentEndpointSet(input.env)) {
+    const config = OtlpTraceExport.configFrom(input.env)
+    if (config === undefined) return createDisabledTracer()
+    return createRecordingTracer(
+      exporterOf(() => config),
+      () => true,
+    )
+  }
+  const localEndpoint = input.localEndpoint
+  if (localEndpoint === undefined) return createDisabledTracer()
+  return createRecordingTracer(
+    exporterOf(() => OtlpTraceExport.configFrom(input.env, localEndpoint())),
+    () => localEndpoint() !== undefined,
+  )
 }
 
 /**
  * Every plugin bundles its own copy of dshx, so the process tracer lives on globalThis under a versioned symbol:
  * all copies share one exporter queue and one async context, and a span opened in one plugin parents the spans
- * another plugin opens while serving that call.
+ * another plugin opens while serving that call. v2: the tracer can start recording after creation (local receiver).
  */
-const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v1')
+const TRACER_KEY = Symbol.for('@dshfiles/dshx.tracing.v2')
 
 const processTracer = (): Tracer => {
   // SAFETY: only this module writes the versioned symbol, and always a Tracer.
   const holder = globalThis as { [TRACER_KEY]?: Tracer }
   if (holder[TRACER_KEY] !== undefined) return holder[TRACER_KEY]
-  const tracer = createTracer({ env: process.env })
+  const tracer = createTracer({ env: process.env, localEndpoint: () => LocalOtlpEndpointRegistry.current()?.baseUrl })
   holder[TRACER_KEY] = tracer
-  if (tracer.enabled) process.once('beforeExit', () => void tracer.flush())
+  process.once('beforeExit', () => void tracer.flush())
   return tracer
 }
 

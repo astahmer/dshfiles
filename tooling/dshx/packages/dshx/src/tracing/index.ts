@@ -1,9 +1,31 @@
+import { LocalOtlpEndpointRegistry, type LocalOtlpEndpoint, type OtlpExportTarget, type OtlpSignal } from './local-endpoint.js'
 import { TracerModel, type Span, type SpanAttributes, type SpanContext, type StartSpanOptions } from './tracer.js'
 
+export type { LocalOtlpEndpoint, OtlpExportTarget, OtlpSignal } from './local-endpoint.js'
 export type { Span, SpanAttributes, SpanAttributeValue, SpanContext, SpanKind, SpanStatusCode, StartSpanOptions } from './tracer.js'
 
-/** True when an OTLP endpoint is configured for this process; otherwise every span is a shared no-op. */
+/**
+ * True when spans are recorded now: an OTLP endpoint is configured for this process, or (without one) an in-process
+ * receiver is published. Otherwise every span is a shared no-op. It can turn true after the first span.
+ */
 export const tracingEnabled = (): boolean => TracerModel.process().enabled
+
+/**
+ * Announce this Host process's own OTLP/HTTP receiver (e.g. `http://127.0.0.1:4318`). While no `OTEL_EXPORTER_OTLP_*`
+ * endpoint is set, dshx spans and every exporter that reads `localOtlpEndpoint()` deliver there. Returns a withdraw
+ * function that only removes this publication. Host only; one receiver per process (the latest publication wins).
+ */
+export const publishLocalOtlpEndpoint = (endpoint: LocalOtlpEndpoint): (() => void) => LocalOtlpEndpointRegistry.publish(endpoint)
+
+/** The published in-process receiver. Read it at export time: it can appear, move or vanish while the Host runs. */
+export const localOtlpEndpoint = (): LocalOtlpEndpoint | undefined => LocalOtlpEndpointRegistry.current()
+
+/**
+ * Where one OTLP signal from this process goes now: `environment` (an `OTEL_EXPORTER_OTLP_*` endpoint, which always
+ * wins; `OTEL_SDK_DISABLED=true` or `OTEL_<SIGNAL>_EXPORTER=none` turn it off), else `local-receiver` (the published
+ * receiver), else `off`. Exporters call it per export so a receiver that binds later is picked up.
+ */
+export const otlpExportTarget = (input: { readonly signal: OtlpSignal }): OtlpExportTarget => LocalOtlpEndpointRegistry.exportTarget(input)
 
 /** Start a span the caller must `end()`. Prefer `withSpan`, which also scopes it as the parent of nested spans. */
 export const startSpan = (name: string, options?: StartSpanOptions): Span => TracerModel.process().startSpan(name, options)
