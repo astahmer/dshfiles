@@ -188,6 +188,69 @@ createInterface({ input: process.stdin }).on('line', () => {
 })
 `
 
+/** A `claude` that answers stdin lines one by one, slowly, the way the real CLI does. */
+const PER_LINE_CLAUDE = `#!/usr/bin/env node
+const { createInterface } = require('node:readline')
+const out = value => process.stdout.write(JSON.stringify(value) + '\\n')
+const event = value => out({ type: 'stream_event', event: value })
+const queue = []
+let busy = false
+const pump = () => {
+  if (busy) return
+  const text = queue.shift()
+  if (text === undefined) return
+  busy = true
+  setTimeout(() => {
+    event({ type: 'message_start', message: { usage: { input_tokens: 1, output_tokens: 0 } } })
+    event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+    event({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'answered: ' + text } })
+    event({ type: 'content_block_stop', index: 0 })
+    event({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } })
+    event({ type: 'message_stop' })
+    out({ type: 'result', subtype: 'success', is_error: false })
+    busy = false
+    pump()
+  }, 150)
+}
+createInterface({ input: process.stdin }).on('line', line => {
+  queue.push(JSON.parse(line).message.content.map(block => block.text ?? '').join(''))
+  pump()
+})
+`
+
+it('answers one step from one CLI turn, so a stale turn never answers the next prompt', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-batch-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(executable, PER_LINE_CLAUDE)
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => join(directory, '.claude'), executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const messages: Message[] = [{ role: 'user', content: 'first prompt', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', messages })
+  const options = { sessionId: 'session-batch' }
+
+  const first = await finished(cli.stream(model, context(), options))
+  expect(textOf(first)).toBe('answered: first prompt')
+
+  // DSH appends a runtime snapshot as a second user message in the same step.
+  messages.push(
+    first,
+    { role: 'user', content: 'the answers to the plan questions', timestamp: 2 },
+    { role: 'user', content: 'a runtime snapshot', timestamp: 3 },
+  )
+  const second = await finished(cli.stream(model, context(), options))
+  expect(textOf(second)).toContain('the answers to the plan questions')
+
+  await new Promise(resolve => setTimeout(resolve, 400))
+  messages.push(second, { role: 'user', content: 'a brand new prompt', timestamp: 4 })
+  const third = await finished(cli.stream(model, context(), options))
+
+  expect(textOf(third)).toBe('answered: a brand new prompt')
+})
+
 it('skips a non-JSON line from the CLI instead of throwing out of its stdout handler', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'claude-cli-noisy-'))
   directories.push(directory)

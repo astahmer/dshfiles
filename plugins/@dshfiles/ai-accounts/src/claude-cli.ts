@@ -210,6 +210,16 @@ const renderTranscript = (messages: TranscriptContext['messages']): string => {
   return lines.join('\n')
 }
 
+/**
+ * First index of the trailing run of user messages DSH appends for one step. One CLI turn answers all of them
+ * together, because the CLI treats every stdin line as a prompt of its own.
+ */
+const trailingUserStart = (conversation: readonly { readonly role: string }[]): number => {
+  let start = conversation.length
+  while (start > 0 && conversation[start - 1]?.role === 'user') start -= 1
+  return start
+}
+
 export class ClaudeCliSessions {
   private readonly sessions = new Map<string, Session>()
 
@@ -286,11 +296,14 @@ export class ClaudeCliSessions {
     const session = this.spawn({ key, signature, model, system, tools, effort, provider: model.provider })
     this.sessions.set(key, session)
     const conversation = messages.filter(message => message.role !== 'system')
-    const last = conversation.at(-1)
-    const earlier = last?.role === 'user' ? conversation.slice(0, -1) : conversation
+    const pendingStart = trailingUserStart(conversation)
+    const pending = conversation.slice(pendingStart).filter(message => message.role === 'user')
+    const earlier = conversation.slice(0, pendingStart)
     const opening = earlier.length === 0 ? [] : [{ type: 'text', text: `The conversation so far, which you are continuing:\n${renderTranscript(earlier)}` }]
     const blocks =
-      last?.role === 'user' ? [...opening, ...userBlocks(last.content)] : [...opening, { type: 'text', text: 'Continue from where the conversation stopped.' }]
+      pending.length === 0
+        ? [...opening, { type: 'text', text: 'Continue from where the conversation stopped.' }]
+        : [...opening, ...pending.flatMap(message => userBlocks(message.content))]
     this.send(session, blocks)
     session.synced = messages.length
     session.lastFingerprint = fingerprint(JSON.stringify(messages.at(-1) ?? ''))
@@ -311,18 +324,30 @@ export class ClaudeCliSessions {
     return true
   }
 
-  /** Hand the process what DSH added since the last step: tool results release held calls, a user turn goes to stdin. */
+  /**
+   * Hand the process what DSH added since the last step: tool results release held calls, then every user message of
+   * this step becomes ONE CLI turn. One stdin line is one request to Claude, so sending each message separately made
+   * the CLI answer each in its own turn; only the first reply belonged to the step, and the rest waited in the backlog
+   * and were then shown as the answer to the next prompt (a question already answered looked asked again).
+   */
   private feed(session: Session, messages: TranscriptContext['messages']): void {
-    for (const message of messages.slice(session.synced)) {
+    const added = messages.slice(session.synced)
+    for (const message of added) {
       if (message.role === 'toolResult') this.answer(session, message.toolCallId, { content: toolResultContent(message.content), isError: message.isError })
-      if (message.role === 'user') this.send(session, userBlocks(message.content))
     }
+    const pending = added.filter(message => message.role === 'user')
+    if (pending.length > 0)
+      this.send(
+        session,
+        pending.flatMap(message => userBlocks(message.content)),
+      )
     session.produced = 0
     session.synced = messages.length
     session.lastFingerprint = fingerprint(JSON.stringify(messages.at(-1) ?? ''))
   }
 
   private send(session: Session, content: readonly unknown[]): void {
+    if (content.length === 0) return
     session.child.stdin.write(`${JSON.stringify({ type: 'user', message: { role: 'user', content } })}\n`)
   }
 
