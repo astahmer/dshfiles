@@ -1,3 +1,5 @@
+import type { PaletteThreadSection } from './palette-api.js'
+
 /** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
 const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
@@ -59,6 +61,7 @@ export interface ThreadCandidate {
   readonly project: string
   readonly cwd: string
   readonly updatedAt: number
+  readonly section?: PaletteThreadSection
 }
 
 const WORD_BOUNDARY = /[\s\-_/.·:]/

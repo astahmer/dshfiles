@@ -6,6 +6,8 @@ export interface PaletteWorkspace {
   readonly title: string
 }
 
+export type PaletteThreadSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'settled' | 'archived'
+
 export interface PaletteThread {
   readonly id: string
   readonly title: string
@@ -13,6 +15,7 @@ export interface PaletteThread {
   readonly workspaceId: string | undefined
   readonly pinned: boolean
   readonly archived: boolean
+  readonly section?: PaletteThreadSection
 }
 
 export type PaletteMode = 'all' | 'threads' | 'files' | 'backlog'
@@ -42,11 +45,13 @@ interface PaletteApiSnapshot {
   readonly actions: readonly PaletteAction[]
   readonly mode: PaletteMode | null
   readonly recentLimit: number
+  readonly threadSections: ReadonlyMap<string, PaletteThreadSection>
 }
 
 interface PaletteRegistry {
   readonly actions: Map<string, PaletteAction>
   readonly listeners: Set<() => void>
+  sectionSources: Map<symbol, ReadonlyMap<string, PaletteThreadSection>>
   mode: PaletteMode | null
   recentLimit: number
   snapshot?: PaletteApiSnapshot
@@ -81,30 +86,38 @@ const paletteActionSchema = z.object({
 
 const registry = (): PaletteRegistry => {
   const current = window.__dshfilesCommandPaletteV1
-  if (current !== undefined) return current
+  if (current !== undefined) {
+    current.sectionSources ??= new Map()
+    return current
+  }
   const created: PaletteRegistry = {
     actions: new Map(),
     listeners: new Set(),
+    sectionSources: new Map(),
     mode: null,
     recentLimit: 10,
-    snapshot: { actions: [], mode: null, recentLimit: 10 },
+    snapshot: { actions: [], mode: null, recentLimit: 10, threadSections: new Map() },
   }
   window.__dshfilesCommandPaletteV1 = created
   return created
 }
 
+const EMPTY_THREAD_SECTIONS: ReadonlyMap<string, PaletteThreadSection> = new Map()
+
 const refreshSnapshot = (current: PaletteRegistry): PaletteApiSnapshot => {
   const actions = [...current.actions.values()]
+  const threadSections = [...current.sectionSources.values()].at(-1) ?? EMPTY_THREAD_SECTIONS
   const previous = current.snapshot
   if (
     previous !== undefined &&
     previous.mode === current.mode &&
     previous.recentLimit === current.recentLimit &&
+    previous.threadSections === threadSections &&
     previous.actions.length === actions.length &&
     previous.actions.every((action, index) => action === actions[index])
   )
     return previous
-  const next = { actions, mode: current.mode, recentLimit: current.recentLimit }
+  const next = { actions, mode: current.mode, recentLimit: current.recentLimit, threadSections }
   current.snapshot = next
   return next
 }
@@ -130,6 +143,18 @@ const registerPaletteAction = (input: PaletteAction): (() => void) => {
 }
 
 const getPaletteSnapshot = (): PaletteApiSnapshot => refreshSnapshot(registry())
+
+/** Register one sidebar surface's derived status projection for the palette. */
+const registerThreadSections = (sections: ReadonlyMap<string, PaletteThreadSection>): (() => void) => {
+  const current = registry()
+  const source = Symbol()
+  current.sectionSources.set(source, sections)
+  notify(current)
+  return () => {
+    if (!current.sectionSources.delete(source)) return
+    notify(current)
+  }
+}
 
 const subscribePaletteActions = (listener: () => void): (() => void) => {
   const current = registry()
@@ -162,6 +187,7 @@ export class PaletteApi {
   static readonly getSnapshot = getPaletteSnapshot
   static readonly subscribe = subscribePaletteActions
   static readonly registerAction = registerPaletteAction
+  static readonly registerThreadSections = registerThreadSections
   static readonly setRecentLimit = setPaletteRecentLimit
   static readonly open = openPalette
   static readonly close = closePalette

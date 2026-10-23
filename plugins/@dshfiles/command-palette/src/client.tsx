@@ -19,7 +19,15 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
-import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
+import {
+  PaletteApi,
+  PALETTE_EVENT,
+  type PaletteAction,
+  type PaletteActionContext,
+  type PaletteMode,
+  type PaletteThreadSection,
+  type PaletteWorkspace,
+} from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
@@ -84,6 +92,7 @@ const workspaceForSession = (
 interface PaletteCatalogProps extends PaletteOverlayProps {
   readonly mode: PaletteMode
   readonly recentLimit: number
+  readonly threadSections: ReadonlyMap<string, PaletteThreadSection>
 }
 
 /** Mounted only while the palette is open, so a closed palette derives nothing at all. */
@@ -150,14 +159,22 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         const workspaceId = workspaceForSession(session, sessionsById, workspaceBySession)
         const project = workspaceId === undefined ? '' : (workspaceTitleById.get(workspaceId) ?? '')
         const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
+        const section = props.threadSections.get(session.id)
         return [
           {
-            thread: { id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt },
+            thread: {
+              id: session.id,
+              title: session.displayTitle,
+              project,
+              cwd: session.cwd ?? '',
+              updatedAt: session.updatedAt,
+              ...(section === undefined ? {} : { section }),
+            },
             repository: path === undefined ? undefined : EntityLabels.repositoryPath(path),
           },
         ]
       }),
-    [archivedSessionIds, sessions, sessionsById, workspaceBySession, workspacePathById, workspaceTitleById],
+    [archivedSessionIds, props.threadSections, sessions, sessionsById, workspaceBySession, workspacePathById, workspaceTitleById],
   )
   const threads = useMemo(() => threadEntries.map(entry => entry.thread), [threadEntries])
   const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
@@ -186,6 +203,8 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     <ThreadPalette
       mode={mode}
       threads={threads}
+      threadSections={props.threadSections}
+      archivedSessionIds={archivedSessionIds}
       {...(projectThreads === undefined ? {} : { projectThreads })}
       context={context}
       additionalActions={workspaceActions}
@@ -202,6 +221,15 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         backlogUnavailable: props.translate('commandPaletteBacklogUnavailable'),
         recent: props.translate('commandPaletteRecent'),
         threads: props.translate('commandPaletteThreads'),
+        threadSectionAll: props.translate('commandPaletteThreadSectionAll'),
+        threadSectionLabels: {
+          pinned: props.translate('commandPaletteThreadSectionPinned'),
+          active: props.translate('commandPaletteThreadSectionActive'),
+          parked: props.translate('commandPaletteThreadSectionParked'),
+          inactive: props.translate('commandPaletteThreadSectionInactive'),
+          settled: props.translate('commandPaletteThreadSectionSettled'),
+        },
+        threadDateLabel: props.translate('commandPaletteThreadDate'),
         destinations: props.translate('commandPaletteDestinations'),
         commands: props.translate('commandPaletteCommands'),
         files: props.translate('commandPaletteFiles'),
@@ -273,7 +301,7 @@ export const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null =
   const paletteSnapshot = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot)
   const { mode, recentLimit } = paletteSnapshot
   if (mode === null) return null
-  return <PaletteCatalog {...props} mode={mode} recentLimit={recentLimit} />
+  return <PaletteCatalog {...props} mode={mode} recentLimit={recentLimit} threadSections={paletteSnapshot.threadSections} />
 }
 
 export default defineClient({

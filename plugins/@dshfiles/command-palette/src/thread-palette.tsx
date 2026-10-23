@@ -14,7 +14,7 @@ import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
 import { ProjectTone } from './project-tone.js'
 import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
-import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode } from './palette-api.js'
+import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteThreadSection } from './palette-api.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
 export interface ThreadPaletteCopy {
@@ -77,6 +77,9 @@ export interface ThreadPaletteCopy {
   readonly askSend: string
   readonly askExit: string
   readonly askFailed: string
+  readonly threadSectionAll: string
+  readonly threadSectionLabels: Readonly<Record<'pinned' | 'active' | 'parked' | 'inactive' | 'settled', string>>
+  readonly threadDateLabel: string
 }
 
 type PaletteActionOption = Omit<PaletteAction, 'label'> & { readonly label: string }
@@ -86,6 +89,8 @@ interface ThreadPaletteProps {
   readonly threads: readonly ThreadCandidate[]
   /** The current project's threads; when set, the Threads tab lists only these, while a session ID still finds any thread. */
   readonly projectThreads?: readonly ThreadCandidate[]
+  readonly threadSections?: ReadonlyMap<string, PaletteThreadSection>
+  readonly archivedSessionIds?: ReadonlySet<string>
   readonly context: PaletteActionContext
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
@@ -163,6 +168,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   useEffect(() => sendNavigation({ type: 'mode.sync', mode: props.mode }), [props.mode, sendNavigation])
   const emptyQuery = deferredQuery.trim().length === 0
   const [askPending, setAskPending] = useState(false)
+  const [threadSectionFilter, setThreadSectionFilter] = useState<'all' | 'pinned' | 'active' | 'parked' | 'inactive' | 'settled'>('all')
   const askInFlight = useRef(false)
   const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
   const latestOnClose = useRef(props.onClose)
@@ -245,6 +251,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         : [],
     [props.recentLimit, rankedThreadIndex, threadSearch.query, view],
   )
+  const filteredThreadRows = useMemo(
+    () =>
+      threadRows.filter(
+        thread =>
+          thread.section !== 'archived' &&
+          props.archivedSessionIds?.has(thread.id) !== true &&
+          (threadSectionFilter === 'all' || (thread.section ?? 'active') === threadSectionFilter),
+      ),
+    [props.archivedSessionIds, threadRows, threadSectionFilter],
+  )
   const exactSearchId = threadSearch.exactId?.toLocaleLowerCase()
   const missingSessionId =
     (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
@@ -257,14 +273,23 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       // A finder hit names its own thread, so content search still reaches a thread this client has not listed
       // (a thread from another project, or one whose workspace is gone).
       const known = threadsById.get(hit.sessionId)
+      const section = props.threadSections?.get(hit.sessionId)
       const thread =
         known ??
         (hit.title === undefined
           ? undefined
-          : { id: hit.sessionId, title: hit.title, project: hit.project ?? '', cwd: hit.cwd ?? '', updatedAt: hit.updatedAt ?? 0 })
-      return thread === undefined ? [] : [{ thread, snippet: hit.snippet }]
+          : {
+              id: hit.sessionId,
+              title: hit.title,
+              project: hit.project ?? '',
+              cwd: hit.cwd ?? '',
+              updatedAt: hit.updatedAt ?? 0,
+              ...(section === undefined ? {} : { section }),
+            })
+      if (thread === undefined || props.archivedSessionIds?.has(hit.sessionId) === true || section === 'archived' || thread.section === 'archived') return []
+      return [{ thread, snippet: hit.snippet }]
     })
-  }, [content.hits, props.threads, view])
+  }, [content.hits, props.archivedSessionIds, props.threadSections, props.threads, view])
   const line = view === 'line' ? PaletteRules.parseLineNumber(deferredQuery) : null
   const helpRows = useMemo(
     () =>
@@ -346,9 +371,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
-      ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
+      ...filteredThreadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, filteredThreadRows, helpRows, line],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -571,6 +596,27 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
             <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
           </div>
+          {mode === 'threads' && !ask && !subview ? (
+            <Tabs
+              value={threadSectionFilter}
+              onValueChange={(value: string) => {
+                if (value === 'all' || value === 'pinned' || value === 'active' || value === 'parked' || value === 'inactive' || value === 'settled') {
+                  setThreadSectionFilter(value)
+                }
+              }}
+            >
+              <TabsList aria-label={props.copy.threads} className="dshx:mx-2 dshx:my-1 dshx:max-w-[calc(100%-1rem)] dshx:overflow-x-auto">
+                <TabsTrigger value="all" onClick={() => setThreadSectionFilter('all')}>
+                  {props.copy.threadSectionAll}
+                </TabsTrigger>
+                {(['pinned', 'active', 'parked', 'inactive', 'settled'] as const).map(section => (
+                  <TabsTrigger key={section} value={section} onClick={() => setThreadSectionFilter(section)}>
+                    {props.copy.threadSectionLabels[section]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          ) : null}
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
               {ask && emptyQuery
@@ -640,6 +686,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
                         <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{hit.snippet}</span>
+                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                          {hit.thread.section === undefined || hit.thread.section === 'archived'
+                            ? props.copy.threadSectionLabels.active
+                            : props.copy.threadSectionLabels[hit.thread.section]}
+                          {hit.thread.updatedAt > 0
+                            ? ` · ${props.copy.threadDateLabel}: ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(hit.thread.updatedAt))}`
+                            : ''}
+                        </span>
                       </span>
                       {shortcut(row)}
                     </CommandItem>
@@ -674,10 +728,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
-            {(destinationRows.length > 0 || commandRows.length > 0) && threadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
-            {threadRows.length > 0 ? (
+            {(destinationRows.length > 0 || commandRows.length > 0) && filteredThreadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
+            {filteredThreadRows.length > 0 ? (
               <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
-                {threadRows.map(thread => {
+                {filteredThreadRows.map(thread => {
                   const row: PaletteRow = { kind: 'thread', thread }
                   const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
                   return (
@@ -694,7 +748,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
                         <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                          {thread.section === undefined
+                            ? props.copy.threadSectionLabels.active
+                            : props.copy.threadSectionLabels[thread.section === 'archived' ? 'active' : thread.section]}
+                          {' · '}
                           {project}
+                          {' · '}
+                          {props.copy.threadDateLabel}: {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(thread.updatedAt))}
                           {thread.cwd.length > 0 ? (
                             <>
                               {' · '}

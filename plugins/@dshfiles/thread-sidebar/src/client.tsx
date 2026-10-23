@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { PaletteApi, type PaletteAction, type PaletteThreadSection } from '@dshfiles/command-palette/api'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -121,7 +122,6 @@ import {
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
-import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
@@ -1648,6 +1648,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   })
   const continuedQuestionSessionIds = useMemo(() => new Set(activeQuestionsQuery.data?.sessionIds ?? []), [activeQuestionsQuery.data])
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
+  const paletteThreadSections = useMemo<ReadonlyMap<string, PaletteThreadSection>>(
+    () =>
+      new Map(
+        sessions.map(session => [
+          session.id,
+          SidebarOrganization.sectionForSession({
+            session: { id: session.id, running: session.running, updatedAt: session.updatedAt },
+            archivedSessionIds,
+            pinnedSessionIds,
+            parkedSessionIds,
+            settledSessionIds,
+            idleSectionOverrides: preferences.idleSectionOverrides,
+            now,
+            idleMinutes: preferences.idleMinutes,
+          }),
+        ]),
+      ),
+    [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, preferences.idleSectionOverrides, sessions, settledSessionIds],
+  )
+  useEffect(() => PaletteApi.registerThreadSections(paletteThreadSections), [paletteThreadSections])
   const mutedThreads = preferences.mutedThreads
   const mutedSessionIds = useMemo(
     () => new Set(Object.entries(mutedThreads).flatMap(([sessionId, mute]) => (isMuteActive(mute, now) ? [sessionId] : []))),
