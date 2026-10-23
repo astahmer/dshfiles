@@ -180,13 +180,14 @@ on demand. A missing key, model or failing call is skipped and the item simply s
 ### Backfilling items captured before triage
 
 Triage only runs on capture, so items that predate it stay untriaged. The wand in the panel header
-(**Backfill triage**) runs it over them: the oldest open items no triage has looked at yet, 25 per run,
-one at a time so a rate limit or a bad key does not burst. The dialog reports how many it applied, left
-as suggestions, found unchanged and how many items remain, so running it again continues where it
-stopped. `backlog_triage_backfill` is the same pass for an agent; `retriage` includes items triage
-already looked at (after changing the prompt or model) and `includeClosed` reaches done and dropped
-items. An item triage found nothing to change on gets a "found nothing to change" event without being
-bumped to fresh, so the next run skips it instead of reviving old work.
+(**Backfill triage**) starts a background pass over inbox/todo tasks only: the oldest eligible items,
+25 per run, one at a time so a rate limit or bad key does not burst. The dialog shows a progress bar and
+outcome counts while it runs; closing the dialog leaves the pass running, with a small progress control
+to reopen it. `backlog_triage_backfill` starts the same pass for an agent and returns a job id;
+`backlog_triage_backfill_status` reads its progress. `retriage` includes inbox/todo tasks triage already
+looked at (after changing the prompt or model). An item triage found nothing to change on gets a "found
+nothing to change" event without being bumped to fresh, so the next run skips it instead of reviving old
+work.
 
 ## Lifecycle signals
 

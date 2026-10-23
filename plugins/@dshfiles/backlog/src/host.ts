@@ -250,20 +250,7 @@ const backfillSnapshot = (job: BackfillJob) => ({ ...job })
 const backfillTriageStatus = (jobId: string) => {
   const job = backfillJobs.get(jobId)
   if (job !== undefined) return backfillSnapshot(job)
-  return {
-    jobId: null,
-    retriage: false,
-    configured: false,
-    reason: 'This backfill is no longer available in this Host process.',
-    state: 'failed' as const,
-    total: 0,
-    completed: 0,
-    applied: 0,
-    proposed: 0,
-    unchanged: 0,
-    failed: 0,
-    remaining: 0,
-  }
+  return null
 }
 
 const backfillTriage = async (ctx: Context, request: { readonly retriage?: boolean | undefined; readonly limit?: number | undefined }) => {
@@ -307,7 +294,7 @@ const backfillTriage = async (ctx: Context, request: { readonly retriage?: boole
         return
       }
       const selection = store.triageCandidates(scope)
-      job.total = selection.ids.length
+      job.total = selection.ids.length + selection.remaining
       job.remaining = selection.remaining
       const report = await BacklogBackfill.run({
         selection,
@@ -318,7 +305,7 @@ const backfillTriage = async (ctx: Context, request: { readonly retriage?: boole
           }),
         markTriaged: id => store.markTriaged(id),
         onProgress: progress => {
-          job.completed = progress.completed
+          job.completed = progress.completed + job.total - selection.ids.length
           job.applied = progress.applied
           job.proposed = progress.proposed
           job.unchanged = progress.unchanged
