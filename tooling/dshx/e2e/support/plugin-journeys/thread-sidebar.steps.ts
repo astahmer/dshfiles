@@ -74,6 +74,11 @@ const openThreadRow = async (row: Locator): Promise<void> => {
 const openThreadRowMenu = async (row: Locator): Promise<void> => {
   await row.click({ button: 'right', position: { x: 24, y: 16 } })
 }
+// Pin, Park, Settle and Archive sit under the row menu's Change status submenu.
+const chooseRowStatusAction = async (page: Page, action: string): Promise<void> => {
+  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
+  await page.getByRole('menuitem', { name: action, exact: true }).click()
+}
 
 /**
  * Drag a row onto a section header with real pointer input: Chromium starts the row's native HTML5 drag on the first
@@ -187,7 +192,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
   const scrollPane = threadSidebar(page).getByTestId('thread-sidebar-scroll')
   const scrollPaneTopBeforeArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await chooseRowStatusAction(page, 'Archive')
   const transientNotice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
   let screenshotClip: { x: number; y: number; width: number; height: number } | undefined
   let layoutEvidence: string | undefined
@@ -294,7 +299,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   const timedRow = threadSidebar(page).locator('article').filter({ hasText: timedPrompt })
   await expect(timedRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
   await openThreadRowMenu(timedRow)
-  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await chooseRowStatusAction(page, 'Archive')
   const archivedNotice = threadSidebar(page).getByText('Thread archived.', { exact: true })
   await expect(archivedNotice).toBeVisible()
   await expect(archivedNotice).toBeHidden({ timeout: 4_000 })
@@ -311,7 +316,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   const disabledRow = threadSidebar(page).locator('article').filter({ hasText: disabledPrompt })
   await expect(disabledRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
   await openThreadRowMenu(disabledRow)
-  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await chooseRowStatusAction(page, 'Archive')
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
   await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toHaveCount(0)
 })
@@ -334,7 +339,7 @@ When('an archived thread is opened from the Archived section', async ({ page }: 
   const targetRow = threadRow(page, archivedThreadId)
   await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await chooseRowStatusAction(page, 'Archive')
 
   await threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true }).click()
   await openThreadRow(targetRow)
@@ -373,8 +378,7 @@ When('a nonblank Host thread is settled from its context menu', async ({ page }:
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+  await chooseRowStatusAction(page, 'Settle')
   await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
 })
 
@@ -510,13 +514,13 @@ When('an archived thread and a settled thread fill the bottom sections', async (
   const archivedRow = threadRow(page, archivedId)
   await expect(archivedRow).toHaveCount(1)
   await openThreadRowMenu(archivedRow)
-  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await chooseRowStatusAction(page, 'Archive')
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
 
   const settledRow = threadRow(page, settledId)
   await expect(settledRow).toHaveCount(1)
   await openThreadRowMenu(settledRow)
-  await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+  await chooseRowStatusAction(page, 'Settle')
   await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
 })
 
@@ -589,7 +593,7 @@ When('a thread is settled with a one-week settled-archive delay', async ({ page 
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+  await chooseRowStatusAction(page, 'Settle')
   await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
 })
 
@@ -677,8 +681,7 @@ When('a nonblank Host thread is parked from its context menu', async ({ page }: 
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
-  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Park', exact: true }).click()
+  await chooseRowStatusAction(page, 'Park')
   await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
   await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
   await expect(targetRow).toHaveCount(1)
@@ -944,6 +947,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await selectThreadViewValue(page, 'Filter: Working', 'All threads')
   await expect(targetRow).toBeVisible()
   await openThreadRowMenu(targetRow)
+  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
   const archiveItem = page.getByRole('menuitem', { name: 'Archive', exact: true })
   await expect(archiveItem).toBeEnabled()
   await archiveItem.click()
