@@ -23,5 +23,6 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Plugin reload](plugin-reload.md)                            | What a rebuilt bundle updates over HMR, what needs a Host restart, and how a failed reload behaves in the page.                          |
 | [ADE interaction performance](ade-performance/README.md)     | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.                             |
 | [Self-improvement from Session history](self-improvement.md) | `/self-improve`: mining past Sessions into candidate signals, deterministic harness validation, and the improvement ledger.              |
+| [Observability](observability.md)                            | OpenTelemetry spans for turns, steps, model calls and tools: the adopted plugin, how to turn export on, and what it records.             |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).
