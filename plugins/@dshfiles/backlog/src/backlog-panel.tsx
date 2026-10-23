@@ -125,7 +125,7 @@ const ProjectFilter = (props: {
       trigger={
         <>
           {singleProject !== null ? <ItemGlyphs.ProjectDot project={singleProject} /> : <FolderIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />}
-          <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-compact:sr-only" title={pathTitle}>
+          <span className="dshx:min-w-0 dshx:truncate dshx:@max-[72rem]:sr-only" title={pathTitle}>
             {label}
           </span>
         </>
@@ -151,7 +151,7 @@ const FilterMenu = (props: {
         )}
       >
         <ListFilterIcon className="dshx:size-3.5" />
-        <span className="dshx:@max-pane-compact:sr-only">Filter</span>
+        <span className="dshx:@max-[72rem]:sr-only">Filter</span>
         {active > 0 ? <span className="dshx:rounded-full dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info">{active}</span> : null}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-56">
@@ -197,7 +197,7 @@ const SavedViews = (props: {
         className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
       >
         <BookmarkIcon className="dshx:size-3.5" />
-        <span className="dshx:@max-pane-compact:sr-only">Views</span>
+        <span className="dshx:@max-[72rem]:sr-only">Views</span>
         {props.views.length === 0 ? null : <span className="dshx:text-[10px] dshx:tabular-nums">{props.views.length}</span>}
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-72 dshx:p-1">
@@ -587,7 +587,7 @@ export const BacklogPanel = (props: {
           })}
         </nav>
         <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <label className="dshx:flex dshx:h-7 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
+          <label className="dshx:flex dshx:h-7 dshx:min-w-24 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
             <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
             <input
               ref={searchInput}
@@ -627,7 +627,7 @@ export const BacklogPanel = (props: {
                 className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground"
               >
                 <ArrowDownWideNarrowIcon className="dshx:size-3.5" />
-                <span className="dshx:@max-pane-compact:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
+                <span className="dshx:@max-[72rem]:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="dshx-root">
                 <DropdownMenuLabel>Sort by</DropdownMenuLabel>
@@ -657,7 +657,7 @@ export const BacklogPanel = (props: {
             className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
           >
             <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-            <span className="dshx:@max-pane-compact:sr-only">Backfill</span>
+            <span className="dshx:@max-[72rem]:sr-only">Backfill</span>
           </button>
           <button
             type="button"
