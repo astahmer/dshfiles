@@ -15,8 +15,31 @@ const searchRevset = (query: string): string => {
   return `all() & (${matches.join(' | ')})`
 }
 
-export const graphPageRevset = (input: { readonly query: string; readonly excludeCommitIds: readonly string[] }): string => {
-  const base = input.query.trim().length === 0 ? 'all()' : searchRevset(input.query.trim())
-  if (input.excludeCommitIds.length === 0) return base
-  return `${base} ~ (${input.excludeCommitIds.map(commitId => `commit_id(${commitId})`).join(' | ')})`
+/** Graph page revsets and the candidate pick that keeps every page's jj evaluation flat. */
+export class GraphPage {
+  static revset(query: string): string {
+    const trimmed = query.trim()
+    return trimmed.length === 0 ? 'all()' : searchRevset(trimmed)
+  }
+
+  static commitIdsRevset(commitIds: readonly string[]): string {
+    return commitIds.map(commitId => `commit_id(${commitId})`).join(' | ')
+  }
+
+  /**
+   * Picks the next page's candidates from an ordered id listing. Skipping already loaded revisions here instead of in
+   * the revset keeps each page's cost flat: a `~ commit_id(…)` union grows with every loaded page.
+   */
+  static nextCandidates(input: {
+    readonly listedCommitIds: readonly string[]
+    readonly excludeCommitIds: readonly string[]
+    readonly size: number
+    readonly scanLimit: number
+  }) {
+    const excluded = new Set(input.excludeCommitIds)
+    return {
+      commitIds: input.listedCommitIds.filter(commitId => !excluded.has(commitId)).slice(0, input.size),
+      listingTruncated: input.listedCommitIds.length >= input.scanLimit,
+    }
+  }
 }

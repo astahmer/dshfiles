@@ -14,7 +14,7 @@ import { composerContextHost } from './composer-context-host.js'
 import { closeReviewProgress, jujutsuReviewProgressApiHost, reviewProgressFor } from './review-progress-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
-import { graphPageRevset } from './graph-page.js'
+import { GraphPage } from './graph-page.js'
 import { matchesRevisionSearch } from './graph.js'
 
 const MAX_OUTPUT = 1_160_000
@@ -242,7 +242,9 @@ const readGraphPage = async (
   excludeCommitIds: readonly string[],
   signal: AbortSignal | undefined,
 ): Promise<{ readonly revisions: Revision[]; readonly hasMore: boolean }> => {
-  const result = await runAt(
+  const candidateCount = INITIAL_GRAPH_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1
+  const scanLimit = excludeCommitIds.length + candidateCount
+  const listing = await runAt(
     ctx,
     repo.root,
     repo.identity,
@@ -251,12 +253,28 @@ const readGraphPage = async (
       'log',
       '--no-graph',
       '--limit',
-      String(INITIAL_GRAPH_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1),
+      String(scanLimit),
       '--revisions',
-      graphPageRevset({ query, excludeCommitIds }),
+      GraphPage.revset(query),
       '--template',
-      REVISION_TEMPLATE,
+      'commit_id ++ "\\n"',
     ],
+    signal,
+    { outputLimit: scanLimit * 64 + 1024 },
+  )
+  if (listing.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
+  const candidates = GraphPage.nextCandidates({
+    listedCommitIds: listing.stdout.split('\n').filter(line => line.length > 0),
+    excludeCommitIds,
+    size: candidateCount,
+    scanLimit,
+  })
+  if (candidates.commitIds.length === 0) return { revisions: [], hasMore: false }
+  const result = await runAt(
+    ctx,
+    repo.root,
+    repo.identity,
+    [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', GraphPage.commitIdsRevset(candidates.commitIds), '--template', REVISION_TEMPLATE],
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
@@ -267,7 +285,7 @@ const readGraphPage = async (
   const evolution = await readEvolvedCommitIds(ctx, repo, page, signal)
   return {
     revisions: page.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) })),
-    hasMore: revisions.length > INITIAL_GRAPH_PAGE_SIZE,
+    hasMore: page.length > 0 && (revisions.length > INITIAL_GRAPH_PAGE_SIZE || candidates.listingTruncated),
   }
 }
 

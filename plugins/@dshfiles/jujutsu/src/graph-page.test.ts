@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
-import { graphPageRevset } from './graph-page.js'
+import { GraphPage } from './graph-page.js'
 
 const fixture = async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-graph-page-'))
@@ -37,17 +37,7 @@ test('graph pages exclude seen IDs and text search reaches history outside the l
     if (index === 2) historicalMatchId = commitId()
   }
 
-  const firstPage = jj([
-    '--ignore-working-copy',
-    'log',
-    '--no-graph',
-    '--limit',
-    '3',
-    '--revisions',
-    graphPageRevset({ query: '', excludeCommitIds: [] }),
-    '-T',
-    'commit_id ++ "\\n"',
-  ])
+  const firstPage = jj(['--ignore-working-copy', 'log', '--no-graph', '--limit', '3', '--revisions', GraphPage.revset(''), '-T', 'commit_id ++ "\\n"'])
     .split('\n')
     .filter(Boolean)
   const secondPage = jj([
@@ -57,7 +47,7 @@ test('graph pages exclude seen IDs and text search reaches history outside the l
     '--limit',
     '3',
     '--revisions',
-    graphPageRevset({ query: '', excludeCommitIds: firstPage }),
+    `all() ~ (${GraphPage.commitIdsRevset(firstPage)})`,
     '-T',
     'commit_id ++ "\\n"',
   ])
@@ -76,7 +66,7 @@ test('graph pages exclude seen IDs and text search reaches history outside the l
     '--limit',
     '3',
     '--revisions',
-    graphPageRevset({ query: 'needle', excludeCommitIds: [] }),
+    GraphPage.revset('needle'),
     '-T',
     'commit_id ++ "\\n"',
   ])
@@ -84,6 +74,30 @@ test('graph pages exclude seen IDs and text search reaches history outside the l
     .filter(Boolean)
   assert.ok(!firstPage.includes(historicalMatchId))
   assert.ok(historicalMatch.includes(historicalMatchId))
+})
+
+test('next page skips loaded revisions without growing the revset and keeps graph order', async () => {
+  const { jj } = await fixture()
+  for (let index = 0; index < 9; index += 1) jj(['new', '@', '-m', `revision ${index}`])
+  const listAll = (limit: number): string[] =>
+    jj(['--ignore-working-copy', 'log', '--no-graph', '--limit', String(limit), '--revisions', GraphPage.revset(''), '-T', 'commit_id ++ "\\n"'])
+      .split('\n')
+      .filter(Boolean)
+  const everything = listAll(100)
+  const loaded = everything.slice(0, 4)
+  const scanLimit = loaded.length + 3
+  const next = GraphPage.nextCandidates({ listedCommitIds: listAll(scanLimit), excludeCommitIds: loaded, size: 3, scanLimit })
+
+  assert.deepEqual(next.commitIds, everything.slice(4, 7))
+  assert.equal(next.listingTruncated, true)
+  const read = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', GraphPage.commitIdsRevset(next.commitIds), '-T', 'commit_id ++ "\\n"'])
+    .split('\n')
+    .filter(Boolean)
+  assert.deepEqual(read, everything.slice(4, 7))
+
+  const tail = GraphPage.nextCandidates({ listedCommitIds: everything, excludeCommitIds: everything.slice(0, -2), size: 5, scanLimit: everything.length + 5 })
+  assert.deepEqual(tail.commitIds, everything.slice(-2))
+  assert.equal(tail.listingTruncated, false)
 })
 
 test('graph pages find revisions by displayed and canonical IDs', async () => {
@@ -97,7 +111,7 @@ test('graph pages find revisions by displayed and canonical IDs', async () => {
   const targetFullChangeId = jj(['--ignore-working-copy', 'log', '--no-graph', '-r', targetCommitId, '-T', 'change_id.short(64)'])
   const targetChangeIdPrefix = targetFullChangeId.slice(0, 8)
   const matchesFor = (query: string): string[] =>
-    jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', graphPageRevset({ query, excludeCommitIds: [] }), '-T', 'commit_id ++ "\\n"'])
+    jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', GraphPage.revset(query), '-T', 'commit_id ++ "\\n"'])
       .split('\n')
       .filter(Boolean)
 
@@ -110,15 +124,7 @@ test('graph search quotes user text before building a revset', async () => {
   const { jj, commitId } = await fixture()
   jj(['new', '@', '-m', 'literal needle") | all()'])
   const target = commitId()
-  const matches = jj([
-    '--ignore-working-copy',
-    'log',
-    '--no-graph',
-    '--revisions',
-    graphPageRevset({ query: 'needle") | all()', excludeCommitIds: [] }),
-    '-T',
-    'commit_id ++ "\\n"',
-  ])
+  const matches = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', GraphPage.revset('needle") | all()'), '-T', 'commit_id ++ "\\n"'])
     .split('\n')
     .filter(Boolean)
   assert.deepEqual(matches, [target])
