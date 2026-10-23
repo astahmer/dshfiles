@@ -12,6 +12,7 @@ import { createJevUsageRecorder, jevSourceOf } from './jev-usage-recorder.js'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
 import { observeLiveCall } from './live-calls.js'
+import { DEFAULT_OTLP_SERVICE_NAME } from './otel-metrics.js'
 import { createRatePricer } from './pricing.js'
 import { openUsageStore, type UsageStore } from './store.js'
 
@@ -102,7 +103,8 @@ const api = usageApi.host({
     const query = resolveActivityQuery(input)
     return requireRuntime().store.activity({ ...query, eventLimit: query.eventLimit ?? 50 })
   },
-  otelMetrics: ({ input }) => requireRuntime().store.otelMetrics(resolveOtelMetricsRange(input)),
+  otelMetrics: ({ input }) =>
+    requireRuntime().store.otelMetrics({ ...resolveOtelMetricsRange(input), temporality: 'delta', serviceName: DEFAULT_OTLP_SERVICE_NAME }),
 })
 
 const setupHost = (context: Context): Effect<void> => {

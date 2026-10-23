@@ -16,7 +16,7 @@ import {
   jevUsageSourceSchema,
 } from './jev-usage.js'
 import { UsageFoldModel, type RequestRow, type SessionMeta } from './fold.js'
-import { createOtlpMetricsRequest, type OtlpCounterInput, type OtlpHistogramInput } from './otel-metrics.js'
+import { createOtlpMetricsRequest, type OtlpCounterInput, type OtlpHistogramInput, type OtlpTemporality } from './otel-metrics.js'
 
 /**
  * The usage index: one row per model request, one per session, and one per
@@ -1154,7 +1154,7 @@ export const openUsageStore = (path: string) => {
     }
   }
 
-  const otelMetrics = (range: { readonly from: number; readonly to: number }) => {
+  const otelMetrics = (range: { readonly from: number; readonly to: number; readonly temporality: OtlpTemporality; readonly serviceName: string }) => {
     const modelCountRows = z
       .array(
         z.object({
@@ -1396,7 +1396,14 @@ export const openUsageStore = (path: string) => {
         })),
       })
 
-    return createOtlpMetricsRequest({ from: range.from, to: range.to, counters, histograms })
+    return createOtlpMetricsRequest({
+      from: range.from,
+      to: range.to,
+      temporality: range.temporality,
+      serviceName: range.serviceName,
+      counters,
+      histograms,
+    })
   }
 
   const counts = () =>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RequestRow, ToolExecutionRow } from './fold.js'
+import { createOtlpMetricsRequest, type OtlpHistogramInput } from './otel-metrics.js'
 import { openUsageStore } from './store.js'
 
 describe('SQLite-backed OTLP metrics', () => {
@@ -84,7 +85,7 @@ describe('SQLite-backed OTLP metrics', () => {
         outputTokens: 7,
       })
 
-      const request = store.otelMetrics({ from, to: from + 200 })
+      const request = store.otelMetrics({ from, to: from + 200, temporality: 'delta', serviceName: 'dshfiles' })
       const metrics = request.resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
       const requestMetric = metrics.find(metric => metric.name === 'dsh.model.request.count')
       const toolMetric = metrics.find(metric => metric.name === 'dsh.tool.execution.count')
@@ -94,8 +95,8 @@ describe('SQLite-backed OTLP metrics', () => {
       const jevDurationMetric = metrics.find(metric => metric.name === 'dsh.jev.request.duration')
       const durationMetric = metrics.find(metric => metric.name === 'dsh.model.request.duration')
 
-      expect(requestMetric && 'sum' in requestMetric ? requestMetric.sum.aggregationTemporality : null).toBe('AGGREGATION_TEMPORALITY_DELTA')
-      expect(durationMetric && 'histogram' in durationMetric ? durationMetric.histogram.aggregationTemporality : null).toBe('AGGREGATION_TEMPORALITY_DELTA')
+      expect(requestMetric && 'sum' in requestMetric ? requestMetric.sum.aggregationTemporality : null).toBe(1)
+      expect(durationMetric && 'histogram' in durationMetric ? durationMetric.histogram.aggregationTemporality : null).toBe(1)
       expect(requestMetric && 'sum' in requestMetric ? requestMetric.sum.dataPoints : []).toEqual([
         expect.objectContaining({
           attributes: expect.arrayContaining([
@@ -165,7 +166,7 @@ describe('SQLite-backed OTLP metrics', () => {
         '00000000-0000-4000-8000-000000000020',
       ])
         expect(output).not.toContain(privateValue)
-      expect(request.resourceMetrics[0]?.resource.attributes).toContainEqual({ key: 'service.name', value: { stringValue: 'dsh' } })
+      expect(request.resourceMetrics[0]?.resource.attributes).toContainEqual({ key: 'service.name', value: { stringValue: 'dshfiles' } })
     } finally {
       store.close()
     }
@@ -199,7 +200,8 @@ describe('SQLite-backed OTLP metrics', () => {
         rows: [],
         tools,
       })
-      const metrics = store.otelMetrics({ from, to: from + 1_000 }).resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
+      const metrics =
+        store.otelMetrics({ from, to: from + 1_000, temporality: 'delta', serviceName: 'dshfiles' }).resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
       const categories = metrics.find(metric => metric.name === 'dsh.tool.execution.count')
       const sources = metrics.find(metric => metric.name === 'dsh.tool.source.execution.count')
       expect(categories && 'sum' in categories ? categories.sum.dataPoints[0]?.asInt : undefined).toBe('501')
@@ -212,10 +214,106 @@ describe('SQLite-backed OTLP metrics', () => {
   it('returns an empty valid OTLP request for a range without records', () => {
     const store = openUsageStore(':memory:')
     try {
-      const request = store.otelMetrics({ from: 1_800_000_000_000, to: 1_800_000_000_100 })
+      const request = store.otelMetrics({ from: 1_800_000_000_000, to: 1_800_000_000_100, temporality: 'delta', serviceName: 'dshfiles' })
       expect(request.resourceMetrics[0]?.scopeMetrics[0]?.metrics).toEqual([])
     } finally {
       store.close()
     }
+  })
+})
+
+describe('OTLP/JSON mapping', () => {
+  const from = 1_800_000_000_123
+  const to = 1_800_000_060_456
+  const histogram: OtlpHistogramInput = {
+    name: 'dsh.example.duration',
+    description: 'Example durations.',
+    unit: 's',
+    bounds: [0.1, 1, 10],
+    points: [{ attributes: { 'z.last': 'b', 'a.first': 'a' }, count: 6, sum: 12.5, bucketCounts: [1, 2, 0, 3] }],
+  }
+  const build = (temporality: 'delta' | 'cumulative') =>
+    createOtlpMetricsRequest({
+      from,
+      to,
+      temporality,
+      serviceName: 'custom-service',
+      counters: [
+        { name: 'dsh.example.count', description: 'Example counter.', unit: '{request}', points: [{ attributes: { 'b.key': 'x', 'a.key': 'y' }, value: 42 }] },
+      ],
+      histograms: [histogram],
+    })
+
+  it('encodes AggregationTemporality as its proto enum number, never its name', () => {
+    const delta = build('delta')
+    const cumulative = build('cumulative')
+    const temporalities = (request: ReturnType<typeof build>) =>
+      request.resourceMetrics[0]?.scopeMetrics[0]?.metrics.map(metric =>
+        'sum' in metric ? metric.sum.aggregationTemporality : metric.histogram.aggregationTemporality,
+      )
+    expect(temporalities(delta)).toEqual([1, 1])
+    expect(temporalities(cumulative)).toEqual([2, 2])
+    expect(JSON.stringify(cumulative)).not.toMatch(/AGGREGATION_TEMPORALITY/u)
+  })
+
+  it('writes 64-bit integers and Unix nanosecond times as decimal strings', () => {
+    const metrics = build('cumulative').resourceMetrics[0]?.scopeMetrics[0]?.metrics ?? []
+    const counter = metrics.find(metric => 'sum' in metric)
+    const durations = metrics.find(metric => 'histogram' in metric)
+    const counterPoint = counter && 'sum' in counter ? counter.sum.dataPoints[0] : undefined
+    const histogramPoint = durations && 'histogram' in durations ? durations.histogram.dataPoints[0] : undefined
+    expect(counter && 'sum' in counter ? counter.sum.isMonotonic : undefined).toBe(true)
+    expect(counterPoint).toEqual({
+      attributes: [
+        { key: 'a.key', value: { stringValue: 'y' } },
+        { key: 'b.key', value: { stringValue: 'x' } },
+      ],
+      startTimeUnixNano: '1800000000123000000',
+      timeUnixNano: '1800000060456000000',
+      asInt: '42',
+    })
+    expect(histogramPoint).toEqual({
+      attributes: [
+        { key: 'a.first', value: { stringValue: 'a' } },
+        { key: 'z.last', value: { stringValue: 'b' } },
+      ],
+      startTimeUnixNano: '1800000000123000000',
+      timeUnixNano: '1800000060456000000',
+      count: '6',
+      sum: 12.5,
+      bucketCounts: ['1', '2', '0', '3'],
+      explicitBounds: [0.1, 1, 10],
+    })
+  })
+
+  it('names the resource and the instrumentation scope', () => {
+    const resource = build('delta').resourceMetrics[0]
+    expect(resource?.resource.attributes).toEqual([{ key: 'service.name', value: { stringValue: 'custom-service' } }])
+    expect(resource?.scopeMetrics[0]?.scope).toEqual({ name: '@dshfiles/usage', version: '0.1.0' })
+  })
+
+  it.each([
+    ['a bucket count per bound plus one', { bucketCounts: [1, 2, 3] }],
+    ['buckets that add up to the count', { bucketCounts: [1, 2, 0, 4] }],
+  ])('rejects histogram points without %s', (_label, override) => {
+    const [point] = histogram.points
+    if (point === undefined) throw new Error('fixture has a point')
+    expect(() =>
+      createOtlpMetricsRequest({
+        from,
+        to,
+        temporality: 'delta',
+        serviceName: 'x',
+        counters: [],
+        histograms: [{ ...histogram, points: [{ ...point, ...override }] }],
+      }),
+    ).toThrow()
+  })
+
+  it('rejects unsorted bounds and a start time after the point time', () => {
+    expect(() =>
+      createOtlpMetricsRequest({ from, to, temporality: 'delta', serviceName: 'x', counters: [], histograms: [{ ...histogram, bounds: [1, 0.1, 10] }] }),
+    ).toThrow()
+    expect(() => createOtlpMetricsRequest({ from: to, to: from, temporality: 'delta', serviceName: 'x', counters: [], histograms: [histogram] })).toThrow()
   })
 })
