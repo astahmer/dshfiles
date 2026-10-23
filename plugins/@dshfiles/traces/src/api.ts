@@ -1,6 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { errorGroupSchema, logListSchema, receiverStatusSchema, traceDetailSchema, traceListSchema, traceStatsSchema } from './types.js'
+import { errorGroupSchema, logListSchema, receiverStatusSchema, serviceMapSchema, traceDetailSchema, traceListSchema, traceStatsSchema } from './types.js'
 
 const windowMinutesSchema = z
   .number()
@@ -103,6 +103,13 @@ export const tracesApi = defineApi({
       output: traceStatsSchema,
       description: 'Per service and per operation (span name) over a window: span count, error count and rate, p50/p95/p99 and max duration in ms. Read-only.',
       tool: { name: 'traces_list_services', readOnly: true, render: compactJson },
+    }),
+    serviceMap: method({
+      input: z.object({ windowMinutes: windowMinutesSchema }).strict(),
+      output: serviceMapSchema,
+      description:
+        'Service dependency map over a window: each service with its span count, error rate and latency, and each edge where a span of one service is the parent of a span of another, with call count, error rate and p50/p95/p99 of the callee spans. Read-only.',
+      tool: { name: 'traces_service_map', readOnly: true, render: compactJson },
     }),
     errors: method({
       input: z

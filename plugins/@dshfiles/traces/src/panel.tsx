@@ -31,6 +31,7 @@ import { tracesKeys, tracesQueries } from './queries.js'
 import { EmptyStoreGuide, ReceiverBadge, ReceiverMessage } from './receiver-status.js'
 import { TraceDetailView } from './trace-detail.js'
 import { LogsView, type LogCorrelation } from './log-list.js'
+import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { storedTracesView, WINDOW_OPTIONS, type TracesView } from './view-state.js'
 
@@ -75,6 +76,7 @@ export const TracesPanel = (props: {
   const listQuery = useInfiniteQuery({ ...tracesQueries.list(client, filters), placeholderData: keepPreviousData, enabled: traceId === null })
   const traceQuery = useQuery({ ...tracesQueries.trace(client, traceId ?? ''), enabled: traceId !== null })
   const errorsQuery = useQuery({ ...tracesQueries.errors(client, view.windowMinutes), enabled: view.tab === 'errors' })
+  const mapQuery = useQuery({ ...tracesQueries.serviceMap(client, view.windowMinutes), enabled: view.tab === 'map', placeholderData: keepPreviousData })
   const clearMutation = useMutation({
     mutationFn: () => client.clear({ confirm: true }),
     onSuccess: () => {
@@ -129,7 +131,9 @@ export const TracesPanel = (props: {
               <AlertDialogHeader>
                 <AlertDialogTitle>{t('clearTitle')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {status === undefined ? '' : `${String(status.store.traces)} ${t('traces')} · ${String(status.store.spans)} ${t('spans')} · ${String(status.store.logs)} ${t('logs')}. `}
+                  {status === undefined
+                    ? ''
+                    : `${String(status.store.traces)} ${t('traces')} · ${String(status.store.spans)} ${t('spans')} · ${String(status.store.logs)} ${t('logs')}. `}
                   {t('clearDescription')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -156,13 +160,14 @@ export const TracesPanel = (props: {
 
       <Tabs
         value={view.tab}
-        onValueChange={value => update({ tab: value === 'operations' || value === 'errors' || value === 'logs' ? value : 'traces' })}
+        onValueChange={value => update({ tab: value === 'operations' || value === 'errors' || value === 'logs' || value === 'map' ? value : 'traces' })}
         className="dshx:min-h-0 dshx:flex-1"
       >
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
           <TabsList>
             <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>
             <TabsTrigger value="logs">{t('tabLogs')}</TabsTrigger>
+            <TabsTrigger value="map">{t('tabMap')}</TabsTrigger>
             <TabsTrigger value="operations">{t('tabOperations')}</TabsTrigger>
             <TabsTrigger value="errors">{t('tabErrors')}</TabsTrigger>
           </TabsList>
@@ -300,6 +305,17 @@ export const TracesPanel = (props: {
               t={t}
             />
           ) : null}
+        </TabsContent>
+
+        <TabsContent value="map">
+          {mapQuery.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage(mapQuery.error, t('loadFailed'))}</AlertDescription>
+            </Alert>
+          ) : null}
+          {mapQuery.data === undefined ? null : (
+            <ServiceMapView map={mapQuery.data} onPickService={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
+          )}
         </TabsContent>
 
         <TabsContent value="operations">

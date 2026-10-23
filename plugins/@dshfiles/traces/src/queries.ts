@@ -14,6 +14,7 @@ export const tracesKeys = {
   logs: (filters: Omit<LogsInput, 'cursor'>) => ['traces', 'logs', filters] as const,
   stats: (windowMinutes: number) => ['traces', 'stats', windowMinutes] as const,
   errors: (windowMinutes: number) => ['traces', 'errors', windowMinutes] as const,
+  serviceMap: (windowMinutes: number) => ['traces', 'service-map', windowMinutes] as const,
 }
 
 const POLL_MS = 5_000
@@ -63,6 +64,13 @@ export const tracesQueries = {
     queryOptions({
       queryKey: tracesKeys.stats(windowMinutes),
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.stats({ windowMinutes, limit: 100 }, { signal: hostSignal }) }),
+      refetchInterval: POLL_MS * 2,
+      retry: 1,
+    }),
+  serviceMap: (client: TracesClient, windowMinutes: number) =>
+    queryOptions({
+      queryKey: tracesKeys.serviceMap(windowMinutes),
+      queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.serviceMap({ windowMinutes }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
       retry: 1,
     }),

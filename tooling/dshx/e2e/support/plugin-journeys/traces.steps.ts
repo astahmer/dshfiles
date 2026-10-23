@@ -266,3 +266,24 @@ Then('the failing span shows only its own logs', async ({ page }: { page: Page }
   await expect(logRows(page)).toHaveCount(3)
   await finishJourneyAssertions(page)
 })
+
+Then('the service map shows both services and the call between them', async ({ page }: { page: Page }) => {
+  await page.getByRole('tab', { name: 'Service map', exact: true }).click()
+  const map = page.getByRole('img', { name: 'Service map' })
+  await recordAssertion(page, 'traces-service-map-draws-services-and-calls', async () => {
+    await expect(map.locator('[data-service="e2e-checkout"]')).toBeVisible({ timeout: 15_000 })
+    await expect(map.locator('[data-service="e2e-payments"]')).toBeVisible()
+    await expect(map.locator('[data-edge="e2e-checkout->e2e-payments"]')).toHaveAttribute('data-errors', '0')
+    await expect(map.locator('[data-edge="e2e-checkout->e2e-payments"]')).toContainText('1×')
+  })
+})
+
+Then('picking a service on the map filters the trace list by it', async ({ page }: { page: Page }) => {
+  await page.getByRole('img', { name: 'Service map' }).getByRole('button', { name: 'Service e2e-payments', exact: true }).click()
+  await recordAssertion(page, 'traces-service-map-filters-traces', async () => {
+    await expect(page.getByRole('tab', { name: 'Traces', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('combobox', { name: 'Service', exact: true })).toContainText('e2e-payments')
+    await expect(page.locator(`tr[data-trace-id="${exportedTraceId(page)}"]`)).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

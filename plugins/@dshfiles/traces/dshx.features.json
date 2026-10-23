@@ -302,6 +302,42 @@
           "testName": "every traces capability is a named tool and only clear writes"
         }
       ]
+    },
+    {
+      "id": "service-map",
+      "title": "Service dependency map",
+      "summary": "A Service map tab draws every service seen in the window as a box with span count, error rate and p95, and every cross-service parent/child call as an arrow with call count and p50, red when a call failed; picking a service filters the trace list by it.",
+      "reach": ["seed otlp-sample-trace", "click button \"Traces\"", "click tab \"Service map\"", "expect img \"Service map\""],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["empty", "services-only", "edges", "failing-edge", "cycle"],
+      "failureModes": ["A call cycle between services still lays out and terminates.", "Services with no cross-service calls are drawn without edges."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.service-map-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-service-map",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "maps calls between services from cross-service parent and child spans"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.service-map-layout",
+          "file": "plugins/@dshfiles/traces/src/service-map-layout.test.ts",
+          "testName": "places callers left of callees by the longest call chain"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.service-map-cycle",
+          "file": "plugins/@dshfiles/traces/src/service-map-layout.test.ts",
+          "testName": "terminates on a cycle and keeps isolated services"
+        }
+      ]
     }
   ]
 }

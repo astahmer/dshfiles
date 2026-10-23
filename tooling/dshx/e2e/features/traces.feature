@@ -31,3 +31,11 @@ Feature: Traces
     Then the Logs tab lists the records and filters them by severity and attribute
     And a log record opens its trace
     And the failing span shows only its own logs
+
+  @scenario:traces.service-map-browser-journey
+  Scenario: The service map draws calls between services
+    Given the isolated Traces profile is booted with the receiver on a free port
+    When the Traces panel is opened
+    And a synthetic OTLP JSON export is posted to the receiver
+    Then the service map shows both services and the call between them
+    And picking a service on the map filters the trace list by it

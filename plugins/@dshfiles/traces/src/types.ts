@@ -92,6 +92,18 @@ export const traceStatsSchema = z
   .strict()
 export type TraceStats = z.infer<typeof traceStatsSchema>
 
+export const serviceEdgeSchema = latencySchema.extend({ source: z.string(), target: z.string() }).strict()
+export type ServiceEdge = z.infer<typeof serviceEdgeSchema>
+
+export const serviceMapSchema = z
+  .object({
+    windowMinutes: z.number().int().positive(),
+    nodes: z.array(serviceStatsSchema),
+    edges: z.array(serviceEdgeSchema),
+  })
+  .strict()
+export type ServiceMap = z.infer<typeof serviceMapSchema>
+
 export const errorGroupSchema = z
   .object({
     service: z.string(),

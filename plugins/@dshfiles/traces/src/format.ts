@@ -22,24 +22,29 @@ const formatClock = (unixMs: number, now: number = Date.now()): string => {
 const formatAttribute = (value: AttributeValue): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 const SERVICE_TONES = [
-  'dshx:bg-chart-1',
-  'dshx:bg-chart-2',
-  'dshx:bg-chart-3',
-  'dshx:bg-info',
-  'dshx:bg-chart-5',
-  'dshx:bg-primary',
-  'dshx:bg-chart-1/55',
-  'dshx:bg-chart-2/55',
-  'dshx:bg-chart-3/55',
-  'dshx:bg-info/55',
+  { background: 'dshx:bg-chart-1', fill: 'dshx:fill-chart-1' },
+  { background: 'dshx:bg-chart-2', fill: 'dshx:fill-chart-2' },
+  { background: 'dshx:bg-chart-3', fill: 'dshx:fill-chart-3' },
+  { background: 'dshx:bg-info', fill: 'dshx:fill-info' },
+  { background: 'dshx:bg-chart-5', fill: 'dshx:fill-chart-5' },
+  { background: 'dshx:bg-primary', fill: 'dshx:fill-primary' },
+  { background: 'dshx:bg-chart-1/55', fill: 'dshx:fill-chart-1/55' },
+  { background: 'dshx:bg-chart-2/55', fill: 'dshx:fill-chart-2/55' },
+  { background: 'dshx:bg-chart-3/55', fill: 'dshx:fill-chart-3/55' },
+  { background: 'dshx:bg-info/55', fill: 'dshx:fill-info/55' },
 ] as const
 
-/** A stable tone per service name, so one service keeps its color across traces and reloads. */
-const serviceTone = (service: string): string => {
+const toneOf = (service: string): (typeof SERVICE_TONES)[number] => {
   let hash = 0
   for (const character of service) hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0
   return SERVICE_TONES[hash % SERVICE_TONES.length] ?? SERVICE_TONES[0]
 }
+
+/** A stable tone per service name, so one service keeps its color across traces and reloads. */
+const serviceTone = (service: string): string => toneOf(service).background
+
+/** The same tone as an SVG fill. */
+const serviceFill = (service: string): string => toneOf(service).fill
 
 /** Five evenly spaced labels from 0 to the trace duration for the waterfall's time axis. */
 const axisTicks = (durationMs: number): readonly { readonly fraction: number; readonly label: string }[] =>
@@ -65,6 +70,7 @@ export class TraceFormat {
   static readonly clock = formatClock
   static readonly attribute = formatAttribute
   static readonly serviceTone = serviceTone
+  static readonly serviceFill = serviceFill
   static readonly axisTicks = axisTicks
   static readonly visibleRows = visibleRows
 }

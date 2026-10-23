@@ -81,6 +81,7 @@ const api = tracesApi.host({
     }
   },
   logs: ({ input }) => requireRuntime().store.searchLogs(input),
+  serviceMap: ({ input }) => requireRuntime().store.serviceMap({ windowMinutes: input.windowMinutes ?? 60 }),
   clear: () => requireRuntime().store.clear(),
 })
 

@@ -4,8 +4,8 @@
 
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
-list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service/operation
-overview and error groups.
+list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, a
+service/operation overview and error groups.
 
 It is a generic viewer: anything that speaks OTLP/HTTP can send to it, with any `service.name`, resource, scope,
 span kind or attribute key. DSH-specific touches are enrichments only: a span carrying `dsh.session.id` gets an
@@ -60,6 +60,7 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 | `traces_get`           | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.          |
 | `traces_list_services` | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window.               |
 | `traces_search_logs`   | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, time. |
+| `traces_service_map`   | Services with span count, error rate and latency; cross-service parent → child calls with counts.       |
 | `traces_error_groups`  | Error spans grouped by service, operation, error type and message shape, with a sample trace.           |
 | `traces_status`        | Receiver mode, address, state, counters, forwarding and store size.                                     |
 | `traces_clear`         | Deletes every stored trace and log record; requires `confirm: true`.                                    |
@@ -87,10 +88,13 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
   attributes, resource and their trace/span ids. The Logs tab filters by text, service, minimum severity and one
   `key=value` attribute; a record opens its trace, and a trace or a span opens only its own logs. With
   `redactGenAiContent`, a GenAI content event (`gen_ai.*` event name) keeps only its body size.
+- **Service map.** An edge is a span whose parent belongs to another service (no `peer.service` guessing), so it
+  only shows calls both sides exported. The SVG lays services out in columns by their longest incoming call chain;
+  no graph library is involved.
 - **Metrics.** `/v1/metrics` is accepted (200) and forwarded in `both` mode but not stored yet; the overview is
   computed from spans.
 
 ## Follow-ups
 
-- A service map from cross-service parent/child spans, and stored metrics with one chart per metric.
+- Stored metrics with one chart per metric.
 - Out of scope: alerting, dashboards and a query builder, session replay.

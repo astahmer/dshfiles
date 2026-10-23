@@ -244,4 +244,26 @@ describe('trace store', () => {
     store.prune(retention)
     expect(store.summary().logs).toBe(0)
   })
+
+  test('maps calls between services from cross-service parent and child spans', () => {
+    const store = openStore()
+    const at = (offsetMs: number): number => (NOW - 30_000 + offsetMs) * 1000
+    store.ingest(
+      [
+        makeSpan({ traceId: traceId(1), spanId: spanId(1), service: 'web', startUs: at(0), endUs: at(100) }),
+        makeSpan({ traceId: traceId(1), spanId: spanId(2), parentSpanId: spanId(1), service: 'web', startUs: at(1), endUs: at(90) }),
+        makeSpan({ traceId: traceId(1), spanId: spanId(3), parentSpanId: spanId(2), service: 'payments', startUs: at(5), endUs: at(45), statusCode: 2 }),
+        makeSpan({ traceId: traceId(2), spanId: spanId(4), service: 'web', startUs: at(200), endUs: at(260) }),
+        makeSpan({ traceId: traceId(2), spanId: spanId(5), parentSpanId: spanId(4), service: 'payments', startUs: at(205), endUs: at(225) }),
+        makeSpan({ traceId: traceId(2), spanId: spanId(6), parentSpanId: spanId(5), service: 'db', startUs: at(206), endUs: at(216) }),
+      ],
+      retention,
+    )
+    const map = store.serviceMap({ windowMinutes: 60 })
+    expect(map.nodes.map(node => node.service).sort()).toEqual(['db', 'payments', 'web'])
+    expect(map.edges.map(edge => [edge.source, edge.target, edge.count, edge.errorCount, edge.p95Ms])).toEqual([
+      ['web', 'payments', 2, 1, 40],
+      ['payments', 'db', 1, 0, 10],
+    ])
+  })
 })

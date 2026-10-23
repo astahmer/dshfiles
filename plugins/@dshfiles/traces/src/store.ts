@@ -10,6 +10,7 @@ import {
   attributeValueSchema,
   type ErrorGroup,
   type LogList,
+  type ServiceMap,
   type SpanKind,
   type SpanStatus,
   type TraceDetail,
@@ -586,7 +587,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const stats = (query: { readonly windowMinutes: number; readonly service?: string | undefined; readonly limit: number }): TraceStats => {
+  const statsOf = (query: { readonly windowMinutes: number; readonly service?: string | undefined; readonly limit: number }): TraceStats => {
     const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
     const samples = z
       .array(z.object({ service: z.string(), name: z.string(), duration_us: z.number(), status_code: z.number() }))
@@ -655,6 +656,29 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       .slice(0, query.limit)
   }
 
+  /** Calls between services: a span whose parent belongs to another service is one call from the parent's service. */
+  const serviceMap = (query: { readonly windowMinutes: number }): ServiceMap => {
+    const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
+    const calls = z
+      .array(z.object({ source: z.string(), target: z.string(), duration_us: z.number(), status_code: z.number() }))
+      .parse(
+        prepare(
+          `SELECT p.service AS source, c.service AS target, c.end_us - c.start_us AS duration_us, c.status_code
+           FROM spans c JOIN spans p ON p.trace_id = c.trace_id AND p.span_id = c.parent_span_id
+           WHERE c.start_us >= ? AND p.service <> c.service`,
+        ).all(sinceUs),
+      )
+      .map(row => ({ source: row.source, target: row.target, durationMs: usToMs(row.duration_us), error: row.status_code === 2 }))
+    const stats = statsOf({ windowMinutes: query.windowMinutes, limit: 1 })
+    return {
+      windowMinutes: query.windowMinutes,
+      nodes: stats.services,
+      edges: [...LatencyStats.groupBy(calls, call => `${call.source}\u0000${call.target}`).values()]
+        .map(group => ({ source: group[0]?.source ?? '', target: group[0]?.target ?? '', ...LatencyStats.summarize(group) }))
+        .sort((left, right) => right.count - left.count),
+    }
+  }
+
   const summary = (): StoreSummary => {
     const row = z
       .object({ traces: z.number(), oldest: z.number().nullable(), newest: z.number().nullable() })
@@ -682,8 +706,9 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     prune,
     list,
     trace,
-    stats,
+    stats: statsOf,
     errorGroups,
+    serviceMap,
     summary,
     clear,
     close: () => database.close(),
