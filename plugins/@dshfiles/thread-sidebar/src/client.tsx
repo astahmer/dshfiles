@@ -254,6 +254,7 @@ type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
 const emptyThreadsMessage = {
   all: 'threadSidebarEmpty',
   working: 'threadSidebarNoWorkingThreads',
+  'not-running': 'threadSidebarNoNotRunningThreads',
   attention: 'threadSidebarNoAttentionThreads',
   unread: 'threadSidebarNoUnreadThreads',
   'approval-needed': 'threadSidebarNoApprovalNeededThreads',
