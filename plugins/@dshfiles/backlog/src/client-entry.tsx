@@ -115,6 +115,19 @@ export default defineClient({
           return []
         }
       },
+      answerReply: async ({ item, text }) => {
+        const catalog = await ctx.remote.session.modelCatalog()
+        if (!catalog.ok) return { ok: false, reason: catalog.error.message }
+        const generated = await api.safe.generateReply({
+          id: item.id,
+          text,
+          provider: catalog.value.default.provider,
+          model: catalog.value.default.model,
+        })
+        if (!generated.ok) return { ok: false, reason: generated.error.message }
+        if (!generated.value.ok) return { ok: false, reason: 'The backlog item no longer exists.' }
+        return { ok: true }
+      },
       dispatch: async ({ item, text, files, open, smartThreadRouting = true, notificationDelivery = 'in-app' }) => {
         const mention = AgentComments.mention(text)
         const automatic = mention === null && files.length === 0 && smartThreadRouting
@@ -169,7 +182,7 @@ export default defineClient({
         )
         if (!started.ok) return { kind: 'failed', reason: started.reason }
         if (files.length === 0) await api.safe.comment({ id: item.id, text })
-        else await api.safe.comment({ id: item.id, text, files })
+        else await api.safe.comment({ id: item.id, text, files: [...files] })
         if (systemNotification && 'Notification' in window && window.Notification.permission === 'granted') {
           try {
             const notification = new Notification('Backlog thread started', { body: `b:${item.id} · ${item.title}` })

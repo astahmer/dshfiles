@@ -511,6 +511,7 @@ const CommentBox = (props: {
   readonly projects: readonly string[]
   readonly openCreatedByDefault: boolean
   readonly smartThreadRouting: boolean
+  readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -558,6 +559,22 @@ const CommentBox = (props: {
         setText(current => (current === '' ? text : current))
         attachments.restore(files)
         setFailed(outcome.reason)
+      } else if (outcome.kind === 'skipped' && outcome.reason === 'reply-only') {
+        if (props.smartReplyAnswers && files.length === 0) {
+          try {
+            await actions.comment.mutateAsync({ id: props.item.id, text })
+            setText('')
+          } catch (error) {
+            setFailed(errorMessage(error, 'Your reply was not saved.'))
+            return
+          }
+          try {
+            const answered = await dispatch.answerReply({ item: props.item, text })
+            if (!answered.ok) setFailed(`Your reply was saved, but an AI answer could not be generated: ${answered.reason}`)
+          } catch (error) {
+            setFailed(`Your reply was saved, but an AI answer could not be generated: ${errorMessage(error, 'Generation failed.')}`)
+          }
+        } else comment(files)
       } else if (outcome.kind === 'skipped') comment(files)
     } catch (error) {
       setText(current => (current === '' ? text : current))
@@ -737,6 +754,7 @@ const PeekBody = (props: {
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly openCreatedByDefault: boolean
   readonly smartThreadRouting: boolean
+  readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
@@ -972,6 +990,7 @@ const PeekBody = (props: {
               projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}
               smartThreadRouting={props.smartThreadRouting}
+              smartReplyAnswers={props.smartReplyAnswers}
               threadStartNotifications={props.threadStartNotifications}
             />
           </Section>
@@ -996,6 +1015,7 @@ const ItemPeek = (props: {
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly openCreatedByDefault: boolean
   readonly smartThreadRouting: boolean
+  readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
   readonly projectPaths: readonly string[]
 }): JSX.Element => {
@@ -1035,6 +1055,7 @@ const ItemPeek = (props: {
           startThread={props.startThread}
           openCreatedByDefault={props.openCreatedByDefault}
           smartThreadRouting={props.smartThreadRouting}
+          smartReplyAnswers={props.smartReplyAnswers}
           threadStartNotifications={props.threadStartNotifications}
           projectPaths={props.projectPaths}
         />

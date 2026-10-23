@@ -784,6 +784,32 @@ When('Backlog notifications use both channels', async ({ page }: { page: Page })
   })
 })
 
+When('Backlog AI reply answers are enabled', async ({ page }: { page: Page }) => {
+  const answerSetting = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="smartReplyAnswers"]')
+  const enabled = answerSetting.getByRole('switch')
+  await expect(enabled).toBeVisible()
+  if (!(await enabled.isChecked())) await enabled.click()
+  await expect(enabled).toBeChecked()
+  const preferredAgent = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="replyAgent"] input')
+  await preferredAgent.fill('reply-helper')
+  await preferredAgent.press('Tab')
+  await expect(preferredAgent).toHaveValue('reply-helper')
+})
+
+When('Backlog uses a configured fake-model agent for replies', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Agents', exact: true }).click()
+  await page.getByRole('button', { name: 'New agent', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('reply-helper')
+  await page.getByRole('textbox', { name: /^Instructions/u }).fill('Answer briefly and directly.')
+  const route = page.getByRole('combobox', { name: 'Model route', exact: true })
+  await route.click()
+  const model = page.getByRole('option', { name: /gpt-6-luna/u })
+  await expect(model).toBeVisible()
+  await model.click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Saved.', { exact: true })).toBeVisible()
+})
+
 Then('the reply starts a linked work thread with an in-app and browser notice', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-smart-reply-routing', async () => {
     await expect(page.getByRole('alert')).toContainText('Thread started for b:1', { timeout: 30_000 })
@@ -793,9 +819,12 @@ Then('the reply starts a linked work thread with an in-app and browser notice', 
   })
 })
 
-Then('the discussion reply stays a comment without starting another thread', async ({ page }: { page: Page }) => {
+Then('the discussion reply gets an AI answer without starting another thread', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-smart-reply-discussion', async () => {
-    await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Why is this flaky?')
+    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    await expect(activity).toContainText('Why is this flaky?')
+    await expect(activity).toContainText('@reply-helper')
+    await expect(activity).toContainText('Answered by ALPHA1', { timeout: 30_000 })
     await expect(peek(page).getByRole('list', { name: 'Related' }).getByRole('listitem')).toHaveCount(1)
   })
   await finishJourneyAssertions(page)

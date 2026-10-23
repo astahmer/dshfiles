@@ -28,6 +28,10 @@ export interface AgentDispatchPort {
     readonly smartThreadRouting?: boolean
     readonly notificationDelivery?: 'off' | 'in-app' | 'system' | 'both'
   }): Promise<AgentDispatchOutcome>
+  answerReply(input: {
+    readonly item: StartThreadItem
+    readonly text: string
+  }): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
   /** Enabled agents, loaded once when an `@` is typed; an unavailable agents bundle answers an empty list. */
   choices(): Promise<readonly AgentChoice[]>
 }

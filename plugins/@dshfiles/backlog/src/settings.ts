@@ -69,6 +69,15 @@ export const backlogSettings = defineSettings({
       .step(0.05)
       .default(0.7)
       .description('Minimum Jev confidence for automatically starting a thread from an item reply. Keyword fallback is used if Jev is off or unavailable.'),
+    smartReplyAnswers: Schema.boolean()
+      .default(true)
+      .description('Generate a short AI answer comment for reply-worthy text-only item replies. Work requests still start a linked thread.'),
+    replyAgent: Schema.string()
+      .default('')
+      .description('Preferred agent for generated item replies. If unavailable, the other selection source is tried, then @dsh.'),
+    replyAgentOrder: Schema.union([Schema.const('preferred'), Schema.const('last-used')])
+      .default('preferred')
+      .description('Try the configured preferred agent before the item’s most recently linked agent, or reverse the order; @dsh is the final fallback.'),
     revisionRepositories: Schema.array(Schema.string())
       .default([])
       .description('Repositories whose main bookmark is read for "Closes b:<n>", besides every project an open item names.'),

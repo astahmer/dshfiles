@@ -795,7 +795,7 @@
     {
       "id": "rich-item-text",
       "title": "Write descriptions and replies like a capture",
-      "summary": "An item's description and reply boxes share the capture composer's text box: `@` completes agents, backlog items, threads and projects, images and files can be picked, pasted or dropped, Enter sends a reply and ⌘↵ saves a description, and Markdown stays Markdown. Project completion inserts a workspace reference without assigning the item. With smart routing enabled, Jev classifies text replies as work for a linked @dsh thread or discussion; reply attachments stay ordinary comments and thread-start notifications are configurable. Description files stay with the item; reply images stay on their comment and open in the same gallery.",
+      "summary": "The description and reply editor share mentions, Markdown, images and files; descriptions keep files and project references, and reply images stay on their comment. Smart routing uses Jev to send work to linked threads and generate AI answers for text-only discussion; answer authors and thread-start notices are configurable.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Describe me with a screenshot\"",
@@ -834,13 +834,36 @@
           "defaultValue": "0.7",
           "constraints": "Number from 0 to 1 in steps of 0.05.",
           "coveredBy": ["backlog.smart-reply-routing"]
+        },
+        {
+          "key": "smartReplyAnswers",
+          "defaultValue": "true",
+          "constraints": "Boolean; generate a short AI answer for text-only replies classified as discussion.",
+          "choices": ["true", "false"],
+          "coveredBy": ["backlog.smart-reply-routing"]
+        },
+        {
+          "key": "replyAgent",
+          "defaultValue": "",
+          "constraints": "Optional enabled agent handle; falls back to the linked-item agent and then @dsh.",
+          "coveredBy": ["backlog.smart-reply-routing"]
+        },
+        {
+          "key": "replyAgentOrder",
+          "defaultValue": "preferred",
+          "constraints": "One of preferred or last-used.",
+          "choices": ["preferred", "last-used"],
+          "coveredBy": ["backlog.smart-reply-routing"]
         }
       ],
       "failureModes": [
         "A file that cannot be read reports why above the box and the rest of the draft stays.",
         "A description keeps the files it saved with an attachment failure; the failure is reported instead of losing the text.",
         "A reply that starts with @agent dispatches a thread and keeps its images with the item.",
-        "With smartThreadRouting enabled, Jev routes high-confidence work requests to a linked @dsh thread; other replies stay comments. If Jev is disabled or unavailable, a conservative keyword fallback is used.",
+        "With smartThreadRouting enabled, Jev routes high-confidence work requests to a linked @dsh thread; other text-only replies get an AI answer comment when smartReplyAnswers is on. If Jev is disabled or unavailable, a conservative keyword fallback is used.",
+        "Generated answers use the configured agent preference order and route, then the DSH default model; unavailable agents fall through to the next choice.",
+        "Replies with attached files stay ordinary comments because generated answers do not inspect attachment contents.",
+        "If answer generation fails, the original user comment remains saved and the error is reported.",
         "System notifications are sent only when the setting requests them and the browser already grants notification permission.",
         "If the thread-sidebar API owner is not loaded, linked thread rows are omitted and the Inbox query stops polling."
       ],
@@ -861,6 +884,12 @@
           "id": "backlog.reply-routing-decision",
           "file": "plugins/@dshfiles/backlog/src/reply-routing.test.ts",
           "testName": "routes work requests and keeps questions and discussion as replies with keyword fallback"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reply-agent-order",
+          "file": "plugins/@dshfiles/backlog/src/reply-agent-selection.test.ts",
+          "testName": "tries the configured agent before the last-used agent by default"
         },
         {
           "kind": "host-test",

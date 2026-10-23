@@ -17,6 +17,13 @@ describe('backlog settings', () => {
     expect(settings.smartThreadRouting).toBe(true)
     expect(settings.threadStartNotifications).toBe('in-app')
     expect(settings.replyThreadThreshold).toBe(0.7)
+    expect(settings.smartReplyAnswers).toBe(true)
+    expect(settings.replyAgent).toBe('')
+    expect(settings.replyAgentOrder).toBe('preferred')
+  })
+
+  it.each(['preferred', 'last-used'] as const)('accepts %s generated-reply agent order', replyAgentOrder => {
+    expect(backlogSettings.schema({ replyAgentOrder }).replyAgentOrder).toBe(replyAgentOrder)
   })
 
   it.each(['off', 'in-app', 'system', 'both'] as const)('accepts %s thread-start notifications', notification => {

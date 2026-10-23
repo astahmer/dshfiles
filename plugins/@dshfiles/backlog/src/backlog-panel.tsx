@@ -512,6 +512,7 @@ export const BacklogPanel = (props: {
         startThread={openStartThread}
         openCreatedByDefault={settings.value?.startThreadOpensCreated ?? false}
         smartThreadRouting={settings.value?.smartThreadRouting ?? true}
+        smartReplyAnswers={settings.value?.smartReplyAnswers ?? true}
         threadStartNotifications={settings.value?.threadStartNotifications ?? 'in-app'}
         close={() => {
           setOpenId(null)

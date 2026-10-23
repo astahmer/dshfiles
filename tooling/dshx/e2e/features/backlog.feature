@@ -226,15 +226,17 @@ Feature: Backlog
   Scenario: Route a work reply to a linked thread with in-app and browser notices
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts, @dshfiles/agents, @dshfiles/settings-shell" is booted
     When a Command Code account backed by a local fake provider is added
+    And Backlog uses a configured fake-model agent for replies
     And Backlog smart thread routing is enabled
     And Backlog notifications use both channels
+    And Backlog AI reply answers are enabled
     And the Backlog panel is opened
     And "Improve the flaky test" is captured
     And backlog item b:1 is opened
     When a comment "Please fix the flaky test" is added
     Then the reply starts a linked work thread with an in-app and browser notice
     When a comment "Why is this flaky?" is added
-    Then the discussion reply stays a comment without starting another thread
+    Then the discussion reply gets an AI answer without starting another thread
 
   @scenario:backlog.project-scope
   Scenario: Scope the feed to a project

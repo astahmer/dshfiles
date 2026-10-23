@@ -270,6 +270,18 @@ export const backlogApi = defineApi({
       description:
         'Classify one submitted item reply as discussion or a separate work thread. Uses Jev when configured and keyword fallback otherwise; presentation-only.',
     }),
+    generateReply: method({
+      input: z
+        .object({
+          id: idSchema,
+          text: z.string().trim().min(1).max(BacklogItems.maxBodyChars),
+          provider: z.string().min(1).max(128),
+          model: z.string().min(1).max(256),
+        })
+        .strict(),
+      output: detailResultSchema,
+      description: 'Generate and save a concise AI answer to a reply-worthy item message using the configured agent policy. Presentation-only.',
+    }),
     transcribeSpeech: method({
       input: z.object({ audioBase64: z.string().min(1).max(24_000_000) }).strict(),
       output: transcriptionSchema,
