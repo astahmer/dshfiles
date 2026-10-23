@@ -82,6 +82,11 @@ const run = (args: readonly string[]) =>
   `Symbol.for('@dshfiles/dshx.tracing.v1')`: all copies share one `AsyncLocalStorage` and one export queue, and a span
   opened while plugin A serves a call parents the spans plugin B opens. A change to the shared tracer shape needs a new
   symbol version.
+- With no dshx span active, a new span takes the active OpenTelemetry API span as its parent (read through the
+  `Symbol.for('opentelemetry.js.api.1')` global and the `OpenTelemetry Context Key SPAN` context key that
+  `@opentelemetry/api` 1.x shares across copies, without depending on it). Under the adopted LoongSuite plugin, a dshx
+  API call made by an agent tool therefore nests under that tool's `execute_tool` span. Verified against
+  `@opentelemetry/api` 1.9.1; 1.10.0 uses the same keys.
 - The exporter batches up to 512 spans every 5 s, holds at most 2,048 (newer spans drop when full), retries
   `429/502/503/504` and network failures with jittered exponential backoff (1 s doubling to 60 s, 5 attempts), drops
   other failures, and times a request out after 10 s. It never throws into the code that ended a span.

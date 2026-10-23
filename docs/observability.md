@@ -91,6 +91,9 @@ span is a shared no-op.
   `jj-integration workspace sync`.
 - `dshx checkout sync` records its own span, continuing a `TRACEPARENT`
   environment variable when set.
+- A dshx span opened while a LoongSuite span is active (an `execute_tool`
+  span, for instance) becomes its child, so a tool call and the plugin work it
+  caused land in one trace.
 
 Spans carry identities, outcome codes, counts and durations only: no API
 arguments or results, command positionals or flag values, secret values,

@@ -236,6 +236,43 @@ describe('span parenting', () => {
   })
 })
 
+describe('OpenTelemetry API interop', () => {
+  const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
+  const OTEL_SPAN_KEY = Symbol.for('OpenTelemetry Context Key SPAN')
+
+  it('parents a span under the active OpenTelemetry API span when no dshx span is active', async () => {
+    const sink = collector()
+    const tracer = TracerModel.create({ env: ENDPOINT_ENV, fetch: sink.fetch })
+    const foreign = { spanContext: () => ({ traceId: '5b8efff798038103d269b633813fc60c', spanId: 'eee19b7ec3c1b174', traceFlags: 1 }) }
+    // SAFETY: the test owns this symbol for its duration and restores it.
+    const holder = globalThis as { [OTEL_API_KEY]?: unknown }
+    const previous = holder[OTEL_API_KEY]
+    holder[OTEL_API_KEY] = { version: '1.9.1', context: { active: () => ({ getValue: (key: symbol) => (key === OTEL_SPAN_KEY ? foreign : undefined) }) } }
+    try {
+      await tracer.withSpan('tool work', {}, async () => {
+        await tracer.withSpan('nested', {}, async () => undefined)
+      })
+      await tracer.withSpan('fresh', { parent: null }, async () => undefined)
+    } finally {
+      if (previous === undefined) delete holder[OTEL_API_KEY]
+      else holder[OTEL_API_KEY] = previous
+    }
+    holder[OTEL_API_KEY] = { context: { active: () => ({ getValue: () => ({ spanContext: () => 'not a span context' }) }) } }
+    try {
+      await tracer.withSpan('malformed', {}, async () => undefined)
+    } finally {
+      if (previous === undefined) delete holder[OTEL_API_KEY]
+      else holder[OTEL_API_KEY] = previous
+    }
+    await tracer.flush()
+    const byName = new Map(sink.spans().map(span => [span.name, span]))
+    expect(byName.get('tool work')).toMatchObject({ traceId: '5b8efff798038103d269b633813fc60c', parentSpanId: 'eee19b7ec3c1b174' })
+    expect(byName.get('nested')?.parentSpanId).toBe(byName.get('tool work')?.spanId)
+    expect(byName.get('fresh')?.parentSpanId).toBeUndefined()
+    expect(byName.get('malformed')?.parentSpanId).toBeUndefined()
+  })
+})
+
 describe('failures and redaction', () => {
   it('records only the error class and code, rethrowing the original error', async () => {
     const sink = collector()

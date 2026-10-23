@@ -35,7 +35,10 @@ export interface Span {
 export interface StartSpanOptions {
   readonly kind?: SpanKind
   readonly attributes?: SpanAttributes
-  /** Explicit parent; `null` starts a new trace. Defaults to the span active in the current async context. */
+  /**
+   * Explicit parent; `null` starts a new trace. Defaults to the dshx span active in the current async context, then to
+   * the active OpenTelemetry API span (another instrumentation's), so both land in one trace.
+   */
   readonly parent?: SpanContext | null
 }
 
@@ -88,6 +91,39 @@ const nonZeroHex = (bytes: number): string => {
   for (;;) {
     const id = randomBytes(bytes).toString('hex')
     if (/[^0]/u.test(id)) return id
+  }
+}
+
+const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
+const OTEL_SPAN_KEY = Symbol.for('OpenTelemetry Context Key SPAN')
+
+interface OtelApiGlobal {
+  readonly context?: { active(): { getValue(key: symbol): unknown } }
+}
+
+interface OtelSpanLike {
+  spanContext(): unknown
+}
+
+const otelSpanContextSchema = z.object({ traceId: z.string().regex(/^[0-9a-f]{32}$/u), spanId: z.string().regex(/^[0-9a-f]{16}$/u) })
+
+/**
+ * The span active in the OpenTelemetry JS API's global context, e.g. the `execute_tool` span of the adopted
+ * LoongSuite plugin, so a dshx span opened inside it joins the same trace. Read through the symbols @opentelemetry/api
+ * 1.x registers for cross-copy sharing (`opentelemetry.js.api.1`, `OpenTelemetry Context Key SPAN`), without a
+ * dependency; any other shape means no parent.
+ */
+const otelActiveContext = (): SpanContext | undefined => {
+  try {
+    // SAFETY: @opentelemetry/api 1.x registers its globals under this symbol; another shape throws into the catch.
+    const api = (globalThis as { [OTEL_API_KEY]?: OtelApiGlobal })[OTEL_API_KEY]
+    const span = api?.context?.active().getValue(OTEL_SPAN_KEY)
+    if (span === undefined) return undefined
+    // SAFETY: the OpenTelemetry span key only holds a Span; another shape throws into the catch.
+    const parsed = otelSpanContextSchema.safeParse((span as OtelSpanLike).spanContext())
+    return parsed.success && /[^0]/u.test(parsed.data.traceId) ? parsed.data : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -186,7 +222,7 @@ const createRecordingTracer = (exporter: BatchExporter): Tracer => {
       const span = new RecordingSpan({
         name,
         kind: options.kind ?? 'internal',
-        parent: options.parent === null ? undefined : (options.parent ?? storage.getStore()),
+        parent: options.parent === null ? undefined : (options.parent ?? storage.getStore() ?? otelActiveContext()),
         onEnd: finished => exporter.enqueue(finished),
       })
       if (options.attributes !== undefined) span.setAttributes(options.attributes)
