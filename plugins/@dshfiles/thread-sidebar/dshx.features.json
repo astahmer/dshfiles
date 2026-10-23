@@ -301,13 +301,13 @@
         },
         {
           "key": "views",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"inactive\",\"interrupted\",\"needs-resume\"],\"sourceFilter\":\"main\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
           "key": "activeViewId",
-          "defaultValue": "all-threads",
+          "defaultValue": "done",
           "constraints": "Browser-local ID of the enabled preset currently selected.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
@@ -327,7 +327,7 @@
         },
         {
           "key": "viewPresets",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"inactive\",\"interrupted\",\"needs-resume\"],\"sourceFilter\":\"main\",\"enabled\":true},{\"id\":\"inbox\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"approval-needed\",\"input-needed\",\"turn-finished\",\"needs-resume\",\"interrupted\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"gone\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"muted\",\"settled\",\"archived\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
           "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
