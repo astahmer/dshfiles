@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 import { BacklogItems, type BacklogStatus } from './item.js'
@@ -19,42 +20,42 @@ export const StatusFilterBar = (props: {
   readonly statuses: readonly BacklogStatus[]
   readonly toggle: (status: BacklogStatus) => void
   readonly clear: () => void
+  readonly trailing?: ReactNode
 }): JSX.Element => {
   const total = Object.values(props.counts).reduce((sum, count) => sum + count, 0)
   return (
-    <div
-      role="group"
-      aria-label="Filter by status"
-      className="dshx:flex dshx:h-9 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:overflow-x-auto dshx:border-b dshx:border-border dshx:px-4"
-    >
-      <button
-        type="button"
-        aria-pressed={props.statuses.length === 0}
-        aria-label={`All statuses, ${itemCount(total)}`}
-        onClick={props.clear}
-        className={cn(chipClass(props.statuses.length === 0), 'dshx:font-medium')}
-      >
-        All
-        <span className={cn('dshx:tabular-nums', props.statuses.length === 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground/80')}>{total}</span>
-      </button>
-      {BacklogItems.statuses.map(status => {
-        const count = props.counts[status]
-        const active = props.statuses.includes(status)
-        return (
-          <button
-            key={status}
-            type="button"
-            aria-pressed={active}
-            aria-label={`${ItemGlyphs.statusLabels[status]}, ${itemCount(count)}`}
-            onClick={() => props.toggle(status)}
-            className={chipClass(active)}
-          >
-            <ItemGlyphs.StatusIcon status={status} />
-            <span className="dshx:@max-pane-compact:sr-only">{ItemGlyphs.statusLabels[status]}</span>
-            <span className={cn('dshx:tabular-nums', active ? 'dshx:text-foreground' : 'dshx:text-muted-foreground/80')}>{count}</span>
-          </button>
-        )
-      })}
+    <div className="dshx:flex dshx:h-9 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border dshx:px-4">
+      <div role="group" aria-label="Filter by status" className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:overflow-x-auto">
+        <button
+          type="button"
+          aria-pressed={props.statuses.length === 0}
+          aria-label={`All statuses, ${itemCount(total)}`}
+          onClick={props.clear}
+          className={cn(chipClass(props.statuses.length === 0), 'dshx:font-medium')}
+        >
+          All
+          <span className={cn('dshx:tabular-nums', props.statuses.length === 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground/80')}>{total}</span>
+        </button>
+        {BacklogItems.statuses.map(status => {
+          const count = props.counts[status]
+          const active = props.statuses.includes(status)
+          return (
+            <button
+              key={status}
+              type="button"
+              aria-pressed={active}
+              aria-label={`${ItemGlyphs.statusLabels[status]}, ${itemCount(count)}`}
+              onClick={() => props.toggle(status)}
+              className={chipClass(active)}
+            >
+              <ItemGlyphs.StatusIcon status={status} />
+              <span className="dshx:@max-pane-compact:sr-only">{ItemGlyphs.statusLabels[status]}</span>
+              <span className={cn('dshx:tabular-nums', active ? 'dshx:text-foreground' : 'dshx:text-muted-foreground/80')}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+      {props.trailing}
     </div>
   )
 }

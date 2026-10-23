@@ -206,7 +206,9 @@
         "rightclick row \"Item b:2\"",
         "click menuitem \"Start thread (2)…\"",
         "expect dialog \"Start thread\"",
-        "expect text \"· 2 items*\""
+        "expect text \"· 2 items*\"",
+        "click button \"Cancel\"",
+        "expect text \"First selection item\""
       ],
       "surfaces": ["client"],
       "configuration": [],

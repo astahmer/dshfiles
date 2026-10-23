@@ -556,7 +556,6 @@ export const BacklogPanel = (props: {
       className="dshx-root dshx:@container dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground dshx:outline-none"
     >
       <header className="dshx:flex dshx:h-12 dshx:shrink-0 dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:px-4">
-        <h2 className="dshx:text-sm dshx:font-semibold dshx:@max-pane-narrow:hidden">Backlog</h2>
         <nav aria-label="Backlog views" className="dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:bg-muted/60 dshx:p-0.5">
           {views.map((entry, index) => {
             const Icon = viewIcons[entry]

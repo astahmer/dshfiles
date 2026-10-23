@@ -364,25 +364,32 @@ export const ItemsView = (props: {
   })
   return (
     <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-      <StatusFilterBar counts={props.counts} statuses={props.statuses} toggle={props.toggleStatus} clear={props.clearStatuses} />
-      <div className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground">
-            <LayersIcon className="dshx:size-3.5" /> Group: <span className="dshx:text-foreground">{groupLabels[props.groupBy]}</span>
-            <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="dshx-root">
-            <DropdownMenuRadioGroup value={props.groupBy} onValueChange={value => props.setGroupBy(groupByOf(value))}>
-              {(['status', 'kind', 'project', 'attention'] as const).map(value => (
-                <DropdownMenuRadioItem key={value} value={value} className="dshx:text-[13px]">
-                  {groupLabels[value]}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <span className="dshx:ml-auto dshx:text-xs dshx:text-muted-foreground">{props.items.length} items</span>
-      </div>
+      <StatusFilterBar
+        counts={props.counts}
+        statuses={props.statuses}
+        toggle={props.toggleStatus}
+        clear={props.clearStatuses}
+        trailing={
+          <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground">
+                <LayersIcon className="dshx:size-3.5" /> Group: <span className="dshx:text-foreground">{groupLabels[props.groupBy]}</span>
+                <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="dshx-root">
+                <DropdownMenuRadioGroup value={props.groupBy} onValueChange={value => props.setGroupBy(groupByOf(value))}>
+                  {(['status', 'kind', 'project', 'attention'] as const).map(value => (
+                    <DropdownMenuRadioItem key={value} value={value} className="dshx:text-[13px]">
+                      {groupLabels[value]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <span className="dshx:ml-1 dshx:whitespace-nowrap dshx:text-xs dshx:text-muted-foreground">{props.items.length} items</span>
+          </div>
+        }
+      />
       <div ref={scroller} role="table" aria-label="Backlog items" className="dshx:@container dshx:min-h-0 dshx:flex-1 dshx:overflow-auto">
         <div
           role="row"
