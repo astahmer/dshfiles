@@ -107,30 +107,26 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     revealSnapshot.context.revealed === null ? null : { id: revealSnapshot.context.revealed.rowId, value: revealSnapshot.context.revealed.value }
   const queryClient = useQueryClient()
   const workspaceIds = useMemo(() => workspaceSnapshot.items.map(workspace => workspace.workspaceId).sort(), [workspaceSnapshot])
-  const workspaceClassification = useQuery({
-    queryKey: ['secret-catalog', 'jj-workspace-classification', workspaceIds],
+  // The Host splits projects from thread workspaces and drops registrations whose folder is gone, as the New thread picker does.
+  const registeredProjects = useQuery({
+    queryKey: ['secret-catalog', 'registered-projects', workspaceIds],
     enabled: pickerOpen && workspaceIds.length > 0,
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-    queryFn: async ({ signal }) => {
-      try {
-        return (await jjApi.classifyWorkspaces({ workspaceIds }, { signal })).jjWorkspaceIds
-      } catch (error) {
-        if (signal.aborted) throw error
-        return []
-      }
-    },
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => jjApi.projects({}, { signal }),
   })
   const cwd = selection?.canonicalPath ?? null
-  const projects: readonly RegisteredProject[] = useMemo(() => {
-    const classifiedWorkspaceIds = new Set(workspaceClassification.data ?? [])
-    return workspaceSnapshot.items.map(workspace => ({
-      workspaceId: workspace.workspaceId,
-      title: workspace.title,
-      canonicalPath: workspace.path,
-      isJjWorkspace: classifiedWorkspaceIds.has(workspace.workspaceId),
-    }))
-  }, [workspaceSnapshot, workspaceClassification.data])
+  const projects: readonly RegisteredProject[] = useMemo(
+    () => [
+      ...(registeredProjects.data?.projects ?? []).map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
+      ...(registeredProjects.data?.workspaces ?? []).map(workspace => ({
+        workspaceId: workspace.workspaceId,
+        title: workspace.title,
+        canonicalPath: workspace.path,
+        isJjWorkspace: true,
+      })),
+    ],
+    [registeredProjects.data],
+  )
 
   const clearRevealed = useCallback((): void => sendReveal({ type: 'hide' }), [sendReveal])
   const copyMutation = useMutation({
