@@ -61,3 +61,9 @@ it('offers a task the Host shutdown cut off, but not one the user stopped', () =
   expect(latestInterruptedTurn([aborted(5, 'disposed')])).toBe(5)
   expect(latestInterruptedTurn([aborted(5, 'user')])).toBeUndefined()
 })
+
+it('offers a task the output-token cap cut off', () => {
+  const capped: SessionEvent = { type: 'turn/end', seq: SessionSeq(5), time: 300, data: { turn: 2, reason: { kind: 'max-tokens' } } }
+  expect(latestInterruptedTurn([interrupted(3, 1), capped])).toBe(5)
+  expect(latestInterruptedTurn([capped, { type: 'turn/start', seq: SessionSeq(6), time: 400, data: { turn: 3 } }])).toBeUndefined()
+})

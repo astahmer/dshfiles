@@ -151,7 +151,8 @@ function TurnErrorItem({ node, t, action, extraActions }: {
 }
 
 /** Persistent, turn-positioned notice for a turn ended at the output-token cap. */
-function TurnMaxTokensItem({ t }: {
+function TurnMaxTokensItem({ t, action }: {
+  action?: ReactNode
   t: ChatViewSlotProps['t']
 }) {
   return (
@@ -161,6 +162,7 @@ function TurnMaxTokensItem({ t }: {
         <span className={css.maxTokensTitle}>{t('message.maxTokens')}</span>
         <span className={css.turnErrorMessage}>{t('message.maxTokens.hint')}</span>
       </div>
+      {action}
     </div>
   )
 }
@@ -350,24 +352,34 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
   return <ModelRetryItem node={data.current} active={data.current.retryState === 'scheduled'} t={t} />
 })
 
+/** Resume for the latest turn's terminal row, while the session is idle and the viewer may prompt; the Host re-checks `seq`. */
+const useResumeAction = (props: {
+  readonly turn: number
+  readonly seq: number
+} & Pick<ChatNodeViewProps, 'useChat' | 'useSession' | 'useAccess'>): ReactNode => {
+  const latest = props.useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === props.turn)
+  const sessionId = props.useSession(snapshot => snapshot.sessionId)
+  const running = props.useSession(snapshot => snapshot.running)
+  const allowed = props.useAccess('session/prompt')
+  return latest && !running && allowed ? <ResumeInterrupted sessionId={sessionId} seq={props.seq} /> : undefined
+}
+
 /** Terminal turn-error keyed Chat renderer. */
 export const TurnErrorNodeView = memo(function TurnErrorNodeView({
   node, t, useChat, useSession, useAccess, renderSlot,
 }: ChatNodeViewProps<'turn-error'> & PropsRenderSlots<'conversation.chat.turnErrorAction'>) {
-  const latest = useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === node.data.turn)
-  const sessionId = useSession(snapshot => snapshot.sessionId)
-  const running = useSession(snapshot => snapshot.running)
-  const allowed = useAccess('session/prompt')
-  const action = node.data.code !== 'ACCOUNT_SIGNED_OUT' && latest && !running && allowed
-    ? <ResumeInterrupted sessionId={sessionId} seq={node.data.seq} />
-    : undefined
+  const resume = useResumeAction({ turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess })
+  const action = node.data.code === 'ACCOUNT_SIGNED_OUT' ? undefined : resume
   const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '' })
   return <TurnErrorItem node={node.data} t={t} action={action} extraActions={extraActions} />
 })
 
 /** Max-tokens turn-end notice keyed Chat renderer. */
-export const TurnMaxTokensNodeView = memo(function TurnMaxTokensNodeView({ t }: ChatNodeViewProps<'turn-max-tokens'>) {
-  return <TurnMaxTokensItem t={t} />
+export const TurnMaxTokensNodeView = memo(function TurnMaxTokensNodeView({
+  node, t, useChat, useSession, useAccess,
+}: ChatNodeViewProps<'turn-max-tokens'>) {
+  const action = useResumeAction({ turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess })
+  return <TurnMaxTokensItem t={t} action={action} />
 })
 
 /** Explicit unknown-surface keyed Chat renderer. */
