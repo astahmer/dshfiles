@@ -23,6 +23,7 @@ import { en, zh } from './shortcut-locales.ts'
 import { ThemePresenter } from './theme-presenter.ts'
 // Local delta (see README "Local delta"): upstream keeps every width in memory.
 import { FrameWidthsModel } from '../../frame-widths.ts'
+import { PanelRetentionModel } from '../../panel-retention.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -168,10 +169,16 @@ export function apply(ctx: ClientContext): void {
     FrameWidthsModel.restore(instance)
     const disposeFrameWidths = FrameWidthsModel.persist(instance)
     const store: typeof handle = { ...handle, create: () => instance }
-    const retainMainPanels = (): void => {
-      instance.actions.retainMainPanels(ctx.slots.entries('main').flatMap(entry =>
-        entry.options.key === undefined ? [] : [entry.options.key]))
-    }
+    const panelRetention = PanelRetentionModel.create({
+      activePanelId: () => instance.getSnapshot().panelInfo.activePanelId,
+      panelKeys: () => ctx.slots.entries('main').flatMap(entry => entry.options.key === undefined ? [] : [entry.options.key]),
+      release: keys => instance.actions.retainMainPanels(keys),
+      schedule: (run, delayMs) => {
+        const timer = window.setTimeout(run, delayMs)
+        return () => window.clearTimeout(timer)
+      },
+    })
+    const retainMainPanels = (): void => panelRetention.check()
     // The right column's seat: a plugin reports which surface fills it (local
     // delta; see README "Local delta"). The frame only needs that choice, never
     // the dock's own state.
@@ -232,6 +239,7 @@ export function apply(ctx: ClientContext): void {
       disposeFrameWidths()
       layout.dispose()
       disposePanels()
+      panelRetention.dispose()
       disposeRegistration()
       disposePanelInfo()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
