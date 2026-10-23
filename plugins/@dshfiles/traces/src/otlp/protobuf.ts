@@ -82,8 +82,11 @@ const createReader = (buffer: Uint8Array): Reader => {
       else if (wireType === WIRE_FIXED64) {
         need(8)
         position += 8
-      } else if (wireType === WIRE_LENGTH) position += length()
-      else if (wireType === WIRE_FIXED32) {
+      } else if (wireType === WIRE_LENGTH) {
+        // Read the length first: `position += length()` would add it to the position from before its own varint.
+        const size = length()
+        position += size
+      } else if (wireType === WIRE_FIXED32) {
         need(4)
         position += 4
       } else throw new ProtobufDecodeError(`Unsupported wire type ${String(wireType)}.`)

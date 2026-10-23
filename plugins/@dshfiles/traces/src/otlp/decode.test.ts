@@ -66,6 +66,12 @@ describe('OTLP trace decoding', () => {
     expect(OtlpProtobuf.decodeTraces(body)).toEqual({ resourceSpans: [{ resource: { attributes: [] }, scopeSpans: [] }] })
   })
 
+  test('skips unknown length-delimited fields past their own length prefix', () => {
+    // Request field 9 (length 2, unknown) precedes an empty ResourceSpans; a skip that forgets the prefix misreads it.
+    const body = Uint8Array.from([0x4a, 0x02, 0x08, 0x01, 0x0a, 0x00])
+    expect(OtlpProtobuf.decodeTraces(body)).toEqual({ resourceSpans: [{ resource: { attributes: [] }, scopeSpans: [] }] })
+  })
+
   test('rejects JSON that is not an export request', () => {
     expect(() => OtlpBody.decodeTraces({ body: Buffer.from('{not json'), wire: 'json' })).toThrow(/could not be parsed/)
     expect(() => OtlpBody.decodeTraces({ body: Buffer.from('{"resourceSpans":"nope"}'), wire: 'json' })).toThrow(/not an OTLP/)
