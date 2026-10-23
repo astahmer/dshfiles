@@ -16,6 +16,7 @@ const row = (sessionId: string, extra: Record<string, unknown> = {}) => ({
 
 const runtimeFixture = () => {
   const calls: { method: string; args: unknown }[] = []
+  const routedCalls: { method: string; mutation: boolean }[] = []
   let released = 0
   let streamed: unknown[] = [{ type: 'snapshot', cursor: 0, records: [], hasMore: false, projections: { asOfSeq: 0, values: {} } }]
   let recordedSessions: { readonly sessionId: string; readonly runtimeId: string; readonly cwd?: string }[] = []
@@ -32,7 +33,12 @@ const runtimeFixture = () => {
       calls.push({ method, args })
       if (method === 'list') return { items: [row('session-remote', { transportSecret: 'discard me' })] }
       if (method === 'page') return { records: [], hasMore: false }
-      if (method === 'projections') return { kind: 'sequenced', asOfSeq: 0, values: {} }
+      if (method === 'projections')
+        return {
+          kind: 'sequenced',
+          asOfSeq: 4,
+          values: { modelSelection: { lastUsed: { provider: 'deepseek', model: 'chat' }, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } } },
+        }
       if (method === 'selectModel') return { selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } }
       if (method === 'create') return { sessionId: 'session-created' }
       return { accepted: true }
@@ -53,11 +59,17 @@ const runtimeFixture = () => {
         released += 1
       },
     }),
-    run: async (_runtimeId, request) => request(gateway),
+    run: async (_runtimeId, request, options) => {
+      const before = calls.length
+      const value = await request(gateway)
+      for (const call of calls.slice(before)) routedCalls.push({ method: call.method, mutation: options.mutation })
+      return value
+    },
   }
   return {
     runtimes,
     calls,
+    routedCalls,
     setStreamed: (frames: unknown[]) => {
       streamed = frames
     },
@@ -161,6 +173,52 @@ describe('remote session source', () => {
       method: 'selectModel',
       args: { request: { sessionId: 'session-remote', provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } },
     })
+  })
+
+  it('reports the remote Session’s model selection from its own projections', async () => {
+    const fixture = runtimeFixture()
+    const source = createRemoteSessionSource({ runtimes: fixture.runtimes })
+    await source.list({}, new AbortController().signal)
+    const projections = await source.projections?.({ sessionId: 'session-remote' as SessionId }, new AbortController().signal)
+    expect(projections).toMatchObject({
+      values: { modelSelection: { lastUsed: { provider: 'deepseek', model: 'chat' }, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } } },
+    })
+    expect(fixture.calls.at(-1)).toEqual({ method: 'projections', args: { request: { sessionId: 'session-remote' } } })
+  })
+
+  it('carries the remote model selection in followed snapshot frames', async () => {
+    const fixture = runtimeFixture()
+    const remoteSelection = { lastUsed: null, next: { provider: 'openai', model: 'gpt-5', reasoningEffort: 'medium' } }
+    fixture.setStreamed([
+      { type: 'snapshot', cursor: 0, records: [], hasMore: false, projections: { asOfSeq: 2, values: { modelSelection: remoteSelection } } },
+    ])
+    const source = createRemoteSessionSource({ runtimes: fixture.runtimes })
+    await source.list({}, new AbortController().signal)
+    const frames: unknown[] = []
+    for await (const frame of source.follow?.({ address: { kind: 'session', sessionId: 'session-remote' as SessionId } }, new AbortController().signal) ?? [])
+      frames.push(frame)
+    expect(frames).toEqual([expect.objectContaining({ projections: { asOfSeq: 2, values: { modelSelection: remoteSelection } } })])
+  })
+
+  it('writes the model selection through the no-replay path and reads through the replayable one', async () => {
+    const fixture = runtimeFixture()
+    const source = createRemoteSessionSource({ runtimes: fixture.runtimes })
+    await source.list({}, new AbortController().signal)
+    await source.projections?.({ sessionId: 'session-remote' as SessionId }, new AbortController().signal)
+    await source.selectModel?.({ sessionId: 'session-remote' as SessionId, provider: 'deepseek', model: 'chat' })
+    expect(fixture.routedCalls.filter(call => call.method !== 'list')).toEqual([
+      { method: 'projections', mutation: false },
+      { method: 'selectModel', mutation: true },
+    ])
+  })
+
+  it('refuses to select a model for a Session no runtime owns', async () => {
+    const fixture = runtimeFixture()
+    const source = createRemoteSessionSource({ runtimes: fixture.runtimes })
+    await expect(source.selectModel?.({ sessionId: 'session-unknown' as SessionId, provider: 'deepseek', model: 'chat' })).rejects.toThrow(
+      'No connected runtime owns Session session-unknown.',
+    )
+    expect(fixture.calls.some(call => call.method === 'selectModel')).toBe(false)
   })
 
   it('reports a Session no runtime owns instead of answering for it', async () => {

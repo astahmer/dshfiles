@@ -141,6 +141,50 @@ describe('mirrored sessions', () => {
     ).resolves.toEqual({ accepted: true, via: 'local' })
   })
 
+  it('routes a mirrored Session’s model selection and projections to its source, never the local controller', async () => {
+    const { mirrored, source } = await fixture()
+    const selected: unknown[] = []
+    mirrored.registry.register(
+      source({
+        rows: [summary('session-remote', 100)],
+        selectModel: async request => {
+          selected.push(request)
+          return SessionSourcePayload.selectedModel({ selected: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } })
+        },
+        projections: async () =>
+          SessionSourcePayload.projections({
+            kind: 'sequenced',
+            asOfSeq: 3,
+            values: { modelSelection: { lastUsed: null, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } } },
+          }),
+      }),
+    )
+    await mirrored.merge([], {}, new AbortController().signal)
+    const request = { sessionId: SessionId('session-remote'), provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' }
+    await expect(
+      mirrored.selectModel(request, async () => {
+        throw new Error('local fallback must not run')
+      }),
+    ).resolves.toEqual({ selected: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } })
+    expect(selected).toEqual([request])
+    await expect(
+      mirrored.projections({ sessionId: SessionId('session-remote') }, new AbortController().signal, async () => {
+        throw new Error('local fallback must not run')
+      }),
+    ).resolves.toMatchObject({ values: { modelSelection: { next: { model: 'reasoner' } } } })
+  })
+
+  it('refuses model selection for a mirrored Session whose source cannot select', async () => {
+    const { mirrored, source } = await fixture()
+    mirrored.registry.register(source({ rows: [summary('session-remote', 100)] }))
+    await mirrored.merge([], {}, new AbortController().signal)
+    await expect(
+      mirrored.selectModel({ sessionId: SessionId('session-remote'), provider: 'deepseek', model: 'chat' }, async () => {
+        throw new Error('local fallback must not run')
+      }),
+    ).rejects.toMatchObject({ code: 'gateway/bad-request' })
+  })
+
   it('reports a source failure with a stable gateway code', async () => {
     const { mirrored, source } = await fixture()
     mirrored.registry.register(
