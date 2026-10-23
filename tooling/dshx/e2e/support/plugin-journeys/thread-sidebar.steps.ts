@@ -1965,3 +1965,41 @@ Then('the renamed thread title survives reload and the cancelled draft is discar
   })
   await finishJourneyAssertions(page)
 })
+
+const MINIMUM_SIDEBAR_WIDTH = 240
+
+When('the thread sidebar is narrowed to its minimum width', async ({ page }: { page: Page }) => {
+  const sidebar = threadSidebar(page)
+  await expect(sidebar.getByRole('group', { name: 'Thread list view', exact: true })).toBeVisible()
+  await sidebar.evaluate((region, width) => {
+    if (!(region instanceof HTMLElement)) throw new Error('The thread sidebar region is not an HTML element.')
+    region.style.width = `${width}px`
+    region.style.maxWidth = `${width}px`
+  }, MINIMUM_SIDEBAR_WIDTH)
+})
+
+Then('every view tab fits without scrolling and keeps its full name as tooltip and accessible name', async ({ page }: { page: Page }) => {
+  const viewTabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
+  const tabs = viewTabs.locator('button[data-thread-list-view-button]')
+  await recordAssertion(page, 'thread-sidebar-compact-view-tabs-fit', async () => {
+    await expect(viewTabs).toHaveAttribute('data-compact-view-tabs', '')
+    await expect.poll(() => viewTabs.evaluate(row => row.scrollWidth - row.clientWidth)).toBeLessThanOrEqual(0)
+    await expect(viewTabs.getByTestId('thread-view-compact-icon').first()).toBeVisible()
+  })
+  const names = await tabs.evaluateAll(buttons => buttons.map(button => button.getAttribute('title') ?? ''))
+  expect(names).toEqual(expect.arrayContaining(['All threads', 'Working', 'Done', 'Gone']))
+  const rowBox = await viewTabs.boundingBox()
+  if (rowBox === null) throw new Error('The view tab row has no layout box.')
+  await recordAssertion(page, 'thread-sidebar-compact-view-tabs-names', async () => {
+    for (const [index, name] of names.entries()) {
+      const tab = tabs.nth(index)
+      await expect(tab).toHaveAccessibleName(new RegExp(`^${name}(?: \\(\\d+\\))?(?:, .+)?$`))
+      const tabBox = await tab.boundingBox()
+      if (tabBox === null) throw new Error(`The ${name} view tab has no layout box.`)
+      expect(tabBox.x + tabBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1)
+    }
+  })
+  await viewTabs.locator('button[title="Done"]').click()
+  await expect(viewTabs.locator('button[title="Done"]')).toHaveAttribute('aria-pressed', 'true')
+  await finishJourneyAssertions(page)
+})

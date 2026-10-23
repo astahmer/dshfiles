@@ -233,3 +233,9 @@ Feature: Thread sidebar journeys
     When the sidebar inventory pane is collapsed
     Then no JJ inventory request is made while the sidebar is collapsed
     Then the JJ inventory is read again after the sidebar expands
+
+  @scenario:thread-sidebar.compact-view-tabs
+  Scenario: View tabs switch to icons in a narrow sidebar and keep their names
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the thread sidebar is narrowed to its minimum width
+    Then every view tab fits without scrolling and keeps its full name as tooltip and accessible name

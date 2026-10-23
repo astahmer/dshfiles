@@ -5,7 +5,20 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import {
+  ActivityIcon,
+  ArchiveIcon,
+  BookmarkIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CircleCheckIcon,
+  InboxIcon,
+  ListIcon,
+  type LucideIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+} from '@dshfiles/plugin-ui/icons'
 import { useMemo, useState } from 'react'
 import { z } from 'zod'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, type ThreadSidebarLocaleKey } from './locales.js'
@@ -69,6 +82,25 @@ export const threadViewPresetLabel = (view: ThreadViewPreset, t: ThreadSidebarTr
   if (view.id === INBOX_VIEW_ID) return t('threadSidebarInbox')
   if (view.id === GONE_VIEW_ID) return t('threadSidebarGone')
   return t('threadSidebarCurrentView')
+}
+
+const builtInViewIcons: Readonly<Record<string, LucideIcon>> = {
+  [ALL_THREADS_VIEW_ID]: ListIcon,
+  [WORKING_VIEW_ID]: ActivityIcon,
+  [DONE_VIEW_ID]: CircleCheckIcon,
+  [INBOX_VIEW_ID]: InboxIcon,
+  [GONE_VIEW_ID]: ArchiveIcon,
+  [LEGACY_CURRENT_VIEW_ID]: BookmarkIcon,
+}
+
+export type ThreadViewCompactLabel = { readonly kind: 'icon'; readonly icon: LucideIcon } | { readonly kind: 'initial'; readonly initial: string }
+
+/** What a view tab shows when the sidebar is too narrow for its name: a built-in view's icon, or a custom view's initial. */
+export const threadViewPresetCompactLabel = (view: ThreadViewPreset): ThreadViewCompactLabel => {
+  const icon = view.name === null ? builtInViewIcons[view.id] : undefined
+  if (icon !== undefined) return { kind: 'icon', icon }
+  const initial = Array.from(view.name?.trim() ?? '')[0] ?? '?'
+  return { kind: 'initial', initial: initial.toLocaleUpperCase() }
 }
 
 interface ThreadViewManagerProps {

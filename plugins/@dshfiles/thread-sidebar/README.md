@@ -157,7 +157,11 @@ beside its name: Working shows the running-thread count, while every other
 view counts the unread threads it lists, so Inbox says how many waiting threads
 still hold an unacknowledged finish on the Host (opening one clears it
 everywhere). The colored dot signals only attention labels matched by that
-view's selected statuses; it is not itself an unread-finish count. A status filter names a state the row already
+view's selected statuses; it is not itself an unread-finish count. When the
+sidebar is too narrow for every full tab (`src/thread-view-tabs.ts` measures the
+row), built-in views show their icon and custom views their initial beside the
+count; the full name stays the tooltip and accessible name, so every tab fits
+without scrolling. A row wide enough keeps the full names. A status filter names a state the row already
 shows, and several combine as OR: **Working**, **Needs attention** (any label),
 **Unread**, one filter per attention label (**Approval needed**, **Input
 needed**, **Turn finished**, **Needs resume**, **Interrupted**), **Inactive**,

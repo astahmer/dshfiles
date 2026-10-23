@@ -163,7 +163,14 @@ import {
   type ThreadViewPreferences,
 } from './thread-view.js'
 import { doneViewFilterMigration, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
-import { ThreadViewManager, threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, threadViewPresetLabel } from './thread-view-manager.js'
+import {
+  ThreadViewManager,
+  threadStatusFilterGroupLabelKeys,
+  threadStatusFilterLabelKeys,
+  threadViewPresetCompactLabel,
+  threadViewPresetLabel,
+} from './thread-view-manager.js'
+import { useCompactViewTabs } from './thread-view-tabs.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion, ThreadMentionDrag } from './thread-mention.js'
 import {
   ThreadNotificationModel,
@@ -2968,6 +2975,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => new Map(threadViewSettings.views.map(view => [view.id, ThreadViewPreferencesModel.unreadCountForPreset(view, threadViewAttentionEntries)])),
     [threadViewAttentionEntries, threadViewSettings.views],
   )
+  const [viewTabRow, setViewTabRow] = useState<HTMLDivElement | null>(null)
+  const compactViewTabs = useCompactViewTabs(viewTabRow, threadViewSettings.views.filter(view => view.enabled).length)
   const visibleThreadEntries = useMemo(
     () =>
       sourceFilteredThreadEntries.filter(entry =>
@@ -4126,9 +4135,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             )}
           </div>
           <div
+            ref={setViewTabRow}
             role="group"
-            className={cn('dshx:flex dshx:gap-1 dshx:overflow-x-auto', !isBoard && 'dshx:pt-1')}
+            className={cn('dshx:flex dshx:gap-1', compactViewTabs ? 'dshx:overflow-x-hidden' : 'dshx:overflow-x-auto', !isBoard && 'dshx:pt-1')}
             aria-label={props.tSidebar('threadSidebarListView')}
+            data-compact-view-tabs={compactViewTabs ? '' : undefined}
             onKeyDown={event => navigateThreadList(event.nativeEvent)}
             hidden={isBoard}
           >
@@ -4136,6 +4147,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               .filter(view => view.enabled)
               .map(view => {
                 const label = threadViewPresetLabel(view, props.tSidebar)
+                const compactLabel = threadViewPresetCompactLabel(view)
                 const attentionLabel = attentionLabelByViewId.get(view.id)
                 const hasOnlyWorkingStatuses =
                   view.statusFilters.every(status => status === 'working' || status === 'interrupted') && view.statusFilters.includes('working')
@@ -4154,12 +4166,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     data-thread-list-view-button=""
                     variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
                     size="sm"
-                    className="dshx:min-w-20 dshx:flex-1 dshx:shrink-0"
+                    className={cn('dshx:flex-1', compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-20 dshx:shrink-0')}
+                    title={label}
                     aria-label={accessibleLabel}
                     aria-pressed={view.id === listThreadView.id}
                     onClick={() => selectThreadViewPreset(view.id)}
                   >
-                    <span className="dshx:truncate">{label}</span>
+                    {compactViewTabs ? (
+                      <>
+                        <span className="dshx:sr-only">{label}</span>
+                        {compactLabel.kind === 'icon' ? (
+                          <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
+                        ) : (
+                          <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
+                            {compactLabel.initial}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="dshx:truncate">{label}</span>
+                    )}
                     {attentionLabel === undefined ? null : (
                       <span
                         aria-hidden="true"
@@ -4175,7 +4201,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         )}
                       />
                     )}
-                    {visibleCount === null ? null : <span className="dshx:shrink-0">({visibleCount})</span>}
+                    {visibleCount === null ? null : (
+                      <span className="dshx:shrink-0">{compactViewTabs ? visibleCount : `(${visibleCount})`}</span>
+                    )}
                   </Button>
                 )
               })}
