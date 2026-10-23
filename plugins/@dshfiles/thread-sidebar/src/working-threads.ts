@@ -1,10 +1,12 @@
 export interface WorkingThreadInput {
   readonly session: { readonly id: string; readonly running: boolean }
+  /** A root's activity also runs while one of its subagents does. */
+  readonly activity: { readonly running: boolean }
 }
 
 /**
- * The threads whose own turn is running. A parent that only waits on a running subagent stays out: its row says
- * Turn finished or Inactive, so listing it under Working would contradict the row.
+ * The threads with work in flight: a turn of their own, or a running subagent. A parent waiting on its subagent is
+ * still working; its row shows the running child under it, so Working lists both together.
  */
 export const workingThreadIds = (threads: readonly WorkingThreadInput[]): ReadonlySet<string> =>
-  new Set(threads.filter(thread => thread.session.running).map(thread => thread.session.id))
+  new Set(threads.filter(thread => thread.session.running || thread.activity.running).map(thread => thread.session.id))

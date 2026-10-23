@@ -147,8 +147,8 @@ preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
 without opening the manager. The shipped views are **All threads**, **Working** (threads
-whose own turn is running; a parent that only waits on a running subagent is not
-listed), **Done** (Inactive + Interrupted + Needs resume main threads, so threads a
+whose own turn is running, and parents whose subagent is running, shown with that
+child under them), **Done** (Inactive + Interrupted + Needs resume main threads, so threads a
 usage limit stopped land here), **Inbox** (everything
 waiting on you: approval needed, input needed, turn finished, needs resume,
 interrupted) and **Gone** (the storage states: muted, settled, archived). A
