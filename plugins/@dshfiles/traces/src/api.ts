@@ -124,7 +124,7 @@ export const tracesApi = defineApi({
         .strict(),
       output: z.object({ metrics: z.array(metricSummarySchema) }).strict(),
       description:
-        'Stored OpenTelemetry metrics received on /v1/metrics, per service and name: type, unit, description, point and series counts, last time and last value. Read-only.',
+        'Stored OpenTelemetry metrics received on /v1/metrics, per service and name: type, unit, description, point and series counts, last time, and the last value when the metric has a single series. Read-only.',
       tool: { name: 'traces_list_metrics', readOnly: true, render: compactJson },
     }),
     metric: method({

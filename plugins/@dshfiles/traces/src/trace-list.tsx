@@ -30,9 +30,9 @@ export const TraceList = (props: {
       <Table aria-label={props.t('tabTraces')}>
         <TableHeader>
           <TableRow>
-            <TableHead className="dshx:w-28">{props.t('started')}</TableHead>
+            <TableHead className="dshx:w-28 dshx:@max-pane-narrow:hidden">{props.t('started')}</TableHead>
             <TableHead>{props.t('root')}</TableHead>
-            <TableHead className="dshx:w-40">{props.t('duration')}</TableHead>
+            <TableHead className="dshx:w-40 dshx:@max-pane-narrow:w-20">{props.t('duration')}</TableHead>
             <TableHead className="dshx:w-16 dshx:text-right dshx:@max-pane-narrow:hidden">{props.t('spanCount')}</TableHead>
             <TableHead className="dshx:w-16 dshx:text-right">{props.t('errorCount')}</TableHead>
           </TableRow>
@@ -45,6 +45,7 @@ export const TraceList = (props: {
               className="dshx:cursor-pointer"
               tabIndex={0}
               aria-label={`${trace.rootService} ${trace.rootName}`}
+              title={`${new Date(trace.startMs).toLocaleString()} · ${trace.rootService} ${trace.rootName}`}
               onClick={() => props.onOpen(trace.traceId)}
               onKeyDown={event => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -53,7 +54,10 @@ export const TraceList = (props: {
                 }
               }}
             >
-              <TableCell className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={new Date(trace.startMs).toLocaleString()}>
+              <TableCell
+                className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden"
+                title={new Date(trace.startMs).toLocaleString()}
+              >
                 {TraceFormat.clock(trace.startMs)}
               </TableCell>
               <TableCell className="dshx:max-w-0">

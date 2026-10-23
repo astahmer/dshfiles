@@ -4,7 +4,7 @@ import type { TracesTranslate } from './locales.js'
 import { ServiceMapLayout } from './service-map-layout.js'
 import type { ServiceMap } from './types.js'
 
-const NODE_WIDTH = 168
+const NODE_WIDTH = 216
 const NODE_HEIGHT = 52
 const COLUMN_GAP = 96
 const ROW_GAP = 28
@@ -109,7 +109,7 @@ export const ServiceMapView = (props: {
                 />
                 <rect width={6} height={NODE_HEIGHT} rx={3} className={TraceFormat.serviceFill(node.service)} />
                 <text x={16} y={21} className="dshx:fill-foreground dshx:text-xs dshx:font-medium">
-                  {node.service.length > 22 ? `${node.service.slice(0, 21)}…` : node.service}
+                  {node.service.length > 28 ? `${node.service.slice(0, 27)}…` : node.service}
                 </text>
                 <text x={16} y={38} className="dshx:fill-muted-foreground dshx:font-mono dshx:text-[10px]">
                   {summary === undefined

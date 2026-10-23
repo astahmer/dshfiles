@@ -34,18 +34,26 @@ const MetricChart = (props: { readonly series: MetricSeries; readonly t: TracesT
     [props.series],
   )
   const labels = useMemo(() => [...new Set(points.map(point => point.series))], [points])
+  // A delta export puts every series at one instant; pad the axis so a single time still reads as a time.
+  const timeDomain = useMemo((): [number, number] => {
+    const times = points.map(point => point.timeMs)
+    const first = Math.min(...times)
+    const last = Math.max(...times)
+    const pad = Math.max(30_000, (last - first) * 0.05)
+    return [first - pad, last + pad]
+  }, [points])
   const definition = useMemo(
     () =>
       defineChart({
         marks: [lineY(points, { x: 'timeMs', y: 'value', z: 'series', color: 'series', points: true, strokeWidth: 1.5 })],
         scales: {
-          x: { scale: scaleLinear, axis: { ticks: { count: 4, format: value => TraceFormat.clock(Number(value)) } } },
+          x: { scale: scaleLinear().domain(timeDomain), axis: { ticks: { count: 4, format: value => TraceFormat.clock(Number(value)) } } },
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => formatNumber(Number(value)) } } },
         },
         color: { domain: labels, legend: colorLegend({ placement: 'bottom' }) },
         tooltip: { use: tooltip, format: point => `${TraceFormat.clock(point.datum.timeMs)} · ${point.datum.series}: ${formatNumber(point.datum.value)}` },
       }),
-    [points, labels],
+    [points, labels, timeDomain],
   )
   const kind =
     props.series.valueKind === 'increase' ? props.t('metricIncrease') : props.series.valueKind === 'mean' ? props.t('metricMean') : props.t('metricValue')
@@ -53,7 +61,7 @@ const MetricChart = (props: { readonly series: MetricSeries; readonly t: TracesT
     <ChartFrame
       title={`${props.series.name}${props.series.unit === null ? '' : ` (${props.series.unit})`}`}
       description={[props.series.service, kind, props.series.description].filter(Boolean).join(' · ')}
-      className="dshx:rounded-lg dshx:border dshx:p-3"
+      className="dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:p-3"
     >
       {points.length === 0 ? (
         <p className="dshx:text-xs">{props.t('metricNoPoints')}</p>

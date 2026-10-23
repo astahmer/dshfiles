@@ -2,6 +2,12 @@
 
 ![Trace list and span waterfall](docs/screenshots/trace-explorer.png)
 
+![Log search with trace correlation](docs/screenshots/log-explorer.png)
+
+![Service dependency map](docs/screenshots/service-map.png)
+
+![Metric list with one chart per metric](docs/screenshots/metric-charts.png)
+
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
 list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, metric

@@ -309,7 +309,7 @@ describe('trace store', () => {
     )
     expect(store.listMetrics({ windowMinutes: 60 }).map(metric => [metric.name, metric.type, metric.points, metric.series, metric.lastValue])).toEqual([
       ['cpu.usage', 'gauge', 1, 1, 0.4],
-      ['http.requests', 'sum', 4, 2, 3],
+      ['http.requests', 'sum', 4, 2, null],
     ])
     const series = store.metricSeries({ name: 'http.requests', service: 'web', windowMinutes: 60 })
     expect(series.valueKind).toBe('increase')

@@ -173,6 +173,7 @@ export const TraceDetailView = (props: {
                 className={cn(
                   'dshx:absolute dshx:top-0 dshx:whitespace-nowrap dshx:font-mono',
                   tick.fraction === 1 ? 'dshx:-translate-x-full' : tick.fraction > 0 ? 'dshx:-translate-x-1/2' : '',
+                  tick.fraction > 0 && tick.fraction < 1 ? 'dshx:@max-pane-narrow:hidden' : '',
                 )}
                 style={{ left: `${String(tick.fraction * 100)}%` }}
               >

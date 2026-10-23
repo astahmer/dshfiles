@@ -546,7 +546,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         points: row.points,
         series: row.series,
         lastMs: usToMs(row.last_us),
-        lastValue: row.last_value,
+        lastValue: row.series === 1 ? row.last_value : null,
       }))
   }
 

@@ -161,7 +161,7 @@ export const TracesPanel = (props: {
 
       <Tabs value={view.tab} onValueChange={value => update({ tab: tracesViewSchema.shape.tab.parse(value) })} className="dshx:min-h-0 dshx:flex-1">
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-          <TabsList>
+          <TabsList className="dshx:max-w-full dshx:justify-start dshx:overflow-x-auto">
             <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>
             <TabsTrigger value="logs">{t('tabLogs')}</TabsTrigger>
             <TabsTrigger value="map">{t('tabMap')}</TabsTrigger>
