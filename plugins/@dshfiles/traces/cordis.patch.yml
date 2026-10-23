@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-traces
+      name: '@dshfiles/traces'

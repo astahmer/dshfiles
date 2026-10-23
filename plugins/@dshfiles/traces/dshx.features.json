@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "otlp-receiver",
+      "title": "Local OTLP/HTTP receiver",
+      "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer.",
+      "reach": ["click button \"Traces\"", "expect heading \"Traces\""],
+      "surfaces": ["host", "storage", "tool", "client", "integration"],
+      "configuration": [
+        {
+          "key": "mode",
+          "defaultValue": "plugin",
+          "constraints": "plugin: this receiver owns the port; external: receiver off; both: store and forward to forwardUrl.",
+          "choices": ["plugin", "external", "both"],
+          "coveredBy": ["traces.receiver-forwarding", "traces.receiver-browser-journey"]
+        },
+        {
+          "key": "port",
+          "defaultValue": "4318",
+          "constraints": "0 to 65535; 0 picks any free port. A port held by another process is reported and retried every 30 s.",
+          "coveredBy": ["traces.receiver-port-in-use", "traces.receiver-browser-journey"]
+        },
+        {
+          "key": "allowNonLoopback",
+          "defaultValue": "false",
+          "constraints": "A non-loopback host is refused unless this is on.",
+          "choices": ["true", "false"],
+          "coveredBy": ["traces.receiver-loopback"]
+        },
+        {
+          "key": "redactGenAiContent",
+          "defaultValue": "true",
+          "constraints": "GenAI message, prompt and tool-payload attributes are stored as their size only.",
+          "choices": ["true", "false"],
+          "coveredBy": ["traces.normalize-redaction", "traces.normalize-no-redaction"]
+        },
+        {
+          "key": "retentionSpans",
+          "defaultValue": "100000",
+          "constraints": "1,000 to 1,000,000 spans; whole traces drop oldest first, alongside retentionHours (default 72).",
+          "coveredBy": ["traces.store-retention"]
+        }
+      ],
+      "states": ["listening", "port-in-use", "disabled", "failed", "forwarding", "empty"],
+      "failureModes": [
+        "A body over 8 MiB, or one that inflates past 32 MiB, is rejected with 413/400 instead of being buffered.",
+        "A malformed protobuf or JSON body is rejected with 400 and nothing is stored.",
+        "A port held by another process (another collector, dsh-traces) leaves stored traces browsable and says so in the panel.",
+        "A non-loopback listen address is refused unless explicitly allowed.",
+        "A forward URL that points back at the receiver is ignored, so telemetry never loops.",
+        "GenAI content attributes are stored as their size unless redaction is turned off."
+      ],
+      "externalDependencies": [
+        {
+          "id": "opentelemetry-exporters",
+          "boundary": "OTLP/HTTP POST bodies (opentelemetry-proto v1 ExportTraceServiceRequest) from any exporter: LoongSuite (protobuf), dshx tracing (JSON), or a third-party SDK.",
+          "deterministicFake": "Request bodies are produced by the official @opentelemetry/otlp-transformer serializers in unit tests and by a synthetic OTLP JSON payload in the browser journey."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.receiver-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-wire-formats",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "stores protobuf, gzip protobuf and JSON trace bodies and answers in kind"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-rejections",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "rejects wrong paths, methods, media types, oversize and malformed bodies"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-port-in-use",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "reports a port held by another process and keeps the rest of the status"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-loopback",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "refuses a non-loopback address unless it is opted into"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-forwarding",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "forwards the raw body to the external viewer and never to itself"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-protobuf-sdk",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
+          "testName": "decodes a protobuf body from the official SDK serializer into the same spans as its JSON body"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-truncated",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
+          "testName": "rejects a truncated protobuf body"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.normalize-redaction",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
+          "testName": "replaces content attributes with their size, also on events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.normalize-no-redaction",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
+          "testName": "keeps content attributes as sent when redaction is turned off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.normalize-bounds",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
+          "testName": "bounds names, attribute counts, string values and events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-retention",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "drops whole traces past the age and span limits, and clears everything"
+        }
+      ]
+    },
+    {
+      "id": "trace-explorer",
+      "title": "Trace list and span waterfall",
+      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible span waterfall on a time axis, colored by service with errors in red, and a side panel with the selected span's attributes, events and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
+      "reach": [
+        "seed otlp-sample-trace",
+        "click button \"Traces\"",
+        "click tab \"Traces\"",
+        "click row \"dshx-sample POST /orders*\"",
+        "click treeitem \"charge card*\"",
+        "expect complementary \"Span detail\""
+      ],
+      "surfaces": ["client", "host", "tool", "storage"],
+      "configuration": [],
+      "states": ["empty", "listed", "filtered", "paged", "trace-open", "span-selected", "collapsed", "trace-missing"],
+      "failureModes": [
+        "A span whose parent never arrived is shown as a root rather than dropped.",
+        "A trace pruned while open reports that it is no longer stored.",
+        "A dsh.session.id for a thread this Host does not list is reported unavailable instead of opening anything.",
+        "A forged pagination cursor is rejected by the Host."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.waterfall-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-list",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "lists traces newest first with root, duration, counts, services and session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-filters",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "filters by service, operation, status, duration, time, text and session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-paging",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "pages with a cursor and rejects a forged one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-tree",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "returns one trace as a depth-first tree with offsets and resource attributes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.tree-orphans",
+          "file": "plugins/@dshfiles/traces/src/span-tree.test.ts",
+          "testName": "treats a span whose parent is missing as a root"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-collapse",
+          "file": "plugins/@dshfiles/traces/src/format.test.ts",
+          "testName": "hides the descendants of collapsed spans only"
+        }
+      ]
+    },
+    {
+      "id": "trace-insights",
+      "title": "Service and operation overview, error groups",
+      "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",
+      "reach": ["click button \"Traces\"", "click tab \"Operations\"", "expect combobox \"Window\""],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["empty-window", "summarized", "errors-grouped"],
+      "failureModes": [
+        "Percentiles use the nearest-rank method, so a single sample is its own p50, p95 and p99.",
+        "Error messages that differ only by numbers fold into one group."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.insights-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-stats",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "summarizes services and operations over a window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-error-groups",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "groups errors by service, operation, type and message shape"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.percentiles",
+          "file": "plugins/@dshfiles/traces/src/span-tree.test.ts",
+          "testName": "uses nearest-rank percentiles"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.agent-tools",
+          "file": "plugins/@dshfiles/traces/src/api-tools.test.ts",
+          "testName": "every traces capability is a named tool and only clear writes"
+        }
+      ]
+    }
+  ]
+}
