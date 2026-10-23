@@ -200,6 +200,65 @@
       ]
     },
     {
+      "id": "log-explorer",
+      "title": "Log search with trace correlation",
+      "summary": "The receiver also accepts POST /v1/logs (JSON or protobuf); the Logs tab searches stored records newest first by text, service, minimum severity and one attribute value, a record with a trace id opens its trace, and a span or trace opens only its own logs. GenAI content events keep only their body size unless redaction is turned off.",
+      "reach": ["seed otlp-sample-trace", "click button \"Traces\"", "click tab \"Logs\"", "expect list \"Logs\""],
+      "surfaces": ["client", "host", "tool", "storage"],
+      "configuration": [
+        {
+          "key": "retentionLogs",
+          "defaultValue": "100000",
+          "constraints": "1,000 to 1,000,000 records; the oldest go first, alongside retentionHours.",
+          "coveredBy": ["traces.store-log-retention"]
+        }
+      ],
+      "states": ["empty", "listed", "filtered", "correlated-trace", "correlated-span", "expanded"],
+      "failureModes": [
+        "A record without a time or observed time is rejected and counted.",
+        "A log whose trace was pruned still lists; opening it reports that the trace is no longer stored.",
+        "A forged logs cursor is rejected by the Host."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.logs-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-logs-sdk",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode-logs.test.ts",
+          "testName": "decodes SDK log records from protobuf into the same records as from JSON"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.decode-logs-fields",
+          "file": "plugins/@dshfiles/traces/src/otlp/decode-logs.test.ts",
+          "testName": "keeps severity, body, attributes, event name and the trace correlation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-logs",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "stores protobuf and JSON log bodies on /v1/logs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-log-search",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "searches logs by service, severity, text, attribute, trace and span, newest first with paging"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-log-retention",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "drops the oldest logs past the count limit and expired ones by age"
+        }
+      ]
+    },
+    {
       "id": "trace-insights",
       "title": "Service and operation overview, error groups",
       "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",

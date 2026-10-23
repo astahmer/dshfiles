@@ -29,6 +29,7 @@ export const tracesSettings = defineSettings({
       ),
     retentionHours: Schema.natural().min(1).max(720).default(72).description('Drop stored telemetry older than this many hours.'),
     retentionSpans: Schema.natural().min(1_000).max(1_000_000).default(100_000).description('Keep at most this many spans; the oldest whole traces go first.'),
+    retentionLogs: Schema.natural().min(1_000).max(1_000_000).default(100_000).description('Keep at most this many log records; the oldest go first.'),
   }),
   applies: 'live',
 })

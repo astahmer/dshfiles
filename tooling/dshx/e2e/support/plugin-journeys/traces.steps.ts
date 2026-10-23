@@ -10,7 +10,7 @@ const freePortPatch = `- id: dshfiles-traces
     port: 0
 `
 
-const exported = new WeakMap<Page, { readonly traceId: string }>()
+const exported = new WeakMap<Page, { readonly traceId: string; readonly clientSpanId: string }>()
 
 const openTraces = async (page: Page): Promise<void> => {
   await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Traces', exact: true }).click()
@@ -27,11 +27,10 @@ const receiverEndpoint = async (page: Page): Promise<string> => {
 
 const hex = (bytes: number): string => randomBytes(bytes).toString('hex')
 
-const syntheticExport = (traceId: string) => {
+const syntheticExport = (traceId: string, clientId: string) => {
   const startNs = BigInt(Date.now() - 5_000) * 1_000_000n
   const at = (offsetMs: number): string => (startNs + BigInt(offsetMs) * 1_000_000n).toString()
   const rootId = hex(8)
-  const clientId = hex(8)
   const attribute = (key: string, value: string | number) =>
     typeof value === 'string' ? { key, value: { stringValue: value } } : { key, value: { intValue: String(value) } }
   return {
@@ -110,13 +109,14 @@ Then('the receiver shows where it listens and how to send it telemetry', async (
 When('a synthetic OTLP JSON export is posted to the receiver', async ({ page }: { page: Page }) => {
   const endpoint = await receiverEndpoint(page)
   const traceId = hex(16)
+  const clientSpanId = hex(8)
   const response = await fetch(`${endpoint}/v1/traces`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(syntheticExport(traceId)),
+    body: JSON.stringify(syntheticExport(traceId, clientSpanId)),
   })
   expect(response.status).toBe(200)
-  exported.set(page, { traceId })
+  exported.set(page, { traceId, clientSpanId })
 })
 
 const exportedTraceId = (page: Page): string => {
@@ -184,5 +184,85 @@ Then('the Errors tab groups the failing span with a sample trace', async ({ page
   await recordAssertion(page, 'traces-error-group-opens-sample-trace', () =>
     expect(page.getByRole('tree', { name: 'Span waterfall' }).getByRole('treeitem')).toHaveCount(3),
   )
+  await finishJourneyAssertions(page)
+})
+
+When('synthetic OTLP JSON logs for that trace are posted to the receiver', async ({ page }: { page: Page }) => {
+  const endpoint = await receiverEndpoint(page)
+  const trace = exported.get(page)
+  if (trace === undefined) throw new Error('No OTLP export was posted in this scenario.')
+  const timeNs = (BigInt(Date.now() - 4_000) * 1_000_000n).toString()
+  const record = (body: string, severityNumber: number, attributes: readonly { key: string; value: { stringValue: string } }[], spanId: string | null) => ({
+    timeUnixNano: timeNs,
+    severityNumber,
+    body: { stringValue: body },
+    attributes,
+    traceId: trace.traceId,
+    ...(spanId === null ? {} : { spanId }),
+  })
+  const response = await fetch(`${endpoint}/v1/logs`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      resourceLogs: [
+        {
+          resource: { attributes: [{ key: 'service.name', value: { stringValue: 'e2e-checkout' } }] },
+          scopeLogs: [
+            {
+              scope: { name: 'e2e-logger' },
+              logRecords: [
+                record('order received', 9, [{ key: 'order.id', value: { stringValue: 'o-7' } }], null),
+                record('card declined by issuer', 17, [{ key: 'order.id', value: { stringValue: 'o-7' } }], trace.clientSpanId),
+                record('unrelated heartbeat', 5, [{ key: 'order.id', value: { stringValue: 'o-8' } }], null),
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  })
+  expect(response.status).toBe(200)
+})
+
+const logRows = (page: Page) => page.getByRole('list', { name: 'Logs', exact: true }).getByRole('listitem')
+
+Then('the Logs tab lists the records and filters them by severity and attribute', async ({ page }: { page: Page }) => {
+  await page.getByRole('tab', { name: 'Logs', exact: true }).click()
+  await recordAssertion(page, 'traces-logs-list-records', async () => {
+    await expect(logRows(page)).toHaveCount(3, { timeout: 15_000 })
+    await expect(logRows(page).filter({ hasText: 'card declined by issuer' })).toContainText('ERROR')
+  })
+  await page.getByRole('combobox', { name: 'Severity', exact: true }).click()
+  await page.getByRole('option', { name: 'Warn+', exact: true }).click()
+  await recordAssertion(page, 'traces-logs-filter-by-severity', () => expect(logRows(page)).toHaveCount(1))
+  await page.getByRole('combobox', { name: 'Severity', exact: true }).click()
+  await page.getByRole('option', { name: 'All levels', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Attribute filter', exact: true }).fill('order.id=o-8')
+  await recordAssertion(page, 'traces-logs-filter-by-attribute', async () => {
+    await expect(logRows(page)).toHaveCount(1)
+    await expect(logRows(page)).toContainText('unrelated heartbeat')
+  })
+  await page.getByRole('textbox', { name: 'Attribute filter', exact: true }).fill('')
+  await expect(logRows(page)).toHaveCount(3)
+})
+
+Then('a log record opens its trace', async ({ page }: { page: Page }) => {
+  const row = logRows(page).filter({ hasText: 'card declined by issuer' })
+  await row.getByRole('button', { expanded: false }).click()
+  await row.getByRole('button', { name: 'Open trace', exact: true }).click()
+  await recordAssertion(page, 'traces-log-opens-its-trace', () =>
+    expect(page.getByRole('tree', { name: 'Span waterfall' }).getByRole('treeitem')).toHaveCount(3),
+  )
+})
+
+Then('the failing span shows only its own logs', async ({ page }: { page: Page }) => {
+  await page.getByRole('tree', { name: 'Span waterfall' }).getByRole('treeitem', { level: 2 }).click()
+  await page.getByRole('complementary', { name: 'Span detail' }).getByRole('button', { name: 'Logs for this span', exact: true }).click()
+  await recordAssertion(page, 'traces-span-opens-its-logs', async () => {
+    await expect(logRows(page)).toHaveCount(1)
+    await expect(logRows(page)).toContainText('card declined by issuer')
+  })
+  await page.getByRole('button', { name: 'Show all logs', exact: true }).click()
+  await expect(logRows(page)).toHaveCount(3)
   await finishJourneyAssertions(page)
 })

@@ -729,7 +729,37 @@ const otlpSampleExport = (): unknown => {
   }
 }
 
-/** Post the sample export to the receiver the Traces panel reports, so the trace list and waterfall have real data. */
+const otlpSampleLogs = (): unknown => {
+  const at = (offsetMs: number): string => ((BigInt(Date.now() - 60_000) + BigInt(offsetMs)) * 1_000_000n).toString()
+  const record = (offsetMs: number, severityNumber: number, body: string, spanId: string | null, orderId: string) => ({
+    timeUnixNano: at(offsetMs),
+    severityNumber,
+    body: { stringValue: body },
+    attributes: [{ key: 'order.id', value: { stringValue: orderId } }],
+    ...(spanId === null ? {} : { traceId: OTLP_SAMPLE_TRACE_ID, spanId }),
+  })
+  return {
+    resourceLogs: [
+      {
+        resource: { attributes: [{ key: 'service.name', value: { stringValue: 'dshx-sample' } }] },
+        scopeLogs: [
+          {
+            scope: { name: 'dshx-dev-seed' },
+            logRecords: [
+              record(2, 9, 'order received', '00000000000000a1', 'o-7'),
+              record(40, 5, 'cart loaded with 3 items', '00000000000000a2', 'o-7'),
+              record(205, 17, 'card declined by issuer', '00000000000000a3', 'o-7'),
+              record(230, 13, 'order marked failed', '00000000000000a1', 'o-7'),
+              record(900, 9, 'health check ok', null, 'none'),
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+/** Post the sample export and its logs to the receiver the Traces panel reports, so the trace list, waterfall and logs have real data. */
 const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
   if (!state.bundles.includes('@dshfiles/traces')) {
     throw new ScratchError(
@@ -760,6 +790,14 @@ const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: n
   })
   if (!response.ok)
     throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(response.status)}.`, 'Read the Traces panel status.')
+  const logs = await fetch(`${endpoint}/v1/logs`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(otlpSampleLogs()),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!logs.ok)
+    throw new ScratchError('seed-otlp-rejected', `The traces receiver answered HTTP ${String(logs.status)} to logs.`, 'Read the Traces panel status.')
 }
 
 /** Apply one seed: the checkout file it changed and the process it started, if any. */

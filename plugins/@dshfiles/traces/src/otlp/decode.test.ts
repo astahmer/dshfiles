@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { OtlpBody } from './decode.js'
 import { otlpTraceRequestSchema } from './json-schema.js'
 import { SPAN_BOUNDS, SpanNormalizer } from './normalize.js'
-import { decodeTraceRequestProtobuf, ProtobufDecodeError } from './protobuf.js'
+import { OtlpProtobuf, ProtobufDecodeError } from './protobuf.js'
 import { sdkFixture } from './sdk-fixture.test-support.js'
 
 const REDACT = { redactContent: true }
@@ -21,7 +21,7 @@ describe('OTLP trace decoding', () => {
 
   test('keeps ids, times, kinds, status, every attribute type, events and resource from the SDK', async () => {
     const fixture = await sdkFixture()
-    const spans = byName(SpanNormalizer.normalizeTraces(decodeTraceRequestProtobuf(fixture.protobuf), REDACT).spans)
+    const spans = byName(SpanNormalizer.normalizeTraces(OtlpProtobuf.decodeTraces(fixture.protobuf), REDACT).spans)
     const sdkRoot = fixture.spans.find(span => span.name === 'GET /checkout')
     const root = spans.get('GET /checkout')
     const child = spans.get('SELECT orders')
@@ -56,14 +56,14 @@ describe('OTLP trace decoding', () => {
 
   test('rejects a truncated protobuf body', async () => {
     const fixture = await sdkFixture()
-    expect(() => decodeTraceRequestProtobuf(fixture.protobuf.subarray(0, fixture.protobuf.length - 7))).toThrow(ProtobufDecodeError)
+    expect(() => OtlpProtobuf.decodeTraces(fixture.protobuf.subarray(0, fixture.protobuf.length - 7))).toThrow(ProtobufDecodeError)
     expect(() => OtlpBody.decodeTraces({ body: Buffer.from(fixture.protobuf.subarray(0, 20)), wire: 'protobuf' })).toThrow(/Truncated|wire type|varint/)
   })
 
   test('skips unknown protobuf fields', () => {
     // field 15 (varint 1) is unknown at the request level; field 1 is an empty ResourceSpans.
     const body = Uint8Array.from([0x78, 0x01, 0x0a, 0x00])
-    expect(decodeTraceRequestProtobuf(body)).toEqual({ resourceSpans: [{ resource: { attributes: [] }, scopeSpans: [] }] })
+    expect(OtlpProtobuf.decodeTraces(body)).toEqual({ resourceSpans: [{ resource: { attributes: [] }, scopeSpans: [] }] })
   })
 
   test('rejects JSON that is not an export request', () => {

@@ -1,7 +1,7 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ChevronDownIcon, ChevronRightIcon, CopyIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronRightIcon, CopyIcon, MessageSquareIcon, ScrollTextIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState } from 'react'
 import { TraceFormat } from './format.js'
@@ -14,7 +14,7 @@ const INDENT_REM = 0.9
 
 const isRedacted = (value: AttributeValue): boolean => typeof value === 'string' && REDACTED_VALUE.test(value)
 
-const AttributeTable = (props: {
+export const AttributeTable = (props: {
   readonly label: string
   readonly values: Readonly<Record<string, AttributeValue>>
   readonly t: TracesTranslate
@@ -46,6 +46,7 @@ const SpanDetailPanel = (props: {
   readonly traceId: string
   readonly span: SpanRow
   readonly onOpenThread: (sessionId: string) => string | null
+  readonly onShowLogs: (spanId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
   const [threadError, setThreadError] = useState<string | null>(null)
@@ -68,6 +69,11 @@ const SpanDetailPanel = (props: {
           <Badge variant={span.status === 'error' ? 'destructive' : span.status === 'ok' ? 'success' : 'muted'}>{span.status}</Badge>
           <span className="dshx:font-mono">{TraceFormat.duration(span.durationMs)}</span>
           <span className="dshx:text-muted-foreground">+{TraceFormat.duration(span.offsetMs)}</span>
+        </div>
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <Button variant="outline" size="sm" onClick={() => props.onShowLogs(span.spanId)}>
+            <ScrollTextIcon /> {props.t('logsForSpan')}
+          </Button>
         </div>
         {span.statusMessage === null ? null : <p className="dshx:break-words dshx:text-xs dshx:text-destructive">{span.statusMessage}</p>}
         {span.sessionId === null ? null : (
@@ -137,6 +143,7 @@ const SpanDetailPanel = (props: {
 export const TraceDetailView = (props: {
   readonly trace: TraceDetail
   readonly onOpenThread: (sessionId: string) => string | null
+  readonly onShowLogs: (spanId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
   const trace = props.trace
@@ -240,7 +247,9 @@ export const TraceDetailView = (props: {
           })}
         </ol>
       </section>
-      {selected === undefined ? null : <SpanDetailPanel traceId={trace.traceId} span={selected} onOpenThread={props.onOpenThread} t={props.t} />}
+      {selected === undefined ? null : (
+        <SpanDetailPanel traceId={trace.traceId} span={selected} onOpenThread={props.onOpenThread} onShowLogs={props.onShowLogs} t={props.t} />
+      )}
     </div>
   )
 }

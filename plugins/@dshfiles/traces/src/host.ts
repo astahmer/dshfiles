@@ -30,7 +30,11 @@ const requireRuntime = (): TracesRuntime => {
   return runtime
 }
 
-const retentionOf = (settings: TracesSettings): Retention => ({ maxAgeHours: settings.retentionHours, maxSpans: settings.retentionSpans })
+const retentionOf = (settings: TracesSettings): Retention => ({
+  maxAgeHours: settings.retentionHours,
+  maxSpans: settings.retentionSpans,
+  maxLogs: settings.retentionLogs,
+})
 
 const receiverConfigOf = (settings: TracesSettings): ReceiverConfig => ({
   enabled: settings.mode !== 'external',
@@ -68,9 +72,15 @@ const api = tracesApi.host({
       mode: settings.mode,
       externalViewerUrl: settings.externalViewerUrl.trim() || null,
       ...active.receiver.status(),
-      store: { ...active.store.summary(), retentionHours: settings.retentionHours, retentionSpans: settings.retentionSpans },
+      store: {
+        ...active.store.summary(),
+        retentionHours: settings.retentionHours,
+        retentionSpans: settings.retentionSpans,
+        retentionLogs: settings.retentionLogs,
+      },
     }
   },
+  logs: ({ input }) => requireRuntime().store.searchLogs(input),
   clear: () => requireRuntime().store.clear(),
 })
 
@@ -83,6 +93,12 @@ const setupHost = (context: Context): Effect<void> => {
         const normalized = SpanNormalizer.normalizeTraces(OtlpBody.decodeTraces(input), { redactContent: currentSettings().redactGenAiContent })
         store.ingest(normalized.spans, retentionOf(currentSettings()))
         return { accepted: normalized.spans.length, rejected: normalized.rejected }
+      },
+      logs: input => {
+        const settings = currentSettings()
+        const normalized = SpanNormalizer.normalizeLogs(OtlpBody.decodeLogs(input), { redactContent: settings.redactGenAiContent })
+        store.ingestLogs(normalized.logs, retentionOf(settings))
+        return { accepted: normalized.logs.length, rejected: normalized.rejected }
       },
       metrics: () => ({ accepted: 0, rejected: 0 }),
     },

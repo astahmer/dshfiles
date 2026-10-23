@@ -107,6 +107,27 @@ export const errorGroupSchema = z
   .strict()
 export type ErrorGroup = z.infer<typeof errorGroupSchema>
 
+export const logRecordSchema = z
+  .object({
+    id: z.number().int(),
+    timeMs: z.number(),
+    severityNumber: z.number().int().min(0).max(24),
+    severityText: z.string().nullable(),
+    body: z.string(),
+    service: z.string(),
+    scope: z.string().nullable(),
+    traceId: z.string().nullable(),
+    spanId: z.string().nullable(),
+    eventName: z.string().nullable(),
+    attributes: attributesSchema,
+    resource: attributesSchema,
+  })
+  .strict()
+export type LogRecord = z.infer<typeof logRecordSchema>
+
+export const logListSchema = z.object({ logs: z.array(logRecordSchema), nextCursor: z.string().nullable() }).strict()
+export type LogList = z.infer<typeof logListSchema>
+
 export const receiverStateSchema = z.enum(['starting', 'listening', 'port-in-use', 'disabled', 'failed'])
 export type ReceiverState = z.infer<typeof receiverStateSchema>
 
@@ -144,10 +165,12 @@ export const receiverStatusSchema = z
       .object({
         spans: z.number().int().nonnegative(),
         traces: z.number().int().nonnegative(),
+        logs: z.number().int().nonnegative(),
         oldestMs: z.number().nullable(),
         newestMs: z.number().nullable(),
         retentionHours: z.number().int().positive(),
         retentionSpans: z.number().int().positive(),
+        retentionLogs: z.number().int().positive(),
       })
       .strict(),
   })

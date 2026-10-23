@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { ArrowLeftIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, RefreshCwIcon, ScrollTextIcon, SearchIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { tracesApi, type ListInput } from './api.js'
@@ -30,6 +30,7 @@ import type { TracesTranslate } from './locales.js'
 import { tracesKeys, tracesQueries } from './queries.js'
 import { EmptyStoreGuide, ReceiverBadge, ReceiverMessage } from './receiver-status.js'
 import { TraceDetailView } from './trace-detail.js'
+import { LogsView, type LogCorrelation } from './log-list.js'
 import { TraceList } from './trace-list.js'
 import { storedTracesView, WINDOW_OPTIONS, type TracesView } from './view-state.js'
 
@@ -49,6 +50,11 @@ export const TracesPanel = (props: {
   const queryClient = useQueryClient()
   const view = storedTracesView.useValue()
   const [traceId, setTraceId] = useState<string | null>(null)
+  const [logCorrelation, setLogCorrelation] = useState<LogCorrelation | null>(null)
+  const showLogs = (correlation: LogCorrelation): void => {
+    setLogCorrelation(correlation)
+    update({ tab: 'logs' })
+  }
   const update = (patch: Partial<TracesView> & { readonly traceId?: string | null }): void => {
     const { traceId: nextTraceId, ...stored } = patch
     if (nextTraceId !== undefined) setTraceId(nextTraceId)
@@ -91,7 +97,7 @@ export const TracesPanel = (props: {
   const status = statusQuery.data
   const traces = listQuery.data?.pages.flatMap(page => page.traces) ?? []
   const filtered = search.length > 0 || view.service !== null || view.operation !== null || view.status !== 'all' || view.minDurationMs !== null
-  const storeEmpty = status !== undefined && status.store.traces === 0
+  const storeEmpty = status !== undefined && status.store.traces === 0 && status.store.logs === 0
   const services = statsQuery.data?.services.map(service => service.service) ?? []
 
   return (
@@ -105,7 +111,7 @@ export const TracesPanel = (props: {
           {status === undefined ? null : <ReceiverBadge status={status} t={t} />}
           {status === undefined ? null : (
             <span className="dshx:text-xs dshx:text-muted-foreground" data-testid="traces-store-summary">
-              {status.store.traces} {t('traces')} · {status.store.spans} {t('spans')} {t('storedSummary')}
+              {status.store.traces} {t('traces')} · {status.store.spans} {t('spans')} · {status.store.logs} {t('logs')} {t('storedSummary')}
             </span>
           )}
           <Button variant="outline" size="sm" aria-label={t('refresh')} onClick={() => void queryClient.invalidateQueries({ queryKey: tracesKeys.all })}>
@@ -123,7 +129,7 @@ export const TracesPanel = (props: {
               <AlertDialogHeader>
                 <AlertDialogTitle>{t('clearTitle')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {status === undefined ? '' : `${String(status.store.traces)} ${t('traces')} · ${String(status.store.spans)} ${t('spans')}. `}
+                  {status === undefined ? '' : `${String(status.store.traces)} ${t('traces')} · ${String(status.store.spans)} ${t('spans')} · ${String(status.store.logs)} ${t('logs')}. `}
                   {t('clearDescription')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -150,16 +156,17 @@ export const TracesPanel = (props: {
 
       <Tabs
         value={view.tab}
-        onValueChange={value => update({ tab: value === 'operations' || value === 'errors' ? value : 'traces' })}
+        onValueChange={value => update({ tab: value === 'operations' || value === 'errors' || value === 'logs' ? value : 'traces' })}
         className="dshx:min-h-0 dshx:flex-1"
       >
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
           <TabsList>
             <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>
+            <TabsTrigger value="logs">{t('tabLogs')}</TabsTrigger>
             <TabsTrigger value="operations">{t('tabOperations')}</TabsTrigger>
             <TabsTrigger value="errors">{t('tabErrors')}</TabsTrigger>
           </TabsList>
-          {view.tab === 'traces' ? null : (
+          {view.tab === 'traces' || view.tab === 'logs' ? null : (
             <Select value={String(view.windowMinutes)} onValueChange={value => update({ windowMinutes: Number(value) })}>
               <SelectTrigger size="sm" aria-label={t('window')} className="dshx:w-32">
                 <SelectValue />
@@ -260,15 +267,39 @@ export const TracesPanel = (props: {
                   <ArrowLeftIcon /> {t('back')}
                 </Button>
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{traceId}</span>
+                <Button variant="outline" size="sm" className="dshx:ml-auto" onClick={() => showLogs({ traceId, spanId: null })}>
+                  <ScrollTextIcon /> <span className="dshx:@max-pane-narrow:sr-only">{t('logsForTrace')}</span>
+                </Button>
               </div>
               {traceQuery.isError ? (
                 <Alert variant="destructive">
                   <AlertDescription>{t('traceNotFound')}</AlertDescription>
                 </Alert>
               ) : null}
-              {traceQuery.data === undefined ? null : <TraceDetailView key={traceQuery.data.traceId} trace={traceQuery.data} onOpenThread={openThread} t={t} />}
+              {traceQuery.data === undefined ? null : (
+                <TraceDetailView
+                  key={traceQuery.data.traceId}
+                  trace={traceQuery.data}
+                  onOpenThread={openThread}
+                  onShowLogs={spanId => showLogs({ traceId: traceQuery.data.traceId, spanId })}
+                  t={t}
+                />
+              )}
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="logs">
+          {view.tab === 'logs' ? (
+            <LogsView
+              client={client}
+              services={services}
+              correlation={logCorrelation}
+              onClearCorrelation={() => setLogCorrelation(null)}
+              onOpenTrace={openedTraceId => update({ traceId: openedTraceId, tab: 'traces' })}
+              t={t}
+            />
+          ) : null}
         </TabsContent>
 
         <TabsContent value="operations">

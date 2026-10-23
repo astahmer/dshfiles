@@ -96,4 +96,46 @@ export const otlpTraceRequestSchema = z
   .loose()
 
 export type OtlpTraceRequest = z.infer<typeof otlpTraceRequestSchema>
+
+const otlpLogRecordSchema = z
+  .object({
+    timeUnixNano: unixNanoSchema.optional(),
+    observedTimeUnixNano: unixNanoSchema.optional(),
+    severityNumber: z.union([z.number().int(), z.string()]).optional(),
+    severityText: z.string().optional(),
+    body: anyValueAt(0).optional(),
+    attributes: attributesSchema,
+    traceId: z.string().optional(),
+    spanId: z.string().optional(),
+    eventName: z.string().optional(),
+  })
+  .loose()
+
+/** The OTLP/HTTP JSON mapping of `ExportLogsServiceRequest`. */
+export const otlpLogsRequestSchema = z
+  .object({
+    resourceLogs: z
+      .array(
+        z
+          .object({
+            resource: z.object({ attributes: attributesSchema }).loose().optional(),
+            scopeLogs: z
+              .array(
+                z
+                  .object({
+                    scope: z.object({ name: z.string().optional(), version: z.string().optional() }).loose().optional(),
+                    logRecords: z.array(otlpLogRecordSchema).optional(),
+                  })
+                  .loose(),
+              )
+              .optional(),
+          })
+          .loose(),
+      )
+      .optional(),
+  })
+  .loose()
+
+export type OtlpLogsRequest = z.infer<typeof otlpLogsRequestSchema>
+export type OtlpLogRecord = z.infer<typeof otlpLogRecordSchema>
 export type OtlpSpan = z.infer<typeof otlpSpanSchema>

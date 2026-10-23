@@ -113,8 +113,9 @@ OTLP/HTTP receiver on `127.0.0.1:4318`, stores spans in
 `$DSH_HOME/plugins/traces/traces.db` (72 h / 100k spans by default) and serves the
 **Traces** panel: a trace list with filters, a span waterfall with a per-span
 attribute and resource panel, a service/operation overview with error rate and
-p50/p95/p99, and error groups. Agents get the same reads as `traces_*` tools.
-It accepts any OTLP/HTTP sender, JSON or protobuf, not only DSH.
+p50/p95/p99, error groups, and `/v1/logs` log search correlated with traces and spans.
+Agents get the same reads as `traces_*` tools. It accepts any OTLP/HTTP sender,
+JSON or protobuf, not only DSH.
 
 With `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` in the `dsh web`
 environment, LoongSuite, dshx tracing and the usage metrics push all send to the

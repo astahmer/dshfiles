@@ -1,7 +1,7 @@
-import type { OtlpAnyValue, OtlpKeyValue, OtlpTraceRequest } from './json-schema.js'
+import type { OtlpAnyValue, OtlpKeyValue, OtlpLogsRequest, OtlpTraceRequest } from './json-schema.js'
 
 /**
- * A minimal decoder for `opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest` (opentelemetry-proto v1.x
+ * A minimal decoder for `opentelemetry.proto.collector.{trace,logs}.v1.Export*ServiceRequest` (opentelemetry-proto v1.x
  * field numbers). It emits the OTLP JSON mapping, so the protobuf and JSON bodies share one validation and one
  * normalizer. Unknown fields are skipped by wire type, as protobuf requires; truncated or malformed input throws.
  */
@@ -239,24 +239,29 @@ const decodeScopeSpans = (bytes: Uint8Array): DecodedScopeSpans => {
   return scopeSpans
 }
 
+const decodeResourceAttributes = (bytes: Uint8Array): OtlpKeyValue[] => {
+  const attributes: OtlpKeyValue[] = []
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field !== 1 || wireType !== WIRE_LENGTH) return false
+    attributes.push(decodeKeyValue(reader.bytes()))
+    return true
+  })
+  return attributes
+}
+
 const decodeResourceSpans = (bytes: Uint8Array) => {
   const attributes: OtlpKeyValue[] = []
   const scopeSpans: DecodedScopeSpans[] = []
   readMessage(bytes, (reader, field, wireType) => {
-    if (field === 1 && wireType === WIRE_LENGTH) {
-      readMessage(reader.bytes(), (resourceReader, resourceField, resourceWire) => {
-        if (resourceField !== 1 || resourceWire !== WIRE_LENGTH) return false
-        attributes.push(decodeKeyValue(resourceReader.bytes()))
-        return true
-      })
-    } else if (field === 2 && wireType === WIRE_LENGTH) scopeSpans.push(decodeScopeSpans(reader.bytes()))
+    if (field === 1 && wireType === WIRE_LENGTH) attributes.push(...decodeResourceAttributes(reader.bytes()))
+    else if (field === 2 && wireType === WIRE_LENGTH) scopeSpans.push(decodeScopeSpans(reader.bytes()))
     else return false
     return true
   })
   return { resource: { attributes }, scopeSpans }
 }
 
-export const decodeTraceRequestProtobuf = (bytes: Uint8Array): OtlpTraceRequest => {
+const decodeTraceRequest = (bytes: Uint8Array): OtlpTraceRequest => {
   const resourceSpans: ReturnType<typeof decodeResourceSpans>[] = []
   readMessage(bytes, (reader, field, wireType) => {
     if (field !== 1) return false
@@ -265,4 +270,75 @@ export const decodeTraceRequestProtobuf = (bytes: Uint8Array): OtlpTraceRequest 
     return true
   })
   return { resourceSpans }
+}
+
+type MutableLogRecord = {
+  timeUnixNano?: string
+  observedTimeUnixNano?: string
+  severityNumber?: number
+  severityText?: string
+  body?: OtlpAnyValue
+  attributes: OtlpKeyValue[]
+  traceId?: string
+  spanId?: string
+  eventName?: string
+}
+
+const decodeLogRecord = (bytes: Uint8Array): MutableLogRecord => {
+  const record: MutableLogRecord = { attributes: [] }
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_FIXED64) record.timeUnixNano = reader.fixed64().toString()
+    else if (field === 2 && wireType === WIRE_VARINT) record.severityNumber = Number(reader.varint())
+    else if (field === 3 && wireType === WIRE_LENGTH) record.severityText = toText(reader.bytes())
+    else if (field === 5 && wireType === WIRE_LENGTH) record.body = decodeAnyValue(reader.bytes(), 0)
+    else if (field === 6 && wireType === WIRE_LENGTH) record.attributes.push(decodeKeyValue(reader.bytes()))
+    else if (field === 9 && wireType === WIRE_LENGTH) record.traceId = toHex(reader.bytes())
+    else if (field === 10 && wireType === WIRE_LENGTH) record.spanId = toHex(reader.bytes())
+    else if (field === 11 && wireType === WIRE_FIXED64) record.observedTimeUnixNano = reader.fixed64().toString()
+    else if (field === 12 && wireType === WIRE_LENGTH) record.eventName = toText(reader.bytes())
+    else return false
+    return true
+  })
+  return record
+}
+
+type DecodedScopeLogs = { scope?: DecodedScope; logRecords: MutableLogRecord[] }
+
+const decodeScopeLogs = (bytes: Uint8Array): DecodedScopeLogs => {
+  const scopeLogs: DecodedScopeLogs = { logRecords: [] }
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_LENGTH) scopeLogs.scope = decodeScope(reader.bytes())
+    else if (field === 2 && wireType === WIRE_LENGTH) scopeLogs.logRecords.push(decodeLogRecord(reader.bytes()))
+    else return false
+    return true
+  })
+  return scopeLogs
+}
+
+const decodeResourceLogs = (bytes: Uint8Array) => {
+  const attributes: OtlpKeyValue[] = []
+  const scopeLogs: DecodedScopeLogs[] = []
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field === 1 && wireType === WIRE_LENGTH) attributes.push(...decodeResourceAttributes(reader.bytes()))
+    else if (field === 2 && wireType === WIRE_LENGTH) scopeLogs.push(decodeScopeLogs(reader.bytes()))
+    else return false
+    return true
+  })
+  return { resource: { attributes }, scopeLogs }
+}
+
+const decodeLogsRequest = (bytes: Uint8Array): OtlpLogsRequest => {
+  const resourceLogs: ReturnType<typeof decodeResourceLogs>[] = []
+  readMessage(bytes, (reader, field, wireType) => {
+    if (field !== 1) return false
+    expectWire(wireType, WIRE_LENGTH)
+    resourceLogs.push(decodeResourceLogs(reader.bytes()))
+    return true
+  })
+  return { resourceLogs }
+}
+
+export class OtlpProtobuf {
+  static readonly decodeTraces = decodeTraceRequest
+  static readonly decodeLogs = decodeLogsRequest
 }

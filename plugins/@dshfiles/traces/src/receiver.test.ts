@@ -2,8 +2,8 @@ import { createServer, type IncomingMessage, type Server } from 'node:http'
 import { gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, test } from 'vitest'
 import { OtlpBody } from './otlp/decode.js'
-import { SpanNormalizer, type NormalizedSpan } from './otlp/normalize.js'
-import { sdkFixture } from './otlp/sdk-fixture.test-support.js'
+import { SpanNormalizer, type NormalizedLog, type NormalizedSpan } from './otlp/normalize.js'
+import { sdkFixture, sdkLogsFixture } from './otlp/sdk-fixture.test-support.js'
 import { MAX_BODY_BYTES, OtlpReceiver, type Receiver, type ReceiverConfig } from './receiver.js'
 
 const REDACT = { redactContent: true }
@@ -19,6 +19,7 @@ const baseConfig: ReceiverConfig = { enabled: true, host: '127.0.0.1', allowNonL
 
 const startReceiver = async (config: Partial<ReceiverConfig> = {}) => {
   const stored: NormalizedSpan[] = []
+  const storedLogs: NormalizedLog[] = []
   const receiver = OtlpReceiver.create({
     handlers: {
       traces: input => {
@@ -26,13 +27,18 @@ const startReceiver = async (config: Partial<ReceiverConfig> = {}) => {
         stored.push(...normalized.spans)
         return { accepted: normalized.spans.length, rejected: normalized.rejected }
       },
+      logs: input => {
+        const normalized = SpanNormalizer.normalizeLogs(OtlpBody.decodeLogs(input), REDACT)
+        storedLogs.push(...normalized.logs)
+        return { accepted: normalized.logs.length, rejected: normalized.rejected }
+      },
       metrics: () => ({ accepted: 0, rejected: 0 }),
     },
   })
   receivers.push(receiver)
   await receiver.apply({ ...baseConfig, ...config })
   await expect.poll(() => receiver.status().state).not.toBe('starting')
-  return { receiver, stored, url: (path: string) => `http://127.0.0.1:${String(receiver.status().boundPort)}${path}` }
+  return { receiver, stored, storedLogs, url: (path: string) => `http://127.0.0.1:${String(receiver.status().boundPort)}${path}` }
 }
 
 const listen = async (handler: (request: IncomingMessage, body: Buffer) => void): Promise<number> => {
@@ -77,6 +83,20 @@ describe('OTLP/HTTP receiver', () => {
     expect(await json.json()).toEqual({})
     expect(stored).toHaveLength(6)
     expect(receiver.status()).toMatchObject({ state: 'listening', requests: { traces: 3, metrics: 0, logs: 0 }, accepted: { traces: 6 } })
+  })
+
+  test('stores protobuf and JSON log bodies on /v1/logs', async () => {
+    const fixture = await sdkLogsFixture()
+    const { receiver, storedLogs, url } = await startReceiver()
+    const protobuf = await fetch(url('/v1/logs'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-protobuf' },
+      body: new Uint8Array(fixture.protobuf),
+    })
+    const json = await fetch(url('/v1/logs'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fixture.json) })
+    expect([protobuf.status, json.status]).toEqual([200, 200])
+    expect(storedLogs).toHaveLength(6)
+    expect(receiver.status()).toMatchObject({ requests: { logs: 2 }, accepted: { logs: 6 } })
   })
 
   test('rejects wrong paths, methods, media types, oversize and malformed bodies', async () => {

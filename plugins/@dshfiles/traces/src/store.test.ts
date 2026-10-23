@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import type { NormalizedSpan } from './otlp/normalize.js'
+import type { NormalizedLog, NormalizedSpan } from './otlp/normalize.js'
 import { openTraceStore } from './store.js'
 
 const NOW = 1_700_000_000_000
-const retention = { maxAgeHours: 24, maxSpans: 10_000 }
+const retention = { maxAgeHours: 24, maxSpans: 10_000, maxLogs: 10_000 }
 
 const traceId = (index: number): string => index.toString(16).padStart(32, '0')
 const spanId = (index: number): string => index.toString(16).padStart(16, '0')
@@ -169,14 +169,79 @@ describe('trace store', () => {
     clock.now += 1_000
     store.ingest([makeSpan({ traceId: traceId(2), spanId: spanId(3) })], retention)
     clock.now += 1_000
-    const pruned = store.ingest([makeSpan({ traceId: traceId(3), spanId: spanId(4) })], { maxAgeHours: 24, maxSpans: 2 })
+    const pruned = store.ingest([makeSpan({ traceId: traceId(3), spanId: spanId(4) })], { maxAgeHours: 24, maxSpans: 2, maxLogs: 10_000 })
     expect(pruned.prunedTraces).toBe(1)
     expect(store.list({}).traces.map(trace => trace.traceId)).toEqual([traceId(3), traceId(2)].sort().reverse())
     clock.now += 25 * 3_600_000
     expect(store.prune(retention)).toBe(2)
     expect(store.summary()).toMatchObject({ spans: 0, traces: 0 })
     store.ingest([makeSpan({ traceId: traceId(4), spanId: spanId(5) })], retention)
-    expect(store.clear()).toEqual({ removedSpans: 1, removedTraces: 1 })
-    expect(store.summary()).toEqual({ spans: 0, traces: 0, oldestMs: null, newestMs: null })
+    expect(store.clear()).toEqual({ removedSpans: 1, removedTraces: 1, removedLogs: 0 })
+    expect(store.summary()).toEqual({ spans: 0, traces: 0, logs: 0, oldestMs: null, newestMs: null })
+  })
+
+  test('searches logs by service, severity, text, attribute, trace and span, newest first with paging', () => {
+    const store = openStore()
+    const log = (index: number, overrides: Partial<NormalizedLog>): NormalizedLog => ({
+      timeUs: (NOW - 10_000 + index) * 1000,
+      severityNumber: 9,
+      severityText: null,
+      body: `message ${String(index)}`,
+      service: 'web',
+      scope: null,
+      traceId: null,
+      spanId: null,
+      eventName: null,
+      attributes: {},
+      resource: { 'service.name': 'web' },
+      ...overrides,
+    })
+    store.ingestLogs(
+      [
+        log(1, { body: 'cart is empty', attributes: { 'cart.id': 'c-42' }, traceId: traceId(1), spanId: spanId(2) }),
+        log(2, { severityNumber: 17, service: 'db', body: 'disk full', resource: { 'service.name': 'db' } }),
+        log(3, { body: '100% done' }),
+      ],
+      retention,
+    )
+    const bodies = (query: Parameters<typeof store.searchLogs>[0]) => store.searchLogs(query).logs.map(entry => entry.body)
+    expect(bodies({})).toEqual(['100% done', 'disk full', 'cart is empty'])
+    expect(bodies({ service: 'db' })).toEqual(['disk full'])
+    expect(bodies({ minSeverity: 13 })).toEqual(['disk full'])
+    expect(bodies({ search: '100%' })).toEqual(['100% done'])
+    expect(bodies({ attribute: { key: 'cart.id', value: 'c-42' } })).toEqual(['cart is empty'])
+    expect(bodies({ traceId: traceId(1).toUpperCase(), spanId: spanId(2) })).toEqual(['cart is empty'])
+    expect(store.searchLogs({ service: 'db' }).logs[0]?.resource).toEqual({ 'service.name': 'db' })
+    const first = store.searchLogs({ limit: 2 })
+    expect(store.searchLogs({ limit: 2, cursor: first.nextCursor ?? undefined }).logs.map(entry => entry.body)).toEqual(['cart is empty'])
+    expect(() => store.searchLogs({ cursor: 'nope' })).toThrow(/cursor/)
+  })
+
+  test('drops the oldest logs past the count limit and expired ones by age', () => {
+    const clock = { now: NOW }
+    const store = openStore(clock)
+    const log = (body: string): NormalizedLog => ({
+      timeUs: NOW * 1000,
+      severityNumber: 9,
+      severityText: null,
+      body,
+      service: 'web',
+      scope: null,
+      traceId: null,
+      spanId: null,
+      eventName: null,
+      attributes: {},
+      resource: {},
+    })
+    store.ingestLogs([log('a'), log('b'), log('c')], { ...retention, maxLogs: 2 })
+    expect(
+      store
+        .searchLogs({})
+        .logs.map(entry => entry.body)
+        .sort(),
+    ).toEqual(['b', 'c'])
+    clock.now += 25 * 3_600_000
+    store.prune(retention)
+    expect(store.summary().logs).toBe(0)
   })
 })

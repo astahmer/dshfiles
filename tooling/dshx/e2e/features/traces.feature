@@ -21,3 +21,13 @@ Feature: Traces
     And a synthetic OTLP JSON export is posted to the receiver
     Then the Operations tab lists each operation with its count and error rate
     And the Errors tab groups the failing span with a sample trace
+
+  @scenario:traces.logs-browser-journey
+  Scenario: Logs correlate with their trace and span both ways
+    Given the isolated Traces profile is booted with the receiver on a free port
+    When the Traces panel is opened
+    And a synthetic OTLP JSON export is posted to the receiver
+    And synthetic OTLP JSON logs for that trace are posted to the receiver
+    Then the Logs tab lists the records and filters them by severity and attribute
+    And a log record opens its trace
+    And the failing span shows only its own logs

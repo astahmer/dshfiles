@@ -1,6 +1,6 @@
 import { RequestRejection, type Wire } from '../receiver.js'
-import { otlpTraceRequestSchema, type OtlpTraceRequest } from './json-schema.js'
-import { decodeTraceRequestProtobuf, ProtobufDecodeError } from './protobuf.js'
+import { otlpLogsRequestSchema, otlpTraceRequestSchema, type OtlpLogsRequest, type OtlpTraceRequest } from './json-schema.js'
+import { OtlpProtobuf, ProtobufDecodeError } from './protobuf.js'
 
 const parseJsonBody = (body: Buffer): unknown => {
   try {
@@ -19,12 +19,20 @@ const decodeProtobufBody = <Decoded>(body: Buffer, decode: (bytes: Uint8Array) =
 }
 
 const decodeTraceBody = (input: { readonly body: Buffer; readonly wire: Wire }): OtlpTraceRequest => {
-  if (input.wire === 'protobuf') return decodeProtobufBody(input.body, decodeTraceRequestProtobuf, 'ExportTraceServiceRequest')
+  if (input.wire === 'protobuf') return decodeProtobufBody(input.body, OtlpProtobuf.decodeTraces, 'ExportTraceServiceRequest')
   const parsed = otlpTraceRequestSchema.safeParse(parseJsonBody(input.body))
   if (!parsed.success) throw new RequestRejection(400, 'The JSON body is not an OTLP ExportTraceServiceRequest.')
   return parsed.data
 }
 
+const decodeLogsBody = (input: { readonly body: Buffer; readonly wire: Wire }): OtlpLogsRequest => {
+  if (input.wire === 'protobuf') return decodeProtobufBody(input.body, OtlpProtobuf.decodeLogs, 'ExportLogsServiceRequest')
+  const parsed = otlpLogsRequestSchema.safeParse(parseJsonBody(input.body))
+  if (!parsed.success) throw new RequestRejection(400, 'The JSON body is not an OTLP ExportLogsServiceRequest.')
+  return parsed.data
+}
+
 export class OtlpBody {
   static readonly decodeTraces = decodeTraceBody
+  static readonly decodeLogs = decodeLogsBody
 }

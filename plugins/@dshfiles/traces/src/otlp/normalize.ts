@@ -1,5 +1,5 @@
 import type { AttributeValue } from '../types.js'
-import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan, OtlpTraceRequest } from './json-schema.js'
+import type { OtlpAnyValue, OtlpKeyValue, OtlpLogRecord, OtlpLogsRequest, OtlpSpan, OtlpTraceRequest } from './json-schema.js'
 
 export const SPAN_BOUNDS = {
   name: 256,
@@ -238,7 +238,102 @@ const normalizeTraceRequest = (request: OtlpTraceRequest, options: NormalizeOpti
   return { spans, rejected, skippedSelf }
 }
 
+export const LOG_BODY_BOUND = 8_192
+
+export type NormalizedLog = {
+  readonly timeUs: number
+  readonly severityNumber: number
+  readonly severityText: string | null
+  readonly body: string
+  readonly service: string
+  readonly scope: string | null
+  readonly traceId: string | null
+  readonly spanId: string | null
+  readonly eventName: string | null
+  readonly attributes: Readonly<Record<string, AttributeValue>>
+  readonly resource: Readonly<Record<string, AttributeValue>>
+}
+
+export type NormalizeLogsResult = { readonly logs: readonly NormalizedLog[]; readonly rejected: number }
+
+const SEVERITY_NAMES = new Map([
+  ['SEVERITY_NUMBER_UNSPECIFIED', 0],
+  ['SEVERITY_NUMBER_TRACE', 1],
+  ['SEVERITY_NUMBER_DEBUG', 5],
+  ['SEVERITY_NUMBER_INFO', 9],
+  ['SEVERITY_NUMBER_WARN', 13],
+  ['SEVERITY_NUMBER_ERROR', 17],
+  ['SEVERITY_NUMBER_FATAL', 21],
+])
+
+const severityOf = (severity: number | string | undefined): number => {
+  const numeric = typeof severity === 'string' ? (SEVERITY_NAMES.get(severity) ?? 0) : (severity ?? 0)
+  return numeric >= 0 && numeric <= 24 ? numeric : 0
+}
+
+const bodyText = (body: OtlpAnyValue | undefined): string => {
+  if (body === undefined) return ''
+  if (body.stringValue !== undefined) return truncate(body.stringValue, LOG_BODY_BOUND)
+  const scalar = scalarOf(body)
+  return truncate(typeof scalar === 'string' ? scalar : JSON.stringify(scalar), LOG_BODY_BOUND)
+}
+
+/** GenAI content events (`gen_ai.user.message`, `gen_ai.choice`, …) carry prompts and completions in their body. */
+const isGenAiEvent = (eventName: string | null, attributes: Readonly<Record<string, AttributeValue>>): boolean => {
+  const name = eventName ?? attributes['event.name']
+  return typeof name === 'string' && name.startsWith('gen_ai.')
+}
+
+const normalizeLog = (
+  record: OtlpLogRecord,
+  context: {
+    readonly service: string
+    readonly scope: string | null
+    readonly resource: Readonly<Record<string, AttributeValue>>
+    readonly options: NormalizeOptions
+  },
+): NormalizedLog | null => {
+  const timeUs = nanosToMicros(record.timeUnixNano) ?? nanosToMicros(record.observedTimeUnixNano)
+  if (timeUs === null) return null
+  const attributes = attributesOf(record.attributes, context.options)
+  const severityText = record.severityText === undefined || record.severityText.length === 0 ? null : truncate(record.severityText, 32)
+  const eventName = record.eventName === undefined || record.eventName.length === 0 ? null : truncate(record.eventName, SPAN_BOUNDS.name)
+  const body = bodyText(record.body)
+  return {
+    timeUs,
+    severityNumber: severityOf(record.severityNumber),
+    severityText,
+    body: context.options.redactContent && body.length > 0 && isGenAiEvent(eventName, attributes) ? `[redacted: ${String(body.length)} chars]` : body,
+    service: context.service,
+    scope: context.scope,
+    traceId: normalizeId(record.traceId, 16),
+    spanId: normalizeId(record.spanId, 8),
+    eventName,
+    attributes,
+    resource: context.resource,
+  }
+}
+
+const normalizeLogsRequest = (request: OtlpLogsRequest, options: NormalizeOptions): NormalizeLogsResult => {
+  const logs: NormalizedLog[] = []
+  let rejected = 0
+  for (const resourceLogs of request.resourceLogs ?? []) {
+    const resource = attributesOf(resourceLogs.resource?.attributes, options)
+    const service = truncate(stringAttribute(resource, 'service.name') ?? 'unknown_service', SPAN_BOUNDS.name)
+    for (const scopeLogs of resourceLogs.scopeLogs ?? []) {
+      const scope = scopeLogs.scope?.name === undefined || scopeLogs.scope.name.length === 0 ? null : truncate(scopeLogs.scope.name, SPAN_BOUNDS.name)
+      for (const record of scopeLogs.logRecords ?? []) {
+        const normalized = normalizeLog(record, { service, scope, resource, options })
+        if (normalized === null) rejected += 1
+        else logs.push(normalized)
+      }
+    }
+  }
+  return { logs, rejected }
+}
+
 export class SpanNormalizer {
   static readonly normalizeTraces = normalizeTraceRequest
+  static readonly normalizeLogs = normalizeLogsRequest
   static readonly isContentAttribute = isContentAttribute
 }

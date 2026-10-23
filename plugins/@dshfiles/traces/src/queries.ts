@@ -1,8 +1,8 @@
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { infiniteQueryOptions, queryOptions, type InfiniteData } from '@dshfiles/plugin-ui/query'
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
-import type { ListInput, tracesApi } from './api.js'
-import type { TraceList } from './types.js'
+import type { ListInput, LogsInput, tracesApi } from './api.js'
+import type { LogList, TraceList } from './types.js'
 
 export type TracesClient = typeof tracesApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
@@ -11,6 +11,7 @@ export const tracesKeys = {
   status: ['traces', 'status'] as const,
   list: (filters: Omit<ListInput, 'cursor'>) => ['traces', 'list', filters] as const,
   trace: (traceId: string) => ['traces', 'trace', traceId] as const,
+  logs: (filters: Omit<LogsInput, 'cursor'>) => ['traces', 'logs', filters] as const,
   stats: (windowMinutes: number) => ['traces', 'stats', windowMinutes] as const,
   errors: (windowMinutes: number) => ['traces', 'errors', windowMinutes] as const,
 }
@@ -33,6 +34,19 @@ export const tracesQueries = {
         runHostRequest({
           signal,
           request: hostSignal => client.list(pageParam === null ? filters : { ...filters, cursor: pageParam }, { signal: hostSignal }),
+        }),
+      getNextPageParam: page => page.nextCursor,
+      refetchInterval: POLL_MS,
+      retry: 1,
+    }),
+  logs: (client: TracesClient, filters: Omit<LogsInput, 'cursor'>) =>
+    infiniteQueryOptions<LogList, Error, InfiniteData<LogList, string | null>, ReturnType<typeof tracesKeys.logs>, string | null>({
+      queryKey: tracesKeys.logs(filters),
+      initialPageParam: null,
+      queryFn: ({ signal, pageParam }) =>
+        runHostRequest({
+          signal,
+          request: hostSignal => client.logs(pageParam === null ? filters : { ...filters, cursor: pageParam }, { signal: hostSignal }),
         }),
       getNextPageParam: page => page.nextCursor,
       refetchInterval: POLL_MS,

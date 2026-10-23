@@ -4,7 +4,8 @@
 
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
-list, a span waterfall, a per-span attribute panel, a service/operation overview and error groups.
+list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service/operation
+overview and error groups.
 
 It is a generic viewer: anything that speaks OTLP/HTTP can send to it, with any `service.name`, resource, scope,
 span kind or attribute key. DSH-specific touches are enrichments only: a span carrying `dsh.session.id` gets an
@@ -39,6 +40,7 @@ takes a DSH Host restart; see [observability](../../../docs/observability.md#in-
 | `redactGenAiContent` | `true`      | Store GenAI message, prompt and tool-payload attributes as `[redacted: N chars]`. The span panel says when a value was redacted.        |
 | `retentionHours`     | `72`        | Drop telemetry received longer ago.                                                                                                     |
 | `retentionSpans`     | `100000`    | Keep at most this many spans; whole traces drop, oldest first.                                                                          |
+| `retentionLogs`      | `100000`    | Keep at most this many log records, oldest first.                                                                                       |
 
 Settings apply live: changing `mode`, `host` or `port` restarts the receiver without a Host restart.
 
@@ -57,9 +59,10 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 | `traces_search`        | Traces newest first; filter by service, operation, error status, min duration, time, text, DSH session. |
 | `traces_get`           | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.          |
 | `traces_list_services` | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window.               |
+| `traces_search_logs`   | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, time. |
 | `traces_error_groups`  | Error spans grouped by service, operation, error type and message shape, with a sample trace.           |
 | `traces_status`        | Receiver mode, address, state, counters, forwarding and store size.                                     |
-| `traces_clear`         | Deletes every stored trace; requires `confirm: true`.                                                   |
+| `traces_clear`         | Deletes every stored trace and log record; requires `confirm: true`.                                    |
 
 ## Decisions
 
@@ -80,11 +83,14 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
   traces so a kept trace never loses part of its tree.
 - **Self-spans.** dshx records a span for every API dispatch; the traces API's own (`dshx.api.id = traces`) are
   dropped at ingest so the panel's 5-second polling never shows up as traces of itself.
+- **Logs.** `POST /v1/logs` (JSON or protobuf, same decoder and bounds) stores records with severity, body (8 KiB),
+  attributes, resource and their trace/span ids. The Logs tab filters by text, service, minimum severity and one
+  `key=value` attribute; a record opens its trace, and a trace or a span opens only its own logs. With
+  `redactGenAiContent`, a GenAI content event (`gen_ai.*` event name) keeps only its body size.
 - **Metrics.** `/v1/metrics` is accepted (200) and forwarded in `both` mode but not stored yet; the overview is
   computed from spans.
 
 ## Follow-ups
 
-- Logs (`/v1/logs`) with search and trace ↔ log jumps, a service map from cross-service parent/child spans, and stored
-  metrics with one chart per metric.
+- A service map from cross-service parent/child spans, and stored metrics with one chart per metric.
 - Out of scope: alerting, dashboards and a query builder, session replay.

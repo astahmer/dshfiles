@@ -1,6 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { errorGroupSchema, receiverStatusSchema, traceDetailSchema, traceListSchema, traceStatsSchema } from './types.js'
+import { errorGroupSchema, logListSchema, receiverStatusSchema, traceDetailSchema, traceListSchema, traceStatsSchema } from './types.js'
 
 const windowMinutesSchema = z
   .number()
@@ -30,6 +30,44 @@ export const listInputSchema = z
   })
   .strict()
 export type ListInput = z.infer<typeof listInputSchema>
+
+const hexId = (bytes: 8 | 16) =>
+  z
+    .string()
+    .regex(new RegExp(`^[0-9a-fA-F]{${String(bytes * 2)}}$`))
+    .describe(`${String(bytes * 2)}-character hex ${bytes === 16 ? 'trace' : 'span'} id.`)
+
+export const logsInputSchema = z
+  .object({
+    service: z.string().min(1).max(256).optional().describe('Only records from this service.name.'),
+    minSeverity: z
+      .number()
+      .int()
+      .min(0)
+      .max(24)
+      .optional()
+      .describe('Only records at or above this OTLP severity number: 5 debug, 9 info, 13 warn, 17 error, 21 fatal.'),
+    search: z.string().trim().min(1).max(200).optional().describe('Literal text matched against the body, attribute JSON and event name.'),
+    attribute: z
+      .object({
+        key: z
+          .string()
+          .regex(/^[\w.:/-]{1,128}$/)
+          .describe('Attribute key, e.g. http.route.'),
+        value: z.string().max(512).describe('Exact value, compared as text.'),
+      })
+      .strict()
+      .optional()
+      .describe('Only records whose attribute equals this value.'),
+    traceId: hexId(16).optional().describe('Only records correlated with this trace.'),
+    spanId: hexId(8).optional().describe('Only records correlated with this span.'),
+    fromMs: z.number().int().nonnegative().optional().describe('Only records at or after this Unix time in milliseconds.'),
+    toMs: z.number().int().nonnegative().optional().describe('Only records before this Unix time in milliseconds.'),
+    cursor: z.string().min(1).max(64).optional().describe('next_cursor from a previous page.'),
+    limit: z.number().int().min(1).max(500).optional().describe('Records per page, 1 to 500; defaults to 100.'),
+  })
+  .strict()
+export type LogsInput = z.infer<typeof logsInputSchema>
 
 export const clearInputSchema = z.object({ confirm: z.literal(true).describe('Must be true: deleting stored telemetry cannot be undone.') }).strict()
 
@@ -78,6 +116,13 @@ export const tracesApi = defineApi({
         'Error spans grouped by service, span name, error.type (or exception.type) and status message shape: count, first and last seen, and a sample trace id. Read-only.',
       tool: { name: 'traces_error_groups', readOnly: true, render: compactJson },
     }),
+    logs: method({
+      input: logsInputSchema,
+      output: logListSchema,
+      description:
+        'Search stored OpenTelemetry log records, newest first: time, severity, body, service, scope, attributes, resource and the trace/span they belong to. Filter by service, minimum severity, text, one attribute value, trace or span id and time range. Read-only.',
+      tool: { name: 'traces_search_logs', readOnly: true, render: compactJson },
+    }),
     status: method({
       input: z.object({}).strict(),
       output: receiverStatusSchema,
@@ -87,8 +132,11 @@ export const tracesApi = defineApi({
     }),
     clear: method({
       input: z.object({ confirm: z.literal(true).describe('Must be true: deleting stored telemetry cannot be undone.') }).strict(),
-      output: z.object({ removedSpans: z.number().int().nonnegative(), removedTraces: z.number().int().nonnegative() }).strict(),
-      description: 'Delete every stored trace. Run only when the user asked to clear stored traces, and pass confirm: true; the receiver keeps running.',
+      output: z
+        .object({ removedSpans: z.number().int().nonnegative(), removedTraces: z.number().int().nonnegative(), removedLogs: z.number().int().nonnegative() })
+        .strict(),
+      description:
+        'Delete every stored trace and log record. Run only when the user asked to clear stored telemetry, and pass confirm: true; the receiver keeps running.',
       tool: { name: 'traces_clear', readOnly: false, render: compactJson },
     }),
   },

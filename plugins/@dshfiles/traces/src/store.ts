@@ -3,10 +3,19 @@ import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { z } from 'zod'
-import type { NormalizedSpan } from './otlp/normalize.js'
+import type { NormalizedLog, NormalizedSpan } from './otlp/normalize.js'
 import { buildSpanTree } from './span-tree.js'
 import { LatencyStats } from './stats.js'
-import { attributeValueSchema, type ErrorGroup, type SpanKind, type SpanStatus, type TraceDetail, type TraceList, type TraceStats } from './types.js'
+import {
+  attributeValueSchema,
+  type ErrorGroup,
+  type LogList,
+  type SpanKind,
+  type SpanStatus,
+  type TraceDetail,
+  type TraceList,
+  type TraceStats,
+} from './types.js'
 
 const MIGRATIONS = [
   `
@@ -50,9 +59,29 @@ const MIGRATIONS = [
   CREATE INDEX traces_received ON traces (received_ms);
   CREATE INDEX traces_session ON traces (session_id);
   `,
+  `
+  CREATE TABLE logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time_us INTEGER NOT NULL,
+    severity_number INTEGER NOT NULL,
+    severity_text TEXT,
+    body TEXT NOT NULL,
+    service TEXT NOT NULL,
+    scope TEXT,
+    trace_id TEXT,
+    span_id TEXT,
+    event_name TEXT,
+    attributes TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    received_ms INTEGER NOT NULL
+  );
+  CREATE INDEX logs_time ON logs (time_us, id);
+  CREATE INDEX logs_trace ON logs (trace_id, span_id);
+  CREATE INDEX logs_received ON logs (received_ms);
+  `,
 ]
 
-export type Retention = { readonly maxAgeHours: number; readonly maxSpans: number }
+export type Retention = { readonly maxAgeHours: number; readonly maxSpans: number; readonly maxLogs: number }
 
 export type TraceListQuery = {
   readonly service?: string | undefined
@@ -68,8 +97,27 @@ export type TraceListQuery = {
 }
 
 type IngestResult = { readonly stored: number; readonly prunedTraces: number }
-type StoreSummary = { readonly spans: number; readonly traces: number; readonly oldestMs: number | null; readonly newestMs: number | null }
-type ClearResult = { readonly removedSpans: number; readonly removedTraces: number }
+type StoreSummary = {
+  readonly spans: number
+  readonly traces: number
+  readonly logs: number
+  readonly oldestMs: number | null
+  readonly newestMs: number | null
+}
+type ClearResult = { readonly removedSpans: number; readonly removedTraces: number; readonly removedLogs: number }
+
+export type LogSearchQuery = {
+  readonly service?: string | undefined
+  readonly minSeverity?: number | undefined
+  readonly search?: string | undefined
+  readonly attribute?: { readonly key: string; readonly value: string } | undefined
+  readonly traceId?: string | undefined
+  readonly spanId?: string | undefined
+  readonly fromMs?: number | undefined
+  readonly toMs?: number | undefined
+  readonly cursor?: string | undefined
+  readonly limit?: number | undefined
+}
 
 export class TraceStoreError extends Error {
   constructor(
@@ -118,6 +166,29 @@ const spanRowSchema = z.object({
 })
 
 const countSchema = z.object({ count: z.number() })
+
+const logRowSchema = z.object({
+  id: z.number(),
+  time_us: z.number(),
+  severity_number: z.number(),
+  severity_text: z.string().nullable(),
+  body: z.string(),
+  service: z.string(),
+  scope: z.string().nullable(),
+  trace_id: z.string().nullable(),
+  span_id: z.string().nullable(),
+  event_name: z.string().nullable(),
+  attributes: z.string(),
+  resource: z.string().nullable(),
+})
+
+type LogCursor = { readonly timeUs: number; readonly id: number }
+
+const decodeLogCursor = (cursor: string): LogCursor => {
+  const match = /^(\d{1,17}):(\d{1,15})$/.exec(cursor)
+  if (match?.[1] === undefined || match[2] === undefined) throw new TraceStoreError('invalid-cursor', 'The logs cursor is invalid.')
+  return { timeUs: Number(match[1]), id: Number(match[2]) }
+}
 
 const escapeLike = (text: string): string => text.replace(/[\\%_]/g, match => `\\${match}`)
 
@@ -253,9 +324,120 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       removed += victims.length
       transaction(() => deleteTraces(victims))
     }
-    if (removed > 0) prepare('DELETE FROM resources WHERE id NOT IN (SELECT DISTINCT resource_id FROM spans)').run()
+    const expiredLogs = Number(prepare('DELETE FROM logs WHERE received_ms < ?').run(cutoff).changes)
+    const excessLogs = logCount() - retention.maxLogs
+    const droppedLogs = excessLogs > 0 ? Number(prepare('DELETE FROM logs WHERE id IN (SELECT id FROM logs ORDER BY id LIMIT ?)').run(excessLogs).changes) : 0
+    if (removed > 0 || expiredLogs + droppedLogs > 0)
+      prepare('DELETE FROM resources WHERE id NOT IN (SELECT resource_id FROM spans UNION SELECT resource_id FROM logs)').run()
     return removed
   }
+
+  const storeResource = (resource: Readonly<Record<string, unknown>>): string => {
+    const resourceJson = JSON.stringify(resource)
+    const resourceId = createHash('sha1').update(resourceJson).digest('hex')
+    prepare('INSERT OR IGNORE INTO resources (id, attributes) VALUES (?, ?)').run(resourceId, resourceJson)
+    return resourceId
+  }
+
+  const ingestLogs = (logs: readonly NormalizedLog[], retention: Retention): number => {
+    if (logs.length === 0) return 0
+    const receivedMs = now()
+    transaction(() => {
+      for (const log of logs)
+        prepare(
+          `INSERT INTO logs (time_us, severity_number, severity_text, body, service, scope, trace_id, span_id, event_name, attributes, resource_id, received_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          log.timeUs,
+          log.severityNumber,
+          log.severityText,
+          log.body,
+          log.service,
+          log.scope,
+          log.traceId,
+          log.spanId,
+          log.eventName,
+          JSON.stringify(log.attributes),
+          storeResource(log.resource),
+          receivedMs,
+        )
+    })
+    prune(retention)
+    return logs.length
+  }
+
+  const searchLogs = (query: LogSearchQuery): LogList => {
+    const limit = query.limit ?? 100
+    const conditions: string[] = []
+    const parameters: SQLInputValue[] = []
+    if (query.service !== undefined) {
+      conditions.push('l.service = ?')
+      parameters.push(query.service)
+    }
+    if (query.minSeverity !== undefined) {
+      conditions.push('l.severity_number >= ?')
+      parameters.push(query.minSeverity)
+    }
+    if (query.traceId !== undefined) {
+      conditions.push('l.trace_id = ?')
+      parameters.push(query.traceId.toLowerCase())
+    }
+    if (query.spanId !== undefined) {
+      conditions.push('l.span_id = ?')
+      parameters.push(query.spanId.toLowerCase())
+    }
+    if (query.fromMs !== undefined) {
+      conditions.push('l.time_us >= ?')
+      parameters.push(Math.round(query.fromMs * 1000))
+    }
+    if (query.toMs !== undefined) {
+      conditions.push('l.time_us < ?')
+      parameters.push(Math.round(query.toMs * 1000))
+    }
+    if (query.attribute !== undefined) {
+      conditions.push('CAST(json_extract(l.attributes, ?) AS TEXT) = ?')
+      parameters.push(`$."${query.attribute.key}"`, query.attribute.value)
+    }
+    if (query.search !== undefined) {
+      const pattern = `%${escapeLike(query.search)}%`
+      conditions.push("(l.body LIKE ? ESCAPE '\\' OR l.attributes LIKE ? ESCAPE '\\' OR l.event_name LIKE ? ESCAPE '\\')")
+      parameters.push(pattern, pattern, pattern)
+    }
+    if (query.cursor !== undefined) {
+      const cursor = decodeLogCursor(query.cursor)
+      conditions.push('(l.time_us < ? OR (l.time_us = ? AND l.id < ?))')
+      parameters.push(cursor.timeUs, cursor.timeUs, cursor.id)
+    }
+    const where = conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`
+    const rows = z.array(logRowSchema).parse(
+      prepare(
+        `SELECT l.id, l.time_us, l.severity_number, l.severity_text, l.body, l.service, l.scope, l.trace_id, l.span_id, l.event_name, l.attributes,
+             r.attributes AS resource
+           FROM logs l LEFT JOIN resources r ON r.id = l.resource_id ${where} ORDER BY l.time_us DESC, l.id DESC LIMIT ?`,
+      ).all(...parameters, limit + 1),
+    )
+    const page = rows.slice(0, limit)
+    const last = page.at(-1)
+    return {
+      logs: page.map(row => ({
+        id: row.id,
+        timeMs: usToMs(row.time_us),
+        severityNumber: row.severity_number,
+        severityText: row.severity_text,
+        body: row.body,
+        service: row.service,
+        scope: row.scope,
+        traceId: row.trace_id,
+        spanId: row.span_id,
+        eventName: row.event_name,
+        attributes: attributesJsonSchema.parse(JSON.parse(row.attributes)),
+        resource: row.resource === null ? {} : attributesJsonSchema.parse(JSON.parse(row.resource)),
+      })),
+      nextCursor: rows.length > limit && last !== undefined ? `${String(last.time_us)}:${String(last.id)}` : null,
+    }
+  }
+
+  const logCount = (): number => countSchema.parse(prepare('SELECT COUNT(*) AS count FROM logs').get()).count
 
   const ingest = (spans: readonly NormalizedSpan[], retention: Retention): IngestResult => {
     if (spans.length === 0) return { stored: 0, prunedTraces: 0 }
@@ -263,9 +445,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     transaction(() => {
       const touched = new Set<string>()
       for (const span of spans) {
-        const resourceJson = JSON.stringify(span.resource)
-        const resourceId = createHash('sha1').update(resourceJson).digest('hex')
-        prepare('INSERT OR IGNORE INTO resources (id, attributes) VALUES (?, ?)').run(resourceId, resourceJson)
+        const resourceId = storeResource(span.resource)
         prepare(
           `INSERT OR REPLACE INTO spans (trace_id, span_id, parent_span_id, name, service, scope, kind, start_us, end_us, status_code, status_message,
              error_type, session_id, attributes, resource_id, events, link_count, received_ms)
@@ -482,6 +662,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     return {
       spans: spanCount(),
       traces: row.traces,
+      logs: logCount(),
       oldestMs: row.oldest === null ? null : usToMs(row.oldest),
       newestMs: row.newest === null ? null : usToMs(row.newest),
     }
@@ -490,12 +671,14 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
   const clear = (): ClearResult =>
     transaction(() => {
       const before = summary()
-      database.exec('DELETE FROM spans; DELETE FROM traces; DELETE FROM resources;')
-      return { removedSpans: before.spans, removedTraces: before.traces }
+      database.exec('DELETE FROM spans; DELETE FROM traces; DELETE FROM logs; DELETE FROM resources;')
+      return { removedSpans: before.spans, removedTraces: before.traces, removedLogs: before.logs }
     })
 
   return {
     ingest,
+    ingestLogs,
+    searchLogs,
     prune,
     list,
     trace,

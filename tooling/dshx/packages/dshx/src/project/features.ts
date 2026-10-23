@@ -43,7 +43,7 @@ const externalDependencySchema = z
  * `backlog-jev-enabled` turns on Backlog Jev in scratch Settings only when off, without supplying a credential;
  * `multi-host-hosts` writes a synthetic host directory (one hidden host, one SSH host) for the Hosts page;
  * `queue-preview-thread` holds a fake-provider turn while queuing an image and file, for queue preview UI;
- * `otlp-sample-trace` posts one synthetic OTLP JSON trace (two services, a failing nested span) to the traces receiver.
+ * `otlp-sample-trace` posts one synthetic OTLP JSON trace (two services, a failing nested span) and its logs to the traces receiver.
  */
 export const REACH_SEEDS = [
   'rebase-ready-thread',
