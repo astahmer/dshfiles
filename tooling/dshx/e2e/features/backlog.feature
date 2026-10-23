@@ -125,6 +125,17 @@ Feature: Backlog
     When the remaining selection is made again
     Then the batch status action updates only the remaining selected items
 
+  @scenario:backlog.board-multi-select
+  Scenario: Select multiple board cards with modifier clicks and batch update them
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "First board selection" is captured
+    And "Second board selection" is captured
+    And "Third board selection" is captured
+    When the Board view selects multiple cards with modifier clicks
+    And the selected board card context menu moves all selected items to "Todo"
+    Then the board context menu status action updates selected items
+
   @scenario:backlog.multi-select-start-threads
   Scenario: Start one thread per selected backlog item
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted

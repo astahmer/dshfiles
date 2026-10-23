@@ -585,6 +585,33 @@ Then('item text links are clickable in the detail', async ({ page }: { page: Pag
   await finishJourneyAssertions(page)
 })
 
+When('the Board view selects multiple cards with modifier clicks', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
+  const cardFor = (id: number) => page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+  await cardFor(1).click({ modifiers: ['ControlOrMeta'] })
+  await cardFor(3).click({ modifiers: ['Shift'] })
+  await expect(cardFor(1)).toHaveAttribute('aria-selected', 'true')
+  await expect(cardFor(2)).toHaveAttribute('aria-selected', 'true')
+  await expect(cardFor(3)).toHaveAttribute('aria-selected', 'true')
+})
+
+When('the selected board card context menu moves all selected items to {string}', async ({ page }: { page: Page }, status: string) => {
+  await page.getByRole('article', { name: 'Card b:2', exact: true }).click({ button: 'right' })
+  await expect(contextMenu(page)).toContainText('3 selected')
+  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true }).click()
+})
+
+Then('the board context menu status action updates selected items', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-board-multi-select-context-status', async () => {
+    const todo = page.locator('[data-backlog-column="todo"]')
+    await expect(todo.getByRole('article', { name: 'Card b:1', exact: true })).toBeVisible()
+    await expect(todo.getByRole('article', { name: 'Card b:2', exact: true })).toBeVisible()
+    await expect(todo.getByRole('article', { name: 'Card b:3', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the Items view selects a range and toggles one item', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Items', exact: true }).click()
   const checkboxFor = (id: number) => page.getByRole('row', { name: `Item b:${String(id)}` }).getByRole('checkbox', { name: `Select b:${String(id)}` })

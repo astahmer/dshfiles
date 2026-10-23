@@ -1,6 +1,6 @@
 import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
@@ -9,7 +9,8 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
-import type { StartThreadItem } from './start-thread.js'
+import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
+import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
@@ -113,12 +114,16 @@ const BoardCard = (props: {
   readonly openId: number | null
   readonly cursor: boolean
   readonly open: (id: number) => void
-  readonly startDrag: (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void) => void
+  readonly startDrag: (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void, shiftKey: boolean, additive: boolean) => void
   readonly pickStatus: (id: number, status: BacklogStatus) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
   readonly dragging: boolean
   readonly triageOff: boolean
+  readonly selected: boolean
+  readonly selectWithModifiers: (id: number, shiftKey: boolean, additive: boolean) => void
+  readonly selection?: readonly StartThreadItem[] | undefined
+  readonly clearSelection: () => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -131,18 +136,21 @@ const BoardCard = (props: {
       triage={id => actions.triage.mutate(id)}
       triageOff={props.triageOff}
       startThread={props.startThread}
+      selection={props.selection}
+      clearSelection={props.clearSelection}
       openItem={props.open}
     >
       <article
         tabIndex={-1}
         aria-label={`Card b:${String(item.id)}`}
-        onPointerDown={event => props.startDrag(event, item, rename.openSoon)}
+        aria-selected={props.selected}
+        onPointerDown={event => props.startDrag(event, item, rename.openSoon, event.shiftKey, event.metaKey || event.ctrlKey)}
         onDoubleClick={rename.renameOnDoubleClick}
         style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
         className={cn(
           cardClass,
           'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
-          item.id === props.openId
+          item.id === props.openId || props.selected
             ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25'
             : props.cursor
               ? 'dshx:border-info/50 dshx:ring-1 dshx:ring-info/15'
@@ -174,7 +182,39 @@ export const BoardView = (props: {
   const [drag, setDrag] = useState<Drag | null>(null)
   const [over, setOver] = useState<BacklogStatus | null>(null)
   const [pages, setPages] = useState<Partial<Record<BacklogStatus, number>>>({})
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
+  const selectionAnchor = useRef<number | null>(null)
+  const orderedItems = useMemo(
+    () => boardStatuses.flatMap(status => props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)),
+    [props.items],
+  )
+  const orderedIds = useMemo(() => orderedItems.map(item => item.id), [orderedItems])
+  const selectedItems = useMemo(() => orderedItems.filter(item => selected.has(item.id)).map(startThreadItemOf), [orderedItems, selected])
+  useEffect(() => {
+    const availableIds = new Set(orderedIds)
+    setSelected(current => {
+      const next = new Set([...current].filter(id => availableIds.has(id)))
+      return next.size === current.size ? current : next
+    })
+    if (selectionAnchor.current !== null && !availableIds.has(selectionAnchor.current)) selectionAnchor.current = null
+  }, [orderedIds])
   const dragged = drag === null ? undefined : props.items.find(item => item.id === drag.id)
+
+  const selectWithModifiers = (id: number, shiftKey: boolean, additive: boolean): void => {
+    if (shiftKey) {
+      setSelected(extendBacklogSelection(selected, orderedIds, selectionAnchor.current ?? id, id))
+      return
+    }
+    if (additive) {
+      selectionAnchor.current = id
+      setSelected(toggleBacklogSelection(selected, id))
+    }
+  }
+
+  const clearSelection = (): void => {
+    setSelected(new Set())
+    selectionAnchor.current = null
+  }
 
   const move = (id: number, status: BacklogStatus): void => {
     withViewTransition(() => actions.patch({ id, status }))
@@ -186,7 +226,7 @@ export const BoardView = (props: {
     return boardStatuses.find(status => status === value) ?? null
   }
 
-  const startDrag = (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void): void => {
+  const startDrag = (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void, shiftKey: boolean, additive: boolean): void => {
     if (event.button !== 0 || (event.target instanceof HTMLElement && event.target.closest('button') !== null)) return
     const card = event.currentTarget.getBoundingClientRect()
     const origin = { x: event.clientX, y: event.clientY }
@@ -203,7 +243,11 @@ export const BoardView = (props: {
       setDrag(null)
       setOver(null)
       if (!started) {
-        open()
+        if (shiftKey || additive) selectWithModifiers(item.id, shiftKey, additive)
+        else {
+          clearSelection()
+          open()
+        }
         return
       }
       const target = columnAt(upEvent.clientX, upEvent.clientY)
@@ -271,6 +315,10 @@ export const BoardView = (props: {
                   projectPaths={props.projectPaths}
                   dragging={drag?.id === item.id}
                   triageOff={props.triageOff}
+                  selected={selected.has(item.id)}
+                  selectWithModifiers={selectWithModifiers}
+                  selection={selected.has(item.id) ? selectedItems : undefined}
+                  clearSelection={clearSelection}
                 />
               ))}
             </div>
