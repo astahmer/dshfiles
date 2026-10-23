@@ -249,7 +249,7 @@ export default defineClient({
       const newestTurnHasEnded = props.turn.end?.time !== undefined && nextTurnStartedAt === undefined
       const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
       const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
-      const statusQueryKey = useMemo(() => ['jj-integration', 'thread', path, props.sessionId] as const, [path, props.sessionId])
+      const statusQueryKey = useMemo(() => threadQueryKeys.threadAt(path ?? '', props.sessionId), [path, props.sessionId])
       // Every Turn tail of a Session shares this query key, so one jj read serves the whole conversation.
       const status = useQuery({
         queryKey: statusQueryKey,

@@ -239,6 +239,12 @@ estimating suite savings. Scratch doctor passed; all fixture-owned processes
 were stopped. Token-free raw sample and measurement script were retained under
 `/private/tmp/dsh-nav-measure.dU0QZm/` (temporary local evidence only).
 
+## Chat inline integration offer (2026-10-24)
+
+The chat turn-tail and header control each read `threadAt` for the same open Session, but used different query keys (chat: repository path + Session id; header: repository path only). The chat could therefore miss the header's already-refreshed status and wait for a second Host read after a Turn ended. Both controls now share the Session-scoped key and request the same viewer-scoped status; path-only invalidations still refresh the panel and all Session views. Different Sessions remain isolated.
+
+Evidence: the live `:3080` Host probe (10 s, before the fix) measured p50 4 ms, p90 20 ms, p99 1,136 ms, max 1,136 ms, with one >250 ms stall; machine load was 25–31. This confirms Host stalls can magnify an unnecessary extra read, not that they explain all user-visible delay. The live page had no selected thread or integration offer, so no honest click-to-offer before/after timing was available. In the scratch E2E run, `jj-integration.turn-end-integrate-browser-journey` passed (1.7 min total journey); no comparable pre-change run was taken. `thread-query-keys.test.ts` verifies shared Session keys, per-Session isolation, and path-prefix invalidation. Do not treat the E2E wall time or Host-lag sample as a measured latency improvement.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the

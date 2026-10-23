@@ -63,11 +63,12 @@ import {
   type ThreadIntegrationCategory,
 } from './thread-integration-state.js'
 import { useToast } from './toast.js'
+import { threadAtQueryKey } from './thread-query-keys.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
-  threadAt: (path: string) => ['jj-integration', 'thread', path] as const,
+  threadAt: threadAtQueryKey,
   workspaceSync: ['jj-integration', 'workspace-sync'] as const,
 }
 export const threadRebaseMutationKey = ['jj-integration', 'thread-rebase'] as const

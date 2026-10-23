@@ -11,6 +11,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { z } from 'zod'
 import { jjIntegrationApi, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
@@ -31,6 +32,7 @@ export interface ThreadWorkspaceControlProps {
 }
 
 const noCwd = (): null => null
+const contractRejectionSchema = z.looseObject({ kind: z.literal('contract') })
 
 /** A Session the client already sees keeping this workspace busy, so the hint can name it instead of blaming "this thread". */
 interface WorkspaceBlocker {
@@ -59,11 +61,16 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
   const toast = useToast()
   const thread = useQuery({
-    queryKey: threadQueryKeys.threadAt(cwd ?? ''),
+    queryKey: threadQueryKeys.threadAt(cwd ?? '', props.sessionId),
     enabled: cwd !== null && cwd.length > 0,
     queryFn: async ({ signal }) => {
-      const previous = queryClient.getQueryData<{ readonly thread: ThreadView | null }>(threadQueryKeys.threadAt(cwd ?? ''))
-      const current = await runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.threadAt({ path: cwd ?? '' }, { signal: hostSignal }) })
+      const previous = queryClient.getQueryData<{ readonly thread: ThreadView | null }>(threadQueryKeys.threadAt(cwd ?? '', props.sessionId))
+      const read = (input: { readonly path: string; readonly sessionId?: SessionSummary['id'] }) =>
+        runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.threadAt(input, { signal: hostSignal }) })
+      const current = await read({ path: cwd ?? '', sessionId: props.sessionId }).catch(error => {
+        if (!contractRejectionSchema.safeParse(error).success) throw error
+        return read({ path: cwd ?? '' })
+      })
       if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
       return current
     },
@@ -91,7 +98,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   /** The status refetch runs jj and can take seconds, so the menu shows the Host's answer at once and refreshes behind it. */
   const showQueued = (path: string, integrationQueuedAt: number | undefined): void => {
     announceRepositoryChange()
-    queryClient.setQueryData(threadQueryKeys.threadAt(path), (previous: { readonly thread: ThreadView | null } | undefined) => {
+    queryClient.setQueryData(threadQueryKeys.threadAt(path, props.sessionId), (previous: { readonly thread: ThreadView | null } | undefined) => {
       if (previous?.thread === null || previous?.thread === undefined) return previous
       const { integrationQueuedAt: _previousQueuedAt, ...thread } = previous.thread
       return { thread: integrationQueuedAt === undefined ? thread : { ...thread, integrationQueuedAt } }
