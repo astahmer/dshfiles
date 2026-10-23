@@ -66,7 +66,6 @@ export class AgentComments {
     return mention === null ? null : { handle: mention.handle, task: mention.text }
   }
 
-  /** Reply files belong to the comment event, not the item's shared attachment list. */
   /**
    * The start-thread request for an agent comment: the agent's preset and route, the item context the thread must name,
    * and the comment text. The Host prepends the agent's identity and instructions to the message it is handed. The

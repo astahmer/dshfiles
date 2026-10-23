@@ -181,8 +181,6 @@ export default defineClient({
           }),
         )
         if (!started.ok) return { kind: 'failed', reason: started.reason }
-        if (files.length === 0) await api.safe.comment({ id: item.id, text })
-        else await api.safe.comment({ id: item.id, text, files: [...files] })
         if (systemNotification && 'Notification' in window && window.Notification.permission === 'granted') {
           try {
             const notification = new Notification('Backlog thread started', { body: `b:${item.id} · ${item.title}` })

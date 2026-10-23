@@ -43,13 +43,14 @@ import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 import { useComposerFiles } from './composer-attachments.js'
-import { fileInput, type ComposerFile } from './composer-files.js'
+import { fileInput } from './composer-files.js'
 import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogText } from './item-text.js'
+import { submitReply } from './reply-submission.js'
 import { ItemPickers } from './item-pickers.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
@@ -521,65 +522,48 @@ const CommentBox = (props: {
   const [failed, setFailed] = useState<string | null>(null)
   const attachments = useComposerFiles({ onError: setFailed })
 
-  const comment = (files: readonly ComposerFile[]): void => {
-    const payload = files.map(fileInput)
-    setText('')
-    attachments.clear()
-    const request = payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload }
-    actions.comment.mutate(request, {
-      onError: error => {
-        setText(current => (current === '' ? text : current))
-        attachments.restore(files)
-        setFailed(errorMessage(error, 'The reply was not saved.'))
-      },
-    })
-  }
   /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
   const submit = async (): Promise<void> => {
     const files = [...attachments.files]
     if ((text.trim() === '' && files.length === 0) || pending) return
-    if (dispatch === null || text.trim() === '') {
-      comment(files)
-      return
-    }
     setPending(true)
     setFailed(null)
     try {
-      setText('')
-      attachments.clear()
-      const outcome = await dispatch.dispatch({
-        item: props.item,
+      await submitReply({
         text,
-        files: files.map(fileInput),
-        open: props.openCreatedByDefault,
-        smartThreadRouting: props.smartThreadRouting,
-        notificationDelivery: props.threadStartNotifications,
-      })
-      if (outcome.kind === 'failed') {
-        setText(current => (current === '' ? text : current))
-        attachments.restore(files)
-        setFailed(outcome.reason)
-      } else if (outcome.kind === 'skipped' && outcome.reason === 'reply-only') {
-        if (props.smartReplyAnswers && files.length === 0) {
-          try {
-            await actions.comment.mutateAsync({ id: props.item.id, text })
+        files,
+        save: async saved => {
+          const payload = saved.map(fileInput)
+          await actions.comment.mutateAsync(payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload })
+        },
+        dispatch:
+          dispatch === null
+            ? null
+            : {
+                dispatch: () =>
+                  dispatch.dispatch({
+                    item: props.item,
+                    text,
+                    files: files.map(fileInput),
+                    open: props.openCreatedByDefault,
+                    smartThreadRouting: props.smartThreadRouting,
+                    notificationDelivery: props.threadStartNotifications,
+                  }),
+                answerReply: () => dispatch.answerReply({ item: props.item, text }),
+                smartReplyAnswers: props.smartReplyAnswers,
+              },
+        view: {
+          clear: () => {
             setText('')
-          } catch (error) {
-            setFailed(errorMessage(error, 'Your reply was not saved.'))
-            return
-          }
-          try {
-            const answered = await dispatch.answerReply({ item: props.item, text })
-            if (!answered.ok) setFailed(`Your reply was saved, but an AI answer could not be generated: ${answered.reason}`)
-          } catch (error) {
-            setFailed(`Your reply was saved, but an AI answer could not be generated: ${errorMessage(error, 'Generation failed.')}`)
-          }
-        } else comment(files)
-      } else if (outcome.kind === 'skipped') comment(files)
-    } catch (error) {
-      setText(current => (current === '' ? text : current))
-      attachments.restore(files)
-      setFailed(errorMessage(error, 'The reply was not sent.'))
+            attachments.clear()
+          },
+          restore: restored => {
+            setText(current => (current === '' ? restored.text : current))
+            attachments.restore(restored.files)
+          },
+          fail: setFailed,
+        },
+      })
     } finally {
       setPending(false)
     }
