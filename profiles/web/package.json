@@ -61,6 +61,7 @@
     "@dshfiles/workspace-folder-picker": "link:../../plugins/@dshfiles/workspace-folder-picker",
     "@dshfiles/workspace-nav": "link:../../plugins/@dshfiles/workspace-nav",
     "@dshfiles/worktree-memory": "link:../../plugins/@dshfiles/worktree-memory",
+    "@loongsuite/dsh-plugin": "0.1.3",
     "dsh-our-free-model": "github:Ebony-Vinyl/dsh-our-free-model#e9695299b549e851214e359b27cfb90da3cf6e95",
     "dshmarket": "^1.66.14"
   },
@@ -71,6 +72,7 @@
         "@deepseek-ai/dsh-web-app",
         "dshmarket",
         "dsh-our-free-model",
+        "@loongsuite/dsh-plugin",
         "@dshfiles/frame-layout",
         "@dshfiles/shared-runtime",
         "@dshfiles/ui-styles",

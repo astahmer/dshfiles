@@ -240,6 +240,11 @@
   disabled: true
 - id: session-log-download
   disabled: false
+# OpenTelemetry spans for turns, steps, model calls and tools (@loongsuite/dsh-plugin). Off unless the Host starts
+# with OTEL_EXPORTER_OTLP_ENDPOINT; it then reads the standard OTEL_* variables and records metadata only.
+# See docs/observability.md.
+- id: loongsuite-observability
+  disabled: !!js '!process.env.OTEL_EXPORTER_OTLP_ENDPOINT'
 # Brave replaces DeepSeek's server-side search: the same key the Models page manages
 # for chat is a chat key, not a search key. The Brave key is bound in
 # dshfiles-web-search-brave settings as secret:brave-api-key; fetch stays anonymous HTTP.
