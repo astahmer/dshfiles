@@ -234,8 +234,13 @@ the hand-back note below):
    rebuilt. The panel shows the outcome, e.g.
    `default updated · 3 plugins rebuilt · restart to apply`, with **Restart**
    (the thread sidebar's restart) when a Host bundle changed; client-only
-   changes arrive over HMR. Conflicts or described work the bookmark lacks
-   leave that checkout untouched and are reported there instead.
+   changes arrive over HMR. A conflict or a build failure is reported as
+   `not updated` (destructive styling, Activity type `workspace.sync_failed`).
+   A refusal, such as described work the bookmark lacks or another workspace
+   built on the checkout, is a safe no-change outcome. The checkout is
+   `kept as is`, its local work is preserved, and the line names the next safe
+   step from dshx's hint (default styling, Activity type
+   `workspace.sync_refused`).
 
 When Rebase stops on conflicts or descriptions, it queues a message asking the
 thread's agent to fix them and rebase again with `/rebase` or the

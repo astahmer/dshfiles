@@ -36,6 +36,7 @@ import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
 import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
 import { JsonText } from './json-text.js'
+import { workspaceSyncActivity } from './workspace-sync-outcome.js'
 import { ThreadStatusWarmup } from './thread-status-warmup.js'
 import {
   defaultJjIntegrationSettings,
@@ -580,14 +581,6 @@ const checkoutSyncOutputSchema = z.object({
   error: z.object({ message: z.string(), hint: z.string() }).optional(),
 })
 
-const describeWorkspaceSync = (view: WorkspaceSyncView): string => {
-  if (view.status === 'up-to-date') return `${view.workspace} already on ${view.bookmark}`
-  if (view.status !== 'synced') return `${view.workspace} not updated: ${view.message ?? view.status ?? 'unknown error'}`
-  const rebuilt = view.pluginsRebuilt.length
-  if (rebuilt === 0 && !view.restartNeeded) return `${view.workspace} updated · nothing to rebuild`
-  return `${view.workspace} updated · ${String(rebuilt)} plugin${rebuilt === 1 ? '' : 's'} rebuilt · ${view.restartNeeded ? 'restart to apply' : 'applied live'}`
-}
-
 interface WorkspaceSyncInput {
   readonly repoRoot: string
   readonly workspace: string
@@ -672,10 +665,7 @@ const queueWorkspaceSync = (input: {
           )
           workspaceSync = view
           emitActivity({
-            type: `workspace.sync_${view.state}`,
-            level: view.state === 'failed' || view.restartNeeded ? 'attention' : 'notable',
-            summary: describeWorkspaceSync(view),
-            detail: view.message ?? undefined,
+            ...workspaceSyncActivity(view),
             path: current.repoRoot,
             sessionId: current.sessionId,
             correlationId: current.correlationId,

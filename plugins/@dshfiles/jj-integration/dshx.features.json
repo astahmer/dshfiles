@@ -467,6 +467,7 @@
         "Rebase is refused while any thread session is running or waiting for input, except the calling agent's own session.",
         "The rebase notice offers the actions `integratedThreadActions` selects; Archive affects only the current Session and both actions are disabled while it runs, while Settle is answered by thread-sidebar, the owner of the settled status.",
         "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands.",
+        "A refused checkout sync is a safe no-change outcome, not a failure: the panel line says the checkout was kept as is with its local work preserved and gives dshx's next step, in default styling, and Activity records it as `workspace.sync_refused`; conflicts and build failures stay destructive `workspace.sync_failed`.",
         "Only the newest completed turn offers the inline Integrate: an older turn keeps its dated notices, and the row is hidden for a shared checkout, an archived thread, a queued or running integration, unverified activity, or work the control center calls blocked (undescribed, conflicted, missing)."
       ],
       "externalDependencies": [
@@ -562,6 +563,12 @@
           "id": "jj-integration.checkout-sync",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.checkout-sync-refused",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-sync-outcome.test.ts",
+          "testName": "reports a refusal as a safe no-change outcome with the next step, not a failed sync"
         }
       ]
     },

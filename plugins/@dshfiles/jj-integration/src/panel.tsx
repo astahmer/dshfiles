@@ -63,6 +63,7 @@ import {
   type ThreadIntegrationCategory,
 } from './thread-integration-state.js'
 import { useToast } from './toast.js'
+import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
@@ -170,11 +171,14 @@ const findRestartAction = () => PaletteApi.getSnapshot().actions.find(action => 
 const noRestartAction = (): null => null
 
 const describeWorkspaceSync = (t: JjIntegrationTranslate, view: WorkspaceSyncView): string => {
-  if (view.state === 'running') return t('workspaceSyncRunning', { workspace: view.workspace, bookmark: view.bookmark })
-  if (view.status === 'up-to-date') return t('workspaceSyncUpToDate', { workspace: view.workspace, bookmark: view.bookmark })
-  if (view.status === 'conflicted')
+  const outcome = workspaceSyncOutcome(view)
+  if (outcome === 'running') return t('workspaceSyncRunning', { workspace: view.workspace, bookmark: view.bookmark })
+  if (outcome === 'up-to-date') return t('workspaceSyncUpToDate', { workspace: view.workspace, bookmark: view.bookmark })
+  if (outcome === 'kept')
+    return `${t('workspaceSyncKept', { workspace: view.workspace })} ${t('workspaceSyncKeptNext', { message: view.message ?? t('workspaceSyncKeptDefault') })}`
+  if (outcome === 'conflicted')
     return `${t('workspaceSyncConflicted', { workspace: view.workspace, files: view.conflicts.join(', ') })} ${view.message ?? ''}`.trim()
-  if (view.status !== 'synced') return t('workspaceSyncFailed', { workspace: view.workspace, message: view.message ?? view.status ?? '' })
+  if (outcome === 'failed') return t('workspaceSyncFailed', { workspace: view.workspace, message: view.message ?? view.status ?? '' })
   if (view.pluginsRebuilt.length === 0 && !view.restartNeeded) return t('workspaceSyncedQuiet', { workspace: view.workspace })
   const effect = view.restartNeeded ? t('workspaceSyncRestart') : t('workspaceSyncLive')
   return t('workspaceSynced', { workspace: view.workspace, count: view.pluginsRebuilt.length, effect })
@@ -194,8 +198,9 @@ const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.E
   })
   const view = sync.data?.sync
   if (view === null || view === undefined) return null
+  const outcome = workspaceSyncOutcome(view)
   return (
-    <Alert variant={view.state === 'failed' ? 'destructive' : 'default'}>
+    <Alert variant={outcome === 'failed' || outcome === 'conflicted' ? 'destructive' : 'default'} data-sync-outcome={outcome}>
       <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         {view.state === 'running' ? <Spinner /> : null}
         <span>{describeWorkspaceSync(props.t, view)}</span>
