@@ -18,7 +18,15 @@ const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done
 /** Cards mounted per column before scrolling near the end reveals another batch. */
 const COLUMN_PAGE = 30
 
-type Drag = { readonly id: number; readonly x: number; readonly y: number; readonly offsetX: number; readonly offsetY: number; readonly width: number }
+type Drag = {
+  readonly ids: readonly number[]
+  readonly id: number
+  readonly x: number
+  readonly y: number
+  readonly offsetX: number
+  readonly offsetY: number
+  readonly width: number
+}
 
 /** The card's state line, as the video's footer: what it is doing now, not its metadata. */
 const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element => {
@@ -181,12 +189,20 @@ export const BoardView = (props: {
   const actions = useBacklogActions()
   const [drag, setDrag] = useState<Drag | null>(null)
   const [over, setOver] = useState<BacklogStatus | null>(null)
+  const dragCleanup = useRef<(() => void) | null>(null)
+  useEffect(() => () => dragCleanup.current?.(), [])
   const [pages, setPages] = useState<Partial<Record<BacklogStatus, number>>>({})
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
   const selectionAnchor = useRef<number | null>(null)
   const orderedItems = useMemo(
-    () => boardStatuses.flatMap(status => props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)),
-    [props.items],
+    () =>
+      boardStatuses.flatMap(status =>
+        props.items
+          .filter(item => item.status === status)
+          .sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+          .slice(0, (pages[status] ?? 1) * COLUMN_PAGE),
+      ),
+    [props.items, pages],
   )
   const orderedIds = useMemo(() => orderedItems.map(item => item.id), [orderedItems])
   const selectedItems = useMemo(() => orderedItems.filter(item => selected.has(item.id)).map(startThreadItemOf), [orderedItems, selected])
@@ -201,9 +217,10 @@ export const BoardView = (props: {
   const dragged = drag === null ? undefined : props.items.find(item => item.id === drag.id)
 
   const selectWithModifiers = (id: number, shiftKey: boolean, additive: boolean): void => {
-    const base = BacklogSelection.seed(selected, props.openId)
+    const visibleOpenId = props.openId !== null && orderedIds.includes(props.openId) ? props.openId : null
+    const base = BacklogSelection.seed(selected, visibleOpenId)
     if (shiftKey) {
-      setSelected(BacklogSelection.extend(base, orderedIds, selectionAnchor.current ?? props.openId ?? id, id))
+      setSelected(BacklogSelection.extend(base, orderedIds, selectionAnchor.current ?? visibleOpenId ?? id, id))
       return
     }
     if (additive) {
@@ -229,20 +246,36 @@ export const BoardView = (props: {
 
   const startDrag = (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView, open: () => void, shiftKey: boolean, additive: boolean): void => {
     if (event.button !== 0 || (event.target instanceof HTMLElement && event.target.closest('button') !== null)) return
+    dragCleanup.current?.()
     const card = event.currentTarget.getBoundingClientRect()
     const origin = { x: event.clientX, y: event.clientY }
+    const draggedItems = selected.has(item.id) ? orderedItems.filter(candidate => selected.has(candidate.id)) : [item]
+    const draggedIds = draggedItems.map(candidate => candidate.id)
     let started = false
     const onMove = (moveEvent: PointerEvent): void => {
       if (!started && Math.hypot(moveEvent.clientX - origin.x, moveEvent.clientY - origin.y) < 4) return
       started = true
-      setDrag({ id: item.id, x: moveEvent.clientX, y: moveEvent.clientY, offsetX: origin.x - card.left, offsetY: origin.y - card.top, width: card.width })
+      setDrag({
+        ids: draggedIds,
+        id: item.id,
+        x: moveEvent.clientX,
+        y: moveEvent.clientY,
+        offsetX: origin.x - card.left,
+        offsetY: origin.y - card.top,
+        width: card.width,
+      })
       setOver(columnAt(moveEvent.clientX, moveEvent.clientY))
     }
-    const onUp = (upEvent: PointerEvent): void => {
+    const cancel = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', cancel)
+      dragCleanup.current = null
       setDrag(null)
       setOver(null)
+    }
+    const onUp = (upEvent: PointerEvent): void => {
+      cancel()
       if (!started) {
         if (shiftKey || additive) selectWithModifiers(item.id, shiftKey, additive)
         else {
@@ -252,17 +285,24 @@ export const BoardView = (props: {
         return
       }
       const target = columnAt(upEvent.clientX, upEvent.clientY)
-      if (target !== null && target !== item.status) move(item.id, target)
+      if (target === null) return
+      const moved = draggedItems.filter(candidate => candidate.status !== target)
+      withViewTransition(() => {
+        for (const candidate of moved) actions.patch({ id: candidate.id, status: target })
+      })
+      for (const candidate of moved) actions.update.mutate({ id: candidate.id, status: target })
     }
+    dragCleanup.current = cancel
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', cancel)
   }
 
   return (
     <div className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-auto dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}>
       {boardStatuses.map(status => {
         const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
-        const target = over === status && dragged?.status !== status
+        const target = over === status && drag !== null && props.items.some(item => drag.ids.includes(item.id) && item.status !== status)
         return (
           <section
             key={status}
@@ -314,7 +354,7 @@ export const BoardView = (props: {
                   pickStatus={move}
                   startThread={props.startThread}
                   projectPaths={props.projectPaths}
-                  dragging={drag?.id === item.id}
+                  dragging={drag?.ids.includes(item.id) ?? false}
                   triageOff={props.triageOff}
                   selected={selected.has(item.id)}
                   selectWithModifiers={selectWithModifiers}
@@ -332,6 +372,7 @@ export const BoardView = (props: {
           style={{ left: drag.x - drag.offsetX, top: drag.y - drag.offsetY, width: drag.width }}
           className={cn(cardClass, 'dshx:pointer-events-none dshx:fixed dshx:z-[1100] dshx:rotate-[1.5deg] dshx:border-input dshx:shadow-xl')}
         >
+          {drag.ids.length > 1 ? <span role="status">Moving {drag.ids.length} items</span> : null}
           <CardFace item={dragged} />
         </article>
       )}

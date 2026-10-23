@@ -1,3 +1,4 @@
+import { useBacklogSelection } from './use-backlog-selection.js'
 import { CheckIcon, CircleAlertIcon, CircleCheckIcon, CircleStopIcon, InboxIcon, MessagesSquareIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
@@ -62,6 +63,7 @@ export const InboxView = (props: {
   const actions = useBacklogActions()
   const [filter, setFilter] = useState<InboxFilter>('all')
   const rows = inboxRows({ items: props.items, threads: props.threads, filter, sort: props.sort })
+  const selection = useBacklogSelection({ items: rows.map(row => row.item), openId: props.openId, scope: filter })
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1">
       <section
@@ -107,6 +109,8 @@ export const InboxView = (props: {
             <BacklogItemMenu
               key={item.id}
               item={item}
+              selection={selection.selected.has(item.id) ? selection.selection : undefined}
+              clearSelection={selection.clear}
               projectPaths={props.projectPaths}
               update={input => actions.update.mutate(input)}
               triage={id => actions.triage.mutate(id)}
@@ -117,11 +121,18 @@ export const InboxView = (props: {
               <li
                 tabIndex={-1}
                 aria-label={`Item b:${String(item.id)}`}
+                data-selected={selection.selected.has(item.id) || undefined}
                 aria-current={item.id === props.openId ? 'true' : undefined}
-                onClick={() => props.select(item.id)}
+                onClick={event => {
+                  if (!selection.click(item.id, event)) props.select(item.id)
+                }}
                 className={cn(
                   'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
-                  item.id === props.openId ? 'dshx:bg-accent/70' : item.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
+                  selection.selected.has(item.id) || item.id === props.openId
+                    ? 'dshx:bg-accent/70'
+                    : item.id === props.cursorId
+                      ? 'dshx:bg-accent/45'
+                      : 'dshx:hover:bg-accent/35',
                 )}
               >
                 {isUnread(item) || threads.length > 0 ? (

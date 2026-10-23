@@ -1,3 +1,4 @@
+import { useBacklogSelection } from './use-backlog-selection.js'
 import { LinkIcon, MessageSquareIcon, PaperclipIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -50,6 +51,7 @@ const Chip = (props: { readonly children: ReactNode; readonly className?: string
 const FeedEntry = (props: {
   readonly item: BacklogSummaryView
   readonly open: boolean
+  readonly selection: ReturnType<typeof useBacklogSelection>
   readonly cursor: boolean
   readonly select: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
@@ -65,6 +67,8 @@ const FeedEntry = (props: {
   return (
     <BacklogItemMenu
       item={item}
+      selection={props.selection.selected.has(item.id) ? props.selection.selection : undefined}
+      clearSelection={props.selection.clear}
       projectPaths={props.projectPaths}
       update={input => actions.update.mutate(input)}
       triage={id => actions.triage.mutate(id)}
@@ -75,13 +79,15 @@ const FeedEntry = (props: {
       <article
         tabIndex={-1}
         aria-label={`Item b:${String(item.id)}`}
-        onClick={() => {
+        data-selected={props.selection.selected.has(item.id) || undefined}
+        onClick={event => {
+          if (props.selection.click(item.id, event)) return
           if (!rename.renaming) rename.openSoon()
         }}
         onDoubleClick={rename.renameOnDoubleClick}
         className={cn(
           'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
-          props.open ? 'dshx:bg-accent/70' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
+          props.selection.selected.has(item.id) || props.open ? 'dshx:bg-accent/70' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
         )}
       >
         <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-[11px] dshx:ring-0" />
@@ -248,6 +254,7 @@ export const FeedView = (props: {
     rootMargin: '500px 0px 0px 0px',
   })
   const pinned = props.items.filter(item => item.pinned)
+  const selection = useBacklogSelection({ items: [...pinned, ...visible], openId: props.openId, scope: JSON.stringify(props.statuses) })
   const lastId = ordered.at(-1)?.id
 
   useLayoutEffect(() => {
@@ -275,6 +282,7 @@ export const FeedView = (props: {
         ) : null}
         <FeedEntry
           item={item}
+          selection={selection}
           open={item.id === props.openId}
           cursor={item.id === props.cursorId}
           select={props.select}
@@ -296,6 +304,8 @@ export const FeedView = (props: {
             <BacklogItemMenu
               key={item.id}
               item={item}
+              selection={selection.selected.has(item.id) ? selection.selection : undefined}
+              clearSelection={selection.clear}
               projectPaths={props.projectPaths}
               update={input => menuActions.update.mutate(input)}
               triage={id => menuActions.triage.mutate(id)}
@@ -305,8 +315,11 @@ export const FeedView = (props: {
             >
               <button
                 type="button"
-                onClick={() => props.select(item.id)}
-                className="dshx:flex dshx:h-7 dshx:max-w-64 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent"
+                onClick={event => {
+                  if (!selection.click(item.id, event)) props.select(item.id)
+                }}
+                data-selected={selection.selected.has(item.id) || undefined}
+                className="dshx:data-selected:bg-accent/70 dshx:flex dshx:h-7 dshx:max-w-64 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent"
               >
                 <ItemGlyphs.StatusIcon status={item.status} />
                 <span className="dshx:truncate">{item.title}</span>

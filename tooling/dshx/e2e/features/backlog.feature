@@ -148,6 +148,47 @@ Feature: Backlog
     And the selected board card context menu moves all selected items to "Todo"
     Then the board context menu status action updates selected items
 
+  @scenario:backlog.selection-visible-scope
+  Scenario: Never batch an item hidden by a filter or collapsed group
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Hidden selection item" is captured
+    And "Visible selection item" is captured
+    And the Items view is opened
+    And backlog selection is filtered after opening another item
+    Then only the visible item is selected
+
+  @scenario:backlog.selection-collapsed-scope
+  Scenario: Collapsing a selected Items group removes its batch targets
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Hidden selection item" is captured
+    And "Visible selection item" is captured
+    And the Items view is opened
+    Then collapsing the selected Inbox group clears its batch selection
+
+  @scenario:backlog.board-multi-drag
+  Scenario: Drag selected board cards together
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "First board selection" is captured
+    And "Second board selection" is captured
+    And "Third board selection" is captured
+    When the Board view selects multiple cards with modifier clicks
+    And the selected board cards are dragged to "todo"
+    Then the board context menu status action updates selected items
+
+  @scenario:backlog.board-drag-unselected
+  Scenario: Dragging an unselected card does not move another selection
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "First board selection" is captured
+    And "Second board selection" is captured
+    And "Third board selection" is captured
+    And only board card b:1 is selected
+    And the selected board cards are dragged to "todo"
+    Then only board card b:2 moved to Todo
+
   @scenario:backlog.multi-select-start-threads
   Scenario: Start one thread per selected backlog item
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted

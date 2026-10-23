@@ -84,7 +84,15 @@ Dormant and archived items stay in search, filters and backlinks. Any edit, move
 an item fresh again. The list groups the feed like a chat history (Pinned, Today, Yesterday, This week,
 Earlier). The board shows the same items by status; each card names its project beside the item id,
 a click opens the item's detail beside the board, a drag moves the card to another column, and its
-status ring changes status in place.
+status ring changes status in place. Dragging a selected card moves the whole selection; dragging an unselected
+card moves only that card. The drag preview names the count and dims every moving card.
+
+Feed, Inbox, Items, Board, search results and project item groups share Cmd/Ctrl-click toggles and inclusive
+Shift-click ranges. Plain clicks keep the existing open behavior and clear the batch. Right-click a selected
+item to apply the menu's counted actions to the entire selection, including the existing explicit permanent-delete
+confirmation. Filter changes and collapsed Items groups remove hidden targets; project overview groups keep separate
+selection scopes. Items also has select-all-visible and the batch action bar.
+
 Status, kind and drops update the view before the Host answers. While you type, chips under the capture
 box show the kind, tags and links triage will derive.
 

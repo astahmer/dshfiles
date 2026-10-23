@@ -42,14 +42,14 @@ import { BacklogFocusModel } from './backlog-focus.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
-import { sortBacklogItems, type BacklogSort } from './backlog-sort.js'
+import type { BacklogSort } from './backlog-sort.js'
 import { inboxThreadsFrom } from './inbox-threads.js'
 import { InboxView } from './inbox-view.js'
 import { inboxRows } from './inbox-model.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogPeek } from './item-peek.js'
-import { ItemsView, itemsOrder } from './items-view.js'
+import { ItemsView } from './items-view.js'
 import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
 import { ProjectFilterPicker } from './project-picker.js'
@@ -467,25 +467,17 @@ export const BacklogPanel = (props: {
   }
 
   const sort: BacklogSort = view === 'feed' || view === 'inbox' || view === 'items' ? stored.sort[view] : 'updated'
-  const viewOrder = () => {
-    if (showsResults) return all
-    if (view === 'inbox') return inboxRows({ items: inboxItems, threads: inboxThreads, sort }).map(row => row.item)
-    if (view === 'items') return itemsOrder(filteredItems, stored.groupBy, collapsed, sort)
-    if (view === 'feed')
-      return sortBacklogItems(
-        filteredItems.filter(item => !item.pinned),
-        sort,
-        'ascending',
-      )
-    return items
-  }
-  const order = viewOrder()
   const moveCursor = (step: number): void => {
-    const index = order.findIndex(item => item.id === (cursorId ?? openId))
-    const next = order[Math.min(order.length - 1, Math.max(0, index === -1 ? 0 : index + step))]
+    const rendered = Array.from(panelRoot.current?.querySelectorAll<HTMLElement>('[data-backlog-item-id]') ?? []).filter(
+      element => element.getClientRects().length > 0 && element.closest('aside, [role="dialog"]') === null,
+    )
+    const visibleIds = [...new Set(rendered.map(element => Number(element.dataset.backlogItemId)))]
+    const index = visibleIds.indexOf(cursorId ?? openId ?? -1)
+    const next = visibleIds[Math.min(visibleIds.length - 1, Math.max(0, index === -1 ? 0 : index + step))]
     if (next === undefined) return
-    setCursorId(next.id)
-    if (openId !== null || view === 'inbox') select(next.id)
+    setCursorId(next)
+    rendered.find(element => Number(element.dataset.backlogItemId) === next)?.scrollIntoView({ block: 'nearest' })
+    if (openId !== null || view === 'inbox') select(next)
   }
 
   const navigateToNearestItem = (): boolean => {
@@ -513,6 +505,8 @@ export const BacklogPanel = (props: {
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
+    if (event.target instanceof HTMLElement && event.target.closest('[role="menu"], [role="dialog"]') !== null) return
+    if (event.key === 'Enter' && event.target instanceof HTMLElement && event.target.closest('button, a[href]') !== null) return
     const viewKey = views[Number(event.key) - 1]
     if (viewKey !== undefined) switchView(viewKey)
     else if (event.key === 'j' || event.key === 'ArrowDown') moveCursor(1)
@@ -795,7 +789,13 @@ export const BacklogPanel = (props: {
               {view === 'projects' && (
                 <ProjectsView
                   query={debounced}
-                  matchingProjects={debounced === '' ? null : SearchScopes.matchingProjects(items)}
+                  matchingProjects={
+                    debounced === ''
+                      ? projectFilters.length === 0
+                        ? null
+                        : new Set(projectFilters.map(project => project ?? ''))
+                      : SearchScopes.matchingProjects(items)
+                  }
                   triageOff={triageOff}
                   selectedProject={selectedProject}
                   setSelectedProject={setSelectedProject}

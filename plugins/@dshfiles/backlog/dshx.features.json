@@ -190,7 +190,7 @@
     {
       "id": "multi-select-items",
       "title": "Select items in ranges and batch-edit them",
-      "summary": "The Items table supports click-to-open, Shift-click ranges, Cmd/Ctrl-click additive toggles, select-all-visible, batch status, kind and pin updates, and one thread for the whole selection from the action bar or the row's context menu.",
+      "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"First selection item\"",
@@ -222,6 +222,15 @@
           "id": "backlog.multi-select",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
+        { "kind": "gherkin", "id": "backlog.board-multi-select", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        { "kind": "gherkin", "id": "backlog.selection-collapsed-scope", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        { "kind": "gherkin", "id": "backlog.board-multi-drag", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        { "kind": "gherkin", "id": "backlog.board-drag-unselected", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        { "kind": "gherkin", "id": "backlog.selection-visible-scope", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        { "kind": "gherkin", "id": "backlog.list-selection-feed", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
+        { "kind": "gherkin", "id": "backlog.list-selection-inbox", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
+        { "kind": "gherkin", "id": "backlog.list-selection-search", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
+        { "kind": "gherkin", "id": "backlog.list-selection-projects", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
         {
           "kind": "unit-test",
           "id": "backlog.multi-select-toggle",
@@ -273,6 +282,7 @@
       ],
       "externalDependencies": [],
       "verification": [
+        { "kind": "gherkin", "id": "backlog.item-context-actions", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
         {
           "kind": "unit-test",
           "id": "backlog.selection-open-item-seed",
@@ -1126,11 +1136,6 @@
         {
           "kind": "gherkin",
           "id": "backlog.multi-select-start-threads",
-          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
-        },
-        {
-          "kind": "gherkin",
-          "id": "backlog.item-context-actions",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

@@ -73,16 +73,23 @@ const contextMenu = (page: Page) => page.getByRole('menu')
 const menuItemTextPosition = async (item: Locator, label: string): Promise<number> =>
   item.evaluate((element, expectedLabel) => {
     const textWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    const textContents: string[] = []
+    const textNodes: Text[] = []
     let textNode = textWalker.nextNode()
     while (textNode !== null) {
-      if (textNode.textContent?.trim() === expectedLabel) {
-        const textRange = document.createRange()
-        textRange.selectNodeContents(textNode)
-        return textRange.getBoundingClientRect().left
+      if (textNode instanceof Text) {
+        textContents.push(textNode.textContent)
+        if (textNode.textContent.trim() !== '') textNodes.push(textNode)
       }
       textNode = textWalker.nextNode()
     }
-    throw new Error(`Could not find the label "${expectedLabel}" in the context-menu item`)
+    const combinedText = textContents.join('').trim()
+    const firstTextNode = textNodes[0]
+    if (!combinedText.includes(expectedLabel) || firstTextNode === undefined)
+      throw new Error(`Could not find the label "${expectedLabel}" in the context-menu item`)
+    const textRange = document.createRange()
+    textRange.selectNodeContents(firstTextNode)
+    return textRange.getBoundingClientRect().left
   }, label)
 
 const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
@@ -423,10 +430,14 @@ When('backlog item b:{int} copies its ID and link from the context menu', async 
 When('backlog item b:{int} is moved to {string} from its feed context menu', async ({ page }: { page: Page }, id: number, status: string) => {
   const target = await contextTarget(page, id, 'feed')
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await contextMenu(page)
+    .getByRole('menuitem', { name: /^Status(?: \(\d+\))?$/u })
+    .hover()
   await page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true }).click()
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await contextMenu(page)
+    .getByRole('menuitem', { name: /^Status(?: \(\d+\))?$/u })
+    .hover()
   await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true })).toHaveAttribute('aria-checked', 'true')
   await page.keyboard.press('Escape')
 })
@@ -616,10 +627,68 @@ When('the Board view selects multiple cards with modifier clicks', async ({ page
   await expect(cardFor(3)).toHaveAttribute('aria-selected', 'true')
 })
 
+Then('collapsing the selected Inbox group clears its batch selection', async ({ page }: { page: Page }) => {
+  await page.getByRole('checkbox', { name: 'Select all visible items', exact: true }).click()
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Toggle inbox', exact: true }).click()
+  await recordAssertion(page, 'backlog-selection-collapsed-scope', async () => {
+    await expect(page.getByRole('row', { name: 'Item b:1', exact: true })).toHaveCount(0)
+    await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Clear selection', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('backlog selection is filtered after opening another item', async ({ page }: { page: Page }) => {
+  await page.getByRole('row', { name: 'Item b:1', exact: true }).getByText('Hidden selection item', { exact: true }).click()
+  await searchInput(page).fill('Visible selection item')
+  await searchInput(page).press('Enter')
+  await expect(page.getByRole('listitem', { name: 'Item b:1', exact: true })).toHaveCount(0)
+  await page.getByRole('listitem', { name: 'Item b:2', exact: true }).click({ modifiers: ['ControlOrMeta'] })
+})
+
+Then('only the visible item is selected', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-visible-scope', async () => {
+    const visible = page.getByRole('listitem', { name: 'Item b:2', exact: true })
+    await expect(visible).toHaveAttribute('data-selected', 'true')
+    await expect(page.locator('[data-selected]')).toHaveCount(1)
+    await visible.click({ button: 'right' })
+    await expect(contextMenu(page)).not.toContainText('2 selected')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('only board card b:{int} is selected', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
+  await page.getByRole('article', { name: `Card b:${String(id)}`, exact: true }).click({ modifiers: ['ControlOrMeta'] })
+})
+
+Then('only board card b:2 moved to Todo', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-board-unselected-drag', async () => {
+    await expect(page.locator('[data-backlog-column="todo"]').getByRole('article', { name: 'Card b:2', exact: true })).toBeVisible()
+    for (const id of [1, 3])
+      await expect(page.locator('[data-backlog-column="inbox"]').getByRole('article', { name: `Card b:${String(id)}`, exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the selected board cards are dragged to {string}', async ({ page }: { page: Page }, status: string) => {
+  const card = page.getByRole('article', { name: 'Card b:2', exact: true })
+  const source = await card.boundingBox()
+  const target = await page.locator(`[data-backlog-column="${status}"]`).boundingBox()
+  if (source === null || target === null) throw new Error('Board drag bounds are unavailable')
+  await page.mouse.move(source.x + 30, source.y + 20)
+  await page.mouse.down()
+  await page.mouse.move(target.x + 40, target.y + 60, { steps: 12 })
+  await page.mouse.up()
+})
+
 When('the selected board card context menu moves all selected items to {string}', async ({ page }: { page: Page }, status: string) => {
   await page.getByRole('article', { name: 'Card b:2', exact: true }).click({ button: 'right' })
   await expect(contextMenu(page)).toContainText('3 selected')
-  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await contextMenu(page)
+    .getByRole('menuitem', { name: /^Status(?: \(\d+\))?$/u })
+    .hover()
   await page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true }).click()
 })
 
@@ -647,7 +716,9 @@ When("the selected item's context menu moves all selected items to {string}", as
   const row = page.getByRole('row', { name: 'Item b:2', exact: true })
   await row.click({ button: 'right' })
   await expect(contextMenu(page)).toContainText('2 selected')
-  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await contextMenu(page)
+    .getByRole('menuitem', { name: /^Status(?: \(\d+\))?$/u })
+    .hover()
   await page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true }).click()
 })
 

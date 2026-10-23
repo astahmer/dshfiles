@@ -1,3 +1,4 @@
+import { useBacklogSelection } from './use-backlog-selection.js'
 import { SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
@@ -61,6 +62,7 @@ export const SearchResults = (props: {
   readonly projectPaths: readonly string[]
   readonly triageOff: boolean
 }): JSX.Element => {
+  const selection = useBacklogSelection({ items: props.items, openId: props.openId, scope: JSON.stringify([props.query, props.statuses]) })
   const terms = termsOf(props.query)
   const actions = useBacklogActions()
   return (
@@ -88,6 +90,8 @@ export const SearchResults = (props: {
           <BacklogItemMenu
             key={item.id}
             item={item}
+            selection={selection.selected.has(item.id) ? selection.selection : undefined}
+            clearSelection={selection.clear}
             projectPaths={props.projectPaths}
             update={input => actions.update.mutate(input)}
             triage={id => actions.triage.mutate(id)}
@@ -96,13 +100,20 @@ export const SearchResults = (props: {
             openItem={props.select}
           >
             <li
+              data-selected={selection.selected.has(item.id) || undefined}
               tabIndex={-1}
               aria-label={`Item b:${String(item.id)}`}
-              onClick={() => props.select(item.id)}
+              onClick={event => {
+                if (!selection.click(item.id, event)) props.select(item.id)
+              }}
               onMouseMove={() => props.hover(item.id)}
               className={cn(
                 'dshx:flex dshx:cursor-default dshx:flex-col dshx:gap-1 dshx:border-b dshx:border-border/50 dshx:px-4 dshx:py-2.5 dshx:transition-colors dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
-                item.id === props.openId ? 'dshx:bg-accent/80' : item.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/30',
+                selection.selected.has(item.id) || item.id === props.openId
+                  ? 'dshx:bg-accent/80'
+                  : item.id === props.cursorId
+                    ? 'dshx:bg-accent/45'
+                    : 'dshx:hover:bg-accent/30',
               )}
             >
               <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-[13px]">

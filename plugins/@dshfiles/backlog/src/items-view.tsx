@@ -284,27 +284,28 @@ export const ItemsView = (props: {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
   const selectionAnchor = useRef<number | null>(null)
-  useEffect(() => {
-    const availableIds = new Set(props.items.map(item => item.id))
-    setSelected(current => {
-      const next = new Set([...current].filter(id => availableIds.has(id)))
-      return next.size === current.size ? current : next
-    })
-    if (selectionAnchor.current !== null && !availableIds.has(selectionAnchor.current)) selectionAnchor.current = null
-  }, [props.items])
   const groups = useMemo(() => groupsOf(props.items, props.groupBy), [props.items, props.groupBy])
   const orderedIds = useMemo(
     () => itemsOrder(props.items, props.groupBy, props.collapsed, props.sort).map(item => item.id),
     [props.items, props.groupBy, props.collapsed, props.sort],
   )
+  const visibleOpenId = props.openId !== null && orderedIds.includes(props.openId) ? props.openId : null
+  useEffect(() => {
+    const availableIds = new Set(orderedIds)
+    setSelected(current => {
+      const next = new Set([...current].filter(id => availableIds.has(id)))
+      return next.size === current.size ? current : next
+    })
+    if (selectionAnchor.current !== null && !availableIds.has(selectionAnchor.current)) selectionAnchor.current = null
+  }, [orderedIds])
   const toggle = (id: number): void => {
     selectionAnchor.current = id
     setSelected(BacklogSelection.toggle(selected, id))
   }
   const selectWithModifiers = (id: number, shiftKey: boolean, additive: boolean): void => {
-    const base = BacklogSelection.seed(selected, props.openId)
+    const base = BacklogSelection.seed(selected, visibleOpenId)
     if (shiftKey) {
-      const anchorId = selectionAnchor.current ?? props.openId ?? id
+      const anchorId = selectionAnchor.current ?? visibleOpenId ?? id
       setSelected(BacklogSelection.extend(base, orderedIds, anchorId, id))
       return
     }
@@ -350,7 +351,7 @@ export const ItemsView = (props: {
           .map((item): Entry => ({ kind: 'row', key: `r:${String(item.id)}`, item }))
         return [header, ...rows]
       }),
-    [visibleGroups, props.collapsed],
+    [visibleGroups, props.collapsed, props.sort],
   )
   const scroller = useRef<HTMLDivElement>(null)
   // Only the rows in view are mounted, so a backlog of thousands scrolls like one of twenty.

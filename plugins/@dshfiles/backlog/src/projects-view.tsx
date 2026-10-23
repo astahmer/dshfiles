@@ -1,3 +1,4 @@
+import { useBacklogSelection } from './use-backlog-selection.js'
 import { ArrowLeftIcon, FolderGit2Icon, GitCommitHorizontalIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, type ReactNode } from 'react'
@@ -72,6 +73,7 @@ const Card = (props: { readonly title: string; readonly action?: ReactNode; read
 )
 
 const ItemLine = (props: {
+  readonly selection: ReturnType<typeof useBacklogSelection>
   readonly item: BacklogSummaryView
   readonly select: (id: number) => void
   readonly startThread: (items: readonly StartThreadItem[]) => void
@@ -82,6 +84,8 @@ const ItemLine = (props: {
 }): JSX.Element => (
   <BacklogItemMenu
     item={props.item}
+    selection={props.selection.selected.has(props.item.id) ? props.selection.selection : undefined}
+    clearSelection={props.selection.clear}
     projectPaths={props.projectPaths}
     update={props.update}
     triage={props.triage}
@@ -90,13 +94,16 @@ const ItemLine = (props: {
     openItem={props.select}
   >
     <li
+      data-selected={props.selection.selected.has(props.item.id) || undefined}
       tabIndex={-1}
       aria-label={`Item b:${String(props.item.id)}`}
-      className="dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
+      className="dshx:data-selected:bg-accent/70 dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
     >
       <button
         type="button"
-        onClick={() => props.select(props.item.id)}
+        onClick={event => {
+          if (!props.selection.click(props.item.id, event)) props.select(props.item.id)
+        }}
         className="dshx:flex dshx:h-9 dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
       >
         <ItemGlyphs.StatusIcon status={props.item.status} />
@@ -139,6 +146,10 @@ const Overview = (props: {
     .filter(item => item.activity.last !== null)
     .sort((left, right) => right.lastActivityAt - left.lastActivityAt)
     .slice(0, 8)
+  const scope = JSON.stringify([project.key, props.query])
+  const needsSelection = useBacklogSelection({ items: needsYou, openId: null, scope })
+  const activeSelection = useBacklogSelection({ items: active.slice(0, 12), openId: null, scope })
+  const recentSelection = useBacklogSelection({ items: recent, openId: null, scope })
   const threads = [...new Set(projectItems.flatMap(item => item.links.filter(link => link.type === 'thread').map(link => link.target)))]
   const revisions = [...new Set(projectItems.flatMap(item => item.links.filter(link => link.type === 'revision').map(link => link.target)))]
   const agents = project.actors.filter(actor => actor.startsWith('agent:'))
@@ -200,6 +211,14 @@ const Overview = (props: {
                   <ItemLine
                     key={item.id}
                     item={item}
+                    selection={{
+                      ...needsSelection,
+                      click: (id, event) => {
+                        activeSelection.clear()
+                        recentSelection.clear()
+                        return needsSelection.click(id, event)
+                      },
+                    }}
                     select={props.select}
                     startThread={props.startThread}
                     projectPaths={props.projectPaths}
@@ -218,6 +237,14 @@ const Overview = (props: {
                 <ItemLine
                   key={item.id}
                   item={item}
+                  selection={{
+                    ...activeSelection,
+                    click: (id, event) => {
+                      needsSelection.clear()
+                      recentSelection.clear()
+                      return activeSelection.click(id, event)
+                    },
+                  }}
                   select={props.select}
                   startThread={props.startThread}
                   projectPaths={props.projectPaths}
@@ -263,6 +290,8 @@ const Overview = (props: {
                 <BacklogItemMenu
                   key={item.id}
                   item={item}
+                  selection={recentSelection.selected.has(item.id) ? recentSelection.selection : undefined}
+                  clearSelection={recentSelection.clear}
                   projectPaths={props.projectPaths}
                   update={input => actions.update.mutate(input)}
                   triage={id => actions.triage.mutate(id)}
@@ -271,14 +300,19 @@ const Overview = (props: {
                   openItem={props.select}
                 >
                   <li
+                    data-selected={recentSelection.selected.has(item.id) || undefined}
                     tabIndex={-1}
                     aria-label={`Item b:${String(item.id)}`}
-                    className="dshx:flex dshx:gap-2.5 dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
+                    className="dshx:data-selected:bg-accent/70 dshx:flex dshx:gap-2.5 dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50"
                   >
                     <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor} className="dshx:mt-0.5" />
                     <button
                       type="button"
-                      onClick={() => props.select(item.id)}
+                      onClick={event => {
+                        needsSelection.clear()
+                        activeSelection.clear()
+                        if (!recentSelection.click(item.id, event)) props.select(item.id)
+                      }}
                       className="dshx:min-w-0 dshx:flex-1 dshx:text-left dshx:text-muted-foreground dshx:hover:text-foreground"
                     >
                       <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(item.activity.last?.actor)}</span>{' '}
@@ -321,7 +355,7 @@ export const ProjectsView = (props: {
   )
   const matchingProjects = props.matchingProjects
   const shown = matchingProjects === null ? projects : projects.filter(project => matchingProjects.has(project.key))
-  const selected = projects.find(project => project.key === props.selectedProject)
+  const selected = shown.find(project => project.key === props.selectedProject)
   return (
     <div className="dshx:@container dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
       {selected !== undefined ? (
