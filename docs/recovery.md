@@ -6,7 +6,7 @@ every turn failing — do this first, then debug from inside a working DSH.
 ## 1. Start the last known good DSH (about 20 seconds)
 
 ```sh
-dsh lkg
+dsh-lkg
 ```
 
 Open <http://127.0.0.1:3099> (the tokenized URL is printed). This is a frozen,
@@ -26,7 +26,7 @@ and never writes to `~/.dsh`. Work done in it stays in
 | `DSH_LKG_PORT=<port>` | listen elsewhere than 3099       |
 | `DSH_LKG_LIVE_HOME`   | clone data from another DSH home |
 
-If `dsh lkg` is not defined (a shell without the Nix setup), run
+If `dsh-lkg` is not defined (a shell without the Nix setup), run
 `~/.dsh-lkg/bin/dsh-recover` directly.
 
 ## 2. Find out what broke
@@ -77,6 +77,14 @@ node scripts/dsh-lkg/cli.mjs list               # known-good snapshots
   `modules/dsh.nix` and `assets/dsh/supervise-web.mjs` in nixfiles).
 - **`node-addon-require-builtin unsupported`**: the command ran on nixpkgs Node;
   use `dsh` through the shell function, or `fnm exec --using=v22.23.3 -- …`.
+- **`No usable native binding found for node-addon-require-builtin-darwin-arm64`**:
+  the global install was laid out in pnpm's global virtual store
+  (`node_modules/@deepseek-ai/dsh` resolves into `store/v11/links`), where the
+  addon's loader cannot see its platform package. A `pnpm patch`, `pnpm install`
+  or `pnpm add -g` run with `enableGlobalVirtualStore` on does that. Rerun
+  `pnpm install --frozen-lockfile --force --config.enableGlobalVirtualStore=false`
+  in the global install root, the directory above `node_modules/.pnpm` in the
+  `dsh` shim's `cmd-shim-target`.
 
 ## 3. Fix, then let the snapshot follow
 

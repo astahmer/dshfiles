@@ -216,7 +216,7 @@ measured evidence; remove abandoned experiments from every profile they reached.
 
 Never upgrade the global `@deepseek-ai/dsh` in place; use
 `scripts/dsh-lkg/cli.mjs upgrade <version>`, which proves the new core against
-the live profile first. When DSH is broken, the user's way out is `dsh lkg`
+the live profile first. When DSH is broken, the user's way out is `dsh-lkg`
 (port 3099, with their accounts and threads). The runbook is
 [`docs/recovery.md`](docs/recovery.md).
 

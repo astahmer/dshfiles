@@ -26,4 +26,4 @@ See [incremental-checks](../docs/incremental-checks.md) for package caching, JJ-
 ## Last known good
 
 [`dsh-lkg/`](dsh-lkg/README.md) snapshots a complete working DSH runtime and
-restores it with `dsh-recover`. The nixfiles `dsh lkg` command calls its CLI.
+restores it with `dsh-recover`. The nixfiles `dsh-lkg` alias runs `dsh-recover`.
