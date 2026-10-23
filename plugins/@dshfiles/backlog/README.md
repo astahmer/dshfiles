@@ -310,10 +310,12 @@ search result labels the item's project.
 
 The Inbox holds open items whose `attention` is set (`needs-input`, `blocked`, `waiting`, set by agents with
 `backlog_update` or by you) and open items with a triage suggestion. Closing an item clears agent/system attention
-and its suggestion. With `inboxThreads` (`failures` by default)
-it also lists threads from the sidebar's unread list that are linked to an item and whose last turn was
-blocked or errored (`all` adds finished turns waiting for review); acknowledging one clears it in the
-sidebar too. Native `ask_user_question` forms stay in their threads: listing them across sessions is the
+and its suggestion. Each open item appears once, combining its attention, suggestion and linked unread
+thread reasons. With `inboxThreads` (`failures` by default), blocked or errored turns add their open linked
+items (`all` adds finished turns waiting for review). Every distinct thread keeps its own open and acknowledge
+actions; acknowledging a thread clears it in the sidebar too, without resolving item attention or dismissing
+its suggestion. Filters and counts use unique items, and closed done/dropped items never return through
+historical threads. Native `ask_user_question` forms stay in their threads: listing them across sessions is the
 expensive scan recorded as a Host gap.
 
 In the inspector, thread links show the thread's title and whether it is running, and a running linked

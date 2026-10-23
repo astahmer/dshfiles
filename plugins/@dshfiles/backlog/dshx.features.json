@@ -702,7 +702,7 @@
     {
       "id": "attention-inbox",
       "title": "Attention Inbox across items and threads",
-      "summary": "Open items asking for input, blocked or waiting, open items with a triage suggestion, and (setting inboxThreads) linked threads whose last turn was blocked or errored. Closing an item clears agent/system attention and suggestions; read state is separate from requiring action, and snoozed items return later.",
+      "summary": "One row per open backlog item combines attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. Thread acknowledgement never resolves item attention or suggestions; done/dropped historical thread items stay excluded, and snoozed items return later.",
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
@@ -720,6 +720,12 @@
           "kind": "gherkin",
           "id": "backlog.attention-inbox",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.inbox-unit-unique-items",
+          "file": "plugins/@dshfiles/backlog/src/inbox-model.test.ts",
+          "testName": "merges ordinary item and multiple unread thread reasons into one row with distinct actions"
         },
         {
           "kind": "unit-test",

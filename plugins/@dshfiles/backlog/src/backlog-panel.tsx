@@ -44,7 +44,8 @@ import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
 import { sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import { inboxThreadsFrom } from './inbox-threads.js'
-import { InboxView, inboxOrder } from './inbox-view.js'
+import { InboxView } from './inbox-view.js'
+import { inboxRows } from './inbox-model.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogPeek } from './item-peek.js'
@@ -433,7 +434,10 @@ export const BacklogPanel = (props: {
       }),
     [attention.data, attentionOwnerMissing, all, inboxThreadsMode, props],
   )
-  const unread = inboxItems.filter(item => item.acknowledgedAt === null || item.acknowledgedAt < item.lastActivityAt).length
+  const inboxEntries = inboxRows({ items: inboxItems, threads: inboxThreads })
+  const unread = inboxEntries.filter(
+    row => row.threads.length > 0 || row.item.acknowledgedAt === null || row.item.acknowledgedAt < row.item.lastActivityAt,
+  ).length
   const tags = useMemo(() => [...new Set(all.flatMap(item => item.tags))].sort(), [all])
   const threads = props.listThreads()
   const projectPaths = useMemo(() => {
@@ -465,7 +469,7 @@ export const BacklogPanel = (props: {
   const sort: BacklogSort = view === 'feed' || view === 'inbox' || view === 'items' ? stored.sort[view] : 'updated'
   const viewOrder = () => {
     if (showsResults) return all
-    if (view === 'inbox') return inboxOrder(inboxItems, 'all', sort)
+    if (view === 'inbox') return inboxRows({ items: inboxItems, threads: inboxThreads, sort }).map(row => row.item)
     if (view === 'items') return itemsOrder(filteredItems, stored.groupBy, collapsed, sort)
     if (view === 'feed')
       return sortBacklogItems(
@@ -576,14 +580,14 @@ export const BacklogPanel = (props: {
               >
                 <Icon aria-hidden className="dshx:size-3.5" />
                 <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
-                {entry === 'inbox' && inboxItems.length + inboxThreads.length > 0 ? (
+                {entry === 'inbox' && inboxEntries.length > 0 ? (
                   <span
                     className={cn(
                       'dshx:min-w-4 dshx:rounded-full dshx:px-1 dshx:text-center dshx:text-[10px] dshx:tabular-nums',
                       unread > 0 ? 'dshx:bg-info dshx:text-white' : 'dshx:bg-muted dshx:text-muted-foreground',
                     )}
                   >
-                    {inboxItems.length + inboxThreads.length}
+                    {inboxEntries.length}
                   </span>
                 ) : null}
               </button>
