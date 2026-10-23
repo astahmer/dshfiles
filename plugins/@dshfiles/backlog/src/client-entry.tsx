@@ -113,7 +113,7 @@ export default defineClient({
           return []
         }
       },
-      dispatch: async ({ item, text, files, open }) => {
+      dispatch: async ({ item, text, open }) => {
         const mention = AgentComments.mention(text)
         if (mention === null) return { kind: 'skipped', reason: 'no-mention' }
         let agent
@@ -131,7 +131,6 @@ export default defineClient({
           AgentComments.request({ items, agent, task: mention.task, target: defaultTargetFor(items, projects), open }),
         )
         if (!started.ok) return { kind: 'failed', reason: started.reason }
-        await api.safe.comment(AgentComments.comment({ id: item.id, text, files }))
         return { kind: 'dispatched' }
       },
     }

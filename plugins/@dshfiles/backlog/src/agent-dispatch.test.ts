@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { Agents, type Agent } from '@dshfiles/agents/contract'
 
-import type { BacklogFileInput } from './item.js'
 import { AgentComments } from './agent-dispatch.js'
 import { defaultTargetFor, type StartThreadItem } from './start-thread.js'
 
@@ -23,19 +22,6 @@ test('a leading mention splits the handle from the task', () => {
   assert.deepEqual(AgentComments.mention('@dsh'), { handle: 'dsh', task: '' })
   assert.equal(AgentComments.mention('please ask @reviewer later'), null)
   assert.equal(AgentComments.mention('no mention here'), null)
-})
-
-test('a dispatched reply keeps its files on the reply event', () => {
-  const files: BacklogFileInput[] = [{ id: 'reply-image', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }]
-  assert.deepEqual(AgentComments.comment({ id: item.id, text: '@reviewer inspect this', files }), {
-    id: item.id,
-    text: '@reviewer inspect this',
-    files,
-  })
-  assert.deepEqual(AgentComments.comment({ id: item.id, text: '@reviewer inspect this', files: [] }), {
-    id: item.id,
-    text: '@reviewer inspect this',
-  })
 })
 
 test('an agent comment starts on the agent preset, route and instructions', () => {

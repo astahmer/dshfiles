@@ -61,14 +61,6 @@ export class AgentComments {
   }
 
   /** Reply files belong to the comment event, not the item's shared attachment list. */
-  static comment(input: { readonly id: number; readonly text: string; readonly files: readonly BacklogFileInput[] }): {
-    readonly id: number
-    readonly text: string
-    readonly files?: BacklogFileInput[]
-  } {
-    return input.files.length === 0 ? { id: input.id, text: input.text } : { ...input, files: [...input.files] }
-  }
-
   /**
    * The start-thread request for an agent comment: the agent's preset and route, the item context the thread must name,
    * and the comment text. The Host prepends the agent's identity and instructions to the message it is handed. The

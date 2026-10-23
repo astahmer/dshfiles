@@ -543,14 +543,16 @@ const CommentBox = (props: {
     setFailed(null)
     try {
       setText('')
+      attachments.clear()
       const outcome = await dispatch.dispatch({ item: props.item, text, files: files.map(fileInput), open: props.openCreatedByDefault })
       if (outcome.kind === 'failed') {
         setText(current => (current === '' ? text : current))
+        attachments.restore(files)
         setFailed(outcome.reason)
-      } else if (outcome.kind === 'skipped') comment(files)
-      else if (files.length > 0) attachments.clear()
+      } else comment(files)
     } catch (error) {
       setText(current => (current === '' ? text : current))
+      attachments.restore(files)
       setFailed(errorMessage(error, 'The reply was not sent.'))
     } finally {
       setPending(false)
