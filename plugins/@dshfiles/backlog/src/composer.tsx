@@ -417,6 +417,7 @@ export const Composer = (props: {
         submit()
       }}
       {...drop.dragProps}
+      data-composer-card
       className={cn(
         'dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:transition-[border-color,box-shadow] dshx:focus-within:border-input dshx:focus-within:shadow-sm',
         failed === null ? 'dshx:border-border' : 'dshx:border-destructive/60',

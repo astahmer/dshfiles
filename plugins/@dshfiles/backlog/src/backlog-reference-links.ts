@@ -3,7 +3,7 @@ import { BacklogAnchorModel } from './backlog-anchor.js'
 
 const referenceSelector = '[data-dshfiles-backlog-reference]'
 /** Inline code holds a written reference; a fenced block holds an example, and links already carry their own target. */
-const ignoredTextSelector = `a, button, pre, [role="link"]:not(${referenceSelector}), [data-composer-card], [data-dshfiles-backlog-preview], ${referenceSelector}`
+const ignoredTextSelector = `a, button, pre, [role="link"]:not(${referenceSelector}), [data-composer-card], [data-ref-chip], [data-dshfiles-backlog-preview], ${referenceSelector}`
 const messageBlocksSelector =
   '[data-conversation-session] [class*="_userRow"] [class*="_bubble"], [data-conversation-session] p, [data-conversation-session] li, [data-conversation-session] blockquote, [data-conversation-session] h1, [data-conversation-session] h2, [data-conversation-session] h3, [data-conversation-session] h4, [data-conversation-session] h5, [data-conversation-session] h6, [data-conversation-session] td'
 
@@ -81,8 +81,8 @@ const dirtyBlocks = (records: readonly MutationRecord[]): readonly Element[] => 
   return [...blocks]
 }
 
-const previewAt = (element: Element): boolean => {
-  const id = Number(element.getAttribute('data-dshfiles-backlog-reference'))
+/** Ask the shared card to show one item above an element the caller rendered itself. */
+export const previewBacklogReference = (id: number, element: Element): boolean => {
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
   const parsed = backlogReferencePreviewRequestSchema.safeParse({ id, anchorId: BacklogAnchorModel.idOf(element), anchor })
@@ -90,6 +90,8 @@ const previewAt = (element: Element): boolean => {
   window.dispatchEvent(new CustomEvent(backlogReferencePreviewEvent, { detail: parsed.data }))
   return true
 }
+
+const previewAt = (element: Element): boolean => previewBacklogReference(Number(element.getAttribute('data-dshfiles-backlog-reference')), element)
 
 const linkFrom = (target: EventTarget | null): Element | null =>
   target instanceof Element && target.closest('[data-composer-card]') === null ? target.closest(referenceSelector) : null

@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems } from './item.js'
+import { formatBacklogMention } from './backlog-mention-text.js'
 
 const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp|backlog|b):/iu
 /** Plain `@` shows a few items next to threads and files; `@b:` lists the backlog alone. */
@@ -73,7 +74,7 @@ const createSource = (options: {
       signal.throwIfAborted()
       const value = decodeRef(ref)
       if (value === null) throw new Error('Backlog reference is invalid.')
-      return `b:${String(value.id)} ${JSON.stringify(value.title)} (backlog item; backlog_get has its details)`
+      return formatBacklogMention(value)
     },
   },
 })

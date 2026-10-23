@@ -17,10 +17,16 @@ export interface BacklogReferenceMatch {
   readonly end: number
 }
 
+/** The item number a written `b:<id>` token names, or undefined when it cannot name an item. */
+export const backlogReferenceId = (raw: string | undefined): number | undefined => {
+  const id = Number(raw)
+  return Number.isSafeInteger(id) && id > 0 && id <= MAX_ITEM_ID ? id : undefined
+}
+
 export const backlogReferenceMatches = (text: string): readonly BacklogReferenceMatch[] =>
   [...text.matchAll(itemReference)].flatMap(match => {
-    const id = Number(match[1])
-    if (!Number.isSafeInteger(id) || id <= 0 || id > MAX_ITEM_ID) return []
+    const id = backlogReferenceId(match[1])
+    if (id === undefined) return []
     const start = match.index ?? 0
     return [{ id, start, end: start + match[0].length }]
   })

@@ -570,10 +570,10 @@
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\"`, which the thread signal turns into a link and a start.",
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; …)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
       "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": ["listed", "inserted", "sent"],
+      "states": ["listed", "inserted", "sent", "rendered"],
       "failureModes": [
         "A failing search returns no backlog rows; the other @ groups are unaffected.",
         "An invalid chip reference blocks the send instead of sending broken text."
@@ -583,6 +583,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.backlog-mentions",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.sent-mention-chip",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {
@@ -602,7 +607,7 @@
     {
       "id": "reference-preview",
       "title": "Preview a referenced item from a conversation",
-      "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",
+      "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",
       "reach": [
         "seed tool-call-thread",
         "click button \"Backlog\"",
@@ -617,8 +622,8 @@
         "click menuitemradio \"dshx_fake_commandcode/gpt-6-luna\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Working on b:1\"",
         "press Enter",
-        "expect link \"Preview backlog item b:1\"",
-        "click link \"Preview backlog item b:1\"",
+        "expect button \"Backlog item b:1\"",
+        "click button \"Backlog item b:1\"",
         "expect text \"Backlog · b:1\"",
         "expect text \"Ship the backlog reference preview\"",
         "expect img \"red.png\"",
@@ -627,11 +632,15 @@
         "press ArrowRight",
         "expect img \"blue.png\"",
         "press Escape",
-        "expect button \"Open in Backlog\""
+        "expect button \"Open in Backlog\"",
+        "press Escape",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Following b:1\"",
+        "press Enter",
+        "expect button \"Backlog item b:1\""
       ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["idle", "loading", "linked", "gallery-open", "navigating", "missing", "opened"],
+      "states": ["idle", "loading", "linked", "sent", "gallery-open", "navigating", "missing", "opened"],
       "failureModes": [
         "A deleted item says it no longer exists inline without failing the conversation.",
         "A token that cannot name an item in the Host's id shape stays plain text."
@@ -660,6 +669,18 @@
           "id": "backlog.reference-preview-focus",
           "file": "plugins/@dshfiles/backlog/src/backlog-focus.test.ts",
           "testName": "keeps the item a reference asked for until the panel takes it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reference-preview-sent-chip",
+          "file": "plugins/@dshfiles/backlog/src/backlog-user-text.test.tsx",
+          "testName": "renders the composer chip shape and opens the shared preview when clicked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.reference-preview-serialized-text",
+          "file": "plugins/@dshfiles/backlog/src/backlog-mention-text.test.ts",
+          "testName": "reads a whole serialized mention back into its id and title"
         }
       ]
     },

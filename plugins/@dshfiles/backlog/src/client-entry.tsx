@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -17,6 +18,8 @@ import { backlogApi, BacklogViews } from './api.js'
 import { ReplyRouting } from './reply-routing.js'
 import { BacklogFocusModel } from './backlog-focus.js'
 import { BacklogMentions } from './backlog-mentions.js'
+import { BacklogMentionChip } from './backlog-mention-chip.js'
+import { backlogUserTextRule } from './backlog-user-text.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { installBacklogReferenceLinks } from './backlog-reference-links.js'
@@ -29,9 +32,10 @@ const PANEL_ID = 'dshfiles-backlog-panel'
 
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers', 'uiConversation'],
   setup(ctx, decorate) {
     ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
+    ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
     const api = createApiClient(ctx, backlogApi)
     const agents = createApiClient(ctx, agentsApi)
     const startOne = async (request: StartThreadRequest, report: boolean): Promise<StartThreadOutcome> => {
@@ -260,6 +264,9 @@ export default defineClient({
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-reference-preview', order: 121 }, decorate(ReferenceOverlay)),
+    )
+    ctx.slots.inject('conversation.user.text.node', () =>
+      ctx.slots.register({ name: 'conversation.user.text.node', key: 'backlog', priority: 100 }, BacklogMentionChip),
     )
   },
 })

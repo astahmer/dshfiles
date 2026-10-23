@@ -783,9 +783,27 @@ When('a thread on the fake model writes {string}', async ({ page }: { page: Page
   await sendMessage(page, text)
 })
 
+When('a message with the serialized backlog mention is sent', async ({ page }: { page: Page }) => {
+  await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
+  // The composer serializes a picked chip this way, so the sent text is exactly what a real mention produces.
+  await sendMessage(page, 'Following b:1 "Ship the backlog reference preview" (backlog item; backlog_get has its details)')
+})
+
+Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
+  await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
+    const chip = page.getByRole('button', { name: `Backlog item ${reference} ${title}`, exact: true })
+    await expect(chip).toBeVisible()
+    // The serialized title and tool hint must not stay in the bubble.
+    await expect(page.getByText('backlog_get has its details')).toHaveCount(0)
+    await chip.click()
+    await expect(page.locator('[data-dshfiles-backlog-preview]')).toContainText(title)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the inline backlog preview shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-reference-inline-preview', async () => {
-    const reference = page.getByRole('link', { name: 'Preview backlog item b:1', exact: true })
+    const reference = page.getByRole('button', { name: 'Backlog item b:1', exact: true })
     await expect(reference).toBeVisible()
     const preview = page.locator('[data-dshfiles-backlog-preview]')
     // A scroll closes the card by design, and the conversation can still settle right after the turn lands, so ask

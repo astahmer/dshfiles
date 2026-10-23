@@ -251,6 +251,15 @@ Feature: Backlog
     When the backlog preview is opened in the Backlog panel
     Then the backlog detail shows "Ship the backlog reference preview"
 
+  @scenario:backlog.sent-mention-chip
+  Scenario: Render a sent backlog mention as its chip
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Ship the backlog reference preview" is captured
+    When a message with the serialized backlog mention is sent
+    Then the sent mention renders as a backlog chip "b:1" titled "Ship the backlog reference preview"
+
   @fake-secret-cli
   @scenario:backlog.jev-secret-setup
   Scenario: Offer a masked secret setup from chat when Jev has no key
