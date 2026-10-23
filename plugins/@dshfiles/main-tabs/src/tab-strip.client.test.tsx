@@ -7,10 +7,12 @@ import { PANEL_ASIDE_EVENT } from './panel-aside.js'
 import { THREAD_MENTION_INSERT_EVENT, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { TabStrip, type TabView } from './tab-strip.js'
+import { SETTLE_THREAD_EVENT } from './settle-request.js'
 import type { TabsEvent } from './tabs-machine.js'
 
 const labels = {
   mentionThread: '@Mention thread',
+  settleThread: 'Settle thread',
   closeTab: 'Close tab',
   copyThreadId: 'Copy thread ID',
   copyThreadLink: 'Copy thread link',
@@ -70,6 +72,8 @@ afterEach(() => {
   cleanup()
   window.removeEventListener(OPEN_THREAD_ASIDE_EVENT, onAsideRequest)
   window.removeEventListener(PANEL_ASIDE_EVENT, onAsideRequest)
+  window.removeEventListener(SETTLE_THREAD_EVENT, onSettleRequest)
+  settleRequests.length = 0
   asideRequests.length = 0
   Reflect.deleteProperty(document, 'elementFromPoint')
   document.body.innerHTML = ''
@@ -103,8 +107,17 @@ const openContextMenu = (tab: HTMLElement): void => {
   fireEvent.contextMenu(tab, { clientX: 20, clientY: 20 })
 }
 
-const mount = (send: (event: TabsEvent) => void = () => {}, renameThread: (sessionId: string, title: string) => Promise<void> = async () => {}) =>
-  render(<TabStrip tabs={tabs} send={send} t={t} newTabKeys="" renameThread={renameThread} />)
+const mount = (
+  send: (event: TabsEvent) => void = () => {},
+  renameThread: (sessionId: string, title: string) => Promise<void> = async () => {},
+  tabViews: readonly TabView[] = tabs,
+) => render(<TabStrip tabs={tabViews} send={send} t={t} newTabKeys="" renameThread={renameThread} />)
+
+const settleRequests: { readonly detail: unknown; readonly cancelable: boolean }[] = []
+const onSettleRequest = (event: Event): void => {
+  settleRequests.push({ detail: event instanceof CustomEvent ? event.detail : undefined, cancelable: event.cancelable })
+  event.preventDefault()
+}
 
 const asideRequests: { readonly detail: unknown; readonly cancelable: boolean }[] = []
 const onAsideRequest = (event: Event): void => {
@@ -124,6 +137,22 @@ describe('TabStrip thread actions', () => {
     openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
     await screen.findByRole('menuitem', { name: 'Copy thread ID' })
     expect(screen.getByRole('menuitem', { name: 'Copy thread link' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: 'Settle thread' }).getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('settles an idle thread from its tab menu through thread-sidebar', async () => {
+    const idleTabs = tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status: null } : tab))
+    window.addEventListener(SETTLE_THREAD_EVENT, onSettleRequest)
+    mount(
+      () => {},
+      async () => {},
+      idleTabs,
+    )
+
+    openContextMenu(screen.getByRole('tab', { name: 'Thread' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Settle thread' }))
+
+    expect(settleRequests).toEqual([{ detail: { sessionId: 'thread-1' }, cancelable: true }])
   })
 
   it('renames a thread from its tab menu', async () => {

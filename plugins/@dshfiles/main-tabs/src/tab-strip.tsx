@@ -21,6 +21,7 @@ import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
 import { requestPanelAside } from './panel-aside.js'
 import { requestThreadAside } from './thread-aside.js'
+import { requestThreadSettle } from './settle-request.js'
 import { buildThreadTabLink } from './thread-link.js'
 import { CompassGlyph } from './start-page.js'
 import type { TabsEvent } from './tabs-machine.js'
@@ -427,6 +428,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                     ) : null}
                     <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId, ThreadMentionDrag.activeComposerSessionId())}>
                       {t('mentionThread')}
+                    </ContextMenuItem>
+                    <ContextMenuItem disabled={tab.status === 'running'} onSelect={() => requestThreadSettle(tab.sessionId)}>
+                      {t('settleThread')}
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => openAside(tab.sessionId)}>
                       <PanelRightOpenIcon aria-hidden="true" />
