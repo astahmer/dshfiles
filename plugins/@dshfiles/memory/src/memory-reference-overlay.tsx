@@ -61,10 +61,10 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-4">
       <div className="dshx:flex dshx:flex-col dshx:gap-2" data-dshfiles-memory-body>
-        <h2 className="dshx:text-lg dshx:font-semibold dshx:leading-snug" data-dshfiles-memory-title>
+        <h2 className="dshx:text-base dshx:font-semibold dshx:leading-snug" data-dshfiles-memory-title>
           {title}
         </h2>
-        {body.length === 0 ? null : <MarkdownText text={body} labels={markdownLabels} />}
+        {body.length === 0 ? null : <MarkdownText text={body} labels={markdownLabels} variant="compact" />}
       </div>
 
       <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
@@ -235,11 +235,11 @@ const NotePreview = (props: {
 const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread: (sessionId: string) => void }): JSX.Element => (
   <div className="dshx:flex dshx:flex-col dshx:gap-4">
     <div className="dshx:flex dshx:flex-col dshx:gap-2" data-dshfiles-memory-body>
-      <h2 className="dshx:text-lg dshx:font-semibold dshx:leading-snug" data-dshfiles-memory-title>
+      <h2 className="dshx:text-base dshx:font-semibold dshx:leading-snug" data-dshfiles-memory-title>
         {props.thread.title.length === 0 ? '(untitled thread)' : props.thread.title}
       </h2>
-      {props.thread.decision.length === 0 ? null : <p className="dshx:text-sm dshx:font-medium">{props.thread.decision}</p>}
-      <MarkdownText text={props.thread.digest} labels={markdownLabels} />
+      {props.thread.decision.length === 0 ? null : <p className="dshx:text-xs dshx:font-medium">{props.thread.decision}</p>}
+      <MarkdownText text={props.thread.digest} labels={markdownLabels} variant="compact" />
     </div>
     <p className="dshx:text-[11px] dshx:text-muted-foreground">
       {props.thread.source === 'model' ? 'Written by a cheap model from the thread transcript.' : 'Built from the thread record without a model call.'}
@@ -451,7 +451,7 @@ export const MemoryReferenceOverlay = (props: {
         collisionPadding={8}
         className={cn(
           'dshx-root dshx:flex dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0',
-          card?.kind === 'excerpt' ? 'dshx:w-[34rem]' : 'dshx:w-[26rem]',
+          card?.kind === 'excerpt' ? 'dshx:w-[34rem]' : 'dshx:w-[30rem]',
         )}
         data-dshfiles-memory-preview
       >

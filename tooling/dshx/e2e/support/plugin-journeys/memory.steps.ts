@@ -149,10 +149,10 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
     const previewTitle = preview.locator('[data-dshfiles-memory-title]').first()
     await expect(previewTitle).toHaveText(text)
     const fontSize = await previewTitle.evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize))
-    expect(fontSize).toBeGreaterThanOrEqual(15)
+    expect(fontSize).toBeGreaterThanOrEqual(14)
     const previewWidth = await preview.evaluate(element => element.getBoundingClientRect().width)
     const previewHeight = await preview.evaluate(element => element.getBoundingClientRect().height)
-    expect(previewWidth).toBeLessThanOrEqual(432)
+    expect(previewWidth).toBeLessThanOrEqual(496)
     expect(previewHeight).toBeLessThanOrEqual(480)
     for (const viewportWidth of [360, 480, 768, 1024]) {
       await page.setViewportSize({ width: viewportWidth, height: 736 })
@@ -160,7 +160,7 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
         const bounds = element.getBoundingClientRect()
         return { width: bounds.width, height: bounds.height }
       })
-      expect(responsivePreviewSize.width).toBeLessThanOrEqual(Math.min(416, viewportWidth - 16))
+      expect(responsivePreviewSize.width).toBeLessThanOrEqual(Math.min(480, viewportWidth - 16))
       expect(responsivePreviewSize.height).toBeLessThanOrEqual(480)
       const responsiveHeaderHeight = await preview.locator('[data-dshfiles-memory-preview-header]').evaluate(element => element.getBoundingClientRect().height)
       expect(responsiveHeaderHeight).toBeLessThanOrEqual(48)
