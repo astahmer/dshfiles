@@ -37,6 +37,7 @@ const linkSchema = z
   .strict()
 /** `user`, `system`, or `agent:<sessionId>`. */
 const actorIdSchema = z.string().regex(/^(user|system|agent:[\w.-]+)$/)
+const fieldChangeSchema = z.object({ field: z.enum(humanFieldNames), before: z.string().max(MAX_BODY_CHARS), after: z.string().max(MAX_BODY_CHARS) }).strict()
 
 /** One file kept with an item; the bytes live in their own table, keyed by item and attachment. */
 const attachmentSchema = z
@@ -61,6 +62,7 @@ const eventSchema = z
     detail: z.string().max(MAX_BODY_CHARS),
     threadId: z.string().min(1).max(MAX_TARGET_CHARS).optional(),
     attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).optional(),
+    fieldChanges: z.array(fieldChangeSchema).max(humanFieldNames.length).optional(),
   })
   .strict()
 

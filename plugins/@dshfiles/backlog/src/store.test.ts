@@ -195,11 +195,26 @@ describe('store', () => {
 
     const moved = await store.update({ id: 1, status: 'doing', actor: user })
     expect(moved.ok && moved.value.item.humanFields).toEqual(['status'])
-    expect(moved.ok && moved.value.item.events.at(-1)).toEqual({ at: 5, actor: 'user', kind: 'moved', detail: 'inbox → doing' })
+    expect(moved.ok && moved.value.item.events.at(-1)).toEqual({
+      at: 5,
+      actor: 'user',
+      kind: 'moved',
+      detail: 'inbox → doing',
+      fieldChanges: [{ field: 'status', before: 'inbox', after: 'doing' }],
+    })
 
     const byAgent = await store.update({ id: 1, kind: 'bug', actor: agent })
     expect(byAgent.ok && byAgent.value.item.humanFields).toEqual(['status'])
     expect(await store.update({ id: 99, status: 'done', actor: user })).toEqual({ ok: false, reason: 'not-found' })
+  })
+
+  it('stores before and after values for edited fields', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 5 })
+    await store.capture({ text: 'old title', actor: user })
+
+    const edited = await store.update({ id: 1, title: 'new title', actor: user })
+
+    expect(edited.ok && edited.value.item.events.at(-1)?.fieldChanges).toEqual([{ field: 'title', before: 'old title', after: 'new title' }])
   })
 
   it('answers backlinks for items and for any linked target', async () => {
@@ -252,7 +267,13 @@ describe('triage proposals', () => {
     })
     expect(applied.ok && applied.value.item.kind).toBe('note')
     expect(applied.ok && applied.value.item.status).toBe('doing')
-    expect(applied.ok && applied.value.item.events.at(-1)).toEqual({ at: 9, actor: 'system', kind: 'triaged', detail: 'applied kind note' })
+    expect(applied.ok && applied.value.item.events.at(-1)).toEqual({
+      at: 9,
+      actor: 'system',
+      kind: 'triaged',
+      detail: 'applied kind note',
+      fieldChanges: [{ field: 'kind', before: 'task', after: 'note' }],
+    })
   })
 
   it('keeps a hesitant proposal until the user accepts it, then treats its values as theirs', async () => {
@@ -306,6 +327,7 @@ describe('lifecycle signals', () => {
       kind: 'moved',
       detail: 'inbox → doing (mentioned in a thread)',
       threadId: 'session-abc123',
+      fieldChanges: [{ field: 'status', before: 'inbox', after: 'doing' }],
     })
 
     await store.update({ id: 1, attention: 'blocked', actor: agent })

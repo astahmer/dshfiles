@@ -397,6 +397,7 @@ const Conversation = (props: {
 }): JSX.Element => {
   const attention = props.attention
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
+  const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set())
   const threadIdsByEvent = new Map<BacklogEvent, string>()
   for (const [eventIndex, event] of props.events.entries()) {
     const threadId = BacklogActivityReferences.threadIdOf({ event, eventIndex, events: props.events, links: props.links })
@@ -442,16 +443,47 @@ const Conversation = (props: {
                 run.events.map((event, position) => {
                   const threadId = threadIdsByEvent.get(event)
                   return (
-                    <p key={String(position)}>
-                      <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
-                      <ActivityDescription
-                        description={ItemGlyphs.describeEvent(event, attention)}
-                        threadId={threadId}
-                        threadLabel={props.threadLabel}
-                        openThread={props.openThread}
-                      />{' '}
-                      · {ItemGlyphs.ago(event.at)}
-                    </p>
+                    <div key={String(position)}>
+                      <p>
+                        <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
+                        <ActivityDescription
+                          description={ItemGlyphs.describeEvent(event, attention)}
+                          threadId={threadId}
+                          threadLabel={props.threadLabel}
+                          openThread={props.openThread}
+                        />{' '}
+                        · {ItemGlyphs.ago(event.at)}
+                      </p>
+                      {event.fieldChanges?.length ? (
+                        <>
+                          <button
+                            type="button"
+                            className="dshx:mt-1 dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground"
+                            aria-expanded={openDiffs.has(`${String(index)}:${String(position)}`)}
+                            onClick={() => {
+                              const key = `${String(index)}:${String(position)}`
+                              setOpenDiffs(current => new Set(current.has(key) ? [...current].filter(candidate => candidate !== key) : [...current, key]))
+                            }}
+                          >
+                            {openDiffs.has(`${String(index)}:${String(position)}`) ? 'Hide changes' : 'Show changes'}
+                          </button>
+                          {openDiffs.has(`${String(index)}:${String(position)}`) ? (
+                            <div className="dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:p-2 dshx:text-[11px]">
+                              {event.fieldChanges.map(change => (
+                                <div key={change.field} className="dshx:grid dshx:grid-cols-[4rem_minmax(0,1fr)] dshx:gap-2">
+                                  <span className="dshx:font-medium dshx:text-foreground">{change.field}</span>
+                                  <span className="dshx:min-w-0 dshx:break-words">
+                                    <del className="dshx:text-destructive">{change.before || '∅'}</del>
+                                    {' → '}
+                                    <ins className="dshx:text-success dshx:no-underline">{change.after || '∅'}</ins>
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
                   )
                 })
               ) : (

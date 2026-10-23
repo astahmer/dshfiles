@@ -307,12 +307,22 @@ const createBacklogStore = ({
   ): Promise<BacklogDetail> => {
     const at = now()
     const actorId = actorIdOf(actor)
+    const fieldChanges = (['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention'] as const).flatMap(field => {
+      const after = change[field]
+      if (after === undefined || (field === 'attention' && after === 'none' && item.attention === undefined)) return []
+      const before = item[field]
+      const display = (value: typeof after | typeof before): string =>
+        value === null || value === undefined ? '' : Array.isArray(value) ? value.join(', ') : String(value)
+      const beforeText = display(before)
+      const afterText = display(after)
+      return beforeText === afterText ? [] : [{ field, before: beforeText, after: afterText }]
+    })
     const next: BacklogItem = {
       ...item,
       ...change,
       actors: withActor(change.actors ?? item.actors, actorId, 'contributor'),
       lastActivityAt: at,
-      events: BacklogItems.appendEvent(item.events, { at, actor: actorId, ...event }),
+      events: BacklogItems.appendEvent(item.events, { at, actor: actorId, ...event, ...(fieldChanges.length === 0 ? {} : { fieldChanges }) }),
     }
     await persist(next)
     const stored = next.events.at(-1)
