@@ -8,6 +8,8 @@
 
 ![Metric list with one chart per metric](docs/screenshots/metric-charts.png)
 
+![Per-thread Traces tab with summary and span waterfall](docs/screenshots/thread-traces-tab.png)
+
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
 list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, metric
@@ -40,6 +42,30 @@ When nothing arrives, the panel and `traces_status` carry a `diagnosis` (`waitin
 now). A restart from the DSH UI reuses the supervisor's environment, so a launcher environment change needs `dsh-web`
 restarted from a terminal.
 
+## Per-thread Traces tab
+
+Every thread gets a **Traces** tab in its conversation view, right after **Trajectory** (a `conversation.view`
+entry, `order: 11`; Trajectory is 10 and only shows with developer tools on). It shows that thread's telemetry only:
+every trace in which any span carries `dsh.session.id` = the thread's Session id, so plugin spans nested under an agent
+turn count even without the attribute.
+
+- **Summary**: traces, spans, error spans, total trace time, model calls (`gen_ai.operation.name = chat`, one per
+  attempt), tool calls (`execute_tool`), trace and model-call p50 · p95, and `gen_ai.usage.*` token totals summed over
+  model calls only (the turn span repeats them as its own totals). Unclassified producers fall back to the span-name
+  prefix (`chat `, `execute_tool `, `invoke_agent`).
+- **Turns**: the thread's traces newest first; a row opens the panel's span waterfall and span detail (without Open
+  thread, since it is this thread).
+- **Logs**: records correlated with one of the thread's traces, or carrying its `dsh.session.id`; a span's
+  **Logs for this span** narrows them.
+- **Empty**: says that nothing carried this thread's id yet, plus the receiver diagnosis (exporter elsewhere or off,
+  port held, external mode) with the restart hint.
+
+Agent-tool calls into dshx APIs carry the calling Session as `dsh.session.id` on their dispatch span, so the plugin
+work a thread's agent triggers shows up even without an agent telemetry exporter. Turn, step, model and tool spans come
+from an agent telemetry exporter (LoongSuite, or a fork keeping its attribute names). The tab reads
+`traces_session_summary`, `traces_search` with `sessionId` and `traces_search_logs` with `sessionId`, so an agent sees
+the same data.
+
 ## Settings (`dshfiles-traces`)
 
 | Setting                 | Default     | Effect                                                                                                                                  |
@@ -68,18 +94,19 @@ How the modes map to `OTEL_EXPORTER_OTLP_ENDPOINT`:
 
 Every read the panel makes is a read-only tool; the one destructive verb needs an explicit opt-in.
 
-| Tool                   | What it returns                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| `traces_search`        | Traces newest first; filter by service, operation, error status, min duration, time, text, DSH session. |
-| `traces_get`           | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.          |
-| `traces_list_services` | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window.               |
-| `traces_search_logs`   | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, time. |
-| `traces_list_metrics`  | Metrics per service and name: type, unit, points, series, last value.                                   |
-| `traces_get_metric`    | One metric's series per attribute set over a window (value, counter increase, or distribution mean).    |
-| `traces_service_map`   | Services with span count, error rate and latency; cross-service parent → child calls with counts.       |
-| `traces_error_groups`  | Error spans grouped by service, operation, error type and message shape, with a sample trace.           |
-| `traces_status`        | Receiver mode, address, state, counters, forwarding, store size, exporter targets and a diagnosis.      |
-| `traces_clear`         | Deletes every stored trace, log record and metric point; requires `confirm: true`.                      |
+| Tool                     | What it returns                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `traces_search`          | Traces newest first; filter by service, operation, error status, min duration, time, text, DSH session.              |
+| `traces_get`             | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.                       |
+| `traces_list_services`   | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window.                            |
+| `traces_search_logs`     | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, DSH session, time. |
+| `traces_list_metrics`    | Metrics per service and name: type, unit, points, series, last value.                                                |
+| `traces_get_metric`      | One metric's series per attribute set over a window (value, counter increase, or distribution mean).                 |
+| `traces_service_map`     | Services with span count, error rate and latency; cross-service parent → child calls with counts.                    |
+| `traces_error_groups`    | Error spans grouped by service, operation, error type and message shape, with a sample trace.                        |
+| `traces_session_summary` | One thread's spans, errors, turns, model and tool calls, durations, model latency and token totals.                  |
+| `traces_status`          | Receiver mode, address, state, counters, forwarding, store size, exporter targets and a diagnosis.                   |
+| `traces_clear`           | Deletes every stored trace, log record and metric point; requires `confirm: true`.                                   |
 
 ## Decisions
 

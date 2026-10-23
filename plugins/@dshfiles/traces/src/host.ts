@@ -134,6 +134,7 @@ const api = tracesApi.host({
   }),
   metric: ({ input }) => requireRuntime().store.metricSeries({ name: input.name, service: input.service, windowMinutes: input.windowMinutes ?? 60 }),
   serviceMap: ({ input }) => requireRuntime().store.serviceMap({ windowMinutes: input.windowMinutes ?? 60 }),
+  sessionSummary: ({ input }) => requireRuntime().store.sessionSummary(input.sessionId),
   clear: () => requireRuntime().store.clear(),
 })
 

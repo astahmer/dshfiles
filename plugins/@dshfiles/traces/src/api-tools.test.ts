@@ -14,6 +14,7 @@ describe('traces agent tools', () => {
       'traces_search',
       'traces_search_logs',
       'traces_service_map',
+      'traces_session_summary',
       'traces_status',
     ])
     expect(tools.filter(tool => tool.readOnly !== true).map(tool => tool.name)).toEqual(['traces_clear'])

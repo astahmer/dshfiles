@@ -1,4 +1,4 @@
-import type { DiagnosisCode, Exporters, ReceiverState, ViewerMode } from './types.js'
+import type { Diagnosis, Exporters, ReceiverState, ViewerMode } from './types.js'
 
 const RESTART_HINT =
   'A restart from the DSH UI respawns the Host with the environment of the process that supervises it, so after changing the launcher environment (nixapply, ~/.local/bin/dsh-web) restart `dsh-web` itself from a terminal.'
@@ -12,7 +12,7 @@ const diagnose = (input: {
   readonly receiverMessage: string | null
   readonly lastReceivedAt: number | null
   readonly exporters: Exporters
-}): { readonly code: DiagnosisCode; readonly message: string } => {
+}): Diagnosis => {
   if (input.mode === 'external')
     return {
       code: 'external-mode',

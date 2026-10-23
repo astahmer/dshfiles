@@ -7,6 +7,7 @@ import {
   metricSummarySchema,
   receiverStatusSchema,
   serviceMapSchema,
+  sessionSummarySchema,
   traceDetailSchema,
   traceListSchema,
   traceStatsSchema,
@@ -71,6 +72,12 @@ export const logsInputSchema = z
       .describe('Only records whose attribute equals this value.'),
     traceId: hexId(16).optional().describe('Only records correlated with this trace.'),
     spanId: hexId(8).optional().describe('Only records correlated with this span.'),
+    sessionId: z
+      .string()
+      .min(1)
+      .max(256)
+      .optional()
+      .describe('Only records of this DSH Session: correlated with one of its traces, or carrying its dsh.session.id attribute.'),
     fromMs: z.number().int().nonnegative().optional().describe('Only records at or after this Unix time in milliseconds.'),
     toMs: z.number().int().nonnegative().optional().describe('Only records before this Unix time in milliseconds.'),
     cursor: z.string().min(1).max(64).optional().describe('next_cursor from a previous page.'),
@@ -165,6 +172,13 @@ export const tracesApi = defineApi({
       description:
         'Search stored OpenTelemetry log records, newest first: time, severity, body, service, scope, attributes, resource and the trace/span they belong to. Filter by service, minimum severity, text, one attribute value, trace or span id and time range. Read-only.',
       tool: { name: 'traces_search_logs', readOnly: true, render: compactJson },
+    }),
+    sessionSummary: method({
+      input: z.object({ sessionId: z.string().min(1).max(256).describe('DSH Session id, matched against dsh.session.id on any span of a trace.') }).strict(),
+      output: sessionSummarySchema,
+      description:
+        "One DSH thread's telemetry at a glance: traces and spans carrying its dsh.session.id (plugin spans nested under them included), error spans, turns, model and tool calls, first and last time, total and percentile trace durations, model-call latency, and gen_ai.usage token totals over model calls. Pair with traces_search sessionId for the traces and traces_search_logs sessionId for its logs. Read-only.",
+      tool: { name: 'traces_session_summary', readOnly: true, render: compactJson },
     }),
     status: method({
       input: z.object({}).strict(),

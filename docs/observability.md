@@ -151,6 +151,17 @@ content capture is opted into) are stored as their size unless
 ledger push and LoongSuite's token metrics chart in the Metrics tab. Details, settings and decisions are in the
 [traces README](../plugins/@dshfiles/traces/README.md).
 
+Each thread also has a **Traces** tab in its conversation view, after
+Trajectory: the traces in which any span carries that thread's
+`dsh.session.id` (agent turn, step, model and tool spans, and the plugin spans
+nested under them), a summary (spans, errors, model and tool calls, total and
+p50/p95 durations, `gen_ai.usage.*` token totals over model calls), the span
+waterfall per turn and the thread's correlated logs. Agent-tool calls into dshx
+APIs carry the calling Session as `dsh.session.id` on their dispatch span, so a
+thread's own plugin work shows even without an agent telemetry exporter. Agents
+read the same through `traces_session_summary`, and `traces_search` /
+`traces_search_logs` with `sessionId`.
+
 ## Decision (2026-10-23, b:299)
 
 Two marketplace plugins export DSH spans. Both read on DSH 0.2.1-rc.2:

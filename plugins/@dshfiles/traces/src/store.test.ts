@@ -321,3 +321,133 @@ describe('trace store', () => {
     expect(() => store.metricSeries({ name: 'missing', service: 'web', windowMinutes: 60 })).toThrow(/No points/)
   })
 })
+
+describe('session summary', () => {
+  const seedTurn = (store: ReturnType<typeof openStore>) =>
+    store.ingest(
+      [
+        makeSpan({
+          traceId: traceId(10),
+          spanId: spanId(10),
+          name: 'invoke_agent deepseek-harness',
+          startUs: 10_000_000,
+          endUs: 14_000_000,
+          sessionId: 'session-t',
+          attributes: { 'gen_ai.operation.name': 'invoke_agent', 'gen_ai.usage.input_tokens': 300, 'gen_ai.usage.output_tokens': 30 },
+        }),
+        makeSpan({
+          traceId: traceId(10),
+          spanId: spanId(11),
+          parentSpanId: spanId(10),
+          name: 'chat model-a',
+          startUs: 10_100_000,
+          endUs: 11_100_000,
+          sessionId: 'session-t',
+          statusCode: 2,
+          attributes: { 'gen_ai.operation.name': 'chat', 'gen_ai.usage.input_tokens': 100, 'gen_ai.usage.output_tokens': 10 },
+        }),
+        makeSpan({
+          traceId: traceId(10),
+          spanId: spanId(12),
+          parentSpanId: spanId(10),
+          name: 'chat model-a',
+          startUs: 11_200_000,
+          endUs: 13_200_000,
+          sessionId: 'session-t',
+          attributes: { 'gen_ai.usage.input_tokens': 200, 'gen_ai.usage.output_tokens': 20, 'gen_ai.usage.cache_read.input_tokens': 50 },
+        }),
+        makeSpan({
+          traceId: traceId(10),
+          spanId: spanId(13),
+          parentSpanId: spanId(10),
+          name: 'execute_tool bash',
+          startUs: 13_300_000,
+          endUs: 13_900_000,
+          sessionId: 'session-t',
+          attributes: { 'gen_ai.operation.name': 'execute_tool' },
+        }),
+        makeSpan({
+          traceId: traceId(10),
+          spanId: spanId(14),
+          parentSpanId: spanId(13),
+          name: 'jujutsu/status',
+          service: 'dshfiles',
+          startUs: 13_400_000,
+          endUs: 13_500_000,
+        }),
+        makeSpan({
+          traceId: traceId(11),
+          spanId: spanId(15),
+          name: 'usage/report',
+          service: 'dshfiles',
+          startUs: 20_000_000,
+          endUs: 20_500_000,
+          sessionId: 'session-t',
+        }),
+        makeSpan({ traceId: traceId(12), spanId: spanId(16), name: 'chat other', startUs: 30_000_000, endUs: 31_000_000, sessionId: 'session-other' }),
+      ],
+      retention,
+    )
+
+  test('counts every span of the session traces, model and tool calls, and tokens from model calls only', () => {
+    const store = openStore()
+    seedTurn(store)
+    const summary = store.sessionSummary('session-t')
+    expect(summary).toMatchObject({
+      sessionId: 'session-t',
+      traces: 2,
+      spans: 6,
+      errorSpans: 1,
+      turns: 1,
+      modelCalls: 2,
+      toolCalls: 1,
+      firstMs: 10_000,
+      lastMs: 20_500,
+      totalTraceMs: 4_500,
+      tokens: { input: 300, output: 30, cacheRead: 50, reasoning: 0 },
+      services: ['dshfiles', 'svc'],
+    })
+    expect(summary.traceLatency).toMatchObject({ count: 2, errorCount: 1, maxMs: 4_000 })
+    expect(summary.modelLatency).toMatchObject({ count: 2, p50Ms: 1_000, maxMs: 2_000 })
+  })
+
+  test('is empty for an unknown session and reports no tokens without usage attributes', () => {
+    const store = openStore()
+    seedTurn(store)
+    expect(store.sessionSummary('session-none')).toMatchObject({ traces: 0, spans: 0, firstMs: null, tokens: null, totalTraceMs: 0 })
+  })
+
+  test('finds the logs of a session through its traces or its dsh.session.id attribute', () => {
+    const store = openStore()
+    seedTurn(store)
+    const log = (id: number, overrides: Partial<NormalizedLog>): NormalizedLog => ({
+      timeUs: 10_500_000 + id,
+      severityNumber: 9,
+      severityText: null,
+      body: `log ${String(id)}`,
+      service: 'svc',
+      scope: null,
+      traceId: null,
+      spanId: null,
+      eventName: null,
+      attributes: {},
+      resource: {},
+      ...overrides,
+    })
+    store.ingestLogs(
+      [
+        log(1, { traceId: traceId(10), spanId: spanId(11) }),
+        log(2, { attributes: { 'dsh.session.id': 'session-t' } }),
+        log(3, { traceId: traceId(12) }),
+        log(4, {}),
+      ],
+      retention,
+    )
+    expect(
+      store
+        .searchLogs({ sessionId: 'session-t' })
+        .logs.map(entry => entry.body)
+        .sort(),
+    ).toEqual(['log 1', 'log 2'])
+  })
+})

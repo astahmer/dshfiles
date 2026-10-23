@@ -71,7 +71,7 @@ const severityVariant = (severityNumber: number): 'destructive' | 'warning' | 'i
 
 export type LogCorrelation = { readonly traceId: string; readonly spanId: string | null }
 
-const LogRow = (props: { readonly log: LogRecord; readonly onOpenTrace: (traceId: string) => void; readonly t: TracesTranslate }): JSX.Element => {
+export const LogRow = (props: { readonly log: LogRecord; readonly onOpenTrace: (traceId: string) => void; readonly t: TracesTranslate }): JSX.Element => {
   const [open, setOpen] = useState(false)
   const log = props.log
   return (

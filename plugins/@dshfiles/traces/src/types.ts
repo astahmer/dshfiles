@@ -104,6 +104,35 @@ export const serviceMapSchema = z
   .strict()
 export type ServiceMap = z.infer<typeof serviceMapSchema>
 
+const tokenTotalsSchema = z
+  .object({
+    input: z.number().int().nonnegative(),
+    output: z.number().int().nonnegative(),
+    cacheRead: z.number().int().nonnegative(),
+    reasoning: z.number().int().nonnegative(),
+  })
+  .strict()
+
+export const sessionSummarySchema = z
+  .object({
+    sessionId: z.string(),
+    traces: z.number().int().nonnegative(),
+    spans: z.number().int().nonnegative(),
+    errorSpans: z.number().int().nonnegative(),
+    turns: z.number().int().nonnegative().describe('invoke_agent spans (gen_ai.operation.name).'),
+    modelCalls: z.number().int().nonnegative().describe('chat spans: one per LLM attempt, retries included.'),
+    toolCalls: z.number().int().nonnegative().describe('execute_tool spans.'),
+    firstMs: z.number().nullable(),
+    lastMs: z.number().nullable(),
+    totalTraceMs: z.number().nonnegative().describe('Sum of the trace durations.'),
+    traceLatency: latencySchema.describe('Per-trace duration percentiles; errorCount counts traces with an error span.'),
+    modelLatency: latencySchema.describe('Per model-call duration percentiles.'),
+    tokens: tokenTotalsSchema.nullable().describe('Sums of gen_ai.usage.* over model-call spans; null when none carries usage.'),
+    services: z.array(z.string()),
+  })
+  .strict()
+export type SessionSummary = z.infer<typeof sessionSummarySchema>
+
 export const errorGroupSchema = z
   .object({
     service: z.string(),
@@ -198,6 +227,9 @@ const exportTargetSchema = z
 export const diagnosisCodeSchema = z.enum(['receiving', 'waiting', 'exporting-elsewhere', 'no-exporter', 'external-mode', 'port-in-use', 'failed', 'starting'])
 export type DiagnosisCode = z.infer<typeof diagnosisCodeSchema>
 
+export const diagnosisSchema = z.object({ code: diagnosisCodeSchema, message: z.string() }).strict()
+export type Diagnosis = z.infer<typeof diagnosisSchema>
+
 export const exportersSchema = z
   .object({
     traces: exportTargetSchema.describe("Where this Host process's dshx spans go now."),
@@ -209,11 +241,7 @@ export type Exporters = z.infer<typeof exportersSchema>
 
 export const receiverStatusSchema = z
   .object({
-    diagnosis: z
-      .object({ code: diagnosisCodeSchema, message: z.string() })
-      .strict()
-      .optional()
-      .describe('Why telemetry does or does not arrive; absent on a Host older than this field.'),
+    diagnosis: diagnosisSchema.optional().describe('Why telemetry does or does not arrive; absent on a Host older than this field.'),
     exporters: exportersSchema.optional(),
     mode: viewerModeSchema,
     externalViewerUrl: z.string().nullable(),

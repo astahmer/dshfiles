@@ -84,7 +84,7 @@ type GuideCopy = {
 
 const GUIDE_COPY = {
   waiting: { title: 'diagnosisWaitingTitle', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
-  receiving: { title: 'diagnosisWaitingTitle', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
+  receiving: { title: 'diagnosisReceivingTitle', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
   starting: { title: 'receiverStarting', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
   'exporting-elsewhere': { title: 'diagnosisElsewhereTitle', body: 'diagnosisElsewhereBody', restartHint: true, variant: 'destructive' },
   'no-exporter': { title: 'diagnosisNoExporterTitle', body: 'diagnosisNoExporterBody', restartHint: true, variant: 'destructive' },
@@ -94,8 +94,7 @@ const GUIDE_COPY = {
 } as const satisfies Record<DiagnosisCode, GuideCopy>
 
 /** This Host's own telemetry cannot reach the receiver: worth saying even while older telemetry is stored. */
-export const exportBlocked = (status: ReceiverStatus): boolean =>
-  status.diagnosis?.code === 'exporting-elsewhere' || status.diagnosis?.code === 'no-exporter'
+export const exportBlocked = (status: ReceiverStatus): boolean => status.diagnosis?.code === 'exporting-elsewhere' || status.diagnosis?.code === 'no-exporter'
 
 /**
  * Says why nothing arrives: the Host's diagnosis (exporter configured elsewhere or off, port held, external mode),

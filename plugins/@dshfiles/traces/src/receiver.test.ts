@@ -158,7 +158,10 @@ describe('OTLP/HTTP receiver', () => {
 describe('state changes', () => {
   test('reports listening with its bound port, then disabled, so the Host can publish and withdraw its address', async () => {
     const seen: string[] = []
-    const receiver: Receiver = OtlpReceiver.create({ handlers: {}, onStateChange: () => seen.push(`${receiver.status().state}:${String(receiver.status().boundPort !== null)}`) })
+    const receiver: Receiver = OtlpReceiver.create({
+      handlers: {},
+      onStateChange: () => seen.push(`${receiver.status().state}:${String(receiver.status().boundPort !== null)}`),
+    })
     receivers.push(receiver)
     await receiver.apply(baseConfig)
     await expect.poll(() => seen.at(-1)).toBe('listening:true')

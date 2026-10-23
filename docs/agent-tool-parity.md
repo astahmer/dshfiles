@@ -64,7 +64,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | backlog                                                                                                                                           | 16                   | 16                                                                                                       | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | hmr-gate | 1 | 1 (`hmr_gate_status`) | 0 | 0 |
-| traces | 11 | 10 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_metrics`, `traces_get_metric`, `traces_list_services`, `traces_error_groups`, `traces_status`, `traces_clear`) | 0 | 0 |
+| traces | 12 | 11 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_metrics`, `traces_get_metric`, `traces_list_services`, `traces_error_groups`, `traces_session_summary`, `traces_status`, `traces_clear`) | 0 | 0 |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
 | send-after-upload                                                                                                                                 | 2                    | 0                                                                                                        | 1             | 1         |
@@ -386,6 +386,10 @@ for the receiver badge), and the Clear button is `traces_clear`, which requires
 `redactGenAiContent`) are written through `settings_set` on `dshfiles-traces`.
 **Open thread** on a span is navigation, not a tool: the agent already has the
 `dsh.session.id` from `traces_get`.
+The per-thread **Traces** conversation tab reads `traces_session_summary` (its
+summary tiles), `traces_search` with `sessionId` (its turn list) and
+`traces_search_logs` with `sessionId` (its logs); `traces_status` carries the
+`diagnosis` its empty state shows.
 
 ### model-effort-picker, usage, memory, optmem
 

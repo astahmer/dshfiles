@@ -9,8 +9,10 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { TRACES_LOCALE_NAMESPACE, tracesLocale } from './locales.js'
 import { TracesPanel } from './panel.js'
+import { SessionTracesView } from './session-view.js'
 
 const PANEL_ID = 'traces'
+const SESSION_VIEW_ID = 'dshfiles-traces'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -28,6 +30,17 @@ export default defineClient({
     const label = (): string => translate('title')
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label, locale: TRACES_LOCALE_NAMESPACE }, PanelGlyph),
+    )
+    // A conversation view tab after the native Trajectory view (order 10); Chat is 0.
+    ctx.slots.inject('conversation.view', () =>
+      ctx.slots.register(
+        { name: 'conversation.view', id: SESSION_VIEW_ID, order: 11, label, locale: TRACES_LOCALE_NAMESPACE, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: string }) => (
+          <PluginQueryProvider>
+            <SessionTracesView sessionId={props.sessionId} t={translate} />
+          </PluginQueryProvider>
+        )),
+      ),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(

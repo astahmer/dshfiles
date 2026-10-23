@@ -13,6 +13,7 @@ import {
   type MetricSeries,
   type MetricSummary,
   type ServiceMap,
+  type SessionSummary,
   type SpanKind,
   type SpanStatus,
   type TraceDetail,
@@ -142,6 +143,7 @@ export type LogSearchQuery = {
   readonly attribute?: { readonly key: string; readonly value: string } | undefined
   readonly traceId?: string | undefined
   readonly spanId?: string | undefined
+  readonly sessionId?: string | undefined
   readonly fromMs?: number | undefined
   readonly toMs?: number | undefined
   readonly cursor?: string | undefined
@@ -417,6 +419,10 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     if (query.spanId !== undefined) {
       conditions.push('l.span_id = ?')
       parameters.push(query.spanId.toLowerCase())
+    }
+    if (query.sessionId !== undefined) {
+      conditions.push(`(l.trace_id IN (SELECT trace_id FROM traces WHERE session_id = ?) OR json_extract(l.attributes, '$."dsh.session.id"') = ?)`)
+      parameters.push(query.sessionId, query.sessionId)
     }
     if (query.fromMs !== undefined) {
       conditions.push('l.time_us >= ?')
@@ -842,6 +848,85 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
+  /**
+   * Everything one DSH Session sent: every span of the traces that carry its `dsh.session.id` anywhere (so plugin spans
+   * nested under a turn count), classified by the GenAI `gen_ai.operation.name` (span-name prefix as a fallback).
+   * Token totals come from model-call spans only: the turn span repeats them as its own totals.
+   */
+  const sessionSummary = (sessionId: string): SessionSummary => {
+    const attribute = (key: string): string => `json_extract(s.attributes, '$."${key}"')`
+    const rows = z
+      .array(
+        z.object({
+          trace_id: z.string(),
+          name: z.string(),
+          service: z.string(),
+          start_us: z.number(),
+          end_us: z.number(),
+          status_code: z.number(),
+          operation: z.string().nullable(),
+          input_tokens: z.number().nullable(),
+          output_tokens: z.number().nullable(),
+          cache_read_tokens: z.number().nullable(),
+          reasoning_tokens: z.number().nullable(),
+        }),
+      )
+      .parse(
+        prepare(
+          `SELECT s.trace_id, s.name, s.service, s.start_us, s.end_us, s.status_code,
+             ${attribute('gen_ai.operation.name')} AS operation,
+             ${attribute('gen_ai.usage.input_tokens')} AS input_tokens,
+             ${attribute('gen_ai.usage.output_tokens')} AS output_tokens,
+             COALESCE(${attribute('gen_ai.usage.cache_read.input_tokens')}, ${attribute('gen_ai.usage.cache_read_input_tokens')}) AS cache_read_tokens,
+             ${attribute('gen_ai.usage.reasoning_tokens')} AS reasoning_tokens
+           FROM spans s JOIN traces t ON t.trace_id = s.trace_id WHERE t.session_id = ?`,
+        ).all(sessionId),
+      )
+    const operationOf = (row: (typeof rows)[number]): 'turn' | 'model' | 'tool' | 'other' => {
+      if (row.operation === 'invoke_agent') return 'turn'
+      if (row.operation === 'chat' || row.operation === 'text_completion' || row.operation === 'generate_content') return 'model'
+      if (row.operation === 'execute_tool') return 'tool'
+      if (row.operation !== null) return 'other'
+      if (row.name.startsWith('chat ')) return 'model'
+      if (row.name.startsWith('execute_tool ')) return 'tool'
+      return row.name.startsWith('invoke_agent') ? 'turn' : 'other'
+    }
+    const classified = rows.map(row => ({ ...row, kind: operationOf(row) }))
+    const modelCalls = classified.filter(row => row.kind === 'model')
+    const earliest = (group: readonly (typeof rows)[number][]): number => group.reduce((least, row) => Math.min(least, row.start_us), Number.POSITIVE_INFINITY)
+    const latest = (group: readonly (typeof rows)[number][]): number => group.reduce((most, row) => Math.max(most, row.end_us), 0)
+    const traces = [...LatencyStats.groupBy(rows, row => row.trace_id).values()].map(group => ({
+      durationMs: usToMs(latest(group) - earliest(group)),
+      error: group.some(row => row.status_code === 2),
+    }))
+    const withUsage = modelCalls.filter(row => row.input_tokens !== null || row.output_tokens !== null)
+    const sum = (values: readonly (number | null)[]): number => values.reduce<number>((total, value) => total + (value ?? 0), 0)
+    return {
+      sessionId,
+      traces: traces.length,
+      spans: rows.length,
+      errorSpans: rows.filter(row => row.status_code === 2).length,
+      turns: classified.filter(row => row.kind === 'turn').length,
+      modelCalls: modelCalls.length,
+      toolCalls: classified.filter(row => row.kind === 'tool').length,
+      firstMs: rows.length === 0 ? null : usToMs(earliest(rows)),
+      lastMs: rows.length === 0 ? null : usToMs(latest(rows)),
+      totalTraceMs: traces.reduce((total, trace) => total + trace.durationMs, 0),
+      traceLatency: LatencyStats.summarize(traces),
+      modelLatency: LatencyStats.summarize(modelCalls.map(row => ({ durationMs: usToMs(row.end_us - row.start_us), error: row.status_code === 2 }))),
+      tokens:
+        withUsage.length === 0
+          ? null
+          : {
+              input: sum(withUsage.map(row => row.input_tokens)),
+              output: sum(withUsage.map(row => row.output_tokens)),
+              cacheRead: sum(withUsage.map(row => row.cache_read_tokens)),
+              reasoning: sum(withUsage.map(row => row.reasoning_tokens)),
+            },
+      services: [...new Set(rows.map(row => row.service))].sort(),
+    }
+  }
+
   const summary = (): StoreSummary => {
     const row = z
       .object({ traces: z.number(), oldest: z.number().nullable(), newest: z.number().nullable() })
@@ -876,6 +961,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     stats: statsOf,
     errorGroups,
     serviceMap,
+    sessionSummary,
     summary,
     clear,
     close: () => database.close(),

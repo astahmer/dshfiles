@@ -5,7 +5,7 @@
     {
       "id": "otlp-receiver",
       "title": "Local OTLP/HTTP receiver",
-      "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer.",
+      "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer. In plugin and both modes the receiver publishes its bound address in-process, so this Host's dshx spans and usage metrics arrive without OTEL_EXPORTER_OTLP_ENDPOINT; traces_status and the panel carry a diagnosis of why nothing arrives (exporter elsewhere or off, port held, external mode).",
       "reach": ["click button \"Traces\"", "expect heading \"Traces\""],
       "surfaces": ["host", "storage", "tool", "client", "integration"],
       "configuration": [
@@ -14,7 +14,7 @@
           "defaultValue": "plugin",
           "constraints": "plugin: this receiver owns the port; external: receiver off; both: store and forward to forwardUrl.",
           "choices": ["plugin", "external", "both"],
-          "coveredBy": ["traces.receiver-forwarding", "traces.receiver-browser-journey"]
+          "coveredBy": ["traces.receiver-forwarding", "traces.receiver-browser-journey", "traces.self-telemetry-browser-journey"]
         },
         {
           "key": "port",
@@ -43,7 +43,7 @@
           "coveredBy": ["traces.store-retention"]
         }
       ],
-      "states": ["listening", "port-in-use", "disabled", "failed", "forwarding", "empty"],
+      "states": ["listening", "port-in-use", "disabled", "failed", "forwarding", "empty", "self-telemetry", "exporting-elsewhere", "no-exporter"],
       "failureModes": [
         "A body over 8 MiB, or one that inflates past 32 MiB, is rejected with 413/400 instead of being buffered.",
         "A malformed protobuf or JSON body is rejected with 400 and nothing is stored.",
@@ -51,7 +51,8 @@
         "A non-loopback listen address is refused unless explicitly allowed.",
         "A forward URL that points back at the receiver is ignored, so telemetry never loops.",
         "GenAI content attributes are stored as their size unless redaction is turned off.",
-        "An unknown length-delimited protobuf field is skipped past its length prefix, so the next field still decodes."
+        "An unknown length-delimited protobuf field is skipped past its length prefix, so the next field still decodes.",
+        "An explicit OTEL_EXPORTER_OTLP_ENDPOINT pointing elsewhere wins over the in-process receiver, and the panel says so with the supervisor-restart hint."
       ],
       "externalDependencies": [
         {
@@ -137,6 +138,29 @@
           "id": "traces.decode-skip-length",
           "file": "plugins/@dshfiles/traces/src/otlp/decode.test.ts",
           "testName": "skips unknown length-delimited fields past their own length prefix"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.receiver-state-change",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "reports listening with its bound port, then disabled, so the Host can publish and withdraw its address"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.diagnosis-elsewhere",
+          "file": "plugins/@dshfiles/traces/src/diagnosis.test.ts",
+          "testName": "names an environment endpoint pointing elsewhere and the supervisor restart that fixes it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.diagnosis-no-exporter",
+          "file": "plugins/@dshfiles/traces/src/diagnosis.test.ts",
+          "testName": "says when this process has no exporter at all"
+        },
+        {
+          "kind": "gherkin",
+          "id": "traces.self-telemetry-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
         }
       ]
     },
@@ -203,6 +227,52 @@
           "id": "traces.waterfall-collapse",
           "file": "plugins/@dshfiles/traces/src/format.test.ts",
           "testName": "hides the descendants of collapsed spans only"
+        }
+      ]
+    },
+    {
+      "id": "thread-traces-tab",
+      "title": "Per-thread Traces tab",
+      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals, a turn list that opens the span waterfall, and the thread's correlated logs. With nothing stored it says why, from the receiver's diagnosis.",
+      "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
+      "surfaces": ["client", "host", "tool", "storage"],
+      "configuration": [],
+      "states": ["empty", "summarized", "trace-open", "logs", "no-exporter"],
+      "failureModes": [
+        "Token totals count model-call spans only, because the turn span repeats the same usage as its own totals.",
+        "A trace counts for the thread when any of its spans carries the thread's dsh.session.id, so plugin spans without the attribute still show under their turn.",
+        "On a Host older than the summary method the tab still lists the thread's traces and hides the summary."
+      ],
+      "externalDependencies": [
+        {
+          "id": "agent-telemetry-exporter",
+          "boundary": "OTLP spans with GenAI semantic conventions (gen_ai.operation.name, gen_ai.usage.*) and dsh.session.id from an agent telemetry exporter such as LoongSuite.",
+          "deterministicFake": "The otlp-session-turns scratch seed and the browser journey post synthetic LoongSuite-shaped OTLP JSON tagged with the open thread's id."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.thread-tab-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-session-summary",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "counts every span of the session traces, model and tool calls, and tokens from model calls only"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-session-empty",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "is empty for an unknown session and reports no tokens without usage attributes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-session-logs",
+          "file": "plugins/@dshfiles/traces/src/store.test.ts",
+          "testName": "finds the logs of a session through its traces or its dsh.session.id attribute"
         }
       ]
     },

@@ -15,6 +15,7 @@ export const tracesKeys = {
   stats: (windowMinutes: number) => ['traces', 'stats', windowMinutes] as const,
   errors: (windowMinutes: number) => ['traces', 'errors', windowMinutes] as const,
   serviceMap: (windowMinutes: number) => ['traces', 'service-map', windowMinutes] as const,
+  sessionSummary: (sessionId: string) => ['traces', 'session-summary', sessionId] as const,
   metrics: (windowMinutes: number, search: string) => ['traces', 'metrics', windowMinutes, search] as const,
   metric: (input: { readonly name: string; readonly service: string; readonly windowMinutes: number }) => ['traces', 'metric', input] as const,
 }
@@ -93,6 +94,13 @@ export const tracesQueries = {
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.serviceMap({ windowMinutes }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
       retry: 1,
+    }),
+  sessionSummary: (client: TracesClient, sessionId: string) =>
+    queryOptions({
+      queryKey: tracesKeys.sessionSummary(sessionId),
+      queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.sessionSummary({ sessionId }, { signal: hostSignal }) }),
+      refetchInterval: POLL_MS,
+      retry: false,
     }),
   errors: (client: TracesClient, windowMinutes: number) =>
     queryOptions({

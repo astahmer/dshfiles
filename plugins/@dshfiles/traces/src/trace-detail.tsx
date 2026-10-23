@@ -45,7 +45,8 @@ export const AttributeTable = (props: {
 const SpanDetailPanel = (props: {
   readonly traceId: string
   readonly span: SpanRow
-  readonly onOpenThread: (sessionId: string) => string | null
+  /** Absent where the trace already belongs to the open thread: the span panel then has no Open thread button. */
+  readonly onOpenThread?: ((sessionId: string) => string | null) | undefined
   readonly onShowLogs: (spanId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
@@ -76,13 +77,13 @@ const SpanDetailPanel = (props: {
           </Button>
         </div>
         {span.statusMessage === null ? null : <p className="dshx:break-words dshx:text-xs dshx:text-destructive">{span.statusMessage}</p>}
-        {span.sessionId === null ? null : (
+        {span.sessionId === null || props.onOpenThread === undefined ? null : (
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                if (span.sessionId !== null) setThreadError(props.onOpenThread(span.sessionId))
+                if (span.sessionId !== null) setThreadError(props.onOpenThread?.(span.sessionId) ?? null)
               }}
             >
               <MessageSquareIcon /> {props.t('openThread')}
@@ -142,7 +143,8 @@ const SpanDetailPanel = (props: {
 
 export const TraceDetailView = (props: {
   readonly trace: TraceDetail
-  readonly onOpenThread: (sessionId: string) => string | null
+  /** Absent where the trace already belongs to the open thread: the span panel then has no Open thread button. */
+  readonly onOpenThread?: ((sessionId: string) => string | null) | undefined
   readonly onShowLogs: (spanId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
