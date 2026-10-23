@@ -296,6 +296,12 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   semantic-component allowlist.
 - `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
   after **any** class change, rebuild it and the plugin you changed.
+- Avoid native JSX `<select>` controls; use `Combobox` from
+  `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
+  picker for consistent, searchable selection. The `no-native-select` lint rule
+  enforces this.
+- Project pickers should list registered projects, not JJ thread workspaces;
+  use `EntityLabels.projectsOf` when deriving choices from the workspace list.
 - Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
   `/machine`, localStorage → `createStoredValue`.
 - Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from

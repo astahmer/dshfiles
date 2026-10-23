@@ -20,6 +20,7 @@
     "no-export-from": 164,
     "no-wildcard-export": 1,
     "no-identity-hook-selector": 0,
-    "no-identity-hook-selector-tsx": 0
+    "no-identity-hook-selector-tsx": 0,
+    "no-native-select": 0
   }
 }

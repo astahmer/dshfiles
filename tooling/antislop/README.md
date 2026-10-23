@@ -27,3 +27,6 @@ revision and are candidates for upstreaming to emilint.
   the difference between one row re-rendering and all of them (see
   `plugins/@dshfiles/thread-sidebar/README.md`). A narrow selector or a two
   argument call with an equality function is accepted.
+- **no-native-select** — avoid JSX `<select>` elements; use the shared
+  `@dshfiles/plugin-ui` `Combobox` for searchable, consistent pickers. The
+  repository ratchet sets its allowed finding count to zero.
