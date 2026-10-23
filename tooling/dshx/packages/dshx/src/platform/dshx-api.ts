@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { ApiProtocolModel } from '../api/common.js'
+import { TracerModel } from '../tracing/tracer.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, DshPlatformLaunchUrl } from './client.js'
 
@@ -38,15 +39,19 @@ const safeMessage = (message: string): string => message.replace(/([?&]token=)[^
 /** Calls one versioned DSHX Host API using an existing authenticated native session. */
 export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version, fetch: request = fetch }: DshxApiCallerOptions): DshxApiCall => {
   const channel = ApiProtocolModel.apiChannel(packageId, apiId)
-  return async (method, input, signal) => {
+  const tracer = TracerModel.process()
+  const call: DshxApiCall = async (method, input, signal) => {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(method)) throw new DshPlatformError('invalid-method', 'DSHX API method names must be plain identifiers.')
     const rpcId = randomUUID()
+    const headers = new Headers({ 'content-type': 'application/json', cookie })
+    const parent = tracer.traceparent()
+    if (parent !== undefined) headers.set('traceparent', parent)
     let response: Response
     try {
       response = await request(origin + '/api/' + channel.slice(1) + '/' + method, {
         method: 'POST',
         redirect: 'error',
-        headers: { 'content-type': 'application/json', cookie },
+        headers,
         body: JSON.stringify({
           type: 'client-request',
           rpcId,
@@ -81,6 +86,17 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
     }
     return output.data.output
   }
+  return (method, input, signal) =>
+    tracer.enabled
+      ? tracer.withSpan(
+          `${apiId}/${method}`,
+          {
+            kind: 'client',
+            attributes: { 'rpc.system': 'dshx', 'rpc.service': apiId, 'rpc.method': method, 'dshx.plugin.package': packageId, 'dshx.api.remote': true },
+          },
+          () => call(method, input, signal),
+        )
+      : call(method, input, signal)
 }
 
 /** Authenticates through the tokenized launch URL, then returns a typed API call function. */

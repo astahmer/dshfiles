@@ -19,6 +19,7 @@ import { ApiDefinitionModel } from './define.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
+import { TracerModel } from '../tracing/tracer.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -71,7 +72,7 @@ function hostLogger(ctx: Context): LoggerLike {
 
 function createDispatch(ctx: Context, packageId: string, registration: ApiHostRegistration): ApiDispatch {
   const { contract, handlers } = ApiDefinitionModel.hostRegistrationParts(registration)
-  return async (endpoint, payload, signal, caller, peer) => {
+  const dispatch: ApiDispatch = async (endpoint, payload, signal, caller, peer) => {
     const methodDefinition = contract.methods[endpoint]
     const handler = handlers[endpoint]
     if (methodDefinition === undefined || typeof handler !== 'function') {
@@ -98,6 +99,33 @@ function createDispatch(ctx: Context, packageId: string, registration: ApiHostRe
       hostLogger(ctx).error(`API handler ${packageId} ${contract.id}.${endpoint} failed: ${describeFailure(cause)}`)
       return { ok: false, error: { code: 'internal', message: 'API handler failed. See Host diagnostics.', details: {} } }
     }
+  }
+  return (endpoint, payload, signal, caller, peer) => {
+    const tracer = TracerModel.process()
+    if (!tracer.enabled) return dispatch(endpoint, payload, signal, caller, peer)
+    const startedAt = performance.now()
+    return tracer.withSpan(
+      `${contract.id}/${endpoint}`,
+      {
+        kind: 'server',
+        attributes: {
+          'rpc.system': 'dshx',
+          'rpc.service': contract.id,
+          'rpc.method': endpoint,
+          'dshx.plugin.package': packageId,
+          'dshx.api.id': contract.id,
+          'dshx.api.method': endpoint,
+          'dshx.api.caller': caller.kind,
+          'dshx.api.caller.package': caller.kind === 'plugin' ? caller.packageId : undefined,
+        },
+      },
+      async span => {
+        const result = await dispatch(endpoint, payload, signal, caller, peer)
+        span.setAttributes({ 'dshx.api.outcome': result.ok ? 'ok' : result.error.code, 'dshx.api.duration_ms': Math.round(performance.now() - startedAt) })
+        if (!result.ok) span.setStatus('error', result.error.code)
+        return result
+      },
+    )
   }
 }
 
@@ -145,7 +173,9 @@ async function registerRoutes(
             })
             return Response.json(mismatch)
           }
-          const result = await dispatch(method, message.payload, request.signal, { kind: 'client' }, connection.browserPeer)
+          const result = await TracerModel.process().runWithParent(TracerModel.parseTraceparent(request.headers.get('traceparent')), () =>
+            dispatch(method, message.payload, request.signal, { kind: 'client' }, connection.browserPeer),
+          )
           return Response.json(serverResponseSchema.parse({ type: 'server-response', rpcId: message.rpcId, result }))
         },
       }
@@ -459,6 +489,7 @@ async function mountApi(
       }
     }
     await Promise.all(removeRoutes.map(remove => remove()))
+    await TracerModel.process().flush()
   }
   return { dispose, servesClients }
 }

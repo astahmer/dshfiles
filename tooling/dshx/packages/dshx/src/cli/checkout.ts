@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
 import { CheckoutSyncError } from '../checkout/rebuild.js'
 import { syncCheckout, type CheckoutSyncResult } from '../checkout/sync.js'
+import { TracerModel } from '../tracing/tracer.js'
 
 const HELP = `dshx checkout sync — bring the jj checkout that runs DSH onto main.
 
@@ -106,21 +107,46 @@ export const runCheckoutCli = async (argv: readonly string[], io: { readonly std
   if (values.revision !== undefined && !commitId.test(values.revision))
     return fail(new CheckoutSyncError('usage', '--revision must be a full lowercase hexadecimal commit id.', 'Pass a 40- or 64-character jj commit id.'))
 
+  const tracer = TracerModel.process()
   try {
-    const result = await syncCheckout({
-      cwd: values.cwd ?? process.cwd(),
-      workspace: values.workspace,
-      bookmark: values.bookmark,
-      revision: values.revision,
-      dryRun: values['dry-run'] === true,
-      onProgress: message => write(io.stderr, `dshx checkout sync: ${message}\n`),
-      onOutput: chunk => write(io.stderr, chunk),
-    })
+    const result = await tracer.withSpan(
+      'dshx checkout sync',
+      {
+        parent: TracerModel.parseTraceparent(process.env.TRACEPARENT) ?? null,
+        attributes: {
+          'dshx.checkout.workspace': values.workspace,
+          'dshx.checkout.bookmark': values.bookmark,
+          'dshx.checkout.dry_run': values['dry-run'] === true,
+        },
+      },
+      async span => {
+        const synced = await syncCheckout({
+          cwd: values.cwd ?? process.cwd(),
+          workspace: values.workspace,
+          bookmark: values.bookmark,
+          revision: values.revision,
+          dryRun: values['dry-run'] === true,
+          onProgress: message => write(io.stderr, `dshx checkout sync: ${message}\n`),
+          onOutput: chunk => write(io.stderr, chunk),
+        })
+        span.setAttributes({
+          'dshx.checkout.status': synced.status,
+          'dshx.checkout.changed_files': synced.changedFiles.length,
+          'dshx.checkout.rebuilt_plugins': synced.rebuilt.plugins.length,
+          'dshx.checkout.rebuilt_dshx': synced.rebuilt.dshx,
+          'dshx.checkout.restart_needed': synced.restart.needed,
+        })
+        if (synced.failure !== null) span.setStatus('error', synced.failure.step)
+        return synced
+      },
+    )
     const ok = result.status === 'synced' || result.status === 'up-to-date' || result.status === 'would-sync'
     write(io.stdout, json ? `${JSON.stringify({ schemaVersion: 1, command, ok, data: result }, null, 2)}\n` : humanReport(result))
     return ok ? 0 : 1
   } catch (error) {
     if (error instanceof CheckoutSyncError) return fail(error)
     return fail(new CheckoutSyncError('failed', error instanceof Error ? error.message : String(error), 'Re-run with --json and read the reported step.'))
+  } finally {
+    await tracer.flush()
   }
 }

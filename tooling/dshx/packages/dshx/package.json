@@ -90,6 +90,10 @@
       "types": "./dist/communication/types.d.ts",
       "default": "./dist/communication/types.js"
     },
+    "./tracing": {
+      "types": "./dist/tracing/index.d.ts",
+      "default": "./dist/tracing/index.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
