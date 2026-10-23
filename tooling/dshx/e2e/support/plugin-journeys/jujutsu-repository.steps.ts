@@ -13,7 +13,13 @@ interface Repository {
   readonly path: string
 }
 
+interface ForeignRepository extends Repository {
+  readonly bookmark: string
+  readonly description: string
+}
+
 const repositories = new WeakMap<Page, Repository>()
+const foreignRepositories = new WeakMap<Page, ForeignRepository>()
 const UNICODE_PATH = 'dir with space/ünïcode file.txt'
 const SHORT_REFERENCE_TITLE = 'Jujutsu reference chips size to title'
 const LONG_REFERENCE_TITLE = 'Jujutsu reference chips size to their own title length'
@@ -45,6 +51,12 @@ const jj = (
 const repositoryFor = (page: Page): Repository => {
   const repository = repositories.get(page)
   if (repository === undefined) throw new Error('The disposable Jujutsu repository was not created for this scenario.')
+  return repository
+}
+
+const foreignRepositoryFor = (page: Page): ForeignRepository => {
+  const repository = foreignRepositories.get(page)
+  if (repository === undefined) throw new Error('The second disposable Jujutsu repository was not created for this scenario.')
   return repository
 }
 
@@ -376,6 +388,61 @@ Then('the Agent prompt tells it to write Jujutsu references with the jj: prefix'
   await finishJourneyAssertions(page)
 })
 
+When('a second disposable Jujutsu repository has a bookmark {string} on {string}', async ({ page }: { page: Page }, bookmark: string, description: string) => {
+  const repository = repositoryFor(page)
+  const foreign = { root: repository.root, path: join(repository.root, 'foreign') }
+  foreignRepositories.set(page, { ...foreign, bookmark, description })
+  await mkdir(foreign.path)
+  jj(foreign, ['git', 'init', '--no-colocate'])
+  await writeFile(join(foreign.path, 'foreign.txt'), 'foreign\n')
+  jj(foreign, ['describe', '-m', description])
+  jj(foreign, ['bookmark', 'create', bookmark, '-r', '@'])
+  jj(foreign, ['new'])
+  expect(descriptions(repository)).not.toContain(description)
+})
+
+When("both repositories are registered and the first repository's thread answers {string}", async ({ page }: { page: Page }, prompt: string) => {
+  const repository = repositoryFor(page)
+  await registerWorkspaceFolder(page, foreignRepositoryFor(page).path)
+  await registerWorkspaceFolder(page, repository.path)
+  await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
+  await sendMessage(page, prompt)
+})
+
+const foreignReferenceLink = (page: Page) => {
+  const foreign = foreignRepositoryFor(page)
+  return page.getByRole('link', { name: `Jujutsu bookmark: ${foreign.description} (${foreign.bookmark})`, exact: true })
+}
+
+Then('hovering the foreign reference previews its revision graph from the other repository', async ({ page }: { page: Page }) => {
+  const foreign = foreignRepositoryFor(page)
+  const link = foreignReferenceLink(page)
+  await expect(link).toBeVisible({ timeout: 30_000 })
+  await link.hover()
+  await recordAssertion(page, 'jujutsu-foreign-chat-reference-hover-previews-other-repository', async () => {
+    await expect(link).toHaveText(foreign.description)
+    await expect(page.getByText(`Revision graph · ${foreign.bookmark}`, { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Commit ID: [a-f0-9]{8}$/u)).toBeVisible()
+    const graph = page.locator('pre[aria-label="Revision graph"]')
+    await expect(graph).toContainText(foreign.bookmark)
+    await expect(page.locator('[data-dshfiles-jj-preview]').getByRole('alert')).toHaveCount(0)
+  })
+  await page.keyboard.press('Escape')
+})
+
+Then('clicking the foreign reference opens the panel on the other repository focused on that revision', async ({ page }: { page: Page }) => {
+  const foreign = foreignRepositoryFor(page)
+  const link = foreignReferenceLink(page)
+  await expect(link).toBeVisible({ timeout: 30_000 })
+  await link.click()
+  await recordAssertion(page, 'jujutsu-foreign-chat-reference-opens-other-repository', async () => {
+    await expect(revisionRow(page, foreign.description)).toBeVisible({ timeout: 30_000 })
+    await expect(revisionRow(page, 'Feature work by Ada')).toHaveCount(0)
+    await expect(revisionRow(page, foreign.description).getByRole('button', { name: 'Full diff', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the composer dock names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {
   const chip = page.getByRole('button', { name: /^repo \(thread-[0-9a-f]{6} \/ main\+\)$/ })
   const viewport = page.viewportSize()
@@ -400,5 +467,6 @@ After(async ({ page }: { page: Page }) => {
   const repository = repositories.get(page)
   if (repository === undefined) return
   repositories.delete(page)
+  foreignRepositories.delete(page)
   await rm(repository.root, { recursive: true, force: true })
 })

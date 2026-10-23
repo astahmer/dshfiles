@@ -430,6 +430,11 @@
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "jujutsu.chat-references-foreign-repository",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "jujutsu.chat-reference-tokens",
           "file": "plugins/@dshfiles/jujutsu/src/chat-reference.test.ts",

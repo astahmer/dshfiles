@@ -97,6 +97,16 @@ Feature: Jujutsu revision interactions
     And clicking the reference opens the panel focused on that revision
     And the Agent prompt tells it to write Jujutsu references with the jj: prefix
 
+  @scenario:jujutsu.chat-references-foreign-repository
+  Scenario: A reference to a revision of another registered repository previews and opens that repository
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And a second disposable Jujutsu repository has a bookmark "foreign-ref" on "Foreign only revision"
+    And a Command Code account backed by a local fake provider is added
+    And both repositories are registered and the first repository's thread answers "[[answer Elsewhere it is `jj:foreign-ref` only]]"
+    Then hovering the foreign reference previews its revision graph from the other repository
+    And clicking the foreign reference opens the panel on the other repository focused on that revision
+
   @scenario:jujutsu.workspace-cleanup
   Scenario: The repository menu previews a background cleanup before removing anything
     Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration" is booted
