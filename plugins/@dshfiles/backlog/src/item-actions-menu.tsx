@@ -21,6 +21,7 @@ import { useState, type ReactNode } from 'react'
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { deleteSelection as deleteSelectedItems } from './delete-selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
 
@@ -60,7 +61,10 @@ export const BacklogItemMenu = (props: {
   const countSuffix = many ? ` (${String(selection.length)})` : ''
   const selectedIds = selection.map(selected => selected.id)
   const deleteSelection = async (): Promise<void> => {
-    for (const id of selectedIds) await actions.delete.mutateAsync({ id, confirm: true })
+    await deleteSelectedItems({
+      ids: selectedIds,
+      remove: id => actions.delete.mutateAsync({ id, confirm: true }),
+    })
     setDeleteOpen(false)
     if (many) props.clearSelection?.()
   }
