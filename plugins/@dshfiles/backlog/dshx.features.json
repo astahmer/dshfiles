@@ -204,7 +204,7 @@
         "expect text \"2 selected\"",
         "expect button \"Start thread\"",
         "rightclick row \"Item b:2\"",
-        "click menuitem \"Start thread for 2 items…\"",
+        "click menuitem \"Start thread (2)…\"",
         "expect dialog \"Start thread\"",
         "expect text \"· 2 items*\""
       ],
@@ -233,6 +233,51 @@
           "id": "backlog.multi-select-range",
           "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
           "testName": "adds the inclusive range in either direction and preserves additive selections"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.multi-select-open-item-seed",
+          "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
+          "testName": "starts a modifier selection from the open item only when nothing is selected"
+        }
+      ]
+    },
+    {
+      "id": "selection-context-menu",
+      "title": "Apply every context-menu action to the selection",
+      "summary": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links, status, kind, attention, project, pin, triage and permanent deletion, which confirms with the count and the item references. Cmd/Ctrl- or Shift-clicking while an item is open includes the open item.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"First menu selection item\"",
+        "press Enter",
+        "expect text \"First menu selection item\"",
+        "fill textbox \"Capture\" \"Second menu selection item\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click checkbox \"Select b:1\"",
+        "click checkbox \"Select b:2\"",
+        "rightclick row \"Item b:2\"",
+        "expect menuitem \"Start thread (2)…\"",
+        "expect menuitem \"Copy item IDs (2)\"",
+        "expect menuitem \"Copy item links (2)\"",
+        "expect menuitem \"Status (2)\"",
+        "expect menuitem \"Pin items (2)\"",
+        "expect menuitem \"Delete permanently (2)…\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["single", "selection"],
+      "failureModes": [
+        "A menu opened on one row of a selection acts only on that row, or names no count, so the user cannot tell how many items an action changes.",
+        "Bulk deletion runs without a confirmation that names how many items it removes."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.selection-open-item-seed",
+          "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
+          "testName": "starts a modifier selection from the open item only when nothing is selected"
         }
       ]
     },

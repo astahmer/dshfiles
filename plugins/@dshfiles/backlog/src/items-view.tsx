@@ -29,7 +29,7 @@ import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
-import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
+import { BacklogSelection } from './selection.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
@@ -299,16 +299,18 @@ export const ItemsView = (props: {
   )
   const toggle = (id: number): void => {
     selectionAnchor.current = id
-    setSelected(toggleBacklogSelection(selected, id))
+    setSelected(BacklogSelection.toggle(selected, id))
   }
   const selectWithModifiers = (id: number, shiftKey: boolean, additive: boolean): void => {
+    const base = BacklogSelection.seed(selected, props.openId)
     if (shiftKey) {
-      const anchorId = selectionAnchor.current ?? id
-      setSelected(extendBacklogSelection(selected, orderedIds, anchorId, id))
+      const anchorId = selectionAnchor.current ?? props.openId ?? id
+      setSelected(BacklogSelection.extend(base, orderedIds, anchorId, id))
       return
     }
     if (additive) {
-      toggle(id)
+      selectionAnchor.current = id
+      setSelected(BacklogSelection.toggle(base, id))
       return
     }
     selectionAnchor.current = id

@@ -55,6 +55,15 @@ export const BacklogItemMenu = (props: {
     if (selection.length > 1) props.clearSelection?.()
   }
   const update = (change: Omit<BacklogUpdateInput, 'id'>): void => applyToSelection(id => props.update({ id, ...change }))
+  const many = selection.length > 1
+  /** Every action applies to the whole selection; the count says so before the click. */
+  const countSuffix = many ? ` (${String(selection.length)})` : ''
+  const selectedIds = selection.map(selected => selected.id)
+  const deleteSelection = async (): Promise<void> => {
+    for (const id of selectedIds) await actions.delete.mutateAsync({ id, confirm: true })
+    setDeleteOpen(false)
+    if (many) props.clearSelection?.()
+  }
 
   return (
     <>
@@ -68,7 +77,7 @@ export const BacklogItemMenu = (props: {
           </ContextMenuLabel>
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(selection)}>
             <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
-            {selection.length > 1 ? `Start thread for ${String(selection.length)} items…` : 'Start thread…'}
+            Start thread{countSuffix}…
           </ContextMenuItem>
           {props.openItem === undefined ? null : (
             <ContextMenuItem className="dshx:text-[13px]" onSelect={() => props.openItem?.(item.id)}>
@@ -76,19 +85,22 @@ export const BacklogItemMenu = (props: {
               Open item
             </ContextMenuItem>
           )}
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(String(item.id))}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selectedIds.map(String).join(', '))}>
             <CopyIcon aria-hidden className="dshx:size-3.5" />
-            Copy item ID
+            {many ? 'Copy item IDs' : 'Copy item ID'}
+            {countSuffix}
           </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(`b:${String(item.id)}`)}>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selectedIds.map(id => `b:${String(id)}`).join(' '))}>
             <LinkIcon aria-hidden className="dshx:size-3.5" />
-            Copy item link
+            {many ? 'Copy item links' : 'Copy item link'}
+            {countSuffix}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuSub>
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
               <ItemGlyphs.StatusIcon status={item.status} />
               Status
+              {countSuffix}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-44">
               <ContextMenuRadioGroup
@@ -111,6 +123,7 @@ export const BacklogItemMenu = (props: {
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
               <ItemGlyphs.KindIcon kind={item.kind} />
               Kind
+              {countSuffix}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-44">
               <ContextMenuRadioGroup
@@ -137,6 +150,7 @@ export const BacklogItemMenu = (props: {
                 <ItemGlyphs.AttentionBadge attention={attention} compact />
               )}
               Attention
+              {countSuffix}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-44">
               <ContextMenuRadioGroup
@@ -159,6 +173,7 @@ export const BacklogItemMenu = (props: {
             <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
               <FolderIcon aria-hidden className="dshx:size-3.5" />
               Project
+              {countSuffix}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-52">
               <ContextMenuRadioGroup value={item.project ?? NO_PROJECT} onValueChange={value => update({ project: value === NO_PROJECT ? null : value })}>
@@ -177,27 +192,31 @@ export const BacklogItemMenu = (props: {
           <ContextMenuSeparator />
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => update({ pinned: !item.pinned })}>
             <PinIcon aria-hidden className="dshx:size-3.5" />
-            {item.pinned ? 'Unpin item' : 'Pin item'}
+            {item.pinned ? 'Unpin' : 'Pin'} {many ? 'items' : 'item'}
+            {countSuffix}
           </ContextMenuItem>
           {props.triageOff ? null : (
             <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => applyToSelection(props.triage)}>
               <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
               Run triage
+              {countSuffix}
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
           <ContextMenuItem className="dshx:gap-2 dshx:text-[13px] dshx:text-destructive" onSelect={() => setDeleteOpen(true)}>
             <Trash2Icon aria-hidden className="dshx:size-3.5" />
-            Delete permanently…
+            Delete permanently{countSuffix}…
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
       <Dialog open={deleteOpen} onOpenChange={open => (actions.delete.isPending ? undefined : setDeleteOpen(open))}>
         <DialogContent className="dshx-root">
           <DialogHeader>
-            <DialogTitle>Delete b:{item.id} permanently?</DialogTitle>
+            <DialogTitle>{many ? `Delete ${String(selection.length)} items permanently?` : `Delete b:${String(item.id)} permanently?`}</DialogTitle>
             <DialogDescription>
-              This permanently removes “{item.title}” and its attachments. This cannot be undone. Dropping the item keeps it in your backlog.
+              {many
+                ? `This permanently removes ${selectedIds.map(id => `b:${String(id)}`).join(', ')} and their attachments. This cannot be undone. Dropping them keeps them in your backlog.`
+                : `This permanently removes “${item.title}” and its attachments. This cannot be undone. Dropping the item keeps it in your backlog.`}
             </DialogDescription>
           </DialogHeader>
           {actions.delete.error === null ? null : (
@@ -207,18 +226,9 @@ export const BacklogItemMenu = (props: {
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={actions.delete.isPending}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              disabled={actions.delete.isPending}
-              onClick={() =>
-                void actions.delete
-                  .mutateAsync({ id: item.id, confirm: true })
-                  .then(() => setDeleteOpen(false))
-                  .catch(() => undefined)
-              }
-            >
+            <Button variant="destructive" disabled={actions.delete.isPending} onClick={() => void deleteSelection().catch(() => undefined)}>
               <Trash2Icon aria-hidden className="dshx:size-3.5" />
-              Delete permanently
+              Delete permanently{countSuffix}
             </Button>
           </DialogFooter>
         </DialogContent>

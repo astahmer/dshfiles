@@ -9,7 +9,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
-import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
+import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
@@ -201,13 +201,14 @@ export const BoardView = (props: {
   const dragged = drag === null ? undefined : props.items.find(item => item.id === drag.id)
 
   const selectWithModifiers = (id: number, shiftKey: boolean, additive: boolean): void => {
+    const base = BacklogSelection.seed(selected, props.openId)
     if (shiftKey) {
-      setSelected(extendBacklogSelection(selected, orderedIds, selectionAnchor.current ?? id, id))
+      setSelected(BacklogSelection.extend(base, orderedIds, selectionAnchor.current ?? props.openId ?? id, id))
       return
     }
     if (additive) {
       selectionAnchor.current = id
-      setSelected(toggleBacklogSelection(selected, id))
+      setSelected(BacklogSelection.toggle(base, id))
     }
   }
 
