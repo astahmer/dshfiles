@@ -170,7 +170,7 @@ export const tracesApi = defineApi({
       input: z.object({}).strict(),
       output: receiverStatusSchema,
       description:
-        'The OTLP receiver: viewer mode, listen address and state (listening, port in use, off), request and item counters, forwarding, and what the store retains. Read-only.',
+        'The OTLP receiver: viewer mode, listen address and state (listening, port in use, off), request and item counters, forwarding, what the store retains, where this DSH process exports its own spans and metrics, and a diagnosis of why telemetry does or does not arrive. Read-only.',
       tool: { name: 'traces_status', readOnly: true, render: compactJson },
     }),
     clear: method({

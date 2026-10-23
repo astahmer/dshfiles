@@ -65,8 +65,9 @@ By default no message text, tool argument or tool result leaves the Host.
 
 ## Usage ledger metrics
 
-`@dshfiles/usage` reads the same variables and, when an endpoint is set, also
-POSTs its SQLite ledger aggregates (model requests and tokens, tool executions
+`@dshfiles/usage` reads the same variables and, when an endpoint is set (or,
+without one, while the in-DSH receiver listens), also POSTs its SQLite ledger
+aggregates (model requests and tokens, tool executions
 by category and source, Jev requests, duration histograms) to `/v1/metrics` as
 OTLP/HTTP JSON every 60 s, cumulative since Host start. Its metrics are named
 `dsh.*` under the `@dshfiles/usage` instrumentation scope and carry
@@ -79,11 +80,12 @@ metrics. Details and the full variable list are in the
 
 LoongSuite sees DSH core: turns, steps, model calls, tool calls. It cannot see
 what an owned plugin does inside a tool or a browser click. For that, dshx
-ships `@dshfiles/dshx/tracing` (no dependency, OTLP/HTTP JSON to `/v1/traces`),
-gated by the same `OTEL_EXPORTER_OTLP_ENDPOINT` /
+ships `@dshfiles/dshx/tracing` (no dependency, OTLP/HTTP JSON to `/v1/traces`).
+It sends to the same `OTEL_EXPORTER_OTLP_ENDPOINT` /
 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` variables (`OTEL_SERVICE_NAME`, default
-`dshfiles`; `OTEL_SDK_DISABLED=true` forces it off). Without an endpoint every
-span is a shared no-op.
+`dshfiles`; `OTEL_SDK_DISABLED=true` forces it off) and, without one, to the
+in-DSH receiver below, which publishes its address in-process
+(`publishLocalOtlpEndpoint`). With neither, every span is a shared no-op.
 
 - Every dshx API dispatch (browser, plugin or agent tool) is a server span
   `<api id>/<method>`: package, API id, method, caller kind, outcome code and
@@ -118,9 +120,22 @@ spans, and `/v1/metrics` charts.
 Agents get the same reads as `traces_*` tools. It accepts any OTLP/HTTP sender,
 JSON or protobuf, not only DSH.
 
-With `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` in the `dsh web`
-environment, LoongSuite, dshx tracing and the usage metrics push all send to the
-Host's own receiver. Its `mode` setting decides who owns the port:
+In `plugin` and `both` modes the receiver publishes its bound address to the
+Host process (`@dshfiles/dshx/tracing`), so dshx tracing and the usage metrics
+push deliver to it **without any environment variable**, re-reading the target
+at every export; any span producer built on `otlpExportTarget` does the same.
+An explicit `OTEL_EXPORTER_OTLP_ENDPOINT` always wins. LoongSuite's turn, step,
+model and tool spans still need the variable in the `dsh web` environment at
+launch: its Loader row is gated on it at boot.
+
+The environment trap: the DSH UI's restart button respawns the Host with the
+environment of the nixfiles `dsh-web` supervisor, so a variable added to the
+launcher (`nixapply`) after the supervisor started never reaches the Host.
+Restart `dsh-web` itself from a terminal after changing the launcher
+environment. `traces_status` and the panel say which case applies (`diagnosis`:
+`waiting`, `receiving`, `exporting-elsewhere`, `no-exporter`, `port-in-use`,
+`external-mode`, `failed`) and where this process's spans and metrics go
+(`exporters`). Its `mode` setting decides who owns the port:
 
 | `mode`             | Receiver                      | `OTEL_EXPORTER_OTLP_ENDPOINT` points at          |
 | ------------------ | ----------------------------- | ------------------------------------------------ |

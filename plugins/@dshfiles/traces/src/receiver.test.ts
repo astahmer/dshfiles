@@ -154,3 +154,16 @@ describe('OTLP/HTTP receiver', () => {
     expect(OtlpReceiver.parseForwardUrl('http://127.0.0.1:4319/').url?.toString()).toBe('http://127.0.0.1:4319/')
   })
 })
+
+describe('state changes', () => {
+  test('reports listening with its bound port, then disabled, so the Host can publish and withdraw its address', async () => {
+    const seen: string[] = []
+    const receiver: Receiver = OtlpReceiver.create({ handlers: {}, onStateChange: () => seen.push(`${receiver.status().state}:${String(receiver.status().boundPort !== null)}`) })
+    receivers.push(receiver)
+    await receiver.apply(baseConfig)
+    await expect.poll(() => seen.at(-1)).toBe('listening:true')
+    await receiver.apply({ ...baseConfig, enabled: false })
+    expect(seen.at(-1)).toBe('disabled:false')
+    expect(seen[0]).toBe('starting:false')
+  })
+})

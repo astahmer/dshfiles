@@ -123,9 +123,23 @@ const en = {
   emptyTitle: 'Send OpenTelemetry here',
   emptyStep1:
     'Point any OTLP/HTTP exporter at this receiver: set OTEL_EXPORTER_OTLP_ENDPOINT to the address above in the environment of the process to observe.',
-  emptyStep2:
-    'For DSH itself, set it for the `dsh web` process (the nixfiles supervisor does) and restart the DSH Host: LoongSuite turn, model and tool spans and dshx plugin spans then arrive here.',
-  emptyStep3: 'JSON and protobuf bodies are both accepted on /v1/traces and /v1/logs; gzip is fine.',
+  diagnosisWaitingTitle: 'Listening, nothing stored yet',
+  diagnosisWaitingBody:
+    'This DSH Host sends its own telemetry here without any environment variable: plugin spans within 5 s of a plugin call, usage metrics every 60 s.',
+  diagnosisElsewhereTitle: 'This DSH exports somewhere else',
+  diagnosisElsewhereBody:
+    'OTEL_EXPORTER_OTLP_ENDPOINT in the DSH Host environment points at another endpoint, and an explicit endpoint always wins. Unset it, or point it at this receiver.',
+  diagnosisNoExporterTitle: 'This DSH process has no OTLP exporter configured',
+  diagnosisNoExporterBody:
+    'OTEL_SDK_DISABLED=true, OTEL_TRACES_EXPORTER=none or a non-HTTP OTEL_EXPORTER_OTLP_ENDPOINT in the DSH Host environment turns its exporters off.',
+  diagnosisPortInUseTitle: 'Another process holds the receiver port',
+  diagnosisPortInUseBody:
+    'Nothing reaches this receiver, and this Host’s exporters have no in-process target until the port is free. Stop the other process or change the “port” setting; the receiver retries every 30 s.',
+  diagnosisFailedTitle: 'The receiver failed to start',
+  diagnosisFailedBody: 'See the receiver message above.',
+  restartHint:
+    'A restart from the DSH UI respawns the Host with the environment of its supervisor: after changing the launcher environment, restart `dsh-web` itself from a terminal.',
+  otherProcessesHint: 'Other processes send here with:',
   externalModeTitle: 'Telemetry goes to an external viewer',
   externalModeBody: 'The receiver is off in external mode. Switch the Traces setting “mode” to plugin or both to store telemetry here.',
 } as const
@@ -249,9 +263,18 @@ const zh = {
   sampleTrace: '打开示例追踪',
   emptyTitle: '把 OpenTelemetry 发送到这里',
   emptyStep1: '让任何 OTLP/HTTP 导出器指向此接收器：在要观测的进程环境中把 OTEL_EXPORTER_OTLP_ENDPOINT 设为上面的地址。',
-  emptyStep2:
-    '对于 DSH 本身，为 `dsh web` 进程设置该变量（nixfiles 监督进程会设置）并重启 DSH Host：LoongSuite 的回合、模型与工具 span 以及 dshx 插件 span 都会出现在这里。',
-  emptyStep3: '/v1/traces 与 /v1/logs 同时接受 JSON 和 protobuf，gzip 也可以。',
+  diagnosisWaitingTitle: '正在监听，尚未存储任何数据',
+  diagnosisWaitingBody: '此 DSH Host 无需任何环境变量即把自身遥测发送到这里：插件调用后 5 秒内的插件 span，以及每 60 秒一次的用量指标。',
+  diagnosisElsewhereTitle: '此 DSH 导出到了别处',
+  diagnosisElsewhereBody: 'DSH Host 环境中的 OTEL_EXPORTER_OTLP_ENDPOINT 指向另一个端点，显式端点始终优先。请取消设置，或把它指向此接收器。',
+  diagnosisNoExporterTitle: '此 DSH 进程没有配置 OTLP 导出器',
+  diagnosisNoExporterBody: 'DSH Host 环境中的 OTEL_SDK_DISABLED=true、OTEL_TRACES_EXPORTER=none 或非 HTTP 的 OTEL_EXPORTER_OTLP_ENDPOINT 会关闭导出器。',
+  diagnosisPortInUseTitle: '接收器端口被其他进程占用',
+  diagnosisPortInUseBody: '在端口空出之前，没有数据能到达此接收器，此 Host 的导出器也没有进程内目标。请停止另一个进程或修改 “port” 设置；接收器每 30 秒重试一次。',
+  diagnosisFailedTitle: '接收器启动失败',
+  diagnosisFailedBody: '请查看上方的接收器消息。',
+  restartHint: '在 DSH 界面中重启会以其监督进程的环境重新启动 Host：修改启动器环境后，请在终端中重启 `dsh-web` 本身。',
+  otherProcessesHint: '其他进程可这样发送到这里：',
   externalModeTitle: '遥测数据发往外部查看器',
   externalModeBody: '外部模式下接收器关闭。把追踪设置 “mode” 改为 plugin 或 both 即可在此存储遥测数据。',
 } as const
@@ -263,5 +286,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export type TracesTranslate = TranslateNS<typeof TRACES_LOCALE_NAMESPACE>
+export type TracesLocaleKey = keyof typeof en
 
 export const tracesLocale = defineLocale(TRACES_LOCALE_NAMESPACE, { en, zh })

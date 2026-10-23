@@ -28,7 +28,7 @@ import { tracesApi, type ListInput } from './api.js'
 import { ErrorGroups, OperationsTable, ServiceStrip } from './insights.js'
 import type { TracesTranslate } from './locales.js'
 import { tracesKeys, tracesQueries } from './queries.js'
-import { EmptyStoreGuide, ReceiverBadge, ReceiverMessage } from './receiver-status.js'
+import { EmptyStoreGuide, exportBlocked, ReceiverBadge, ReceiverMessage } from './receiver-status.js'
 import { TraceDetailView } from './trace-detail.js'
 import { LogsView, type LogCorrelation } from './log-list.js'
 import { MetricsView } from './metrics-view.js'
@@ -153,7 +153,7 @@ export const TracesPanel = (props: {
           <AlertDescription>{errorMessage(statusQuery.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       ) : null}
-      {storeEmpty && status !== undefined ? <EmptyStoreGuide status={status} t={t} /> : null}
+      {status !== undefined && (storeEmpty || exportBlocked(status)) ? <EmptyStoreGuide status={status} compact={!storeEmpty} t={t} /> : null}
 
       {statsQuery.data === undefined ? null : (
         <ServiceStrip stats={statsQuery.data} onPick={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />

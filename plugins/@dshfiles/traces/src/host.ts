@@ -2,12 +2,15 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
+import { otlpExportTarget, publishLocalOtlpEndpoint } from '@dshfiles/dshx/tracing'
 import { tracesApi } from './api.js'
+import { ReceiverDiagnosis } from './diagnosis.js'
 import { OtlpBody } from './otlp/decode.js'
 import { SpanNormalizer } from './otlp/normalize.js'
 import { OtlpReceiver, type Receiver, type ReceiverConfig } from './receiver.js'
 import { tracesSettings, type TracesSettings } from './settings.js'
 import { openTraceStore, type Retention, type TraceStore } from './store.js'
+import type { Exporters } from './types.js'
 
 const PRUNE_INTERVAL_MS = 10 * 60_000
 
@@ -45,6 +48,37 @@ const receiverConfigOf = (settings: TracesSettings): ReceiverConfig => ({
   forwardUrl: settings.mode === 'both' ? settings.forwardUrl : '',
 })
 
+const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '[::]'])
+
+/** The URL a client of this process dials: a wildcard listen address is reached on loopback. */
+const dialableEndpoint = (address: string, port: number | null): string | null => {
+  if (port === null) return null
+  const host = WILDCARD_HOSTS.has(address) ? '127.0.0.1' : address
+  return `http://${host.includes(':') && !host.startsWith('[') ? `[${host}]` : host}:${String(port)}`
+}
+
+const exportersOf = (boundPort: number | null): Exporters => {
+  const traces = otlpExportTarget({ signal: 'traces' })
+  const configured = traces.source === 'environment' && traces.url !== null && URL.canParse(traces.url) ? new URL(traces.url) : null
+  return {
+    traces,
+    metrics: otlpExportTarget({ signal: 'metrics' }),
+    environmentPointsHere: configured === null ? null : boundPort !== null && OtlpReceiver.pointsAt(configured, boundPort),
+  }
+}
+
+let withdrawEndpoint: () => void = () => undefined
+
+/** Publish the bound receiver to this process's exporters while it listens in plugin or both mode; withdraw it otherwise. */
+const syncLocalEndpoint = (receiver: Receiver): void => {
+  withdrawEndpoint()
+  withdrawEndpoint = () => undefined
+  const status = receiver.status()
+  const endpoint = dialableEndpoint(status.address, status.boundPort)
+  if (status.state !== 'listening' || endpoint === null || currentSettings().mode === 'external') return
+  withdrawEndpoint = publishLocalOtlpEndpoint({ baseUrl: endpoint, owner: '@dshfiles/traces' })
+}
+
 const applySettings = (settings: TracesSettings): void => {
   void runtime?.receiver.apply(receiverConfigOf(settings))
 }
@@ -69,10 +103,22 @@ const api = tracesApi.host({
   status: () => {
     const active = requireRuntime()
     const settings = currentSettings()
+    const receiver = active.receiver.status()
+    const exporters = exportersOf(receiver.boundPort)
     return {
+      diagnosis: ReceiverDiagnosis.diagnose({
+        mode: settings.mode,
+        state: receiver.state,
+        endpoint: dialableEndpoint(receiver.address, receiver.boundPort),
+        configuredPort: receiver.configuredPort,
+        receiverMessage: receiver.message,
+        lastReceivedAt: receiver.lastReceivedAt,
+        exporters,
+      }),
+      exporters,
       mode: settings.mode,
       externalViewerUrl: settings.externalViewerUrl.trim() || null,
-      ...active.receiver.status(),
+      ...receiver,
       store: {
         ...active.store.summary(),
         retentionHours: settings.retentionHours,
@@ -115,6 +161,9 @@ const setupHost = (context: Context): Effect<void> => {
       },
     },
     onWarning: warning => logger.warn(warning),
+    onStateChange: () => {
+      if (runtime?.receiver === receiver) syncLocalEndpoint(receiver)
+    },
   })
   const active: TracesRuntime = { store, receiver }
   runtime = active
@@ -125,7 +174,11 @@ const setupHost = (context: Context): Effect<void> => {
     async *[Symbol.asyncIterator]() {
       yield async () => {
         clearInterval(pruneTimer)
-        if (runtime === active) runtime = undefined
+        if (runtime === active) {
+          runtime = undefined
+          withdrawEndpoint()
+          withdrawEndpoint = () => undefined
+        }
         await receiver.stop()
         store.close()
       }

@@ -28,10 +28,17 @@ Point an exporter at the receiver with the standard variable:
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
 ```
 
-For DSH itself, that variable in the `dsh web` environment (nixfiles sets it) enables the adopted LoongSuite plugin
-(turn, step, model and tool spans, protobuf), dshx tracing (plugin API, jj, secret, Jev spans, JSON) and the usage
-plugin's metrics push. With this plugin in `plugin` mode the Host sends them to its own receiver. Setting the variable
-takes a DSH Host restart; see [observability](../../../docs/observability.md#in-dsh-viewer-dshfilestraces).
+DSH itself needs no variable: in `plugin` and `both` modes the receiver publishes its bound address to its own Host
+process through `@dshfiles/dshx/tracing` (`publishLocalOtlpEndpoint`), and dshx tracing (plugin API, jj, secret, Jev
+spans) and the usage plugin's metrics push deliver there, re-reading the target at every export. The address is
+withdrawn when the receiver stops, loses its port or switches to `external`. An explicit `OTEL_EXPORTER_OTLP_ENDPOINT`
+in the Host environment always wins. The adopted LoongSuite plugin (turn, step, model and tool spans) is still gated on
+that variable at launch; see [observability](../../../docs/observability.md#in-dsh-viewer-dshfilestraces).
+
+When nothing arrives, the panel and `traces_status` carry a `diagnosis` (`waiting`, `receiving`, `exporting-elsewhere`,
+`no-exporter`, `port-in-use`, `external-mode`, `failed`) and `exporters` (where this process's spans and metrics go
+now). A restart from the DSH UI reuses the supervisor's environment, so a launcher environment change needs `dsh-web`
+restarted from a terminal.
 
 ## Settings (`dshfiles-traces`)
 
@@ -71,7 +78,7 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 | `traces_get_metric`    | One metric's series per attribute set over a window (value, counter increase, or distribution mean).    |
 | `traces_service_map`   | Services with span count, error rate and latency; cross-service parent → child calls with counts.       |
 | `traces_error_groups`  | Error spans grouped by service, operation, error type and message shape, with a sample trace.           |
-| `traces_status`        | Receiver mode, address, state, counters, forwarding and store size.                                     |
+| `traces_status`        | Receiver mode, address, state, counters, forwarding, store size, exporter targets and a diagnosis.      |
 | `traces_clear`         | Deletes every stored trace, log record and metric point; requires `confirm: true`.                      |
 
 ## Decisions

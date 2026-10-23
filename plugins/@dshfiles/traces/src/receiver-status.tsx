@@ -2,8 +2,8 @@ import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/compone
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
-import type { TracesTranslate } from './locales.js'
-import type { ReceiverStatus } from './types.js'
+import type { TracesLocaleKey, TracesTranslate } from './locales.js'
+import type { DiagnosisCode, ReceiverStatus } from './types.js'
 
 export const receiverEndpoint = (status: ReceiverStatus): string | null =>
   status.boundPort === null ? null : `http://${status.address.includes(':') ? `[${status.address}]` : status.address}:${String(status.boundPort)}`
@@ -75,27 +75,63 @@ export const ReceiverMessage = (props: { readonly status: ReceiverStatus; readon
   )
 }
 
-export const EmptyStoreGuide = (props: { readonly status: ReceiverStatus; readonly t: TracesTranslate }): JSX.Element => {
+type GuideCopy = {
+  readonly title: TracesLocaleKey
+  readonly body: TracesLocaleKey
+  readonly restartHint: boolean
+  readonly variant: 'default' | 'destructive'
+}
+
+const GUIDE_COPY = {
+  waiting: { title: 'diagnosisWaitingTitle', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
+  receiving: { title: 'diagnosisWaitingTitle', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
+  starting: { title: 'receiverStarting', body: 'diagnosisWaitingBody', restartHint: false, variant: 'default' },
+  'exporting-elsewhere': { title: 'diagnosisElsewhereTitle', body: 'diagnosisElsewhereBody', restartHint: true, variant: 'destructive' },
+  'no-exporter': { title: 'diagnosisNoExporterTitle', body: 'diagnosisNoExporterBody', restartHint: true, variant: 'destructive' },
+  'port-in-use': { title: 'diagnosisPortInUseTitle', body: 'diagnosisPortInUseBody', restartHint: false, variant: 'destructive' },
+  failed: { title: 'diagnosisFailedTitle', body: 'diagnosisFailedBody', restartHint: false, variant: 'destructive' },
+  'external-mode': { title: 'externalModeTitle', body: 'externalModeBody', restartHint: false, variant: 'default' },
+} as const satisfies Record<DiagnosisCode, GuideCopy>
+
+/** This Host's own telemetry cannot reach the receiver: worth saying even while older telemetry is stored. */
+export const exportBlocked = (status: ReceiverStatus): boolean =>
+  status.diagnosis?.code === 'exporting-elsewhere' || status.diagnosis?.code === 'no-exporter'
+
+/**
+ * Says why nothing arrives: the Host's diagnosis (exporter configured elsewhere or off, port held, external mode),
+ * with the endpoint other processes should use. A Host older than the diagnosis gets the generic setup steps.
+ */
+export const EmptyStoreGuide = (props: { readonly status: ReceiverStatus; readonly t: TracesTranslate; readonly compact?: boolean }): JSX.Element => {
   const endpoint = receiverEndpoint(props.status) ?? `http://${props.status.address}:${String(props.status.configuredPort)}`
-  if (props.status.mode === 'external')
+  const diagnosis = props.status.diagnosis
+  if (diagnosis === undefined)
     return (
       <Alert data-testid="traces-empty-guide">
-        <AlertTitle>{props.t('externalModeTitle')}</AlertTitle>
-        <AlertDescription>{props.t('externalModeBody')}</AlertDescription>
+        <AlertTitle>{props.t(props.status.mode === 'external' ? 'externalModeTitle' : 'emptyTitle')}</AlertTitle>
+        <AlertDescription>
+          {props.status.mode === 'external' ? props.t('externalModeBody') : `${props.t('emptyStep1')} OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}`}
+        </AlertDescription>
       </Alert>
     )
+  const copy = GUIDE_COPY[diagnosis.code]
+  const elsewhere = props.status.exporters?.traces.source === 'environment' ? props.status.exporters.traces.url : null
   return (
-    <Alert data-testid="traces-empty-guide">
-      <AlertTitle>{props.t('emptyTitle')}</AlertTitle>
+    <Alert variant={copy.variant} data-testid="traces-empty-guide" data-diagnosis={diagnosis.code}>
+      <AlertTitle>{props.t(copy.title)}</AlertTitle>
       <AlertDescription>
-        <ol className="dshx:flex dshx:list-decimal dshx:flex-col dshx:gap-1 dshx:pl-4">
-          <li>{props.t('emptyStep1')}</li>
-          <li>
-            <code className="dshx:font-mono dshx:text-xs">OTEL_EXPORTER_OTLP_ENDPOINT={endpoint}</code>
-          </li>
-          <li>{props.t('emptyStep2')}</li>
-          <li>{props.t('emptyStep3')}</li>
-        </ol>
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1.5">
+          <p>{diagnosis.code === 'failed' ? diagnosis.message : props.t(copy.body)}</p>
+          {diagnosis.code === 'exporting-elsewhere' && elsewhere !== null ? (
+            <code className="dshx:font-mono dshx:text-xs dshx:break-all">OTEL_EXPORTER_OTLP_ENDPOINT → {elsewhere}</code>
+          ) : null}
+          {copy.restartHint ? <p>{props.t('restartHint')}</p> : null}
+          {props.compact === true || diagnosis.code === 'external-mode' ? null : (
+            <>
+              <p>{props.t('otherProcessesHint')}</p>
+              <code className="dshx:font-mono dshx:text-xs dshx:break-all">OTEL_EXPORTER_OTLP_ENDPOINT={endpoint}</code>
+            </>
+          )}
+        </div>
       </AlertDescription>
     </Alert>
   )

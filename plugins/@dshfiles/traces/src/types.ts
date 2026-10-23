@@ -188,8 +188,33 @@ const signalCountsSchema = z
   .object({ traces: z.number().int().nonnegative(), metrics: z.number().int().nonnegative(), logs: z.number().int().nonnegative() })
   .strict()
 
+const exportTargetSchema = z
+  .object({
+    source: z.enum(['environment', 'local-receiver', 'off']),
+    url: z.string().nullable(),
+  })
+  .strict()
+
+export const diagnosisCodeSchema = z.enum(['receiving', 'waiting', 'exporting-elsewhere', 'no-exporter', 'external-mode', 'port-in-use', 'failed', 'starting'])
+export type DiagnosisCode = z.infer<typeof diagnosisCodeSchema>
+
+export const exportersSchema = z
+  .object({
+    traces: exportTargetSchema.describe("Where this Host process's dshx spans go now."),
+    metrics: exportTargetSchema.describe("Where this Host process's usage metrics push goes now."),
+    environmentPointsHere: z.boolean().nullable().describe('Whether OTEL_EXPORTER_OTLP_ENDPOINT targets this receiver; null when unset.'),
+  })
+  .strict()
+export type Exporters = z.infer<typeof exportersSchema>
+
 export const receiverStatusSchema = z
   .object({
+    diagnosis: z
+      .object({ code: diagnosisCodeSchema, message: z.string() })
+      .strict()
+      .optional()
+      .describe('Why telemetry does or does not arrive; absent on a Host older than this field.'),
+    exporters: exportersSchema.optional(),
     mode: viewerModeSchema,
     externalViewerUrl: z.string().nullable(),
     state: receiverStateSchema,

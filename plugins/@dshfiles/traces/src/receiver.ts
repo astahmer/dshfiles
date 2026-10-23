@@ -106,6 +106,8 @@ const describeError = (error: unknown): string => (error instanceof Error ? erro
 const createReceiver = (options: {
   readonly handlers: Partial<Record<OtlpSignal, SignalHandler>>
   readonly onWarning?: (message: string) => void
+  /** Called after every state change (listening, port in use, failed, disabled), e.g. to publish the bound address. */
+  readonly onStateChange?: () => void
   readonly now?: () => number
   readonly fetch?: typeof fetch
 }) => {
@@ -130,6 +132,14 @@ const createReceiver = (options: {
   }
   let lastReceivedAt: number | null = null
   let forwardError: string | null = null
+
+  const notifyStateChange = (): void => {
+    try {
+      options.onStateChange?.()
+    } catch (error) {
+      options.onWarning?.(`traces receiver: ${describeError(error)}`)
+    }
+  }
 
   const forwardTarget = (): URL | null => {
     const parsed = parseForwardUrl(config.forwardUrl)
@@ -239,10 +249,12 @@ const createReceiver = (options: {
           message = `Port ${String(config.port)} on ${config.host} is held by another process (an OpenTelemetry collector or dsh-traces, for instance). Stored traces stay browsable; the receiver retries every ${String(PORT_RETRY_MS / 1000)} s.`
           retryTimer = setTimeout(() => void listen(attempt), PORT_RETRY_MS)
           retryTimer.unref()
+          notifyStateChange()
           return
         }
         state = 'failed'
         message = describeError(error)
+        notifyStateChange()
       })
       candidate.listen({ host: config.host, port: config.port, exclusive: true }, () => {
         settle()
@@ -258,6 +270,7 @@ const createReceiver = (options: {
         const forwardError = parseForwardUrl(config.forwardUrl).error
         const loops = config.forwardUrl.trim() !== '' && forwardTarget() === null && forwardError === null
         message = forwardError ?? (loops ? 'The forward URL points at this receiver; forwarding is off.' : null)
+        notifyStateChange()
       })
     })
 
@@ -275,15 +288,18 @@ const createReceiver = (options: {
     if (!next.enabled) {
       state = 'disabled'
       message = null
+      notifyStateChange()
       return
     }
     if (!isLoopbackHost(next.host) && !next.allowNonLoopback) {
       state = 'failed'
       message = `Refusing to listen on ${next.host}: a non-loopback address exposes the receiver to the network. Turn on "Allow a non-loopback address" to opt in.`
+      notifyStateChange()
       return
     }
     state = 'starting'
     message = null
+    notifyStateChange()
     await listen(generation)
   }
 
@@ -311,6 +327,7 @@ const createReceiver = (options: {
     generation += 1
     state = 'disabled'
     await closeServer()
+    notifyStateChange()
   }
 
   return { apply, status, stop }
@@ -319,6 +336,7 @@ const createReceiver = (options: {
 export class OtlpReceiver {
   static readonly create = createReceiver
   static readonly parseForwardUrl = parseForwardUrl
+  static readonly pointsAt = pointsAt
 }
 
 export type Receiver = ReturnType<typeof createReceiver>
