@@ -43,6 +43,33 @@ describe('backlog tool exposure', () => {
     ])
   })
 
+  test('item-returning tools render a compact linked preview instead of raw JSON', () => {
+    const item = {
+      id: 42,
+      title: 'A linked backlog item',
+      body: 'First line\nsecond line',
+      kind: 'task' as const,
+      status: 'doing' as const,
+      project: null,
+      tags: [],
+      links: [],
+      attachments: [],
+      actors: [],
+      pinned: false,
+      humanFields: [],
+      createdAt: 1,
+      lastActivityAt: 1,
+      events: [],
+      freshness: 'fresh' as const,
+    }
+    const render = backlogApi.methods.get.tool?.render
+    expect(render).toBeTypeOf('function')
+    expect(render?.({ ok: true, value: { item, backlinks: [] } })).toBe(['b:42 — A linked backlog item', 'task · doing', 'First line second line'].join('\n'))
+    for (const name of ['capture', 'get', 'attachFile', 'removeFile', 'update', 'link', 'triage', 'applyProposal', 'dismissProposal', 'comment'] as const) {
+      expect(backlogApi.methods[name].tool?.render).toBeTypeOf('function')
+    }
+  })
+
   test('every tool explains itself', () => {
     for (const method of Object.values(backlogApi.methods)) {
       if (method.tool === undefined) continue

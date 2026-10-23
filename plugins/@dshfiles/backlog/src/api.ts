@@ -108,6 +108,20 @@ const listInputSchema = z
 
 const listOutputSchema = z.object({ revision: z.number(), total: z.number().int().nonnegative(), items: z.array(summarySchema) }).strict()
 
+const previewText = (text: string): string => text.trim().replace(/\s+/g, ' ').slice(0, 240)
+
+const renderItemPreview = (item: z.infer<typeof detailSchema>['item']): string => {
+  const body = previewText(item.body)
+  const status = `${item.kind} · ${item.status}`
+  const project = item.project === null ? '' : ` · ${item.project}`
+  return [`b:${String(item.id)} — ${item.title}`, `${status}${project}`, ...(body === '' ? [] : [body])].join('\n')
+}
+
+const renderDetailPreview = (result: z.infer<typeof detailResultSchema>): string =>
+  result.ok ? renderItemPreview(result.value.item) : 'No backlog item found.'
+
+const renderCreatedPreview = (detail: z.infer<typeof detailSchema>): string => renderItemPreview(detail.item)
+
 const backfillOutputSchema = z
   .object({
     retriage: z.boolean(),
@@ -166,7 +180,7 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description:
         'One backlog item `b:<id>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.',
-      tool: { name: 'backlog_get', readOnly: true },
+      tool: { name: 'backlog_get', readOnly: true, render: renderDetailPreview },
     }),
     getMany: method({
       input: z
@@ -212,13 +226,13 @@ export const backlogApi = defineApi({
         .strict(),
       output: detailSchema,
       description: `Add one item to the backlog; the calling thread is linked to it. ${writeNote}`,
-      tool: { name: 'backlog_capture', readOnly: false },
+      tool: { name: 'backlog_capture', readOnly: false, render: renderCreatedPreview }
     }),
     attachFile: method({
       input: z.object({ id: idSchema, file: fileInputSchema }).strict(),
       output: detailResultSchema,
       description: `Keep one image or file with an existing backlog item. ${writeNote}`,
-      tool: { name: 'backlog_attach_file', readOnly: false },
+      tool: { name: 'backlog_attach_file', readOnly: false, render: renderDetailPreview },
     }),
     readFile: method({
       input: z
@@ -239,7 +253,7 @@ export const backlogApi = defineApi({
       input: z.object({ id: idSchema, attachmentId: z.string().min(1).max(64) }).strict(),
       output: detailResultSchema,
       description: `Remove one image or file from a backlog item. ${writeNote}`,
-      tool: { name: 'backlog_remove_file', readOnly: false },
+      tool: { name: 'backlog_remove_file', readOnly: false, render: renderDetailPreview },
     }),
     delete: method({
       input: z
@@ -308,13 +322,13 @@ export const backlogApi = defineApi({
         .strict(),
       output: detailResultSchema,
       description: `Edit or move one backlog item, or ask the user for input with \`attention\`. ${writeNote}`,
-      tool: { name: 'backlog_update', readOnly: false },
+      tool: { name: 'backlog_update', readOnly: false, render: renderDetailPreview },
     }),
     link: method({
       input: z.object({ id: idSchema, link: BacklogItems.linkSchema, remove: z.boolean().optional() }).strict(),
       output: detailResultSchema,
       description: `Link a backlog item to a thread, jj revision, branch, workspace, URL or another item (\`remove: true\` unlinks). ${writeNote}`,
-      tool: { name: 'backlog_link', readOnly: false },
+      tool: { name: 'backlog_link', readOnly: false, render: renderDetailPreview },
     }),
     startThread: method({
       input: z
@@ -342,7 +356,7 @@ export const backlogApi = defineApi({
         .strict(),
       output: z.object({ sessionId: z.string().min(1), linked: z.array(idSchema), missing: z.array(idSchema) }).strict(),
       description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, told what to work on and linked to every item. ${writeNote}`,
-      tool: { name: 'backlog_start_thread', readOnly: false },
+      tool: { name: 'backlog_start_thread', readOnly: false }
     }),
     acknowledge: method({
       input: z.object({ ids: z.array(idSchema).max(500) }).strict(),
@@ -354,7 +368,7 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description:
         'Run automatic triage on one item now (Jev and the configured cheap model). A confident answer applies, skipping fields the user set by hand; otherwise it is left as a proposal on the item.',
-      tool: { name: 'backlog_triage', readOnly: false },
+      tool: { name: 'backlog_triage', readOnly: false, render: renderDetailPreview },
     }),
     backfillTriage: method({
       input: z
@@ -365,7 +379,7 @@ export const backlogApi = defineApi({
         .strict(),
       output: backfillOutputSchema,
       description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. ${writeNote}`,
-      tool: { name: 'backlog_triage_backfill', readOnly: false },
+      tool: { name: 'backlog_triage_backfill', readOnly: false }
     }),
     backfillTriageStatus: method({
       input: z.object({ jobId: z.string().min(1).max(100) }).strict(),
@@ -377,13 +391,13 @@ export const backlogApi = defineApi({
       input: z.object({ id: idSchema }).strict(),
       output: detailResultSchema,
       description: `Accept the triage proposal on an item: its kind, status, title and tags apply, and a suspected duplicate is linked. ${writeNote}`,
-      tool: { name: 'backlog_accept_proposal', readOnly: false },
+      tool: { name: 'backlog_accept_proposal', readOnly: false, render: renderDetailPreview },
     }),
     dismissProposal: method({
       input: z.object({ id: idSchema }).strict(),
       output: detailResultSchema,
       description: `Dismiss the triage proposal on an item without changing it. ${writeNote}`,
-      tool: { name: 'backlog_dismiss_proposal', readOnly: false },
+      tool: { name: 'backlog_dismiss_proposal', readOnly: false, render: renderDetailPreview },
     }),
     comment: method({
       input: z
@@ -399,7 +413,7 @@ export const backlogApi = defineApi({
         .strict(),
       output: detailResultSchema,
       description: `Add a progress comment to a backlog item, optionally with images or files; references in it become links. ${writeNote}`,
-      tool: { name: 'backlog_comment', readOnly: false },
+      tool: { name: 'backlog_comment', readOnly: false, render: renderDetailPreview },
     }),
   },
 })
