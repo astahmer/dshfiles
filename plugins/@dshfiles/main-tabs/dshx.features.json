@@ -412,7 +412,7 @@
     {
       "id": "tab-keyboard",
       "title": "Jump between tabs from the keyboard",
-      "summary": "Desktop Mod+W closes the active tab without archiving its thread; with no active tab the normal window-close action remains. Mod+1\u20268 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1\u20269 and Mod+Alt+] / [. All are rebindable in Settings \u203a Shortcuts. Arrow keys, Enter and Delete work inside the focused strip. Mod+T (Web: Mod+Alt+T) opens a new tab.",
+      "summary": "Close active tab closes the active tab without archiving its thread; it ships without a default because DSH's own page.close owns Mod+W, and is bound in Settings \u203a Shortcuts. Mod+1\u20268 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1\u20269 and Mod+Alt+] / [. All are rebindable in Settings \u203a Shortcuts. Arrow keys, Enter and Delete work inside the focused strip. Mod+T (Web: Mod+Alt+T) opens a new tab.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["bound", "unbound-on-conflict"],
@@ -435,12 +435,6 @@
           "id": "main-tabs.machine-unit-close-active",
           "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
           "testName": "closes the active tab and navigates to its right neighbour"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.shortcut-close-active-default",
-          "file": "plugins/@dshfiles/main-tabs/src/close-active-tab-shortcut.test.ts",
-          "testName": "close active tab uses primary+W on Desktop and has no Web default"
         }
       ],
       "reach": [

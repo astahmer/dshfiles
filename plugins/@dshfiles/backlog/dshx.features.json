@@ -284,6 +284,11 @@
       "verification": [
         { "kind": "gherkin", "id": "backlog.item-context-actions", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
         {
+          "kind": "gherkin",
+          "id": "backlog.board-multi-select",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "backlog.selection-open-item-seed",
           "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
@@ -294,7 +299,7 @@
     {
       "id": "auto-triage",
       "title": "Triage new items automatically",
-      "summary": "With autoTriage on, each capture is triaged in the background: Jev answers whether it is work to do and whether it repeats the closest open item, a configured cheap model proposes kind, status, title, tags and duplicates using the user's past corrections as examples. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
+      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
       "surfaces": ["client", "host", "settings", "tool"],
       "configuration": [],
       "states": ["off", "proposed", "applied", "dismissed"],
@@ -308,7 +313,13 @@
           "kind": "unit-test",
           "id": "backlog.auto-triage-unit-jev-work",
           "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
-          "testName": "moves work out of the inbox with Jev alone and reports its confidence"
+          "testName": "does not ask Jev to move a newly captured task out of the inbox"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-explicit-kind",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "skips the actionable question when the kind was explicitly chosen"
         },
         {
           "kind": "unit-test",
@@ -330,9 +341,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "backlog.auto-triage-unit-disagree",
+          "id": "backlog.auto-triage-unit-model-sole-judge",
           "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
-          "testName": "lowers confidence when Jev and the model disagree on the kind"
+          "testName": "uses the configured model without making a redundant Jev request or changing status"
         },
         {
           "kind": "unit-test",
@@ -385,7 +396,7 @@
     {
       "id": "backfill-triage",
       "title": "Backfill triage on items captured before it was set up",
-      "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest open items no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging items triage already looked at or including closed ones.",
+      "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest inbox/todo tasks no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run continues where it stopped. An agent runs the same pass with backlog_triage_backfill, optionally re-triaging inbox/todo tasks triage already looked at.",
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
       "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
@@ -422,19 +433,19 @@
           "kind": "unit-test",
           "id": "backlog.backfill-unit-oldest",
           "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
-          "testName": "takes open items nothing triaged yet, oldest first, and says how many a later run leaves"
+          "testName": "selects only inbox/todo tasks, oldest first, and says how many a later run leaves"
         },
         {
           "kind": "unit-test",
           "id": "backlog.backfill-unit-retriage",
           "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
-          "testName": "re-triages what triage already looked at, and reaches closed items when no status is scoped"
+          "testName": "re-triages only inbox/todo tasks it already looked at"
         },
         {
           "kind": "unit-test",
           "id": "backlog.backfill-unit-run",
           "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
-          "testName": "counts what each item became, marks only the unchanged ones, and leaves failures for the next run"
+          "testName": "counts what each item became, reports progress, marks only unchanged ones, and leaves failures for later"
         },
         {
           "kind": "host-test",

@@ -34,6 +34,11 @@
           "id": "workspace-nav.new-thread-request-reuse-unit",
           "file": "plugins/@dshfiles/workspace-nav/tests/new-thread-request.test.ts",
           "testName": "reuses the first listed blank of the workspace when draft options allow reuse"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "workspace-nav.new-thread-composer-no-gherkin-journey",
+          "reason": "No Gherkin scenario holds session/create in flight yet; the feature's reach steps open the New thread composer on a scratch DSH with dshx dev open, the request shape is unit-tested in tests/new-thread-request.test.ts, and the provisional row and its removal on refusal belong to @dshfiles/session-controller."
         }
       ]
     }

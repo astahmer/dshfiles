@@ -536,7 +536,7 @@
           "kind": "unit-test",
           "id": "secret-catalog.jev-inline-setup-view",
           "file": "plugins/@dshfiles/secret-catalog/src/jev-inline-setup-model.test.ts",
-          "testName": "shows a resolution warning instead of suggesting a duplicate when a reference is configured"
+          "testName": "hands a configured reference to the repair card instead of suggesting a duplicate"
         },
         {
           "kind": "unit-test",

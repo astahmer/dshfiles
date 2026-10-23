@@ -47,6 +47,11 @@
           "id": "tool-search.lifecycle-and-code-mode",
           "file": "plugins/@dshfiles/tool-search/src/host.test.ts",
           "testName": "rejects nested Code Mode search and unload removes only its own scope contributions"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tool-search.no-browser-surface",
+          "reason": "Progressive disclosure only changes which tools an Agent's provider requests carry; the bundle renders no browser UI, so a Gherkin browser scenario has nothing to observe. Ranking, per-agent disclosure, restore after reload and the Code Mode guard are covered by src/search.test.ts and src/host.test.ts."
         }
       ]
     }

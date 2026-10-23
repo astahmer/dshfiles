@@ -84,6 +84,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "jj-integration.project-switch-with-saved-draft-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "jj-integration.structured-reference-handoff-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
@@ -514,7 +519,7 @@
           "kind": "unit-test",
           "id": "jj-integration.rebase-unknown-question-state",
           "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
-          "testName": "fails closed when pending-question state is unknown"
+          "testName": "reports unknown when pending-question state is unavailable"
         },
         {
           "kind": "unit-test",
@@ -562,7 +567,7 @@
           "kind": "unit-test",
           "id": "jj-integration.checkout-sync",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
-          "testName": "brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits"
+          "testName": "syncs the default checkout to the exact landed commit even if the bookmark advances later"
         },
         {
           "kind": "unit-test",
@@ -863,12 +868,6 @@
           "id": "jj-integration.registered-projects",
           "file": "plugins/@dshfiles/jj-integration/src/registered-projects.test.ts",
           "testName": "splits projects from thread workspaces concurrently, drops missing folders and keeps registry order"
-        },
-        {
-          "kind": "unit-test",
-          "id": "project-folder-picker.everything-tab",
-          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
-          "testName": "lists recents, then projects, then workspaces on Everything, each folder once"
         },
         {
           "kind": "unit-test",

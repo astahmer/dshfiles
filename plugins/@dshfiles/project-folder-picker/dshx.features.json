@@ -65,7 +65,7 @@
     {
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
-      "summary": "After registered project matches, offer eligible recent folders and keep their canonical path distinct from registered project identity.",
+      "summary": "List recent folders in order on their own tab and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["registered-match", "recent-unregistered", "selected"],
@@ -76,7 +76,13 @@
           "kind": "unit-test",
           "id": "project-folder-picker.recent-folders",
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
-          "testName": "offers unregistered recent folders after matching projects"
+          "testName": "lists recent folders in order, showing a registered one as its project"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.everything-tab",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "lists recents, then projects, then workspaces on Everything, each folder once"
         }
       ]
     },

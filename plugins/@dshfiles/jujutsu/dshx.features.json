@@ -538,6 +538,11 @@
           "id": "jujutsu.workspace-forget",
           "file": "plugins/@dshfiles/jujutsu/src/fileset.integration.test.ts",
           "testName": "workspace-forget unregisters a secondary workspace and leaves its folder and files in place"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "jujutsu.workspace-removal-no-gherkin-journey",
+          "reason": "No Gherkin scenario removes a workspace from the graph yet; the feature's reach steps seed a thread workspace on a scratch DSH with dshx dev open and stop at the inline confirmation, and the forget path itself runs against a real jj repository in src/fileset.integration.test.ts."
         }
       ]
     },
@@ -604,28 +609,9 @@
           "testName": "asks for another tab seeded with the repository on screen"
         },
         {
-          "kind": "unit-test",
-          "id": "main-tabs.panel-scope-request",
-          "file": "plugins/@dshfiles/main-tabs/src/panel-tabs.test.ts",
-          "testName": "asks for a tab on one panel scope and names it"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.panel-scope-visible",
-          "file": "plugins/@dshfiles/main-tabs/src/panel-tabs.test.ts",
-          "testName": "reports the scoped tab on screen as what the main view shows, and a bare panel when another tab is active"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.panel-scope-machine",
-          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
-          "testName": "keeps one tab per panel scope, each naming the scope it asks the Host to show"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.panel-scope-persist",
-          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
-          "testName": "retitles a scoped tab wherever its set is, and saves the title and scope for a reload"
+          "kind": "not-applicable",
+          "id": "jujutsu.panel-scopes-no-gherkin-journey",
+          "reason": "No Gherkin scenario walks per-tab repository scopes yet; the feature's reach steps open a second Jujutsu tab on a scratch DSH with dshx dev open and switch between tabs to prove each keeps its own view, the scope rules are unit-tested in src/panel-scope.test.ts, and the main-tabs side (main-tabs.panel-scope-*) is owned and verified by the @dshfiles/main-tabs catalog."
         }
       ]
     }

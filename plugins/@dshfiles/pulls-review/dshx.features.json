@@ -63,13 +63,13 @@
           "kind": "unit-test",
           "id": "pulls-review.thread-review-scopes-unit-real-jj",
           "file": "plugins/@dshfiles/pulls-review/tests/jj-output.spec.ts",
-          "testName": "groups a real `jj diff --git --from main --to @` into scopes"
+          "testName": "reviews a real workspace through the argv the Host builds"
         },
         {
           "kind": "unit-test",
           "id": "pulls-review.thread-review-scopes-unit-reviewed-key",
           "file": "plugins/@dshfiles/pulls-review/tests/reviewed.spec.ts",
-          "testName": "separates the same path across workspaces and revisions"
+          "testName": "separates the same path across workspaces, bases and revisions"
         },
         {
           "kind": "unit-test",
@@ -111,13 +111,13 @@
           "kind": "unit-test",
           "id": "pulls-review.ai-scope-summaries-unit-parse",
           "file": "plugins/@dshfiles/pulls-review/tests/summarize.spec.ts",
-          "testName": "reads a fenced JSON answer and keeps every known scope"
+          "testName": "reads one keyed line per scope"
         },
         {
           "kind": "unit-test",
           "id": "pulls-review.ai-scope-summaries-unit-route",
           "file": "plugins/@dshfiles/pulls-review/tests/summarize.spec.ts",
-          "testName": "uses the thread provider with its cheapest offered model"
+          "testName": "uses the thread provider with the first model it offers, and lends it the session id"
         },
         {
           "kind": "unit-test",
