@@ -154,6 +154,13 @@ const setThreadStatusFilters = async (
   await page.keyboard.press('Escape')
 }
 
+// The shipped default view is Done grouped by date, which has no Active, Parked or Pinned section headers; journeys that
+// assert a status section switch to the status-grouped All threads view first, as a user would.
+const showThreadsByStatus = async (page: Page): Promise<void> => {
+  await threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true }).getByRole('button', { name: 'All threads', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
+}
+
 const selectThreadViewValue = async (page: Page, triggerName: string, value: string, scope: Locator = threadSidebar(page)): Promise<void> => {
   if (statusFilterLabels.includes(value)) {
     await setThreadStatusFilters(page, triggerName, value === 'All threads' ? [] : [value], scope)
@@ -666,9 +673,11 @@ When('a nonblank Host thread is parked from its context menu', async ({ page }: 
   const threadId = currentThreadId(page)
   if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   parkedThreadId = threadId
+  await showThreadsByStatus(page)
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   await openThreadRowMenu(targetRow)
+  await page.getByRole('menuitem', { name: 'Change status', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Park', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
   await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
@@ -725,6 +734,7 @@ When('a nonblank Host thread is pinned from its session header', async ({ page }
   const threadId = currentThreadId(page)
   if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   pinnedThreadId = threadId
+  await showThreadsByStatus(page)
   await expect(threadRow(page, threadId)).toHaveCount(1)
   const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
   await expect(threadActions).toHaveCount(1)
@@ -745,6 +755,7 @@ When('a nonblank Host thread is pinned from its sidebar row', async ({ page }: {
   const threadId = currentThreadId(page)
   if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   pinnedThreadId = threadId
+  await showThreadsByStatus(page)
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
   const threadRowActions = targetRow.getByTestId('thread-row-actions')
