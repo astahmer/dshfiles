@@ -12,11 +12,12 @@ import { createJevUsageRecorder, jevSourceOf } from './jev-usage-recorder.js'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
 import { observeLiveCall } from './live-calls.js'
-import { DEFAULT_OTLP_SERVICE_NAME } from './otel-metrics.js'
+import { OtlpMetricsExporter } from './otel-exporter.js'
 import { createRatePricer } from './pricing.js'
 import { openUsageStore, type UsageStore } from './store.js'
 
 const INDEX_INTERVAL_MS = 30_000
+const otlpServiceName = OtlpMetricsExporter.serviceName(process.env)
 const usageIndexService = createUsageIndexService({ fileSystem: { readdir, stat }, readLogFrom })
 
 const persistenceConfigSchema = z.object({ config: z.object({ root: z.string().min(1) }) })
@@ -103,9 +104,25 @@ const api = usageApi.host({
     const query = resolveActivityQuery(input)
     return requireRuntime().store.activity({ ...query, eventLimit: query.eventLimit ?? 50 })
   },
-  otelMetrics: ({ input }) =>
-    requireRuntime().store.otelMetrics({ ...resolveOtelMetricsRange(input), temporality: 'delta', serviceName: DEFAULT_OTLP_SERVICE_NAME }),
+  otelMetrics: ({ input }) => requireRuntime().store.otelMetrics({ ...resolveOtelMetricsRange(input), temporality: 'delta', serviceName: otlpServiceName }),
 })
+
+const startExporter = (context: Context, store: UsageStore) => {
+  const resolution = OtlpMetricsExporter.resolve(process.env)
+  const logger = context.logger('usage')
+  if (!resolution.enabled) {
+    if (resolution.reason === 'invalid-endpoint') logger.warn('OTLP metrics export is off: the configured endpoint is not an http(s) URL')
+    return undefined
+  }
+  return OtlpMetricsExporter.start({
+    config: resolution.config,
+    collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: otlpServiceName }),
+    onFailure: failure => {
+      if (failure.consecutiveFailures === 1) logger.warn('OTLP metrics export failed, backing off: %s', failure.message)
+    },
+    onRecovery: () => logger.info('OTLP metrics export recovered'),
+  })
+}
 
 const setupHost = (context: Context): Effect<void> => {
   const store = openUsageStore(dshHomePath('plugins', 'usage', 'usage.db'))
@@ -146,10 +163,12 @@ const setupHost = (context: Context): Effect<void> => {
   )
   void runPass(active)
   const timer = setInterval(() => void runPass(active), INDEX_INTERVAL_MS)
+  const exporter = startExporter(context, store)
   return {
     async *[Symbol.asyncIterator]() {
       yield async () => {
         clearInterval(timer)
+        await exporter?.stop()
         await active.pass
         if (runtime === active) runtime = undefined
         store.close()

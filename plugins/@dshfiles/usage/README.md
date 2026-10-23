@@ -89,12 +89,48 @@ label stays in the card; neither the activity report nor the export carries it.
 
 The read-only `usage_otel_metrics` Agent tool returns an OTLP/HTTP JSON
 `ExportMetricsServiceRequest` built directly from `$DSH_HOME/plugins/usage/usage.db`.
-It never posts or sends telemetry: SQLite remains the source of truth, and the
-returned document can be sent to a collector by a separate, explicitly configured
-client. Omit inputs for the last 30 days, pass `days` (1–365), or specify a
-half-open `[from, to)` range in Unix milliseconds (at most 365 days). Counter
-and histogram sums use OTLP delta temporality; when importing multiple exports,
-choose adjacent non-overlapping intervals to avoid counting the same events twice.
+The tool itself never posts anything: SQLite remains the source of truth. Omit
+inputs for the last 30 days, pass `days` (1–365), or specify a half-open
+`[from, to)` range in Unix milliseconds (at most 365 days). The tool's counters
+and histograms use delta temporality over that range; when importing multiple
+tool exports, choose adjacent non-overlapping intervals to avoid counting the
+same events twice.
+
+The document follows the OTLP/JSON mapping of `opentelemetry-proto`:
+`aggregationTemporality` is the enum number (`1` delta, `2` cumulative, never
+the enum name), 64-bit integers (`asInt`, `count`, `bucketCounts`) and
+`startTimeUnixNano`/`timeUnixNano` are decimal strings, sums are monotonic,
+histogram `explicitBounds` ascend with one more bucket count than bounds and the
+buckets add up to `count`, attribute values are `stringValue`s sorted by key,
+the resource carries `service.name`, and the scope is `@dshfiles/usage`.
+
+### Periodic export (opt-in)
+
+The Host can also push the same metrics to an OTLP/HTTP collector. It is off
+unless one of these is set in the DSH Host's environment (read once at
+activation, so a change needs a **Host restart**):
+
+| Variable                                                           | Effect                                                                                 |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`                              | Full metrics URL, used verbatim. Wins over the base endpoint.                          |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`                                      | Base URL; `/v1/metrics` is appended.                                                   |
+| `OTEL_METRIC_EXPORT_INTERVAL`                                      | Export interval in ms (default `60000`, minimum `1000`).                               |
+| `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | `key=value,…` request headers (URL-encoded), e.g. collector auth; metrics headers win. |
+| `OTEL_EXPORTER_OTLP_TIMEOUT`, `OTEL_EXPORTER_OTLP_METRICS_TIMEOUT` | Request timeout in ms (default `10000`).                                               |
+| `OTEL_SERVICE_NAME`                                                | `service.name` resource attribute (default `dshfiles`); the tool uses it too.          |
+| `OTEL_SDK_DISABLED=true` or `OTEL_METRICS_EXPORTER=none`           | Keeps the exporter off.                                                                |
+
+Payloads are always `application/json` (`http/json`), whatever
+`OTEL_EXPORTER_OTLP_PROTOCOL` says; gRPC is not supported. Each export is
+cumulative: every data point counts the events recorded since the exporter
+started, with the same `startTimeUnixNano` on every export, so a backend can
+diff consecutive exports (a Host restart starts a new series, which backends
+treat as a counter reset). Nothing is sent while there is nothing to report.
+A failed export never throws; the exporter logs the first failure, retries with
+exponential backoff (doubling the interval, capped at 15 minutes, honouring
+`Retry-After`) and resumes the interval after the next success. It stops when
+the plugin is disposed. Named tool sources stay capped at the 500 most used, so
+a source can drop out of a later export while category totals stay exact.
 
 The export includes model request and token counters, model request-duration
 histograms, exact tool counts by category and outcome, named-source counts for
