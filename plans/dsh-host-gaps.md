@@ -131,6 +131,40 @@ card keeps its identity, so a discarded reply is still revealable from its tool 
 - Durable route if it recurs: fork `@deepseek-ai/dsh-client-ui-user-questions` the way `chat` or
   `rich-composer` do ([native forks](../docs/native-forks.md)), recording the same files as the delta.
 
+## Rich question answers — transport boundary (2026-10-23)
+
+Decision: **upstream**, owned by `user-questions` / `agent-questions`, Host layer.
+
+Question free-text answers (with or without offered options) should support
+composer references and image/file attachments. Backlog has attachment previews,
+paste/drop handling and mention completion, but reusing its UI does not make the
+native answer transport attachment-capable.
+
+Verified against installed DSH 0.2.1-rc.2:
+
+- `@deepseek-ai/dsh-user-questions/lib/types/types.d.ts` defines
+  `AskUserQuestionAnswerItem` as `{ id, selected: string[], custom?: string }`.
+  The `user-questions/request` waterfall returns that same answer batch.
+- `lib/typert.remote-client.d.ts` exposes `userQuestions/answer` with only that
+  batch; there is no attachment or reference-content parameter.
+- `lib/index.js` uses a strict per-answer projection schema, and
+  `UserQuestionService.answer` creates a late reply containing one JSON text
+  block. It does not attach image blocks or upload receipts to the message.
+
+Required seam: an optional, validated answer-content/attachment contract shared
+by foreground waterfall answers, continued-question RPC replies, durable
+projection/review records and model-facing delivery. Preserve text-only defaults;
+validate attachment ownership and bounds on the Host. References need supported
+serialization into that content, not merely visually decorated text.
+
+Stop here rather than showing an upload control that silently loses image
+content, embedding base64 in `custom`, or sending an unrelated second chat turn.
+Once that seam exists, extract stable attachment and reference-input pieces from
+backlog at a shared client boundary and reuse them for both generic question
+variants and cross-thread custom-answer fields. Ordinary settings, credentials
+and other scalar fields must remain plain inputs. No core or installed-package
+patch made for this request.
+
 ## Upstream tracker
 
 Reports the community already filed against the installed runtime. Read these
