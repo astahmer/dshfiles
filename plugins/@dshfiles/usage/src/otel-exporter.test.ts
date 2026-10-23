@@ -126,6 +126,21 @@ describe('OtlpMetricsExporter.resolve', () => {
     expect(OtlpMetricsExporter.resolve({ OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: 'not a url' })).toEqual({ enabled: false, reason: 'invalid-endpoint' })
   })
 
+  it('falls back to the in-process receiver only without an environment endpoint, never sending env headers there', () => {
+    const local = OtlpMetricsExporter.resolve({ OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer%20k' }, { localBaseUrl: 'http://127.0.0.1:4318/' })
+    expect(local).toEqual({ enabled: true, config: { url: 'http://127.0.0.1:4318/v1/metrics', headers: {}, intervalMs: 60_000, timeoutMs: 10_000 } })
+    const environment = OtlpMetricsExporter.resolve({ OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318' }, { localBaseUrl: 'http://127.0.0.1:4318' })
+    expect(environment.enabled && environment.config.url).toBe('http://collector:4318/v1/metrics')
+    expect(OtlpMetricsExporter.resolve({ OTEL_EXPORTER_OTLP_ENDPOINT: 'collector:4317' }, { localBaseUrl: 'http://127.0.0.1:4318' })).toEqual({
+      enabled: false,
+      reason: 'invalid-endpoint',
+    })
+    expect(OtlpMetricsExporter.resolve({ OTEL_METRICS_EXPORTER: 'none' }, { localBaseUrl: 'http://127.0.0.1:4318' })).toEqual({
+      enabled: false,
+      reason: 'disabled',
+    })
+  })
+
   it('names the service from OTEL_SERVICE_NAME, defaulting to dshfiles', () => {
     expect(OtlpMetricsExporter.serviceName({})).toBe('dshfiles')
     expect(OtlpMetricsExporter.serviceName({ OTEL_SERVICE_NAME: 'laptop-dsh' })).toBe('laptop-dsh')
@@ -137,7 +152,8 @@ describe('OtlpMetricsExporter.start', () => {
     const collector = await startCollector()
     const store = openStore()
     const exporter = OtlpMetricsExporter.start({
-      config: { url: collector.url, headers: { authorization: 'Bearer token' }, intervalMs: 25, timeoutMs: 1_000 },
+      timing: { intervalMs: 25, timeoutMs: 1_000 },
+      destination: () => ({ url: collector.url, headers: { authorization: 'Bearer token' } }),
       collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
     })
     cleanups.push(() => exporter.stop())
@@ -173,7 +189,8 @@ describe('OtlpMetricsExporter.start', () => {
     const store = openStore()
     let collected = 0
     const exporter = OtlpMetricsExporter.start({
-      config: { url: collector.url, headers: {}, intervalMs: 10, timeoutMs: 1_000 },
+      timing: { intervalMs: 10, timeoutMs: 1_000 },
+      destination: () => ({ url: collector.url, headers: {} }),
       collect: range => {
         collected += 1
         return store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' })
@@ -184,13 +201,32 @@ describe('OtlpMetricsExporter.start', () => {
     expect(collector.received).toEqual([])
   })
 
+  it('sends nothing until a destination appears, then exports to it', async () => {
+    const collector = await startCollector()
+    const store = openStore()
+    let url: string | undefined
+    const exporter = OtlpMetricsExporter.start({
+      timing: { intervalMs: 10, timeoutMs: 1_000 },
+      destination: () => (url === undefined ? undefined : { url, headers: {} }),
+      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
+    })
+    cleanups.push(() => exporter.stop())
+    recordJev(store, 1)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    expect(collector.received).toEqual([])
+    expect(exporter.state().consecutiveFailures).toBe(0)
+    url = collector.url
+    await vi.waitFor(() => expect(collector.received.length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+  })
+
   it('backs off exponentially on failure and resumes the interval after recovery', async () => {
     const collector = await startCollector(index => (index < 2 ? { status: 503 } : { status: 200 }))
     const store = openStore()
     const failures: { readonly message: string; readonly consecutiveFailures: number }[] = []
     let recoveries = 0
     const exporter = OtlpMetricsExporter.start({
-      config: { url: collector.url, headers: {}, intervalMs: 20, timeoutMs: 1_000 },
+      timing: { intervalMs: 20, timeoutMs: 1_000 },
+      destination: () => ({ url: collector.url, headers: {} }),
       collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
       onFailure: failure => {
         failures.push(failure)
@@ -219,7 +255,8 @@ describe('OtlpMetricsExporter.start', () => {
     const collector = await startCollector(() => ({ status: 429, headers: { 'retry-after': '3' } }))
     const store = openStore()
     const exporter = OtlpMetricsExporter.start({
-      config: { url: collector.url, headers: {}, intervalMs: 20, timeoutMs: 1_000 },
+      timing: { intervalMs: 20, timeoutMs: 1_000 },
+      destination: () => ({ url: collector.url, headers: {} }),
       collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
     })
     cleanups.push(() => exporter.stop())
@@ -234,7 +271,8 @@ describe('OtlpMetricsExporter.start', () => {
     const store = openStore()
     recordJev(store, 1)
     const exporter = OtlpMetricsExporter.start({
-      config: { url: unreachable, headers: {}, intervalMs: 10, timeoutMs: 1_000 },
+      timing: { intervalMs: 10, timeoutMs: 1_000 },
+      destination: () => ({ url: unreachable, headers: {} }),
       collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
     })
     await vi.waitFor(() => expect(exporter.state().consecutiveFailures).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
@@ -250,7 +288,8 @@ describe('OtlpMetricsExporter.start', () => {
     const store = openStore()
     recordJev(store, 1)
     const exporter = OtlpMetricsExporter.start({
-      config: { url: collector.url, headers: {}, intervalMs: 10, timeoutMs: 60_000 },
+      timing: { intervalMs: 10, timeoutMs: 60_000 },
+      destination: () => ({ url: collector.url, headers: {} }),
       collect: range => store.otelMetrics({ from: range.from - 60_000, to: range.to, temporality: 'cumulative', serviceName: 'dshfiles' }),
     })
     await vi.waitFor(() => expect(collector.received).toHaveLength(1), { timeout: 2_000 })

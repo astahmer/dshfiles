@@ -32,12 +32,17 @@ const httpUrlSchema = z.url({ protocol: /^https?$/u })
 
 const positiveMillisecondsSchema = z.coerce.number().int().positive()
 
-export interface OtlpExporterConfig {
-  readonly url: string
-  readonly headers: Readonly<Record<string, string>>
+export interface OtlpExporterTiming {
   readonly intervalMs: number
   readonly timeoutMs: number
 }
+
+export interface OtlpExportDestination {
+  readonly url: string
+  readonly headers: Readonly<Record<string, string>>
+}
+
+export interface OtlpExporterConfig extends OtlpExportDestination, OtlpExporterTiming {}
 
 export type OtlpExporterResolution =
   | { readonly enabled: true; readonly config: OtlpExporterConfig }
@@ -67,21 +72,39 @@ const millisecondsOr = (value: string | undefined, fallback: number) => {
   return parsed.success ? parsed.data : fallback
 }
 
-const resolveExporter = (environment: Readonly<Record<string, string | undefined>>): OtlpExporterResolution => {
+const timingOf = (environment: Readonly<Record<string, string | undefined>>): OtlpExporterTiming => {
+  const env = otlpEnvironmentSchema.parse(environment)
+  return {
+    intervalMs: Math.max(MIN_INTERVAL_MS, millisecondsOr(env.OTEL_METRIC_EXPORT_INTERVAL, DEFAULT_INTERVAL_MS)),
+    timeoutMs: millisecondsOr(env.OTEL_EXPORTER_OTLP_METRICS_TIMEOUT ?? env.OTEL_EXPORTER_OTLP_TIMEOUT, DEFAULT_TIMEOUT_MS),
+  }
+}
+
+/**
+ * An environment endpoint always wins. Without one, `localBaseUrl` (the Host's own receiver, published through
+ * `@dshfiles/dshx/tracing`) is the target, without the environment's headers, which belong to a configured collector.
+ */
+const resolveExporter = (
+  environment: Readonly<Record<string, string | undefined>>,
+  options: { readonly localBaseUrl?: string | undefined } = {},
+): OtlpExporterResolution => {
   const env = otlpEnvironmentSchema.parse(environment)
   if (env.OTEL_SDK_DISABLED?.toLowerCase() === 'true' || env.OTEL_METRICS_EXPORTER?.toLowerCase() === 'none') return { enabled: false, reason: 'disabled' }
-  const url =
+  const configured =
     env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT ??
     (env.OTEL_EXPORTER_OTLP_ENDPOINT === undefined ? undefined : `${env.OTEL_EXPORTER_OTLP_ENDPOINT.replace(/\/+$/u, '')}/v1/metrics`)
-  if (url === undefined) return { enabled: false, reason: 'not-configured' }
-  if (!httpUrlSchema.safeParse(url).success) return { enabled: false, reason: 'invalid-endpoint' }
+  if (configured === undefined) {
+    const localUrl = options.localBaseUrl === undefined ? undefined : `${options.localBaseUrl.replace(/\/+$/u, '')}/v1/metrics`
+    if (localUrl === undefined || !httpUrlSchema.safeParse(localUrl).success) return { enabled: false, reason: 'not-configured' }
+    return { enabled: true, config: { url: localUrl, headers: {}, ...timingOf(environment) } }
+  }
+  if (!httpUrlSchema.safeParse(configured).success) return { enabled: false, reason: 'invalid-endpoint' }
   return {
     enabled: true,
     config: {
-      url,
+      url: configured,
       headers: { ...parseHeaders(env.OTEL_EXPORTER_OTLP_HEADERS), ...parseHeaders(env.OTEL_EXPORTER_OTLP_METRICS_HEADERS) },
-      intervalMs: Math.max(MIN_INTERVAL_MS, millisecondsOr(env.OTEL_METRIC_EXPORT_INTERVAL, DEFAULT_INTERVAL_MS)),
-      timeoutMs: millisecondsOr(env.OTEL_EXPORTER_OTLP_METRICS_TIMEOUT ?? env.OTEL_EXPORTER_OTLP_TIMEOUT, DEFAULT_TIMEOUT_MS),
+      ...timingOf(environment),
     },
   }
 }
@@ -112,10 +135,12 @@ const failureMessageOf = (error: unknown): string => {
 
 /**
  * Periodically POSTs cumulative OTLP/JSON metrics counted since the exporter started. It never throws: failures back off
- * exponentially (honouring Retry-After) and the next success resumes the configured interval.
+ * exponentially (honouring Retry-After) and the next success resumes the configured interval. `destination` is read on
+ * every tick, so a receiver that binds after the Host started is picked up; while it is undefined nothing is sent.
  */
 const startExporter = (input: {
-  readonly config: OtlpExporterConfig
+  readonly timing: OtlpExporterTiming
+  readonly destination: () => OtlpExportDestination | undefined
   readonly collect: (range: { readonly from: number; readonly to: number }) => OtlpMetricsRequest
   readonly onFailure?: (failure: { readonly message: string; readonly consecutiveFailures: number }) => void
   readonly onRecovery?: () => void
@@ -132,10 +157,10 @@ const startExporter = (input: {
   let lastSuccessAt: number | null = null
 
   const nextDelayMs = () => {
-    if (consecutiveFailures === 0) return input.config.intervalMs
+    if (consecutiveFailures === 0) return input.timing.intervalMs
     const backoff = Math.min(
-      input.config.intervalMs * 2 ** Math.min(consecutiveFailures, MAX_BACKOFF_EXPONENT),
-      Math.max(MAX_BACKOFF_MS, input.config.intervalMs),
+      input.timing.intervalMs * 2 ** Math.min(consecutiveFailures, MAX_BACKOFF_EXPONENT),
+      Math.max(MAX_BACKOFF_MS, input.timing.intervalMs),
     )
     return Math.max(backoff, retryAfterMs)
   }
@@ -157,13 +182,15 @@ const startExporter = (input: {
 
   const exportOnce = async () => {
     try {
+      const destination = input.destination()
+      if (destination === undefined) return
       const request = input.collect({ from: startedAt, to: Math.max(Date.now(), startedAt) })
       if (request.resourceMetrics.every(resource => resource.scopeMetrics.every(scope => scope.metrics.length === 0))) return
-      const response = await fetch(input.config.url, {
+      const response = await fetch(destination.url, {
         method: 'POST',
-        headers: { ...input.config.headers, 'content-type': 'application/json' },
+        headers: { ...destination.headers, 'content-type': 'application/json' },
         body: JSON.stringify(request),
-        signal: AbortSignal.any([abort.signal, AbortSignal.timeout(input.config.timeoutMs)]),
+        signal: AbortSignal.any([abort.signal, AbortSignal.timeout(input.timing.timeoutMs)]),
       })
       await response.arrayBuffer().catch(() => undefined)
       if (!response.ok) {
@@ -207,6 +234,7 @@ const startExporter = (input: {
 
 export class OtlpMetricsExporter {
   static readonly resolve = resolveExporter
+  static readonly timing = timingOf
   static readonly serviceName = resolveServiceName
   static readonly start = startExporter
 }

@@ -104,13 +104,21 @@ histogram `explicitBounds` ascend with one more bucket count than bounds and the
 buckets add up to `count`, attribute values are `stringValue`s sorted by key,
 the resource carries `service.name`, and the scope is `@dshfiles/usage`.
 
-### Periodic export (opt-in)
+### Periodic export
 
-The Host can also push the same metrics to an OTLP/HTTP collector. It is off
-unless one of these is set in the DSH Host's environment (read once at
-activation, so a change needs a **Host restart**). They are the same variables
-the LoongSuite span exporter reads, so one endpoint receives both; see
+The Host can also push the same metrics to an OTLP/HTTP collector. One of these
+variables in the DSH Host's environment names it (a change needs a **Host
+restart** with the variable in that environment). They are the standard
+variables every OTLP exporter of the Host reads, so one endpoint receives
+everything; see
 [observability](../../../docs/observability.md#usage-ledger-metrics).
+
+Without an endpoint variable, the export goes to the Host's own
+`@dshfiles/traces` receiver whenever it listens (it publishes its address
+through `@dshfiles/dshx/tracing`; the target is re-read at every export, so a
+receiver that starts later is picked up, and nothing is sent while there is
+none). An endpoint variable always wins, and its headers are never sent to the
+local receiver.
 
 | Variable                                                           | Effect                                                                                 |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |

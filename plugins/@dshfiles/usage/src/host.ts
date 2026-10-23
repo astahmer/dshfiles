@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-llm'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
+import { localOtlpEndpoint } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 import { resolveActivityQuery, resolveOtelMetricsRange, usageApi } from './api.js'
 import type { ToolSourceMetadata } from './fold.js'
@@ -110,12 +111,16 @@ const api = usageApi.host({
 const startExporter = (context: Context, store: UsageStore) => {
   const resolution = OtlpMetricsExporter.resolve(process.env)
   const logger = context.logger('usage')
-  if (!resolution.enabled) {
+  if (!resolution.enabled && resolution.reason !== 'not-configured') {
     if (resolution.reason === 'invalid-endpoint') logger.warn('OTLP metrics export is off: the configured endpoint is not an http(s) URL')
     return undefined
   }
   return OtlpMetricsExporter.start({
-    config: resolution.config,
+    timing: OtlpMetricsExporter.timing(process.env),
+    destination: () => {
+      const current = OtlpMetricsExporter.resolve(process.env, { localBaseUrl: localOtlpEndpoint()?.baseUrl })
+      return current.enabled ? current.config : undefined
+    },
     collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: otlpServiceName }),
     onFailure: failure => {
       if (failure.consecutiveFailures === 1) logger.warn('OTLP metrics export failed, backing off: %s', failure.message)
