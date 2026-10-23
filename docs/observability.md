@@ -6,6 +6,15 @@ step, model call and tool call. It uses the marketplace plugin
 (adopted, not ported or built), and exports nothing unless the Host process
 starts with `OTEL_EXPORTER_OTLP_ENDPOINT` set.
 
+Four sources answer different questions; pick the one that owns the question before adding another:
+
+| Question                                                          | Source                                                                                                     |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| What did a thread, its tools, Jev or an integration do, in order? | Activity Timeline plugin (`activity_timeline_*` agent tools): retained, condensed events.                  |
+| How many requests, tokens, what cost, which tools fail?           | Usage plugin: SQLite ledger, `usage_report`, and its OTLP metrics push (below).                            |
+| Why is the live GUI slow right now?                               | [`live-performance-audit`](performance.md) probes against :3080; measure before fixing.                    |
+| Where did the time of one turn or call go, across plugins?        | Traces: LoongSuite spans for turns, model calls and tools; dshx spans for our own code (below), one trace. |
+
 ## Turning it on
 
 The seed (`profiles/web/package.json` and the managed region of
@@ -61,6 +70,34 @@ OTLP/HTTP JSON every 60 s, cumulative since Host start. Its metrics are named
 `OTEL_METRICS_EXPORTER=none` turns off both this export and LoongSuite's
 metrics. Details and the full variable list are in the
 [usage README](../plugins/@dshfiles/usage/README.md#periodic-export-opt-in).
+
+## Spans from our own code (dshx)
+
+LoongSuite sees DSH core: turns, steps, model calls, tool calls. It cannot see
+what an owned plugin does inside a tool or a browser click. For that, dshx
+ships `@dshfiles/dshx/tracing` (no dependency, OTLP/HTTP JSON to `/v1/traces`),
+gated by the same `OTEL_EXPORTER_OTLP_ENDPOINT` /
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` variables (`OTEL_SERVICE_NAME`, default
+`dshfiles`; `OTEL_SDK_DISABLED=true` forces it off). Without an endpoint every
+span is a shared no-op.
+
+- Every dshx API dispatch (browser, plugin or agent tool) is a server span
+  `<api id>/<method>`: package, API id, method, caller kind, outcome code and
+  duration.
+- Under it: `jj <subcommand>` (jujutsu, jj-integration), `secret resolve` and
+  `secret <verb>` (secret-catalog), `jev classify` (backlog, memory: model,
+  provider, HTTP status, token counts), multi-host gateway
+  `<namespace>/<method>` requests (forwarding `traceparent`) and
+  `jj-integration workspace sync`.
+- `dshx checkout sync` records its own span, continuing a `TRACEPARENT`
+  environment variable when set.
+
+Spans carry identities, outcome codes, counts and durations only: no API
+arguments or results, command positionals or flag values, secret values,
+prompts or error messages. Attributes, bounds and the exporter's retry and
+drop policy are in the [dshx tracing guide](../tooling/dshx/docs/guides/tracing.md).
+Add a span at a work-unit boundary in an owned plugin with `withSpan`; do not
+log the same event a second way.
 
 ## Decision (2026-10-23, b:299)
 

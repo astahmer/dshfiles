@@ -2,12 +2,12 @@
 
 DSHX exposes a small authoring surface and keeps compiler/runtime internals out of application bundles. These labels describe API maturity and change policy.
 
-| Label             | Meaning |
-| ----------------- | ------- |
-| **Supported** | Documented production API. Breaking changes require a migration note and an entry in [compatibility](./compatibility.md). |
+| Label             | Meaning                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Supported**     | Documented production API. Breaking changes require a migration note and an entry in [compatibility](./compatibility.md).      |
 | **API Candidate** | Intended authoring shape; names and behavior may change. Breaking changes are recorded in [compatibility](./compatibility.md). |
-| **Experimental** | May change at any time; import only from an `experimental` or Tooling entry. |
-| **Tooling** | Node-only compiler, compatibility, diagnostic, and CLI APIs. Never import into Host or Client source. |
+| **Experimental**  | May change at any time; import only from an `experimental` or Tooling entry.                                                   |
+| **Tooling**       | Node-only compiler, compatibility, diagnostic, and CLI APIs. Never import into Host or Client source.                          |
 
 ## API chapters
 
@@ -20,6 +20,7 @@ DSHX exposes a small authoring surface and keeps compiler/runtime internals out 
 7. [Build](./guides/build.md) — bounded config, Vite plugin extensions, CSS/assets, declarations, and watch behavior.
 8. [Creator](./guides/creator.md) — template/style matrix, generated dependencies, and automation.
 9. [Tooling](./guides/tooling.md) — experimental Node-side build/watch, config, compatibility, diagnostics, CLI, and repair APIs.
+10. [Tracing](./guides/tracing.md) — metadata-only Host spans, OTLP/HTTP JSON export behind `OTEL_EXPORTER_OTLP_*`, and what is never recorded.
 
 Additional references:
 
@@ -38,6 +39,7 @@ Additional references:
 | `@dshfiles/dshx/client`                    | API Candidate          | Yes          | Client definitions, Locale/Slot contributions, and React Hooks                |
 | `@dshfiles/dshx/api`                       | API Candidate          | Yes          | Shared typed API contracts and error guards                                   |
 | `@dshfiles/dshx/settings`                  | API Candidate          | Yes          | Shared Settings contracts                                                     |
+| `@dshfiles/dshx/tracing`                   | API Candidate          | No           | Host spans and OTLP trace export (off unless an endpoint is configured)       |
 | `@dshfiles/dshx/experimental/conversation` | Experimental           | Yes          | Conversation lifecycle and renderer contributions                             |
 | `@dshfiles/dshx/tooling`                   | Tooling / Experimental | No           | Compiler, config resolution, compatibility, diagnostics, CLI, and repair APIs |
 
