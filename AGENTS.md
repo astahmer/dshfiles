@@ -323,39 +323,11 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
 ### Plugin UI and state
 
 Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
-`plugin-ui` and `plugin-state` hold the details. The rules that break silently:
-
-- Every utility is `dshx:`-prefixed, a complete static string, merged with
-  `cn`; `dshx-root` on each surface root; semantic colors only.
-- Avoid native JSX `title` attributes for hover help; use the shared
-  `@dshfiles/plugin-ui` Tooltip components instead, because native title
-  tooltips appear after a long delay. Keep `title` props only for components
-  whose prop is actual semantic content (such as a dialog or panel heading).
-  Oxlint enforces this with `ui-guidance/no-native-title` and its explicit
-  semantic-component allowlist.
-- `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
-  after **any** class change, rebuild it and the plugin you changed.
-- Avoid native JSX `<select>` controls; use `Combobox` from
-  `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
-  picker for consistent, searchable selection. The `no-native-select` lint rule
-  enforces this.
-- Project pickers should list registered projects, not JJ thread workspaces;
-  use `EntityLabels.projectsOf` when deriving choices from the workspace list.
-- Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
-  `/machine`, localStorage → `createStoredValue`.
-- Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from
-  `@deepseek-ai/dsh-client-ui-primitives`) over local copies.
-- **Multi-select only when a repeated row verb is worth batching.** Add it to
-  a list whose rows share a routine verb (move, mark, enable, stop) and whose
-  batch saves real work; skip it for detail panes and for lists whose rows have
-  unrelated actions. Use one model: plain click selects one row — or runs the
-  row's existing verb when it already has one — Cmd/Ctrl-click toggles the
-  selection, Shift-click extends the inclusive range from the anchor, and the
-  header checkbox selects exactly the rows visible under the current filter,
-  group or scope; changing any of those drops ids that are no longer visible.
-  A batch action keeps each single-row verb's rules, refusals and confirmations,
-  and a bulk destructive verb (forget, stop, remove) opens an explicit
-  confirmation that names the count — it never runs from a bare click.
+`plugin-ui` and `plugin-state` carry the workflow. The rules that break silently
+— `dshx:` utilities with `cn`, no native `title` or `<select>`, rebuild
+`@dshfiles/ui-styles` after a class change, project pickers over thread
+workspaces, multi-select only for a batchable row verb — are in the
+[kit README](plugins/@dshfiles/plugin-ui/README.md#rules-that-break-silently).
 
 ### Credentials: store a reference, never a value
 
@@ -431,65 +403,9 @@ without a fresh check is the pattern behind them. See `focused-validation`.
 
 ## Verifying
 
-A plugin that installs is not a plugin that works.
-
-- **Read the boot output.** `dsh web` prints one line per entry that failed to
-  activate, plus the tokenized URL. Fatal failures also write
-  `~/.dsh/logs/startup-*.log`; "did not activate" warnings only go to stdout.
-- A bare `curl` gets **401**; use the tokenized URL. `EADDRINUSE` means a stale
-  process holds the port (`lsof -nP -iTCP:<port> -sTCP:LISTEN`).
-- **Ask the running instance what it is before trusting it.** `dshx status`
-  reports the live DSH's pid, port, profile, launch time, the checkout revision
-  it was launched on (read back from the jj operation log), whether the checkout
-  moved since, how many plugin bundles were rebuilt after launch, and which
-  owned bundles have unbuilt edits. `dshx status --json` gives the same facts
-  (plus the full stale-bundle list) for comparing two runs, and
-  `dshx plugins list` lists every loaded plugin entry with its activation phase.
-  A plugin whose sources are newer than its `dist/`, or a served bundle older
-  than your edit, explains a change that "is not there" before any code reading.
-- `dsh --profile web --dump-config` shows what a profile actually loads.
-- After every build, import-check the Host bundle with the DSH Node:
-  `fnm exec --using="$(cat .node-version)" node -e "import('./dist/index.js')"`.
-
-### Repository checks
-
-When changing a plugin, do **not** run the full repository or plugin test suite
-by default. Use `pnpm test:related <changed-file>` for a focused source change or
-`pnpm test:changed --from <base>` for a set of changes; run only additional
-checks needed for the affected boundary (for example, the relevant E2E journey
-for a changed user flow). Docs-only changes need no tests. Widen to the plugin's
-full suite or repository-wide checks only when the change crosses broader
-contracts, a pre-landing/release gate requires it, or the focused checks expose
-a reason. See [docs/incremental-checks.md](docs/incremental-checks.md#test-selection)
-for selection behavior and its full-suite fallbacks.
-
-`node --run <script>` is faster than `pnpm run` and drops a bare argument
-silently, so pass it after `--` or through the check's own environment variable
-(`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The `check:diff`/`check:green`
-split, the Turbo cache and `--force` rules, and the e2e scope rule live in
-[docs/repository-checks.md](docs/repository-checks.md).
-
-### Rebuilt plugins reach the browser over HMR
-
-A rebuilt `dist/client.js` reaches the browser without a restart; Host code does
-not, and until a restart the old Host runs under the new client, so decode
-snapshots with defaults and never assume a new field, method or settings
-namespace. What needs a restart, how a failed reload behaves and what to report
-are in [docs/plugin-reload.md](docs/plugin-reload.md).
-
-### Client boot failures are cross-plugin
-
-A `Failed to load plugins` card lists symptoms. The first entry named is often
-not the broken one: a plugin that throws during `apply` is the cause, and the
-entries `pending (waiting for service: X)` are its innocent dependents. `dshx
-check --boot` catches these across the installed set; `tsc` alone does not.
-
-A client slot entry can also activate and then throw while rendering, which shows
-no card at all. A shadowing cell (the sidebar is one) retires the entry and
-renders the next registration, so a native fallback replaces the plugin's UI and
-only the browser console says so. `check:plugin-boot` and the `@smoke` client-boot
-scenario fail on both traces — the `[data-slot-error]` marker and the renderer's
-`slot entry crashed in '<slot>'` line. **A plugin-ui `useQuery`/`useMutation` hook
-needs a `PluginQueryProvider` in the entry's own tree**: dshx decorates slot
-components with the API context, not the Query client, and the missing provider
-throws exactly this way.
+A plugin that installs is not a plugin that works: read the boot output, ask
+`dshx status` what the running instance is, and import-check the built Host
+bundle. `dsh --profile web --dump-config` shows what a profile loads; a bare
+`curl` gets 401. Focused checks first (`pnpm test:related`), never the full suite
+by default. Full detail, including HMR-versus-restart and the cross-plugin shape
+of a client boot failure: [docs/verifying-plugins.md](docs/verifying-plugins.md).

@@ -129,3 +129,40 @@ The Host ships one unlayered `button, input, select, textarea { font-family: inh
   (`sm:max-w-2xl`). Consumers ship nothing; after a class change rebuild the owner and the changed plugin.
 - Host modals sit at `z-index: 1000`. Kit dialogs/sheets use 1050 and floating layers (select, popover, menus,
   tooltip, hover card) 1100, so they open above Host Settings and above our own dialogs.
+
+## Rules that break silently
+
+Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
+`plugin-ui` and `plugin-state` hold the details. The rules that break silently:
+
+- Every utility is `dshx:`-prefixed, a complete static string, merged with
+  `cn`; `dshx-root` on each surface root; semantic colors only.
+- Avoid native JSX `title` attributes for hover help; use the shared
+  `@dshfiles/plugin-ui` Tooltip components instead, because native title
+  tooltips appear after a long delay. Keep `title` props only for components
+  whose prop is actual semantic content (such as a dialog or panel heading).
+  Oxlint enforces this with `ui-guidance/no-native-title` and its explicit
+  semantic-component allowlist.
+- `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
+  after **any** class change, rebuild it and the plugin you changed.
+- Avoid native JSX `<select>` controls; use `Combobox` from
+  `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
+  picker for consistent, searchable selection. The `no-native-select` lint rule
+  enforces this.
+- Project pickers should list registered projects, not JJ thread workspaces;
+  use `EntityLabels.projectsOf` when deriving choices from the workspace list.
+- Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
+  `/machine`, localStorage → `createStoredValue`.
+- Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from
+  `@deepseek-ai/dsh-client-ui-primitives`) over local copies.
+- **Multi-select only when a repeated row verb is worth batching.** Add it to
+  a list whose rows share a routine verb (move, mark, enable, stop) and whose
+  batch saves real work; skip it for detail panes and for lists whose rows have
+  unrelated actions. Use one model: plain click selects one row — or runs the
+  row's existing verb when it already has one — Cmd/Ctrl-click toggles the
+  selection, Shift-click extends the inclusive range from the anchor, and the
+  header checkbox selects exactly the rows visible under the current filter,
+  group or scope; changing any of those drops ids that are no longer visible.
+  A batch action keeps each single-row verb's rules, refusals and confirmations,
+  and a bulk destructive verb (forget, stop, remove) opens an explicit
+  confirmation that names the count — it never runs from a bare click.
