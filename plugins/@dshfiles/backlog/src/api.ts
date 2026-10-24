@@ -159,6 +159,11 @@ export const backlogApi = defineApi({
       output: z.number(),
       description: 'A number that changes whenever any item changes; the panel polls it instead of the lists. Not an agent tool.',
     }),
+    aiActivity: method({
+      input: z.void(),
+      output: z.object({ active: z.boolean() }).strict(),
+      description: 'Whether Host-scheduled backlog AI work is currently running. Presentation-only status; not an agent tool.',
+    }),
     projects: method({
       input: z.void(),
       output: z.array(

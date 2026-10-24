@@ -407,7 +407,6 @@ export const BacklogPanel = (props: {
   const [backfillError, setBackfillError] = useState<string | null>(null)
   const backfillJobId = backfillJob?.jobId
   const backfillJobState = backfillJob?.state
-  const aiWorking = triagePending || backfillJobState === 'queued' || backfillJobState === 'running'
   useEffect(() => {
     if (backfillJobId === undefined || backfillJobId === null || backfillJobState === 'completed' || backfillJobState === 'failed') return
     let stopped = false
@@ -469,6 +468,14 @@ export const BacklogPanel = (props: {
     queryFn: ({ signal }) => api.revision(undefined, { signal }),
     refetchInterval: REFRESH_MS,
   })
+  const aiActivity = useQuery({
+    queryKey: [BacklogQueries.key, 'ai-activity'],
+    queryFn: ({ signal }) => api.aiActivity(undefined, { signal }),
+    retry: false,
+    refetchInterval: query => (query.state.error === null ? 1_000 : false),
+  })
+  const aiWorking =
+    triagePending || (aiActivity.error === null && aiActivity.data?.active === true) || backfillJobState === 'queued' || backfillJobState === 'running'
   const lastRevision = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (revision.data === undefined) return
