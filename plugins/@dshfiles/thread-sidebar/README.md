@@ -2,6 +2,7 @@
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
+![Start a chat directly from an expanded or collapsed project header](docs/screenshots/project-header-chat.png)
 
 ![Group remote threads with each view](docs/screenshots/section-order.png)
 
@@ -21,6 +22,14 @@ Active/Inactive status grouping.
 A local status section with no rows folds away and keeps its saved slot while the
 shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
+
+**New chat from a project header.** With **Group: Project**, each registered local
+project has an always-visible **+** beside its collapse chevron. It opens a blank
+chat in that project, even when another project's chat is open, without changing
+whether the group is collapsed. The tooltip and accessible name say **New chat in
+&lt;project&gt;**; Enter and Space activate it. It uses the existing New thread path,
+including draft handling, workspace isolation and error feedback. Unassigned,
+remote and unavailable project groups, and date/status groups, have no **+**.
 
 **Moving a row between sections.** Drag a thread row onto another section header
 (or anywhere inside that section) to put it there; while a row is in flight every

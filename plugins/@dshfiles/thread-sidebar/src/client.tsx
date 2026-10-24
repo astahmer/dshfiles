@@ -12,6 +12,7 @@ import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel 
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
+import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
 import { useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -240,6 +241,7 @@ type InjectedActions = {
   /** Open the thread a page-load link names without closing a panel the user opened while the list was loading. */
   openLinkedSession?: (sessionId: SessionSummary['id']) => void
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
+  startProjectSession: (projectId: string) => void
   /** Fork the thread into another project and settle it; resolves to the continuing thread and whether it settled. */
   continueInProject: (
     sessionId: SessionSummary['id'],
@@ -3556,6 +3558,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       groupBy: threadView.groupBy,
       entries,
       workspaceTitles,
+      localProjectIds: new Set(displayWorkspaces.map(workspace => workspace.id)),
       unassignedTitle: tSidebar('threadSidebarUnassigned'),
       dateTitles: {
         today: tSidebar('threadSidebarToday'),
@@ -4973,23 +4976,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       aria-label={isBoard ? `${group.label || props.tSidebar('threadSidebarAllThreads')} column` : showHeader ? groupLabel : undefined}
                     >
                       {showHeader ? (
-                        <button
-                          type="button"
-                          data-thread-section-header=""
-                          className={cn(
-                            stickyHeaderClass,
-                            'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-                          )}
-                          aria-expanded={!groupCollapsed}
-                          onClick={() => toggleGroup(group.key)}
-                        >
-                          <span className="dshx:whitespace-nowrap">{groupLabel}</span>
-                          <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
-                          <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                          <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                            {groupCollapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
-                          </span>
-                        </button>
+                        <ThreadGroupHeader
+                          label={groupLabel}
+                          count={group.threads.length}
+                          collapsed={groupCollapsed}
+                          projectId={group.projectId}
+                          className={stickyHeaderClass}
+                          onToggle={() => toggleGroup(group.key)}
+                          startProjectSession={props.startProjectSession}
+                          t={props.tSidebar}
+                        />
                       ) : null}
                       {groupCollapsed
                         ? null
