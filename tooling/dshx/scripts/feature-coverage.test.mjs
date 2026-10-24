@@ -264,3 +264,20 @@ test('ignores type-only Node network imports', async () => {
     assert.equal(runCheck(root).status, 0, runCheck(root).stderr)
   })
 })
+
+test('accepts every dshx create template as scaffolded, telemetry included', async () => {
+  const { CreateProjectModel } = await import('../packages/create-dshx/dist/index.js')
+  for (const template of ['basic', 'tool', 'ui', 'starter', 'showcase']) {
+    await withFixture(async ({ root, pluginRoot }) => {
+      await rm(pluginRoot, { recursive: true, force: true })
+      const created = await CreateProjectModel.create({ name: 'demo', cwd: resolve(root, 'plugins/@dshfiles'), install: false, template, style: 'none' })
+      const manifestFile = resolve(created.root, 'package.json')
+      const manifest = JSON.parse(await readFile(manifestFile, 'utf8'))
+      await writeFile(manifestFile, JSON.stringify({ ...manifest, name: '@dshfiles/demo' }))
+      await rm(resolve(root, 'tooling/dshx/e2e/features/demo.feature'))
+      const result = runCheck(root)
+      assert.equal(result.status, 0, `${template}: ${result.stderr}`)
+      assert.match(result.stdout, /telemetry \((?:0|1) automatic, 1 custom span entries, 0 not applicable\)/)
+    })
+  }
+})

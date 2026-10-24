@@ -56,6 +56,7 @@ function classAttribute(style: ProjectStyle, cssModule: string, tailwind: string
 
 function renderStarterHost(context: TemplateContext): string {
   return `import { definePlugin, defineTool } from '@dshfiles/dshx/host'
+import { runWork } from './work.js'
 
 const statusTool = defineTool({
   name: '${toolName(context.packageId)}',
@@ -66,7 +67,7 @@ const statusTool = defineTool({
     render: (_args, value) => [{ type: 'text', text: value }],
   },
   async execute() {
-    return '${context.packageId} is ready'
+    return runWork({ run: async () => '${context.packageId} is ready' })
   },
 })
 
@@ -157,6 +158,7 @@ function renderShowcaseHost(context: TemplateContext): string {
   return `import { definePlugin, definePromptContext, definePromptSection, defineTool } from '@dshfiles/dshx/host'
 import { statusApi } from './api/status.js'
 import { runtimeSettings } from './settings.js'
+import { runWork } from './work.js'
 
 const startedAt = new Date().toISOString()
 let requestCount = 0
@@ -170,7 +172,7 @@ const statusTool = defineTool({
     render: (_args, value) => [{ type: 'text', text: value }],
   },
   async execute() {
-    return '${context.packageId} is ready'
+    return runWork({ run: async () => '${context.packageId} is ready' })
   },
 })
 
@@ -430,6 +432,7 @@ function sdkDependencies(context: TemplateContext): DependencyMap {
 
 function renderBasicHost(context: TemplateContext): string {
   return `import { definePlugin } from '@dshfiles/dshx/host'
+import { runWork } from './work.js'
 
 export default definePlugin({
   id: '${packageSlug(context.packageId)}',
@@ -438,7 +441,7 @@ export default definePlugin({
     api.commands.register({
       name: '${packageSlug(context.packageId)}',
       description: 'Say hello from this plugin.',
-      handler: () => ({ kind: 'success', text: 'Hello from ${context.packageId}!' }),
+      handler: async () => ({ kind: 'success', text: await runWork({ run: async () => 'Hello from ${context.packageId}!' }) }),
     })
   },
 })
@@ -546,6 +549,7 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
         './package.json': './package.json',
       },
       files: ['dist', 'cordis.patch.yml'],
+      dshx: { features: './dshx.features.json' },
       dsh: {
         bundle: { patch: './cordis.patch.yml' },
         ...(template.hostOnly
@@ -641,7 +645,7 @@ import { createTestHost } from '@dshfiles/dshx/testing'
 ${fullStack ? "import { definePlugin } from '@dshfiles/dshx/host'\n" : ''}import plugin from '../src/host.js'
 
 describe('${context.packageId}', () => {
-  it('registers native ${commands ? 'commands' : 'tools'} and removes them on unload', async () => {
+  it('${hostTestName(template)}', async () => {
     const host = await createTestHost()
     try {
       ${fullStack ? `// Test tool contributions without starting the connection or settings providers.\n      const contribution = definePlugin({ id: '${packageSlug(context.packageId)}', tools: plugin.tools })\n      ` : ''}const mounted = await host.mount(${fullStack ? 'contribution' : 'plugin'})
@@ -654,6 +658,74 @@ describe('${context.packageId}', () => {
   })
 })
 `
+}
+
+function workSpanName(context: TemplateContext): string {
+  return `${packageSlug(context.packageId)} work`
+}
+
+function renderWork(context: TemplateContext): string {
+  return `import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
+
+/**
+ * One unit of Host work, in a span. Wrap every network call, child process or long job the same way, list the span in
+ * dshx.features.json, and prove it in tests/telemetry.spec.ts with recordSpans().
+ */
+export const runWork = <Result>(input: { readonly run: () => Promise<Result> }): Promise<Result> =>
+  withSpan('${workSpanName(context)}', { attributes: pluginAttributes({ plugin: '${packageSlug(context.packageId)}', attributes: { caller: 'host' } }) }, input.run)
+`
+}
+
+function renderTelemetryTest(context: TemplateContext): string {
+  return `import { describe, expect, it } from 'vitest'
+import { recordSpans } from '@dshfiles/dshx/tracing'
+import { runWork } from '../src/work.js'
+
+describe('${context.packageId} telemetry', () => {
+  it('records the ${workSpanName(context)} span', async () => {
+    const recorder = recordSpans()
+    try {
+      await expect(runWork({ run: async () => 'done' })).resolves.toBe('done')
+      expect(recorder.span('${workSpanName(context)}').attributes['dshx.${packageSlug(context.packageId)}.caller']).toBe('host')
+    } finally {
+      recorder.stop()
+    }
+  })
+})
+`
+}
+
+function hostTestName(template: TemplateName): string {
+  return `registers native ${template === 'basic' || template === 'ui' ? 'commands' : 'tools'} and removes them on unload`
+}
+
+function renderFeatureCatalog(context: TemplateContext, templateName: TemplateName): string {
+  const template: TemplateDefinition = TEMPLATE_REGISTRY[templateName]
+  const slug = packageSlug(context.packageId)
+  const commands = templateName === 'basic' || templateName === 'ui'
+  const feature = {
+    id: commands ? 'greeting-command' : 'status-tool',
+    title: commands ? 'Greeting command' : 'Status tool',
+    summary: commands ? 'A native command answers with a greeting.' : 'An agent tool reports that the plugin is ready.',
+    surfaces: [...(template.hostOnly ? [] : ['client']), 'host', commands ? 'command' : 'tool'],
+    configuration: [],
+    states: ['ready'],
+    failureModes: ['The Host entry fails to activate, so the contribution is never registered.'],
+    externalDependencies: [],
+    verification: [
+      { kind: 'unit-test', id: `${slug}.host-registration`, file: 'tests/host.spec.ts', testName: hostTestName(templateName) },
+      {
+        kind: 'not-applicable',
+        id: `${slug}.browser-journey`,
+        reason: 'No browser journey yet: add a Gherkin scenario once the plugin has a user-visible flow.',
+      },
+    ],
+    telemetry: [
+      ...(commands ? [] : [{ kind: 'automatic', source: 'agent-tool' }]),
+      { kind: 'custom', span: workSpanName(context), file: 'tests/telemetry.spec.ts', testName: `records the ${workSpanName(context)} span` },
+    ],
+  }
+  return `${JSON.stringify({ schemaVersion: 1, kind: 'bundle', features: [feature] }, null, 2)}\n`
 }
 
 /** Compose exactly the feature and style files required by one generated project. */
@@ -680,7 +752,10 @@ export function renderProjectTemplate(context: TemplateContext, templateName: Te
           2,
         ) + '\n',
     },
+    { path: 'src/work.ts', contents: renderWork(context) },
     { path: 'tests/host.spec.ts', contents: renderHostTest(context, templateName) },
+    { path: 'tests/telemetry.spec.ts', contents: renderTelemetryTest(context) },
+    { path: 'dshx.features.json', contents: renderFeatureCatalog(context, templateName) },
     {
       path: 'cordis.patch.yml',
       contents: `- insert:\n    - id: ${packageEntryId(context.packageId)}\n      name: "${context.packageId}"\n`,

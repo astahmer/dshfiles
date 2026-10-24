@@ -129,6 +129,22 @@ describe('create-dshx', () => {
     const host = await readFile(resolve(result.root, 'src/host.ts'), 'utf8')
     const client = await readFile(resolve(result.root, 'src/client.tsx'), 'utf8')
     expect(host).toContain('defineTool')
+    expect(host).toContain("runWork({ run: async () => '")
+    const work = await readFile(resolve(result.root, 'src/work.ts'), 'utf8')
+    const spanName = `demo-${template}-${style} work`
+    expect(work).toContain(`withSpan('${spanName}'`)
+    const telemetryTest = await readFile(resolve(result.root, 'tests/telemetry.spec.ts'), 'utf8')
+    expect(telemetryTest).toContain('recordSpans()')
+    expect(telemetryTest).toContain(`recorder.span('${spanName}')`)
+    const catalog = JSON.parse(await readFile(resolve(result.root, 'dshx.features.json'), 'utf8')) as {
+      features: { surfaces: string[]; telemetry: { kind: string; source?: string; span?: string; file?: string; testName?: string }[] }[]
+    }
+    expect(catalog.features[0]?.surfaces).toEqual(['client', 'host', 'tool'])
+    expect(catalog.features[0]?.telemetry).toEqual([
+      { kind: 'automatic', source: 'agent-tool' },
+      { kind: 'custom', span: spanName, file: 'tests/telemetry.spec.ts', testName: `records the ${spanName} span` },
+    ])
+    expect(telemetryTest).toContain(`it('records the ${spanName} span'`)
     expect(client).toContain("defineSlot('sidebar.footer.action'")
     expect(client.includes('defineLocale(')).toBe(template === 'starter')
     expect(client.includes('locales: [copy]')).toBe(template === 'starter')
