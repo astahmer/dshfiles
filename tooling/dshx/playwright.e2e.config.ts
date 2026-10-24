@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 import { defineBddProject } from 'playwright-bdd'
 import { E2E_VIEWPORT } from './e2e/support/evidence.js'
+import { chromiumLaunchOptions } from './packages/dshx/src/project/chromium-launch-options.js'
 
 /**
  * Behavior E2E for the DSH Web UI.
@@ -46,5 +47,5 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     viewport: E2E_VIEWPORT,
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [{ name: 'chromium', use: { browserName: 'chromium', launchOptions: await chromiumLaunchOptions() } }],
 })
