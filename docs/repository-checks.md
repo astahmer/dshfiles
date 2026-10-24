@@ -65,10 +65,14 @@ and [upstream cache discussion](https://github.com/microsoft/playwright/issues/2
 
 ## The order
 
-From `plugins/`: `node --run contract`, then the Turbo tasks `pnpm run build`,
-`pnpm run typecheck`, `pnpm run test` (the order `check:plugins` uses). The root
-`pnpm run check` adds dshx, desktop, scripts, web-profile contract, `lint` and
-`fmt:check`.
+For a plugin change, use `pnpm test:related <changed-file>` or
+`pnpm test:changed --from <base>` to select relevant tests; avoid running the
+plugin's entire test suite or root `pnpm run check` by default. Add package
+build/typecheck or only the E2E journey that exercises the changed behavior
+when needed. The complete `check:plugins` and root `pnpm run check` remain
+available as broader gates when a change crosses contracts or a pre-landing /
+release check calls for them. See [incremental checks](incremental-checks.md#test-selection)
+for selector behavior and full-suite fallbacks.
 
 `lint` ratchets Oxlint and the ast-grep rules (`node --run sg`): any error, or a
 rule exceeding its cap in `scripts/lint-ratchet.json`, fails; lower a cap when
@@ -79,11 +83,12 @@ touches, and, when the revision touches a plugin or the catalog checker, runs
 the feature-catalog check (Gherkin and telemetry coverage, a few seconds);
 `node --run check:green` runs everything except lint/format.
 `check:green` ends with `check:plugin-boot` and `check:e2e:smoke` (the `@smoke`
-journeys only); before landing a plugin change, also run
-`pnpm run check:e2e <plugin>` (its journeys, headless, serial; `node --run` would
-drop the name) green, or `DSHX_E2E_ONLY=<plugin> node --run check:e2e`. A broad
-journey run needs `pnpm run check:e2e --all`: it is the pre-land or post-merge
-gate, not the iteration loop.
+journeys only). For plugin iteration, run only the E2E scenario(s) that exercise
+the changed behavior, e.g. `DSHX_E2E_ONLY=<plugin> node --run check:e2e` when the
+plugin's scenarios are the relevant scope. Running every journey for a plugin
+(`pnpm run check:e2e <plugin>`, headless and serial; `node --run` would drop the
+name) or all repository journeys via `pnpm run check:e2e --all` is a broader
+pre-land/release gate, not the default iteration loop.
 
 All three are Turbo tasks keyed on the built bundles they boot, so an unchanged
 package replays from cache in seconds; `--force` reruns everything (see

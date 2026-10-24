@@ -438,11 +438,20 @@ A plugin that installs is not a plugin that works.
 
 ### Repository checks
 
+When changing a plugin, do **not** run the full repository or plugin test suite
+by default. Use `pnpm test:related <changed-file>` for a focused source change or
+`pnpm test:changed --from <base>` for a set of changes; run only additional
+checks needed for the affected boundary (for example, the relevant E2E journey
+for a changed user flow). Docs-only changes need no tests. Widen to the plugin's
+full suite or repository-wide checks only when the change crosses broader
+contracts, a pre-landing/release gate requires it, or the focused checks expose
+a reason. See [docs/incremental-checks.md](docs/incremental-checks.md#test-selection)
+for selection behavior and its full-suite fallbacks.
+
 `node --run <script>` is faster than `pnpm run` and drops a bare argument
 silently, so pass it after `--` or through the check's own environment variable
-(`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The order, the
-`check:diff`/`check:green` split, the Turbo cache and `--force` rules, and the
-e2e scope rule live in
+(`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The `check:diff`/`check:green`
+split, the Turbo cache and `--force` rules, and the e2e scope rule live in
 [docs/repository-checks.md](docs/repository-checks.md).
 
 ### Rebuilt plugins reach the browser over HMR
