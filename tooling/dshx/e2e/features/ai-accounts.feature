@@ -87,7 +87,15 @@ Feature: AI Accounts
     Then widening the usage popover from its grip lays the accounts out side by side
     And the usage popover keeps its size until its grip is double-clicked
 
-  @scenario:ai-accounts.pool-failover
+  @scenario:ai-accounts.active-chat-switch
+  Scenario: Follow actual accounts across foreground chats and a blank draft
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    And two healthy threads use different accounts
+    Then the sidebar account source follows thread switches
+
+  @scenario:ai-accounts.pool-failover @scenario:ai-accounts.active-chat-account
   Scenario: A rate-limited account hands the turn to a healthy one
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When a rate-limited and a healthy Command Code account share a local fake provider

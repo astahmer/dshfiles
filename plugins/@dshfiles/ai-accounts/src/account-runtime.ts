@@ -9,6 +9,7 @@ import type { CopilotLoginService } from './copilot-login.js'
 import type { ModelFallbackRouter } from './model-fallback-router.js'
 import type { FastModeService } from './codex-fast-mode.js'
 import type { FastModeUsageHistoryService } from './fast-mode-usage-history.js'
+import type { ServingAccountService } from './serving-account.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
@@ -24,6 +25,7 @@ interface AccountRuntime {
   modelFallbackRouter?: ModelFallbackRouter
   fastMode?: FastModeService
   fastModeUsageHistory?: FastModeUsageHistoryService
+  servingAccount?: ServingAccountService
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()
