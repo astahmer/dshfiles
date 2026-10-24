@@ -616,7 +616,7 @@ const ChildThreadList = (props: {
           className={cn(
             lineClass,
             'dshx:data-[selected=true]:bg-accent',
-            'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
+            'dshx:group/selection dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
@@ -626,6 +626,13 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
+          <span
+            aria-hidden="true"
+            className="dshx:pointer-events-none dshx:absolute dshx:-left-1 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground dshx:opacity-0 dshx:group-data-[multi-selected=true]/selection:opacity-100"
+            data-thread-selection-indicator=""
+          >
+            ✓
+          </span>
           <StatusDot
             session={child}
             unread={props.unreadSessionIds.has(child.id)}
@@ -1076,7 +1083,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               type="button"
               draggable
               className={cn(
-                'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                'dshx:group/selection dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
@@ -1087,6 +1094,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               onClick={() => props.actions.open(session.id)}
               onDoubleClick={() => keepThreadTab(session.id)}
             >
+              <span
+                aria-hidden="true"
+                className="dshx:pointer-events-none dshx:absolute dshx:-left-1 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground dshx:opacity-0 dshx:group-data-[multi-selected=true]/selection:opacity-100"
+                data-thread-selection-indicator=""
+              >
+                ✓
+              </span>
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
                   {rowStyle.statusDot ? (
@@ -1361,6 +1375,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [threadSelection, setThreadSelection] = useState<ThreadSelectionState>(EMPTY_THREAD_SELECTION)
+  const [shiftPressed, setShiftPressed] = useState(false)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Shift') setShiftPressed(true)
+    }
+    const onKeyUp = (event: KeyboardEvent): void => {
+      if (event.key === 'Shift') setShiftPressed(false)
+    }
+    const onWindowBlur = (): void => setShiftPressed(false)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onWindowBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onWindowBlur)
+    }
+  }, [])
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null)
   const selectionRef = useRef(threadSelection)
   selectionRef.current = threadSelection
@@ -4149,7 +4181,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   return (
     <TooltipProvider delayDuration={500}>
       <section
-        className="dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
+        className={cn('dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col', shiftPressed && 'dshx:select-none')}
         aria-label={props.tSidebar(isBoard ? 'threadSidebarBoardTitle' : 'threadSidebarTitle')}
         data-thread-surface={surface}
         onClickCapture={handleSelectionClickCapture}
