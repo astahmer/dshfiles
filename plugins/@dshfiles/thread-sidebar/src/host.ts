@@ -9,6 +9,7 @@ import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import { attentionFor, closeAttention, threadAttentionApiHost } from './attention-host.js'
 import { ThreadAttentionStoreModel } from './attention-store.js'
 import { threadSidebarMachineApi } from './machine-api.js'
@@ -190,7 +191,9 @@ const readMachineName = async (): Promise<string> => {
   const shortHostname = hostname().replace(/\..*$/u, '')
   if (process.platform !== 'darwin') return shortHostname
   try {
-    const { stdout } = await execFileAsync('scutil', ['--get', 'ComputerName'], { timeout: 1000 })
+    const { stdout } = await withSpan('machine name read', { kind: 'client', attributes: { 'process.executable.name': 'scutil' } }, () =>
+      execFileAsync('scutil', ['--get', 'ComputerName'], { timeout: 1000 }),
+    )
     return stdout.trim() || shortHostname
   } catch {
     return shortHostname

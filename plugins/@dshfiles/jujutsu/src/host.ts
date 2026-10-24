@@ -1,5 +1,4 @@
 import { defineHost, definePromptSection, waitForManagedExit } from '@dshfiles/dshx/host'
-import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
@@ -9,6 +8,7 @@ import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revi
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
+import { withJjSpan } from './jj-span.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { ReferenceGraphModel } from './reference-graph.js'
 import { composerContextHost } from './composer-context-host.js'
@@ -81,23 +81,6 @@ const resolveJjExecutable = async (ctx: Context, signal: AbortSignal): Promise<s
   return fixedJjExecutable
 }
 
-/** jj flags whose next argument is a value (a path, an operation id, a template) and must stay out of span attributes. */
-const JJ_VALUE_FLAGS = [
-  '-R',
-  '--repository',
-  '--at-operation',
-  '--at-op',
-  '--config',
-  '--config-toml',
-  '--config-file',
-  '-T',
-  '--template',
-  '-r',
-  '--revisions',
-  '-m',
-  '--message',
-]
-
 const runAt = (
   ctx: Context,
   cwd: string,
@@ -106,13 +89,7 @@ const runAt = (
   signal: AbortSignal | undefined,
   options: { readonly outputLimit?: number; readonly timeoutMs?: number } = {},
 ): Promise<ProcessResult> => {
-  if (!tracingEnabled()) return runJjAt(ctx, cwd, expectedIdentity, args, signal, options)
-  const attributes = commandAttributes({ executable: 'jj', args, valueFlags: JJ_VALUE_FLAGS })
-  return withSpan(`jj ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }, async span => {
-    const result = await runJjAt(ctx, cwd, expectedIdentity, args, signal, options)
-    span.setAttribute('jj.output.truncated', result.truncated)
-    return result
-  })
+  return withJjSpan({ args, run: () => runJjAt(ctx, cwd, expectedIdentity, args, signal, options) })
 }
 
 const runJjAt = async (

@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { worktreeMemoryApi } from './api.js'
 import { ProcessTable, type KnownSession, type ProcessRow } from './process-table.js'
 import { emptyCategoryBytes, type MemoryPressure, type MemorySnapshot, type ProcessTree, type StopResult, type StopTarget } from './types.js'
+import { withSpan } from '@dshfiles/dshx/tracing'
 
 const SNAPSHOT_TTL_MS = 3_000
 const PROBE_TIMEOUT_MS = 10_000
@@ -59,7 +60,10 @@ const unsupported = (now: number): MemorySnapshot => ({
   groups: [],
 })
 
-const run = async (context: Context, command: string, args: readonly string[]): Promise<string> => {
+const run = (context: Context, command: string, args: readonly string[]): Promise<string> =>
+  withSpan('worktree-memory probe', { kind: 'client', attributes: { 'process.executable.name': command } }, () => runUntraced(context, command, args))
+
+const runUntraced = async (context: Context, command: string, args: readonly string[]): Promise<string> => {
   const signal = AbortSignal.timeout(PROBE_TIMEOUT_MS)
   const executable = await context.subprocess.resolveExecutable(command, undefined, signal)
   const handle = context.subprocess.spawn({

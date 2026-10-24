@@ -1,6 +1,6 @@
-import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { waitForManagedExit } from '@dshfiles/dshx/host'
+import { commandAttributes, withSpan } from '@dshfiles/dshx/tracing'
 
 const COMMAND_TIMEOUT_MS = 30_000
 const MAX_STDERR_BYTES = 16_000
@@ -40,7 +40,7 @@ const isMissingRepository = (stderr: string): boolean => /no jj repo|not a jj re
  * cancellation. stderr is read only to classify a failure and never leaves this
  * module: jj prints credential-bearing remote URLs there.
  */
-export const createJjRun = (ctx: Context): JjRun => {
+export const createJjRun = (ctx: { readonly subprocess: Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'> }): JjRun => {
   let executable: Promise<string> | undefined
   const resolveExecutable = (signal: AbortSignal): Promise<string> => {
     executable ??= ctx.subprocess.resolveExecutable('jj', undefined, signal).catch(() => {
@@ -50,14 +50,14 @@ export const createJjRun = (ctx: Context): JjRun => {
     return executable
   }
 
-  return async input => {
+  const run: JjRun = async input => {
     const controller = new AbortController()
     const forwardAbort = (): void => controller.abort()
     if (input.signal?.aborted === true) controller.abort()
     else input.signal?.addEventListener('abort', forwardAbort, { once: true })
     const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? COMMAND_TIMEOUT_MS)
 
-    let handle: ReturnType<Context['subprocess']['spawn']> | undefined
+    let handle: ReturnType<SubprocessRuntime['spawn']> | undefined
     try {
       const binary = await resolveExecutable(controller.signal)
       handle = ctx.subprocess.spawn({
@@ -94,5 +94,13 @@ export const createJjRun = (ctx: Context): JjRun => {
       clearTimeout(timer)
       input.signal?.removeEventListener('abort', forwardAbort)
     }
+  }
+  return input => {
+    const attributes = commandAttributes({ executable: 'jj', args: input.args, valueFlags: ['-r', '--revisions', '-T', '--template', '--from', '--to', '-R'] })
+    return withSpan(`jj ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }, async span => {
+      const output = await run(input)
+      span.setAttribute('jj.output.truncated', output.truncated)
+      return output
+    })
   }
 }

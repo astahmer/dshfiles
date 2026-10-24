@@ -7,7 +7,6 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { waitForManagedExit } from '@dshfiles/dshx/host'
 import { defineHost } from '@dshfiles/dshx/host'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
@@ -19,6 +18,7 @@ import type { ProjectChecksVerifiedTurn } from './completion-event.js'
 import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type RemoteHost } from './core.js'
 import { ExecutionModel, LOCAL_ENDPOINT_KEY, type RemoteEndpointState } from './execution.js'
 import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './receipt-activity.js'
+import { runManagedProcess, type ProcessResult } from './managed-process.js'
 import { PeerSnapshotModel, type PeerFailureCode, type StepResult } from './remote.js'
 import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, type StoredReceipt } from './store.js'
 
@@ -39,7 +39,6 @@ const REVISION_PATTERN = /^[a-f0-9]{40,64}$/
 
 export const Config = projectChecksConfigSchema
 
-type ProcessFailure = 'spawn-failed' | 'process-group-failed' | 'cancelled' | 'timed-out'
 type ReceiptStage =
   | 'resolve-session-paths'
   | 'capture-source-revision-before'
@@ -66,13 +65,6 @@ const reportApiFailure = (operation: ApiDiagnosticOperation, diagnosticId: strin
     errorType: cause instanceof Error ? cause.name.slice(0, 64) : typeof cause,
     errorCode: safeErrorCode(cause),
   })
-}
-
-interface ProcessResult {
-  readonly exitCode: number | null
-  readonly stdout: string
-  readonly stderr: string
-  readonly failure: ProcessFailure | null
 }
 
 interface ProjectPaths {
@@ -202,73 +194,8 @@ const persistReceipt = async (ctx: Context, receipt: StoredReceipt): Promise<voi
   await Promise.all(removals.map(key => table.delete(key)))
 }
 
-const runManaged = async (
-  ctx: Context,
-  command: string,
-  args: readonly string[],
-  cwd: string,
-  timeoutMs: number,
-  signal: AbortSignal | undefined,
-): Promise<ProcessResult> => {
-  const controller = new AbortController()
-  let timedOut = false
-  let managedExit = false
-  let handle: ReturnType<typeof ctx.subprocess.spawn> | undefined
-  const abortFromCaller = (): void => controller.abort(signal?.reason)
-  const timeout = setTimeout(() => {
-    timedOut = true
-    controller.abort(new Error('Project action timed out.'))
-  }, timeoutMs)
-
-  signal?.addEventListener('abort', abortFromCaller, { once: true })
-  if (signal?.aborted === true) abortFromCaller()
-
-  try {
-    if (controller.signal.aborted) return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
-    const executable = await ctx.subprocess.resolveExecutable(command, undefined, controller.signal)
-    if (!isAbsolute(executable) || executable.includes('\0')) return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
-
-    handle = ctx.subprocess.spawn({
-      argv: [executable, ...args],
-      cwd,
-      stdio: {
-        stdin: 'ignore',
-        stdout: { maxBytes: 16_384 },
-        stderr: { maxBytes: 4_096 },
-      },
-      graceMs: 1_000,
-      signal: controller.signal,
-    })
-    const outcome = await handle.done
-    if (controller.signal.aborted) {
-      handle.terminate()
-      if (timedOut) return { exitCode: null, stdout: '', stderr: '', failure: 'timed-out' }
-      return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
-    }
-
-    managedExit = await waitForManagedExit({ handle, timeoutMs, signal: controller.signal })
-    if (!managedExit) {
-      handle.terminate()
-      return { exitCode: outcome.exitCode, stdout: '', stderr: '', failure: 'process-group-failed' }
-    }
-
-    const stdout = handle.collected.stdout?.readFrom(0)
-    const stderr = handle.collected.stderr?.readFrom(0)
-    return { exitCode: outcome.exitCode, stdout: stdout?.text ?? '', stderr: stderr?.text ?? '', failure: null }
-  } catch {
-    if (controller.signal.aborted) {
-      return { exitCode: null, stdout: '', stderr: '', failure: timedOut ? 'timed-out' : 'cancelled' }
-    }
-    return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
-  } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', abortFromCaller)
-    if (handle !== undefined && !managedExit) {
-      handle.terminate()
-      await waitForManagedExit({ handle, timeoutMs: 10_000 }).catch(() => false)
-    }
-  }
-}
+const runManaged = (ctx: Context, command: string, args: readonly string[], cwd: string, timeoutMs: number, signal: AbortSignal | undefined) =>
+  runManagedProcess({ subprocess: ctx.subprocess, command, args, cwd, timeoutMs, signal })
 
 /** Free plus reclaimable memory: the signal that says the laptop has headroom to join `auto`. */
 const availableMemoryMb = (): number => Math.floor(process.availableMemory() / 1_048_576)

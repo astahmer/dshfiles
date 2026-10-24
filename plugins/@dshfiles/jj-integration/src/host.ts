@@ -17,7 +17,8 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
-import { commandAttributes, tracingEnabled, withSpan } from '@dshfiles/dshx/tracing'
+import { withSpan } from '@dshfiles/dshx/tracing'
+import { traceJjExecutor } from './jj-span.js'
 import { workspaceScriptsApi } from '@dshfiles/memory/workspace-scripts-api'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
 import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/completion-event'
@@ -204,36 +205,7 @@ const safePromptField = (value: string, maximumLength: number): string =>
     .replaceAll('`', "'")
     .slice(0, maximumLength)
 
-/** jj flags whose next argument is a value (a path, an operation id, a template) and must stay out of span attributes. */
-const JJ_VALUE_FLAGS = [
-  '-R',
-  '--repository',
-  '--at-operation',
-  '--at-op',
-  '--config',
-  '--config-toml',
-  '--config-file',
-  '-T',
-  '--template',
-  '-r',
-  '--revisions',
-  '-m',
-  '--message',
-]
-
-const createExecutor = (context: Context): JjExecutor => {
-  const execute = createUntracedExecutor(context)
-  return input => {
-    if (!tracingEnabled()) return execute(input)
-    const attributes = commandAttributes({ executable: 'jj', args: input.args, valueFlags: JJ_VALUE_FLAGS })
-    return withSpan(`jj ${String(attributes['process.command.verb'])}`.trim(), { kind: 'client', attributes }, async span => {
-      const result = await execute(input)
-      span.setAttributes({ 'process.exit.code': result.exitCode, 'jj.output.truncated': result.stdoutLossy })
-      if (result.exitCode !== 0) span.setStatus('error', `exit ${String(result.exitCode)}`)
-      return result
-    })
-  }
-}
+const createExecutor = (context: Context): JjExecutor => traceJjExecutor(createUntracedExecutor(context))
 
 const createUntracedExecutor =
   (context: Context): JjExecutor =>

@@ -6,6 +6,7 @@ import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { PluginApiError } from '@dshfiles/dshx/api'
+import { commandAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 import { JsonText } from './json-text.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -787,7 +788,10 @@ export const createThreads = (options: {
    */
   const gitWorktrees = async (repoRoot: string, args: readonly string[]): Promise<void> => {
     if (!existsSync(join(repoRoot, '.git'))) return
-    await execFileAsync('git', ['-C', repoRoot, 'worktree', ...args]).catch(() => undefined)
+    const argv = ['-C', repoRoot, 'worktree', ...args]
+    await withSpan('git worktree', { kind: 'client', attributes: commandAttributes({ executable: 'git', args: argv, valueFlags: ['-C'] }) }, () =>
+      execFileAsync('git', argv),
+    ).catch(() => undefined)
   }
 
   const sparesFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-spare-workspaces.json')

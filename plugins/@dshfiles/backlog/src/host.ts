@@ -35,6 +35,7 @@ import { JevClient } from './jev-client.js'
 import { ReplyAgentSelection } from './reply-agent-selection.js'
 import { ReplyRouting } from './reply-routing.js'
 import { BacklogTriage, type TriageServices } from './triage.js'
+import { runReadOnlyJj } from './jj-runner.js'
 
 interface OpenedBacklog {
   readonly store: BacklogStore
@@ -463,21 +464,10 @@ const onSessionEvent = (ctx: Context, session: Session, event: SessionEvent): vo
     .catch(logFailure('Backlog thread signal failed'))
 }
 
-/** Read-only and bounded: `--ignore-working-copy` never snapshots anyone's checkout. */
 const runJj = async (ctx: Context, cwd: string, args: readonly string[]): Promise<string> => {
   const subprocess = ctx.get('subprocess')
   if (subprocess === undefined) throw new Error('the DSH subprocess service is unavailable')
-  const binary = await subprocess.resolveExecutable('jj', undefined, AbortSignal.timeout(5_000))
-  const handle = subprocess.spawn({
-    argv: [binary, '--color=never', '--no-pager', '--ignore-working-copy', ...args],
-    cwd,
-    stdio: { stdin: 'ignore', stdout: { maxBytes: 400_000 }, stderr: { maxBytes: 4_000 } },
-    graceMs: 1_500,
-    signal: AbortSignal.timeout(20_000),
-  })
-  const outcome = await handle.done
-  if (outcome.exitCode !== 0) throw new Error(`jj exited ${String(outcome.exitCode)} in ${cwd}`)
-  return handle.collected.stdout?.readFrom(0)?.text ?? ''
+  return runReadOnlyJj({ subprocess, cwd, args })
 }
 
 const MAX_REPOSITORIES = 10
