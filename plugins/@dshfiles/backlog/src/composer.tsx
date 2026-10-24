@@ -427,7 +427,13 @@ export const Composer = (props: {
     >
       <MentionMenu suggestions={suggestions} highlight={highlight} label="Suggestions" onPick={pick} onHover={setHighlight} />
 
-      <AttachmentTray files={attachments.files} onRemove={attachments.remove} />
+      {attachments.files.length === 0 ? null : chat ? (
+        <div className="dshx:absolute dshx:inset-x-0 dshx:bottom-full dshx:z-20 dshx:mb-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-2 dshx:shadow-lg">
+          <AttachmentTray files={attachments.files} onRemove={attachments.remove} />
+        </div>
+      ) : (
+        <AttachmentTray files={attachments.files} onRemove={attachments.remove} />
+      )}
       <input
         ref={fileInputRef}
         type="file"

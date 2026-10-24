@@ -156,9 +156,14 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
 
 When('two images are attached to the capture', async ({ page }: { page: Page }) => {
   const captureForm = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'Capture', exact: true }) })
+  const contentRegion = page.locator('[data-backlog-content-region]')
+  const contentHeight = await contentRegion.evaluate(element => element.getBoundingClientRect().height)
+  const composerHeight = await captureForm.evaluate(element => element.getBoundingClientRect().height)
   await captureForm.locator('input[type="file"]').setInputFiles([join(attachmentFixtures, 'red.png'), join(attachmentFixtures, 'blue.png')])
   await expect(captureForm.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
   await expect(captureForm.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
+  await expect.poll(() => contentRegion.evaluate(element => element.getBoundingClientRect().height)).toBe(contentHeight)
+  await expect.poll(() => captureForm.evaluate(element => element.getBoundingClientRect().height)).toBe(composerHeight)
 })
 
 When('{string} is captured', async ({ page }: { page: Page }, text: string) => {

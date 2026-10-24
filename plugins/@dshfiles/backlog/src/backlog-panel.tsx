@@ -833,7 +833,7 @@ export const BacklogPanel = (props: {
       {list.isError ? (
         <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(list.error, 'The backlog is unavailable.')}</p>
       ) : null}
-      <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
+      <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
         {showSettings ? <BacklogSettingsPanel /> : null}
         {showSettings ? null : showsResults ? (
           <>
