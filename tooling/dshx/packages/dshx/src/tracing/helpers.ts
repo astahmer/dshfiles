@@ -1,3 +1,4 @@
+import { redactIdentifier } from './identifier.js'
 import { SpanRecorders, type SpanRecorder } from './recorder.js'
 import { TracerModel, type Span, type SpanAttributeValue, type SpanContext, type StartSpanOptions } from './tracer.js'
 
@@ -63,15 +64,6 @@ const pluginAttributes = <Plugin extends string, Attributes extends Readonly<Rec
   // SAFETY: the keys were built from `Attributes` with exactly the mapped type's template.
   return Object.fromEntries(entries) as PluginAttributes<Plugin, Attributes>
 }
-
-const IDENTIFIER = /^[\w.:/@+-]{1,128}$/u
-
-/**
- * A value safe to record as an identity (a tool, model, provider or package name): kept when it is one bounded token
- * of letters, digits and `_ . : / @ + -`, otherwise `undefined`, so free text (prompts, paths with spaces, messages)
- * never becomes an attribute by accident.
- */
-const redactIdentifier = (value: string | undefined): string | undefined => (value !== undefined && IDENTIFIER.test(value) ? value : undefined)
 
 /** The size of a payload instead of the payload: string length, list length, or the JSON length of anything else. */
 const contentSize = (value: unknown): number => {

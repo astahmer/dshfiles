@@ -161,11 +161,16 @@ describe('API registry', () => {
     expect(listing.tools.find(tool => tool.name === 'test_thread_land')).toMatchObject({ source: 'api', owner: '@test/threads' })
     expect(listing.tools.find(tool => tool.name === 'dshx_capabilities')).toMatchObject({ source: 'tool' })
     expect(listing.skills).toEqual([])
-    expect(listApis(first.ctx).map(api => `${api.owner}/${api.id}`)).toEqual(['@dshfiles/dshx/registry', '@test/caller/plain', '@test/threads/threads'])
+    expect(listApis(first.ctx).map(api => `${api.owner}/${api.id}`)).toEqual([
+      '@dshfiles/dshx/browser-traces',
+      '@dshfiles/dshx/registry',
+      '@test/caller/plain',
+      '@test/threads/threads',
+    ])
 
     await first.dispose()
     const afterHandover = await list()
-    expect(afterHandover.apis.map(api => api.owner)).toEqual(['@dshfiles/dshx', '@test/threads'])
+    expect(afterHandover.apis.map(api => api.owner)).toEqual(['@dshfiles/dshx', '@dshfiles/dshx', '@test/threads'])
     expect(host.tools.schemas().filter(schema => schema.name === 'dshx_capabilities')).toHaveLength(1)
     await host.dispose()
   })

@@ -20,6 +20,14 @@ export interface FinishedSpan {
   readonly endTimeUnixNano: bigint
   readonly attributes: ReadonlyMap<string, SpanAttributeValue>
   readonly status: SpanStatus
+  readonly events?: readonly FinishedSpanEvent[]
+}
+
+/** A timestamped point inside a span (a long task during a browser interaction). */
+export interface FinishedSpanEvent {
+  readonly name: string
+  readonly timeUnixNano: bigint
+  readonly attributes: ReadonlyMap<string, SpanAttributeValue>
 }
 
 export interface SpanStatus {
@@ -60,6 +68,13 @@ interface OtlpSpan {
   readonly endTimeUnixNano: string
   readonly attributes: readonly OtlpKeyValue[]
   readonly status: OtlpStatus
+  events?: readonly OtlpEvent[]
+}
+
+interface OtlpEvent {
+  readonly name: string
+  readonly timeUnixNano: string
+  readonly attributes: readonly OtlpKeyValue[]
 }
 
 const SPAN_KIND_CODES = { internal: 1, server: 2, client: 3, producer: 4, consumer: 5 } as const satisfies Record<SpanKind, number>
@@ -102,24 +117,38 @@ const encodeSpan = (span: FinishedSpan): OtlpSpan => {
     status,
   }
   if (span.parentSpanId !== undefined) encoded.parentSpanId = span.parentSpanId
+  if (span.events !== undefined && span.events.length > 0) {
+    encoded.events = span.events.map(event => ({
+      name: event.name,
+      timeUnixNano: event.timeUnixNano.toString(),
+      attributes: keyValues(event.attributes),
+    }))
+  }
   return encoded
 }
 
 const SCOPE = { name: '@dshfiles/dshx', version: '1' } as const
 
-/** The `ExportTraceServiceRequest` body for one batch. */
-const encodeTraceRequest = (input: { readonly serviceName: string; readonly spans: readonly FinishedSpan[] }) => ({
+const hostResource = (): ReadonlyMap<string, SpanAttributeValue> =>
+  new Map<string, SpanAttributeValue>([
+    ['telemetry.sdk.name', SCOPE.name],
+    ['telemetry.sdk.language', 'nodejs'],
+    ['process.pid', process.pid],
+  ])
+
+/**
+ * The `ExportTraceServiceRequest` body for one batch. `resource` replaces the Host process resource (pid, nodejs) for
+ * spans another runtime produced, such as the browser spans the Host forwards; `service.name` always comes first.
+ */
+const encodeTraceRequest = (input: {
+  readonly serviceName: string
+  readonly spans: readonly FinishedSpan[]
+  readonly resource?: ReadonlyMap<string, SpanAttributeValue> | undefined
+}) => ({
   resourceSpans: [
     {
       resource: {
-        attributes: keyValues(
-          new Map<string, SpanAttributeValue>([
-            ['service.name', input.serviceName],
-            ['telemetry.sdk.name', SCOPE.name],
-            ['telemetry.sdk.language', 'nodejs'],
-            ['process.pid', process.pid],
-          ]),
-        ),
+        attributes: keyValues(new Map<string, SpanAttributeValue>([['service.name', input.serviceName], ...(input.resource ?? hostResource())])),
       },
       scopeSpans: [{ scope: SCOPE, spans: input.spans.map(encodeSpan) }],
     },
@@ -194,6 +223,8 @@ const environmentEndpointSet = (env: Environment): boolean =>
 export interface BatchExporterOptions {
   /** Read before every request, so the target can appear, move or vanish; `undefined` drops the batch. */
   readonly config: () => ExportConfig | undefined
+  /** Resource attributes besides `service.name`; the Host process resource by default. */
+  readonly resource?: ReadonlyMap<string, SpanAttributeValue> | undefined
   readonly fetch?: typeof fetch | undefined
   readonly maxQueueSize?: number
   readonly maxBatchSize?: number
@@ -252,7 +283,7 @@ const createBatchExporter = (options: BatchExporterOptions): BatchExporter => {
       const response = await send(config.url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(encodeTraceRequest({ serviceName: config.serviceName, spans: batch })),
+        body: JSON.stringify(encodeTraceRequest({ serviceName: config.serviceName, spans: batch, resource: options.resource })),
         signal: AbortSignal.timeout(exportTimeoutMs),
       })
       await response.body?.cancel().catch(() => undefined)

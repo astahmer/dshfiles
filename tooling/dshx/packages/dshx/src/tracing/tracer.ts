@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { LocalOtlpEndpointRegistry } from './local-endpoint.js'
 import { SpanRecorders } from './recorder.js'
+import { TraceparentModel, type SpanContext } from './traceparent.js'
 import {
   OtlpTraceExport,
   type BatchExporter,
@@ -18,10 +19,7 @@ export type { SpanAttributeValue, SpanKind, SpanStatusCode } from './otlp-export
 
 export type SpanAttributes = Readonly<Record<string, SpanAttributeValue | undefined>>
 
-export interface SpanContext {
-  readonly traceId: string
-  readonly spanId: string
-}
+export type { SpanContext }
 
 export interface Span {
   /** False for the no-op span handed out while export is off; skip expensive attribute work on it. */
@@ -95,17 +93,6 @@ const nonZeroHex = (bytes: number): string => {
     const id = randomBytes(bytes).toString('hex')
     if (/[^0]/u.test(id)) return id
   }
-}
-
-const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/u
-
-/** Read a W3C `traceparent` header (version 00); anything else, including all-zero ids, is ignored. */
-const parseTraceparent = (header: string | null | undefined): SpanContext | undefined => {
-  const match = TRACEPARENT.exec(header?.trim().toLowerCase() ?? '')
-  if (match === null) return undefined
-  const [, traceId = '', spanId = ''] = match
-  if (!/[^0]/u.test(traceId) || !/[^0]/u.test(spanId)) return undefined
-  return { traceId, spanId }
 }
 
 class RecordingSpan implements Span {
@@ -221,7 +208,7 @@ const createRecordingTracer = (exporter: BatchExporter | undefined, exportEnable
     activeContext: () => storage.getStore(),
     traceparent: () => {
       const active = storage.getStore()
-      return active === undefined ? undefined : `00-${active.traceId}-${active.spanId}-01`
+      return active === undefined ? undefined : TraceparentModel.format(active)
     },
     runWithParent: (parent, run) => (parent === undefined ? run() : storage.run(parent, run)),
     flush: async () => exporter?.flush(),
@@ -279,6 +266,6 @@ const processTracer = (): Tracer => {
 export class TracerModel {
   static readonly create = createTracer
   static readonly process = processTracer
-  static readonly parseTraceparent = parseTraceparent
+  static readonly parseTraceparent = (header: string | null | undefined): SpanContext | undefined => TraceparentModel.parse(header)
   static readonly noopSpan = NOOP_SPAN
 }

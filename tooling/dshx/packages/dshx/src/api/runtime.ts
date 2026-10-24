@@ -2,6 +2,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiClientContract, ApiError } from './types.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
+import type { BrowserSpan } from '../tracing/browser.js'
+import { BrowserTracingRegistryModel } from '../tracing/browser-registry.js'
+import { TraceparentModel } from '../tracing/traceparent.js'
 
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
@@ -39,6 +42,20 @@ function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, api
   return ApiProtocolModel.error('remote', message, apiId, method, false, undefined, code)
 }
 
+/**
+ * A Client call made while a browser span or interaction is active becomes its `client` child, and carries that
+ * child's `traceparent` so the Host dispatch span joins the trace. Without one, no span: background polling never
+ * starts traces of its own.
+ */
+function browserCallSpan(packageId: string, apiId: string, method: string): BrowserSpan | undefined {
+  const tracer = BrowserTracingRegistryModel.current().tracer
+  if (tracer?.activeContext() === undefined) return undefined
+  return tracer.startSpan(`${apiId}/${method}`, {
+    kind: 'client',
+    attributes: { 'rpc.system': 'dshx', 'rpc.service': apiId, 'rpc.method': method, 'dshx.plugin.package': packageId },
+  })
+}
+
 function createApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
   context: ContextLike | Context | undefined,
   contract: ApiClientContract<Methods>,
@@ -49,12 +66,19 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
   const call = async (name: string, input: unknown, options?: ApiCallOptions): Promise<unknown> => {
     const rpc = connection?.rpc
     if (rpc?.call === undefined) throw ApiProtocolModel.error('unavailable', 'The DSH Connection provider is unavailable.', contract.id, name, true)
+    const span = browserCallSpan(contract.owner ?? packageId, contract.id, name)
     try {
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       if (contract.methods[name] === undefined) throw ApiProtocolModel.error('contract', `Unknown API method ${name}.`, contract.id, name, false)
       ApiProtocolModel.jsonBytes(input)
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
-      const result = await rpc.call('/api', `${channel.slice(1)}/${name}`, { version: contract.version, input }, options?.signal)
+      const request =
+        span?.context === undefined
+          ? { version: contract.version, input }
+          : { version: contract.version, input, [TraceparentModel.envelopeField]: TraceparentModel.format(span.context) }
+      const result = await rpc.call('/api', `${channel.slice(1)}/${name}`, request, options?.signal)
+      span?.setAttribute('dshx.api.outcome', result.ok ? 'ok' : (result.error?.code ?? 'remote'))
+      if (!result.ok) span?.setStatus('error', result.error?.code ?? 'remote')
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       if (!result.ok) throw errorFromRemote(result, contract.id, name)
       const envelope = result.value as { version?: unknown; output?: unknown }
@@ -64,6 +88,9 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       return envelope.output
     } catch (cause) {
+      // A caller that cancels (a query superseded by the next thread) did not see the call fail.
+      if (options?.signal?.aborted === true) span?.setAttribute('dshx.api.outcome', 'aborted')
+      else span?.recordFailure(cause)
       if (ApiProtocolModel.isApiError(cause)) throw cause
       if (options?.signal?.aborted) throw ApiProtocolModel.aborted(contract.id, name, cause)
       if (cause instanceof ContractViolation) throw ApiProtocolModel.error('contract', cause.message, contract.id, name, false, cause)
@@ -71,6 +98,8 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
       if (cause instanceof Error && /\bHTTP 404$/.test(cause.message))
         throw ApiProtocolModel.ownerMissing(contract.owner ?? packageId, contract.id, name, cause)
       throw ApiProtocolModel.error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
+    } finally {
+      span?.end()
     }
   }
   const client: Record<string, unknown> = { safe: {} }

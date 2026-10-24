@@ -20,6 +20,8 @@ import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
 import { TracerModel } from '../tracing/tracer.js'
+import { TraceparentModel } from '../tracing/traceparent.js'
+import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -70,7 +72,12 @@ function hostLogger(ctx: Context): LoggerLike {
   }
 }
 
-function createDispatch(ctx: Context, packageId: string, registration: ApiHostRegistration): ApiDispatch {
+interface MountOptions {
+  /** False for an API whose own calls must not become spans (the browser-traces forwarder would trace its exports). */
+  readonly traced?: boolean
+}
+
+function createDispatch(ctx: Context, packageId: string, registration: ApiHostRegistration, options: MountOptions = {}): ApiDispatch {
   const { contract, handlers } = ApiDefinitionModel.hostRegistrationParts(registration)
   const dispatch: ApiDispatch = async (endpoint, payload, signal, caller, peer) => {
     const methodDefinition = contract.methods[endpoint]
@@ -102,7 +109,7 @@ function createDispatch(ctx: Context, packageId: string, registration: ApiHostRe
   }
   return (endpoint, payload, signal, caller, peer) => {
     const tracer = TracerModel.process()
-    if (!tracer.enabled) return dispatch(endpoint, payload, signal, caller, peer)
+    if (options.traced === false || !tracer.enabled) return dispatch(endpoint, payload, signal, caller, peer)
     const startedAt = performance.now()
     return tracer.withSpan(
       `${contract.id}/${endpoint}`,
@@ -174,7 +181,9 @@ async function registerRoutes(
             })
             return Response.json(mismatch)
           }
-          const result = await TracerModel.process().runWithParent(TracerModel.parseTraceparent(request.headers.get('traceparent')), () =>
+          // A browser caller cannot set headers on a Connection RPC, so its trace context rides in the envelope.
+          const parent = TracerModel.parseTraceparent(request.headers.get('traceparent')) ?? TraceparentModel.fromEnvelope(message.payload)
+          const result = await TracerModel.process().runWithParent(parent, () =>
             dispatch(method, message.payload, request.signal, { kind: 'client' }, connection.browserPeer),
           )
           return Response.json(serverResponseSchema.parse({ type: 'server-response', rpcId: message.rpcId, result }))
@@ -393,6 +402,21 @@ const capabilitiesTool = (registry: ApiRegistry): ToolDefinition => ({
   },
 })
 
+/** The browser-traces forwarder rides with the registry: one per process, served by whichever dshx Host leads it. */
+async function mountBrowserTraces(ctx: Context): Promise<() => Promise<void>> {
+  const forwarder = BrowserTracesIngest.createForwarder()
+  try {
+    const mounted = await mountApi(ctx, ApiDefinitionModel.registryOwner, forwarder.registration, { traced: false })
+    return async () => {
+      await mounted.dispose()
+      await forwarder.flush()
+    }
+  } catch (cause) {
+    warn(ctx, `dshx registry: browser traces are not forwarded: ${describeFailure(cause)}`)
+    return async () => undefined
+  }
+}
+
 async function lead(registry: ApiRegistry): Promise<void> {
   const member = registry.members[0]
   if (member === undefined || registry.leader !== undefined) return
@@ -400,6 +424,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
   const registration = ApiDefinitionModel.registryApi.host({ list: ({ input }) => describeRegistry(member.ctx, registry, input ?? {}) })
   try {
     const unmount = (await mountApi(member.ctx, ApiDefinitionModel.registryOwner, registration)).dispose
+    const unmountBrowserTraces = await mountBrowserTraces(member.ctx)
     const tools = toolsOf(member.ctx)
     const unregister = tools?.register(capabilitiesTool(registry))
     member.stop = async () => {
@@ -408,6 +433,7 @@ async function lead(registry: ApiRegistry): Promise<void> {
       } catch {
         // The tools layer may already have released it with the Host fiber.
       }
+      await unmountBrowserTraces()
       await unmount()
     }
   } catch (cause) {
@@ -438,6 +464,7 @@ async function mountApi(
   ctx: Context,
   packageId: string,
   registration: ApiHostRegistration,
+  options: MountOptions = {},
 ): Promise<{ readonly dispose: () => Promise<void>; readonly servesClients: boolean }> {
   const { contract } = ApiDefinitionModel.hostRegistrationParts(registration)
   if (contract.owner !== undefined && contract.owner !== packageId) {
@@ -454,7 +481,7 @@ async function mountApi(
   if (previous !== undefined) {
     throw new Error(`API channel collision at ${channel}: ${previous} and ${owner}.`)
   }
-  const dispatch = createDispatch(ctx, packageId, registration)
+  const dispatch = createDispatch(ctx, packageId, registration, options)
   const connection = ctx.get('connection') as HostConnectionHandle | undefined
   const servesClients = connection?.fetch?.register !== undefined
   const removeRoutes = connection?.fetch?.register === undefined ? [] : await registerRoutes(connection, channel, contract, dispatch)

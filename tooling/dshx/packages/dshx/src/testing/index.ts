@@ -7,6 +7,7 @@ import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle, PeerScope } from '@deepseek-ai/dsh-client-connection'
 import { ApiProtocolModel } from '../api/common.js'
 import { ApiDefinitionModel } from '../api/define.js'
+import { BROWSER_TRACES_API } from '../tracing/browser-protocol.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
 import { createClientModule, createClientPlugin } from '../client/runtime.js'
 import { createClientModuleLoader } from './client-module.js'
@@ -38,6 +39,8 @@ export interface TestConnection {
     readonly version: number
     readonly input: unknown
   }): Promise<Response>
+  /** One Connection RPC exactly as a browser Client posts it (`endpoint` without `/api/`), so a client half can run against the real routes. */
+  requestRpc(request: { readonly endpoint: string; readonly payload: unknown }): Promise<Response>
   dispose(): void
 }
 
@@ -86,21 +89,26 @@ export function provideTestConnection(ctx: Context): TestConnection {
     authenticatedUrl: baseUrl => baseUrl,
   }
   const dispose = ctx.provide('connection', connection)
-  return {
-    /** Routes the mounted plugins registered, without the registry listing dshx serves on the first one's behalf. */
-    get routeCount() {
-      const registryPrefix = `/api${ApiProtocolModel.apiChannel(ApiDefinitionModel.registryOwner, ApiDefinitionModel.registryApi.id)}/`
-      return [...routes.keys()].filter(path => !path.startsWith(registryPrefix)).length
-    },
-    requestApi: ({ packageId, apiId, method, version, input }) => {
-      const endpoint = `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${method}`
-      const request = new Request(`http://dshx.test/api/${endpoint}`, {
+  const requestRpc = (request: { readonly endpoint: string; readonly payload: unknown }): Promise<Response> =>
+    handler.fetch(
+      new Request(`http://dshx.test/api/${request.endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ type: 'client-request', rpcId: 'dshx-test', method: endpoint, payload: { version, input } }),
-      })
-      return handler.fetch(request, peer)
+        body: JSON.stringify({ type: 'client-request', rpcId: 'dshx-test', method: request.endpoint, payload: request.payload }),
+      }),
+      peer,
+    )
+  return {
+    /** Routes the mounted plugins registered, without the registry listing and browser-traces API dshx serves on the first one's behalf. */
+    get routeCount() {
+      const dshxPrefixes = [ApiDefinitionModel.registryApi.id, BROWSER_TRACES_API.id].map(
+        apiId => `/api${ApiProtocolModel.apiChannel(ApiDefinitionModel.registryOwner, apiId)}/`,
+      )
+      return [...routes.keys()].filter(path => !dshxPrefixes.some(prefix => path.startsWith(prefix))).length
     },
+    requestApi: ({ packageId, apiId, method, version, input }) =>
+      requestRpc({ endpoint: `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${method}`, payload: { version, input } }),
+    requestRpc,
     dispose,
   }
 }

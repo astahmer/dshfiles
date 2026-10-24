@@ -3,7 +3,8 @@
 `@dshfiles/dshx/tracing` is a small Host-only OpenTelemetry tracer. It records **metadata-only** spans and exports
 them as OTLP/HTTP JSON. It adds no dependency and is off unless an OTLP endpoint is configured.
 
-Status: **API Candidate**. Host bundles only (it uses `node:async_hooks`); never import it into Client code.
+Status: **API Candidate**. `@dshfiles/dshx/tracing` is Host-only (it uses `node:async_hooks`); never import it into
+Client code. Client code uses its browser half, `@dshfiles/dshx/tracing/client` ([below](#browser-spans-dshfilesdshxtracingclient)).
 
 ## Enable export
 
@@ -69,6 +70,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 OTEL_SERVICE_NAME=dsh-verify \
 | `<api id>/<method>`  | server   | every dshx API dispatch (Client, plugin, agent tool) | `dshx.plugin.package`, `dshx.api.id`, `dshx.api.method`, `dshx.api.caller` (+ `.package` for plugin callers), `dshx.api.outcome` (`ok` or error code), `dshx.api.duration_ms`, `rpc.system/service/method`, `dsh.session.id` (agent-tool calls: the calling Session) |
 | `<api id>/<method>`  | client   | `createDshxApiCaller` (remote dshx API calls)        | `rpc.*`, `dshx.plugin.package`, `dshx.api.remote`                                                                                                                                                                                                                    |
 | `dshx checkout sync` | internal | the CLI                                              | workspace, bookmark, dry run, status, changed-file and rebuilt-plugin counts, restart needed                                                                                                                                                                         |
+| `<interaction>`      | internal | browser, `startInteraction` (`dshfiles-web` service) | `dshx.interaction`, `.outcome`, `.long_tasks`, `.long_task_ms`, `longtask` events, the owning plugin's `dshx.<plugin>.*` keys                                                                                                                                        |
+| `<api id>/<method>`  | client   | browser dshx API call inside an interaction          | `rpc.*`, `dshx.plugin.package`, `dshx.api.outcome`; parent of the Host server span                                                                                                                                                                                   |
 
 Owned plugins add child spans: `jj <subcommand>` (jujutsu, jj-integration), `secret <verb>` and `secret resolve`
 (secret-catalog), `jev classify` (backlog, memory), `<namespace>/<method>` gateway requests (multi-host) and
@@ -171,6 +174,69 @@ contract is described in [observability](../../../../docs/observability.md#the-t
   { "kind": "custom", "span": "backlog triage", "file": "plugins/@dshfiles/backlog/src/triage.test.ts", "testName": "records a backlog triage span" }
 ]
 ```
+
+## Browser spans (`@dshfiles/dshx/tracing/client`)
+
+The browser half measures slow UI interactions and joins them to the Host work they cause: one trace from a click to
+the `<api id>/<method>` server spans (and their `jj` / `secret` children) on the Host. It has no Node API, no schema
+library and no dependency; a test pins that its module graph stays that way.
+
+```ts
+import { endInteractionAfterPaint, startInteraction } from '@dshfiles/dshx/tracing/client'
+
+// where the click lands (thread-sidebar)
+startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'sidebar' } })
+// where its result renders (chat), once
+endInteractionAfterPaint('thread switch', { 'dshx.chat.entries': entries.length })
+```
+
+| Export                                                    | Purpose                                                                                                                                                                                                                           |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startInteraction(name, { attributes?, timeoutMs? })`     | A root span for one user interaction. While open it is the **ambient parent** of every span and dshx API call on the page, across awaits and plugins. Reopening a name supersedes the open one; an unended one closes after 10 s. |
+| `openInteraction(name)`, `endInteractionAfterPaint(name)` | Find the open interaction; end it after the next frame painted (one animation frame, then a task). A no-op when none is open.                                                                                                     |
+| `withSpan(name, options?, run)`, `traced`, `startSpan`    | Same shapes as the Host API. The browser has no async context: `withSpan` is the active parent only during the synchronous part of `run`; later work nests through an open interaction or `parent: span.context`.                 |
+| `traceparent()`, `activeSpanContext()`                    | The active span, else the open interaction.                                                                                                                                                                                       |
+| `flushBrowserTracing()`, `recordBrowserSpans()`           | Send the queue now; an in-memory recorder for tests (`span(name)`, `named`, `children`, `using`).                                                                                                                                 |
+| `browserTracingEnabled()`, `redactIdentifier`             | Skip attribute work when off; keep a value only when it is one identifier token.                                                                                                                                                  |
+
+`Interaction` and `BrowserSpan` also have `addEvent(name, attributes?)`.
+
+**Propagation.** A dshx API call made from a Client while a span or interaction is active opens a `client` span
+`<api id>/<method>` (`rpc.*`, `dshx.plugin.package`, `dshx.api.outcome`: `ok`, the error code, or `aborted` when the
+caller cancelled it, which is not an error) and sends its `traceparent`. The Connection
+RPC carries no custom headers, so it rides in the request envelope (`{ version, input, traceparent }`); the Host route
+reads the `traceparent` header first, then that field, and a Host without it ignores the field. Without an active span
+nothing is recorded, so background polling never starts traces. An interaction is ambient for everything on the page
+while it is open, so a poll that happens to fire inside that window joins it too; keep interactions short (they end
+at the paint they wait for). Native DSH requests (`session/follow`, `session/prompt`, `session/create`) are not dshx
+calls and carry no trace context: the browser span still measures them, but has no Host child for them.
+
+**Long tasks.** While an interaction is open, a `longtask` `PerformanceObserver` (Chromium) adds each task of 200 ms or
+more as a `longtask` event (`browser.longtask.duration_ms`) and sets `dshx.interaction.long_tasks` /
+`dshx.interaction.long_task_ms`; `dshx.interaction.outcome` is `completed`, `superseded` or `timeout`.
+
+**Export.** The page never posts to an OTLP endpoint (CORS, collector credentials). The dshx client runtime attaches
+the page tracer to the Connection of each API-capable plugin (the latest attached is used), and spans go to the
+`browser-traces` API that the dshx registry leader serves on every Host with a dshx API (owner `@dshfiles/dshx`). That
+route:
+
+- answers `status` (`enabled` when `otlpExportTarget({ signal: 'traces' })` is not `off`, `sampleRatio` 1,
+  `maxRootSpansPerMinute` 60); the page asks on its first span, caches the answer for 5 minutes, and records
+  nothing while it is `enabled: false` (an old Host without the route counts as off);
+- validates each batch (128 spans, 32 attributes, 32 events, 256-character strings, lowercase dotted keys; spans that
+  are inverted, longer than 10 minutes or more than an hour off the Host clock are dropped), caps all pages together
+  at 1,200 spans a minute, and forwards through the dshx OTLP exporter to the same target as Host spans, with
+  environment headers only for an environment endpoint;
+- is never traced itself, and the page calls it without a client span or `traceparent`, so exporting cannot feed
+  back.
+
+Forwarded spans have `service.name=dshfiles-web` and a resource of `telemetry.sdk.language=webjs`, `browser.engine`
+(`chromium`, `firefox`, `webkit` or `other`) and `browser.mobile`: never the user agent string, a URL, a path or page
+content. The page batches every 5 s (or at 128 spans), holds at most 512, and flushes when the tab is hidden.
+
+Instrumented today: `thread switch` (thread-sidebar row or main-tabs tab → chat transcript painted), `new thread`
+(workspace-nav, click → Session created and painted), `panel open` (main-tabs, `dshx.main_tabs.panel`) and
+`composer send` (rich-composer, submit → Host admission; `dshx.composer.mode`, `.attachments`, `.outcome`).
 
 ## Runtime model
 

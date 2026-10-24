@@ -14,6 +14,7 @@ import { ClientContributionModel, type SlotRegistrationOptions } from './define.
 import { LocaleNamespaceModel } from './locale.js'
 import { ConversationContributionModel } from '../conversation/define.js'
 import { ApiClientLifecycle } from '../api/client.js'
+import { BrowserTraceTransportModel } from '../tracing/browser-transport.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { registerPluginPageSettings } from '../settings/plugin-page.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
@@ -369,6 +370,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
         return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
       }
       const apiClient = ApiClientLifecycle.create(ctx, metadata.packageId)
+      if (typeof client.effect === 'function') client.effect(() => BrowserTraceTransportModel.connect(client))
       // The decorator returns a context-providing wrapper, which is a different
       // function type than the component it wraps. The contract callers rely on
       // is "renders the same component", so the wrapper is asserted once here
