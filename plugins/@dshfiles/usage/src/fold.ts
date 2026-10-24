@@ -84,10 +84,27 @@ export interface ToolExecutionRow {
   readonly startedAt: number
   readonly endedAt: number | null
   readonly outcome: 'success' | 'error' | 'interrupted' | 'unknown' | 'pending'
+  /** Text characters the tool returned, so callers can estimate output tokens. Never the text itself. */
+  readonly resultChars?: number | null
 }
 
 const stepKey = (turn: number, step: number): string => `${String(turn)}:${String(step)}`
 const MAX_OPEN_TOOL_CALLS = 2_000
+
+const toolResultSchema = z.object({
+  message: z.object({
+    toolCallId: z.string().min(1).max(256),
+    isError: z.boolean().optional(),
+    content: z.array(z.object({ text: z.string().optional() })).optional(),
+  }),
+})
+
+/** Characters of text a tool returned. Image and binary parts carry no `text` and are not counted. */
+const resultCharsOf = (content: readonly { readonly text?: string | undefined }[] | undefined): number => {
+  let total = 0
+  for (const part of content ?? []) total += part.text?.length ?? 0
+  return total
+}
 
 const foldStateSchema = z.object({
   session: z
@@ -345,7 +362,7 @@ export class UsageFoldModel {
           break
         }
         case 'tool/result': {
-          const parsed = z.object({ message: z.object({ toolCallId: z.string().min(1).max(256), isError: z.boolean().optional() }) }).safeParse(record.data)
+          const parsed = toolResultSchema.safeParse(record.data)
           if (!parsed.success || seq === null || time === null) break
           const index = state.openTools.findIndex(call => call.callId === parsed.data.message.toolCallId)
           if (index < 0) break
@@ -365,6 +382,7 @@ export class UsageFoldModel {
             startedAt: call.startedAt,
             endedAt: time,
             outcome: parsed.data.message.isError === true ? 'error' : parsed.data.message.isError === false ? 'success' : 'unknown',
+            resultChars: resultCharsOf(parsed.data.message.content),
           })
           break
         }

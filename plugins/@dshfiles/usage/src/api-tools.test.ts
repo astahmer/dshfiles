@@ -4,7 +4,7 @@ import { activityInputSchema, activityReportSchema, otelMetricsInputSchema, reso
 describe('usage tool exposure', () => {
   test('activity stats default to the last 30 days and support bounded ranked queries', () => {
     const defaults = resolveActivityQuery(activityInputSchema.parse({}), 1_000_000)
-    expect(defaults).toEqual({ from: 1_000_000 - 30 * 24 * 60 * 60 * 1_000, to: 1_000_000, limit: 10 })
+    expect(defaults).toEqual({ from: 1_000_000 - 30 * 24 * 60 * 60 * 1_000, to: 1_000_000, limit: 10, bucket: 'day', tzOffsetMinutes: 0 })
     expect(resolveActivityQuery(activityInputSchema.parse({ days: 7, category: 'skill', limit: 5 }), 1_000_000)).toMatchObject({
       from: 1_000_000 - 7 * 24 * 60 * 60 * 1_000,
       to: 1_000_000,
@@ -18,6 +18,10 @@ describe('usage tool exposure', () => {
     })
     expect(() => resolveActivityQuery(activityInputSchema.parse({ from: 100 }), 1_000_000)).toThrow(/both/u)
     expect(() => resolveActivityQuery(activityInputSchema.parse({ from: 200, to: 100 }), 1_000_000)).toThrow(/after/u)
+    expect(resolveActivityQuery(activityInputSchema.parse({ from: 0, to: 3 * 24 * 60 * 60 * 1_000, bucket: 'hour' }), 1_000_000)).toMatchObject({
+      bucket: 'day',
+    })
+    expect(resolveActivityQuery(activityInputSchema.parse({ from: 0, to: 60 * 60 * 1_000, bucket: 'hour' }), 1_000_000)).toMatchObject({ bucket: 'hour' })
     expect(() => resolveActivityQuery(activityInputSchema.parse({ from: 100, to: 200, days: 7 }), 1_000_000)).toThrow(/cannot be combined/u)
     expect(() => resolveActivityQuery(activityInputSchema.parse({ to: 200, days: 7 }), 1_000_000)).toThrow(/cannot be combined/u)
     expect(activityInputSchema.safeParse({ query: 'secret' }).success).toBe(false)
@@ -96,7 +100,7 @@ describe('usage tool exposure', () => {
     expect(usageApi.methods.recordJevUsage.tool).toBeUndefined()
     expect(usageApi.methods.refresh.description ?? '').toMatch(/Call only when the user asked/u)
     expect(usageApi.methods.activity.description ?? '').toMatch(/last 30 days/u)
-    expect(usageApi.methods.activity.description ?? '').toMatch(/which commands or tests took the most time/u)
+    expect(usageApi.methods.activity.description ?? '').toMatch(/which tools or skills do I use most/u)
     expect(usageApi.methods.activity.description ?? '').toMatch(/compound\/ambiguous shell commands are omitted/u)
   })
 

@@ -79,8 +79,49 @@ describe('request costs', () => {
     const charts = store.charts({ from: 0, to: 10_000, bucket: 'hour', groupBy: 'model', tzOffsetMinutes: 0 })
     expect(charts.summary.cost).toBeCloseTo(0.0713, 10)
     expect(charts.summary.unpriced).toBe(1)
+    // 30k cache-read tokens billed at $0.01 instead of the $0.1 input rate; the unpriced request contributes nothing.
+    expect(charts.summary.cacheSavings).toBeCloseTo(0.0027, 10)
+    expect(charts.summary.turns).toBe(1)
+    expect(charts.summary.previous.turns).toBe(0)
     expect(charts.topThreads).toEqual([{ sessionId: 'session-a', title: 'T', project: 'dev', cost: expect.closeTo(0.0713, 10), requests: 3 }])
     expect(charts.breakdown.model.map(row => row.key)).toEqual(['gpt-6-luna', 'unknown-model'])
+    const byPurpose = store.charts({ from: 0, to: 10_000, bucket: 'hour', groupBy: 'purpose', tzOffsetMinutes: 0 })
+    expect(byPurpose.keys).toEqual(['agent'])
+    expect(byPurpose.buckets).toEqual([expect.objectContaining({ key: 'agent', requests: 3 })])
+  })
+
+  it('reports cache savings and a turn count beside the list-price cost', () => {
+    const store = openUsageStore(':memory:')
+    store.commitLogSlice({
+      path: '/x',
+      sessionId: 'session-a',
+      offset: 1,
+      size: 1,
+      mtimeMs: 1,
+      state: '{}',
+      session: { id: 'session-a', cwd: '/home/user/dev/project', parentSession: null, subagent: false, createdAt: 0, title: 'T' },
+      rows: [
+        request({ id: 'a', startedAt: 1_000 }),
+        request({ id: 'b', startedAt: 2_000, turn: 2 }),
+        request({ id: 'c', startedAt: 3_000, turn: 2, sessionId: 'session-b' }),
+      ],
+    })
+    store.writeRates({
+      replace: true,
+      rates: new Map([
+        [
+          'luna@32000',
+          { route: { provider: 'codex-alex', model: 'gpt-6-luna', band: 32_000 }, rates: { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.1 } },
+        ],
+      ]),
+    })
+    const charts = store.charts({ from: 0, to: 10_000, bucket: 'day', groupBy: 'purpose', tzOffsetMinutes: 0 })
+    // Each request carries 30k cached prompt tokens billed at the cache-read rate instead of the input rate:
+    // 90k × ($0.1 - $0.01) / 1M. Turn 2 appears in two sessions, so it counts twice.
+    expect(charts.summary.cacheSavings).toBeCloseTo(0.0081, 10)
+    expect(charts.summary.turns).toBe(3)
+    expect(charts.summary.previous).toMatchObject({ cacheSavings: 0, turns: 0 })
+    expect(charts.keys).toEqual(['agent'])
   })
 
   it('prices routes from the AI Accounts catalog file and re-prices when the catalog changes', async () => {

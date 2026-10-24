@@ -109,6 +109,7 @@ describe('foldRecords', () => {
         startedAt: 100,
         endedAt: 375,
         outcome: 'error',
+        resultChars: 14,
       },
     ])
     expect(JSON.stringify(finished.tools)).not.toContain('super-secret')

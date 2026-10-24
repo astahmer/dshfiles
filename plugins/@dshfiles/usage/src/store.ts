@@ -126,6 +126,7 @@ const MIGRATIONS: readonly string[] = [
   `,
   `ALTER TABLE tools ADD COLUMN normalized_command TEXT CHECK (normalized_command IS NULL OR length(normalized_command) BETWEEN 1 AND 80);`,
   `ALTER TABLE tools ADD COLUMN test_runner TEXT CHECK (test_runner IS NULL OR length(test_runner) BETWEEN 1 AND 80);`,
+  `ALTER TABLE tools ADD COLUMN result_chars INTEGER CHECK (result_chars IS NULL OR result_chars BETWEEN 0 AND 100000000);`,
 ]
 
 export interface RouteBand {
@@ -142,7 +143,7 @@ export interface Rates {
 }
 
 /** Bump whenever the fold reads a log differently. */
-const FOLD_VERSION = 3
+const FOLD_VERSION = 4
 
 /** Live side calls wait this long for the log row they duplicate before they count on their own. */
 const LIVE_MATCH_WAIT_MS = 10 * 60_000
@@ -220,6 +221,7 @@ const toolRowSchema = z.object({
   startedAt: z.number().int(),
   endedAt: z.number().int().nullable(),
   outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
+  resultChars: z.number().int().min(0).max(100_000_000).nullable().default(null),
 })
 const durationTotalSchema = z.object({ totalDurationMs: z.number().int().nonnegative() })
 const identifierActivityRowSchema = z.object({
@@ -251,6 +253,9 @@ const toolActivityRowSchema = z.object({
   p50DurationMs: numberColumn,
   p90DurationMs: numberColumn,
   maxDurationMs: numberColumn,
+  resultChars: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  measuredCalls: z.number().int().nonnegative(),
 })
 const activityCategoryRowSchema = z.object({
   category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
@@ -264,6 +269,28 @@ const activityCategoryRowSchema = z.object({
   p50DurationMs: numberColumn,
   p90DurationMs: numberColumn,
   maxDurationMs: numberColumn,
+  resultChars: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  measuredCalls: z.number().int().nonnegative(),
+})
+const timelineRowSchema = z.object({
+  start: z.number().int(),
+  category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
+  calls: z.number().int(),
+  errors: z.number().int(),
+  durationMs: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+})
+const activityTotalsRowSchema = z.object({
+  calls: z.number().int(),
+  successes: z.number().int(),
+  errors: z.number().int(),
+  interrupted: z.number().int(),
+  unknown: z.number().int(),
+  pending: z.number().int(),
+  durationMs: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  measuredCalls: z.number().int().nonnegative(),
 })
 const jevEventRowSchema = z.object({
   at: z.number().int(),
@@ -318,7 +345,15 @@ const summaryRowSchema = z.object({
   cache_write: z.number(),
   output: z.number(),
   unpriced: z.number(),
+  cacheSavings: z.number(),
+  turns: z.number().int(),
 })
+
+/** Would-be prompt cost of cache reads minus what they were billed, per route list price. */
+const CACHE_SAVINGS_SQL = `CASE WHEN rr.provider IS NULL OR r.cache_read IS NULL THEN 0
+  ELSE r.cache_read * (rr.input - rr.cache_read) / 1000000.0 END`
+
+const TURNS_SQL = "COUNT(DISTINCT CASE WHEN r.turn IS NULL THEN NULL ELSE r.session_id || ':' || r.turn END)"
 
 const COST_SQL = `CASE WHEN rr.provider IS NULL OR r.input IS NULL THEN NULL
   ELSE (r.input * rr.input + r.output * rr.output + r.cache_read * rr.cache_read + r.cache_write * rr.cache_write) / 1000000.0 END`
@@ -450,12 +485,12 @@ export const openUsageStore = (path: string) => {
   }
 
   const upsertToolExecution = (row: z.infer<typeof toolRowSchema>): void => {
-    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner, normalized_command, test_runner)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner, normalized_command, test_runner, result_chars)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (id) DO UPDATE SET turn = excluded.turn, step = excluded.step, name = excluded.name,
         started_at = excluded.started_at, ended_at = excluded.ended_at, outcome = excluded.outcome,
         category = excluded.category, owner = excluded.owner, normalized_command = excluded.normalized_command,
-        test_runner = excluded.test_runner`).run(
+        test_runner = excluded.test_runner, result_chars = COALESCE(excluded.result_chars, tools.result_chars)`).run(
       row.id,
       row.sessionId,
       row.seq,
@@ -469,6 +504,7 @@ export const openUsageStore = (path: string) => {
       row.owner,
       row.normalizedCommand,
       row.testRunner,
+      row.resultChars,
     )
   }
 
@@ -688,7 +724,8 @@ export const openUsageStore = (path: string) => {
            COALESCE(SUM(r.status = 'failed'), 0) AS failed, COALESCE(SUM(r.status = 'aborted'), 0) AS aborted,
            COALESCE(SUM(r.input), 0) AS input, COALESCE(SUM(r.cache_read), 0) AS cache_read,
            COALESCE(SUM(r.cache_write), 0) AS cache_write, COALESCE(SUM(r.output), 0) AS output,
-           COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
+           COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced,
+           COALESCE(SUM(${CACHE_SAVINGS_SQL}), 0) AS cacheSavings, ${TURNS_SQL} AS turns
          FROM ${FROM_SQL} WHERE ${filter.clauses.join(' AND ')}`,
       ).get(...filter.params),
     )
@@ -699,7 +736,7 @@ export const openUsageStore = (path: string) => {
     const bucketMs = query.bucket === 'hour' ? 3_600_000 : 86_400_000
     const offsetMs = query.tzOffsetMinutes * 60_000
     const bucketSql = `((r.started_at + ${String(offsetMs)}) / ${String(bucketMs)}) * ${String(bucketMs)} - ${String(offsetMs)}`
-    const dimensionSql = { model: 'r.model', provider: 'r.provider', project: "COALESCE(s.project, '(none)')" } as const
+    const dimensionSql = { model: 'r.model', provider: 'r.provider', project: "COALESCE(s.project, '(none)')", purpose: 'r.purpose' } as const
 
     const breakdown = (dimension: keyof typeof dimensionSql) =>
       z
@@ -713,7 +750,7 @@ export const openUsageStore = (path: string) => {
         .map(row => ({ key: row.key ?? '(none)', cost: row.cost, requests: row.requests, tokens: row.tokens }))
 
     const byDimension = { model: breakdown('model'), provider: breakdown('provider'), project: breakdown('project') }
-    const ranked = byDimension[query.groupBy]
+    const ranked = query.groupBy === 'purpose' ? breakdown('purpose') : byDimension[query.groupBy]
     const leading = new Set(ranked.slice(0, ranked.length > SERIES_KEYS ? SERIES_KEYS - 1 : SERIES_KEYS).map(row => row.key))
     const keys = [...leading, ...(ranked.length > leading.size ? [OTHER_KEY] : [])]
 
@@ -792,10 +829,14 @@ export const openUsageStore = (path: string) => {
         cacheWrite: current.cache_write,
         output: current.output,
         unpriced: current.unpriced,
+        cacheSavings: current.cacheSavings,
+        turns: current.turns,
         previous: {
           cost: previous.cost,
           requests: previous.requests,
           tokens: previous.input + previous.cache_read + previous.cache_write + previous.output,
+          cacheSavings: previous.cacheSavings,
+          turns: previous.turns,
         },
       },
       keys,
@@ -927,7 +968,13 @@ export const openUsageStore = (path: string) => {
     readonly category?: 'api' | 'mcp' | 'plugin' | 'tool' | 'skill' | 'other'
     readonly limit?: number
     readonly eventLimit?: number
+    /** Timeline bucket; defaults to a local day. */
+    readonly bucket?: 'hour' | 'day'
+    readonly tzOffsetMinutes?: number
   }) => {
+    const bucketMs = query.bucket === 'hour' ? 3_600_000 : 86_400_000
+    const offsetMs = (query.tzOffsetMinutes ?? 0) * 60_000
+    const timelineBucketSql = `((started_at + ${String(offsetMs)}) / ${String(bucketMs)}) * ${String(bucketMs)} - ${String(offsetMs)}`
     const toolRows = z.array(toolActivityRowSchema).parse(
       prepare(`WITH durations AS (
         SELECT category, owner, name, ended_at - started_at AS duration_ms,
@@ -951,7 +998,10 @@ export const openUsageStore = (path: string) => {
         AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
         COALESCE(SUM(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END), 0) AS totalDurationMs,
         ds.p50DurationMs, ds.p90DurationMs,
-        MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs
+        MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs,
+        COALESCE(SUM(t.result_chars), 0) AS resultChars,
+        CAST((COALESCE(SUM(t.result_chars), 0) + 3) / 4 AS INTEGER) AS outputTokens,
+        SUM(CASE WHEN t.result_chars IS NOT NULL THEN 1 ELSE 0 END) AS measuredCalls
       FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category AND ds.owner IS t.owner AND ds.name = t.name
       WHERE t.started_at >= ? AND t.started_at < ? AND (? IS NULL OR t.category = ?)
       GROUP BY t.category, t.owner, t.name ORDER BY calls DESC, t.category, t.owner, t.name LIMIT ?`).all(
@@ -1064,7 +1114,10 @@ export const openUsageStore = (path: string) => {
       SUM(CASE WHEN t.outcome = 'pending' THEN 1 ELSE 0 END) AS pending,
       AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
       ds.p50DurationMs, ds.p90DurationMs,
-      MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs
+      MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs,
+      COALESCE(SUM(t.result_chars), 0) AS resultChars,
+      CAST((COALESCE(SUM(t.result_chars), 0) + 3) / 4 AS INTEGER) AS outputTokens,
+      SUM(CASE WHEN t.result_chars IS NOT NULL THEN 1 ELSE 0 END) AS measuredCalls
     FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category
     WHERE t.started_at >= ? AND t.started_at < ? GROUP BY t.category ORDER BY t.category`).all(query.from, query.to, query.from, query.to),
       )
@@ -1077,6 +1130,8 @@ export const openUsageStore = (path: string) => {
         unknown: row.unknown,
         pending: row.pending,
         successRate: row.calls === 0 ? 0 : row.successes / row.calls,
+        outputTokens: row.outputTokens,
+        measuredCalls: row.measuredCalls,
         durationMs: {
           averageMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
           p50Ms: row.p50DurationMs,
@@ -1084,6 +1139,31 @@ export const openUsageStore = (path: string) => {
           maxMs: row.maxDurationMs,
         },
       }))
+    const timeline = z.array(timelineRowSchema).parse(
+      prepare(`SELECT ${timelineBucketSql} AS start, category, COUNT(*) AS calls,
+          SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END) AS errors,
+          COALESCE(SUM(CASE WHEN ended_at IS NOT NULL THEN ended_at - started_at END), 0) AS durationMs,
+          CAST((COALESCE(SUM(result_chars), 0) + 3) / 4 AS INTEGER) AS outputTokens
+        FROM tools WHERE started_at >= ? AND started_at < ? AND (? IS NULL OR category = ?)
+        GROUP BY start, category ORDER BY start, category`).all(query.from, query.to, query.category ?? null, query.category ?? null),
+    )
+    const totals = activityTotalsRowSchema.parse(
+      prepare(`SELECT COUNT(*) AS calls,
+        COALESCE(SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END), 0) AS successes,
+        COALESCE(SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END), 0) AS errors,
+        COALESCE(SUM(CASE WHEN outcome = 'interrupted' THEN 1 ELSE 0 END), 0) AS interrupted,
+        COALESCE(SUM(CASE WHEN outcome = 'unknown' THEN 1 ELSE 0 END), 0) AS unknown,
+        COALESCE(SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
+        COALESCE(SUM(CASE WHEN ended_at IS NOT NULL THEN ended_at - started_at END), 0) AS durationMs,
+        CAST((COALESCE(SUM(result_chars), 0) + 3) / 4 AS INTEGER) AS outputTokens,
+        COALESCE(SUM(CASE WHEN result_chars IS NOT NULL THEN 1 ELSE 0 END), 0) AS measuredCalls
+      FROM tools WHERE started_at >= ? AND started_at < ? AND (? IS NULL OR category = ?)`).get(
+        query.from,
+        query.to,
+        query.category ?? null,
+        query.category ?? null,
+      ),
+    )
     const jev = jevActivityRowSchema.parse(
       prepare(`SELECT COUNT(*) AS calls,
       COALESCE(SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END), 0) AS successes,
@@ -1161,8 +1241,14 @@ export const openUsageStore = (path: string) => {
 
     return {
       range: { from: query.from, to: query.to },
-      categories: categoryOutcomes.map(row => ({ category: row.category, calls: row.calls })),
+      timelineBucket: query.bucket ?? 'day',
+      categories: categoryOutcomes.map(row => ({ category: row.category, calls: row.calls, outputTokens: row.outputTokens })),
       categoryOutcomes,
+      timeline,
+      totals: {
+        ...totals,
+        successRate: totals.calls === 0 ? 0 : totals.successes / totals.calls,
+      },
       tools: toolRows.map(row => ({
         name: row.name,
         category: row.category,
@@ -1184,6 +1270,8 @@ export const openUsageStore = (path: string) => {
         },
         averageDurationMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
         totalDurationMs: row.totalDurationMs,
+        outputTokens: row.outputTokens,
+        measuredCalls: row.measuredCalls,
       })),
       commandDurationTotalMs,
       testRunDurationTotalMs,

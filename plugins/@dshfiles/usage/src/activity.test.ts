@@ -21,7 +21,8 @@ const jevRecord: JevUsageRecord = {
 const emptySlice = { path: '/session/log', sessionId: 'session-a', offset: 1, size: 1, mtimeMs: 1, state: '{}', session: null, rows: [] }
 
 const toolRow = (
-  row: Pick<ToolExecutionRow, 'id' | 'name' | 'startedAt' | 'endedAt'> & Partial<Pick<ToolExecutionRow, 'normalizedCommand' | 'testRunner'>>,
+  row: Pick<ToolExecutionRow, 'id' | 'name' | 'startedAt' | 'endedAt'> &
+    Partial<Pick<ToolExecutionRow, 'normalizedCommand' | 'testRunner' | 'resultChars' | 'category' | 'owner'>>,
 ): ToolExecutionRow => ({
   normalizedCommand: null,
   testRunner: null,
@@ -67,6 +68,34 @@ describe('usage activity telemetry', () => {
     }
   })
 
+  it('reports returned text as token estimates per tool, category and bucket', () => {
+    const store = openUsageStore(':memory:')
+    const day = 86_400_000
+    const start = Date.UTC(2026, 9, 1)
+    try {
+      store.commitLogSlice({
+        ...emptySlice,
+        tools: [
+          toolRow({ id: 'session-a#1', name: 'bash', startedAt: start + 1_000, endedAt: start + 2_000, resultChars: 4_000 }),
+          toolRow({ id: 'session-a#2', name: 'bash', startedAt: start + 3_000, endedAt: start + 4_000, resultChars: 4 }),
+          toolRow({ id: 'session-a#3', name: 'read', startedAt: start + day + 1_000, endedAt: start + day + 2_000 }),
+        ],
+      })
+      const report = store.activity({ from: start, to: start + 2 * day, bucket: 'day', tzOffsetMinutes: 0 })
+      expect(report.totals).toMatchObject({ calls: 3, measuredCalls: 2, outputTokens: 1_001 })
+      expect(report.tools.find(row => row.name === 'bash')).toMatchObject({ calls: 2, measuredCalls: 2, outputTokens: 1_001 })
+      expect(report.tools.find(row => row.name === 'read')).toMatchObject({ calls: 1, measuredCalls: 0, outputTokens: 0 })
+      expect(report.categoryOutcomes[0]).toMatchObject({ category: 'plugin', outputTokens: 1_001, measuredCalls: 2 })
+      expect(report.timelineBucket).toBe('day')
+      expect(report.timeline).toEqual([
+        { start, category: 'plugin', calls: 2, errors: 0, durationMs: 2_000, outputTokens: 1_001 },
+        { start: start + day, category: 'plugin', calls: 1, errors: 0, durationMs: 1_000, outputTokens: 0 },
+      ])
+    } finally {
+      store.close()
+    }
+  })
+
   it('keeps category totals exact when the per-tool table is capped', () => {
     const store = openUsageStore(':memory:')
     const now = Date.now()
@@ -96,7 +125,7 @@ describe('usage activity telemetry', () => {
       })
       const report = store.activity({ from: now, to: now + 2 })
       expect(report.tools).toHaveLength(100)
-      expect(report.categories).toEqual([{ category: 'mcp', calls: 101 }])
+      expect(report.categories).toEqual([{ category: 'mcp', calls: 101, outputTokens: 0 }])
       expect(report.categoryOutcomes[0]).toMatchObject({ calls: 101, successes: 101, errors: 0, successRate: 1 })
     } finally {
       store.close()
@@ -273,8 +302,8 @@ describe('usage activity telemetry', () => {
         }),
       ])
       expect(report.categories).toEqual([
-        { category: 'plugin', calls: 1 },
-        { category: 'tool', calls: 1 },
+        { category: 'plugin', calls: 1, outputTokens: 0 },
+        { category: 'tool', calls: 1, outputTokens: 0 },
       ])
       expect(report.categoryOutcomes).toEqual([
         expect.objectContaining({ category: 'plugin', calls: 1, errors: 1, successRate: 0 }),
@@ -339,7 +368,7 @@ describe('usage activity telemetry', () => {
           averageDurationMs: 350,
         }),
       ])
-      expect(reclassified.categories).toEqual([{ category: 'api', calls: 2 }])
+      expect(reclassified.categories).toEqual([{ category: 'api', calls: 2, outputTokens: 0 }])
       expect(reclassified.categoryOutcomes[0]).toMatchObject({ category: 'api', calls: 2, successes: 1, errors: 1, successRate: 0.5 })
       const limited = store.activity({ from: now, to: now + 1_000, category: 'tool', limit: 1, eventLimit: 1 })
       expect(limited.tools).toHaveLength(0)
