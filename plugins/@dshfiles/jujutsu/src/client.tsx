@@ -1861,7 +1861,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                           Clear empty ancestors ({emptyAncestors.length})
                         </DropdownMenuItem>
                         <DropdownMenuItem className="dshx:text-xs" disabled={busy} onSelect={() => setCleanupOpen(true)}>
-                          Clean up thread workspaces…
+                          Clean up JJ workspaces…
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">

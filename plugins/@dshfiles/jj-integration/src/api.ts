@@ -93,14 +93,14 @@ const threadPathInput = z
   })
   .strict()
 
-const cleanupKindSchema = z.enum(['empty', 'integrated', 'untracked'])
+const cleanupKindSchema = z.enum(['empty', 'integrated', 'secondary', 'untracked'])
 
 const cleanupWorkspaceSchema = z
   .object({
     repoRoot: z.string(),
     name: z.string(),
     path: z.string(),
-    kind: z.enum(['empty', 'integrated']),
+    kind: z.enum(['empty', 'integrated', 'secondary']),
     lastUsedAt: z.number().int().nonnegative(),
     outcome: z.enum(['would-remove', 'removed', 'has-work', 'failed']),
     message: z.string().max(400).optional(),
@@ -111,7 +111,7 @@ const cleanupSkippedSchema = z
   .object({
     repoRoot: z.string(),
     name: z.string(),
-    reason: z.enum(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded']),
+    reason: z.enum(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded', 'working-copy-dirty', 'workspace-state-unknown']),
   })
   .strict()
 
@@ -447,20 +447,20 @@ export const jjIntegrationApi = defineApi({
       input: cleanupRequestSchema.extend({ apply: z.boolean() }).strict(),
       output: cleanupResultSchema,
       description:
-        'Remove idle thread workspaces in one pass, then abandon the empty undescribed revisions nothing builds on. A workspace qualifies when it holds no unlanded revision, no live Session in it is working, waiting for an answer or unreadable, no integration is queued, its kind is listed (empty: never landed; integrated: landed and nothing left), and it was last used longer ago than olderThanHours. Kind untracked also deletes threads-directory folders and files no jj workspace owns that were not modified for olderThanHours (at least one hour). Never forces: unlanded work is always kept, and a later turn in a removed thread checks a fresh workspace out from the bookmark. apply: false previews; call with apply: true only when the user asked to clean up.',
+        'Remove idle workspaces in one pass, then abandon the empty undescribed revisions nothing builds on. A thread workspace qualifies when it has no unlanded revision, no live Session in it is working, waiting for an answer or unreadable, no integration is queued, its kind is listed (empty: never landed; integrated: landed and nothing left), and it was last used longer ago than olderThanHours. Other JJ workspaces are manual-only and opt-in; their working copy must be clean, state verified, and no unlanded work present. JJ snapshots working-copy files to check them, preserving them in the working-copy revision. Kind untracked also deletes threads-directory folders and files no jj workspace owns that were not modified for olderThanHours (at least one hour). Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
     startCleanup: method({
       input: cleanupRequestSchema,
       output: z.object({ job: cleanupJobSchema }).strict(),
       description:
-        'Start removing idle thread workspaces in the background. Returns at once with the job, so a UI click never waits on node_modules deletion; cleanupJobs reports its progress and outcome, and the newest job carries the full result. The same scope already queued or running is returned instead of queued twice. A workspace qualifies exactly as in cleanupWorkspaces, never forcibly. Call only when the user asked to clean up.',
+        'Start removing idle workspaces in the background. Returns at once with the job, so a UI click never waits on node_modules deletion; cleanupJobs reports its progress and outcome, and the newest job carries the full result. The same scope already queued or running is returned instead of queued twice. Secondary JJ workspaces are manual-only and opt-in; cleanupWorkspaces documents their safety checks. Call only when the user asked to clean up.',
     }),
     cleanupJobs: method({
       input: z.object({}).strict(),
       output: z.object({ jobs: z.array(cleanupJobSchema).max(32) }).strict(),
       description:
-        'Progress and recent trail of background thread-workspace removals, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.',
+        'Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.',
       tool: {
         name: 'jj_thread_cleanup_jobs',
         readOnly: true,

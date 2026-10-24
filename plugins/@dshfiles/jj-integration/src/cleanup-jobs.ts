@@ -15,14 +15,20 @@ export type CleanupJobOutcome = 'removed' | 'kept' | 'failed'
 /** `automatic` is the Host's own interval run; it queues behind and attaches to manual jobs exactly like a click. */
 export type CleanupTrigger = 'manual' | 'automatic'
 
-export interface CleanupJobRequest {
-  /** Any folder inside the repository; null cleans every registered jj repository. */
-  readonly path: string | null
-  readonly olderThanHours: number
-  /** Copies of the requested kinds, in wire shape rather than the caller's array. */
-  readonly kinds: CleanupKind[]
-  readonly trigger: CleanupTrigger
-}
+export type CleanupJobRequest =
+  | {
+      /** Any folder inside the repository; null cleans every registered jj repository. */
+      readonly path: string | null
+      readonly olderThanHours: number
+      readonly kinds: CleanupKind[]
+      readonly trigger: 'manual'
+    }
+  | {
+      readonly path: string | null
+      readonly olderThanHours: number
+      readonly kinds: Exclude<CleanupKind, 'secondary'>[]
+      readonly trigger: 'automatic'
+    }
 
 export interface CleanupJobProgress {
   /** Workspaces and untracked folders the scan decided to remove; empty revisions are counted only when done. */
@@ -108,7 +114,10 @@ export const createCleanupJobTrail = (options: { readonly now?: () => number; re
         id: `cleanup-${String(sequence)}`,
         state: 'queued',
         phase: 'queued',
-        request: { ...request, kinds: [...request.kinds] },
+        request:
+          request.trigger === 'automatic'
+            ? { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'automatic' }
+            : { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'manual' },
         startedAt: now(),
         finishedAt: null,
         progress: emptyProgress,

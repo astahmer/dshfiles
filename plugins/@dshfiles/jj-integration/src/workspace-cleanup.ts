@@ -4,10 +4,18 @@ import type { ThreadSessionActivity } from './thread-rebase-eligibility.js'
  * `empty` never landed anything; `integrated` landed at least once and has nothing left above the bookmark;
  * `untracked` is a threads-directory entry no jj workspace owns.
  */
-export type CleanupKind = 'empty' | 'integrated' | 'untracked'
+export type CleanupKind = 'empty' | 'integrated' | 'secondary' | 'untracked'
 type WorkspaceKind = Exclude<CleanupKind, 'untracked'>
 
-export type CleanupSkipReason = 'has-work' | 'busy' | 'activity-unknown' | 'queued' | 'too-recent' | 'kind-excluded'
+export type CleanupSkipReason =
+  | 'has-work'
+  | 'busy'
+  | 'activity-unknown'
+  | 'queued'
+  | 'too-recent'
+  | 'kind-excluded'
+  | 'working-copy-dirty'
+  | 'workspace-state-unknown'
 
 export interface CleanupThread {
   readonly name: string
@@ -15,6 +23,8 @@ export interface CleanupThread {
   readonly rebasedAt: number | undefined
   readonly sessionIds: readonly string[]
   readonly integrationQueued: boolean
+  readonly secondary?: boolean
+  readonly workingCopyState?: 'clean' | 'dirty' | 'unknown'
   /** Every timestamp that says the workspace was used: its working-copy commit, its creation, its lands. */
   readonly usedAt: readonly (number | undefined)[]
 }
@@ -40,6 +50,9 @@ const decide = (input: {
   const thread = input.thread
   const usedAt = lastUsedAt(thread)
   const skip = (reason: CleanupSkipReason): CleanupDecision => ({ action: 'skip', reason, lastUsedAt: usedAt })
+  if (thread.secondary === true && thread.workingCopyState === 'dirty') return skip('working-copy-dirty')
+  if (thread.secondary === true && thread.workingCopyState !== 'clean') return skip('workspace-state-unknown')
+  if (thread.secondary === true && usedAt === 0) return skip('workspace-state-unknown')
   if (thread.unlandedCount > 0) return skip('has-work')
   if (thread.integrationQueued) return skip('queued')
   const liveSessions = thread.sessionIds.filter(sessionId => !input.archived.has(sessionId))
@@ -48,7 +61,7 @@ const decide = (input: {
     if (activity?.running === true || activity?.pendingUserQuestion === true) return skip('busy')
     if (activity?.running === undefined || activity.pendingUserQuestion === undefined) return skip('activity-unknown')
   }
-  const kind: WorkspaceKind = thread.rebasedAt === undefined ? 'empty' : 'integrated'
+  const kind: WorkspaceKind = thread.secondary === true ? 'secondary' : thread.rebasedAt === undefined ? 'empty' : 'integrated'
   if (!input.kinds.includes(kind)) return skip('kind-excluded')
   if (input.now - usedAt < input.olderThanMs) return skip('too-recent')
   return { action: 'remove', kind, lastUsedAt: usedAt }

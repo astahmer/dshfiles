@@ -71,6 +71,96 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(secondaryLocation).toMatchObject({ repoRoot: repo, workspaceRoot: secondaryPath, threadName: undefined })
   })
 
+  it('lists and removes an integrated clean secondary workspace at its JJ-reported root only', async () => {
+    const secondaryPath = join(root, 'projection-selector')
+    const decoyPath = join(ThreadWorkspaceModel.defaultThreadsDirectory(repo), 'projection-selector')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'projection-selector')
+    mkdirSync(decoyPath, { recursive: true })
+    writeFileSync(join(decoyPath, 'keep.txt'), 'decoy\n')
+
+    const listed = await threads.secondaryWorkspaces(repo)
+    expect(listed).toContainEqual(expect.objectContaining({ name: 'projection-selector', path: secondaryPath, workingCopyState: 'clean', unlanded: [] }))
+    expect(listed.some(workspace => workspace.path === repo)).toBe(false)
+
+    const removed = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'projection-selector', path: secondaryPath }] })
+
+    expect(removed.results).toEqual([{ name: 'projection-selector', path: secondaryPath, status: 'discarded', message: null }])
+    expect(existsSync(secondaryPath)).toBe(false)
+    expect(readFileSync(join(decoyPath, 'keep.txt'), 'utf8')).toBe('decoy\n')
+  })
+
+  it('keeps an outer secondary workspace when it contains another JJ workspace', async () => {
+    const outerPath = join(root, 'outer')
+    const nestedPath = join(outerPath, 'nested')
+    jj(repo, 'workspace', 'add', outerPath, '--name', 'outer')
+    jj(outerPath, 'workspace', 'add', nestedPath, '--name', 'nested')
+
+    const listed = await threads.secondaryWorkspaces(repo)
+
+    expect(listed.map(workspace => workspace.name)).not.toContain('outer')
+    expect(listed.map(workspace => workspace.name)).toContain('nested')
+  })
+
+  it('rechecks a secondary workspace changed after listing before removal', async () => {
+    const secondaryPath = join(root, 'changes-after-preview')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'changes-after-preview')
+    expect(await threads.secondaryWorkspaces(repo)).toContainEqual(
+      expect.objectContaining({ name: 'changes-after-preview', workingCopyState: 'clean', unlanded: [] }),
+    )
+    writeFileSync(join(secondaryPath, 'late-change.txt'), 'keep me\n')
+
+    const result = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'changes-after-preview', path: secondaryPath }] })
+
+    expect(result.results[0]).toMatchObject({ status: 'has-work' })
+    expect(existsSync(join(secondaryPath, 'late-change.txt'))).toBe(true)
+  })
+
+  it('keeps dirty and unlanded secondary workspaces', async () => {
+    const dirtyPath = join(root, 'dirty')
+    const unlandedPath = join(root, 'unlanded')
+    jj(repo, 'workspace', 'add', dirtyPath, '--name', 'dirty')
+    jj(repo, 'workspace', 'add', unlandedPath, '--name', 'unlanded')
+    writeFileSync(join(dirtyPath, 'draft.txt'), 'unsnapshotted\n')
+    writeFileSync(join(unlandedPath, 'plan.txt'), 'unlanded\n')
+    jj(unlandedPath, 'commit', '-m', 'unlanded')
+
+    const listed = await threads.secondaryWorkspaces(repo)
+    expect(listed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'dirty', workingCopyState: 'dirty', unlanded: expect.arrayContaining([expect.any(Object)]) }),
+        expect.objectContaining({ name: 'unlanded', workingCopyState: 'clean', unlanded: expect.arrayContaining([expect.any(Object)]) }),
+      ]),
+    )
+    const removed = await threads.discardSecondaryMany({
+      repoRoot: repo,
+      workspaces: [
+        { name: 'dirty', path: dirtyPath },
+        { name: 'unlanded', path: unlandedPath },
+      ],
+    })
+
+    expect(removed.results.map(result => result.status)).toEqual(['has-work', 'has-work'])
+    expect(existsSync(dirtyPath)).toBe(true)
+    expect(existsSync(unlandedPath)).toBe(true)
+  })
+
+  it('refuses a changed name-to-root mapping without touching the new workspace or a same-named decoy', async () => {
+    const originalPath = join(root, 'original')
+    const replacementPath = join(root, 'replacement')
+    const decoyPath = join(ThreadWorkspaceModel.defaultThreadsDirectory(repo), 'secondary')
+    jj(repo, 'workspace', 'add', originalPath, '--name', 'secondary')
+    mkdirSync(decoyPath, { recursive: true })
+    writeFileSync(join(decoyPath, 'keep.txt'), 'decoy\n')
+    jj(originalPath, '--ignore-working-copy', 'workspace', 'forget', 'secondary')
+    jj(repo, 'workspace', 'add', replacementPath, '--name', 'secondary')
+
+    const result = await threads.discardSecondaryMany({ repoRoot: repo, workspaces: [{ name: 'secondary', path: originalPath }] })
+
+    expect(result.results[0]).toMatchObject({ status: 'error' })
+    expect(existsSync(replacementPath)).toBe(true)
+    expect(readFileSync(join(decoyPath, 'keep.txt'), 'utf8')).toBe('decoy\n')
+  })
+
   it('creates the thread workspace under the name the client already shows', async () => {
     const thread = await threads.provision(repo, undefined, 'thread-c0ffee')
     expect(thread).toEqual({ name: 'thread-c0ffee', path: join(`${repo}-threads`, 'thread-c0ffee') })

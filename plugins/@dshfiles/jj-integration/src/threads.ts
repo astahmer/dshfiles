@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { commandAttributes, withSpan } from '@dshfiles/dshx/tracing'
@@ -119,6 +119,21 @@ export interface UntrackedEntry {
   readonly modifiedAt: number
 }
 
+export interface SecondaryWorkspaceStatus {
+  readonly name: string
+  readonly path: string
+  readonly repoRoot: string
+  readonly unlanded: readonly ThreadRevision[]
+  readonly workingCopyState: 'clean' | 'dirty' | 'unknown'
+}
+
+export interface SecondaryDiscardResult {
+  readonly name: string
+  readonly path: string
+  readonly status: 'discarded' | 'has-work' | 'error'
+  readonly message: string | null
+}
+
 export type DiscardOutcome = { readonly status: 'discarded' } | { readonly status: 'has-work'; readonly revisions: readonly ThreadRevision[] }
 
 const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
@@ -138,6 +153,11 @@ const MAX_PATCH_BODY_BYTES = 65_536
 const LAND_ATTEMPTS = 3
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const execFileAsync = promisify(execFile)
+const pathIsWithin = (parent: string, candidate: string): boolean => {
+  const relativePath = relative(parent, candidate)
+  return relativePath === '' || (relativePath !== '..' && !relativePath.startsWith(`..${sep}`) && !relativePath.startsWith(sep))
+}
+const pathsOverlap = (left: string, right: string): boolean => pathIsWithin(left, right) || pathIsWithin(right, left)
 const HEX_ID = /^[0-9a-f]+$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
 const commitIdRevset = (commitId: string): string => {
@@ -1431,6 +1451,98 @@ export const createThreads = (options: {
       return { results }
     })
 
+  const secondaryWorkspaces = async (repoRoot: string): Promise<readonly SecondaryWorkspaceStatus[]> => {
+    const rootRecords = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'json(name) ++ "\\t" ++ json(self.root()) ++ "\\n"'], repoRoot))
+      .split('\n')
+      .filter(line => line.length > 0)
+      .map(line => {
+        const separator = line.indexOf('\t')
+        if (separator < 1) throw new ThreadError('jj-failed', 'JJ returned an invalid workspace row; refusing secondary cleanup.')
+        return {
+          name: z
+            .string()
+            .min(1)
+            .parse(JSON.parse(line.slice(0, separator))),
+          path: z
+            .string()
+            .min(1)
+            .parse(JSON.parse(line.slice(separator + 1))),
+        }
+      })
+    const realRepoRoot = realpathSync(repoRoot)
+    const threadDirectory = resolve(options.threadsDirectory(repoRoot))
+    const out: SecondaryWorkspaceStatus[] = []
+    for (const record of rootRecords) {
+      const reportedRoot = resolve(record.path)
+      if (
+        record.name.startsWith('thread-') ||
+        !existsSync(join(reportedRoot, '.jj')) ||
+        pathsOverlap(reportedRoot, realRepoRoot) ||
+        pathsOverlap(reportedRoot, threadDirectory) ||
+        rootRecords.some(other => other.name !== record.name && pathIsWithin(reportedRoot, resolve(other.path)))
+      )
+        continue
+      const actualRoot = realpathSync(reportedRoot)
+      if (actualRoot !== reportedRoot || storeRootOf(actualRoot) !== realRepoRoot) continue
+      const readWorkingCopyId = async (): Promise<string | undefined> => {
+        const result = await execute(['--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'commit_id'], actualRoot)
+        if (result.exitCode !== 0 || result.stdoutLossy) return undefined
+        const commitId = result.stdout.trim()
+        return isCommitId(commitId) ? commitId : undefined
+      }
+      const beforeStatus = await readWorkingCopyId()
+      const status = await execute(['status'], actualRoot)
+      const afterStatus = await readWorkingCopyId()
+      const unlanded = await revisions(`(::@ ~ ::${options.bookmark()}) ~ empty()`, actualRoot, true).then(
+        value => ({ value, known: true as const }),
+        () => ({ value: [], known: false as const }),
+      )
+      const workingCopyState =
+        !unlanded.known || status.exitCode !== 0 || beforeStatus === undefined || afterStatus === undefined
+          ? 'unknown'
+          : beforeStatus === afterStatus
+            ? 'clean'
+            : 'dirty'
+      out.push({ name: record.name, path: actualRoot, repoRoot: realRepoRoot, unlanded: unlanded.value, workingCopyState })
+    }
+    return out
+  }
+
+  const discardSecondaryMany = (input: {
+    readonly repoRoot: string
+    readonly workspaces: readonly { readonly name: string; readonly path: string }[]
+  }): Promise<{ readonly results: readonly SecondaryDiscardResult[] }> =>
+    serialized(input.repoRoot, async () => {
+      const results: SecondaryDiscardResult[] = []
+      const seen = new Set<string>()
+      for (const expected of input.workspaces) {
+        if (seen.has(expected.name)) continue
+        seen.add(expected.name)
+        try {
+          const current = (await secondaryWorkspaces(input.repoRoot)).find(workspace => workspace.name === expected.name)
+          if (current === undefined || current.path !== expected.path) {
+            results.push({ name: expected.name, path: expected.path, status: 'error', message: 'The JJ workspace name or root changed after preview.' })
+            continue
+          }
+          if (current.workingCopyState !== 'clean' || current.unlanded.length > 0) {
+            results.push({
+              name: expected.name,
+              path: expected.path,
+              status: 'has-work',
+              message: 'The workspace now has uncommitted or unlanded work, or its state cannot be verified.',
+            })
+            continue
+          }
+          await jj(['--ignore-working-copy', 'workspace', 'forget', expected.name], input.repoRoot)
+          await rm(current.path, { recursive: true, force: true })
+          results.push({ name: expected.name, path: expected.path, status: 'discarded', message: null })
+        } catch (error) {
+          results.push({ name: expected.name, path: expected.path, status: 'error', message: error instanceof Error ? error.message : String(error) })
+        }
+      }
+      return { results }
+    })
+
   const workingCopyChangedAt = async (repoRoot: string): Promise<ReadonlyMap<string, number>> => {
     const output = await jj(
       [
@@ -1583,6 +1695,8 @@ export const createThreads = (options: {
     landVerified,
     discard,
     discardMany,
+    secondaryWorkspaces,
+    discardSecondaryMany,
     workingCopyChangedAt,
     danglingEmptyRevisions,
     untrackedEntries,

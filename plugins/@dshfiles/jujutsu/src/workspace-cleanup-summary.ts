@@ -9,6 +9,8 @@ const SKIP_LABELS = {
   queued: { singular: 'workspace with an integration queued', plural: 'workspaces with integrations queued' },
   'too-recent': { singular: 'recently used workspace', plural: 'recently used workspaces' },
   'kind-excluded': { singular: 'workspace excluded by kind', plural: 'workspaces excluded by kind' },
+  'working-copy-dirty': { singular: 'workspace with uncommitted changes', plural: 'workspaces with uncommitted changes' },
+  'workspace-state-unknown': { singular: 'workspace with unverifiable state', plural: 'workspaces with unverifiable state' },
 } satisfies Record<CleanupSkipReason, { readonly singular: string; readonly plural: string }>
 
 const joinList = (items: readonly string[]): string => {

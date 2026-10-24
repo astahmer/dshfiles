@@ -5,6 +5,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { errorMessage, keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type CleanupKindView, type CleanupResult } from '@dshfiles/jj-integration/api'
@@ -21,6 +22,7 @@ const AGE_CHOICES = [
 const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: string; readonly hint: string }[] = [
   { kind: 'empty', label: 'Empty', hint: 'never landed anything' },
   { kind: 'integrated', label: 'Already integrated', hint: 'landed, nothing left' },
+  { kind: 'secondary', label: 'Other JJ workspaces', hint: 'manual only; the working copy must be clean and no work may be unlanded' },
   { kind: 'untracked', label: 'Untracked folders', hint: 'folders and files in the threads directory no jj workspace owns' },
 ]
 
@@ -98,10 +100,11 @@ export const WorkspaceCleanupDialog = (props: {
     <Dialog onOpenChange={open => props.onOpenChange(open)} open={props.open}>
       <DialogContent className="dshx-root dshx:sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Clean up thread workspaces</DialogTitle>
+          <DialogTitle>Clean up JJ workspaces</DialogTitle>
           <DialogDescription>
-            Removes idle thread workspaces with no unlanded work and stale folders no workspace owns, then abandons the empty revisions nothing builds on. Busy
-            threads and unlanded work are always kept.
+            Removes idle thread workspaces with no unlanded work and stale folders no workspace owns, then abandons the empty revisions nothing builds on. Other
+            JJ workspaces are manual-only and opt-in. JJ snapshots working-copy files before checking them; unlanded work, uncommitted changes, busy Sessions,
+            and unverifiable workspaces are always kept.
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:text-xs">
@@ -149,29 +152,43 @@ export const WorkspaceCleanupDialog = (props: {
               Enter a whole number of hours greater than 0.
             </p>
           )}
-          <div className="dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1.5">
-            {KIND_CHOICES.map(choice => (
-              <Label className="dshx:gap-1.5 dshx:text-xs dshx:font-normal" key={choice.kind} title={choice.hint}>
-                <Checkbox checked={kinds.includes(choice.kind)} onCheckedChange={checked => toggleKind(choice.kind, checked === true)} />
-                {choice.label}
-              </Label>
-            ))}
-          </div>
-          <div
-            aria-live="polite"
-            className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2"
-          >
-            {preview.isFetching && shown === undefined && <Spinner className="dshx:size-3" />}
-            {preview.isError && <p className="dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>}
-            {shown !== undefined && candidates.length === 0 && <p className="dshx:text-muted-foreground">No workspace qualifies.</p>}
-            {candidates.map(row => (
-              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:font-mono" key={row.key} title={row.title}>
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.name}</span>
-                <span className="dshx:text-muted-foreground">{row.kind}</span>
-                <span className="dshx:text-muted-foreground">{formatAge(row.at)}</span>
-              </div>
-            ))}
-          </div>
+          <TooltipProvider delayDuration={500}>
+            <div className="dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1.5">
+              {KIND_CHOICES.map(choice => (
+                <Tooltip key={choice.kind}>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:inline-flex">
+                      <Label className="dshx:gap-1.5 dshx:text-xs dshx:font-normal">
+                        <Checkbox checked={kinds.includes(choice.kind)} onCheckedChange={checked => toggleKind(choice.kind, checked === true)} />
+                        {choice.label}
+                      </Label>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{choice.hint}</TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+            <div
+              aria-live="polite"
+              className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2"
+            >
+              {preview.isFetching && shown === undefined && <Spinner className="dshx:size-3" />}
+              {preview.isError && <p className="dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>}
+              {shown !== undefined && candidates.length === 0 && <p className="dshx:text-muted-foreground">No workspace qualifies.</p>}
+              {candidates.map(row => (
+                <Tooltip key={row.key}>
+                  <TooltipTrigger asChild>
+                    <div aria-label={row.title} className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:font-mono">
+                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.name}</span>
+                      <span className="dshx:text-muted-foreground">{row.kind}</span>
+                      <span className="dshx:text-muted-foreground">{formatAge(row.at)}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{row.title}</TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
           {shown === undefined ? null : (
             <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-muted-foreground" aria-live="polite">
               {WorkspaceCleanupSummary.format({

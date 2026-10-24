@@ -81,6 +81,38 @@ describe('WorkspaceCleanupModel.decide', () => {
     ).toMatchObject({ action: 'skip', reason: 'kind-excluded' })
   })
 
+  it('removes only explicitly selected secondary workspaces with a clean verified state', () => {
+    const secondary = idleThread({
+      name: 'projection-selector',
+      sessionIds: [],
+      secondary: true,
+      workingCopyState: 'clean',
+      usedAt: [now - 10 * HOUR],
+    })
+    expect(
+      WorkspaceCleanupModel.decide({ thread: secondary, archived: new Set(), activity: undefined, now, olderThanMs: 6 * HOUR, kinds: ['secondary'] }),
+    ).toEqual({
+      action: 'remove',
+      kind: 'secondary',
+      lastUsedAt: now - 10 * HOUR,
+    })
+    expect(
+      WorkspaceCleanupModel.decide({ thread: secondary, archived: new Set(), activity: undefined, now, olderThanMs: 6 * HOUR, kinds: ['empty'] }),
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'kind-excluded',
+    })
+  })
+
+  it('keeps dirty, unknown, or undated secondary workspaces', () => {
+    expect(decide(idleThread({ secondary: true, workingCopyState: 'dirty' }))).toMatchObject({ action: 'skip', reason: 'working-copy-dirty' })
+    expect(decide(idleThread({ secondary: true, workingCopyState: 'unknown' }))).toMatchObject({ action: 'skip', reason: 'workspace-state-unknown' })
+    expect(decide(idleThread({ secondary: true, workingCopyState: 'clean', usedAt: [undefined] }))).toMatchObject({
+      action: 'skip',
+      reason: 'workspace-state-unknown',
+    })
+  })
+
   it('treats an untracked entry as stale only past the threshold and never younger than an hour', () => {
     const kinds = ['untracked'] as const
     expect(WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: now - 2 * HOUR, now, olderThanMs: HOUR, kinds })).toBe(true)

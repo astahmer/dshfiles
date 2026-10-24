@@ -40,6 +40,7 @@ import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-clea
 import { JsonText } from './json-text.js'
 import { workspaceSyncActivity } from './workspace-sync-outcome.js'
 import { ThreadStatusWarmup } from './thread-status-warmup.js'
+import { WorkspaceSessionPath } from './workspace-session-path.js'
 import {
   defaultJjIntegrationSettings,
   isolatesNewThreadsByDefault,
@@ -911,6 +912,7 @@ interface CleanupScan {
   readonly repoRoots: readonly string[]
   readonly skipped: CleanupResult['skipped']
   readonly workspaces: readonly PlannedWorkspace[]
+  readonly workspaceIds: ReadonlyMap<string, string | null>
   readonly untracked: readonly PlannedUntracked[]
   /** Preview only: what the abandon pass would clear, read before anything moved. */
   readonly emptyRevisions: CleanupResult['emptyRevisions']
@@ -920,12 +922,17 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
   const active = requireThreads()
   const scopedRepoRoot = input.path === undefined ? undefined : (await active.locate(input.path)).repoRoot
   invalidateRepositories()
-  const [repositories, activity] = await Promise.all([listRepositories(), input.apply ? sessionActivity.guard() : sessionActivity.display()])
+  const [repositories, activity, sessionRecords] = await Promise.all([
+    listRepositories(),
+    input.apply ? sessionActivity.guard() : sessionActivity.display(),
+    input.kinds.includes('secondary') ? requireContext().sessionQuery.listSessions() : Promise.resolve([]),
+  ])
   const registry = registryOf()
   const archived = new Set<string>(registry.archivedSessionIds)
   const now = Date.now()
   const repoRoots: string[] = []
   const workspaces: PlannedWorkspace[] = []
+  const workspaceIds = new Map<string, string | null>()
   const skipped: CleanupResult['skipped'] = []
   const emptyRevisions: CleanupResult['emptyRevisions'] = []
   const untracked: PlannedUntracked[] = []
@@ -934,6 +941,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
     repoRoots.push(repository.repoRoot)
     const changedAt = await active.workingCopyChangedAt(repository.repoRoot).catch(() => new Map<string, number>())
     for (const thread of repository.threads) {
+      workspaceIds.set(thread.path, thread.workspaceId)
       const createdAt = thread.workspaceId === null ? undefined : registry.get(WorkspaceId(thread.workspaceId))?.createdAt
       const decision = WorkspaceCleanupModel.decide({
         thread: {
@@ -956,6 +964,45 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
       }
       workspaces.push({ repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
     }
+    if (input.kinds.includes('secondary')) {
+      const secondary = await active.secondaryWorkspaces(repository.repoRoot)
+      for (const workspace of secondary) {
+        const resolved = await registry.resolveByPath(workspace.path)
+        const registered = resolved?.path === workspace.path ? resolved : undefined
+        workspaceIds.set(workspace.path, registered?.id ?? null)
+        const sessionIds = [
+          ...new Set([
+            ...(registered?.sessionIds ?? []),
+            ...sessionRecords
+              .filter(record => WorkspaceSessionPath.includes({ sessionCwd: record.header.cwd, workspacePath: workspace.path }))
+              .map(record => record.header.id),
+          ]),
+        ]
+        const createdAt = registered?.createdAt
+        const decision = WorkspaceCleanupModel.decide({
+          thread: {
+            name: workspace.name,
+            unlandedCount: workspace.unlanded.length,
+            rebasedAt: undefined,
+            sessionIds,
+            integrationQueued: deferredIntegrations.get(workspace.path) !== undefined,
+            secondary: true,
+            workingCopyState: sessionRecords === undefined ? 'unknown' : workspace.workingCopyState,
+            usedAt: [changedAt.get(workspace.name), createdAt === undefined ? undefined : Date.parse(createdAt)],
+          },
+          archived,
+          activity,
+          now,
+          olderThanMs: input.olderThanHours * HOUR_MS,
+          kinds: input.kinds,
+        })
+        if (decision.action === 'skip') {
+          skipped.push({ repoRoot: repository.repoRoot, name: workspace.name, reason: decision.reason })
+          continue
+        }
+        workspaces.push({ repoRoot: repository.repoRoot, name: workspace.name, path: workspace.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
+      }
+    }
     const entries = input.kinds.includes('untracked') ? await active.untrackedEntries(repository.repoRoot).catch(() => []) : []
     for (const entry of entries) {
       if (!WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: entry.modifiedAt, now, olderThanMs: input.olderThanHours * HOUR_MS, kinds: input.kinds }))
@@ -973,7 +1020,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
     })
     emptyRevisions.push(...found)
   }
-  return { scopedRepoRoot, repoRoots, skipped, workspaces, untracked, emptyRevisions }
+  return { scopedRepoRoot, repoRoots, skipped, workspaces, workspaceIds, untracked, emptyRevisions }
 }
 
 const previewCleanup = async (input: CleanupRequest): Promise<CleanupResult> => {
@@ -1007,21 +1054,33 @@ const applyCleanup = async (input: {
   }
   for (const [repoRoot, plannedWorkspaces] of plannedByRepository) {
     for (const planned of plannedWorkspaces) report.beginItem(planned.name)
-    const repository = (await listRepositories()).find(candidate => candidate.repoRoot === repoRoot)
-    const workspaceIds = new Map(repository?.threads.map(thread => [thread.name, thread.workspaceId]) ?? [])
-    const outcome = await active.discardMany({ repoRoot, names: plannedWorkspaces.map(planned => planned.name), force: false })
-    const resultByName = new Map(outcome.results.map(result => [result.name, result]))
+    const threadWorkspaces = plannedWorkspaces.filter(planned => planned.kind !== 'secondary')
+    const secondaryWorkspaces = plannedWorkspaces.filter(planned => planned.kind === 'secondary')
+    const threadOutcome =
+      threadWorkspaces.length === 0
+        ? { results: [] }
+        : await active.discardMany({ repoRoot, names: threadWorkspaces.map(planned => planned.name), force: false })
+    const secondaryOutcome =
+      secondaryWorkspaces.length === 0
+        ? { results: [] }
+        : await active.discardSecondaryMany({
+            repoRoot,
+            workspaces: secondaryWorkspaces.map(planned => ({ name: planned.name, path: planned.path })),
+          })
+    const resultByName = new Map<string, { readonly status: string; readonly error: string | null }>()
+    for (const result of threadOutcome.results) resultByName.set(result.name, { status: result.status, error: result.error })
+    for (const result of secondaryOutcome.results) resultByName.set(result.name, { status: result.status, error: result.message })
     for (const planned of plannedWorkspaces) {
       const result = resultByName.get(planned.name)
       if (result?.status === 'discarded') {
-        const workspaceId = workspaceIds.get(planned.name)
+        const workspaceId = scan.workspaceIds.get(planned.path)
         if (workspaceId !== null && workspaceId !== undefined) await registryOf().delete(WorkspaceId(workspaceId))
         for (const [sessionId, workspace] of isolatedSessionWorkspaces) {
           if (workspace.path === planned.path) isolatedSessionWorkspaces.delete(sessionId)
         }
         const correlationId = randomUUID()
-        emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${planned.name}`, path: planned.path, correlationId })
-        queueWorkspaceSync({ repoRoot, bookmark: readSettings().bookmark, correlationId })
+        emitActivity({ type: 'workspace.discarded', summary: `Removed JJ workspace ${planned.name}`, path: planned.path, correlationId })
+        if (planned.kind !== 'secondary') queueWorkspaceSync({ repoRoot, bookmark: readSettings().bookmark, correlationId })
         workspaces.push({ ...planned, outcome: 'removed' })
         report.settleItem('removed')
         continue
@@ -1059,7 +1118,7 @@ const applyCleanup = async (input: {
   const removedCount = CleanupJobModel.removedCount(result)
   emitActivity({
     type: 'workspace.cleaned',
-    summary: `${input.trigger === 'automatic' ? 'Automatic cleanup removed' : 'Cleaned up'} ${String(removedCount.workspaces)} thread workspace(s), ${String(removedCount.untracked)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
+    summary: `${input.trigger === 'automatic' ? 'Automatic cleanup removed' : 'Cleaned up'} ${String(removedCount.workspaces)} workspace(s), ${String(removedCount.untracked)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
     detail: CleanupJobModel.skippedSummary(result),
     path: scan.scopedRepoRoot ?? null,
     level: input.trigger === 'automatic' && removedCount.workspaces + removedCount.untracked + emptyRevisions.length === 0 ? 'routine' : 'notable',
@@ -1069,7 +1128,12 @@ const applyCleanup = async (input: {
 
 const cleanupRunner = createCleanupJobRunner({
   execute: async ({ request, report }) => {
-    const scan = await scanCleanup({ path: request.path ?? undefined, olderThanHours: request.olderThanHours, kinds: request.kinds, apply: true })
+    const scan = await scanCleanup({
+      path: request.path ?? undefined,
+      olderThanHours: request.olderThanHours,
+      kinds: request.kinds,
+      apply: true,
+    })
     report.planned(scan.workspaces.length + scan.untracked.length)
     return await applyCleanup({ scan, trigger: request.trigger, report })
   },
