@@ -153,3 +153,30 @@ Then('no agent suggestion is offered', async ({ page }: { page: Page }) => {
   await expect(peek(page).getByRole('listbox', { name: 'Reply suggestions', exact: true })).toHaveCount(0)
   await finishJourneyAssertions(page)
 })
+
+const agentPreview = (page: Page) => page.locator('[data-dshfiles-agent-preview]')
+
+When('the mention {string} is clicked in the open item', async ({ page }: { page: Page }, handle: string) => {
+  await peek(page)
+    .getByRole('link', { name: `Preview agent ${handle}`, exact: true })
+    .first()
+    .click()
+})
+
+Then('the agent preview shows {string} with instructions {string}', async ({ page }: { page: Page }, name: string, instructions: string) => {
+  await recordAssertion(page, 'agents-mention-opens-a-preview-card', async () => {
+    await expect(agentPreview(page)).toBeVisible()
+    await expect(agentPreview(page).getByText(name, { exact: true })).toBeVisible()
+    await expect(agentPreview(page).getByText(instructions, { exact: true })).toBeVisible()
+  })
+})
+
+Then('the preview opens {string} in the Agents panel', async ({ page }: { page: Page }, name: string) => {
+  await agentPreview(page).getByRole('button', { name: 'Open in Agents', exact: true }).click()
+  await recordAssertion(page, 'agents-mention-preview-opens-the-agent', async () => {
+    await expect(agentPreview(page)).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
+  })
+  await finishJourneyAssertions(page)
+})

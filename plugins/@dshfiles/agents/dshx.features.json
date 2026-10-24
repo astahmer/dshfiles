@@ -204,6 +204,11 @@
           "id": "agents.reference-native-chip",
           "file": "plugins/@dshfiles/agents/src/agent-reference-links.test.tsx",
           "testName": "opens the card from the native mention chip a sent message renders"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agents.mention-preview",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
         }
       ],
       "reach": [

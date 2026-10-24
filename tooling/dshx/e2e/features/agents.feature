@@ -52,3 +52,15 @@ Feature: Persistent agents
     Then the comment box reads "@dsh "
     When "@b:1" is typed in the open item comment box
     Then no agent suggestion is offered
+
+  @scenario:agents.mention-preview
+  Scenario: Preview an agent from its mention in a backlog comment
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/agents, @dshfiles/ai-accounts" is booted
+    Then the agent "Luna" is saved with instructions "Prefer small findings."
+    When the Backlog panel is opened
+    And "Preview the agent mention" is captured
+    When backlog item b:1 is opened
+    And "Ping @luna about b:1" is commented on the open item
+    And the mention "@luna" is clicked in the open item
+    Then the agent preview shows "Luna" with instructions "Prefer small findings."
+    And the preview opens "Luna" in the Agents panel
