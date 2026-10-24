@@ -8,15 +8,15 @@ and the skill at [`.agents/skills/self-improve/SKILL.md`](../../.agents/skills/s
 
 ## Resume here
 
-The 2026-10-22 run analysed the 2026-10-15…22 window (935 Sessions, 159,930 tool
-calls, 4,530 tool errors) and turned the validated findings into an ordered task
-plan: [`plans/self-improve-2026-10/README.md`](../self-improve-2026-10/README.md).
-Work that plan; add a ledger entry only when a new finding is not already one of
-its tasks.
+Run the weekly review first: `node scripts/self-improve.ts review --since=7d`.
+Its candidate list is the short list; the ledger stops a candidate being opened
+twice. The 2026-10-22 run's validated findings are still an ordered task plan:
+[`plans/self-improve-2026-10/README.md`](../self-improve-2026-10/README.md).
 
 ```sh
+node scripts/self-improve.ts review --since=7d --top=5
 node scripts/self-improve.ts ledger list --status=proposed
-node scripts/self-improve.ts mine --since=7d --top=25
+node scripts/self-improve.ts mine --since=14d --top=25
 ```
 
 ## Open

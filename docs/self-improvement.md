@@ -15,10 +15,64 @@ anything. The first real run of this tool is the argument for that rule — see
 ## Commands
 
 ```sh
+node scripts/self-improve.ts review --since=7d           # week vs the week before
 node scripts/self-improve.ts mine --since=14d --scope=all   # rank candidate signals
 node scripts/self-improve.ts validate                       # deterministic harness findings
 node scripts/self-improve.ts ledger list                    # the improvement backlog
 ```
+
+### `review`
+
+The recurring half. `review` reads two adjacent windows of the same corpus and
+asks the question a weekly loop needs: **what got worse, what got better, and
+what is worth one change this week?**
+
+- **Vitals, side by side.** Sessions, projects, turns, tool calls, tool errors,
+  corrections, compactions, skill loads, peer messages, jj/job failures, provider
+  retries and tokens — previous window, current window, change. Tool errors are
+  also shown per 100 turns, so a busier week does not read as a regression.
+- **Signal deltas.** Every mined signal is matched to its previous-window count
+  and classified `new`, `worse`, `better` or `steady`, with thresholds on both the
+  ratio (1.5×) and the absolute move (5 hits), so a 2→3 count is never a trend.
+- **Candidates, ranked.** A `new` signal outranks a `worse` one, which outranks a
+  steady recurring one; `better` signals are never candidates. Each candidate
+  carries its evidence, its Session ids, and whether the ledger already tracks it —
+  an entry with `proposed` or `investigating` status means _work that entry_
+  instead of opening a second one.
+- **Limits in the artifact.** The report states what it does not read (cost,
+  provider billing, live spans, Activity Timeline, Memory analytics), how the
+  window is selected, that correction counts are lexical, and the noise floor.
+
+It writes `review-<stamp>.md` and `.json` into `output/self-improve/` and prints a
+summary. `mine` remains the deep pass: when a review names a candidate, `mine`
+with a wider scope and its per-Session provenance is how you read the evidence
+around it.
+
+Windows are `[from, to)`: a log whose mtime equals the boundary belongs to the
+earlier window. `--since` sets the current window; the previous one is the same
+length immediately before it.
+
+```sh
+node scripts/self-improve.ts review --since=7d --projects=dshfiles --top=3
+```
+
+### The weekly loop
+
+1. Run `review --since=7d`. Read its candidates, not its whole signal list.
+2. Open the named Session events for at most three candidates. Discard the ones a
+   provider outage, the user's own decision, or a legitimately long task explains.
+3. Record the survivors in the ledger — one entry per candidate — with the root
+   cause and a falsifiable hypothesis.
+4. Implement at most one change this week, on an eligible surface, in this
+   thread's own JJ workspace.
+5. Validate it with a check that could have failed, record the verdict as
+   `helped`, `hurt`, `no-observed-effect` or `confounded`, and note which next
+   week's `review` should see move.
+6. Next run, `review` compares that signal again: `better` is the only evidence a
+   change worked, and it is weak evidence on its own.
+
+The cadence is a schedule, not a daemon: a `schedule_create` weekly reminder in a
+long-lived thread, or a manual run. Nothing runs model calls on its own.
 
 ### `mine`
 
@@ -30,14 +84,14 @@ conversation: extraction yields grouped, counted, capped facts, so a Session wit
 `output/self-improve/cache.json` keyed by path, size, mtime and extractor
 version, so a rerun re-reads only changed Sessions.
 
-| Flag | Meaning |
-| --- | --- |
-| `--scope=all\|tools\|memory\|skills\|ux\|infra\|agent` | keep one signal category |
-| `--since=14d\|30d\|7d\|all\|<ISO date>` | window over log mtime |
-| `--sessions=<n>`, `--projects=<a,b>` | bound the corpus |
-| `--dsh-home=<path>` | analyze another DSH home, or a fixture |
-| `--cache=<path>`, `--no-cache` | control the extraction cache |
-| `--out=<dir>`, `--top=<n>`, `--json`, `--quiet` | what gets written and printed |
+| Flag                                                   | Meaning                                |
+| ------------------------------------------------------ | -------------------------------------- |
+| `--scope=all\|tools\|memory\|skills\|ux\|infra\|agent` | keep one signal category               |
+| `--since=14d\|30d\|7d\|all\|<ISO date>`                | window over log mtime                  |
+| `--sessions=<n>`, `--projects=<a,b>`                   | bound the corpus                       |
+| `--dsh-home=<path>`                                    | analyze another DSH home, or a fixture |
+| `--cache=<path>`, `--no-cache`                         | control the extraction cache           |
+| `--out=<dir>`, `--top=<n>`, `--json`, `--quiet`        | what gets written and printed          |
 
 It writes `report-<stamp>.md` and `.json` into `output/self-improve/` (git-ignored)
 and nothing else. Codes and definitions live in
@@ -92,6 +146,28 @@ file re-edited inside a single Session (ordinary iteration, now only reported
 when the same file is reworked across Sessions) and the duplicate
 `repeated-call:skill:*` signals.
 
+## The first weekly review, in numbers
+
+`node scripts/self-improve.ts review --since=7d` over the 2026-10-17 → 2026-10-24
+window against 2026-10-10 → 2026-10-17, on 2026-10-25:
+
+- 957 Sessions current against 564 previous, 2 162 turns against 2 297;
+- tool calls 132 296 against 129 917, tool errors 3 736 against 3 924 — a 5 %
+  drop in errors on 2 % more calls, so the rate was flat;
+- corrections 264 against 146 (+81 %), compactions 508 against 901 (−44 %);
+- 984 `new` signals, 34 `worse`, 61 `better`, 44 `steady`.
+
+The candidate list was immediately useful, which is the point: `apply_patch`
+appeared as a `new` tool error at **453 hits across 193 Sessions** with the
+message `cannot get property "workingDirectory" without inject` — a real
+regression invisible in any single Session's transcript. The second run over the
+same corpus took 2 s instead of 3 min because the cache already held both
+windows, which is what makes a weekly cadence cheap.
+
+Raw candidate counts are deliberately unflattering: most `new` signals come from
+one thread workspace each. The spread weighting is why a 442-hit signal confined
+to one Session ranked below a 206-hit signal seen across Sessions.
+
 ## The correction-signal defect
 
 The first full-corpus run (2026-10-19, 806 Sessions over 14 days) ranked "user
@@ -106,7 +182,7 @@ Four defects were behind it, all fixed:
    `data.source.kind` (only `user` is human). Classification now reads that field
    and falls back to text matching only for logs written before it existed.
 2. **The opening brief scored as pushback.** A Session whose brief arrived first
-   as a queue splice made the real prompt the *second* user message. The
+   as a queue splice made the real prompt the _second_ user message. The
    discriminator is now whether the agent has produced output yet, not the
    message index.
 3. **Normal turn endings counted as friction.** `turn-end` used a denylist, so
@@ -116,20 +192,20 @@ Four defects were behind it, all fixed:
    Session produced a `rework` signal; 3 477 of them buried the report. `rework`
    now needs the same file reworked across Sessions.
 
-| Signal | Before | After |
-| --- | --- | --- |
-| `correction:misunderstood-requirement` | 631 Sessions / 1 943 hits | 24 Sessions / 29 hits |
-| `correction:process-complaint` | 56 / 103 | 2 / 2 |
-| `correction:incomplete-or-unfixed` | 631 / 3 979 | 130 / 188 |
-| `correction:unwanted-change` | 70 / 128 | 23 / 23 |
-| `turn-end:completed` | 601 / 2 960 | not reported |
-| duplicate `repeated-call:skill:*` | 80 / 539 | not reported (one signal per fact) |
-| `rework` (one Session only) | 3 477 / 3 477 | not reported; cross-Session rework remains (718) |
-| `slow-tool:bash` | 219 / 49 328 | 171 / 1 815 |
-| `redundant-skill-load:dsh-plugin-verify` (control) | 80 / 539 | 80 / 539 |
-| `turn-end:interrupted` (control) | 100 / 142 | 97 / 136 |
-| `coverage.totalCorrections` | 4 095 | 224 |
-| total signals | 4 299 | 1 509 |
+| Signal                                             | Before                    | After                                            |
+| -------------------------------------------------- | ------------------------- | ------------------------------------------------ |
+| `correction:misunderstood-requirement`             | 631 Sessions / 1 943 hits | 24 Sessions / 29 hits                            |
+| `correction:process-complaint`                     | 56 / 103                  | 2 / 2                                            |
+| `correction:incomplete-or-unfixed`                 | 631 / 3 979               | 130 / 188                                        |
+| `correction:unwanted-change`                       | 70 / 128                  | 23 / 23                                          |
+| `turn-end:completed`                               | 601 / 2 960               | not reported                                     |
+| duplicate `repeated-call:skill:*`                  | 80 / 539                  | not reported (one signal per fact)               |
+| `rework` (one Session only)                        | 3 477 / 3 477             | not reported; cross-Session rework remains (718) |
+| `slow-tool:bash`                                   | 219 / 49 328              | 171 / 1 815                                      |
+| `redundant-skill-load:dsh-plugin-verify` (control) | 80 / 539                  | 80 / 539                                         |
+| `turn-end:interrupted` (control)                   | 100 / 142                 | 97 / 136                                         |
+| `coverage.totalCorrections`                        | 4 095                     | 224                                              |
+| total signals                                      | 4 299                     | 1 509                                            |
 
 Conditions: the same corpus and window, extractor version 1 → 4, and 806 Sessions
 analyzed before against 810 after — the 14-day window moved while the runs were

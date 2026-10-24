@@ -3,10 +3,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { z } from 'zod'
+import { SessionCorpus, type CorpusOptions } from './self-improve-corpus.ts'
 import { HarnessAudit } from './self-improve-harness.ts'
 import { ImprovementLedger, type AddInput, type LedgerEntry, type UpdateInput } from './self-improve-ledger.ts'
-import { SessionLogs, type SessionLogRef } from './self-improve-log.ts'
-import { SessionMiner, type MineReport, type SessionFacts } from './self-improve-mine.ts'
+import { SessionLogs } from './self-improve-log.ts'
+import { SessionMiner, type MineReport } from './self-improve-mine.ts'
+import { SessionReview } from './self-improve-review.ts'
 
 /**
  * `/self-improve`'s deterministic half: mine real Session logs into ranked
@@ -35,6 +37,18 @@ const USAGE = `Usage: node scripts/self-improve.ts <command> [--key=value]
 
   validate  Deterministic checks on skills and always-on instructions
             --json
+
+  review    Compare one window with the window before it and name what got worse
+            --since=7d|14d|<ISO date>   current window length (default 7d)
+            --projects=<a,b>   Session project directory substrings
+            --dsh-home=<path>  default $DSH_HOME or ~/.dsh
+            --cache=<path>     default output/self-improve/cache.json
+            --no-cache         ignore and do not write the cache
+            --out=<dir>        default output/self-improve
+            --ledger=<path>    default plans/self-improve/ledger.jsonl
+            --top=<n>          candidates in the report (default 5)
+            --json             machine-readable report instead of markdown
+            --quiet            write files, print nothing
 
   ledger    list|add|update|show|path
             --ledger=<path>    default plans/self-improve/ledger.jsonl
@@ -69,38 +83,6 @@ const parseOptions = (argv: readonly string[]): Options => {
 
 const dshHome = (flags: ReadonlyMap<string, string>): string => flags.get('dsh-home') ?? process.env['DSH_HOME'] ?? join(homedir(), '.dsh')
 
-const mapPool = async <Item, Result>(items: readonly Item[], width: number, worker: (item: Item) => Promise<Result>): Promise<Result[]> => {
-  const results: Result[] = new Array<Result>(items.length)
-  let next = 0
-  const run = async (): Promise<void> => {
-    for (;;) {
-      const index = next++
-      const item = items[index]
-      if (item === undefined) return
-      results[index] = await worker(item)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(width, items.length) }, run))
-  return results
-}
-
-const cacheSchema = z.object({
-  version: z.number(),
-  entries: z.record(z.string(), z.object({ size: z.number(), mtimeMs: z.number(), facts: SessionMiner.factsSchema })),
-})
-type Cache = z.infer<typeof cacheSchema>
-
-const emptyCache = (): Cache => ({ version: SessionMiner.EXTRACTOR_VERSION, entries: {} })
-
-const loadCache = async (path: string | undefined): Promise<Cache> => {
-  if (path === undefined) return emptyCache()
-  const text = await readFile(path, 'utf8').catch(() => undefined)
-  if (text === undefined) return emptyCache()
-  const parsed = SessionLogs.decodeJsonSafe(cacheSchema, text)
-  if (parsed === undefined || parsed.version !== SessionMiner.EXTRACTOR_VERSION) return emptyCache()
-  return parsed
-}
-
 const CATEGORY_BY_SCOPE = new Map<string, string>([
   ['all', ''],
   ['tools', 'tools'],
@@ -121,32 +103,16 @@ const mine = async (flags: ReadonlyMap<string, string>): Promise<number> => {
   const projects = (flags.get('projects') ?? '').split(',').filter(value => value.length > 0)
   const sessionLimit = flags.get('sessions') === undefined ? Number.POSITIVE_INFINITY : Number(flags.get('sessions'))
 
-  const discovered = await SessionLogs.discover(join(dshHome(flags), 'sessions'))
-  const inWindow = discovered
-    .filter(ref => sinceMs === undefined || ref.mtimeMs >= sinceMs)
-    .filter(ref => projects.length === 0 || projects.some(project => ref.project.includes(project)))
-    .sort((left, right) => right.mtimeMs - left.mtimeMs)
-  const selected = inWindow.slice(0, sessionLimit === 0 ? inWindow.length : sessionLimit)
-  const skippedBySince = discovered.length - inWindow.length
-
-  const cache = await loadCache(cachePath)
-  let reused = 0
-  let failed = 0
-  const extracted = await mapPool(selected, 8, async (ref: SessionLogRef): Promise<SessionFacts | undefined> => {
-    const cached = cache.entries[ref.path]
-    if (cached !== undefined && cached.size === ref.size && cached.mtimeMs === ref.mtimeMs) {
-      reused += 1
-      return cached.facts
-    }
-    const facts = await SessionMiner.extract(ref).catch(error => {
-      failed += 1
-      process.stderr.write(`self-improve: could not read ${ref.path}: ${String(error)}\n`)
-      return undefined
-    })
-    if (facts !== undefined) cache.entries[ref.path] = { size: ref.size, mtimeMs: ref.mtimeMs, facts }
-    return facts
-  })
-  const facts = extracted.filter((entry): entry is SessionFacts => entry !== undefined)
+  const corpusOptions: CorpusOptions = {
+    dshHome: dshHome(flags),
+    projects,
+    sessionLimit,
+    onUnreadable: ({ path, error }) => process.stderr.write(`self-improve: could not read ${path}: ${String(error)}\n`),
+  }
+  if (cachePath !== undefined) corpusOptions.cachePath = cachePath
+  if (sinceMs !== undefined) corpusOptions.sinceMs = sinceMs
+  const corpus = await SessionCorpus.load(corpusOptions)
+  const facts = corpus.facts
 
   const wanted = CATEGORY_BY_SCOPE.get(scope) ?? ''
   const signals = SessionMiner.aggregate(facts, now).filter(signal => wanted === '' || signal.category === wanted)
@@ -154,9 +120,9 @@ const mine = async (flags: ReadonlyMap<string, string>): Promise<number> => {
     `Extractor version ${String(SessionMiner.EXTRACTOR_VERSION)}; a signal is a candidate, not a diagnosis.`,
     'Correction themes are lexical matches on human messages; open every one before treating it as pushback.',
     'Occurrence counts for tool errors are capped at 40 distinct signatures per Session, so a very noisy Session is understated rather than overstated.',
-    `Unreadable logs: ${String(failed)}.`,
+    `Unreadable logs: ${String(corpus.failed)}.`,
   ]
-  if (cachePath !== undefined) notes.push(`Cache: ${cachePath} (${String(reused)} of ${String(selected.length)} Sessions reused).`)
+  if (cachePath !== undefined) notes.push(`Cache: ${cachePath} (${String(corpus.reused)} of ${String(corpus.selected.length)} Sessions reused).`)
 
   const report: MineReport = {
     generatedAt: now,
@@ -165,11 +131,11 @@ const mine = async (flags: ReadonlyMap<string, string>): Promise<number> => {
     since,
     until: now,
     coverage: {
-      discovered: discovered.length,
+      discovered: corpus.discovered,
       analyzed: facts.length,
-      reusedFromCache: reused,
-      skippedBySince,
-      failed,
+      reusedFromCache: corpus.reused,
+      skippedBySince: corpus.skippedByWindow,
+      failed: corpus.failed,
       projects: new Set(facts.map(entry => entry.project)).size,
       totalToolCalls: facts.reduce((total, entry) => total + entry.toolCallCount, 0),
       totalToolErrors: facts.reduce((total, entry) => total + entry.toolErrorCount, 0),
@@ -186,10 +152,6 @@ const mine = async (flags: ReadonlyMap<string, string>): Promise<number> => {
   const markdownPath = join(outDirectory, `report-${stamp}.md`)
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`)
   await writeFile(markdownPath, SessionMiner.render(report))
-  if (cachePath !== undefined) {
-    await mkdir(resolve(cachePath, '..'), { recursive: true })
-    await writeFile(cachePath, JSON.stringify(cache))
-  }
 
   if (flags.get('quiet') !== 'true') {
     // `--json` keeps stdout a single parseable document; the artifact paths go to stderr.
@@ -200,6 +162,59 @@ const mine = async (flags: ReadonlyMap<string, string>): Promise<number> => {
       const top = Number(flags.get('top') ?? '25')
       process.stdout.write(SessionMiner.render({ ...report, signals: report.signals.slice(0, top) }))
       process.stdout.write(`\nreport: ${jsonPath}\n`)
+    }
+  }
+  return 0
+}
+
+const review = async (flags: ReadonlyMap<string, string>): Promise<number> => {
+  const now = Date.now()
+  const since = flags.get('since') ?? '7d'
+  const sinceMs = SessionLogs.parseSince(since, now) ?? now - 7 * 86_400_000
+  const windowMs = Math.max(now - sinceMs, 86_400_000)
+  const previousFrom = sinceMs - windowMs
+  const outDirectory = flags.get('out') ?? join(REPO_ROOT, 'output/self-improve')
+  const cachePath = flags.get('no-cache') === 'true' ? undefined : (flags.get('cache') ?? join(outDirectory, 'cache.json'))
+  const projects = (flags.get('projects') ?? '').split(',').filter(value => value.length > 0)
+  const onUnreadable = ({ path, error }: { readonly path: string; readonly error: unknown }): void => {
+    process.stderr.write(`self-improve: could not read ${path}: ${String(error)}\n`)
+  }
+  const corpusOptions: CorpusOptions = {
+    dshHome: dshHome(flags),
+    projects,
+    sessionLimit: Number.POSITIVE_INFINITY,
+    onUnreadable,
+  }
+  if (cachePath !== undefined) corpusOptions.cachePath = cachePath
+
+  const current = await SessionCorpus.load({ ...corpusOptions, sinceMs, untilMs: now })
+  const previous = await SessionCorpus.load({ ...corpusOptions, sinceMs: previousFrom, untilMs: sinceMs })
+  const ledger = await ImprovementLedger.read(ledgerPathOf(flags))
+  const report = SessionReview.build({
+    now,
+    since,
+    current,
+    previous,
+    currentWindow: { from: sinceMs, to: now },
+    previousWindow: { from: previousFrom, to: sinceMs },
+    ledger: ledger.map(entry => ({ key: entry.key, status: entry.status })),
+    top: Number(flags.get('top') ?? '5'),
+  })
+
+  await mkdir(outDirectory, { recursive: true })
+  const stamp = new Date(now).toISOString().replace(/[:.]/g, '-')
+  const jsonPath = join(outDirectory, `review-${stamp}.json`)
+  const markdownPath = join(outDirectory, `review-${stamp}.md`)
+  await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`)
+  await writeFile(markdownPath, SessionReview.render(report))
+
+  if (flags.get('quiet') !== 'true') {
+    if (flags.get('json') === 'true') {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+      process.stderr.write(`review: ${jsonPath}\n`)
+    } else {
+      process.stdout.write(SessionReview.renderSummary(report))
+      process.stdout.write(`\nreview: ${markdownPath}\n`)
     }
   }
   return 0
@@ -362,6 +377,8 @@ export const run = async (argv: readonly string[]): Promise<number> => {
   switch (options.command) {
     case 'mine':
       return mine(options.flags)
+    case 'review':
+      return review(options.flags)
     case 'validate':
       return validate(options.flags)
     case 'ledger':
