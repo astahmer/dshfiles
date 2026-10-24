@@ -1,3 +1,4 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { appendFile, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -69,6 +70,12 @@ describe('indexSessionLogs', () => {
 
     const titles = page.rows.filter(row => row.purpose === 'title')
     expect(titles.every(row => row.input === null && row.durationMs !== null)).toBe(true)
+  })
+
+  it('records a usage index span with the files and rows of one pass', async () => {
+    using recorder = recordSpans()
+    await usageIndexService.indexSessionLogs({ store: openUsageStore(':memory:'), root: FIXTURES })
+    expect(recorder.span('usage index').attributes).toEqual({ 'dshx.usage.files': 3, 'dshx.usage.rows': 238 })
   })
 
   it('searches by model, provider or project and counts every status for the chips', async () => {

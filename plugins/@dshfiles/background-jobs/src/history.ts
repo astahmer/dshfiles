@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { readLogFrom } from '@dshfiles/usage/session-log'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 import { boundedLabel } from './bounds.js'
 import { historyJobSchema, jobSessionSchema, jobStateSchema, type HistoryJob, type JobIndexing, type JobSession } from './types.js'
@@ -123,16 +124,21 @@ export class HistoryIndex implements JobHistorySource {
     if (this.active) return
     this.active = true
     try {
-      await this.listFiles()
-      let changed = 0
-      for (const file of this.files) {
-        if (changed >= this.options.filesPerPass || this.options.now() - this.startedPassAt > this.options.budgetMs) break
-        if (file.size <= (this.offsets.get(file.path) ?? 0)) continue
-        changed += 1
-        await this.readFile(file)
-      }
-      this.caughtUp = changed < this.options.filesPerPass
-      if (changed > 0) await this.persist()
+      await withSpan('background-jobs history pass', {}, async span => {
+        await this.listFiles()
+        let changed = 0
+        for (const file of this.files) {
+          if (changed >= this.options.filesPerPass || this.options.now() - this.startedPassAt > this.options.budgetMs) break
+          if (file.size <= (this.offsets.get(file.path) ?? 0)) continue
+          changed += 1
+          await this.readFile(file)
+        }
+        this.caughtUp = changed < this.options.filesPerPass
+        span.setAttributes(
+          pluginAttributes({ plugin: 'background-jobs', attributes: { files: this.files.length, read_files: changed, caught_up: this.caughtUp } }),
+        )
+        if (changed > 0) await this.persist()
+      })
       this.lastIndexedAt = this.options.now()
       this.lastError = null
     } catch (error) {

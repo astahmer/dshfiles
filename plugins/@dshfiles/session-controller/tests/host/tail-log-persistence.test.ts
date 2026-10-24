@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterEach, expect, it } from 'vitest'
 import { TailLog } from '../../src/tail-log.ts'
 
@@ -33,20 +34,24 @@ const turn = (index: number, firstSeq: number): SessionEvent[] => {
   ] as never
 }
 
-it('decodes the same events as the JSONL backend, from the newest frames back to the first', async () => {
+/** A 1 MB+ current-format log: ten turns per durable append, one zstd frame each, as a busy Agent's batches are. */
+const writeLargeLog = async (sessionId: string) => {
   const root = mkdtempSync(join(tmpdir(), 'tail-log-jsonl-'))
   directories.push(root)
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(JsonlPersistence, { root })
-  const header: SessionHeader = { id: SessionId('session-tail-check'), createdAt: 1, cwd: root, isSeeded: false, delegationDepth: 0, version: 4 } as never
+  const header: SessionHeader = { id: SessionId(sessionId), createdAt: 1, cwd: root, isSeeded: false, delegationDepth: 0, version: 4 } as never
   const writer = await ctx.sessionPersistence.create(header)
-  // Ten turns per durable append: one zstd frame each, as a busy Agent's batches are.
   for (let batch = 0; batch < 32; batch += 1) {
     await writer.append(Array.from({ length: 10 }, (_, offset) => turn(batch * 10 + offset + 1, (batch * 10 + offset) * 3)).flat())
   }
   await writer.close()
+  return { ctx, header }
+}
 
+it('decodes the same events as the JSONL backend, from the newest frames back to the first', async () => {
+  const { ctx, header } = await writeLargeLog('session-tail-check')
   const reader = await ctx.sessionPersistence.open(header.id, 'read')
   const stored = (await reader.read()).events
   await reader.close()
@@ -60,4 +65,13 @@ it('decodes the same events as the JSONL backend, from the newest frames back to
   expect(tail.complete).toBe(false)
   for (let frames = 8; !tail.complete; frames *= 2) tail.before(frames)
   expect(tail.events).toEqual(stored)
+}, 30_000)
+
+it('records a session tail read span with the thread, bytes and frames it read', async () => {
+  const { ctx, header } = await writeLargeLog('session-tail-span')
+  using recorder = recordSpans()
+  await TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal })
+  const span = recorder.span('session tail read')
+  expect(span.attributes).toMatchObject({ 'dsh.session.id': 'session-tail-span', 'dshx.session-controller.served': true, 'dshx.session-controller.frames': 33 })
+  expect(span.attributes['dshx.session-controller.bytes']).toBeGreaterThan(1_000_000)
 }, 30_000)

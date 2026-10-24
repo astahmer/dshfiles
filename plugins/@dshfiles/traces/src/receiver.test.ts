@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http'
 import { gzipSync } from 'node:zlib'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterEach, describe, expect, test } from 'vitest'
 import { OtlpBody } from './otlp/decode.js'
 import { SpanNormalizer, type NormalizedLog, type NormalizedSpan } from './otlp/normalize.js'
@@ -100,6 +101,16 @@ describe('OTLP/HTTP receiver', () => {
     expect([protobuf.status, json.status]).toEqual([200, 200])
     expect(storedLogs).toHaveLength(6)
     expect(receiver.status()).toMatchObject({ requests: { logs: 2 }, accepted: { logs: 6 } })
+  })
+
+  test('records an otlp ingest span for logs and metrics but none for traces, which would feed back into itself', async () => {
+    const traces = await SdkFixtures.traces()
+    const { url } = await startReceiver()
+    using recorder = recordSpans()
+    await fetch(url('/v1/metrics'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"resourceMetrics":[]}' })
+    await fetch(url('/v1/traces'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(traces.json) })
+    expect(recorder.named('otlp ingest').map(span => span.attributes['dshx.traces.signal'])).toEqual(['metrics'])
+    expect(recorder.span('otlp ingest').attributes).toMatchObject({ 'dshx.traces.wire': 'json', 'dshx.traces.accepted': 0, 'dshx.traces.body_bytes': 22 })
   })
 
   test('rejects wrong paths, methods, media types, oversize and malformed bodies', async () => {

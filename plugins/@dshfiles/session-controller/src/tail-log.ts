@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { ProjectionCheckpoint, ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { readFile, stat } from 'node:fs/promises'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { zstdDecompressSync } from 'node:zlib'
 import { z } from 'zod'
 
@@ -64,7 +65,21 @@ export class TailLog {
    * Open the tail of a cold, unforked, current-format zstd log, or `undefined` when only the full read can serve it:
    * another backend or encoding, a forked or subagent Session, a torn last frame.
    */
-  static async open(input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal }): Promise<TailLog | undefined> {
+  static open(input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal }): Promise<TailLog | undefined> {
+    return withSpan('session tail read', { attributes: { 'dsh.session.id': input.sessionId } }, async span => {
+      const tail = await TailLog.openUntraced(input)
+      span.setAttributes(
+        pluginAttributes({ plugin: 'session-controller', attributes: { served: tail !== undefined, bytes: tail?.bytes.length, frames: tail?.frames.length } }),
+      )
+      return tail
+    })
+  }
+
+  private static async openUntraced(input: {
+    readonly ctx: Context
+    readonly sessionId: SessionId
+    readonly signal: AbortSignal
+  }): Promise<TailLog | undefined> {
     const kept = TailLog.kept.get(input.sessionId)
     if (kept !== undefined) {
       // A file identity check instead of the backend's stat and log lookup (130–330 ms on a busy Host): an unchanged

@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { gunzip, inflate } from 'node:zlib'
 import { promisify } from 'node:util'
 import { z } from 'zod'
+import { pluginAttributes, withSpan, type Span } from '@dshfiles/dshx/tracing'
 import type { ReceiverState, ReceiverStatus } from './types.js'
 
 export const MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -200,14 +201,21 @@ const createReceiver = (options: {
     if (request.method !== 'POST') throw new RequestRejection(405, 'Use POST.')
     const wire = wireOf(request.headers['content-type'])
     if (wire === null) throw new RequestRejection(415, 'Send application/json or application/x-protobuf.')
-    const raw = await readBody(request)
-    const result = handler({ body: await decodeContent(raw, request.headers['content-encoding']), wire })
-    counters.requests[signal] += 1
-    counters.accepted[signal] += result.accepted
-    counters.rejectedItems += result.rejected
-    lastReceivedAt = now()
-    forward(signal, raw, request.headers)
-    respond(response, 200, wire)
+    const store = async (span?: Span): Promise<void> => {
+      const raw = await readBody(request)
+      const result = handler({ body: await decodeContent(raw, request.headers['content-encoding']), wire })
+      counters.requests[signal] += 1
+      counters.accepted[signal] += result.accepted
+      counters.rejectedItems += result.rejected
+      lastReceivedAt = now()
+      span?.setAttributes(pluginAttributes({ plugin: 'traces', attributes: { body_bytes: raw.length, accepted: result.accepted, rejected: result.rejected } }))
+      forward(signal, raw, request.headers)
+      respond(response, 200, wire)
+    }
+    // A span per /v1/traces request would be exported back into this receiver with every batch, forever; the
+    // traces_status counters observe those requests instead.
+    if (signal === 'traces') return store()
+    return withSpan('otlp ingest', { kind: 'server', attributes: pluginAttributes({ plugin: 'traces', attributes: { signal, wire } }) }, store)
   }
 
   const onRequest = (request: IncomingMessage, response: ServerResponse): void => {

@@ -1,3 +1,4 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -50,6 +51,19 @@ describe('job history index', () => {
       project: '--Users-astahmer-dev-dshfiles--',
     })
     expect(index.indexing).toMatchObject({ caughtUp: true, historyRows: 2 })
+  })
+
+  it('records a background-jobs history pass span with the files it read', async () => {
+    const { root, statePath } = await setup()
+    const index = new HistoryIndex({ root, statePath })
+    await index.load()
+    using recorder = recordSpans()
+    await index.pass()
+    expect(recorder.span('background-jobs history pass').attributes).toEqual({
+      'dshx.background-jobs.files': 1,
+      'dshx.background-jobs.read_files': 1,
+      'dshx.background-jobs.caught_up': true,
+    })
   })
 
   it('resumes from the persisted offset and reads only the appended records', async () => {

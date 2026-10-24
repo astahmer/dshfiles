@@ -1,4 +1,5 @@
 import { basename, dirname, join } from 'node:path'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import type { readdir, stat } from 'node:fs/promises'
 import { UsageFoldModel, type ToolSourceMetadata } from './fold.js'
 import type { readLogFrom } from './session-log.js'
@@ -118,19 +119,21 @@ export const createUsageIndexService = (dependencies: UsageIndexDependencies) =>
     readonly store: UsageStore
     readonly root: string
     readonly toolSources?: ReadonlyMap<string, ToolSourceMetadata>
-  }): Promise<{ readonly files: number; readonly rows: number }> => {
-    const logs = await discoverSessionLogs({ root })
-    let rows = 0
-    for (const path of logs) {
-      rows += await indexSessionLog({
-        store,
-        path,
-        toolSources,
-      })
-      await yieldToHost()
-    }
-    return { files: logs.length, rows }
-  }
+  }): Promise<{ readonly files: number; readonly rows: number }> =>
+    withSpan('usage index', {}, async span => {
+      const logs = await discoverSessionLogs({ root })
+      let rows = 0
+      for (const path of logs) {
+        rows += await indexSessionLog({
+          store,
+          path,
+          toolSources,
+        })
+        await yieldToHost()
+      }
+      span.setAttributes(pluginAttributes({ plugin: 'usage', attributes: { files: logs.length, rows } }))
+      return { files: logs.length, rows }
+    })
 
   return { discoverSessionLogs, indexSessionLog, indexSessionLogs }
 }

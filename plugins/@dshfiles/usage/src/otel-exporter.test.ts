@@ -1,3 +1,4 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { once } from 'node:events'
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -182,6 +183,22 @@ describe('OtlpMetricsExporter.start', () => {
     ).toEqual(expect.arrayContaining([2]))
     expect(JSON.stringify(body)).not.toContain('PRIVATE_LABEL')
     expect(exporter.state()).toEqual(expect.objectContaining({ consecutiveFailures: 0, lastError: null }))
+  })
+
+  it('records a usage metrics export span with the collector host and status', async () => {
+    const collector = await startCollector()
+    const store = openStore()
+    using recorder = recordSpans()
+    const exporter = OtlpMetricsExporter.start({
+      timing: { intervalMs: 25, timeoutMs: 1_000 },
+      destination: () => ({ url: collector.url, headers: { authorization: 'Bearer token' } }),
+      collect: range => store.otelMetrics({ ...range, temporality: 'cumulative', serviceName: 'dshfiles' }),
+    })
+    cleanups.push(() => exporter.stop())
+    recordJev(store, 1)
+    await vi.waitFor(() => expect(recorder.named('usage metrics export').length).toBeGreaterThanOrEqual(1), { timeout: 2_000 })
+    const span = recorder.span('usage metrics export')
+    expect(span.attributes).toEqual({ 'server.address': new URL(collector.url).host, 'http.response.status_code': 200 })
   })
 
   it('skips the POST while there is nothing to report', async () => {

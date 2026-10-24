@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DEFAULT_OTLP_SERVICE_NAME, type OtlpMetricsRequest } from './otel-metrics.js'
+import { withSpan } from '@dshfiles/dshx/tracing'
 
 const DEFAULT_INTERVAL_MS = 60_000
 const MIN_INTERVAL_MS = 1_000
@@ -186,12 +187,20 @@ const startExporter = (input: {
       if (destination === undefined) return
       const request = input.collect({ from: startedAt, to: Math.max(Date.now(), startedAt) })
       if (request.resourceMetrics.every(resource => resource.scopeMetrics.every(scope => scope.metrics.length === 0))) return
-      const response = await fetch(destination.url, {
-        method: 'POST',
-        headers: { ...destination.headers, 'content-type': 'application/json' },
-        body: JSON.stringify(request),
-        signal: AbortSignal.any([abort.signal, AbortSignal.timeout(input.timing.timeoutMs)]),
-      })
+      const response = await withSpan(
+        'usage metrics export',
+        { kind: 'client', attributes: { 'server.address': new URL(destination.url).host } },
+        async span => {
+          const sent = await fetch(destination.url, {
+            method: 'POST',
+            headers: { ...destination.headers, 'content-type': 'application/json' },
+            body: JSON.stringify(request),
+            signal: AbortSignal.any([abort.signal, AbortSignal.timeout(input.timing.timeoutMs)]),
+          })
+          span.setAttribute('http.response.status_code', sent.status)
+          return sent
+        },
+      )
       await response.arrayBuffer().catch(() => undefined)
       if (!response.ok) {
         fail(`HTTP ${String(response.status)}`, retryAfterMsOf(response))
