@@ -92,6 +92,39 @@ package gets the real grouping without that coupling. See
 [the changes-review plan](../../../plans/changes-review/README.md) for this
 surface.
 
+## Design decisions
+
+- The tab takeover uses the sidebar-right registry's `extension` band rather than
+  forking the deliverables package: a tab type registered under our own id
+  shadows the builtin `changes-review` kind, and the body/title seats dispatch
+  under that id. Turning `classicReviewTab` on unregisters the type and the
+  builtin resumes, including for tabs already open.
+- Comments are anchored on a side (`old`/`new`) and line number, stored by review
+  identity. A workspace review's identity includes the head revision, so its
+  comments belong to the revision that was reviewed.
+- The diff renderer is our own React tree (Shiki spans through the Host's
+  `useCodeHighlighter`) rather than `PatchView`: inline comments and per-line
+  affordances need per-line nodes, and `PatchView` mounts each file in a shadow
+  root with no line hooks.
+- Auto-mark fires when a file's end is reached _and_ its section has scrolled
+  into the viewport; a short file still fully visible on open is not marked. It
+  only ever marks, and a Host without `diff-viewed.mark` disables the toggle
+  rather than faking durable progress.
+- `dshx` exports the settings client runtime, `ApiClientLifecycle` and
+  `provideSettingsContext` so a raw keyed slot body can carry the same providers
+  a dshx-registered slot gets.
+
+## Risks
+
+- A future DSH release may change the `changes-review` address or summary route;
+  the takeover then stops matching and the native tab resumes (a visible
+  fallback, not a crash).
+- An older Host without the comments API hides the comment affordances instead
+  of failing; an older Host without `diff-viewed.mark` disables auto-mark only.
+- The turn's viewed marks need `@dshfiles/diff-viewed` installed. Without it the
+  manual toggle still works locally, but progress is not durable and auto-mark is
+  disabled.
+
 ## Host API
 
 `pullsReviewApi.review({ path, base? })` returns one of:
