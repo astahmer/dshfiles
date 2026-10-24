@@ -141,7 +141,7 @@ const linkPatterns: readonly { readonly type: BacklogLink['type']; readonly patt
   { type: 'revision', pattern: /(?<![\w/])jj:([\w.@/-]+[\w])/g },
   { type: 'thread', pattern: /(?<![\w/-])(session-[\w-]{6,})/g },
   { type: 'branch', pattern: /(?<![\w/])branch:([\w./-]+[\w])/g },
-  { type: 'workspace', pattern: /(?<![\w/])workspace:(\S+)/g },
+  { type: 'workspace', pattern: /(?<![\w/])workspace:([^\s)]+)/g },
   { type: 'url', pattern: /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g },
   { type: 'secret', pattern: /(?<![\w/])secret:([A-Za-z_][A-Za-z0-9_-]*(?:@[A-Za-z0-9_-]+)?)/g },
 ]

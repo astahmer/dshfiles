@@ -14,4 +14,8 @@ describe('backlog composer link labels', () => {
   it('keeps backlog item references labeled by item id', () => {
     expect(composerLinkLabel({ type: 'item', target: '42' }, [])).toBe('b:42')
   })
+
+  it('shows the project folder for an encoded workspace reference', () => {
+    expect(composerLinkLabel({ type: 'workspace', target: '%2FUsers%2Fme%2Fdev%2Fbb-plugins' }, [])).toBe('bb-plugins')
+  })
 })

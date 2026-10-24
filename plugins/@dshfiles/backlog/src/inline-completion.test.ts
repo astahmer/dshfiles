@@ -61,13 +61,16 @@ test('agent rows match handle, name or description, and insert the readable ment
   assert.equal(InlineCompletion.insertFor('reviewer'), '@reviewer ')
 })
 
-test('project completions insert workspace references, never project-assignment commands', () => {
-  assert.deepEqual(InlineCompletion.projects(at('@dsh'), ['/work/dshfiles', '/work/other']), [
-    { path: '/work/dshfiles', insert: 'workspace:%2Fwork%2Fdshfiles ' },
+test('project completions show readable draft tokens', () => {
+  assert.deepEqual(InlineCompletion.projects(at('@dsh'), ['/work/dshfiles', '/work/other']), [{ path: '/work/dshfiles', insert: '@project:dshfiles ' }])
+  assert.deepEqual(InlineCompletion.projects(at('@'), ['/work/dshfiles', '/work/space name', '/work/project[one]']), [
+    { path: '/work/dshfiles', insert: '@project:dshfiles ' },
+    { path: '/work/space name', insert: '@project:space-name ' },
+    { path: '/work/project[one]', insert: '@project:project[one] ' },
   ])
-  assert.deepEqual(InlineCompletion.projects(at('@'), ['/work/dshfiles', '/work/space name']), [
-    { path: '/work/dshfiles', insert: 'workspace:%2Fwork%2Fdshfiles ' },
-    { path: '/work/space name', insert: 'workspace:%2Fwork%2Fspace%20name ' },
+  assert.deepEqual(InlineCompletion.projects(at('@'), ['/work/alpha/shared', '/work/beta/shared']), [
+    { path: '/work/alpha/shared', insert: '@project:alpha-shared ' },
+    { path: '/work/beta/shared', insert: '@project:beta-shared ' },
   ])
   assert.deepEqual(InlineCompletion.projects(at('@b:12'), ['/work/dshfiles']), [])
 })

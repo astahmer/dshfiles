@@ -9,6 +9,7 @@ import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'
 import { replyTextAtSubmit } from './reply-input.js'
+import { serializeProjectReferenceDraft } from './project-reference-draft.js'
 
 export type ComposerFiles = ReturnType<typeof useComposerFiles>
 
@@ -65,7 +66,8 @@ export const BacklogTextBox = (props: {
   }
 
   const submit = (): void => {
-    props.onSubmit?.(reply ? replyTextAtSubmit(input.current, props.value) : props.value)
+    const text = reply ? replyTextAtSubmit(input.current, props.value) : props.value
+    props.onSubmit?.(serializeProjectReferenceDraft(text, props.projects ?? []))
   }
 
   const blur = (event: FocusEvent<HTMLDivElement>): void => {

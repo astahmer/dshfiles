@@ -69,6 +69,7 @@ import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { BacklogTextBox } from './text-box.js'
 import { actorThreadFor } from './actor-thread.js'
 import { BacklogTriage } from './triage.js'
+import { workspaceReferenceLabel } from './workspace-reference-label.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
 type OpenThread = (sessionId: string) => void
@@ -108,6 +109,7 @@ const linkLabel = (link: BacklogLink): string => {
   if (link.type === 'revision') return `jj:${link.target}`
   if (link.type === 'url') return link.target.replace(/^https?:\/\//, '').replace(/\/$/, '')
   if (link.type === 'secret') return `secret:${link.target}`
+  if (link.type === 'workspace') return workspaceReferenceLabel(link.target)
   return link.target
 }
 

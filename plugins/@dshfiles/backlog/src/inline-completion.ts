@@ -1,5 +1,7 @@
 import { prefixedTokenAt } from '@dshfiles/input-trigger/caret-token'
 
+import { projectReferenceDraftToken } from './project-reference-draft.js'
+
 /** The `#tag` or `@query` token the caret is on, with the source scope it names when it has one. */
 export interface InlineToken {
   readonly trigger: '#' | '@'
@@ -92,14 +94,14 @@ export class InlineCompletion {
       .map(agent => ({ handle: agent.handle, insert: `@${agent.handle} ` }))
   }
 
-  /** Project paths match by full path or final folder name and insert a non-assigning workspace reference. */
+  /** Project paths match by full path or final folder name and insert a readable draft token for serialization on submit. */
   static projects(token: InlineToken | null, projects: readonly string[]): readonly InlineProjectRow[] {
     if (token === null || token.trigger !== '@' || token.scope !== null) return []
     const query = token.query.trim().toLowerCase()
     return projects
       .filter(path => query === '' || path.toLowerCase().includes(query) || (path.split('/').filter(Boolean).at(-1) ?? path).toLowerCase().includes(query))
       .slice(0, 6)
-      .map(path => ({ path, insert: `workspace:${encodeURIComponent(path)} ` }))
+      .map(path => ({ path, insert: `${projectReferenceDraftToken(path, projects)} ` }))
   }
 
   /** The text after picking one row: the readable mention a dispatch reads, plus a space. */

@@ -1192,7 +1192,7 @@
         "expect option \"sample project reference\"",
         "click option \"sample project reference\"",
         "press Meta+Enter",
-        "expect text \"workspace:%2F*\""
+        "expect text \"sample\""
       ],
       "surfaces": ["client", "host", "storage"],
       "states": ["reading", "editing", "mentioning", "attached", "saved", "routing"],

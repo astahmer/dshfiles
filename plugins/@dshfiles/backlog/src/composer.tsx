@@ -43,6 +43,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogProjectCommand } from './project-command.js'
 import { continueMarkdownList } from './list-continuation.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
+import { serializeProjectReferenceDraft } from './project-reference-draft.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 export interface ComposerThread {
@@ -396,7 +397,10 @@ export const Composer = (props: {
     setStatus('inbox')
     setFailed(null)
     props.onClearStatus?.()
-    const payload: Parameters<typeof api.capture>[0] = { text: text.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : text }
+    const serializedText = serializeProjectReferenceDraft(text, props.projects)
+    const payload: Parameters<typeof api.capture>[0] = {
+      text: serializedText.trim() === '' ? (submitted.files[0]?.name ?? 'File capture') : serializedText,
+    }
     if (statusTouched || (props.status !== undefined && props.status !== null)) payload.status = status
     if (kind !== null) payload.kind = kind
     if (project !== null) payload.project = project
@@ -414,7 +418,7 @@ export const Composer = (props: {
     })
   }
 
-  const preview = useMemo(() => (text.trim() === '' ? null : BacklogItems.triage(text)), [text])
+  const preview = useMemo(() => (text.trim() === '' ? null : BacklogItems.triage(serializeProjectReferenceDraft(text, props.projects))), [text, props.projects])
   const chat = props.variant === 'chat'
   const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
   const voiceAvailable = speech.data?.available === true

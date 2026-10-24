@@ -74,8 +74,8 @@ describe('triage', () => {
     expect(triaged.body).toBe(`${title.slice(BacklogItems.maxTitleChars)}\n\nDetails`)
   })
 
-  it('keeps a project mention as a workspace reference without assigning the project', () => {
-    const triaged = BacklogItems.triage('Investigate workspace:%2Fwork%2Fdshfiles')
+  it('keeps a readable project mention as a workspace reference without assigning the project', () => {
+    const triaged = BacklogItems.triage('Investigate [dshfiles](workspace:%2Fwork%2Fdshfiles)')
     expect(triaged.links).toEqual([{ type: 'workspace', target: '%2Fwork%2Fdshfiles', provenance: 'extracted' }])
     expect('project' in triaged).toBe(false)
   })
