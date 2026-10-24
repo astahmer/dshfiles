@@ -1,4 +1,4 @@
-import { Writable } from 'node:stream'
+import { Readable, Writable } from 'node:stream'
 import type { SubprocessHandle, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it, vi } from 'vitest'
@@ -28,8 +28,8 @@ const harness = (
   })
   const handle: SubprocessHandle = {
     stdin,
-    stdout: undefined,
-    stderr: undefined,
+    stdout: Readable.from(['synthetic-private-mutation-output']),
+    stderr: Readable.from(['synthetic-private-diagnostic-output']),
     control: undefined,
     collected: {
       stdout: {
@@ -73,7 +73,8 @@ describe('managed secret CLI runner', () => {
     expect(test.spec()?.argv).toEqual(['/nix/store/secret-cli/bin/secret', 'set', 'SYNTHETIC_TOKEN', '--env', 'dev'])
     expect(test.spec()?.cwd).toBe('/private/tmp/project')
     expect(test.spec()?.env).toEqual({ BW_SESSION: 'synthetic-session-token', SECRET_SESSION_FILE: '/private/tmp/synthetic-secret-session' })
-    expect(test.spec()?.stdio).toEqual({ stdin: 'pipe', stdout: { maxBytes: 1_000_000 }, stderr: { maxBytes: 1 } })
+    expect(test.spec()?.stdio).toEqual({ stdin: 'pipe', stdout: { maxBytes: 1_000_000 }, stderr: 'pipe' })
+    expect(test.handle.stderr?.readableFlowing).toBe(true)
     expect(test.stdin()).toBe('synthetic-secret-value')
     expect(test.handle.waitForExit).toHaveBeenCalledOnce()
   })
@@ -91,8 +92,11 @@ describe('managed secret CLI runner', () => {
     )
 
     expect(result).toBe('')
-    expect(test.spec()?.stdio.stdout).toEqual({ maxBytes: 1 })
-    expect(test.spec()?.stdio.stderr).toEqual({ maxBytes: 1 })
+    expect(test.spec()?.stdio.stdout).toBe('pipe')
+    expect(test.spec()?.stdio.stderr).toBe('pipe')
+    expect(test.handle.stdout?.readableFlowing).toBe(true)
+    expect(test.handle.stderr?.readableFlowing).toBe(true)
+    expect(test.handle.collected.stdout?.readFrom).not.toHaveBeenCalled()
     expect(test.spec()?.env).toEqual({})
   })
 
@@ -129,6 +133,120 @@ describe('managed secret CLI runner', () => {
     await expect(missingFailure).rejects.toBeInstanceOf(SecretCliError)
     await expect(missingFailure).rejects.toMatchObject({ code: 'cli-missing', message: 'Secret CLI executable could not be found on the Host PATH.' })
     expect(missing.runtime.spawn).not.toHaveBeenCalled()
+  })
+
+  it.each(['stdout', 'stderr', 'stdin'] as const)('cancels on repeated %s errors during the process-range wait, even after a zero exit', async stream => {
+    const test = harness()
+    vi.mocked(test.handle.waitForExit).mockImplementationOnce(async () => {
+      test.handle[stream]?.emit('error', new Error('synthetic-private-stream-detail'))
+      test.handle[stream]?.emit('error', new Error('synthetic-private-second-stream-detail'))
+      return true
+    })
+    const result = runSecretCli(test.runtime, { args: ['set', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: false, stdin: 'synthetic-value' }, {})
+
+    await expect(result).rejects.toBeInstanceOf(SecretCliError)
+    await expect(result).rejects.toMatchObject({ code: 'cli-failed', message: 'Secret CLI command failed.' })
+    expect(test.spec()?.signal?.aborted).toBe(true)
+    expect(test.handle.terminate).toHaveBeenCalledOnce()
+    expect(() => test.handle[stream]?.emit('error', new Error('synthetic-private-late-stream-detail'))).not.toThrow()
+  })
+
+  it.each(['stdout', 'stderr'] as const)('fails closed when the requested raw %s pipe is unavailable', async stream => {
+    const test = harness()
+    vi.mocked(test.runtime.spawn).mockReturnValueOnce({ ...test.handle, [stream]: undefined })
+    await expect(runSecretCli(test.runtime, { args: ['set', 'SYNTHETIC_TOKEN'], cwd: null, captureStdout: false }, {})).rejects.toMatchObject({
+      code: 'cli-failed',
+      message: 'Secret CLI command failed.',
+    })
+    expect(test.handle.terminate).toHaveBeenCalledOnce()
+  })
+
+  it('does not accept a zero exit if the deadline elapses during the process-range wait', async () => {
+    vi.useFakeTimers()
+    try {
+      const test = harness()
+      vi.mocked(test.handle.waitForExit).mockImplementationOnce(async () => {
+        await vi.advanceTimersByTimeAsync(15_000)
+        return true
+      })
+      await expect(runSecretCli(test.runtime, { args: ['print', '--json'], cwd: null, captureStdout: true }, {})).rejects.toMatchObject({
+        code: 'cli-timeout',
+        message: 'Secret CLI command timed out.',
+      })
+      expect(test.handle.terminate).toHaveBeenCalledOnce()
+      expect(test.handle.collected.stdout?.readFrom).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['throws', 'unconfirmed'] as const)('masks termination diagnostics and reports cleanup when it %s', async mode => {
+    const test = harness({ exitCode: 2 })
+    if (mode === 'throws') {
+      vi.mocked(test.handle.terminate).mockImplementationOnce(() => {
+        throw new Error('synthetic-private-termination-detail')
+      })
+    } else {
+      vi.mocked(test.handle.waitForExit).mockResolvedValue(false)
+    }
+    const result = runSecretCli(test.runtime, { args: ['print', '--json'], cwd: null, captureStdout: true }, {})
+    await expect(result).rejects.toBeInstanceOf(SecretCliError)
+    await expect(result).rejects.toMatchObject({ code: 'cli-failed', message: 'Secret CLI command failed. Process cleanup could not be confirmed.' })
+    await expect(result).rejects.not.toHaveProperty('cause')
+  })
+
+  it('preserves the timeout code when termination throws', async () => {
+    vi.useFakeTimers()
+    try {
+      const test = harness()
+      vi.mocked(test.handle.waitForExit).mockImplementationOnce(async () => {
+        await vi.advanceTimersByTimeAsync(15_000)
+        return true
+      })
+      vi.mocked(test.handle.terminate).mockImplementationOnce(() => {
+        throw new Error('synthetic-private-termination-detail')
+      })
+      await expect(runSecretCli(test.runtime, { args: ['print', '--json'], cwd: null, captureStdout: true }, {})).rejects.toMatchObject({
+        code: 'cli-timeout',
+        message: 'Secret CLI command timed out. Process cleanup could not be confirmed.',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('classifies a timed-out executable lookup as a timeout, not a missing CLI', async () => {
+    vi.useFakeTimers()
+    try {
+      const test = harness()
+      vi.mocked(test.runtime.resolveExecutable).mockImplementationOnce(async () => {
+        await vi.advanceTimersByTimeAsync(15_000)
+        throw new Error('synthetic-private-lookup-detail')
+      })
+      await expect(runSecretCli(test.runtime, { args: ['print', '--json'], cwd: null, captureStdout: true }, {})).rejects.toMatchObject({
+        code: 'cli-timeout',
+        message: 'Secret CLI command timed out.',
+      })
+      expect(test.runtime.spawn).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps failure spans typed and free of provider diagnostics when cleanup throws', async () => {
+    using recorder = recordSpans()
+    const test = harness({ exitCode: 2 })
+    vi.mocked(test.handle.terminate).mockImplementationOnce(() => {
+      throw new Error('synthetic-private-termination-detail')
+    })
+    await expect(
+      runSecretCli(test.runtime, { args: ['set', 'SYNTHETIC_TOKEN', '--env', 'dev'], cwd: null, captureStdout: false, stdin: 'synthetic-secret-value' }, {}),
+    ).rejects.toBeInstanceOf(SecretCliError)
+    const span = recorder.span('secret set')
+    expect(span.kind).toBe('client')
+    expect(span.status).toEqual({ code: 'error', message: 'SecretCliError:cli-failed' })
+    expect(span.attributes['error.type']).toBe('SecretCliError:cli-failed')
+    expect(JSON.stringify({ attributes: span.attributes, status: span.status })).not.toMatch(/SYNTHETIC_TOKEN|synthetic-|dev"/)
   })
 
   it('records a secret <verb> span with flag names only, never the alias or the value', async () => {
