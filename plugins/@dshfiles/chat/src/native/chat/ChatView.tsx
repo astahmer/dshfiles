@@ -11,6 +11,7 @@ import {
   Button, classifyLinkPath, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
+import { endInteractionAfterPaint } from '@dshfiles/dshx/tracing/client'
 import { isAtOrOutside } from '../contract/group-tree.ts'
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
@@ -130,6 +131,13 @@ export function ChatView({
   const followingTail = useRef(true)
   const fillSteps = useRef(TranscriptWindow.openingFillSteps)
   useEffect(() => { fillSteps.current = TranscriptWindow.openingFillSteps }, [sessionId])
+  // A sidebar or tab click opened the thread switch; it ends once this thread's transcript painted.
+  const transcriptOpen = openState === 'open'
+  const entryCount = useRef(0)
+  entryCount.current = entries.length
+  useEffect(() => {
+    if (transcriptOpen) endInteractionAfterPaint('thread switch', { 'dshx.chat.entries': entryCount.current })
+  }, [sessionId, transcriptOpen])
   const transcript = useTranscriptWindow({
     ready: openState === 'open',
     following: useCallback(() => followingTail.current, []),

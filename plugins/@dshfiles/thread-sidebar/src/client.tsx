@@ -20,6 +20,7 @@ import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-ch
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { startInteraction } from '@dshfiles/dshx/tracing/client'
 import { createInventoryPoll } from './inventory-poll.js'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
@@ -1924,6 +1925,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   const selectThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
+    if (sessionId !== selectedSessionId) startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'sidebar' } })
     const opened = attention.records.get(sessionId)
     if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)

@@ -33,6 +33,7 @@ import type {
   DraftAttachmentId, DraftAttachmentSerializationResult, SessionInputResolver, SubmitAttachment, SubmitOutcome,
 } from './contract/input.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
+import { startInteraction } from '@dshfiles/dshx/tracing/client'
 
 const encodeBase64 = (bytes: Uint8Array): string => {
   let binary = ''
@@ -239,6 +240,29 @@ export class ConversationController extends Service implements IConversation {
    * @returns the Host admission outcome; local attachment preparation failures reject.
    */
   async sendSession(
+    session: SessionFace,
+    text: string,
+    attachmentIds: readonly DraftAttachmentId[],
+    mode: InputSubmitMode,
+    signal?: AbortSignal,
+  ): Promise<SubmitOutcome> {
+    const interaction = startInteraction('composer send', {
+      attributes: { 'dshx.composer.mode': mode, 'dshx.composer.attachments': attachmentIds.length },
+    })
+    try {
+      const outcome = await this.admitSession(session, text, attachmentIds, mode, signal)
+      interaction.setAttribute('dshx.composer.outcome', outcome.kind)
+      return outcome
+    } catch (error) {
+      interaction.recordFailure(error)
+      throw error
+    } finally {
+      interaction.end()
+    }
+  }
+
+  /** The submission itself; `sendSession` measures it from submit to Host admission. */
+  private async admitSession(
     session: SessionFace,
     text: string,
     attachmentIds: readonly DraftAttachmentId[],

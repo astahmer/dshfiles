@@ -763,6 +763,78 @@
           "source": "agent-tool"
         }
       ]
+    },
+    {
+      "id": "browser-interaction-traces",
+      "title": "Browser interaction traces",
+      "summary": "Slow GUI interactions (thread switch, New thread, panel open, composer send) arrive as dshfiles-web root spans, forwarded by the Host instead of posted from the page, with the dshx API calls they made as client children and the Host dispatch spans those calls caused nested under them: one trace from click to Host work.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Second thread for a switch\"",
+        "press Enter",
+        "expect text \"Second thread for a switch*\"",
+        "click text \"Seeded thread to rebase\" at 12,8",
+        "click button \"Traces\"",
+        "expect heading \"Traces\"",
+        "fill textbox \"Search traces\" \"thread switch\"",
+        "click row \"dshfiles-web thread switch\"",
+        "expect tree \"Span waterfall\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["forwarding", "off-without-target", "old-host"],
+      "failureModes": [
+        "With no OTLP target (no environment endpoint, no in-process receiver) the Host answers enabled: false and the page records nothing.",
+        "A Host without the browser-traces route (not restarted since the client updated) reads as off; the page stays silent.",
+        "A batch over 128 spans, an attribute key that is not lowercase dotted, a string over 256 characters or an unknown engine class is refused whole; inverted, over-long or clock-skewed spans are dropped.",
+        "All pages together forward at most 1,200 spans a minute; the excess is dropped and counted.",
+        "The forwarding route is never traced and the page calls it without a traceparent, so exporting cannot trace itself."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "traces.browser-interaction-scratch",
+          "reason": "The trace needs a jj thread workspace (seed rebase-ready-thread) plus a second thread and the composer, thread-sidebar, chat, workspace-nav, session-controller, jj-integration and jujutsu bundles together; it is walked with dshx dev open traces/browser-interaction-traces, which ends on the waterfall of a dshfiles-web thread switch with its dshx client calls and their Host spans nested. The span shapes, propagation, bounds and no-feedback rule are unit-tested in tooling/dshx."
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.browser-span-host-child",
+          "file": "tooling/dshx/packages/dshx/tests/browser-traces-ingest.spec.ts",
+          "testName": "joins a browser API call and the Host dispatch span it causes in one trace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.browser-forwarding",
+          "file": "tooling/dshx/packages/dshx/tests/browser-traces-ingest.spec.ts",
+          "testName": "forwards to the in-process receiver as dshfiles-web with the engine resource, parent and events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.browser-forwarding-bounds",
+          "file": "tooling/dshx/packages/dshx/tests/browser-traces-ingest.spec.ts",
+          "testName": "refuses unbounded input and drops implausible spans"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.browser-forwarding-untraced",
+          "file": "tooling/dshx/packages/dshx/tests/browser-traces-ingest.spec.ts",
+          "testName": "never traces its own dispatch, so forwarding cannot feed back into itself"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.browser-ambient-interaction",
+          "file": "tooling/dshx/packages/dshx/tests/browser-tracing.spec.ts",
+          "testName": "keeps an open interaction the ambient parent across awaits, so API calls carry its child traceparent"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The feature is browser spans themselves (thread switch, new thread, panel open, composer send), asserted with recordBrowserSpans in tooling/dshx/packages/dshx/tests/browser-tracing.spec.ts; the Host forwarding route is deliberately untraced so exporting cannot feed back into itself."
+        }
+      ]
     }
   ]
 }

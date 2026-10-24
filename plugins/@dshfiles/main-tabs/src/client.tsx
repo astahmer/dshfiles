@@ -7,6 +7,7 @@ import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deeps
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, runHostCommand, useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
@@ -102,16 +103,22 @@ export default defineClient({
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
 
+    let shownSessionId: string | undefined
     const navigate = (target: HostTarget): boolean => {
       if (target.kind === 'panel') {
         if (!isMainPanelId(target.panelId)) return false
         // The Host shows one panel per key, so the scope is announced to the panel before it is selected.
         PanelTabs.announce(target)
+        const opening = startInteraction('panel open', { attributes: { 'dshx.main_tabs.panel': redactIdentifier(target.panelId) } })
         ctx.layout.selectPanel(target.panelId)
+        opening.endAfterPaint()
         return true
       }
       const sessionId = ctx.sessions.list.getSnapshot().ids.find(id => id === target.sessionId)
       if (sessionId === undefined) return false
+      // A sidebar click already opened the interaction and reaches here through the open-thread request.
+      if (shownSessionId !== sessionId && openInteraction('thread switch') === undefined)
+        startInteraction('thread switch', { attributes: { 'dshx.thread.source': 'main-tabs' } })
       ctx.uiWorkspace.openSession(sessionId)
       return true
     }
@@ -188,6 +195,7 @@ export default defineClient({
         const activeSet = snapshot.context.sets[snapshot.context.scopeKey]
         const activeTab = activeSet?.tabs.find(tab => tab.id === activeSet.activeTabId)
         const target = PanelTabs.visibleTarget(view.target, activeTab?.target ?? null)
+        shownSessionId = view.target?.kind === 'thread' ? view.target.sessionId : undefined
         const key = `${target === null ? '' : tabIdOf(target)}|${view.projectId ?? ''}`
         if (key !== reported) {
           reported = key

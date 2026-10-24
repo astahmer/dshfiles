@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { DraftInitializationOptions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { RowToast } from './contract/slots.ts'
 import { newThreadRequest } from '../new-thread-request.ts'
+import { startInteraction } from '@dshfiles/dshx/tracing/client'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import type { WorkspaceViewStoreActions } from './stores.ts'
 
@@ -369,6 +370,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       this.clearMain()
       return
     }
+    const interaction = startInteraction('new thread', { attributes: { 'dshx.workspace_nav.draft': draftOptions !== undefined } })
     const opening = draftOptions === undefined
       ? this.openOptimistic(target, undefined, undefined)
       : this.openWorkspace(target, initializeDraft ? (id) => {
@@ -376,8 +378,13 @@ class UiWorkspaceService extends Service implements UiWorkspace {
         if (binding === undefined) this.draftPreparationFailed()
         this.prepareDraft(binding, draftOptions)
       } : undefined, agentPreset === undefined ? {} : { agentPreset })
-    void opening.catch(
-      (reason: unknown) => { console.warn('new session failed:', reason) },
+    void opening.then(
+      () => { interaction.endAfterPaint() },
+      (reason: unknown) => {
+        interaction.recordFailure(reason)
+        interaction.end()
+        console.warn('new session failed:', reason)
+      },
     )
   }
 

@@ -14,6 +14,8 @@
 
 ![Boards and saved views](docs/screenshots/boards-and-saved-views.png)
 
+![A browser thread switch with its dshx calls and the Host spans they caused in one trace](docs/screenshots/browser-interaction-traces.png)
+
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
 list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, metric
@@ -44,6 +46,11 @@ When nothing arrives, the panel and `traces_status` carry a `diagnosis` (`waitin
 `no-exporter`, `port-in-use`, `external-mode`, `failed`) and `exporters` (where this process's spans and metrics go
 now). A restart from the DSH UI reuses the supervisor's environment, so a launcher environment change needs `dsh-web`
 restarted from a terminal.
+
+Browser interactions (`thread switch`, `new thread`, `panel open`, `composer send`) arrive as service `dshfiles-web`
+through the Host, not from the page: dshx forwards them to this receiver like its own spans, with the dshx calls each
+interaction made as client spans and the Host spans those calls caused nested under them (catalog feature
+`browser-interaction-traces`; [observability](../../../docs/observability.md#browser-interactions-dshfiles-web)).
 
 ## Per-thread Traces tab
 
