@@ -153,30 +153,9 @@ const attributesOf = (attributes: readonly OtlpKeyValue[] | undefined, options: 
   return result
 }
 
-const KIND_NAMES = new Map([
-  ['SPAN_KIND_UNSPECIFIED', 0],
-  ['SPAN_KIND_INTERNAL', 1],
-  ['SPAN_KIND_SERVER', 2],
-  ['SPAN_KIND_CLIENT', 3],
-  ['SPAN_KIND_PRODUCER', 4],
-  ['SPAN_KIND_CONSUMER', 5],
-])
+const kindOf = (kind: number | undefined): number => (kind !== undefined && kind >= 0 && kind <= 5 ? kind : 0)
 
-const kindOf = (kind: number | string | undefined): number => {
-  const numeric = typeof kind === 'string' ? (KIND_NAMES.get(kind) ?? 0) : (kind ?? 0)
-  return numeric >= 0 && numeric <= 5 ? numeric : 0
-}
-
-const STATUS_NAMES = new Map<string, 0 | 1 | 2>([
-  ['STATUS_CODE_UNSET', 0],
-  ['STATUS_CODE_OK', 1],
-  ['STATUS_CODE_ERROR', 2],
-])
-
-const statusOf = (code: number | string | undefined): 0 | 1 | 2 => {
-  if (typeof code === 'string') return STATUS_NAMES.get(code) ?? 0
-  return code === 1 || code === 2 ? code : 0
-}
+const statusOf = (code: number | undefined): 0 | 1 | 2 => (code === 1 || code === 2 ? code : 0)
 
 const stringAttribute = (attributes: Readonly<Record<string, AttributeValue>>, key: string): string | null => {
   const value = attributes[key]
@@ -269,20 +248,7 @@ export type NormalizedLog = {
 
 export type NormalizeLogsResult = { readonly logs: readonly NormalizedLog[]; readonly rejected: number }
 
-const SEVERITY_NAMES = new Map([
-  ['SEVERITY_NUMBER_UNSPECIFIED', 0],
-  ['SEVERITY_NUMBER_TRACE', 1],
-  ['SEVERITY_NUMBER_DEBUG', 5],
-  ['SEVERITY_NUMBER_INFO', 9],
-  ['SEVERITY_NUMBER_WARN', 13],
-  ['SEVERITY_NUMBER_ERROR', 17],
-  ['SEVERITY_NUMBER_FATAL', 21],
-])
-
-const severityOf = (severity: number | string | undefined): number => {
-  const numeric = typeof severity === 'string' ? (SEVERITY_NAMES.get(severity) ?? 0) : (severity ?? 0)
-  return numeric >= 0 && numeric <= 24 ? numeric : 0
-}
+const severityOf = (severity: number | undefined): number => (severity !== undefined && severity >= 0 && severity <= 24 ? severity : 0)
 
 const bodyText = (body: OtlpAnyValue | undefined): string => {
   if (body === undefined) return ''
@@ -389,11 +355,14 @@ const metricData = (metric: OtlpMetric) => {
   return null
 }
 
+interface PointValue {
+  readonly value: number | null
+  readonly count: number | null
+  readonly sum: number | null
+}
+
 /** A number point's value; for a distribution, its mean (sum / count) so every metric charts as one line. */
-const pointValue = (
-  type: MetricType,
-  point: OtlpMetricPoint,
-): { readonly value: number | null; readonly count: number | null; readonly sum: number | null } => {
+const pointValue = (type: MetricType, point: OtlpMetricPoint): PointValue => {
   if (type === 'gauge' || type === 'sum') return { value: finiteOf(point.asDouble) ?? finiteOf(point.asInt), count: null, sum: null }
   const count = finiteOf(point.count)
   const sum = finiteOf(point.sum)

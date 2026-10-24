@@ -71,14 +71,12 @@ export const TracesPanel = (props: {
   }
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const filters: Omit<ListInput, 'cursor'> = {
-    ...(search.length === 0 ? {} : { search }),
-    ...(view.service === null ? {} : { service: view.service }),
-    ...(view.operation === null ? {} : { operation: view.operation }),
-    ...(view.status === 'all' ? {} : { status: view.status }),
-    ...(view.minDurationMs === null ? {} : { minDurationMs: view.minDurationMs }),
-    limit: 50,
-  }
+  const filters: Omit<ListInput, 'cursor'> = { limit: 50 }
+  if (search.length > 0) filters.search = search
+  if (view.service !== null) filters.service = view.service
+  if (view.operation !== null) filters.operation = view.operation
+  if (view.status !== 'all') filters.status = view.status
+  if (view.minDurationMs !== null) filters.minDurationMs = view.minDurationMs
   const statusQuery = useQuery(tracesQueries.status(client))
   const statsQuery = useQuery({ ...tracesQueries.stats(client, view.windowMinutes), placeholderData: keepPreviousData })
   const listQuery = useInfiniteQuery({ ...tracesQueries.list(client, filters), placeholderData: keepPreviousData, enabled: traceId === null })

@@ -135,14 +135,14 @@ export const LogsView = (props: {
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   const attribute = parseAttributeFilter(useDebouncedValue({ value: view.attribute, delayMs: 250 }))
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const filters: Omit<LogsInput, 'cursor'> = {
-    ...(search.length === 0 ? {} : { search }),
-    ...(view.service === null ? {} : { service: view.service }),
-    ...(view.minSeverity === 0 ? {} : { minSeverity: view.minSeverity }),
-    ...(attribute === null ? {} : { attribute }),
-    ...(props.correlation === null ? {} : { traceId: props.correlation.traceId }),
-    ...(props.correlation?.spanId === null || props.correlation === null ? {} : { spanId: props.correlation.spanId }),
-    limit: 100,
+  const filters: Omit<LogsInput, 'cursor'> = { limit: 100 }
+  if (search.length > 0) filters.search = search
+  if (view.service !== null) filters.service = view.service
+  if (view.minSeverity !== 0) filters.minSeverity = view.minSeverity
+  if (attribute !== null) filters.attribute = attribute
+  if (props.correlation !== null) {
+    filters.traceId = props.correlation.traceId
+    if (props.correlation.spanId !== null) filters.spanId = props.correlation.spanId
   }
   const logsQuery = useInfiniteQuery({ ...tracesQueries.logs(props.client, filters), placeholderData: keepPreviousData })
   const logs = logsQuery.data?.pages.flatMap(page => page.logs) ?? []

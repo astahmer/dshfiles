@@ -52,20 +52,48 @@ const otlpEventSchema = z
   })
   .loose()
 
+const SPAN_KIND_NUMBERS = new Map([
+  ['SPAN_KIND_UNSPECIFIED', 0],
+  ['SPAN_KIND_INTERNAL', 1],
+  ['SPAN_KIND_SERVER', 2],
+  ['SPAN_KIND_CLIENT', 3],
+  ['SPAN_KIND_PRODUCER', 4],
+  ['SPAN_KIND_CONSUMER', 5],
+])
+
+const STATUS_CODE_NUMBERS = new Map([
+  ['STATUS_CODE_UNSET', 0],
+  ['STATUS_CODE_OK', 1],
+  ['STATUS_CODE_ERROR', 2],
+])
+
+const SEVERITY_NUMBERS = new Map([
+  ['SEVERITY_NUMBER_UNSPECIFIED', 0],
+  ['SEVERITY_NUMBER_TRACE', 1],
+  ['SEVERITY_NUMBER_DEBUG', 5],
+  ['SEVERITY_NUMBER_INFO', 9],
+  ['SEVERITY_NUMBER_WARN', 13],
+  ['SEVERITY_NUMBER_ERROR', 17],
+  ['SEVERITY_NUMBER_FATAL', 21],
+])
+
+/** OTLP/JSON may spell an enum by its name; decoding settles it to the number the protobuf wire carries. */
+const enumNumberSchema = (numbers: ReadonlyMap<string, number>) => z.union([z.number().int(), z.string().transform(name => numbers.get(name) ?? 0)])
+
 const otlpSpanSchema = z
   .object({
     traceId: z.string(),
     spanId: z.string(),
     parentSpanId: z.string().optional(),
     name: z.string().optional(),
-    kind: z.union([z.number().int(), z.string()]).optional(),
+    kind: enumNumberSchema(SPAN_KIND_NUMBERS).optional(),
     startTimeUnixNano: unixNanoSchema.optional(),
     endTimeUnixNano: unixNanoSchema.optional(),
     attributes: attributesSchema,
     events: z.array(otlpEventSchema).optional(),
     links: z.array(z.unknown()).optional(),
     status: z
-      .object({ code: z.union([z.number().int(), z.string()]).optional(), message: z.string().optional() })
+      .object({ code: enumNumberSchema(STATUS_CODE_NUMBERS).optional(), message: z.string().optional() })
       .loose()
       .optional(),
   })
@@ -101,7 +129,7 @@ const otlpLogRecordSchema = z
   .object({
     timeUnixNano: unixNanoSchema.optional(),
     observedTimeUnixNano: unixNanoSchema.optional(),
-    severityNumber: z.union([z.number().int(), z.string()]).optional(),
+    severityNumber: enumNumberSchema(SEVERITY_NUMBERS).optional(),
     severityText: z.string().optional(),
     body: anyValueAt(0).optional(),
     attributes: attributesSchema,

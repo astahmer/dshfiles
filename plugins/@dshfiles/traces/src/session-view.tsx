@@ -77,11 +77,10 @@ export const SessionTracesView = (props: { readonly sessionId: string; readonly 
   })
   const traceQuery = useQuery({ ...tracesQueries.trace(client, traceId ?? ''), enabled: traceId !== null })
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
-  const logFilters: Omit<LogsInput, 'cursor'> = {
-    sessionId: props.sessionId,
-    ...(correlation === null ? {} : { traceId: correlation.traceId }),
-    ...(correlation?.spanId === null || correlation === null ? {} : { spanId: correlation.spanId }),
-    limit: 50,
+  const logFilters: Omit<LogsInput, 'cursor'> = { sessionId: props.sessionId, limit: 50 }
+  if (correlation !== null) {
+    logFilters.traceId = correlation.traceId
+    if (correlation.spanId !== null) logFilters.spanId = correlation.spanId
   }
   const logsQuery = useInfiniteQuery({ ...tracesQueries.logs(client, logFilters), placeholderData: keepPreviousData, enabled: section === 'logs' })
 

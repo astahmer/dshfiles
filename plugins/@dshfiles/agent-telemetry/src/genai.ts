@@ -74,7 +74,7 @@ const addUsage = (total: UsageTotals, usage: TokenUsage): void => {
  * DSH reports uncached input, cache reads and cache writes as disjoint buckets; the GenAI conventions define the cache
  * counts as subsets of `gen_ai.usage.input_tokens`, so the three are summed back (LoongSuite's `applyUsage`).
  */
-const usageAttributes = (usage: TokenUsage): Attributes => {
+const usageAttributes = (usage: TokenUsage) => {
   const inputTokens = usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
   return {
     'gen_ai.usage.input_tokens': inputTokens,
@@ -83,10 +83,10 @@ const usageAttributes = (usage: TokenUsage): Attributes => {
     'gen_ai.usage.cache_creation.input_tokens': usage.cacheWriteTokens,
     'gen_ai.usage.total_tokens': inputTokens + usage.outputTokens > 0 ? inputTokens + usage.outputTokens : undefined,
     'gen_ai.usage.reasoning_tokens': usage.reasoningTokens,
-  }
+  } satisfies Attributes
 }
 
-const totalsAttributes = (totals: UsageTotals): Attributes => {
+const totalsAttributes = (totals: UsageTotals) => {
   const inputTokens = totals.inputTokens + totals.cacheReadTokens + totals.cacheWriteTokens
   return {
     'gen_ai.usage.input_tokens': inputTokens,
@@ -94,7 +94,7 @@ const totalsAttributes = (totals: UsageTotals): Attributes => {
     'gen_ai.usage.cache_read.input_tokens': totals.cacheReadTokens,
     'gen_ai.usage.cache_creation.input_tokens': totals.cacheWriteTokens,
     'gen_ai.usage.total_tokens': inputTokens + totals.outputTokens,
-  }
+  } satisfies Attributes
 }
 
 /** A chunk the user would see: the first one stamps time-to-first-token. */
@@ -112,38 +112,53 @@ const serializeCaptured = (value: unknown): string => {
 }
 
 const blockSchema = z.looseObject({ type: z.string() })
-type LooseBlock = z.infer<typeof blockSchema>
+export type LooseBlock = z.infer<typeof blockSchema>
+const contentBlocksSchema = z.array(blockSchema).catch([])
 
-const textOf = (value: unknown): string => (typeof value === 'string' ? value : '')
+const jsonSchema = z.json()
+type JsonValue = z.infer<typeof jsonSchema>
+
+const textField = z.string().catch('')
+const textBlockSchema = z.looseObject({ text: textField })
+const toolCallBlockSchema = z.looseObject({ id: textField, name: textField, arguments: textField })
+const toolResultBlockSchema = z.looseObject({ toolCallId: textField, content: contentBlocksSchema })
+const imageBlockSchema = z.looseObject({ attachment: z.looseObject({}).catch({}) })
+
+/** One message part in the GenAI vocabulary; a block type this mapping does not know passes through as DSH wrote it. */
+type GenAiPart =
+  | { readonly type: 'text' | 'reasoning'; readonly content: string }
+  | { readonly type: 'tool_call'; readonly id: string | null; readonly name: string; readonly arguments: JsonValue }
+  | { readonly type: 'tool_call_response'; readonly id: string | null; readonly response: readonly GenAiPart[] }
+  | ({ readonly type: 'image' } & z.infer<typeof imageBlockSchema>['attachment'])
+  | LooseBlock
 
 /** One DSH content block in the GenAI message-parts vocabulary (LoongSuite `mapContentBlock`). */
-const mapContentBlock = (block: LooseBlock): Record<string, unknown> => {
+const mapContentBlock = (block: LooseBlock): GenAiPart => {
   switch (block.type) {
     case 'text':
-      return { type: 'text', content: textOf(block.text) }
+      return { type: 'text', content: textBlockSchema.parse(block).text }
     case 'reasoning':
-      return { type: 'reasoning', content: textOf(block.text) }
-    case 'tool-call':
-      return { type: 'tool_call', id: textOf(block.id) || null, name: textOf(block.name), arguments: parseToolArguments(textOf(block.arguments)) }
-    case 'tool-result':
-      return { type: 'tool_call_response', id: textOf(block.toolCallId) || null, response: mapContent(block.content) }
+      return { type: 'reasoning', content: textBlockSchema.parse(block).text }
+    case 'tool-call': {
+      const call = toolCallBlockSchema.parse(block)
+      return { type: 'tool_call', id: call.id || null, name: call.name, arguments: parseToolArguments(call.arguments) }
+    }
+    case 'tool-result': {
+      const result = toolResultBlockSchema.parse(block)
+      return { type: 'tool_call_response', id: result.toolCallId || null, response: mapContent(result.content) }
+    }
     case 'image':
-      return { type: 'image', ...z.looseObject({}).catch({}).parse(block.attachment) }
+      return { type: 'image', ...imageBlockSchema.parse(block).attachment }
     default:
       return { ...block }
   }
 }
 
-const mapContent = (blocks: unknown): Record<string, unknown>[] =>
-  z
-    .array(blockSchema)
-    .catch([])
-    .parse(blocks)
-    .map(block => mapContentBlock(block))
+const mapContent = (blocks: readonly LooseBlock[]): GenAiPart[] => blocks.map(block => mapContentBlock(block))
 
-const parseToolArguments = (value: string): unknown => {
+const parseToolArguments = (value: string): JsonValue => {
   try {
-    return JSON.parse(value)
+    return jsonSchema.parse(JSON.parse(value))
   } catch {
     return value
   }
@@ -151,14 +166,14 @@ const parseToolArguments = (value: string): unknown => {
 
 export const messageSchema = z.looseObject({
   role: z.string(),
-  content: z.array(blockSchema).catch([]),
+  content: contentBlocksSchema,
   source: z.looseObject({ kind: z.string(), callId: z.string().optional() }).catch({ kind: 'unknown' }),
 })
 export type CapturedMessage = z.infer<typeof messageSchema>
 
 export interface GenAiMessage {
   readonly role: string
-  readonly parts: Record<string, unknown>[]
+  readonly parts: readonly GenAiPart[]
   readonly finishReason?: string
 }
 
@@ -187,17 +202,19 @@ const capturedLlmAttributes = (input: {
   readonly tools: readonly ToolSchema[] | undefined
   readonly inputMessages: readonly GenAiMessage[]
   readonly outputMessages: readonly GenAiMessage[]
-}): Attributes => ({
-  [CONTENT_ATTRIBUTES.inputMessages]: serializeCaptured(input.inputMessages),
-  [CONTENT_ATTRIBUTES.outputMessages]: serializeCaptured(withFinishReason(input.outputMessages)),
-  [CONTENT_ATTRIBUTES.systemInstructions]: serializeCaptured(systemInstruction(input.system)),
-  [CONTENT_ATTRIBUTES.toolDefinitions]: serializeCaptured(toolDefinitions(input.tools)),
-})
+}) =>
+  ({
+    [CONTENT_ATTRIBUTES.inputMessages]: serializeCaptured(input.inputMessages),
+    [CONTENT_ATTRIBUTES.outputMessages]: serializeCaptured(withFinishReason(input.outputMessages)),
+    [CONTENT_ATTRIBUTES.systemInstructions]: serializeCaptured(systemInstruction(input.system)),
+    [CONTENT_ATTRIBUTES.toolDefinitions]: serializeCaptured(toolDefinitions(input.tools)),
+  }) satisfies Attributes
 
-const capturedConversationAttributes = (input: { readonly inputs: readonly GenAiMessage[]; readonly outputs: readonly GenAiMessage[] }): Attributes => ({
-  [CONTENT_ATTRIBUTES.inputMessages]: serializeCaptured(input.inputs),
-  [CONTENT_ATTRIBUTES.outputMessages]: serializeCaptured(withFinishReason(input.outputs.slice(-1))),
-})
+const capturedConversationAttributes = (input: { readonly inputs: readonly GenAiMessage[]; readonly outputs: readonly GenAiMessage[] }) =>
+  ({
+    [CONTENT_ATTRIBUTES.inputMessages]: serializeCaptured(input.inputs),
+    [CONTENT_ATTRIBUTES.outputMessages]: serializeCaptured(withFinishReason(input.outputs.slice(-1))),
+  }) satisfies Attributes
 
 const CONTENT_MODES = new Set(['SPAN_ONLY', 'SPAN_AND_EVENT'])
 
@@ -213,6 +230,8 @@ export class GenAi {
   static readonly totalsAttributes = totalsAttributes
   static readonly isVisibleToken = isVisibleToken
   static readonly serializeCaptured = serializeCaptured
+  static readonly contentBlocks = contentBlocksSchema
+  static readonly contentBlock = blockSchema
   static readonly mapContent = mapContent
   static readonly parseToolArguments = parseToolArguments
   static readonly inputMessage = inputMessage

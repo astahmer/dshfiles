@@ -11,6 +11,7 @@ import {
   type Attributes,
   type CapturedMessage,
   type GenAiMessage,
+  type LooseBlock,
   type UsageTotals,
   messageSchema,
 } from './genai.js'
@@ -70,6 +71,11 @@ export interface CoordinatorOptions {
 /** How a turn's root span found its parent; recorded as `dsh.trace.parent_link` so the choice is visible in a trace. */
 type ParentLink = 'root' | 'async-context' | 'created-in-tool' | 'running-tool' | 'parent-turn'
 
+interface TurnParent {
+  readonly parent: SpanContext | null
+  readonly link: ParentLink
+}
+
 interface ToolState {
   readonly span: Span
   readonly name: string
@@ -81,7 +87,7 @@ interface LlmState {
   readonly span: Span
   readonly options: ObservedLlmRequest
   readonly inputMessages: readonly GenAiMessage[]
-  readonly blocks: unknown[]
+  readonly blocks: LooseBlock[]
   readonly startedAt: number
   readonly step: StepState | undefined
   usage: TokenUsage | undefined
@@ -239,7 +245,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
    * started it (the parent's `subagent` tool body runs with its `execute_tool` span active), else the one captured when
    * its session was created, else the parent's running delegation tool, else the parent's turn.
    */
-  const turnParent = (state: SessionState): { readonly parent: SpanContext | null; readonly link: ParentLink } => {
+  const turnParent = (state: SessionState): TurnParent => {
     if (state.session.header.origin !== 'subagent') return { parent: null, link: 'root' }
     const active = activeSpanContext()
     if (active !== undefined) return { parent: active, link: 'async-context' }
@@ -337,7 +343,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     if (options.captureContent()) {
       tool.span.setAttribute(
         'gen_ai.tool.call.result',
-        GenAi.serializeCaptured(GenAi.mapContent(resultBlock === undefined ? data.message.content : resultBlock.content)),
+        GenAi.serializeCaptured(GenAi.mapContent(resultBlock === undefined ? data.message.content : GenAi.contentBlocks.parse(resultBlock.content))),
       )
     }
     const isError = data.error !== undefined || resultBlock?.isError === true
@@ -750,8 +756,10 @@ export const createCoordinator = (options: CoordinatorOptions) => {
         'langfuse.observation.completion_start_time': new Date().toISOString(),
       })
     }
-    if (chunk.type === 'block-end') llm.blocks.push(chunk.block)
-    else if (chunk.type === 'usage') llm.usage = chunk.usage
+    if (chunk.type === 'block-end') {
+      const block = GenAi.contentBlock.safeParse(chunk.block)
+      if (block.success) llm.blocks.push(block.data)
+    } else if (chunk.type === 'usage') llm.usage = chunk.usage
     else if (chunk.type === 'finish') finishLlm(llm, chunk)
   }
 
