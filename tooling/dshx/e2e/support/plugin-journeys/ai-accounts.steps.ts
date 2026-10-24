@@ -73,7 +73,7 @@ Then('account search preserves priority and the existing settings and usage cont
     await page.getByRole('tab', { name: 'Usage', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Record now', exact: true })).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'History range', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Usage history', exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Selected account', exact: true }).getByRole('button', { name: 'Usage history', exact: true })).toBeVisible()
   })
 })
 
