@@ -10,6 +10,12 @@ Cursor sessions run outside DSH.
 
 ## Quick setup
 
+![Shared account setup chooser](docs/screenshots/quick-account-setup.png)
+
+![Codex setup before any sign-in starts](docs/screenshots/codex-connect.png)
+
+_Synthetic unsigned profiles; provider approval was not started._
+
 Use **Add account** on the accounts page or the trailing sidebar **+**. Both open
 the same setup without leaving the active chat. Choose a provider to allocate a
 disabled, retry-safe profile. Connect it to enable it, or **Finish later** to
@@ -17,8 +23,9 @@ keep it disabled. **Connect account** / **Reauthenticate** on the existing page
 reopens setup for a saved profile; save pending edits first.
 
 - **Codex:** **Continue with Codex** runs the installed official OpenAI CLI with
-  device authentication in fresh private staging. Only a successful, verified
-  token pair is atomically adopted. Existing credentials require explicit
+  device authentication in fresh private staging. Only successful CLI completion
+  with a locally validated token-pair shape is adopted; presence is not provider
+  validation. Existing credentials require explicit
   replacement consent; cancel, expiry and stale setup callbacks preserve them.
   DSH never installs the CLI automatically.
 - **GitHub Copilot:** **Sign in with GitHub** shows device approval in the Web GUI.
@@ -29,7 +36,7 @@ reopens setup for a saved profile; save pending edits first.
   storage confirms credential presence, not provider validation.
 
 New Codex and Claude profiles use private homes under the active account store;
-they never inherit the Host user's global login. Managed Codex route slugs are
+no global CLI login files are copied into those homes. Managed Codex route slugs are
 read-only: rename the display name instead. Legacy manual overlays retain their
 containment checks. Claude subscription login remains owned by unmodified Claude
 Code; this setup does not implement Claude.ai OAuth. Cursor stays quota-only.
@@ -43,6 +50,23 @@ a user-managed restart; older Hosts show an unavailable/retry error.
 Unit tests use fake subprocesses and private temporary credential fixtures. Real
 OpenAI/GitHub approval and installed CLI compatibility require separate human
 verification; automated UI journeys never start real sign-in.
+
+Recorded on 2026-10-24 in an upstream-plus-store-prerequisite workspace: 530
+package tests, typecheck, plugin/styles builds, Host/public-contract imports and
+catalog checks pass. Independent review found a delayed Copilot cancellation
+cache race; its two regressions failed before the exact-key invalidation fix
+and pass afterward. No new user capability was added for that correction.
+
+Actual Chromium passed the sidebar-add journey and nine additional safe-flow
+assertions: shared entrypoints, disabled owned homes, preserved composer/URL,
+reconnect without duplicate profiles, and offered sign-in without starting it.
+Scratch doctor and capture diagnostics pass with zero errors or warnings. All
+owned processes were stopped. Browser captures precede the cache-only fix;
+that final callback behavior is proven by the delayed-response regression.
+The shared verifier prerequisites were used only in separate test worktrees.
+No real provider approval, token validity, billing/tier behavior or cross-OS
+child-process/ACL behavior is claimed. Synchronous compare-and-rename prevents
+in-process cancellation interleaving, not malicious same-UID cross-process races.
 
 ## Providers
 
