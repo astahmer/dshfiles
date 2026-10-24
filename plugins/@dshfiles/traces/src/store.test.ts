@@ -411,6 +411,23 @@ describe('session summary', () => {
     expect(summary.modelLatency).toMatchObject({ count: 2, p50Ms: 1_000, maxMs: 2_000 })
   })
 
+  test("counts a subagent's turn in its parent's trace for both threads", () => {
+    const store = openStore()
+    // The child Session id sorts after the parent's, so a single per-trace session used to hide the trace from the parent.
+    store.ingest(
+      [
+        makeSpan({ traceId: traceId(20), spanId: spanId(20), name: 'invoke_agent deepseek-harness', sessionId: 'session-a-parent' }),
+        makeSpan({ traceId: traceId(20), spanId: spanId(21), parentSpanId: spanId(20), name: 'execute_tool subagent', sessionId: 'session-a-parent' }),
+        makeSpan({ traceId: traceId(20), spanId: spanId(22), parentSpanId: spanId(21), name: 'invoke_agent deepseek-harness', sessionId: 'session-z-child' }),
+      ],
+      retention,
+    )
+    expect(store.list({ sessionId: 'session-a-parent' }).traces.map(trace => trace.traceId)).toEqual([traceId(20)])
+    expect(store.list({ sessionId: 'session-z-child' }).traces.map(trace => trace.traceId)).toEqual([traceId(20)])
+    expect(store.sessionSummary('session-a-parent')).toMatchObject({ traces: 1, spans: 3 })
+    expect(store.sessionSummary('session-z-child')).toMatchObject({ traces: 1, spans: 3 })
+  })
+
   test('is empty for an unknown session and reports no tokens without usage attributes', () => {
     const store = openStore()
     seedTurn(store)

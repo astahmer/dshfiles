@@ -103,6 +103,10 @@ const MIGRATIONS = [
   CREATE INDEX metric_points_series ON metric_points (service, name, time_us);
   CREATE INDEX metric_points_received ON metric_points (received_ms);
   `,
+  // A subagent's turns join their parent's trace, so a thread's traces are those where any span carries its Session.
+  `
+  CREATE INDEX spans_session ON spans (session_id, trace_id);
+  `,
 ]
 
 export type Retention = { readonly maxAgeHours: number; readonly maxSpans: number; readonly maxLogs: number; readonly maxMetricPoints: number }
@@ -446,7 +450,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       parameters.push(query.spanId.toLowerCase())
     }
     if (query.sessionId !== undefined) {
-      conditions.push(`(l.trace_id IN (SELECT trace_id FROM traces WHERE session_id = ?) OR json_extract(l.attributes, '$."dsh.session.id"') = ?)`)
+      conditions.push(`(l.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ?) OR json_extract(l.attributes, '$."dsh.session.id"') = ?)`)
       parameters.push(query.sessionId, query.sessionId)
     }
     if (query.fromMs !== undefined) {
@@ -699,7 +703,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       parameters.push(Math.round(query.toMs * 1000))
     }
     if (query.sessionId !== undefined) {
-      conditions.push('t.session_id = ?')
+      conditions.push('t.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ?)')
       parameters.push(query.sessionId)
     }
     if (query.search !== undefined) {
@@ -904,7 +908,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
              ${attribute('gen_ai.usage.output_tokens')} AS output_tokens,
              COALESCE(${attribute('gen_ai.usage.cache_read.input_tokens')}, ${attribute('gen_ai.usage.cache_read_input_tokens')}) AS cache_read_tokens,
              ${attribute('gen_ai.usage.reasoning_tokens')} AS reasoning_tokens
-           FROM spans s JOIN traces t ON t.trace_id = s.trace_id WHERE t.session_id = ?`,
+           FROM spans s WHERE s.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ?)`,
         ).all(sessionId),
       )
     const operationOf = (row: (typeof rows)[number]): 'turn' | 'model' | 'tool' | 'other' => {
