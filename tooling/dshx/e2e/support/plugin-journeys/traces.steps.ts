@@ -178,6 +178,32 @@ Then('selecting a span shows its attributes and resource attributes', async ({ p
   await finishJourneyAssertions(page)
 })
 
+Then('the span detail panel stays visible while scrolling the trace view', async ({ page }: { page: Page }) => {
+  const main = page.locator('main.dshx-root')
+  const detail = page.getByRole('complementary', { name: 'Span detail' })
+  await page.getByRole('tree', { name: 'Span waterfall' }).evaluate(element => {
+    element.style.minHeight = '1200px'
+  })
+  await main.evaluate(element => element.scrollTo({ top: element.scrollHeight, behavior: 'instant' }))
+  await expect.poll(() => main.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+  await recordAssertion(page, 'traces-span-detail-stays-visible-while-scrolling', async () => {
+    await expect
+      .poll(async () => {
+        const mainTop = await main.evaluate(element => element.getBoundingClientRect().top)
+        const detailTop = await detail.evaluate(element => element.getBoundingClientRect().top)
+        return detailTop - mainTop
+      })
+      .toBeGreaterThanOrEqual(0)
+    await expect
+      .poll(async () => {
+        const mainTop = await main.evaluate(element => element.getBoundingClientRect().top)
+        const detailTop = await detail.evaluate(element => element.getBoundingClientRect().top)
+        return detailTop - mainTop
+      })
+      .toBeLessThan(48)
+  })
+})
+
 Then('the Operations tab lists each operation with its count and error rate', async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Operations', exact: true }).click()
   const table = page.getByRole('table', { name: 'Operations' })

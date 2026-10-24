@@ -59,7 +59,7 @@ const SpanDetailPanel = (props: {
   const costUsd = TraceFormat.spanCostUsd(span.attributes)
   return (
     <aside
-      className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-md dshx:border dshx:border-border dshx:p-3"
+      className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-md dshx:border dshx:border-border dshx:p-3 dshx:@min-[42rem]:sticky dshx:@min-[42rem]:top-4 dshx:@min-[42rem]:self-start dshx:@min-[42rem]:max-h-[calc(100dvh-8rem)] dshx:@min-[42rem]:overflow-y-auto"
       aria-label={props.t('spanDetail')}
     >
       <header className="dshx:flex dshx:flex-col dshx:gap-1">

@@ -13,6 +13,7 @@ Feature: Traces
     Then the trace list shows the exported trace with its error count
     And opening the trace renders the nested span waterfall with the failing span in red
     And selecting a span shows its attributes and resource attributes
+    And the span detail panel stays visible while scrolling the trace view
 
   @scenario:traces.insights-browser-journey
   Scenario: Operations and error groups summarize the stored spans
