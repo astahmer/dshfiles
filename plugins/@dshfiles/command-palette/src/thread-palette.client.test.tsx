@@ -343,6 +343,7 @@ describe('Threads tab project scope', () => {
         mac
         copy={copy}
         searchContent={searchContent}
+        onBacklogCapture={vi.fn(() => true)}
         onAsk={vi.fn(async () => {})}
         onOpenThread={vi.fn()}
         onClose={vi.fn()}
@@ -367,6 +368,7 @@ describe('Threads tab project scope', () => {
         mac
         copy={copy}
         searchContent={null}
+        onBacklogCapture={vi.fn(() => true)}
         onAsk={vi.fn(async () => {})}
         onOpenThread={vi.fn()}
         onClose={vi.fn()}
