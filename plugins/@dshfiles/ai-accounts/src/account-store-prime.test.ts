@@ -104,5 +104,36 @@ describe('account store priming', () => {
 
     expect(moved.accounts.map(account => account.instanceId)).toEqual(['codex-second', 'claude-work', 'codex-test'])
     expect(moved.accounts.filter(account => account.kind === 'codex').map(account => account.instanceId)).toEqual(['codex-second', 'codex-test'])
+    expect(store.accountStoreService.readAccountFileSync().accounts).toEqual(moved.accounts)
+  })
+
+  it('serializes overlapping move, save, distribution and remove without lost updates', async () => {
+    const first = { ...accountDraft, kind: 'github-copilot' as const }
+    const second = { ...first, instanceId: 'second' }
+    const removed = { ...first, instanceId: 'removed' }
+    const store = await loadStoreWith([first, second, removed])
+    await Promise.all([
+      store.accountStoreService.moveAccount('second', 'earlier'),
+      store.accountStoreService.upsertAccount({ ...first, displayName: 'Edited concurrently' }),
+      store.accountStoreService.setDistribution('priority'),
+      store.accountStoreService.removeAccount('removed'),
+    ])
+    const file = await store.accountStoreService.readAccountFile()
+    expect(file.accounts.map(account => account.instanceId)).toEqual(['second', 'codex-test'])
+    expect(file.accounts[1]?.displayName).toBe('Edited concurrently')
+    expect(file.distribution).toBe('priority')
+  })
+
+  it('accepts the next mutation after a rejected account rename', async () => {
+    const first = { ...accountDraft, kind: 'github-copilot' as const }
+    const second = { ...first, instanceId: 'second' }
+    const store = await loadStoreWith([first, second])
+    const outcomes = await Promise.allSettled([
+      store.accountStoreService.upsertAccount(second, first.instanceId),
+      store.accountStoreService.setDistribution('priority'),
+    ])
+    expect(outcomes.map(outcome => outcome.status)).toEqual(['rejected', 'fulfilled'])
+    expect((await store.accountStoreService.readAccountFile()).accounts.map(account => account.instanceId)).toEqual(['codex-test', 'second'])
+    expect(store.accountStoreService.readAccountFileSync().distribution).toBe('priority')
   })
 })
