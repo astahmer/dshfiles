@@ -3,6 +3,7 @@
 import type { StreamChunk, TokenUsage, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { activeSpanContext, redactIdentifier, startSpan, tracingEnabled, withActiveSpan, type Span, type SpanContext } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
+import { CostAttributes, type PriceCall } from './cost.js'
 import {
   AGENT_SYSTEM,
   GenAi,
@@ -66,6 +67,8 @@ export interface CoordinatorOptions {
   /** Read at every span that may carry content, so the setting and the environment apply live. */
   readonly captureContent: () => boolean
   readonly warn: (message: string) => void
+  /** List price of one model call; absent or undefined leaves the span without `dshx.cost.usd`. */
+  readonly priceCall?: PriceCall | undefined
 }
 
 /** How a turn's root span found its parent; recorded as `dsh.trace.parent_link` so the choice is visible in a trace. */
@@ -114,6 +117,7 @@ interface TurnState {
   readonly inputs: GenAiMessage[]
   readonly outputs: GenAiMessage[]
   readonly usage: UsageTotals
+  costUsd: number | undefined
   splicedMessages: number
 }
 
@@ -279,7 +283,18 @@ export const createCoordinator = (options: CoordinatorOptions) => {
         'gen_ai.conversation.id': state.session.id,
       },
     })
-    state.turn = { turn, entry, agent, step: undefined, contextMessages: [], inputs: [], outputs: [], usage: GenAi.emptyTotals(), splicedMessages: 0 }
+    state.turn = {
+      turn,
+      entry,
+      agent,
+      step: undefined,
+      contextMessages: [],
+      inputs: [],
+      outputs: [],
+      usage: GenAi.emptyTotals(),
+      costUsd: undefined,
+      splicedMessages: 0,
+    }
   }
 
   const startStep = (state: SessionState, turn: number, step: number): void => {
@@ -378,6 +393,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     if (turn.step !== undefined) closeStep(state, turn, 'interrupted')
     turn.agent.setAttributes({
       ...GenAi.totalsAttributes(turn.usage),
+      [CostAttributes.usd]: turn.costUsd,
       'gen_ai.response.finish_reasons': [GenAi.finishReason(reason.kind)],
       'dsh.turn.end_reason': reason.kind,
       'dsh.inbox.spliced_messages': turn.splicedMessages > 0 ? turn.splicedMessages : undefined,
@@ -709,9 +725,20 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     return llm
   }
 
+  const priceOf = (llm: LlmState): number | undefined => {
+    const usage = llm.usage
+    const priceCall = options.priceCall
+    if (usage === undefined || priceCall === undefined) return undefined
+    const price = contained('pricing a model call', undefined, () => priceCall({ provider: llm.options.provider, model: llm.options.model, usage }))
+    if (price === undefined) return undefined
+    llm.span.setAttributes({ [CostAttributes.usd]: price.usd, [CostAttributes.priceId]: price.priceId ?? undefined })
+    return price.usd
+  }
+
   const settleLlm = (llm: LlmState, reason: string): void => {
     llm.span.setAttribute('gen_ai.response.finish_reasons', [reason])
     if (llm.usage !== undefined) llm.span.setAttributes(GenAi.usageAttributes(llm.usage))
+    const costUsd = priceOf(llm)
     if (llm.step !== undefined && options.captureContent()) {
       llm.span.setAttributes(
         GenAi.capturedLlmAttributes({
@@ -726,6 +753,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     const turn = step === undefined || llm.options.sessionId === undefined ? undefined : sessions.get(llm.options.sessionId)?.turn
     if (step === undefined || turn?.step !== step || !step.llms.has(llm)) return
     if (llm.usage !== undefined) GenAi.addUsage(turn.usage, llm.usage)
+    if (costUsd !== undefined) turn.costUsd = (turn.costUsd ?? 0) + costUsd
     step.lastFinishReason = reason
   }
 

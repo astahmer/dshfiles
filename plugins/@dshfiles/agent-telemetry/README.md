@@ -40,6 +40,22 @@ join their parent's trace under the delegation tool span. `dsh.trace.parent_link
 `async-context` (DSH started the turn inside the parent's tool body), `created-in-tool`, `running-tool`,
 `parent-turn`, or `root`.
 
+## List-price cost on model spans
+
+Each `chat <model>` span with token usage carries `dshx.cost.usd` (and `dshx.cost.price_id`, the models.dev
+`provider/model` the price came from); `invoke_agent` carries the sum of its turn's calls. Prices come from AI
+Accounts' models.dev cache (`$DSH_HOME/plugins/ai-accounts/pricing.json`) and its account kinds, resolved by the same
+`@dshfiles/ai-accounts/pricing-catalog` and `cost-estimate` code the usage ledger and memory digests use, so a span's
+cost matches the Usage panel's request row. Subscription routes are priced at list price, like the Usage panel. A
+route with no price leaves the attribute off rather than writing 0. The catalog and kinds reload every 5 minutes in
+the background (every 30 s while no catalog exists yet, as on a fresh home before AI Accounts first fetched it); pricing never waits on disk or another plugin, and a pricing failure is logged and leaves the span
+unpriced.
+
+Why at span end, here, rather than at query time in the traces viewer: the cost then reaches every OTLP destination
+(a collector, Langfuse, Tempo), not only the in-DSH viewer; the viewer only sums one attribute; and the price is the
+one in force when the call ran. The trade-off is that spans recorded before this change, or by a sender without it,
+show no cost.
+
 ## What any plugin gets for free
 
 No per-plugin code: the `tools/execute` hook runs every agent tool body (dshx-bound or `defineTool`, any owner) with

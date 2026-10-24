@@ -36,6 +36,7 @@
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
+    "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
     "typescript": "catalog:",
