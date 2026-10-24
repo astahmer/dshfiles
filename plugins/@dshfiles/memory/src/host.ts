@@ -404,7 +404,7 @@ const usage = async (days: number): Promise<MemoryUsage> => {
         block: { threads: 0, meanBytes: 0, maxBytes: 0, requests: 0 },
         citations: { total: 0, agentCorrected: 0, userCorrected: 0, up: 0, down: 0 },
       },
-      noteCounts: { active: 0, superseded: 0, forgotten: 0 },
+      noteCounts: { active: 0, superseded: 0, forgotten: 0, archived: 0 },
       daily: [],
       events: [],
       topNotes: [],
@@ -454,7 +454,8 @@ const panelNote = (note: NoteRecord): PanelNote => ({
   createdAt: note.firstCreatedAt,
   updatedAt: note.createdAt,
   citations: note.uses,
-  status: note.valid ? 'valid' : note.forgottenAt !== null ? 'forgotten' : 'superseded',
+  status: note.archivedAt !== null ? 'archived' : note.valid ? 'valid' : note.forgottenAt !== null ? 'forgotten' : 'superseded',
+  archivedAt: note.archivedAt,
   supersedes: note.supersedes,
   supersededBy: note.supersededBy,
   reason: note.reason,
@@ -586,6 +587,30 @@ const panelApi = memoryApi.host({
       .map(panelNote)
     return [...notes]
   },
+  panelNotes: async ({ input }) => {
+    await projectNormalization
+    const filter = notesFilter.parse(input)
+    return requireStore()
+      .listNotes({
+        project: filter.project,
+        scope: filter.scope,
+        category: filter.type,
+        query: filter.query,
+        thread: filter.thread,
+        includeInvalid: filter.includeInvalid,
+        includeArchived: true,
+        limit: 500,
+      })
+      .map(panelNote)
+  },
+  reviewNotes: ({ input, caller }) =>
+    withMemory(active =>
+      active.reviewNotes(callerOf(caller), {
+        project: anyWhenEmpty(4_096).parse(input.project),
+        afterId: input.afterId,
+        limit: input.limit,
+      }),
+    ),
   noteCounts: async ({ input }) => {
     await projectNormalization
     return requireStore().noteStatusCounts(anyWhenEmpty(4_096).parse(input.project))
@@ -619,7 +644,13 @@ const panelApi = memoryApi.host({
     if (!record) throw new Error('The new note could not be read back.')
     return panelNote(record)
   },
-  noteHistory: ({ input }) => [...requireStore().noteHistory(noteId.parse(input.id)).map(panelNote)],
+  noteHistory: ({ input }) => [
+    ...requireStore()
+      .noteHistory(noteId.parse(input.id))
+      .filter(note => note.archivedAt === null)
+      .map(panelNote),
+  ],
+  panelNoteHistory: ({ input }) => [...requireStore().noteHistory(noteId.parse(input.id)).map(panelNote)],
   editNote: ({ input }) => {
     const parsed = z
       .object({ id: noteId, text: z.string().trim().min(1).max(2_000), type: noteType.optional(), scope: z.string().trim().min(1).max(256).optional(), reason })
@@ -645,6 +676,8 @@ const panelApi = memoryApi.host({
     const parsed = z.object({ id: noteId, reason }).parse(input)
     return { forgotten: requireStore().forgetNote({ id: parsed.id, reason: parsed.reason || 'removed in the Memory panel' }) }
   },
+  archiveNote: ({ input }) => ({ archived: requireStore().archiveNote(noteId.parse(input.id)) }),
+  restoreNote: ({ input }) => ({ restored: requireStore().restoreNote(noteId.parse(input.id)) }),
   citations: ({ input }) => [
     ...requireStore().recentCitations({
       limit: 100,

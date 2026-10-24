@@ -215,6 +215,76 @@ describe('memory runtime', () => {
     expect(JSON.stringify(jevUsage[0])).not.toContain(text)
   })
 
+  it('reviews saved notes with Jev in bounded pages and never archives automatically', async () => {
+    const { runtime, store, jevUsage, caller } = setup({ enabled: true, crossProject: false, jevEnabled: true, jevThreshold: 0.5 }, undefined, {
+      key: 'synthetic-memory-key',
+      fetch: async () =>
+        new Response(JSON.stringify({ model: 'jev-latest', answers: { verdict: { type: 'noul', noul: 0.2 } }, usage: { input_tokens: 8, output_tokens: 1 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    })
+    const first = store.addNote({
+      project: root,
+      text: 'Temporary staging environment is on port 9001.',
+      category: 'project',
+      scope: 'repo',
+      confidence: 'stated',
+      sourceThread: null,
+      sourceSeq: null,
+      origin: 'agent',
+    }).note
+    store.addNote({
+      project: root,
+      text: 'Repository uses pnpm for package management.',
+      category: 'project',
+      scope: 'repo',
+      confidence: 'stated',
+      sourceThread: null,
+      sourceSeq: null,
+      origin: 'agent',
+    })
+
+    await expect(runtime.reviewNotes(caller('session-agent-review'), { project: '/private/another-project', limit: 1 })).rejects.toThrow(
+      'Cross-project memory is disabled for this Agent.',
+    )
+    expect(jevUsage).toHaveLength(0)
+    const firstPage = await runtime.reviewNotes(caller('session-agent-review'), { project: root, limit: 1 })
+    expect(firstPage.results).toHaveLength(1)
+    expect(firstPage.results[0]).toMatchObject({ probability: 0.2, candidate: true })
+    expect(firstPage.nextAfterId).not.toBeNull()
+    const secondPage = await runtime.reviewNotes(caller('session-agent-review'), { project: root, afterId: firstPage.nextAfterId ?? undefined, limit: 1 })
+    expect(secondPage.results).toHaveLength(1)
+    expect(secondPage.nextAfterId).toBeNull()
+    expect(store.note(first.id)).toBeDefined()
+    expect(jevUsage).toHaveLength(2)
+    expect(jevUsage.every(record => record.outcome === 'success')).toBe(true)
+  })
+
+  it('keeps failed note reviews unknown and requires Jev to be enabled', async () => {
+    const { runtime, caller, store, jevUsage } = setup({ enabled: true, jevEnabled: true }, undefined, {
+      key: 'synthetic-memory-key',
+      fetch: async () => new Response('synthetic private error body', { status: 503 }),
+    })
+    const note = store.addNote({
+      project: root,
+      text: 'The temporary rollout ends Friday.',
+      category: 'project',
+      scope: 'repo',
+      confidence: 'stated',
+      sourceThread: null,
+      sourceSeq: null,
+      origin: 'agent',
+    }).note
+    const result = await runtime.reviewNotes(caller('session-review'), { project: root, limit: 1 })
+    expect(result.results[0]).toMatchObject({ id: note.id, probability: null, candidate: false })
+    expect(store.note(note.id)).toBeDefined()
+    expect(jevUsage[0]).toMatchObject({ outcome: 'failure', inputTokens: null, outputTokens: null })
+
+    const disabled = setup({ enabled: true, jevEnabled: false })
+    await expect(disabled.runtime.reviewNotes(disabled.caller('session-review'), { project: root, limit: 1 })).rejects.toThrow('Enable Jev')
+  })
+
   it('records failed Jev attempts with unknown token usage', async () => {
     const { runtime, caller, jevUsage } = setup({ enabled: true, jevEnabled: true }, undefined, {
       key: 'synthetic-memory-key',

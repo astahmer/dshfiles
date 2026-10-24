@@ -177,6 +177,25 @@ describe('memory store', () => {
     ])
   })
 
+  it('archives and restores notes without deleting their stored rows or retrieval indexes', () => {
+    const store = open()
+    const noteRecord = store.addNote(note('/p/x', 'The rollout window remains 72 hours.')).note
+
+    expect(store.archiveNote(noteRecord.id)).toBe(true)
+    expect(store.note(noteRecord.id)).toBeUndefined()
+    expect(store.listNotes({ project: '/p/x', includeInvalid: true, limit: 10 })).toEqual([])
+    expect(store.listNotes({ project: '/p/x', includeInvalid: true, includeArchived: true, limit: 10 })).toMatchObject([
+      { id: noteRecord.id, archivedAt: start },
+    ])
+    expect(store.search({ query: 'rollout window', projects: [], limit: 5 }).filter(hit => hit.kind === 'note')).toEqual([])
+    const duplicate = store.addNote(note('/p/x', 'The rollout window remains 72 hours.')).note
+    expect(store.restoreNote(noteRecord.id)).toBe(false)
+    expect(store.archiveNote(duplicate.id)).toBe(true)
+
+    expect(store.restoreNote(noteRecord.id)).toBe(true)
+    expect(store.search({ query: 'rollout window', projects: [], limit: 5 }).some(hit => hit.kind === 'note' && hit.id === noteRecord.id)).toBe(true)
+  })
+
   it('counts notes by lifecycle state and ranks the most-cited valid notes', () => {
     const store = open()
     const cited = store.addNote(note('/p/x', 'Nightly runs start after the cache warms.')).note
@@ -193,8 +212,8 @@ describe('memory store', () => {
     store.forgetNote({ id: forgotten.id, reason: 'obsolete' })
     store.recordUse({ kind: 'note', id: cited.id }, 'session-reader')
     store.recordUse({ kind: 'note', id: cited.id }, 'session-writer')
-    expect(store.noteStatusCounts()).toEqual({ active: 2, superseded: 1, forgotten: 1 })
-    expect(store.noteStatusCounts('/p/x')).toEqual({ active: 2, superseded: 1, forgotten: 1 })
+    expect(store.noteStatusCounts()).toEqual({ active: 2, superseded: 1, forgotten: 1, archived: 0 })
+    expect(store.noteStatusCounts('/p/x')).toEqual({ active: 2, superseded: 1, forgotten: 1, archived: 0 })
     expect(store.topNotes(5).map(entry => [entry.id, entry.uses])).toEqual([[cited.id, 2]])
   })
 
@@ -361,6 +380,30 @@ describe('memory store statement reuse', () => {
     } finally {
       prepare.mockRestore()
     }
+  })
+
+  it('migrates legacy notes to a distinct archive column before building the active-note index', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'memory-archive-migration-'))
+    const path = join(directory, 'memory.db')
+    const legacy = new DatabaseSync(path)
+    legacy.exec(
+      "create table notes (id integer primary key, project text not null, scope text not null, category text not null, confidence text not null, text text not null, hash text not null, source_thread text, source_seq integer, origin text not null default 'agent', first_created_at integer not null default 0, created_at integer not null, valid integer not null default 1, supersedes integer, superseded_by integer, forgotten_at integer, reason text, uses integer not null default 0, last_used_at integer); create unique index notes_valid_hash on notes (project, hash) where valid = 1",
+    )
+    legacy.close()
+
+    const store = openMemoryStore({ path })
+    const database = new DatabaseSync(path)
+    expect(
+      database
+        .prepare("select name from pragma_table_info('notes')")
+        .all()
+        .map(row => row['name']),
+    ).toContain('archived_at')
+    expect(database.prepare("select name from sqlite_master where type = 'index' and name = 'notes_active_hash'").get()).toBeDefined()
+    expect(database.prepare("select name from sqlite_master where type = 'index' and name = 'notes_valid_hash'").get()).toBeUndefined()
+    database.close()
+    store.close()
+    rmSync(directory, { recursive: true, force: true })
   })
 
   it('adds the excerpt column to a database indexed before excerpts were kept', () => {

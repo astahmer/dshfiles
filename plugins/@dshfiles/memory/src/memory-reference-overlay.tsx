@@ -159,7 +159,7 @@ const NotePreview = (props: {
   const history = useQuery({
     queryKey: ['dshfiles-memory', 'preview-history', props.note.id],
     enabled: tab === 'history',
-    queryFn: ({ signal }) => api.noteHistory({ id: props.note.id }, { signal }),
+    queryFn: ({ signal }) => api.panelNoteHistory({ id: props.note.id }, { signal }),
   })
   const relatedNotes = PanelFormat.relatedNotes(props.note, related.data ?? [])
   const versions = history.data ?? []

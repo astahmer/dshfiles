@@ -42,14 +42,14 @@
         {
           "key": "jevEnabled",
           "defaultValue": "false",
-          "constraints": "Boolean; needs TYPESAFE_API_KEY in the Host environment, any failure falls back to the heuristics.",
+          "constraints": "Boolean; needs Jev credential. Used for digest signals, recall gating, and on-demand saved-note review; review failures stay unknown and do not archive.",
           "choices": ["true", "false"],
           "coveredBy": ["memory.digest-signals"]
         },
         {
           "key": "jevThreshold",
           "defaultValue": "0.5",
-          "constraints": "Number from 0 to 1.",
+          "constraints": "Number from 0 to 1; notes below this relevance threshold are candidates only and require an explicit archive action.",
           "coveredBy": ["memory.digest-signals"]
         },
         {
@@ -320,13 +320,23 @@
     },
     {
       "id": "memory-panel",
-      "title": "Browse and correct memory in the Memory panel",
-      "summary": "A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, superseded history, related memories), a thread digest list with digest/memories/citations/timeline detail, and an analytics dashboard with per-day activity, cost, recall, correctness and recent events.",
+      "title": "Browse and clean up memory in the Memory panel",
+      "summary": "A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, reversible archive, restore, superseded history, related memories), on-demand Jev relevance suggestions with explicit per-note archive actions, a thread digest list with digest/memories/citations/timeline detail, and an analytics dashboard with per-day activity, cost, recall, correctness and recent events.",
       "surfaces": ["client", "api"],
       "configuration": [],
-      "states": ["empty", "notes", "editing", "forgetting", "history", "threads", "usage"],
-      "failureModes": ["An edit of a note superseded meanwhile reports that it is no longer valid."],
-      "externalDependencies": [],
+      "states": ["empty", "notes", "editing", "forgetting", "reviewing", "suggested", "archived", "restored", "history", "threads", "usage"],
+      "failureModes": [
+        "An edit of a note superseded meanwhile reports that it is no longer valid.",
+        "Jev must be enabled and configured for relevance review; failures are unknown and never archive automatically.",
+        "Archived notes remain visible in the panel but are excluded from memory retrieval and agent tools."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jev",
+          "boundary": "Optional TypeSafe Jev classifier over HTTPS when the user requests note relevance review.",
+          "deterministicFake": "Runtime tests inject a fixed Jev response; the review is disabled by default."
+        }
+      ],
       "verification": [
         {
           "kind": "gherkin",
@@ -337,12 +347,29 @@
           "kind": "gherkin",
           "id": "memory.panel-first-note",
           "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "memory.panel-archive",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.review-notes-jev",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "reviews saved notes with Jev in bounded pages and never archives automatically"
         }
       ],
       "telemetry": [
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jev classify",
+          "file": "plugins/@dshfiles/memory/src/jev.test.ts",
+          "testName": "classifies saved-note durability with the relevance question"
         }
       ],
       "reach": ["click button \"Memory\"", "expect tab \"Notes\""]

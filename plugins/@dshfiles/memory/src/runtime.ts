@@ -149,7 +149,7 @@ export const createMemoryRuntime = (options: {
   }
 
   const askJev = async (request: {
-    readonly question: 'signal' | 'recall'
+    readonly question: 'signal' | 'recall' | 'relevance'
     readonly text: string
     readonly apiKey: string
     readonly credential: JevUsageRecord['credential']
@@ -377,6 +377,40 @@ export const createMemoryRuntime = (options: {
         logger.warn('memory: recording a citation failed: %s', error instanceof Error ? error.message : String(error))
       }
     }
+  }
+
+  const reviewNotes = async (
+    caller: Caller,
+    input: { readonly project?: string | undefined; readonly afterId?: number | undefined; readonly limit: number },
+  ) => {
+    if (!options.settings().jevEnabled)
+      throw new PluginApiError('Enable Jev in Memory settings before requesting a relevance review.', { code: 'jev-disabled' })
+    const clientCaller = isClientCaller(caller)
+    const ownProject = await projectOf(caller.session.header)
+    const requestedProject = input.project?.trim()
+    if (!clientCaller && !options.settings().crossProject && requestedProject !== undefined && requestedProject !== ownProject) {
+      throw new PluginApiError('Cross-project memory is disabled for this Agent.', { code: 'cross-project-disabled' })
+    }
+    const project = clientCaller || options.settings().crossProject ? requestedProject : ownProject
+    const credential = await services.jevCredential()
+    if (credential === undefined) throw new PluginApiError('Configure a Jev credential before requesting a relevance review.', { code: 'jev-unavailable' })
+    const notes = store.listNotes({ project, beforeId: input.afterId, limit: input.limit + 1 })
+    const page = notes.slice(0, input.limit)
+    const results = []
+    for (const note of page) {
+      try {
+        const verdict = await askJev({ question: 'relevance', text: `${note.category}: ${note.text}`, apiKey: credential.value, credential: credential.label })
+        const inputTokens = verdict.inputTokens ?? 0
+        store.bump('jev.calls')
+        store.bump('jev.inputTokens', inputTokens)
+        store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: inputTokens, cacheRead: 0, output: verdict.outputTokens ?? 0 })
+        results.push({ id: note.id, text: note.text, probability: verdict.probability, candidate: verdict.probability < options.settings().jevThreshold })
+      } catch {
+        store.bump('jev.failures')
+        results.push({ id: note.id, text: note.text, probability: null, candidate: false })
+      }
+    }
+    return { results, nextAfterId: notes.length > input.limit ? (page.at(-1)?.id ?? null) : null }
   }
 
   const recallGate = async (firstUserText: string | undefined): Promise<boolean> => {
@@ -884,6 +918,7 @@ export const createMemoryRuntime = (options: {
     search,
     findThreads,
     relatedThreads,
+    reviewNotes,
     read,
     preview,
     note,

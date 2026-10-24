@@ -195,6 +195,28 @@ Then('the note {string} is listed in the Notes tab', async ({ page }: { page: Pa
   })
 })
 
+When('the note {string} is archived from Memory', async ({ page }: { page: Page }, text: string) => {
+  await page.getByText(text, { exact: true }).first().click()
+  await page.getByRole('button', { name: 'Archive', exact: true }).click()
+})
+
+When('the archived note {string} is restored', async ({ page }: { page: Page }, text: string) => {
+  await page.getByRole('combobox', { name: 'Filter by status' }).click()
+  await page.getByRole('option', { name: 'Archived', exact: true }).click()
+  await page.getByText(text, { exact: true }).first().click()
+  await page.getByRole('button', { name: 'Restore to memory', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Filter by status' }).click()
+  await page.getByRole('option', { name: 'Active', exact: true }).click()
+})
+
+Then('the restored note {string} is listed in the Notes tab', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'memory-panel-restored-note', async () => {
+    await expect(page.locator('main.dshx-root:visible').getByText(text, { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Restore to memory', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('editing it to {string} keeps the old text in its history', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'memory-panel-edit-supersedes-note', async () => {
     await page.getByText('Deploys need the ops approval label.', { exact: true }).click()

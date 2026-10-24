@@ -94,7 +94,8 @@ export const panelNoteSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   citations: z.number().int(),
-  status: z.enum(['valid', 'superseded', 'forgotten']),
+  status: z.enum(['valid', 'superseded', 'forgotten', 'archived']),
+  archivedAt: z.number().nullable(),
   supersedes: z.number().int().nullable(),
   supersededBy: z.number().int().nullable(),
   reason: z.string().nullable(),
@@ -302,8 +303,23 @@ ${output.text}`,
       input: notesFilterSchema,
       output: z.array(panelNoteSchema),
       description:
-        'Browse stored notes by project, scope, type, text and source thread, optionally including superseded and forgotten ones. Read-only; every filter field is required, and an empty string means any.',
+        'Browse active notes by project, scope, type, text and source thread, optionally including superseded and forgotten ones. Archived memories are excluded. Read-only; every filter field is required, and an empty string means any.',
       tool: { name: 'memory_notes', readOnly: true, render: compactJson },
+    }),
+    panelNotes: method({
+      input: notesFilterSchema,
+      output: z.array(panelNoteSchema),
+      description: 'Browse notes in the Memory panel, including archived notes for debugging.',
+    }),
+    reviewNotes: method({
+      input: z.object({ project: z.string(), afterId: z.number().int().positive().optional(), limit: z.number().int().min(1).max(50).default(25) }).strict(),
+      output: z.object({
+        results: z.array(z.object({ id: z.number().int(), text: z.string(), probability: z.number().min(0).max(1).nullable(), candidate: z.boolean() })),
+        nextAfterId: z.number().int().positive().nullable(),
+      }),
+      description:
+        'Ask Jev whether each active saved note still looks durable. Sends each note text to TypeSafe; Jev is opt-in in Memory settings, failures remain unknown, and results are suggestions only. Call only when the user asked to review memories; this does not archive notes.',
+      tool: { name: 'memory_review_notes', readOnly: true, render: compactJson },
     }),
     noteCounts: method({
       input: z.object({ project: z.string() }).strict(),
@@ -327,8 +343,13 @@ ${output.text}`,
     noteHistory: method({
       input: z.object({ id: z.number().int() }).strict(),
       output: z.array(panelNoteSchema),
-      description: 'Every version of one note, oldest first, so a superseded or forgotten note can be traced. Read-only.',
+      description: 'Every active or superseded version of one note, oldest first. Archived notes are excluded. Read-only.',
       tool: { name: 'memory_note_history', readOnly: true, render: compactJson },
+    }),
+    panelNoteHistory: method({
+      input: z.object({ id: z.number().int() }).strict(),
+      output: z.array(panelNoteSchema),
+      description: 'Every version of one note, oldest first, including archived notes for debugging in the Memory panel.',
     }),
     editNote: method({
       input: z
@@ -350,6 +371,19 @@ ${output.text}`,
       output: z.object({ forgotten: z.boolean() }),
       description: 'Forget one note, keeping it in the history as forgotten, with the reason recorded. Call only when the user asked to forget that note.',
       tool: { name: 'memory_forget_note', render: compactJson },
+    }),
+    archiveNote: method({
+      input: z.object({ id: z.number().int().positive() }).strict(),
+      output: z.object({ archived: z.boolean() }),
+      description:
+        'Archive one note without deleting it. It remains visible in the Memory panel but is excluded from memory tools. Call only when the user asked to archive it.',
+      tool: { name: 'memory_archive_note', render: compactJson },
+    }),
+    restoreNote: method({
+      input: z.object({ id: z.number().int().positive() }).strict(),
+      output: z.object({ restored: z.boolean() }),
+      description: 'Restore one archived note to memory retrieval. Call only when the user asked to restore it.',
+      tool: { name: 'memory_restore_note', render: compactJson },
     }),
     threads: method({
       input: z

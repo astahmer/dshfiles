@@ -13,6 +13,16 @@ Feature: Thread memory panel
     And editing it to "Deploys need the ops-approval label and a green canary." keeps the old text in its history
     And forgetting it with a reason removes it from the list
 
+  @scenario:memory.panel-archive
+  Scenario: Archive and restore a saved note without deleting it
+    Given the isolated plugin profile "@dshfiles/memory" is booted
+    And memory holds the project note "The staging token expires after one hour."
+    When the Memory panel is opened
+    Then the note "The staging token expires after one hour." is listed in the Notes tab
+    When the note "The staging token expires after one hour." is archived from Memory
+    And the archived note "The staging token expires after one hour." is restored
+    Then the restored note "The staging token expires after one hour." is listed in the Notes tab
+
   @scenario:memory.panel-first-note
   Scenario: Write the first memory on a profile with a registered project
     Given the isolated plugin profile "@dshfiles/memory" is booted

@@ -6,6 +6,7 @@ describe('memory tool exposure', () => {
     const tools = Object.values(memoryApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name).sort()).toEqual([
       'find_threads',
+      'memory_archive_note',
       'memory_citations',
       'memory_edit_note',
       'memory_forget_note',
@@ -15,6 +16,8 @@ describe('memory tool exposure', () => {
       'memory_notes',
       'memory_projects',
       'memory_read',
+      'memory_restore_note',
+      'memory_review_notes',
       'memory_search',
       'memory_start_block',
       'memory_thread_detail',
@@ -33,6 +36,7 @@ describe('memory tool exposure', () => {
       'memory_notes',
       'memory_projects',
       'memory_read',
+      'memory_review_notes',
       'memory_search',
       'memory_start_block',
       'memory_thread_detail',
@@ -44,6 +48,9 @@ describe('memory tool exposure', () => {
   test('the note-correction writes ask for the user request and the rest stay untooled on purpose', () => {
     expect(memoryApi.methods.editNote.description).toMatch(/Call only when the user asked/u)
     expect(memoryApi.methods.forgetNote.description).toMatch(/Call only when the user asked/u)
+    expect(memoryApi.methods.archiveNote.description).toMatch(/Call only when the user asked/u)
+    expect(memoryApi.methods.restoreNote.description).toMatch(/Call only when the user asked/u)
+    expect(memoryApi.methods.reviewNotes.description).toMatch(/suggestions only/u)
     // usage needs the full MemoryUsage schema; preview duplicates memory_read and would count as an
     // agent memory-tool call; rateCitation would let an Agent rate its own citations; createNote and
     // redigest are the panel's own verbs (an Agent writes notes with memory_note and digests idle anyway).

@@ -29,11 +29,19 @@ const questions = {
       'Does answering the user message in `content` likely depend on earlier conversations, past work, a past decision or something said before (for example "last time", a ticket, an earlier incident)?',
     criteria: { true: 'Refers to or needs earlier work or context', false: 'Self-contained: the current request carries what it needs' },
   },
+  relevance: {
+    instructions:
+      'Is this stored memory likely still useful to preserve for future conversations, based only on its text? A high probability means keep it. A low probability means it may be outdated or transient and should be reviewed by a person before archiving.',
+    criteria: {
+      true: 'A durable preference, decision, constraint, reference or project fact likely to help future work',
+      false: 'A one-time outcome, temporary state, completed task detail or fact that appears time-bound from the text itself',
+    },
+  },
 } as const
 
 /**
- * TypeSafe's Jev (`POST /v1/systemone`, one Noul question), used optionally for two cheap decisions: whether a user
- * message is a durable signal, and whether a new thread likely needs memory. Callers treat any failure as "unknown".
+ * TypeSafe's Jev (`POST /v1/systemone`, one Noul question), used optionally for digest signals, recall gating and
+ * on-demand saved-note relevance suggestions. Callers treat any failure as "unknown".
  */
 export class JevClassifier {
   static readonly endpoint = 'https://api.typesafe.ai/v1/systemone'

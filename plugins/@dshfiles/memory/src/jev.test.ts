@@ -25,6 +25,18 @@ describe('JevClassifier', () => {
     expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic-key|synthetic user message/)
   })
 
+  it('classifies saved-note durability with the relevance question', async () => {
+    using recorder = recordSpans()
+    const verdict = await JevClassifier.ask({
+      question: 'relevance',
+      text: 'The project uses Node 22.',
+      apiKey: 'synthetic-key',
+      fetch: async () => answer(200),
+    })
+    expect(verdict.probability).toBe(0.7)
+    expect(recorder.span('jev classify').attributes['jev.question']).toBe('relevance')
+  })
+
   it('marks a refused classification as an error span', async () => {
     using recorder = recordSpans()
     await expect(JevClassifier.ask({ question: 'recall', text: 'x', apiKey: 'k', fetch: async () => answer(503) })).rejects.toThrow('jev answered HTTP 503')

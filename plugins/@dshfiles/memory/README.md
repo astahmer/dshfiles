@@ -2,7 +2,7 @@
 
 ![Preview cited memory inline](docs/screenshots/memory-reference-preview.png)
 
-![Browse and correct memory in the Memory panel](docs/screenshots/memory-panel.png)
+![Browse and clean up memory in the Memory panel](docs/screenshots/memory-panel.png)
 
 Read [docs/findings.md](docs/findings.md) first: why memory exists, its design, and how it compares with native DSH.
 For the plain-language version — what a digest is, when one is written, what the panel's **Digest** button does, and
@@ -49,7 +49,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
 - **Memory page** (sidebar → Memory): three tabs.
   **Notes** is a searchable, filterable list (type, status, source, sort; list or card view) beside a detail pane with
   the note text, its source thread and message, metadata, related memories, superseded history, inline edit and
-  forget, and a project selector plus **Add memory** dialog. Selection mode (Shift range, Cmd/Ctrl toggle, select-all
+  forget, and a project selector plus **Add memory** dialog. Archived notes remain visible under the Archived status
+  filter for debugging, but are excluded from memory tools and retrieval; they can be restored. **Review with Jev** checks
+  active notes in bounded pages and offers possible-outdated suggestions only; each archive remains a separate user action. Selection mode (Shift range, Cmd/Ctrl toggle, select-all
   over the visible valid notes) forgets every selected note after one count-named confirmation.
   **Threads** lists digested threads and Sessions memory has not digested yet, with digest source and citation
   counts; the detail pane has Digest / Memories / Citations / Timeline / Raw content views, a **Regenerate** action,
@@ -62,8 +64,7 @@ Message text is indexed with contentless FTS5 tables (the index only; the text s
 shapes, bearer tokens, `key=value` secrets and tokenized URLs are redacted before anything is indexed, digested,
 noted or returned, and an excerpt never shows tool output that names a credential file.
 
-Optional: TypeSafe's Jev (`jevEnabled`; key from `jevSecret`, a Secret Catalog reference, else `TYPESAFE_API_KEY`) flags user messages as durable signals at digest time and
-gates whether a new thread gets thread pointers at all. Any failure falls back to the heuristics.
+Optional: TypeSafe's Jev (`jevEnabled`; key from `jevSecret`, a Secret Catalog reference, else `TYPESAFE_API_KEY`) flags user messages as durable signals at digest time, gates whether a new thread gets thread pointers, and on demand classifies saved notes for relevance. A low Jev relevance score is only a suggestion: the note stays active until the user archives it. Any failure is shown as unknown and never changes storage.
 
 Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid-thread injection, thread handoff.
 

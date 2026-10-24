@@ -116,12 +116,14 @@ export const noteStatusLabels = {
   valid: 'Active',
   superseded: 'Superseded',
   forgotten: 'Forgotten',
+  archived: 'Archived',
 } satisfies Record<NoteStatus, string>
 
 export const noteStatusBadge = {
   valid: 'dshx:bg-success/10 dshx:text-success',
   superseded: 'dshx:bg-warning/10 dshx:text-warning',
   forgotten: 'dshx:bg-destructive/10 dshx:text-destructive',
+  archived: 'dshx:bg-muted dshx:text-muted-foreground',
 } satisfies Record<NoteStatus, string>
 
 export const originLabels = {

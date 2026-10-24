@@ -36,11 +36,12 @@ import {
   MoreHorizontalIcon,
   QuoteIcon,
   SearchIcon,
+  SparklesIcon,
   SquareCheckBigIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { memoryApi, type MemoryNoteType, type PanelNote } from './api.ts'
@@ -62,7 +63,7 @@ export type NoteSort = 'newest' | 'oldest' | 'cited'
 
 const noteTypeOf = (value: string): NoteTypeFilter => PanelFormat.noteToneList().find(tone => tone.value === value)?.value ?? ''
 const noteStatusOf = (value: string): NoteStatusFilter =>
-  value === 'superseded' || value === 'forgotten' || value === 'valid' || value === 'all' ? value : 'all'
+  value === 'superseded' || value === 'forgotten' || value === 'archived' || value === 'valid' || value === 'all' ? value : 'all'
 const noteOriginOf = (value: string): NoteOriginFilter => (value === 'user-requested' || value === 'agent' || value === 'panel' || value === '' ? value : '')
 const noteSortOf = (value: string): NoteSort => (value === 'oldest' || value === 'cited' || value === 'newest' ? value : 'newest')
 
@@ -288,12 +289,25 @@ const NoteDetail = (props: {
   readonly onSelectNote: (id: number) => void
 }): JSX.Element => {
   const api = useApi(memoryApi)
+  const queryClient = useQueryClient()
   const note = props.note
+  const archive = useMutation({
+    mutationFn: async () => {
+      if (note.status === 'archived') {
+        const restored = await api.restoreNote({ id: note.id })
+        if (!restored) throw new Error('An active note with identical text exists. Archive it first to restore this version.')
+        return
+      }
+      const archived = await api.archiveNote({ id: note.id })
+      if (!archived) throw new Error('This note is no longer active and cannot be archived.')
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['dshfiles-memory'] }),
+  })
   const tone = PanelFormat.noteToneOf(note.type)
   const { title, body } = PanelFormat.splitNoteText(note.text)
   const history = useQuery({
     queryKey: ['dshfiles-memory', 'history', note.id],
-    queryFn: ({ signal }) => api.noteHistory({ id: note.id }, { signal }),
+    queryFn: ({ signal }) => api.panelNoteHistory({ id: note.id }, { signal }),
   })
   const related = useQuery({
     queryKey: ['dshfiles-memory', 'related-notes', note.project],
@@ -439,6 +453,9 @@ const NoteDetail = (props: {
               <Button size="sm" variant="outline" onClick={() => send({ type: 'edit' })} disabled={mode !== 'view'}>
                 Edit
               </Button>
+              <Button size="sm" variant="outline" onClick={() => archive.mutate()} disabled={archive.isPending}>
+                {archive.isPending ? 'Archiving…' : 'Archive'}
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -449,7 +466,14 @@ const NoteDetail = (props: {
                 Forget
               </Button>
             </div>
+          ) : note.status === 'archived' ? (
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <Button size="sm" variant="outline" onClick={() => archive.mutate()} disabled={archive.isPending}>
+                {archive.isPending ? 'Restoring…' : 'Restore to memory'}
+              </Button>
+            </div>
           ) : null}
+          {archive.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archive.error, 'The archive action failed.')}</p> : null}
         </section>
 
         {mode === 'view' ? null : <NoteEditorForm note={note} editor={{ snapshot, send }} key={`${note.id}:${note.updatedAt}`} />}
@@ -514,6 +538,7 @@ export const NotesTab = (props: {
   const [forgetReason, setForgetReason] = useState('')
   const [forgetFailure, setForgetFailure] = useState<string | null>(null)
   const [forgetPending, setForgetPending] = useState(false)
+  const [archivedSuggestions, setArchivedSuggestions] = useState<ReadonlySet<number>>(() => new Set())
   const searchRef = useRef<HTMLInputElement | null>(null)
   const focusNoteId = props.focusNoteId
   const selectNote = props.onSelect
@@ -521,12 +546,25 @@ export const NotesTab = (props: {
   const includeInvalid = status !== 'valid'
   const notes = useQuery({
     queryKey: ['dshfiles-memory', 'notes', props.project ?? '', debounced, type, includeInvalid],
-    queryFn: ({ signal }) => api.notes({ project: props.project ?? '', scope: '', type, query: debounced, thread: '', includeInvalid }, { signal }),
+    queryFn: ({ signal }) => api.panelNotes({ project: props.project ?? '', scope: '', type, query: debounced, thread: '', includeInvalid }, { signal }),
   })
   const counts = useQuery({
     queryKey: ['dshfiles-memory', 'note-counts', props.project ?? ''],
     queryFn: ({ signal }) => api.noteCounts({ project: props.project ?? '' }, { signal }),
     staleTime: 10_000,
+  })
+  const review = useMutation({
+    mutationFn: (afterId: number | undefined) => api.reviewNotes({ project: props.project ?? '', afterId, limit: 25 }),
+  })
+  const archiveSuggestion = useMutation({
+    mutationFn: async (id: number) => {
+      const archived = await api.archiveNote({ id })
+      if (!archived) throw new Error('This note is no longer active and cannot be archived.')
+    },
+    onSuccess: (_, id) => {
+      setArchivedSuggestions(current => new Set(current).add(id))
+      void queryClient.invalidateQueries({ queryKey: ['dshfiles-memory'] })
+    },
   })
   useEffect(() => {
     if (focusNoteId !== undefined) {
@@ -571,7 +609,7 @@ export const NotesTab = (props: {
   const selectedMissing = props.selectedId !== null && !visibleNotes.some(note => note.id === props.selectedId)
   const selectedFallback = useQuery({
     queryKey: ['dshfiles-memory', 'history', 'selected', props.selectedId ?? 0],
-    queryFn: ({ signal }) => api.noteHistory({ id: props.selectedId ?? 0 }, { signal }),
+    queryFn: ({ signal }) => api.panelNoteHistory({ id: props.selectedId ?? 0 }, { signal }),
     enabled: selectedMissing,
   })
   const selected = visibleNotes.find(note => note.id === props.selectedId) ?? (selectedFallback.data ?? []).find(note => note.id === props.selectedId)
@@ -663,7 +701,7 @@ export const NotesTab = (props: {
                 <SelectItem key="all" value="all">
                   All statuses
                 </SelectItem>,
-                ...(['valid', 'superseded', 'forgotten'] as const).map(value => (
+                ...(['valid', 'superseded', 'forgotten', 'archived'] as const).map(value => (
                   <SelectItem key={value} value={value}>
                     {noteStatusLabels[value]}
                   </SelectItem>
@@ -704,6 +742,9 @@ export const NotesTab = (props: {
               ],
             })}
             <span className="dshx:flex-1" />
+            <Button size="xs" variant="outline" disabled={review.isPending} onClick={() => review.mutate(undefined)}>
+              <SparklesIcon /> {review.isPending ? 'Reviewing…' : 'Review with Jev'}
+            </Button>
             <Button
               variant={selectMode ? 'secondary' : 'ghost'}
               size="icon-sm"
@@ -722,8 +763,8 @@ export const NotesTab = (props: {
             <span className="dshx:text-[13px] dshx:font-semibold">{PanelFormat.formatCount(visibleNotes.length)} memories</span>
             <span className="dshx:flex-1" />
             <span className="dshx:text-[11px] dshx:text-muted-foreground">
-              Active {PanelFormat.formatCount(counts.data?.active ?? 0)} · Superseded {PanelFormat.formatCount(counts.data?.superseded ?? 0)} · Forgotten{' '}
-              {PanelFormat.formatCount(counts.data?.forgotten ?? 0)}
+              Active {PanelFormat.formatCount(counts.data?.active ?? 0)} · Archived {PanelFormat.formatCount(counts.data?.archived ?? 0)} · Superseded{' '}
+              {PanelFormat.formatCount(counts.data?.superseded ?? 0)} · Forgotten {PanelFormat.formatCount(counts.data?.forgotten ?? 0)}
             </span>
           </div>
         </div>
@@ -739,6 +780,57 @@ export const NotesTab = (props: {
             <span className="dshx:text-muted-foreground">Select all visible notes</span>
           </div>
         ) : null}
+        {review.isError ? (
+          <p className="dshx:border-b dshx:border-border dshx:p-3 dshx:text-xs dshx:text-destructive">
+            {errorMessage(review.error, 'Jev review is unavailable.')}
+          </p>
+        ) : null}
+        {review.data === undefined ? null : (
+          <section
+            aria-label="Jev relevance suggestions"
+            className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:border-border dshx:bg-muted/20 dshx:p-3"
+          >
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <span className="dshx:text-xs dshx:font-semibold">Jev suggestions · review before archiving</span>
+              <span className="dshx:flex-1" />
+              {review.data.nextAfterId === null ? null : (
+                <Button size="xs" variant="outline" disabled={review.isPending} onClick={() => review.mutate(review.data?.nextAfterId ?? undefined)}>
+                  Review next 25
+                </Button>
+              )}
+              <Button size="xs" variant="ghost" onClick={() => review.reset()}>
+                Close
+              </Button>
+            </div>
+            <p className="dshx:text-[11px] dshx:text-muted-foreground">
+              Jev sees note text and can only suggest; it never archives automatically. Unknown results need manual review.
+            </p>
+            {review.data.results.map(result => (
+              <div key={result.id} className="dshx:flex dshx:items-start dshx:gap-3 dshx:border-t dshx:border-border dshx:pt-2">
+                <div className="dshx:min-w-0 dshx:flex-1">
+                  <p className="dshx:line-clamp-3 dshx:text-xs">{result.text}</p>
+                  <p className="dshx:mt-1 dshx:text-[11px] dshx:text-muted-foreground">
+                    {result.probability === null ? 'Unknown — review manually' : `Likely relevant: ${Math.round(result.probability * 100)}%`}
+                    {result.candidate ? ' · may be outdated' : ''}
+                  </p>
+                </div>
+                {result.candidate ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={archiveSuggestion.isPending || archivedSuggestions.has(result.id)}
+                    onClick={() => archiveSuggestion.mutate(result.id)}
+                  >
+                    {archivedSuggestions.has(result.id) ? 'Archived' : 'Archive note'}
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+            {archiveSuggestion.isError ? (
+              <p className="dshx:text-xs dshx:text-destructive">{errorMessage(archiveSuggestion.error, 'The note could not be archived.')}</p>
+            ) : null}
+          </section>
+        )}
         {notes.isError ? <p className="dshx:p-4 dshx:text-xs dshx:text-destructive">{errorMessage(notes.error, 'Notes are unavailable.')}</p> : null}
         {notes.isSuccess && visibleNotes.length === 0 ? (
           <p className="dshx:p-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">

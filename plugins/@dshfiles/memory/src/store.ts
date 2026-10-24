@@ -57,6 +57,7 @@ export type NoteRecord = Note & {
   readonly valid: boolean
   readonly supersededBy: number | null
   readonly forgottenAt: number | null
+  readonly archivedAt: number | null
   readonly reason: string | null
 }
 
@@ -81,7 +82,7 @@ export type DailyUsage = {
 }
 
 /** Stored notes by lifecycle state, for the notes header and analytics. */
-export type NoteStatusCounts = { readonly active: number; readonly superseded: number; readonly forgotten: number }
+export type NoteStatusCounts = { readonly active: number; readonly superseded: number; readonly forgotten: number; readonly archived: number }
 
 export type IndexedMessage = { readonly seq: number; readonly role: 'user' | 'assistant'; readonly text: string; readonly at: number }
 
@@ -222,9 +223,9 @@ create table if not exists notes (
   forgotten_at integer,
   reason text,
   uses integer not null default 0,
-  last_used_at integer
+  last_used_at integer,
+  archived_at integer
 );
-create unique index if not exists notes_valid_hash on notes (project, hash) where valid = 1;
 create index if not exists notes_project on notes (project, valid, created_at desc);
 create virtual table if not exists docs_words using fts5 (text, kind unindexed, ref unindexed, project unindexed, tokenize = 'porter unicode61 remove_diacritics 2');
 create virtual table if not exists docs_ids using fts5 (text, kind unindexed, ref unindexed, project unindexed, tokenize = 'trigram');
@@ -278,13 +279,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   database.exec('pragma journal_mode = wal; pragma busy_timeout = 5000;')
   database.exec(schema)
   // Databases created before excerpts were kept get the column; their rows stay null until a log read backfills them.
-  if (
-    !database
-      .prepare('select name from pragma_table_info(?)')
-      .all('messages')
-      .some(column => column['name'] === 'excerpt')
+  const tableColumns = database.prepare('select name from pragma_table_info(?)')
+  const hasColumn = (table: string, columnName: string): boolean => tableColumns.all(table).some(column => column['name'] === columnName)
+  if (!hasColumn('messages', 'excerpt')) database.exec('alter table messages add column excerpt text')
+  if (!hasColumn('notes', 'archived_at')) database.exec('alter table notes add column archived_at integer')
+  database.exec(
+    'drop index if exists notes_valid_hash; create unique index if not exists notes_active_hash on notes (project, hash) where valid = 1 and archived_at is null',
   )
-    database.exec('alter table messages add column excerpt text')
   /**
    * One prepared statement per SQL text for the life of this database. The store compiles the same index, lookup and
    * retention SQL over and over otherwise — three statements per indexed message alone — and preparing re-parses it.
@@ -369,6 +370,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     valid: Number(row['valid']) === 1,
     supersededBy: row['superseded_by'] === null ? null : Number(row['superseded_by']),
     forgottenAt: row['forgotten_at'] === null ? null : Number(row['forgotten_at']),
+    archivedAt: row['archived_at'] === null ? null : Number(row['archived_at']),
     reason: row['reason'] === null ? null : String(row['reason']),
   })
 
@@ -411,7 +413,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     })
 
   const note = (id: number): Note | undefined => {
-    const row = statement('select * from notes where id = ? and valid = 1').get(id)
+    const row = statement('select * from notes where id = ? and valid = 1 and archived_at is null').get(id)
     return row === undefined ? undefined : noteRow(row)
   }
 
@@ -444,7 +446,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   /** A note whose text already exists as a valid note of the project is not stored twice; the existing one is returned. */
   const addNote = (input: NoteInput): { readonly note: Note; readonly duplicate: boolean } =>
     transaction(() => {
-      const twin = statement('select * from notes where project = ? and hash = ? and valid = 1').get(input.project, hashOf(input.text))
+      const twin = statement('select * from notes where project = ? and hash = ? and valid = 1 and archived_at is null').get(input.project, hashOf(input.text))
       if (twin !== undefined) return { note: noteRow(twin), duplicate: true }
       const created = insertNote(input, null)
       bump('notes.added')
@@ -469,7 +471,10 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       if (current === undefined) return undefined
       statement('update notes set valid = 0, reason = ? where id = ?').run(input.reason, input.id)
       removeDoc('note', String(input.id))
-      const twin = statement('select * from notes where project = ? and hash = ? and valid = 1').get(current.project, hashOf(input.text))
+      const twin = statement('select * from notes where project = ? and hash = ? and valid = 1 and archived_at is null').get(
+        current.project,
+        hashOf(input.text),
+      )
       const replacement =
         twin === undefined
           ? insertNote(
@@ -501,6 +506,34 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       removeDoc('note', String(input.id))
       bump('notes.forgotten')
       changed(current.project)
+      return true
+    })
+
+  const archiveNote = (id: number): boolean =>
+    transaction(() => {
+      const current = note(id)
+      if (current === undefined) return false
+      const result = statement('update notes set archived_at = ? where id = ? and archived_at is null').run(now(), id)
+      if (result.changes === 0) return false
+      removeDoc('note', String(id))
+      changed(current.project)
+      return true
+    })
+
+  const restoreNote = (id: number): boolean =>
+    transaction(() => {
+      const row = statement('select * from notes where id = ? and valid = 1 and archived_at is not null').get(id)
+      if (row === undefined) return false
+      const duplicate = statement('select id from notes where project = ? and hash = ? and valid = 1 and archived_at is null and id != ?').get(
+        String(row['project']),
+        String(row['hash']),
+        id,
+      )
+      if (duplicate !== undefined) return false
+      statement('update notes set archived_at = null where id = ?').run(id)
+      const restored = noteRow(row)
+      indexDoc('note', String(id), restored.project, `${restored.category}: ${restored.text}`)
+      changed(restored.project)
       return true
     })
 
@@ -603,7 +636,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     const extraSql = extra.map(() => '?').join(', ')
     const scoped = extra.length === 0 ? '' : ` or scope in (${extraSql})`
     return statement(
-      `select * from notes where valid = 1
+      `select * from notes where valid = 1 and archived_at is null
          and ((project = ? and (scope = 'repo' or scope = 'global' or scope like 'path:%')) or scope = 'global'${scoped})
          order by uses desc, case category when 'feedback' then 0 when 'project' then 1 when 'user' then 2 else 3 end, created_at desc limit ?`,
     )
@@ -635,7 +668,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     ...statement(
       `select n.id ref, n.project, n.text from notes n
          left join embeddings e on e.kind = 'note' and e.ref = cast(n.id as text) and e.model = ?
-         where n.valid = 1 and e.ref is null order by n.created_at limit ?`,
+         where n.valid = 1 and n.archived_at is null and e.ref is null order by n.created_at limit ?`,
     )
       .all(input.model, input.limit)
       .map(row => ({ kind: 'note' as const, ref: String(row['ref']), project: String(row['project']), text: String(row['text']) })),
@@ -945,11 +978,14 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     readonly query?: string | undefined
     readonly thread?: string | undefined
     readonly includeInvalid?: boolean | undefined
+    readonly includeArchived?: boolean | undefined
+    readonly beforeId?: number | undefined
     readonly limit: number
   }): readonly NoteRecord[] => {
     const clauses: string[] = []
     const params: (string | number)[] = []
     if (filter.includeInvalid !== true) clauses.push('valid = 1')
+    if (filter.includeArchived !== true) clauses.push('archived_at is null')
     if (filter.project !== undefined) {
       clauses.push('project = ?')
       params.push(filter.project)
@@ -966,11 +1002,15 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       clauses.push('source_thread = ?')
       params.push(filter.thread)
     }
+    if (filter.beforeId !== undefined) {
+      clauses.push('id < ?')
+      params.push(filter.beforeId)
+    }
     if (filter.query !== undefined && filter.query.trim().length > 0) {
       clauses.push('text like ?')
       params.push(`%${filter.query.trim().replaceAll('%', '')}%`)
     }
-    return statement(`select * from notes ${clauses.length === 0 ? '' : `where ${clauses.join(' and ')}`} order by created_at desc limit ?`)
+    return statement(`select * from notes ${clauses.length === 0 ? '' : `where ${clauses.join(' and ')}`} order by created_at desc, id desc limit ?`)
       .all(...params, filter.limit)
       .map(noteRecord)
   }
@@ -1037,7 +1077,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
         const placeholders = projects.map(() => '?').join(', ')
         const noteCollisions = statement(
           `select count(*) collisions from (
-               select hash from notes where valid = 1 and hash is not null and project in (${placeholders})
+               select hash from notes where valid = 1 and archived_at is null and hash is not null and project in (${placeholders})
                group by hash having count(*) > 1)`,
         ).get(...projects)
         const noteCount = Number(noteCollisions?.['collisions'] ?? 0)
@@ -1092,7 +1132,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     statement(
       `select project, sum(threads) threads, sum(notes) notes from (
            select project, count(*) threads, 0 notes from threads where duplicate_of is null group by project
-           union all select project, 0, count(*) from notes where valid = 1 group by project)
+           union all select project, 0, count(*) from notes where valid = 1 and archived_at is null group by project)
          group by project order by project`,
     )
       .all()
@@ -1167,18 +1207,20 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   /** Stored notes by lifecycle state, for the notes header and analytics. */
   const noteStatusCounts = (project?: string | undefined): NoteStatusCounts => {
     const row = statement(
-      `select sum(valid = 1) active, sum(valid = 0 and forgotten_at is null) superseded, sum(forgotten_at is not null) forgotten from notes${project === undefined ? '' : ' where project = ?'}`,
+      `select sum(valid = 1 and archived_at is null) active, sum(valid = 1 and archived_at is not null) archived,
+              sum(valid = 0 and forgotten_at is null) superseded, sum(forgotten_at is not null) forgotten from notes${project === undefined ? '' : ' where project = ?'}`,
     ).get(...(project === undefined ? [] : [project]))
     return {
       active: Number(row?.['active'] ?? 0),
       superseded: Number(row?.['superseded'] ?? 0),
       forgotten: Number(row?.['forgotten'] ?? 0),
+      archived: Number(row?.['archived'] ?? 0),
     }
   }
 
   /** The valid notes agents cited most, with their current text and citation counts. */
   const topNotes = (limit: number): readonly NoteRecord[] =>
-    statement('select * from notes where valid = 1 and uses > 0 order by uses desc, created_at desc limit ?').all(limit).map(noteRecord)
+    statement('select * from notes where valid = 1 and archived_at is null and uses > 0 order by uses desc, created_at desc limit ?').all(limit).map(noteRecord)
 
   const usage = (): UsageCounts => ({
     tools: statement('select tool, count(*) calls, sum(results > 0) with_results, sum(used) used from tool_calls group by tool order by tool')
@@ -1196,7 +1238,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
         .map(row => [String(row['name']), Number(row['value'])]),
     ),
     threads: Number(statement('select count(*) n from threads where duplicate_of is null').get()?.['n'] ?? 0),
-    notes: Number(statement('select count(*) n from notes where valid = 1').get()?.['n'] ?? 0),
+    notes: Number(statement('select count(*) n from notes where valid = 1 and archived_at is null').get()?.['n'] ?? 0),
     indexedMessages: Number(statement('select count(*) n from messages').get()?.['n'] ?? 0),
   })
 
@@ -1234,6 +1276,8 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     note,
     updateNote,
     forgetNote,
+    archiveNote,
+    restoreNote,
     blockNotes,
     indexMessages,
     backfillExcerpts,
