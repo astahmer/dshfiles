@@ -50,6 +50,9 @@ At each continuation, reread the goal, refresh the project-filtered session/work
 
 Before marking complete, verify there are no relevant active or unfinished threads, unanswered questions, failed latest checks, undescribed work to land, or requested cleanup remaining within the originating project. Confirm final JJ workspace/bookmark/conflict state and that this project's `main` contains the intended completed work.
 
+- When all other in-scope work is complete and only the supervisor's own authorized change remains, finish and validate it, integrate it if safe, then complete the goal and stop monitoring. Do not keep an empty watch open for self-generated follow-up.
+- If the user explicitly asks to stop, cancel, or hand off the current task, pause its goal immediately in that same human turn before replying. Continue only any separate follow-up the user explicitly authorized. Preserve any active or protected workspace and report a blocker rather than touching it.
+
 ## Supervisor-thread kickoff prompt
 
 > I'm going AFK. Monitor my other DSH threads in this project only and coordinate or answer their questions when appropriate. Create a durable goal and todo list. Keep in-progress work safe; validate and integrate only completed changes into this project's `main`. Do not inspect or act in other projects, push, or restart the live DSH. Report each round's active work, latest validation, questions, and remaining steps. Keep going until no requested work remains.
