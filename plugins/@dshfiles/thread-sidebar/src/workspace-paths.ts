@@ -3,6 +3,12 @@ const THREADS_DIRECTORY_SUFFIX = '-threads'
 
 const normalize = (path: string): string => path.replace(/\/+$/u, '')
 
+/** The display name of a workspace checkout, accepting paths from either platform. */
+export const workspaceName = (path: string): string | undefined => {
+  const name = path.split(/[\\/]/u).filter(Boolean).at(-1)
+  return name === '' ? undefined : name
+}
+
 /** Where a registered workspace sits relative to the project it belongs to. */
 export class WorkspacePaths {
   /**

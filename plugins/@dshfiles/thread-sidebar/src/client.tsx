@@ -127,6 +127,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
+import { workspaceName } from './workspace-paths.js'
 import {
   failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
@@ -495,6 +496,7 @@ interface ThreadRowProps {
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+  readonly workspaceName: string | undefined
   readonly machine: string | undefined
   readonly age: string
   /** Set only while the thread is muted or snoozed. */
@@ -1160,6 +1162,11 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>
                   ) : null}
+                  {props.workspaceName === undefined ? null : (
+                    <span className="dshx:shrink-0 dshx:truncate" data-testid="thread-workspace-name">
+                      · {props.workspaceName}
+                    </span>
+                  )}
                   {props.parentTitle === undefined ? null : (
                     <span className="dshx:min-w-0 dshx:truncate">
                       {t('threadSidebarChildOf')} {props.parentTitle}
@@ -1482,6 +1489,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
+  const workspaceNameById = useMemo(
+    () => new Map<string, string | undefined>(workspaceState.items.map(workspace => [workspace.workspaceId, workspaceName(workspace.path)])),
+    [workspaceState.items],
+  )
   const integrationQueuedAtBySessionId = useMemo(
     () => indexQueuedIntegrationSessions((jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads)),
     [jjRepositories.data],
@@ -3990,6 +4001,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       selectedSessionId: selectedSession?.id,
     })
     const rowAttentionLabel = attentionLabel ?? inlineAttentionLabels.get(session.id)
+    const realWorkspaceId = realWorkspaceBySession.get(session.id)
     return (
       <ThreadRow
         key={session.id}
@@ -4007,6 +4019,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+        workspaceName={realWorkspaceId === undefined || realWorkspaceId === workspaceId ? undefined : workspaceNameById.get(realWorkspaceId)}
         machine={machine}
         age={formatAge(session.updatedAt)}
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
