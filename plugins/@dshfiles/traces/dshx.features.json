@@ -259,7 +259,7 @@
     {
       "id": "thread-traces-tab",
       "title": "Per-thread Traces tab",
-      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals, a turn list that opens the span waterfall, and the thread's correlated logs. With nothing stored it says why, from the receiver's diagnosis.",
+      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn list that opens the span waterfall, and the thread's correlated logs. With nothing stored it says why, from the receiver's diagnosis.",
       "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [],
@@ -833,6 +833,128 @@
         {
           "kind": "not-applicable",
           "reason": "The feature is browser spans themselves (thread switch, new thread, panel open, composer send), asserted with recordBrowserSpans in tooling/dshx/packages/dshx/tests/browser-tracing.spec.ts; the Host forwarding route is deliberately untraced so exporting cannot feed back into itself."
+        }
+      ]
+    },
+    {
+      "id": "trace-transcript-links",
+      "title": "Span ↔ transcript links",
+      "summary": "A span's Open in thread (Traces panel) or Show in chat (thread Traces tab) opens its thread's Chat scrolled to and highlighting the turn, step or tool call it belongs to — the nearest span carrying dsh.turn, dsh.step and gen_ai.tool.call.id, so a plugin span lands on its tool call. Each Turn footer has a Trace button that opens the thread's Traces tab on that turn's trace. Both directions use the native Conversation View focus request (openView/viewRequest) and the owned Chat fork's @dshfiles/chat/chat-focus contract.",
+      "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click button \"Open the trace of turn*\"", "expect tree \"Span waterfall\""],
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["turn-trace-pending", "turn-trace-open", "turn-trace-missing", "chat-focused", "thread-opened-focused"],
+      "failureModes": [
+        "A turn's trace is exported a moment after the turn ends: the Trace button retries for 20 s, then says no trace was recorded for that turn.",
+        "A tool call or step that never appears in Chat within 4 s lands on its turn instead.",
+        "With the stock Chat row (no @dshfiles/chat fork) the Turn footer has no View opener and the Trace button does not render.",
+        "A thread that reopens on another view keeps a cross-thread request for 30 s; the Traces tab forwards it to Chat."
+      ],
+      "externalDependencies": [
+        {
+          "id": "chat-fork-focus",
+          "boundary": "@dshfiles/chat/chat-focus (focus encoding, pending request, turnTail openView) and the native Conversation View viewRequest/openView props of dsh-client-ui-conversation 0.2.1-rc.2.",
+          "deterministicFake": "The browser journey runs a real bash turn on the e2e fake Command Code provider with agent telemetry exporting to the same Host's receiver."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.turn-trace-button-journey",
+          "featureFile": "tooling/dshx/e2e/features/trace-transcript-links.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "traces.show-in-chat-journey",
+          "featureFile": "tooling/dshx/e2e/features/trace-transcript-links.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "traces.open-thread-focus-journey",
+          "featureFile": "tooling/dshx/e2e/features/trace-transcript-links.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.thread-target-tool-call",
+          "file": "plugins/@dshfiles/traces/src/thread-links.test.ts",
+          "testName": "lands a tool span, and a plugin span under it, on the tool call"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-turn-trace",
+          "file": "plugins/@dshfiles/traces/src/span-cost.test.ts",
+          "testName": "finds the trace of one thread turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-subagent-trace-sessions",
+          "file": "plugins/@dshfiles/traces/src/span-cost.test.ts",
+          "testName": "lists a trace for every thread with a span in it, parent and subagent alike"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "span-cost",
+      "title": "List-price cost on traces",
+      "summary": "Sums the dshx.cost.usd agent telemetry puts on model-call spans (never the turn span that repeats them): the thread Traces tab shows the thread's total and each turn's cost, the span panel a call's own cost, the Operations tab model calls per service and model with tokens and cost, and traces_session_summary / traces_search / traces_list_services return the same.",
+      "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["priced", "unpriced"],
+      "failureModes": [
+        "Spans recorded before agent telemetry priced them, or from a sender that does not, show no cost (—) rather than $0.",
+        "An older Host omits the cost fields until it restarts; the client hides them."
+      ],
+      "externalDependencies": [
+        {
+          "id": "agent-telemetry-cost",
+          "boundary": "dshx.cost.usd on chat spans, priced by @dshfiles/agent-telemetry from AI Accounts' models.dev catalog.",
+          "deterministicFake": "The journey posts synthetic priced OTLP spans; the otlp-session-turns scratch seed carries priced chat spans."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.cost-display-journey",
+          "featureFile": "tooling/dshx/e2e/features/trace-transcript-links.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-trace-cost",
+          "file": "plugins/@dshfiles/traces/src/span-cost.test.ts",
+          "testName": "sums model calls per trace, never the turn span that repeats them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-session-cost",
+          "file": "plugins/@dshfiles/traces/src/span-cost.test.ts",
+          "testName": "summarizes a thread in total and per own turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.store-model-cost",
+          "file": "plugins/@dshfiles/traces/src/span-cost.test.ts",
+          "testName": "reports model calls, tokens and cost per service and model in the overview"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

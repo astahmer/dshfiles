@@ -810,7 +810,8 @@ const otlpSampleMetrics = (offsetMs: number, requests: number): unknown => {
  */
 const otlpSessionTurns = (sessionId: string) => {
   const hex = (bytes: number): string => randomBytes(bytes).toString('hex')
-  const value = (input: string | number) => (typeof input === 'string' ? { stringValue: input } : { intValue: String(input) })
+  const value = (input: string | number) =>
+    typeof input === 'string' ? { stringValue: input } : Number.isInteger(input) ? { intValue: String(input) } : { doubleValue: input }
   const attributes = (record: Readonly<Record<string, string | number>>) => Object.entries(record).map(([key, entry]) => ({ key, value: value(entry) }))
   const turn = (input: { readonly turn: number; readonly startMsAgo: number; readonly failedAttempt: boolean }) => {
     const traceId = hex(16)
@@ -837,6 +838,8 @@ const otlpSessionTurns = (sessionId: string) => {
       attributes: attributes({ ...session, ...span.attributes }),
       status: span.error === undefined ? { code: 0 } : { code: 2, message: span.error },
     })
+    // List price the way agent telemetry stamps it (dshx.cost.usd), at $10 / $40 per million input / output tokens.
+    const costOf = (usage: { readonly input: number; readonly output: number }): number => (usage.input * 10 + usage.output * 40) / 1_000_000
     const chat = (spanId: string, parentSpanId: string, from: number, to: number, usage: { readonly input: number; readonly output: number }) =>
       agentSpan({
         spanId,
@@ -851,6 +854,8 @@ const otlpSessionTurns = (sessionId: string) => {
           'gen_ai.usage.input_tokens': usage.input,
           'gen_ai.usage.output_tokens': usage.output,
           'gen_ai.usage.cache_read.input_tokens': Math.round(usage.input / 2),
+          'dshx.cost.usd': costOf(usage),
+          'dshx.cost.price_id': 'fake/fake-model',
         },
       })
     const spans = [
@@ -859,7 +864,12 @@ const otlpSessionTurns = (sessionId: string) => {
         name: 'invoke_agent deepseek-harness',
         from: 0,
         to: 6_400,
-        attributes: { 'gen_ai.operation.name': 'invoke_agent', 'gen_ai.usage.input_tokens': 2_480, 'gen_ai.usage.output_tokens': 504 },
+        attributes: {
+          'gen_ai.operation.name': 'invoke_agent',
+          'gen_ai.usage.input_tokens': 2_480,
+          'gen_ai.usage.output_tokens': 504,
+          'dshx.cost.usd': costOf({ input: 1_840, output: 312 }) + costOf({ input: 640, output: 192 }),
+        },
       }),
       agentSpan({ spanId: ids.step1, parentSpanId: ids.root, name: 'react step', from: 20, to: 4_300, attributes: { 'dsh.step': 1 } }),
       ...(input.failedAttempt

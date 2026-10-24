@@ -92,6 +92,52 @@
           "reason": "Client-only: Open image links in the gallery renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "focus-from-plugin",
+      "title": "Scroll to a turn, step or tool call on request",
+      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; Turn-footer entries get the thread's View opener.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["focus-requested", "turn-landed", "tool-call-revealed", "fallback-to-turn"],
+      "failureModes": [
+        "A tool call or step that never appears within 4 s lands on its turn.",
+        "A cross-thread request expires after 30 s when the thread never shows Chat."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "seed otlp-session-turns",
+        "click button \"Open the trace of turn*\"",
+        "click treeitem \"execute_tool bash*\"",
+        "click button \"Show in chat\"",
+        "expect tab \"Chat\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.focus-contract",
+          "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
+          "testName": "round-trips a focus through the opaque view-request string and refuses anything else"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.focus-reveal",
+          "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
+          "testName": "opens a folded group with beforematch, then scrolls to and highlights the tool call it mounts"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.focus-from-trace-journey",
+          "featureFile": "tooling/dshx/e2e/features/trace-transcript-links.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: scrolling Chat to a requested turn, step or tool call reads browser state and starts no Host work of its own."
+        }
+      ]
     }
   ]
 }

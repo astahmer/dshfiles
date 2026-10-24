@@ -303,6 +303,59 @@
           "testName": "puts content on spans when switched on, as bounded JSON"
         }
       ]
+    },
+    {
+      "id": "span-cost",
+      "title": "List-price cost on model spans",
+      "summary": "Each chat span with token usage carries dshx.cost.usd and dshx.cost.price_id, and invoke_agent the sum of its turn's calls, priced from AI Accounts' models.dev catalog and account kinds by the same pricing code as the usage ledger. An unpriced route leaves the attribute off.",
+      "reach": ["seed tool-call-thread", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["priced", "unpriced", "no-catalog"],
+      "failureModes": [
+        "A pricing failure is logged and leaves the span unpriced; the model stream is untouched.",
+        "Without AI Accounts' pricing.json (never fetched) no span is priced."
+      ],
+      "externalDependencies": [
+        {
+          "id": "ai-accounts-pricing",
+          "boundary": "$DSH_HOME/plugins/ai-accounts/pricing.json (models.dev prices AI Accounts fetches) and the aiAccountsApi read of account kinds.",
+          "deterministicFake": "Unit tests price against an in-memory catalog through recordSpans()."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.cost-on-spans",
+          "file": "plugins/@dshfiles/agent-telemetry/src/cost.test.ts",
+          "testName": "puts dshx.cost.usd on every priced chat span and their sum on the turn span"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.cost-band",
+          "file": "plugins/@dshfiles/agent-telemetry/src/cost.test.ts",
+          "testName": "prices uncached input, output and cache reads at the band the prompt reaches"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-telemetry.cost-contained",
+          "file": "plugins/@dshfiles/agent-telemetry/src/cost.test.ts",
+          "testName": "leaves spans unpriced, and the model path intact, when pricing throws"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agent-telemetry.span-cost-browser",
+          "reason": "The loopback fake provider reports no token usage, so a real turn carries nothing to price; the pricing and span attributes are driven through the coordinator in src/cost.test.ts, and the traces cost-display journey covers how priced spans render."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "chat <model>",
+          "file": "plugins/@dshfiles/agent-telemetry/src/cost.test.ts",
+          "testName": "puts dshx.cost.usd on every priced chat span and their sum on the turn span"
+        }
+      ]
     }
   ]
 }
