@@ -1326,6 +1326,11 @@
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "backlog.project-detail-picker",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "backlog.project-scope-command",
           "file": "plugins/@dshfiles/backlog/src/project-command.test.ts",

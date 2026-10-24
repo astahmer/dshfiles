@@ -316,6 +316,35 @@ When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: numb
   await expect(peek(page)).toContainText(`b:${String(id)}`)
 })
 
+When('the project picker for item b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
+  await peek(page)
+    .getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })
+    .click()
+})
+
+Then('the project choices are visible', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('combobox', { name: 'Search projects', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'No project', exact: true })).toBeVisible()
+})
+
+When('item b:{int} is assigned to the registered project from its details', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('option', { name: /^default-workspace\b/ }).click()
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('default-workspace')
+})
+
+Then('item b:{int} shows its selected project', async ({ page }: { page: Page }, id: number) => {
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('default-workspace')
+})
+
+When('item b:{int} is unassigned from its details', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('option', { name: 'No project', exact: true }).click()
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('Project')
+})
+
+Then('item b:{int} has no project', async ({ page }: { page: Page }, id: number) => {
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('Project')
+})
+
 Then('it is referenced by {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-backlinks', async () => {
     await expect(peek(page).getByRole('list', { name: 'Referenced by' })).toContainText(title)

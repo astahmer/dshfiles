@@ -86,7 +86,7 @@ export const ProjectPicker = (props: {
       searchPlaceholder="Search projects…"
       side={props.side}
       triggerClassName={cn(triggerClass, props.triggerClassName)}
-      triggerContent={props.trigger}
+      trigger={props.trigger}
       value={props.value}
     />
   )

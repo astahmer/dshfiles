@@ -104,6 +104,20 @@ Feature: Backlog
     When the inline title is replaced with "Renamed on the board"
     Then the board card for b:1 is titled "Renamed on the board"
 
+  @scenario:backlog.project-detail-picker
+  Scenario: Change an item's project from its details
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Change project from details" is captured
+    And backlog item b:1 is opened
+    When the project picker for item b:1 is opened
+    Then the project choices are visible
+    When item b:1 is assigned to the registered project from its details
+    Then item b:1 shows its selected project
+    When the project picker for item b:1 is opened
+    And item b:1 is unassigned from its details
+    Then item b:1 has no project
+
   @scenario:backlog.start-thread
   Scenario: Start a thread from a board card and stay in the backlog
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
