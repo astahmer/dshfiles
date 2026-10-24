@@ -293,6 +293,24 @@ When('item b:{int} is moved to In progress on the board', async ({ page }: { pag
   await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
 })
 
+When('the Inbox column is moved right and the Dropped column is hidden', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Configure board columns' }).click()
+  await page.getByRole('button', { name: 'Move Inbox right' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Dropped' }).click()
+  await page.keyboard.press('Escape')
+})
+
+Then('the board columns show the customized order without Dropped', async ({ page }: { page: Page }) => {
+  const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.map(column => column.getAttribute('data-backlog-column')))
+  expect(statuses).toEqual(['todo', 'inbox', 'doing', 'done'])
+})
+
+Then('the Backlog items remain available outside the customized board', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('table', { name: 'Backlog items' })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Backlog items' }).getByRole('row', { name: /^Item b:/ })).toHaveCount(1)
+  await expect(page.getByRole('table', { name: 'Backlog items' })).toContainText('Keep board preferences local')
+})
+
 Then('the board columns follow the status order through Dropped', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-board-status-order', async () => {
     const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.map(column => column.getAttribute('data-backlog-column')))

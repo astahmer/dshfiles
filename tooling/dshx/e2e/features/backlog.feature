@@ -53,6 +53,17 @@ Feature: Backlog
     When the backlog search is submitted
     Then search results list only "composer chip on the board"
 
+  @scenario:backlog.board-columns-customization
+  Scenario: Reorder and hide columns on the Backlog board only
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Keep board preferences local" is captured
+    And the Board view is opened
+    And the Inbox column is moved right and the Dropped column is hidden
+    Then the board columns show the customized order without Dropped
+    When the Items view is opened
+    Then the Backlog items remain available outside the customized board
+
   @scenario:backlog.board-links
   Scenario: Move an item on the board and follow its backlinks
     Given the isolated plugin profile "@dshfiles/backlog" is booted
