@@ -33,6 +33,7 @@ export const AccountDetail = (props: {
   readonly file: AccountsFile
   readonly folderPicker: WorkspacePickerPorts
   readonly onOpenUsageHistory: () => void
+  readonly onConnectAccount: (accountId: string) => void
 }): JSX.Element => {
   const draft = props.draft
   const { catalog, refreshingCatalog, refreshCatalog, selected, setDraft, persist, save, remove, dirty, saving, notice, problem } = props.state
@@ -50,7 +51,17 @@ export const AccountDetail = (props: {
             <h2 className="dshx:truncate dshx:text-lg dshx:font-semibold dshx:tracking-tight">{draft.displayName || draft.instanceId}</h2>
           </div>
         </div>
-        <div className="dshx:flex dshx:items-center dshx:gap-2.5">
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2.5">
+          <Button
+            disabled={selected === null || dirty || saving}
+            onClick={() => {
+              if (selected !== null && !dirty && !saving) props.onConnectAccount(selected.instanceId)
+            }}
+            size="sm"
+            variant="outline"
+          >
+            {dirty ? 'Save changes to connect' : selected?.signedIn ? 'Reauthenticate' : 'Connect account'}
+          </Button>
           <Label className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground" htmlFor={enabledSwitchId}>
             {routedKind(draft.kind)
               ? draft.enabled

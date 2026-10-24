@@ -12,6 +12,8 @@ import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { AccountsPanel } from './accounts-panel.js'
+import { createAccountSetupController } from './account-setup-controller.js'
+import { AccountSetupOverlay } from './account-setup-dialog.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { QuotaFooter, QuotaStrip } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
@@ -66,6 +68,16 @@ export default defineClientPlugin({
               if (!result.ok) throw new Error('The key could not be stored in DSH credentials.')
             },
           }
+    const setupController = createAccountSetupController()
+    ctx.effect(() => () => setupController.close())
+    const openSetup = (onCreated?: (accountId: string) => void): void => setupController.open(onCreated === undefined ? {} : { onCreated })
+    const reconnect = (accountId: string): void => setupController.open({ accountId })
+    const SetupOverlayView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <AccountSetupOverlay controller={setupController} credentialSetup={credentialSetup} folderPicker={folderPicker} />
+      </PluginQueryProvider>
+    )
+    api.ui.register({ name: 'shell.overlay', id: 'ai-accounts-setup', order: 20, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SetupOverlayView)
     const translate = ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)
     const label = (): string => translate('aiAccountsPanel')
     const historyLabel = (): string => translate('aiAccountsUsageHistory')
@@ -78,7 +90,13 @@ export default defineClientPlugin({
     // and panels read one usage cache instead of polling side by side.
     const AccountsPanelView = (): JSX.Element => (
       <PluginQueryProvider>
-        <AccountsPanel credentialSetup={credentialSetup} folderPicker={folderPicker} onOpenUsageHistory={openUsageHistory} />
+        <AccountsPanel
+          credentialSetup={credentialSetup}
+          folderPicker={folderPicker}
+          onOpenUsageHistory={openUsageHistory}
+          onAddAccount={openSetup}
+          onConnectAccount={reconnect}
+        />
       </PluginQueryProvider>
     )
     const UsageHistoryPanelView = (): JSX.Element => (
@@ -97,13 +115,13 @@ export default defineClientPlugin({
       const seated = useSyncExternalStore(subscribeStripSeat, stripSeated)
       return (
         <PluginQueryProvider>
-          <QuotaFooter onOpenUsageHistory={openUsageHistory} stripSeated={seated} wide={props.wide} />
+          <QuotaFooter onOpenUsageHistory={openUsageHistory} onAddAccount={() => openSetup()} stripSeated={seated} wide={props.wide} />
         </PluginQueryProvider>
       )
     }
     const QuotaStripView = (): JSX.Element => (
       <PluginQueryProvider>
-        <QuotaStrip onOpenUsageHistory={openUsageHistory} />
+        <QuotaStrip onOpenUsageHistory={openUsageHistory} onAddAccount={() => openSetup()} />
       </PluginQueryProvider>
     )
     const EdgeUsageHostView = (): JSX.Element => (

@@ -21,6 +21,8 @@ import type { CredentialSetupPort } from './credential-setup-port.js'
  */
 export const AccountsPanel = (props: {
   readonly onOpenUsageHistory: () => void
+  readonly onAddAccount: (onCreated?: (accountId: string) => void) => void
+  readonly onConnectAccount: (accountId: string) => void
   readonly credentialSetup?: CredentialSetupPort | undefined
   readonly folderPicker: WorkspacePickerPorts
 }): JSX.Element => {
@@ -47,7 +49,7 @@ export const AccountsPanel = (props: {
       <QuotaContinuations accountId={state.selectedId} />
 
       <div className="dshx:mx-auto dshx:grid dshx:min-h-0 dshx:w-full dshx:max-w-[1600px] dshx:flex-1 dshx:grid-cols-[minmax(220px,250px)_minmax(0,1fr)] dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:bg-card">
-        <AccountRail file={state.file} state={state} />
+        <AccountRail file={state.file} state={state} onAddAccount={() => props.onAddAccount(state.setSelectedId)} />
 
         {state.draft !== null ? (
           <AccountDetail
@@ -56,6 +58,7 @@ export const AccountsPanel = (props: {
             file={state.file}
             folderPicker={props.folderPicker}
             onOpenUsageHistory={props.onOpenUsageHistory}
+            onConnectAccount={props.onConnectAccount}
             state={state}
           />
         ) : (

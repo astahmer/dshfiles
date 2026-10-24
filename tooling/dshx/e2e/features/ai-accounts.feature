@@ -2,6 +2,12 @@ Feature: AI Accounts
 
   AI Accounts policy settings are available in the real Settings UI.
 
+  @scenario:ai-accounts.sidebar-add
+  Scenario: Add an account from the sidebar without leaving a draft
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When the sidebar add-account button is used beside an unsent draft
+    Then account setup closes without navigating away or losing the composer draft
+
   @smoke
   @scenario:ai-accounts.account-draft
   @scenario:ai-accounts.save-policy

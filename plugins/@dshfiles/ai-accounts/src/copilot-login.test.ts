@@ -1,5 +1,5 @@
 import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CopilotCredentialModel } from './copilot-credentials.js'
 import { createCopilotLoginService } from './copilot-login.js'
 
@@ -46,7 +46,7 @@ describe('GitHub Copilot device sign-in', () => {
     expect(service.state('copilot-personal')).toMatchObject({ status: 'waiting', userCode: 'ABCD-EFGH', verificationUri: 'https://github.com/login/device' })
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    expect(service.state('copilot-personal')).toMatchObject({ status: 'complete', userCode: 'ABCD-EFGH' })
+    expect(service.state('copilot-personal')).toMatchObject({ status: 'complete', userCode: null, verificationUri: null })
     expect(records.get(String(CopilotCredentialModel.key('copilot-personal')))).toEqual({ kind: 'grant', payload: credential })
     expect(JSON.stringify(service.state('copilot-personal'))).not.toContain('copilot-access-token')
     await service.signOut('copilot-personal')
@@ -156,4 +156,118 @@ describe('GitHub Copilot device sign-in', () => {
     const service = createCopilotLoginService({ credentials: undefined, isCopilotAccount: () => false, onChange: () => undefined })
     await expect(service.begin('other-account')).rejects.toThrow('no longer available')
   })
+})
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(done => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+afterEach(() => vi.useRealTimers())
+
+it('ignores stale notifications and delayed cancellation after a newer setup starts', async () => {
+  const { provider, records } = createCredentialProvider()
+  const first = deferred<typeof credential>()
+  const second = deferred<typeof credential>()
+  let lateNotify: (() => void) | undefined
+  let calls = 0
+  const service = createCopilotLoginService({
+    credentials: provider,
+    isCopilotAccount: () => true,
+    onChange: () => {},
+    login: async interaction => {
+      calls += 1
+      if (calls === 1) lateNotify = () => interaction.notify({ type: 'device_code', userCode: 'OLD1-CODE', verificationUri: 'https://github.com/login/device' })
+      return calls === 1 ? first.promise : second.promise
+    },
+  })
+  await service.begin('work', 'old-intent')
+  await service.begin('work', 'new-intent')
+  service.cancel('work', 'old-intent')
+  lateNotify?.()
+  expect(service.state('work')).toMatchObject({ status: 'starting', userCode: null })
+  first.resolve(credential)
+  second.resolve(credential)
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(service.state('work').status).toBe('complete')
+  expect(records.size).toBe(1)
+  service.dispose()
+})
+
+it.each(['cancel', 'remove', 'dispose'] as const)('preserves existing credentials when %s wins a queued credential mutation', async action => {
+  const { provider, records } = createCredentialProvider()
+  const key = String(CopilotCredentialModel.key('work'))
+  const original = { ...credential, access: 'previous-fixture-access' }
+  records.set(key, { kind: 'grant', payload: original })
+  const mutationEntered = deferred<void>()
+  const release = deferred<void>()
+  const modifyRecord = provider.modifyRecord
+  provider.modifyRecord = async (key, mutate) => {
+    mutationEntered.resolve()
+    await release.promise
+    return modifyRecord(key, mutate)
+  }
+  let available = true
+  const service = createCopilotLoginService({ credentials: provider, isCopilotAccount: () => available, onChange: () => {}, login: async () => credential })
+  await service.begin('work')
+  await mutationEntered.promise
+  if (action === 'cancel') service.cancel('work')
+  else if (action === 'remove') {
+    available = false
+    service.reconcile()
+  } else service.dispose()
+  release.resolve()
+  vi.useRealTimers()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(records.get(key)).toEqual({ kind: 'grant', payload: original })
+  expect(service.state('work').status).not.toBe('complete')
+  service.dispose()
+})
+
+it('expires a pending device flow and ignores its late successful grant', async () => {
+  vi.useFakeTimers()
+  const { provider, records } = createCredentialProvider()
+  const pending = deferred<typeof credential>()
+  const service = createCopilotLoginService({ credentials: provider, isCopilotAccount: () => true, onChange: () => {}, login: async () => pending.promise })
+  await service.begin('work')
+  await vi.advanceTimersByTimeAsync(15 * 60_000)
+  expect(service.state('work')).toMatchObject({ status: 'error', userCode: null, verificationUri: null })
+  pending.resolve(credential)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(records.size).toBe(0)
+  service.dispose()
+})
+
+it('preserves a newer credential when the provider completes after an external replacement', async () => {
+  const { provider, records } = createCredentialProvider()
+  const pending = deferred<typeof credential>()
+  const service = createCopilotLoginService({ credentials: provider, isCopilotAccount: () => true, onChange: () => {}, login: async () => pending.promise })
+  await service.begin('work')
+  await Promise.resolve()
+  const newer = { ...credential, access: 'newer-fixture-access' }
+  const key = String(CopilotCredentialModel.key('work'))
+  records.set(key, { kind: 'grant', payload: newer })
+  pending.resolve(credential)
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(records.get(key)).toEqual({ kind: 'grant', payload: newer })
+  expect(service.state('work').status).toBe('error')
+  service.dispose()
+})
+
+it('handles synchronous provider failures without reflecting sensitive diagnostics', async () => {
+  const service = createCopilotLoginService({
+    credentials: undefined,
+    isCopilotAccount: () => true,
+    onChange: () => {},
+    login: () => {
+      throw new Error('private-provider-payload')
+    },
+  })
+  await service.begin('work')
+  await new Promise(resolve => setTimeout(resolve, 0))
+  expect(service.state('work')).toMatchObject({ status: 'error', userCode: null, verificationUri: null })
+  expect(JSON.stringify(service.state('work'))).not.toContain('private-provider-payload')
+  service.dispose()
 })

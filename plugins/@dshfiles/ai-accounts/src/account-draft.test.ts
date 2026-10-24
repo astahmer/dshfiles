@@ -48,6 +48,30 @@ describe('the editor draft following the selection', () => {
     expect(landed).toBe(renamed)
   })
 
+  it('follows external availability changes when the editor has no unsaved edits', () => {
+    const disabled = { ...original, enabled: false }
+    const enabled = stored({ ...original, enabled: true })
+    expect(
+      AccountDraftModel.followSelection({
+        current: disabled,
+        previousSelected: stored(disabled),
+        selected: enabled,
+        selectedId: original.instanceId,
+        followedId: original.instanceId,
+      }),
+    ).toEqual(AccountDraftModel.toDraft(enabled))
+    const typing = { ...disabled, displayName: 'Still typing' }
+    expect(
+      AccountDraftModel.followSelection({
+        current: typing,
+        previousSelected: stored(disabled),
+        selected: enabled,
+        selectedId: original.instanceId,
+        followedId: original.instanceId,
+      }),
+    ).toBe(typing)
+  })
+
   it('keeps a half-typed slug when the store is read again for the same account', () => {
     const typing = { ...original, instanceId: 'fake_ro' }
     expect(

@@ -5,15 +5,22 @@ import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '.
 
 const providerAccounts = (page: Page) => page.getByRole('complementary', { name: 'Provider accounts' })
 
-const addCommandCodeAccount = async (page: Page, input: { readonly name: string; readonly key: string }): Promise<void> => {
+const addCommandCodeAccount = async (page: Page, input: { readonly name: string; readonly key: string; readonly routeSlug?: string }): Promise<void> => {
   await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Command Code account', exact: true }).click()
+  const setup = page.getByRole('dialog', { name: `Configure ${input.name} key`, exact: true })
+  await setup.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(setup).toBeHidden()
+  const slug = page.getByRole('textbox', { name: 'Route slug', exact: true })
+  const number = input.name.match(/ (\d+)$/u)?.[1] ?? '1'
+  await slug.fill(input.routeSlug ?? `commandcode_work${number === '1' ? '' : `_${number}`}`)
+  await slug.blur()
   await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
   const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
   await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
   await baseUrl.blur()
   await expect(page.getByRole('status').filter({ hasText: /^(Saved|Changes save automatically)$/ })).toBeVisible()
-  await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
+  await page.getByRole('button', { name: 'Connect account', exact: true }).click()
   const keyDialog = page.getByRole('dialog', { name: `Configure ${input.name} key`, exact: true })
   await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.key)
   await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click()
@@ -67,7 +74,10 @@ When('a Codex account draft is edited in manual save mode', async ({ page }: { p
   await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
   await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
   await page.getByRole('button', { name: 'Add account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Codex account', exact: true }).click()
+  const setup = page.getByRole('dialog', { name: /^Connect Codex/ })
+  await setup.getByRole('button', { name: 'Finish later', exact: true }).click()
+  await expect(setup).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: 'Display name', exact: true }).fill('E2E Draft Account')
   await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes.' })).toBeVisible()
@@ -92,7 +102,10 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
 When('a Codex account is ready for removal', async ({ page }: { page: Page }) => {
   await openAccountsPanel(page)
   await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Codex account', exact: true }).click()
+  const setup = page.getByRole('dialog', { name: /^Connect Codex/ })
+  await setup.getByRole('button', { name: 'Finish later', exact: true }).click()
+  await expect(setup).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
 })
 
@@ -209,7 +222,10 @@ When('two Codex accounts are added with Priority distribution', async ({ page }:
   await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
   for (const accountName of ['Codex 1', 'Codex 2']) {
     await page.getByRole('button', { name: 'Add account', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Codex account', exact: true }).click()
+    const setup = page.getByRole('dialog', { name: /^Connect Codex/ })
+    await setup.getByRole('button', { name: 'Finish later', exact: true }).click()
+    await expect(setup).toBeHidden()
     await expect(page.getByRole('heading', { name: accountName, exact: true })).toBeVisible()
   }
   const distribution = page.getByRole('combobox', { name: 'Request distribution' })
@@ -611,4 +627,29 @@ Then('the quota forecast shows its account and forecast views', async ({ page }:
 
 After(async ({ page }: { page: Page }) => {
   await stopFakeCommandCode(page)
+})
+
+const sidebarAddOrigins = new WeakMap<Page, string>()
+When('the sidebar add-account button is used beside an unsent draft', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('Keep this unsent draft while connecting an account.')
+  sidebarAddOrigins.set(page, page.url())
+  await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+})
+Then('account setup closes without navigating away or losing the composer draft', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-sidebar-add-preserves-draft', async () => {
+    const dialog = page.getByRole('dialog', { name: 'Add account', exact: true })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Codex account', exact: true }).click()
+    const connect = page.getByRole('dialog', { name: 'Connect Codex 1', exact: true })
+    await expect(connect.getByRole('button', { name: 'Continue with Codex', exact: true })).toBeVisible()
+    await connect.getByRole('button', { name: 'Finish later', exact: true }).click()
+    await expect(connect).toBeHidden()
+    expect(page.url()).toBe(sidebarAddOrigins.get(page))
+    await expect(providerAccounts(page)).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toHaveText(
+      'Keep this unsent draft while connecting an account.',
+    )
+  })
+  await finishJourneyAssertions(page)
 })

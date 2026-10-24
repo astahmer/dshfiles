@@ -24,10 +24,12 @@ interface SecretCatalogImportRequest {
 
 export const ApiKeySetupDialog = (props: {
   readonly draft: AccountDraft
-  readonly state: AccountsPanelState
+  readonly state: Pick<AccountsPanelState, 'credentialInfo' | 'storeCredential' | 'importSecretCatalogKey'>
   readonly folderPicker: WorkspacePickerPorts
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
+  readonly setupNotice?: string
+  readonly errorNotice?: string | null
 }): JSX.Element => {
   const api = useApi(aiAccountsApi)
   const { onOpenChange } = props
@@ -141,6 +143,12 @@ export const ApiKeySetupDialog = (props: {
             Store or replace the key for <code className="dshx:font-mono!">{props.draft.apiKeyEnv.trim() || 'Choose a key name first'}</code>. The value never
             enters AI Accounts JSON or chat.
           </DialogDescription>
+          {props.setupNotice === undefined ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{props.setupNotice}</p>}
+          {props.errorNotice == null ? null : (
+            <p className="dshx:text-sm dshx:text-destructive" role="alert">
+              {props.errorNotice}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="dshx:flex dshx:flex-col dshx:gap-4">

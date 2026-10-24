@@ -328,7 +328,10 @@ export const planBrowserTasks = async () => {
     owners.set(ownerName, owner)
   }
 
-  const fixtureInputsByFeature = new Map([['multi-host', ['scripts/profile-sync.ts']]])
+  const fixtureInputsByFeature = new Map([
+    ['multi-host', ['scripts/profile-sync.ts']],
+    ['ai-accounts', ['plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.ts']],
+  ])
   const e2eTask = owner => ({
     dependsOn: [],
     inputs: rootAnchored([

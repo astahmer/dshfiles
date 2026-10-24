@@ -6,6 +6,7 @@ import type { QuotaContinuationService } from './quota-continuation.js'
 import type { AccountsUsage } from './api.js'
 import type { PricingCatalog } from './pricing-catalog.js'
 import type { CopilotLoginService } from './copilot-login.js'
+import type { AccountLoginService } from './account-login-service.js'
 import type { ModelFallbackRouter } from './model-fallback-router.js'
 import type { FastModeService } from './codex-fast-mode.js'
 import type { FastModeUsageHistoryService } from './fast-mode-usage-history.js'
@@ -21,6 +22,7 @@ interface AccountRuntime {
   usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; latest(): AccountsUsage | undefined; invalidate(): void }
   pricing?: PricingCatalog
   copilotLogin?: CopilotLoginService
+  accountLogin?: AccountLoginService
   modelFallbackRouter?: ModelFallbackRouter
   fastMode?: FastModeService
   fastModeUsageHistory?: FastModeUsageHistoryService
@@ -36,6 +38,7 @@ export const activateAccountRuntime = (ctx: Context): AccountRuntime => {
   ctx.effect(() => () => {
     runtime.scheduler?.dispose()
     runtime.copilotLogin?.dispose()
+    runtime.accountLogin?.dispose()
     runtime.fastMode?.clear()
     if (runtimes.get(ctx.root) === runtime) runtimes.delete(ctx.root)
   })

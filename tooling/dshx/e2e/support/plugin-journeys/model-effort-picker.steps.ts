@@ -1,6 +1,7 @@
+import { seedInertCodexLogin } from '../../../../../plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.js'
 import { expect, type Page } from '@playwright/test'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
 import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '../fake-command-code.js'
 
 const reasoningEffort = (page: Page) => page.getByRole('region', { name: 'Reasoning effort', exact: true })
@@ -112,7 +113,13 @@ When('a supported Codex model is selected in the composer picker', async ({ page
   await page.getByRole('button', { name: 'AI Accounts', exact: true }).click()
   await expect(providerAccounts).toBeVisible()
   await providerAccounts.getByRole('button', { name: 'Add account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Codex account', exact: true }).click()
+  const connect = page.getByRole('dialog', { name: 'Connect Codex 1', exact: true })
+  await connect.getByRole('button', { name: 'Finish later', exact: true }).click()
+  await expect(connect).toBeHidden()
+  await seedInertCodexLogin(profileFor(page).homeRoot, 'Codex 1')
+  await page.getByRole('switch', { name: 'Hidden from model picker', exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
   await page.getByRole('treeitem', { name: /Open a scratch Session for/i }).click()
   await expect(providerAccounts).toBeHidden()
@@ -124,7 +131,7 @@ When('a supported Codex model is selected in the composer picker', async ({ page
   const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
   const modelOptions = modelList.locator('[data-model-picker-option]')
   await search.fill('gpt-')
-  expect(await modelOptions.count()).toBeGreaterThan(1)
+  await expect.poll(() => modelOptions.count()).toBeGreaterThan(1)
   await search.press('ArrowDown')
   await expect(modelOptions.first()).toBeFocused()
   await modelOptions.first().press('ArrowDown')
@@ -222,13 +229,16 @@ When('two Command Code accounts offer the same model in a new thread', async ({ 
     ['Command Code 2', 'e2e-fake-key-BRAVO2'],
   ]) {
     await panel.getByRole('button', { name: 'Add account', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Command Code account', exact: true }).click()
+    const setup = page.getByRole('dialog', { name: `Configure ${name} key`, exact: true })
+    await setup.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(setup).toBeHidden()
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
     await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
     await baseUrl.blur()
     await expect(page.getByRole('status').filter({ hasText: /^(Saved|Changes save automatically)$/ })).toBeVisible()
-    await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
+    await page.getByRole('button', { name: 'Connect account', exact: true }).click()
     const keyDialog = page.getByRole('dialog', { name: `Configure ${name} key`, exact: true })
     await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(key)
     await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click()

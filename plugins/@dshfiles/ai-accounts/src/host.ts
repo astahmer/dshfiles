@@ -4,6 +4,7 @@ export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
+import { accountLoginHostApi, installAccountLogin, AccountLoginHostModel } from './account-login-host.js'
 import { closeModelFallbacks, modelFallbackHostApi, modelFallbacksFor } from './model-fallback-host.js'
 import { createModelFallbackRouter } from './model-fallback-router.js'
 import { ModelFallbackModel } from './model-fallback.js'
@@ -92,13 +93,14 @@ const PRICING_CHECK_MS = 30 * 60_000
 export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials', 'agents'],
-  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi],
+  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, accountLoginHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],
   setup: api => {
     const ctx = api.raw.ctx
     const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
+    installAccountLogin(ctx)
     const usageHistory = createUsageHistoryService(ctx)
     const fastModeUsageHistory = createFastModeUsageHistoryService(ctx, {
       readRetentionDays: async () => (await usageHistory.readSettings()).retentionDays,
@@ -568,6 +570,7 @@ export default definePlugin({
 
     let registeredProviders: ReadonlySet<string> = new Set()
     const applyRouteSnapshot = (sourceFile: AccountStoreFile): void => {
+      runtime.accountLogin?.reconcile(AccountLoginHostModel.accountsFromFile(sourceFile))
       const nextConfig = configFromAccountsFile(sourceFile)
       const takenProviders = new Set(
         llm
@@ -622,6 +625,7 @@ export default definePlugin({
       pool.setDistribution(nextConfig.distribution)
       config = nextConfig
       routes = nextRoutes
+      runtime.copilotLogin?.reconcile()
       profiles = buildProfiles(nextRoutes, sourceFile)
       reasoningDefaults.clear()
       for (const [id, pins] of buildReasoningDefaults(sourceFile)) reasoningDefaults.set(id, pins)
