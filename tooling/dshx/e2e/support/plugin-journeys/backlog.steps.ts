@@ -1025,8 +1025,10 @@ When('a reply with an image is added', async ({ page }: { page: Page }) => {
 
 When('the user reply is edited with keyboard navigation', async ({ page }: { page: Page }) => {
   const activity = peek(page).getByRole('list', { name: 'Activity' })
-  const edit = activity.getByRole('button', { name: 'Edit your reply', exact: true })
-  await edit.focus()
+  const actions = activity.getByRole('button', { name: 'Reply actions', exact: true })
+  await actions.focus()
+  await page.keyboard.press('Enter')
+  await page.getByRole('menuitem', { name: 'Edit reply', exact: true }).focus()
   await page.keyboard.press('Enter')
   const editor = activity.getByRole('textbox', { name: 'Edit reply', exact: true })
   await expect(editor).toBeVisible()
@@ -1052,7 +1054,8 @@ When('the user reply is deleted after confirmation', async ({ page }: { page: Pa
     confirmationMessage = dialog.message()
     void dialog.accept()
   })
-  await activity.getByRole('button', { name: 'Delete your reply', exact: true }).click()
+  await activity.getByRole('button', { name: 'Reply actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Delete reply', exact: true }).click()
   expect(confirmationMessage).toBe('Delete this reply? This cannot be undone.')
 })
 

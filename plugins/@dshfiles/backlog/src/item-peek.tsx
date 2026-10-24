@@ -27,6 +27,7 @@ import {
   MessageSquareIcon,
   MessagesSquareIcon,
   Minimize2Icon,
+  MoreHorizontalIcon,
   PencilIcon,
   PinIcon,
   PlusIcon,
@@ -433,7 +434,7 @@ const Conversation = (props: {
                 <p className="dshx:text-xs dshx:text-muted-foreground">
                   <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
                 </p>
-                <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
+                <div className="dshx:group dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
                   {isEditing ? (
                     <>
                       <textarea
@@ -479,32 +480,37 @@ const Conversation = (props: {
                       <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
                       <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
                       {canEdit ? (
-                        <div className="dshx:flex dshx:flex-wrap dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Edit your reply"
-                            onClick={() => {
-                              setCommentFailure(null)
-                              setCommentDraft(run.event.detail)
-                              setEditingComment(commentId ?? null)
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete your reply"
-                            onClick={() => {
-                              if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
-                              void actions.deleteComment
-                                .mutateAsync({ id: props.itemId, commentId })
-                                .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
-                            }}
-                          >
-                            Delete
-                          </Button>
+                        <div className="dshx:flex dshx:justify-end dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-within:opacity-100">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon-sm" aria-label="Reply actions" className="dshx:text-muted-foreground">
+                                <MoreHorizontalIcon aria-hidden className="dshx:size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="dshx-root dshx:min-w-36">
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  setCommentFailure(null)
+                                  setCommentDraft(run.event.detail)
+                                  setEditingComment(commentId ?? null)
+                                }}
+                              >
+                                <PencilIcon aria-hidden className="dshx:size-3.5" /> Edit reply
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="dshx:text-destructive dshx:focus:text-destructive"
+                                onSelect={() => {
+                                  if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
+                                  void actions.deleteComment
+                                    .mutateAsync({ id: props.itemId, commentId })
+                                    .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
+                                }}
+                              >
+                                Delete reply
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       ) : null}
                     </>
