@@ -411,6 +411,38 @@ export const jjIntegrationApi = defineApi({
                 .join('; ')}). Ask the user before passing force: true.`,
       },
     }),
+    discardMany: method({
+      input: z.object({ paths: z.array(z.string().min(1)).min(1).max(100), force: z.boolean(), confirm: z.literal(true) }).strict(),
+      output: z
+        .object({
+          results: z.array(
+            z
+              .object({
+                path: z.string(),
+                status: z.enum(['discarded', 'has-work', 'error']),
+                revisions: z.array(revisionSchema),
+                error: z.string().nullable(),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+      description:
+        'Remove up to 100 specified thread workspaces in one request. Each target follows jj_thread_discard rules: with force false, unlanded revisions are kept; force true abandons them. Requires confirm: true as explicit opt-in, and force: true only when the user explicitly authorized abandoning unlanded work. Each target reports its own result and failures do not prevent later targets. Call only when the user asked to remove these workspaces.',
+      tool: {
+        name: 'jj_thread_discard_many',
+        render: output =>
+          output.results
+            .map(result =>
+              result.status === 'discarded'
+                ? `Removed ${result.path}.`
+                : result.status === 'has-work'
+                  ? `Kept ${result.path}: ${String(result.revisions.length)} unlanded revision(s).`
+                  : `Failed ${result.path}: ${result.error ?? 'unknown error'}`,
+            )
+            .join('\n'),
+      },
+    }),
     cleanupWorkspaces: method({
       input: cleanupRequestSchema.extend({ apply: z.boolean() }).strict(),
       output: cleanupResultSchema,

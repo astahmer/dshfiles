@@ -874,6 +874,24 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
 }
 
+const discardThreads = async (input: { readonly paths: readonly string[]; readonly force: boolean }) => {
+  const results: {
+    readonly path: string
+    readonly status: 'discarded' | 'has-work' | 'error'
+    readonly revisions: Awaited<ReturnType<typeof discardThread>>['revisions']
+    readonly error: string | null
+  }[] = []
+  for (const path of input.paths) {
+    try {
+      const result = await discardThread({ path, force: input.force })
+      results.push({ path, ...result, error: null })
+    } catch (error) {
+      results.push({ path, status: 'error', revisions: [], error: errorText(error) })
+    }
+  }
+  return { results }
+}
+
 const HOUR_MS = 60 * 60_000
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 400)
@@ -1342,6 +1360,7 @@ const api = jjIntegrationApi.host({
   },
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
+  discardMany: ({ input }) => discardThreads(input),
   cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
   startCleanup: ({ input }) => {
     const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
