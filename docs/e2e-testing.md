@@ -96,8 +96,9 @@ from the app root (see the `verify-dsh` skill).
 
 `features:check` fails on a bundle feature with neither a scenario nor a
 `not-applicable` reason, a library feature without a unit test, a missing,
-duplicated or misplaced tag, a test name no longer found in its file, or an
-orphan tag. It proves the catalog is
+duplicated or misplaced tag, a test name no longer found in its file, an
+orphan tag, or a broken telemetry entry (see
+[the telemetry contract](observability.md#the-telemetry-contract-checked)). It proves the catalog is
 consistent, not that it is exhaustive: whether every behavior is listed is a
 review question.
 

@@ -32,6 +32,16 @@ fnm exec --using=22.23.3 node -e "import('./dist/index.js')"   # 22.23.3 = .node
 An import failure here is exactly what shows up at boot as "did not activate". `dist/` is not versioned.
 Changed classes? Rebuild `@dshfiles/ui-styles` too (skill `plugin-ui`).
 
+Then the catalog contract, spans included:
+
+```sh
+fnm exec --using=22.23.3 pnpm --dir tooling/dshx run features:check
+```
+
+A new or changed feature lists `telemetry`; new Host I/O (fetch, socket, child process, subprocess spawn) opens a span
+or is named in `ioDelegation`, and a `custom` span's test calls `recordSpans()` and asserts the span by name. `dshx
+build` rejects a catalog without `telemetry`. Rules: `docs/observability.md#the-telemetry-contract-checked`.
+
 ## 2. HMR or restart?
 
 | Change | Reaches the running DSH |

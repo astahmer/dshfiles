@@ -24,6 +24,19 @@ const changed = execFileSync('jj', ['diff', '--from', from, '--to', to, '--name-
   .split('\n')
   .filter(Boolean)
 
+// A plugin change can add a feature or Host I/O without its Gherkin or telemetry entry; the catalog check is fast.
+const catalogInputs = [
+  'plugins/@dshfiles/',
+  'tooling/dshx/packages/dshx/src/project/features.ts',
+  'tooling/dshx/scripts/feature-coverage.mjs',
+  'tooling/dshx/scripts/telemetry-coverage.mjs',
+  'tooling/dshx/e2e/features/',
+]
+if (changed.some(path => catalogInputs.some(input => path.startsWith(input)))) {
+  console.log('check:diff: plugin catalogs (Gherkin and telemetry coverage)')
+  run(process.execPath, ['--experimental-strip-types', 'tooling/dshx/scripts/feature-coverage.mjs', '--check'])
+}
+
 const targets = changed.filter(path => lintRoots.some(root => path === root || path.startsWith(`${root}/`)) && existsSync(path))
 // Oxlint exits non-zero when a path list holds nothing it can parse, which a manifest-only change under a lint root is.
 const lintTargets = targets.filter(path => lintExtensions.some(extension => path.endsWith(extension)))

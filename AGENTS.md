@@ -20,6 +20,7 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `maintain-verify-dsh` — after changing how DSH is launched, seeded, driven or verified (e2e support, `dshx dev`, catalog schema, profile seeding, a feature's UI path).
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
 - `complete-plan` — when a plan's last task is done and verified: move its durable content into docs and delete it.
+- `traces-first` — when something is slow or failing: read the stored traces (`traces_*` tools) before reading code.
 
 Shared skills (`~/.agents/skills/`) for the same kinds of work:
 
@@ -272,6 +273,17 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
   [`plans/dsh-host-gaps.md`](plans/dsh-host-gaps.md) instead of faking the action
   client-side. The per-owner audit and backlog live in
   [`docs/agent-tool-parity.md`](docs/agent-tool-parity.md).
+- **Host work leaves a span, and the catalog says which.** Every feature in
+  `dshx.features.json` lists `telemetry`: the `automatic` spans it already gets
+  (`api-dispatch`, `agent-tool`, `model-stream`, or the shared `jj` / `secret`
+  / `multi-host` helpers), a `custom` span with the `recordSpans()` test that
+  asserts it, or a `not-applicable` reason (client-only, pure functions). Host
+  code that fetches, opens a socket, spawns a process or runs a long job wraps
+  that work unit in `withSpan`/`traced` (one span per unit, named
+  `<subject> <verb>`, identities and counts only) or names its caller's span in
+  `ioDelegation`. `features:check` and `dshx build` fail an addition or update
+  that skips this. See
+  [the telemetry contract](docs/observability.md#the-telemetry-contract-checked).
 - Loader row ids share one namespace per profile: keep the scope in the id
   (`@dshfiles/shortcuts` → `dshfiles-shortcuts`). `defineSettings.namespace`
   must equal that row id, and one Host entry cannot declare both native

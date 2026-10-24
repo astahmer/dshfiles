@@ -75,7 +75,9 @@ rule exceeding its cap in `scripts/lint-ratchet.json`, fails; lower a cap when
 you fix sites, never raise it.
 
 `node --run check:diff` lints and format-checks only the paths your revision
-touches, and `node --run check:green` runs everything except lint/format.
+touches, and, when the revision touches a plugin or the catalog checker, runs
+the feature-catalog check (Gherkin and telemetry coverage, a few seconds);
+`node --run check:green` runs everything except lint/format.
 `check:green` ends with `check:plugin-boot` and `check:e2e:smoke` (the `@smoke`
 journeys only); before landing a plugin change, also run
 `pnpm run check:e2e <plugin>` (its journeys, headless, serial; `node --run` would

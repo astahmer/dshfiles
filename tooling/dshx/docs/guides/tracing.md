@@ -155,7 +155,22 @@ expect(recorder.span('backlog triage').attributes['dshx.backlog.items']).toBe(1)
 ```
 
 `recorder.children(span)` checks nesting; the recorder sees spans from every dshx copy in the process, so a test of
-one plugin also sees the API and process spans its call caused.
+one plugin also sees the API and process spans its call caused. Recording turns tracing on for the process, so code
+guarded by `tracingEnabled()` records too.
+
+**Declare it in the catalog.** Every `dshx.features.json` feature lists `telemetry`, and `features:check` and
+`dshx build` check it: `automatic` sources (`api-dispatch`, `agent-tool`, `model-stream`, `jj`, `secret`,
+`multi-host`) need Host-code evidence, a `custom` span needs a Host source string with its name and a named test that
+calls `recordSpans()` and asserts it, and every Host file that does network or process I/O opens a span or is named in
+`ioDelegation`. `dshx create` scaffolds `src/work.ts`, `tests/telemetry.spec.ts` and a catalog that already pass. The
+contract is described in [observability](../../../../docs/observability.md#the-telemetry-contract-checked).
+
+```json
+"telemetry": [
+  { "kind": "automatic", "source": "api-dispatch" },
+  { "kind": "custom", "span": "backlog triage", "file": "plugins/@dshfiles/backlog/src/triage.test.ts", "testName": "records a backlog triage span" }
+]
+```
 
 ## Runtime model
 

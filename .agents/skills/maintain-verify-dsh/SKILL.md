@@ -26,7 +26,10 @@ If none applies, stop: **Clean**.
 
 1. **Hygiene.**
    `fnm exec --using=22.23.3 pnpm --dir tooling/dshx run features:check` — every
-   catalog parses, `reach` steps match the grammar and end with `expect`. List
+   catalog parses, `reach` steps match the grammar and end with `expect`, and
+   every feature's `telemetry` holds (automatic sources backed by Host code,
+   custom spans emitted and asserted by a `recordSpans()` test, Host I/O
+   spanned or delegated). List
    the affected features: changed catalogs, plus features whose plugin source
    changed (`jj diff --name-only`). A new user-facing feature gets `reach` when
    one short path from the app root reaches it.

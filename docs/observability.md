@@ -95,10 +95,18 @@ no-op.
 - Every dshx API dispatch (browser, plugin or agent tool) is a server span
   `<api id>/<method>`: package, API id, method, caller kind, outcome code and
   duration.
-- Under it: `jj <subcommand>` (jujutsu, jj-integration), `secret resolve` and
-  `secret <verb>` (secret-catalog), `jev classify` (backlog, memory: model,
-  provider, HTTP status, token counts), multi-host gateway
-  `<namespace>/<method>` requests (forwarding `traceparent`) and
+- Under it: `jj <subcommand>` (jujutsu, jj-integration, backlog, pulls-review),
+  `git worktree` (jj-integration), `secret resolve` and `secret <verb>`
+  (secret-catalog), `jev classify` (backlog, memory: model, provider, HTTP
+  status, token counts), multi-host gateway `<namespace>/<method>` requests
+  (forwarding `traceparent`), `ssh command` and `ssh tunnel open` (multi-host),
+  `ai-accounts provider request` (quota, catalog and credit HTTP calls, host and
+  status only), `keychain read`, `mcp registry search`, `mcp server start`,
+  `project-checks run`, `brave search`, `dsh release check`,
+  `marketplace hub request`, `tweet context fetch` and `ffmpeg sample`,
+  `worktree-memory probe`, `usage index`, `usage metrics export`,
+  `background-jobs history pass`, `session tail read` (session-controller),
+  `otlp ingest` (traces receiver, metrics and logs only) and
   `jj-integration workspace sync`.
 - `dshx checkout sync` records its own span, continuing a `TRACEPARENT`
   environment variable when set.
@@ -108,6 +116,40 @@ no-op.
   tool call and the plugin work it caused land in one trace with no per-plugin
   code. To add a span of your own, see
   [Add tracing to a plugin](../tooling/dshx/docs/guides/tracing.md#add-tracing-to-a-plugin).
+
+### The telemetry contract (checked)
+
+Span coverage is a contract, checked like Gherkin coverage: `features:check`
+(`tooling/dshx/scripts/feature-coverage.mjs`, which calls
+`telemetry-coverage.mjs`) and `dshx build` fail a plugin that breaks it. Every
+feature in a `dshx.features.json` lists `telemetry`, one or more of:
+
+| Entry                                                   | Means                                                                                                                                                                                                                                                                                                                         | Checked                                                                                                                                                                     |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ "kind": "automatic", "source": … }`                  | The span exists without plugin code: `api-dispatch` (`<api id>/<method>`), `agent-tool` (`execute_tool <name>`), `model-stream` (`chat <model>`), or a shared helper another owned plugin opens: `jj` (jujutsu / jj-integration APIs), `secret` (`secretCatalogValues`), `multi-host` (gateway). | The package's Host code (or an owned dshx module it imports) contains the thing that emits it: `defineApi`, a tool binding, a `ctx.llm` stream, the helper's import or service. |
+| `{ "kind": "custom", "span", "file", "testName" }`      | A span this plugin opens with `withSpan` / `traced`. `span` is its name; `<word>` marks a dynamic part (`jj <subcommand>`).                                                                                                                                                                                                       | A Host source string emits the name; the named test exists, calls `recordSpans()` and names a concrete span matching it.                                                      |
+| `{ "kind": "not-applicable", "reason" }` (stands alone) | No span is worth having: client-only presentation, a pure in-memory function, a registry. Never on a `tool` surface (those always list `agent-tool`).                                                                                                                                                                             | Reason of 20+ characters.                                                                                                                                                     |
+
+The source rule catches new I/O no catalog mentions: every Host-reachable file
+(the `dshx.config.ts` Host entry and modules, followed through relative
+imports; tests excluded) that calls `fetch`, imports `node:http(s)/net/tls/dgram`
+or `node:child_process` for values, or spawns through the subprocess service
+must open a span itself (`withSpan`, `traced`, `startSpan`) or be listed in the
+catalog's `ioDelegation` with a reason, and optionally `tracedBy` naming one of
+its custom spans, when its caller opens the span (a runner the traced wrapper
+calls, a transport under `chat <model>`, the subprocess runtime itself). A stale
+delegation (no I/O any more, or the file opens its own span) fails too.
+
+Keep it cheap: a feature served through a dshx API or an agent tool lists the
+automatic source and is done. Add a custom span only for work that leaves the
+process (network, child process, a socket), runs long (an index pass, a scan)
+or is a hot read worth timing; wrap the call once at the work-unit boundary,
+and prove it with one `recordSpans()` test. The `traces` receiver records no
+span for `/v1/traces` requests: one per batch would be exported back into it
+forever; its `traces_status` counters observe them instead.
+
+`features:report` prints the telemetry column per feature and the
+automatic/custom/not-applicable totals.
 
 Spans carry identities, outcome codes, counts and durations only: no API
 arguments or results, command positionals or flag values, secret values,
