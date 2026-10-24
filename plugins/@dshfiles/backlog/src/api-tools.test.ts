@@ -77,6 +77,23 @@ describe('backlog tool exposure', () => {
     }
   })
 
+  test('comments accept an attachment-only reply, but reject an empty comment', () => {
+    const input = backlogApi.methods.comment.input
+    if (input === undefined) throw new Error('Comment input schema is missing.')
+    const validate = (value: unknown): boolean => {
+      const result = input['~standard'].validate(value)
+      return !('issues' in result)
+    }
+    expect(
+      validate({
+        id: 1,
+        text: '',
+        files: [{ id: 'reply-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
+      }),
+    ).toBe(true)
+    expect(validate({ id: 1, text: '' })).toBe(false)
+  })
+
   test('item writes name the bar for acting on their own', () => {
     for (const name of [
       'capture',

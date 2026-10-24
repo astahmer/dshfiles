@@ -226,7 +226,7 @@ export const backlogApi = defineApi({
         .strict(),
       output: detailSchema,
       description: `Add one item to the backlog; the calling thread is linked to it. ${writeNote}`,
-      tool: { name: 'backlog_capture', readOnly: false, render: renderCreatedPreview }
+      tool: { name: 'backlog_capture', readOnly: false, render: renderCreatedPreview },
     }),
     attachFile: method({
       input: z.object({ id: idSchema, file: fileInputSchema }).strict(),
@@ -356,7 +356,7 @@ export const backlogApi = defineApi({
         .strict(),
       output: z.object({ sessionId: z.string().min(1), linked: z.array(idSchema), missing: z.array(idSchema) }).strict(),
       description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, told what to work on and linked to every item. ${writeNote}`,
-      tool: { name: 'backlog_start_thread', readOnly: false }
+      tool: { name: 'backlog_start_thread', readOnly: false },
     }),
     acknowledge: method({
       input: z.object({ ids: z.array(idSchema).max(500) }).strict(),
@@ -379,7 +379,7 @@ export const backlogApi = defineApi({
         .strict(),
       output: backfillOutputSchema,
       description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. ${writeNote}`,
-      tool: { name: 'backlog_triage_backfill', readOnly: false }
+      tool: { name: 'backlog_triage_backfill', readOnly: false },
     }),
     backfillTriageStatus: method({
       input: z.object({ jobId: z.string().min(1).max(100) }).strict(),
@@ -403,16 +403,17 @@ export const backlogApi = defineApi({
       input: z
         .object({
           id: idSchema,
-          text: z.string().min(1).max(BacklogItems.maxBodyChars),
+          text: z.string().max(BacklogItems.maxBodyChars).describe('Reply text; it may be empty only when the comment includes an attachment.'),
           files: z
             .array(fileInputSchema)
             .max(BacklogItems.maxAttachments)
             .optional()
             .describe('Images or files the comment carries: base64 `data` without a data-URL prefix, with kind, name, media type and byte size.'),
         })
-        .strict(),
+        .strict()
+        .refine(input => input.text.trim() !== '' || (input.files?.length ?? 0) > 0, 'Add reply text or at least one attachment.'),
       output: detailResultSchema,
-      description: `Add a progress comment to a backlog item, optionally with images or files; references in it become links. ${writeNote}`,
+      description: `Add a progress comment to a backlog item with text or attachments; references in the text become links. ${writeNote}`,
       tool: { name: 'backlog_comment', readOnly: false, render: renderDetailPreview },
     }),
   },
