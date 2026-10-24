@@ -144,7 +144,13 @@ import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
-import { EMPTY_THREAD_SELECTION, THREAD_MAIN_BUTTON_SELECTOR, ThreadSelectionModel, type ThreadSelectionState } from './thread-selection.js'
+import {
+  EMPTY_THREAD_SELECTION,
+  THREAD_MAIN_BUTTON_SELECTOR,
+  isThreadSelectionBackgroundClick,
+  ThreadSelectionModel,
+  type ThreadSelectionState,
+} from './thread-selection.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -3887,15 +3893,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     const target = event.target
     if (!(target instanceof Element)) return
-    // Portalled menus and dialogs keep this React tree as their parent, so their clicks arrive here too.
-    if (target.closest('[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="dialog"]') !== null) return
-    const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
-    if (rowButton === null || !event.currentTarget.contains(rowButton)) {
+    if (isThreadSelectionBackgroundClick({ target, surface: event.currentTarget })) {
       if (!event.shiftKey && !event.metaKey && !event.ctrlKey && threadSelection.sessionIds.length > 0) {
         setThreadSelection(EMPTY_THREAD_SELECTION)
       }
       return
     }
+    const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+    if (rowButton === null || !event.currentTarget.contains(rowButton)) return
     const sessionId = rowButton.dataset.threadId
     if (sessionId === undefined) return
     if (event.shiftKey) {
@@ -4132,6 +4137,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         className="dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
         aria-label={props.tSidebar(isBoard ? 'threadSidebarBoardTitle' : 'threadSidebarTitle')}
         data-thread-surface={surface}
+        onClickCapture={handleSelectionClickCapture}
+        onContextMenuCapture={handleSelectionContextMenuCapture}
       >
         <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
           {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
@@ -4580,8 +4587,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           onKeyDown={event => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}
-          onClickCapture={handleSelectionClickCapture}
-          onContextMenuCapture={handleSelectionContextMenuCapture}
         >
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
