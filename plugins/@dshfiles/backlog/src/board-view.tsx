@@ -309,7 +309,8 @@ export const BoardView = (props: {
   return (
     <div
       ref={boardRoot}
-      className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-auto dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}
+      data-backlog-board
+      className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-hidden dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}
     >
       {boardStatuses.map(status => {
         const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
@@ -320,7 +321,7 @@ export const BoardView = (props: {
             data-backlog-column={status}
             aria-label={`${ItemGlyphs.statusLabels[status]} column`}
             className={cn(
-              'dshx:flex dshx:min-h-0 dshx:max-w-80 dshx:min-w-64 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
+              'dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
               target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
             )}
           >

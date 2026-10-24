@@ -300,6 +300,16 @@ Then('the board columns follow the status order through Dropped', async ({ page 
   })
 })
 
+Then('the board columns do not scroll horizontally', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-board-no-horizontal-scroll', async () => {
+    const board = page.locator('[data-backlog-board]')
+    const boardOverflows = await board.evaluate(element => element.scrollWidth > element.clientWidth)
+    const columnsOverflow = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.some(column => column.scrollWidth > column.clientWidth))
+    expect(boardOverflows).toBe(false)
+    expect(columnsOverflow).toBe(false)
+  })
+})
+
 Then('the In progress column holds {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-board-move', async () => {
     await expect(page.getByRole('region', { name: 'In progress column' })).toContainText(title)

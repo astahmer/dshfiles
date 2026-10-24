@@ -61,6 +61,7 @@ Feature: Backlog
     And "Child step, part of b:1" is captured
     When item b:2 is moved to In progress on the board
     Then the board columns follow the status order through Dropped
+    And the board columns do not scroll horizontally
     And the In progress column holds "Child step, part of b:1"
     When backlog item b:1 is opened
     Then it is referenced by "Child step, part of b:1"
