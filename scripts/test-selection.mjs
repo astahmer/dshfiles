@@ -113,6 +113,59 @@ const buildRequiredFor = ({ packages, sharedChecks }) => {
   return { required: false, reason: 'related tests import source only' }
 }
 
+const packageSourceEntry = name => {
+  const shortName = name.replace(/^@dshfiles\//, '')
+  for (const base of ['plugins/@dshfiles', 'tooling/dshx/packages'])
+    for (const entry of ['src/index.ts', 'src/host.ts', 'src/client.ts'])
+      if (existsSync(join(repositoryRoot, base, shortName, entry))) return join(repositoryRoot, base, shortName, entry)
+  return null
+}
+
+const sourceImports = path => {
+  const source = readFileSync(path, 'utf8')
+  return [...source.matchAll(/(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]/g)].map(match => match[1])
+}
+
+const resolveSourceImport = (fromFile, specifier) => {
+  if (specifier.startsWith('.')) {
+    const base = resolve(dirname(fromFile), specifier)
+    for (const candidate of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), base.replace(/\.js$/, '.ts')])
+      if (existsSync(candidate)) return candidate
+    return null
+  }
+  return specifier.startsWith('@dshfiles/') ? packageSourceEntry(specifier) : null
+}
+
+// A dependent test runs only when its static import closure reaches one of the changed packages.
+const reachesChangedPackage = (startFile, changedPackages) => {
+  const seen = new Set()
+  const stack = [startFile]
+  while (stack.length > 0) {
+    const file = stack.pop()
+    if (seen.has(file)) continue
+    seen.add(file)
+    for (const specifier of sourceImports(file)) {
+      if (changedPackages.has(specifier) || [...changedPackages].some(name => specifier.startsWith(`${name}/`))) return true
+      const next = resolveSourceImport(file, specifier)
+      if (next !== null) stack.push(next)
+    }
+  }
+  return false
+}
+
+const narrowDependentTests = ({ packages, changedPackages }) => {
+  const narrowed = new Map()
+  for (const packageInfo of packages) {
+    if (packageInfo.mode !== 'full' || changedPackages.has(packageInfo.name) || fullSuitePackages.has(packageInfo.name)) continue
+    const tests = testFilesOf(join(repositoryRoot, packageInfo.directory))
+    const selected = tests
+      .filter(testFile => reachesChangedPackage(testFile, changedPackages))
+      .map(testFile => relative(join(repositoryRoot, packageInfo.directory), testFile))
+    narrowed.set(packageInfo.name, selected)
+  }
+  return narrowed
+}
+
 const discoverPackages = () =>
   ['plugins/@dshfiles', 'tooling/dshx/packages'].flatMap(packageRoot =>
     readdirSync(join(repositoryRoot, packageRoot), { withFileTypes: true })
@@ -144,7 +197,8 @@ const main = () => {
       to: { type: 'string', default: '@' },
       'dry-run': { type: 'boolean', default: false },
       since: { type: 'string' },
-      build: { type: 'string', default: 'always' },
+      build: { type: 'string', default: 'auto' },
+      consumers: { type: 'string', default: 'full' },
     },
     allowPositionals: true,
   })
@@ -166,6 +220,7 @@ const main = () => {
   if (mode === 'related' && files.some(path => !existsSync(join(repositoryRoot, path))))
     throw new Error('Related source paths must exist; use changed mode for deleted files.')
   const selection = selectTests({ packages: discoverPackages(), files, deletedFiles: files.filter(path => !existsSync(join(repositoryRoot, path))) })
+  const changedPackages = new Set(selection.filter(packageInfo => packageInfo.files.length > 0).map(packageInfo => packageInfo.name))
   const sharedChecks = files.some(
     path =>
       !isDocumentation(path) &&
@@ -177,8 +232,15 @@ const main = () => {
         path.startsWith('profiles/')),
   )
   if (values.build !== 'always' && values.build !== 'auto') throw new Error('Expected --build always or auto.')
+  if (values.consumers !== 'full' && values.consumers !== 'related') throw new Error('Expected --consumers full or related.')
+  const narrowed = values.consumers === 'related' && !sharedChecks ? narrowDependentTests({ packages: selection, changedPackages }) : new Map()
   const buildDecision = buildRequiredFor({ packages: selection, sharedChecks })
-  const build = values.build === 'always' ? { required: true, reason: 'forced' } : buildDecision
+  const build =
+    narrowed.size > 0
+      ? { required: true, reason: 'dependent tests load built packages' }
+      : values.build === 'always'
+        ? { required: true, reason: 'forced' }
+        : buildDecision
   console.log(
     JSON.stringify(
       {
@@ -186,6 +248,7 @@ const main = () => {
         sharedChecks,
         build,
         packages: selection.map(packageInfo => ({ name: packageInfo.name, mode: packageInfo.mode, files: packageInfo.files })),
+        consumers: narrowed.size === 0 ? undefined : [...narrowed].map(([name, tests]) => ({ name, tests: tests.length, files: tests })),
       },
       null,
       2,
@@ -201,13 +264,22 @@ const main = () => {
   if (selection.length === 0) return
   if (!build.required) console.log(`test selection: skipped build (${build.reason}); pass --build=always on a cold workspace.`)
   if (build.required) {
-    const buildFilters = selection.map(packageInfo => `--filter=${packageInfo.name}`)
+    const buildTargets = narrowed.size > 0 && changedPackages.size > 0 ? [...changedPackages] : selection.map(packageInfo => packageInfo.name)
+    const buildFilters = buildTargets.map(name => `--filter=${name}`)
     if (files.some(path => path.startsWith('plugins/@dshfiles/') && /\.(ts|tsx|js|jsx|css|html)$/.test(path)))
       buildFilters.push('--filter=...@dshfiles/plugin-ui')
     run({ args: ['exec', 'turbo', 'run', 'build', ...buildFilters] })
   }
-  const full = selection.filter(packageInfo => packageInfo.mode === 'full')
+  const full = selection.filter(packageInfo => packageInfo.mode === 'full' && !narrowed.has(packageInfo.name))
   if (full.length > 0) run({ args: ['exec', 'turbo', 'run', 'test', ...full.map(packageInfo => `--filter=${packageInfo.name}`)] })
+  for (const [packageName, tests] of narrowed) {
+    const packageInfo = selection.find(candidate => candidate.name === packageName)
+    if (tests.length === 0) {
+      console.log(`test selection: skipped full suite of ${packageName} (no test reaches the changed packages)`)
+      continue
+    }
+    run({ args: ['exec', 'vitest', 'run', ...tests, '--passWithNoTests'], cwd: join(repositoryRoot, packageInfo.directory) })
+  }
   for (const packageInfo of selection.filter(packageInfo => packageInfo.mode === 'related')) {
     const match = /^vitest run(?: (.*))?$/.exec(packageInfo.test)
     if (!match) {

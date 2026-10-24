@@ -17,6 +17,10 @@ const dryRun = path => JSON.parse(execFileSync(process.execPath, [selectionScrip
 const dryRunAutoBuild = path =>
   JSON.parse(execFileSync(process.execPath, [selectionScript, 'related', path, '--dry-run', '--build=auto'], { encoding: 'utf8' }))
 
+test('auto build is the default and skips source-only related runs', () => {
+  assert.equal(dryRun('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
+})
+
 test('auto build skips source-only related runs and builds dist loaders and full dependents', () => {
   assert.equal(dryRunAutoBuild('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
   const distLoader = dryRunAutoBuild('plugins/@dshfiles/prompt-stash/src/host.ts')
@@ -25,6 +29,19 @@ test('auto build skips source-only related runs and builds dist loaders and full
   const dependent = dryRunAutoBuild('plugins/@dshfiles/usage/src/command-identifiers.ts')
   assert.equal(dependent.build.required, true)
   assert.match(dependent.build.reason, /full suite/)
+})
+
+test('consumer narrowing selects fewer dependent tests and keeps full suites for dynamic packages', () => {
+  const narrowed = JSON.parse(
+    execFileSync(process.execPath, [selectionScript, 'related', 'plugins/@dshfiles/usage/src/session-log.ts', '--dry-run', '--consumers=related'], {
+      encoding: 'utf8',
+    }),
+  )
+  assert.equal(narrowed.build.required, true)
+  assert.ok(narrowed.consumers.length > 0)
+  assert.ok(narrowed.consumers.every(consumer => consumer.tests < 5))
+  const fullSuites = narrowed.packages.filter(packageInfo => packageInfo.mode === 'full').map(packageInfo => packageInfo.name)
+  assert.ok(fullSuites.includes('@dshfiles/jj-integration'))
 })
 
 test('CLI rejects an unknown build mode', () => {
