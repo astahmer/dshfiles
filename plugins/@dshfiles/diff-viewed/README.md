@@ -16,11 +16,18 @@ while its Session lives, so a mark cannot outlive the diff it reviewed: a later
 turn that edits the file again is a new review and reads as not viewed. Marks
 live in the Host's durable `diff_viewed` storage domain, capped at the 2,000
 most recent, so every browser, plugin and CLI reads the same review progress.
-The `diff-viewed` API serves the snapshot and the toggles; a browser whose Host
-does not serve it yet (an older Host, or the HMR window before a restart) keeps
-its own `localStorage` marks and hands them to the Host once it does. The Host
-forgets summaries when a Session is disposed or the Host restarts, so a mark is
-only useful as long as the review it belongs to.
+The `diff-viewed` API serves the snapshot and the toggles, plus an idempotent
+`mark({ sessionId, seq, path, viewed })` for callers that mark while scrolling
+instead of on a click; a browser whose Host does not serve it yet (an older Host,
+or the HMR window before a restart) keeps its own `localStorage` marks and hands
+them to the Host once it does. The Host forgets summaries when a Session is
+disposed or the Host restarts, so a mark is only useful as long as the review it
+belongs to.
+
+The contract is published as the `@dshfiles/diff-viewed/marks-api` dshx module,
+because `@dshfiles/pulls-review` reads and writes the same record: its all-files
+review and this toolbar toggle show one progress. The API also exposes
+`review_viewed_files` (read) and `review_mark_viewed` (write) agent tools.
 
 ## Port notes
 
@@ -29,7 +36,8 @@ attach to and ran `jj diff --git` itself. DSH 0.2 ships a changed-files card and
 review tab with a file-action slot, so this version is a toolbar entry plus a
 Host half that owns the marks; it runs no subprocess.
 
-The slot only adds toolbar content. These BB behaviors are not available:
-collapsing a viewed file, an "only unviewed" filter in the file selector, and
-auto-marking files as they scroll past. Each would need a Host change to the
-review tab, not a plugin.
+The slot only adds toolbar content. These BB behaviors are not available in the
+native tab: collapsing a viewed file and an "only unviewed" filter in the file
+selector each need a Host change to that tab, not a plugin. Auto-marking as files
+scroll past lives in `@dshfiles/pulls-review`'s all-files review, which reuses
+this record through the module above.

@@ -35,6 +35,7 @@ const markKeysToTrim = (marks: readonly ViewedMark[], limit = MAX_VIEWED_MARKS):
 export interface ViewedMarksStore {
   snapshot(): ViewedMarksSnapshot
   toggle(file: ViewedFile): Promise<ViewedMarksSnapshot>
+  mark(file: ViewedFile, viewed: boolean): Promise<ViewedMarksSnapshot>
   flush(): Promise<void>
 }
 
@@ -90,6 +91,18 @@ const createViewedMarksStore = ({
       } else {
         await put({ key, version: takeVersion() })
       }
+      return snapshot()
+    },
+    mark: async (file, viewed) => {
+      const key = viewedKey(file)
+      if (!viewed) {
+        if (records.has(key)) {
+          records.delete(key)
+          await enqueue(() => table.delete(key))
+        }
+        return snapshot()
+      }
+      if (!records.has(key)) await put({ key, version: takeVersion() })
       return snapshot()
     },
     flush: () => writes,
