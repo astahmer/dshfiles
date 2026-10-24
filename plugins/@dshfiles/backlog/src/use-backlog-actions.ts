@@ -54,7 +54,11 @@ export const commentMutation = <Result>(input: { readonly client: QueryClient; r
   onError: (_error: Error, _request: CommentInput, context: { readonly key: readonly unknown[]; readonly previous: DetailData | undefined } | undefined) => {
     if (context?.previous !== undefined) input.client.setQueryData(context.key, context.previous)
   },
-  onSettled: () => input.client.invalidateQueries({ queryKey: [QUERY_KEY] }),
+  onSettled: (_data: Result | undefined, _error: Error | null, request: CommentInput) =>
+    Promise.all([
+      input.client.invalidateQueries({ queryKey: [QUERY_KEY] }),
+      ...(request.files ?? []).map(file => input.client.invalidateQueries({ queryKey: ['dshfiles-backlog-file', request.id, file.id] })),
+    ]),
 })
 
 /**

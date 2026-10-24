@@ -95,7 +95,7 @@ const setup = async () => {
       view.failures.push(message)
     },
   }
-  return { id, storedComments, saveGate, mutation, cachedComments, view, viewPort }
+  return { id, store, client, storedComments, saveGate, mutation, cachedComments, view, viewPort }
 }
 
 const dispatchPort = (outcome: Promise<AgentDispatchOutcome>) => ({
@@ -139,6 +139,24 @@ describe('submitReply', () => {
     await submitted
     expect(context.view.failures).toEqual([])
     expect(context.view.text).toBe('')
+  })
+
+  it('refreshes an attachment read that first missed while the optimistic reply was saving', async () => {
+    const context = await setup()
+    const attachmentKey = ['dshfiles-backlog-file', context.id, screenshot.id]
+    const readFile = () =>
+      context.client.fetchQuery({
+        queryKey: attachmentKey,
+        queryFn: () => context.store.readFile({ id: context.id, attachmentId: screenshot.id }),
+        staleTime: Infinity,
+      })
+
+    expect(await readFile()).toEqual({ ok: false, reason: 'not-found' })
+
+    context.saveGate.resolve()
+    await context.mutation.mutate({ id: context.id, text: 'like this', files: [fileInput(screenshot)] })
+
+    expect(await readFile()).toMatchObject({ ok: true, value: { dataUrl: 'data:image/png;base64,iVBORw==' } })
   })
 
   it('saves an attachment-only comment without dispatching an empty reply', async () => {
