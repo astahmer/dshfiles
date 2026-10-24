@@ -1,3 +1,4 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import type { SecretMetadata } from './secret-metadata.js'
 import { createSecretCatalogValues } from './secret-reference-resolver.js'
@@ -56,5 +57,13 @@ describe('secret reference resolution', () => {
       'exists in several scopes',
     )
     expect(fixture.calls).toEqual([])
+  })
+
+  it('records a secret resolve span with the alias, environment and scope, never the value', async () => {
+    using recorder = recordSpans()
+    await valuesWith([row({ scope: 'project' })]).values.resolve({ reference: { alias: 'TOKEN', environment: 'prod' }, cwd: '/private/tmp/project' })
+    const span = recorder.span('secret resolve')
+    expect(span.attributes).toEqual({ 'secret.alias': 'TOKEN', 'secret.environment': 'prod', 'secret.project_scoped': true, 'secret.scope': 'project' })
+    expect(JSON.stringify(span.attributes)).not.toContain('resolved-secret-value')
   })
 })

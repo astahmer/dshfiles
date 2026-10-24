@@ -1,5 +1,6 @@
 import { Writable } from 'node:stream'
 import type { SubprocessHandle, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it, vi } from 'vitest'
 import { runSecretCli, SecretCliError } from './secret-cli-runner.js'
 
@@ -128,5 +129,19 @@ describe('managed secret CLI runner', () => {
     await expect(missingFailure).rejects.toBeInstanceOf(SecretCliError)
     await expect(missingFailure).rejects.toMatchObject({ code: 'cli-missing', message: 'Secret CLI executable could not be found on the Host PATH.' })
     expect(missing.runtime.spawn).not.toHaveBeenCalled()
+  })
+
+  it('records a secret <verb> span with flag names only, never the alias or the value', async () => {
+    using recorder = recordSpans()
+    await runSecretCli(harness().runtime, {
+      args: ['set', 'SYNTHETIC_TOKEN', '--env', 'dev'],
+      cwd: null,
+      captureStdout: false,
+      stdin: 'synthetic-secret-value',
+    })
+    const span = recorder.span('secret set')
+    expect(span.kind).toBe('client')
+    expect(span.attributes['process.command.verb']).toBe('set')
+    expect(JSON.stringify(span.attributes)).not.toMatch(/SYNTHETIC_TOKEN|synthetic-secret-value|dev"/)
   })
 })

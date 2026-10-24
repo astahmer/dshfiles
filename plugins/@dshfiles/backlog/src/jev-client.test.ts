@@ -1,3 +1,4 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import { JevClient } from './jev-client.js'
 import type { JevUsageRecord } from '@dshfiles/usage/api'
@@ -62,6 +63,14 @@ describe('JevClient', () => {
     expect(records[0]).toMatchObject({ source: 'backlog', credential: 'secret:BACKLOG_JEV', outcome: 'failure', inputTokens: null, outputTokens: null })
     expect(JSON.stringify(records[0])).not.toContain('synthetic-test-key')
     expect(JSON.stringify(records[0])).not.toContain('synthetic private error body')
+  })
+
+  it('records a jev classify span with status and token counts, never the key or text', async () => {
+    using recorder = recordSpans()
+    await JevClient.ask({ ...request, fetch: async () => answerResponse() })
+    const span = recorder.span('jev classify')
+    expect(span.attributes).toMatchObject({ 'http.response.status_code': 200, 'gen_ai.usage.input_tokens': 42, 'gen_ai.usage.output_tokens': 3 })
+    expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic-test-key|synthetic prompt text/)
   })
 
   it('keeps Jev results when usage recording fails', async () => {
