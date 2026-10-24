@@ -140,14 +140,14 @@ const matchesThreadStatusFilter = (options: {
 }): boolean => {
   if (options.filters.length === 0) return true
   return options.filters.some(filter => {
-    if (filter === 'muted') return options.muted
+    if (filter === 'muted') return options.muted && !options.running
     if (filter === 'working') return options.running
     if (filter === 'not-running') return !options.running && !options.archived && !options.settled && !options.muted
     if (filter === 'inactive') return options.inactive === true
     if (filter === 'attention') return options.labels.length > 0
     if (filter === 'unread') return options.unread && !options.archived && !options.settled
-    if (filter === 'settled') return options.settled
-    if (filter === 'archived') return options.archived
+    if (filter === 'settled') return options.settled && !options.running
+    if (filter === 'archived') return options.archived && !options.running
     return options.labels.includes(THREAD_ATTENTION_FILTER_LABELS[filter])
   })
 }

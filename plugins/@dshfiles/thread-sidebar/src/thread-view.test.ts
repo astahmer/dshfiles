@@ -279,10 +279,12 @@ describe('thread view filters', () => {
     }
   })
 
-  it('requires explicit selectors to admit stored idle rows', () => {
+  it('requires explicit selectors to admit stored idle rows but keeps running work out of storage-only views', () => {
     for (const storage of ['muted', 'settled', 'archived'] as const) {
       expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running'], [storage]: true }))).toBe(false)
       expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['not-running', storage], [storage]: true }))).toBe(true)
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: [storage], [storage]: true, running: true }))).toBe(false)
+      expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working', storage], [storage]: true, running: true }))).toBe(true)
     }
   })
 
@@ -320,7 +322,7 @@ describe('thread view filters', () => {
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['archived'], archived: true }))).toBe(true)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['settled'], settled: true }))).toBe(true)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['settled'] }))).toBe(false)
-    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['muted'], muted: true, running: true }))).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['muted'], muted: true, running: true }))).toBe(false)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['muted'], running: true }))).toBe(false)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working', 'attention'], labels: ['threadSidebarInterrupted'] }))).toBe(true)
     expect(ThreadViewModel.matchesStatusFilter(filterState({ filters: ['working', 'attention'] }))).toBe(false)
