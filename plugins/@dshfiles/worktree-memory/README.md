@@ -1,5 +1,7 @@
 # DSH worktree memory
 
+![Process memory by workspace](docs/screenshots/memory-board.png)
+
 Activity Monitor shows forty `node` rows and nothing about which thread started them. This page groups the resident
 memory of everything the threads spawned by workspace, so "what is eating my RAM" is one look, and "stop it" is two
 clicks. Inspired by Fusebox, a menu-bar app built around Lovable's dev setup; no code is taken from it.
