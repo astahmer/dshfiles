@@ -50,6 +50,24 @@ When('the dark-theme action is selected', async ({ page }: { page: Page }) => {
   await paletteOption(page, /Use dark theme/).click()
 })
 
+Then('the notification sound mute palette action toggles both ways', async ({ page }: { page: Page }) => {
+  const dialog = paletteDialog(page)
+  const muteAction = paletteOption(page, /^Mute notification sounds\b/u)
+  await recordAssertion(page, 'notification-sound-mute-action-is-searchable', () => expect(muteAction).toBeVisible())
+  await muteAction.click()
+  await expect(dialog).not.toBeVisible()
+  await openPalette(page)
+  await paletteInput(page).fill('Unmute notification sounds')
+  const unmuteAction = paletteOption(page, /^Unmute notification sounds\b/u)
+  await recordAssertion(page, 'notification-sound-unmute-action-is-searchable', () => expect(unmuteAction).toBeVisible())
+  await unmuteAction.click()
+  await expect(dialog).not.toBeVisible()
+  await openPalette(page)
+  await paletteInput(page).fill('Mute notification sounds')
+  await recordAssertion(page, 'notification-sound-action-returns-to-mute-state', () => expect(muteAction).toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
 Then('the New thread action is available and can run', async ({ page }: { page: Page }) => {
   const newThreadAction = paletteDialog(page).locator('[data-value="destination:@dshfiles/command-palette/new-thread"]')
   await recordAssertion(page, 'new-thread-action-is-searchable', () => expect(newThreadAction).toBeVisible())

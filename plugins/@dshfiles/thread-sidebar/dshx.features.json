@@ -1022,7 +1022,7 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds and grant system permission explicitly.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds, mute or unmute tones globally from the command palette, and grant system permission explicitly.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
@@ -1055,6 +1055,23 @@
           "kind": "gherkin",
           "id": "thread-sidebar.notifications-settings",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.notification-sound-palette",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-sound-palette-label-and-execution",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-sound-palette-action.test.ts",
+          "testName": "the palette action label reflects the current mute state"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-sound-palette-toggle-execution",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-sound-palette-action.test.ts",
+          "testName": "executing the palette action toggles shared mute state in both directions"
         },
         {
           "kind": "unit-test",

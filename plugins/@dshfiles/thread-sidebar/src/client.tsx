@@ -193,6 +193,7 @@ import {
   type ThreadFinishNotificationCategory,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
+import { createNotificationSoundPaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import {
@@ -3708,6 +3709,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   useEffect(() => {
     if (!isPrimarySurface) return
     const actions: readonly PaletteAction[] = [
+      createNotificationSoundPaletteAction(latestRowActions.current.props.tSidebar),
       ...(asideOpener === null
         ? []
         : [
