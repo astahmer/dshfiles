@@ -1,73 +1,40 @@
 # pulls.review
 
-![Review every changed file in one stacked surface](docs/screenshots/all-files-review-tab.png)
+![Group a thread workspace's changes into review scopes](docs/screenshots/thread-review-scopes.png)
 
-Review changes the way [pulls.review](https://pulls.review) and GitHub do: every
-changed file in one scroll, grouped into scopes, with lazy comparisons, a
-searchable file rail, viewed progress and line comments — inside DSH, for a
-turn's snapshot and for the thread's own jj workspace.
+Review this thread's changes the way [pulls.review](https://pulls.review) does:
+changed files grouped into scopes, one scope at a time, with review progress —
+inside DSH, for the thread's own jj workspace.
 
-## Two sources, one surface
+## What it does
 
-- **This turn** — the snapshot the changed-files card lists
-  (`/api/changes.summary` + `/api/changes.diff`). This is what the card's
-  "Preview in sidebar" opens.
-- **Workspace** — the thread's live `jj diff --from <base> --to @`, grouped by
-  [`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
-  rules (MIT): no model call, no GitHub token, the same `Code` / `Tests` / `Docs`
-  / `Config` / `Dependencies` / `Generated` / `Other` scopes the site uses.
+A thread works in its own jj workspace, so its changes are `jj diff --from
+<base> --to @`. The Host reads that patch and groups it with
+[`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
+rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
+site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /
+`Dependencies` / `Generated` / `Other` here exactly as it does there.
 
-A turn review is immutable: its identity is the Session and the announcing
-sequence, so a later turn starts a new review. A workspace review is keyed by
-workspace path, base bookmark and head revision, so a new revision starts fresh.
+The panel shows the range and totals, a scope chip per group with its reviewed
+count, the selected scope's files with per-file `+/-` stats, and that scope's
+diff. Marking a file reviewed persists locally, keyed by workspace, base and
+working-copy revision, so a new revision — or a base that moved under the same
+`@` — starts fresh; the record keeps the 20 most recently touched scopes. A
+plain click on a file row still toggles that file; Shift-click extends a range
+and Cmd/Ctrl-click toggles the selection, and the scope header's checkbox plus
+the Mark selected action mark (or clear) the whole selection in one write.
 
-## The review tab
-
-The plugin writes the `changes-review` tab kind itself, at the sidebar-right
-registry's `extension` band, so a changed-files card row or a prose file link
-opens this all-files review instead of the native one-file tab. The native tab is
-one setting away (`classicReviewTab`), and the builtin resumes the moment the
-setting changes because the extension registration goes away.
-
-The surface shows:
-
-- **A stacked review**: each file mounts its comparison only when it comes near
-  the viewport, so a large change set stays scrollable. A comparison the Host
-  refuses (binary, oversized, missing) renders one line instead of an empty diff.
-- **A file rail** with search, scope groups, per-file `+/-` stats, comment counts
-  and a viewed checkbox. Below 42 rem of pane width it becomes a `Files` toggle
-  with an overlay, because the right Sidebar is often narrower than the rail.
-- **Viewed progress**: a file's header and rail row mark it viewed; the header
-  menu marks every file, clears them, or jumps to the next unviewed file. Turn
-  progress is the Host's durable `diff-viewed` record, so the native tab and this
-  surface always agree. Auto-mark on scroll is on by default and configurable: a
-  file is marked once its header leaves the review viewport, and scrolling back
-  never unviews it.
-- **Unified/split and wrap** choices, kept per browser.
-- **Scope summaries**: `Summarize scopes` replaces the deterministic scope text
-  with one model call over the whole diff, using the provider the thread last
-  requested with and the first model that provider offers. The route is resolved
-  from the thread's session log, so no key is typed twice; the call borrows that
-  session id because providers keyed per session (OpenCode Go) reject a call
-  without it. Anything unusable leaves the deterministic summaries in place.
-- **Inline comments**: hover a changed line, anchor a thread, reply, resolve or
-  reopen it, and delete it behind a confirmation. Threads live in Host storage
-  keyed by the review identity, so the Agent reads and writes the same threads
-  through its tools.
-
-The same surface is the plugin's main-area page (`pulls.review` in the sidebar
-rail); the tab's menu opens it on the same review with `Open full page`.
-
-## Settings (`dshfiles-pulls-review`)
-
-| Key                | Default | Meaning                                                                                       |
-| ------------------ | ------- | --------------------------------------------------------------------------------------------- |
-| `autoMarkViewed`   | `true`  | Mark a changed file viewed once its header scrolls past the review viewport. Never unmarks.   |
-| `classicReviewTab` | `false` | Open the native one-file review tab instead of this all-files review. Off restores this view. |
+**Summarize** replaces the deterministic scope text with one model call over the
+whole diff, using the provider the thread last requested with and the first model
+that provider offers. The route is resolved from the thread's session log, so no
+key is typed twice, and the call borrows that session id because providers keyed
+per session (OpenCode Go) reject a call without it. The model answers with one
+`scope: sentence` line per scope; anything unusable leaves the deterministic
+summaries in place and says why.
 
 ## In a thread
 
-`/pulls` prints the same grouping as text, without opening the surface:
+`/pulls` prints the same grouping as text, without opening the panel:
 
 ```
 pulls.review · main..@ · 3 files · +42 −7
@@ -78,8 +45,8 @@ Docs (1) · +2 −0 · Documentation updates.
   - README.md (+2 −0)
 ```
 
-Agents get the same through the `pulls_review` tool (`path`, optional `base`), so
-an agent can inspect a workspace's change shape before reading it.
+Agents get the same through the `pulls_review` tool (`path`, optional `base`),
+so an agent can inspect a workspace's change shape before reading it.
 
 ## Why the rules rather than the site
 
@@ -88,42 +55,7 @@ checkout. A DSH thread workspace is a jj workspace with no `.git`, and the
 CLI's dev server gates its browser behind a one-time pairing code, so embedding
 it would depend on another project's dev-server internals. Reusing the core
 package gets the real grouping without that coupling. See
-[the plan](../../../plans/pulls-review/README.md) for the measured evidence and
-[the changes-review plan](../../../plans/changes-review/README.md) for this
-surface.
-
-## Design decisions
-
-- The tab takeover uses the sidebar-right registry's `extension` band rather than
-  forking the deliverables package: a tab type registered under our own id
-  shadows the builtin `changes-review` kind, and the body/title seats dispatch
-  under that id. Turning `classicReviewTab` on unregisters the type and the
-  builtin resumes, including for tabs already open.
-- Comments are anchored on a side (`old`/`new`) and line number, stored by review
-  identity. A workspace review's identity includes the head revision, so its
-  comments belong to the revision that was reviewed.
-- The diff renderer is our own React tree (Shiki spans through the Host's
-  `useCodeHighlighter`) rather than `PatchView`: inline comments and per-line
-  affordances need per-line nodes, and `PatchView` mounts each file in a shadow
-  root with no line hooks.
-- Auto-mark fires when a file's end is reached _and_ its section has scrolled
-  into the viewport; a short file still fully visible on open is not marked. It
-  only ever marks, and a Host without `diff-viewed.mark` disables the toggle
-  rather than faking durable progress.
-- `dshx` exports the settings client runtime, `ApiClientLifecycle` and
-  `provideSettingsContext` so a raw keyed slot body can carry the same providers
-  a dshx-registered slot gets.
-
-## Risks
-
-- A future DSH release may change the `changes-review` address or summary route;
-  the takeover then stops matching and the native tab resumes (a visible
-  fallback, not a crash).
-- An older Host without the comments API hides the comment affordances instead
-  of failing; an older Host without `diff-viewed.mark` disables auto-mark only.
-- The turn's viewed marks need `@dshfiles/diff-viewed` installed. Without it the
-  manual toggle still works locally, but progress is not durable and auto-mark is
-  disabled.
+[the plan](../../../plans/pulls-review/README.md) for the measured evidence.
 
 ## Host API
 
@@ -143,32 +75,8 @@ per scope key, an answer missing a scope is still a success — or
 `llm-unavailable`, `llm-failed`, `unparsed`, `review-failed` (the read failed)
 or `no-changes`.
 
-`reviewCommentsApi` owns the comment threads in the `changes_review` storage
-domain:
-
-- `list({ source })` — the threads anchored to one review, oldest first.
-- `create({ source, path, anchor, body })`, `reply({ id, body })`,
-  `setResolved({ id, resolved })`, `delete({ id, confirm: true })`.
-- `source` is `{ kind: 'turn', sessionId, seq }` or
-  `{ kind: 'workspace', path, base, head }`; `anchor` is
-  `{ side: 'old' | 'new', line }`. A thread written from a tool is attributed to
-  that Agent, one written from the browser to the user.
-
-Every method is also an agent tool: `review_comments` (read), and
-`review_comment_create`, `review_comment_reply`, `review_comment_resolve`,
-`review_comment_delete` (write; they run only when the user asked, and delete
-needs `confirm: true`).
-
 `jj` runs with explicit argv, a bounded output, a timeout and the caller's
 signal; its stderr is read only to classify a failure and never leaves the Host.
 The model call goes through the Host's `llm` service with `purpose: 'compaction'`,
 the thread's session id and the caller's signal, so it is cancellable and never a
 second key path.
-
-## Viewed marks
-
-The turn's viewed marks are owned by
-[`@dshfiles/diff-viewed`](../diff-viewed/README.md): the review surface imports
-its `@dshfiles/diff-viewed/marks-api` contract and calls `mark` (idempotent, so a
-scroll handler can repeat it) instead of flipping a checkbox. A workspace review
-keeps its marks in the plugin's local record, keyed by workspace, base and head.

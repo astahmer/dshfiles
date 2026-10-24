@@ -12,18 +12,6 @@ supported plugin-owned implementation can meet the required guarantees; never
 fake a native method or durable state in the client. Work in a separate DSH
 source checkout only when the human explicitly redirects the task there.
 
-## Active goal cancellation
-
-A direct human request to stop, cancel, or hand off the current task also cancels
-its automatic goal continuation. In that same direct human turn, pause the active
-goal with `update_goal` before replying; do not merely stop edits while leaving
-the goal active. Pause the old goal before starting a replacement objective. A
-later `<goal_round>` is only a continuation of the old request and must never
-override a newer human stop or hand-off. If this Agent cannot update the owning
-goal, stop its own work and ask the goal-owning Agent to pause it; do not continue
-under the stale objective. Say the task is stopped only after its goal is paused
-or removed.
-
 ## Skills
 
 Load the matching skill from `.agents/skills/` before the work it covers:

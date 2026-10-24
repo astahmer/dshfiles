@@ -4,15 +4,14 @@
     {
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
-      "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar), keeps independent grouping, status/source filters, project scope, column order and visibility, and never changes the sidebar thread list; park and settle through sidebar preferences and pin/archive through Host APIs.",
+      "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar) and keeps its own grouping, status/source filters and project scope; park and settle through sidebar preferences and pin/archive through Host APIs.",
       "reach": [
         "expect region \"Threads\"",
-        "expect button \"Group: Date\"",
+        "expect button \"Group: Status\"",
         "click button \"Thread board\"",
         "expect region \"Thread board\"",
         "expect region \"Active column\"",
-        "click button \"Board columns\"",
-        "expect menuitemcheckbox \"Archived\""
+        "expect button \"Group: Status\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [

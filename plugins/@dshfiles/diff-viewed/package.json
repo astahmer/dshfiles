@@ -14,11 +14,7 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./client": "./dist/client.js",
-    "./marks-api": {
-      "types": "./src/marks-api.ts",
-      "default": "./dist/marks-api.js"
-    }
+    "./client": "./dist/client.js"
   },
   "scripts": {
     "build": "dshx build",

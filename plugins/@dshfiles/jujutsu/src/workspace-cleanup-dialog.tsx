@@ -205,6 +205,13 @@ export const WorkspaceCleanupDialog = (props: {
               }).map(line => (
                 <p key={line}>{line}</p>
               ))}
+              {shown.skipped
+                .filter(workspace => workspace.reason === 'working-copy-dirty' || workspace.reason === 'workspace-state-unknown')
+                .map(workspace => (
+                  <p key={`${workspace.repoRoot}:${workspace.name}:${workspace.reason}`}>
+                    <span className="dshx:font-mono">{workspace.name}</span>: {WorkspaceCleanupSummary.skipLabel(workspace.reason)}
+                  </p>
+                ))}
             </div>
           )}
           {running === undefined ? null : (

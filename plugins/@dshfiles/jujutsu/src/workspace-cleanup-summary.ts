@@ -10,8 +10,10 @@ const SKIP_LABELS = {
   'too-recent': { singular: 'recently used workspace', plural: 'recently used workspaces' },
   'kind-excluded': { singular: 'workspace excluded by kind', plural: 'workspaces excluded by kind' },
   'working-copy-dirty': { singular: 'workspace with uncommitted changes', plural: 'workspaces with uncommitted changes' },
-  'workspace-state-unknown': { singular: 'workspace with unverifiable state', plural: 'workspaces with unverifiable state' },
+  'workspace-state-unknown': { singular: 'workspace whose state could not be verified', plural: 'workspaces whose state could not be verified' },
 } satisfies Record<CleanupSkipReason, { readonly singular: string; readonly plural: string }>
+
+const skipLabel = (reason: CleanupSkipReason): string => SKIP_LABELS[reason].singular
 
 const joinList = (items: readonly string[]): string => {
   if (items.length === 0) return ''
@@ -21,6 +23,8 @@ const joinList = (items: readonly string[]): string => {
 }
 
 export class WorkspaceCleanupSummary {
+  static skipLabel = skipLabel
+
   static formatCount(count: number, singular: string, plural: string): string {
     return `${String(count)} ${count === 1 ? singular : plural}`
   }

@@ -66,6 +66,8 @@ describe('auto-cleanup settings', () => {
     expect(() => jjIntegrationSettings.schema({ autoCleanup: { activeWithinHours: 24 * 8 } })).toThrow()
     const storedByHand = JSON.parse('{ "autoCleanup": { "kinds": ["everything"] } }')
     expect(() => jjIntegrationSettings.schema(storedByHand)).toThrow()
+    const manualOnlyKind = JSON.parse('{ "autoCleanup": { "kinds": ["secondary"] } }')
+    expect(() => jjIntegrationSettings.schema(manualOnlyKind)).toThrow()
   })
 })
 

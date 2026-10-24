@@ -375,7 +375,7 @@ export const backlogApi = defineApi({
         })
         .strict(),
       output: z.object({ sessionId: z.string().min(1), linked: z.array(idSchema), missing: z.array(idSchema) }).strict(),
-      description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, receives every full description, current reply and listed attachment, and links to every item. Missing or unreadable items/files and upload or prompt failures reject the start instead of silently omitting context. ${writeNote}`,
+      description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, receives every selected item's full description, all current replies in order, and every item- and reply-level attachment, and links to every item. Missing or unreadable items/files and upload or prompt failures reject the start instead of silently omitting context. ${writeNote}`,
       tool: { name: 'backlog_start_thread', readOnly: false },
     }),
     acknowledge: method({

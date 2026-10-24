@@ -905,14 +905,19 @@ interface CleanupScan {
   readonly emptyRevisions: CleanupResult['emptyRevisions']
 }
 
-const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }): Promise<CleanupScan> => {
+const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; readonly trigger: CleanupTrigger }): Promise<CleanupScan> => {
   const active = requireThreads()
+  const kinds = input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary') : input.kinds
   const scopedRepoRoot = input.path === undefined ? undefined : (await active.locate(input.path)).repoRoot
   invalidateRepositories()
   const [repositories, activity, sessionRecords] = await Promise.all([
     listRepositories(),
     input.apply ? sessionActivity.guard() : sessionActivity.display(),
-    input.kinds.includes('secondary') ? requireContext().sessionQuery.listSessions() : Promise.resolve([]),
+    kinds.includes('secondary')
+      ? Promise.resolve()
+          .then(() => requireContext().sessionQuery.listSessions())
+          .catch(() => undefined)
+      : Promise.resolve([]),
   ])
   const registry = registryOf()
   const archived = new Set<string>(registry.archivedSessionIds)
@@ -943,7 +948,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
         activity,
         now,
         olderThanMs: input.olderThanHours * HOUR_MS,
-        kinds: input.kinds,
+        kinds,
       })
       if (decision.action === 'skip') {
         skipped.push({ repoRoot: repository.repoRoot, name: thread.name, reason: decision.reason })
@@ -951,7 +956,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
       }
       workspaces.push({ repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
     }
-    if (input.kinds.includes('secondary')) {
+    if (kinds.includes('secondary')) {
       const secondary = await active.secondaryWorkspaces(repository.repoRoot)
       for (const workspace of secondary) {
         const resolved = await registry.resolveByPath(workspace.path)
@@ -960,7 +965,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
         const sessionIds = [
           ...new Set([
             ...(registered?.sessionIds ?? []),
-            ...sessionRecords
+            ...(sessionRecords ?? [])
               .filter(record => WorkspaceSessionPath.includes({ sessionCwd: record.header.cwd, workspacePath: workspace.path }))
               .map(record => record.header.id),
           ]),
@@ -981,7 +986,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
           activity,
           now,
           olderThanMs: input.olderThanHours * HOUR_MS,
-          kinds: input.kinds,
+          kinds,
         })
         if (decision.action === 'skip') {
           skipped.push({ repoRoot: repository.repoRoot, name: workspace.name, reason: decision.reason })
@@ -990,10 +995,9 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
         workspaces.push({ repoRoot: repository.repoRoot, name: workspace.name, path: workspace.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
       }
     }
-    const entries = input.kinds.includes('untracked') ? await active.untrackedEntries(repository.repoRoot).catch(() => []) : []
+    const entries = kinds.includes('untracked') ? await active.untrackedEntries(repository.repoRoot).catch(() => []) : []
     for (const entry of entries) {
-      if (!WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: entry.modifiedAt, now, olderThanMs: input.olderThanHours * HOUR_MS, kinds: input.kinds }))
-        continue
+      if (!WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: entry.modifiedAt, now, olderThanMs: input.olderThanHours * HOUR_MS, kinds })) continue
       untracked.push({ repoRoot: repository.repoRoot, name: entry.name, path: entry.path, modifiedAt: entry.modifiedAt })
     }
     if (input.apply) continue
@@ -1011,7 +1015,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }):
 }
 
 const previewCleanup = async (input: CleanupRequest): Promise<CleanupResult> => {
-  const scan = await scanCleanup({ ...input, apply: false })
+  const scan = await scanCleanup({ ...input, apply: false, trigger: 'manual' })
   return {
     applied: false,
     workspaces: scan.workspaces.map(row => ({ ...row, outcome: 'would-remove' })),
@@ -1073,7 +1077,7 @@ const applyCleanup = async (input: {
         continue
       }
       if (result?.status === 'has-work') {
-        workspaces.push({ ...planned, outcome: 'has-work' })
+        workspaces.push({ ...planned, outcome: 'has-work', ...(result.error === null ? {} : { message: result.error }) })
         report.settleItem('kept')
         continue
       }
@@ -1120,6 +1124,7 @@ const cleanupRunner = createCleanupJobRunner({
       olderThanHours: request.olderThanHours,
       kinds: request.kinds,
       apply: true,
+      trigger: request.trigger,
     })
     report.planned(scan.workspaces.length + scan.untracked.length)
     return await applyCleanup({ scan, trigger: request.trigger, report })

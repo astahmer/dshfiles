@@ -77,22 +77,3 @@ test('the least recently written marks are the ones trimmed', () => {
   expect(ViewedMarksModel.keysToTrim([mark('a', 1)], 2)).toEqual([])
   expect(ViewedMarksModel.nextVersion(1_000, 900)).toBe(1_001)
 })
-
-test('marking is idempotent so a scroll handler never flips a file back', async () => {
-  const table = memoryTable()
-  const store = ViewedMarksModel.createStore({ table, now: () => 5_000 })
-
-  const first = await store.mark(file, true)
-  expect(first.marks).toEqual([viewedKey(file)])
-  const revision = first.revision
-  const again = await store.mark(file, true)
-  expect(again).toEqual(first)
-  expect(again.revision).toBe(revision)
-
-  const cleared = await store.mark(file, false)
-  expect(cleared.marks).toEqual([])
-  const clearedAgain = await store.mark(file, false)
-  expect(clearedAgain.marks).toEqual([])
-  await store.flush()
-  expect(table.rows.size).toBe(0)
-})

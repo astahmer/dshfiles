@@ -80,7 +80,6 @@ export const REACH_SEEDS = [
   'rebase-ready-thread',
   'pending-restart',
   'tool-call-thread',
-  'file-change-thread',
   'jev-setup-chat-thread',
   'quota-blocked-thread',
   'chat-reference-thread',

@@ -42,9 +42,6 @@ export const viewedMarksSnapshotSchema = z
   })
   .strict()
 
-/** One file's mark set to an explicit value, for callers that mark while scrolling instead of on a click. */
-export const viewedMarkInputSchema = viewedFileSchema.extend({ viewed: z.boolean() }).strict()
-
 /** The reviewed files of every Session, owned by the Host so every browser, plugin and CLI reads the same progress. */
 export const diffViewedApi = defineApi({
   id: 'diff-viewed',
@@ -55,23 +52,14 @@ export const diffViewedApi = defineApi({
       input: z.void(),
       output: viewedMarksSnapshotSchema,
       description: 'Every file marked as viewed, keyed by Session, announcing sequence and path. Read-only.',
-      tool: { name: 'review_viewed_files', readOnly: true, render: snapshot => `${snapshot.marks.length} files marked viewed` },
     }),
     toggle: method({
       input: viewedFileSchema,
       output: viewedMarksSnapshotSchema,
       description: 'Toggle one file of one review-session change and return the marks it produced.',
     }),
-    mark: method({
-      input: viewedMarkInputSchema,
-      output: viewedMarksSnapshotSchema,
-      description:
-        'Set one file of one review-session change as viewed or unviewed and return the marks it produced. Idempotent, so a scroll handler can repeat it. Run only when the user asked to change review progress.',
-      tool: { name: 'review_mark_viewed', readOnly: false, render: snapshot => `${snapshot.marks.length} files marked viewed` },
-    }),
   },
 })
 
 export type ViewedFile = z.infer<typeof viewedFileSchema>
-export type ViewedFileMark = z.infer<typeof viewedMarkInputSchema>
 export type ViewedMarksSnapshot = z.infer<typeof viewedMarksSnapshotSchema>

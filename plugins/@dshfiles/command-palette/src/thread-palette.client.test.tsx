@@ -15,9 +15,6 @@ const copy: ThreadPaletteCopy = {
   backlogUnavailable: 'Install Backlog to capture this draft.',
   recent: 'Recent',
   threads: 'Threads',
-  threadSectionAll: 'All',
-  threadSectionLabels: { pinned: 'Pinned', active: 'Active', parked: 'Parked', inactive: 'Inactive', settled: 'Settled' },
-  threadDateLabel: 'Updated',
   destinations: 'Destinations',
   commands: 'Commands',
   files: 'Files',
@@ -318,76 +315,14 @@ describe('Ask DSH keyboard submit', () => {
 
 describe('Threads tab project scope', () => {
   const here = { id: 'session-here', title: 'Here work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 }
-  const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1, section: 'parked' as const }
-  const archived = { id: 'session-archived', title: 'Archived work', project: 'welii', cwd: '/dev/welii', updatedAt: 1, section: 'archived' as const }
-
-  it('shows sidebar section and update date on content-search results', async () => {
-    const searchContent = vi.fn(async () => [
-      {
-        sessionId: 'session-content',
-        title: 'Content result',
-        project: 'dshfiles',
-        cwd: '/dev/dshfiles',
-        updatedAt: 1_704_067_200_000,
-        snippet: 'needle in the thread body',
-      },
-    ])
-    render(
-      <ThreadPalette
-        mode="all"
-        threads={[]}
-        threadSections={new Map([['session-content', 'parked']])}
-        context={context}
-        additionalActions={[]}
-        recentLimit={6}
-        mac
-        copy={copy}
-        searchContent={searchContent}
-        onBacklogCapture={vi.fn(() => true)}
-        onAsk={vi.fn(async () => {})}
-        onOpenThread={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    )
-
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '#needle' } })
-    const result = await screen.findByRole('option', { name: /needle in the thread body/ })
-    expect(result.textContent).toContain('Parked')
-    expect(result.textContent).toContain('Updated:')
-    expect(searchContent).toHaveBeenCalledWith('needle', expect.any(AbortSignal))
-  })
-
-  it('filters threads by sidebar section and shows their update date', async () => {
-    render(
-      <ThreadPalette
-        mode="threads"
-        threads={[here, elsewhere, archived]}
-        context={context}
-        additionalActions={[]}
-        recentLimit={6}
-        mac
-        copy={copy}
-        searchContent={null}
-        onBacklogCapture={vi.fn(() => true)}
-        onAsk={vi.fn(async () => {})}
-        onOpenThread={vi.fn()}
-        onClose={vi.fn()}
-      />,
-    )
-    await screen.findByRole('option', { name: /Elsewhere work/ })
-    expect(screen.queryByRole('option', { name: /Archived work/ })).toBeNull()
-    expect(screen.getAllByRole('option', { name: /Updated:/ })).toHaveLength(2)
-    fireEvent.click(screen.getByRole('tab', { name: 'Parked' }))
-    await screen.findByRole('option', { name: /Elsewhere work/ })
-    await waitFor(() => expect(screen.queryByRole('option', { name: /Here work/ })).toBeNull())
-  })
+  const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1 }
 
   it('lists only the current project on Threads and every project on Everything', async () => {
     const view = (mode: 'all' | 'threads') =>
       render(
         <ThreadPalette
           mode={mode}
-          threads={[here, elsewhere, archived]}
+          threads={[here, elsewhere]}
           projectThreads={[here]}
           context={context}
           additionalActions={[]}

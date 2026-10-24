@@ -1,6 +1,7 @@
 import type { CleanupResult } from './api.js'
 import type { CleanupJobRequest, CleanupJobRunner } from './cleanup-jobs.js'
 import type { JjIntegrationSettings } from './settings.js'
+import type { CleanupKind } from './workspace-cleanup.js'
 
 type AutoCleanupSettings = JjIntegrationSettings['autoCleanup']
 
@@ -20,10 +21,13 @@ export type AutoCleanupOutcome =
 /** Long enough for boot, the first repository scan and Session activity to settle before anything is judged idle. */
 export const AUTO_CLEANUP_FIRST_RUN_DELAY_MS = 5 * 60_000
 
+const automaticKinds = (kinds: readonly CleanupKind[]): Exclude<CleanupKind, 'secondary'>[] =>
+  [...new Set(kinds)].filter((kind): kind is Exclude<CleanupKind, 'secondary'> => kind !== 'secondary')
+
 const request = (settings: AutoCleanupSettings, path: string | null): CleanupJobRequest => ({
   path,
   olderThanHours: settings.olderThanHours,
-  kinds: [...new Set(settings.kinds)],
+  kinds: automaticKinds(settings.kinds),
   trigger: 'automatic',
 })
 

@@ -18,7 +18,6 @@ import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { randomUUID } from 'node:crypto'
-import { Readable } from 'node:stream'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { AgentComments } from './agent-dispatch.js'
 import { BacklogStartContext } from './backlog-start-context.js'
@@ -638,6 +637,13 @@ const agentForStart = async (ctx: Context, handle: string): Promise<Agent> => {
  * first message, and every item link. The panel and `backlog_start_thread` share this, so a thread an agent starts is
  * the same thread the dialog starts.
  */
+const attachmentChunks = (bytes: Uint8Array): AsyncIterable<Uint8Array> => ({
+  async *[Symbol.asyncIterator]() {
+    const chunkBytes = 64 * 1024
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkBytes) yield bytes.subarray(offset, offset + chunkBytes)
+  },
+})
+
 const startThreadForItems = async (
   ctx: Context,
   input: {
@@ -654,19 +660,17 @@ const startThreadForItems = async (
 ): Promise<{ readonly sessionId: string; readonly linked: number[]; readonly missing: number[] }> => {
   const store = await backlogFor(ctx)
   const { items, missing } = store.getMany(input.ids)
-  if (items.length === 0) {
-    throw new PluginApiError(`No backlog item matched ${input.ids.map(id => `b:${String(id)}`).join(', ')}.`, { code: 'item-not-found' })
+  if (items.length === 0 || missing.length > 0) {
+    const absent = missing.length === 0 ? input.ids : missing
+    throw new PluginApiError(`No complete backlog context for ${absent.map(id => `b:${String(id)}`).join(', ')}.`, { code: 'item-not-found' })
   }
-  if (missing.length > 0) {
-    throw new PluginApiError(`Could not load every requested backlog item: ${missing.map(id => `b:${String(id)}`).join(', ')}.`, { code: 'item-not-found' })
-  }
-  const context = await BacklogStartContext.prepare({ details: items, readFile: request => store.readFile(request) })
   const agent = input.agent === undefined ? null : await agentForStart(ctx, input.agent)
   const details = items.map(detail => startThreadItemOf({ ...detail.item, preview: detail.item.body.slice(0, PREVIEW_CHARS) }))
+  const context = await BacklogStartContext.prepare({ details: items, readFile: request => store.readFile(request) })
   const heading = StartThreadForm.message(details)
   const raw = input.message ?? heading
-  const fullMessage = `${raw}\n\n${context.text}`
-  const message = agent === null ? fullMessage : AgentComments.opening(agent, fullMessage)
+  const task = raw === '' ? context.text : `${raw}\n\n${context.text}`
+  const message = agent === null ? task : AgentComments.opening(agent, task)
   const placement = StartThreadPlacementPlan.of({
     workspaceId: input.workspaceId,
     cwd: input.cwd,
@@ -705,8 +709,8 @@ const startThreadForItems = async (
   } catch (error) {
     logFailure('Backlog thread kept its created title')(error)
   }
+  const content: PromptContentPart[] = [{ type: 'text', text: message }]
   try {
-    const content: PromptContentPart[] = [{ type: 'text', text: message }]
     const uploadSignal = AbortSignal.timeout(120_000)
     for (const attachment of context.attachments) {
       if (attachment.type === 'image') {
@@ -715,7 +719,7 @@ const startThreadForItems = async (
       }
       const uploaded = await ctx.fileUploads.uploadStream({
         sessionId,
-        data: Readable.from([attachment.bytes]),
+        data: attachmentChunks(attachment.bytes),
         name: attachment.name,
         signal: uploadSignal,
       })
@@ -725,7 +729,7 @@ const startThreadForItems = async (
     const requestId = randomUUID() as SessionRequestId
     await controller.prompt({ requestId, sessionId, mode: 'queue', content }, AbortSignal.timeout(120_000))
   } catch (error) {
-    const reason = error instanceof Error ? error.message : 'Unknown error'
+    const reason = (error instanceof Error ? error.message : String(error)).slice(0, 300)
     throw new PluginApiError(`Session ${sessionId} was created, but mandatory backlog context was not delivered: ${reason}`, {
       code: 'thread-context-not-delivered',
     })

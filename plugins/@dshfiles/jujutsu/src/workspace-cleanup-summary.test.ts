@@ -21,6 +21,13 @@ describe('WorkspaceCleanupSummary.formatCount', () => {
   })
 })
 
+describe('WorkspaceCleanupSummary.skipLabel', () => {
+  it('explains why a secondary workspace was kept', () => {
+    expect(WorkspaceCleanupSummary.skipLabel('working-copy-dirty')).toBe('workspace with uncommitted changes')
+    expect(WorkspaceCleanupSummary.skipLabel('workspace-state-unknown')).toBe('workspace whose state could not be verified')
+  })
+})
+
 describe('WorkspaceCleanupSummary.format', () => {
   it('formats zero and singular revisions naturally', () => {
     expect(WorkspaceCleanupSummary.format({ emptyRevisionCount: 0, skippedReasons: [] })).toEqual(['0 empty revisions will be abandoned.'])

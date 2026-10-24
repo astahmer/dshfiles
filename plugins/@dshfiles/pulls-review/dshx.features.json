@@ -4,26 +4,11 @@
   "features": [
     {
       "id": "thread-review-scopes",
-      "title": "Review a thread workspace's changes as one all-files surface",
-      "summary": "Read the current thread workspace's jj diff against its base bookmark and show every changed file in one stacked review, grouped with pulls.review's deterministic scopes, with a searchable file rail, per-file lazy comparisons and persisted viewed progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
-      "surfaces": [
-        "client",
-        "host"
-      ],
+      "title": "Group a thread workspace's changes into review scopes",
+      "summary": "Read the current thread workspace's jj diff against its base bookmark, group the changed files with pulls.review's deterministic rules, and review one scope at a time with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
+      "surfaces": ["client", "host"],
       "configuration": [],
-      "states": [
-        "no-thread",
-        "no-folder",
-        "loading",
-        "empty-diff",
-        "scoped",
-        "reviewing",
-        "file-loading",
-        "viewed",
-        "filtered",
-        "truncated",
-        "failed"
-      ],
+      "states": ["no-thread", "no-folder", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
@@ -41,13 +26,14 @@
         "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
         "press Enter",
-        "expect text \"pulls.review · main..@*\"",
+        "expect text \"pulls.review \u00b7 main..@*\"",
         "click button \"pulls.review\"",
-        "expect textbox \"Filter changed files\"",
-        "expect text \"main..@*\"",
+        "expect heading \"pulls.review\"",
+        "expect text \"main..@\"",
+        "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
-        "click checkbox \"Mark seeded-work.md as viewed\"",
-        "expect text \"1/1 viewed\""
+        "click button \"Mark reviewed\"",
+        "expect text \"1/1 reviewed\""
       ],
       "verification": [
         {
@@ -90,18 +76,6 @@
           "id": "pulls-review.thread-review-scopes-unit-command-report",
           "file": "plugins/@dshfiles/pulls-review/tests/report.spec.ts",
           "testName": "renders the range, totals and one line per scope with its files"
-        },
-        {
-          "kind": "unit-test",
-          "id": "pulls-review.all-files-unit-model",
-          "file": "plugins/@dshfiles/pulls-review/src/review-model.test.ts",
-          "testName": "keeps pulls.review scopes and collects files outside them"
-        },
-        {
-          "kind": "unit-test",
-          "id": "pulls-review.all-files-unit-diff",
-          "file": "plugins/@dshfiles/pulls-review/src/review-diff.test.ts",
-          "testName": "parses one file patch into hunks"
         }
       ],
       "telemetry": [
@@ -121,19 +95,9 @@
       "id": "ai-scope-summaries",
       "title": "Summarize review scopes with the thread's own model",
       "summary": "One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.",
-      "surfaces": [
-        "client",
-        "host"
-      ],
+      "surfaces": ["client", "host"],
       "configuration": [],
-      "states": [
-        "idle",
-        "summarizing",
-        "summarized",
-        "no-route",
-        "unparsed",
-        "failed"
-      ],
+      "states": ["idle", "summarizing", "summarized", "no-route", "unparsed", "failed"],
       "failureModes": [
         "No thread provider, no offered model, or no Host llm service is reported as its own reason, never as an empty summary.",
         "A review that failed, or a workspace with no changes, keeps its own reason instead of blaming the model.",
@@ -150,9 +114,9 @@
       "reach": [
         "seed rebase-ready-thread",
         "click button \"pulls.review\"",
-        "click button \"Review actions\"",
-        "click menuitem \"Summarize scopes\"",
-        "expect text \"No model route is available for this thread*\""
+        "expect button \"Summarize\"",
+        "click button \"Summarize\"",
+        "expect text \"The model call failed*\""
       ],
       "verification": [
         {
@@ -197,185 +161,37 @@
       ]
     },
     {
-      "id": "review-progress",
-      "title": "Track viewed progress per file",
-      "summary": "Each file header and rail row marks its file viewed, the header menu marks every file viewed, clears them or jumps to the next unviewed file, and auto-mark on scroll (on by default, a setting) marks a file once its header leaves the review viewport. A turn review writes the Host's diff-viewed marks; a workspace review writes its local record.",
-      "surfaces": [
-        "client"
-      ],
+      "id": "batch-reviewed-marks",
+      "title": "Mark a selection of scope files reviewed",
+      "summary": "File rows in the open scope take Shift ranges and Cmd/Ctrl toggles, the scope header selects every visible file, and one action marks or clears the whole selection in local review progress. A plain click still toggles one file.",
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "unviewed",
-        "viewed",
-        "progress-updated",
-        "auto-marked",
-        "all-viewed"
-      ],
+      "states": ["unselected", "range-selected", "marked", "cleared"],
       "failureModes": [
-        "A Host that does not serve the idempotent diff-viewed mark disables auto-mark and leaves the manual toggle working.",
-        "Auto-mark only ever marks, so scrolling back never unviews a file the reviewer marked.",
-        "A workspace review starts fresh when its revision changes, so a mark cannot outlive the diff it reviewed."
+        "A mark only ever covers paths of the open scope, so switching scopes or revisions prunes ids the scope no longer lists.",
+        "The selection is presentation state and never touches the stored reviewed marks until the batch action runs."
       ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
-          "id": "pulls-review.review-progress",
+          "id": "pulls-review.batch-reviewed",
           "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
         },
         {
           "kind": "unit-test",
-          "id": "pulls-review.review-progress-unit-batch",
+          "id": "pulls-review.batch-reviewed-marks",
           "file": "plugins/@dshfiles/pulls-review/tests/reviewed.spec.ts",
           "testName": "marks and unmarks a batch without duplicating or dropping other paths"
         }
       ],
       "telemetry": [
         {
-          "kind": "automatic",
-          "source": "api-dispatch"
-        }
-      ],
-      "reach": [
-        "seed rebase-ready-thread",
-        "click button \"pulls.review\"",
-        "expect text \"0/1 viewed\"",
-        "click checkbox \"Mark seeded-work.md as viewed\"",
-        "expect text \"1/1 viewed\"",
-        "click button \"Review actions\"",
-        "click menuitem \"Mark all viewed\"",
-        "expect text \"1/1 viewed\""
-      ]
-    },
-    {
-      "id": "all-files-review-tab",
-      "title": "Open every changed file in one review tab",
-      "summary": "The plugin writes the changes-review tab kind itself, so a changed-files card row or a prose file link opens an all-files review instead of the native one-file tab: a source switch between the turn snapshot and the live workspace diff, every file stacked with its comparison mounted only near the viewport, unified/split and wrap choices, and the native tab reachable again from the classicReviewTab setting.",
-      "surfaces": [
-        "client"
-      ],
-      "configuration": [
-        {
-          "key": "dshfiles-pulls-review.classicReviewTab",
-          "defaultValue": "false",
-          "constraints": "Boolean; live. Turns the all-files tab takeover off so the native one-file tab opens.",
-          "coveredBy": [
-            "pulls-review.tab-unit-address"
-          ]
-        }
-      ],
-      "states": [
-        "turn-source",
-        "workspace-source",
-        "loading",
-        "empty",
-        "failed",
-        "classic-tab"
-      ],
-      "failureModes": [
-        "A DSH release that changes the changes-review address stops matching, so the native tab resumes instead of the plugin breaking the open path.",
-        "A turn whose summary the Host no longer serves reports its own empty or failed state and offers Retry.",
-        "A comparison the Host refuses (binary, oversized, missing) renders one line instead of an empty diff."
-      ],
-      "externalDependencies": [],
-      "reach": [
-        "seed file-change-thread",
-        "expect text \"review-fixture.md*\"",
-        "click button \"review-fixture.md*\"",
-        "expect text \"turn 1*\"",
-        "expect text \"review-fixture.md*\"",
-        "expect text \"File created in this review.*\"",
-        "expect text \"0/1 viewed\""
-      ],
-      "verification": [
-        {
-          "kind": "unit-test",
-          "id": "pulls-review.tab-unit-address",
-          "file": "plugins/@dshfiles/pulls-review/src/review-model.test.ts",
-          "testName": "reads and writes the changes-review address"
-        },
-        {
           "kind": "not-applicable",
-          "id": "pulls-review.tab-browser",
-          "reason": "A turn with changed files needs a model provider turn; the scratch and e2e profiles run none. The workspace path of the same surface is covered by the scopes and progress reaches."
+          "reason": "Client-only: Mark a selection of scope files reviewed renders browser state and starts no Host work of its own."
         }
       ],
-      "telemetry": [
-        {
-          "kind": "not-applicable",
-          "reason": "Client-only: the tab reads the Host routes and plugin APIs it already covers; it starts no Host work of its own."
-        }
-      ]
-    },
-    {
-      "id": "inline-review-comments",
-      "title": "Comment on reviewed lines",
-      "summary": "Hover a changed line to anchor a comment thread, reply, resolve or reopen it, and delete it behind a confirmation. Threads live in Host storage keyed by the review identity, so the Agent reads and writes the same threads through review_comments and review_comment_* tools.",
-      "surfaces": [
-        "client",
-        "host",
-        "api",
-        "storage"
-      ],
-      "configuration": [],
-      "states": [
-        "idle",
-        "composing",
-        "threaded",
-        "replied",
-        "resolved",
-        "unavailable"
-      ],
-      "failureModes": [
-        "A Host that does not serve the comments API hides the affordances instead of failing the review.",
-        "A thread that no longer exists is refused by its id rather than invented.",
-        "Deleting a thread needs an explicit confirm and removes its replies with it."
-      ],
-      "externalDependencies": [],
-      "verification": [
-        {
-          "kind": "unit-test",
-          "id": "pulls-review.comments-unit-scope",
-          "file": "plugins/@dshfiles/pulls-review/src/review-comments-store.test.ts",
-          "testName": "a comment thread belongs to one review and keeps its anchor"
-        },
-        {
-          "kind": "unit-test",
-          "id": "pulls-review.comments-unit-lifecycle",
-          "file": "plugins/@dshfiles/pulls-review/src/review-comments-store.test.ts",
-          "testName": "a reply, a resolve and a reopen keep the thread and its author"
-        },
-        {
-          "kind": "unit-test",
-          "id": "pulls-review.comments-unit-missing",
-          "file": "plugins/@dshfiles/pulls-review/src/review-comments-store.test.ts",
-          "testName": "an unknown thread is refused instead of invented"
-        },
-        {
-          "kind": "not-applicable",
-          "id": "pulls-review.comments-browser",
-          "reason": "Reaching a line affordance needs a comparison in a turn or workspace review; the scratch and e2e profiles cannot produce one with a provider. The Host store and API are covered by unit tests and the API contract by the catalog checks."
-        }
-      ],
-      "telemetry": [
-        {
-          "kind": "automatic",
-          "source": "api-dispatch"
-        },
-        {
-          "kind": "automatic",
-          "source": "agent-tool"
-        }
-      ],
-      "reach": [
-        "seed rebase-ready-thread",
-        "click button \"pulls.review\"",
-        "expect textbox \"Filter changed files\"",
-        "click button \"Comment on line 1\"",
-        "fill textbox \"Comment body\" \"Why this line?\"",
-        "click button \"Comment\"",
-        "expect text \"Why this line?*\""
-      ]
+      "reach": ["click button \"pulls.review\"", "expect checkbox \"Select all files in this scope\""]
     }
   ]
 }

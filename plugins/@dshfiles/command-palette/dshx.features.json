@@ -4,9 +4,8 @@
     {
       "id": "palette-search",
       "title": "Search threads and workspace files",
-      "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Filter by sidebar group and show each result’s update date. Archived threads are hidden. Rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads unless threadsScope is all.",
+      "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all.",
       "surfaces": ["client"],
-      "reach": ["press Meta+k", "click tab \"Threads\"", "expect tab \"Pinned\""],
       "configuration": [
         {
           "key": "threadsScope",
@@ -16,11 +15,9 @@
           "coveredBy": ["command-palette.threads-project-scope"]
         }
       ],
-      "states": ["closed", "open-empty", "thread-results", "group-filtered-results", "file-results", "content-results"],
+      "states": ["closed", "open-empty", "thread-results", "file-results", "content-results"],
       "failureModes": [
         "A thread title or project match is omitted from results.",
-        "A thread result omits its sidebar group or update date.",
-        "An archived thread appears in search results.",
         "A child session or subagent appears in the Threads list.",
         "A file basename match is buried below unrelated path matches.",
         "A persisted user message does not return from thread-content search."
@@ -31,12 +28,6 @@
           "kind": "gherkin",
           "id": "command-palette.thread-search",
           "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "command-palette.thread-search-section-metadata",
-          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
-          "testName": "shows sidebar section and update date on content-search results"
         },
         {
           "kind": "gherkin",

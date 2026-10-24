@@ -63,6 +63,19 @@ describe('WorkspaceCleanupModel.decide', () => {
     expect(decide(idleThread(), { archived: ['session-a'], running: undefined })).toMatchObject({ action: 'remove' })
   })
 
+  it('offers only clean, known, idle secondary workspaces when explicitly selected', () => {
+    const secondary = idleThread({ name: 'projection-selector', secondary: true, workingCopyState: 'clean', sessionIds: [] })
+    expect(WorkspaceCleanupModel.decide({ thread: secondary, archived: new Set(), activity: undefined, now, olderThanMs: 6 * HOUR, kinds: ['secondary'] })).toEqual({
+      action: 'remove',
+      kind: 'secondary',
+      lastUsedAt: now - 10 * HOUR,
+    })
+    expect(WorkspaceCleanupModel.decide({ thread: { ...secondary, workingCopyState: 'dirty' }, archived: new Set(), activity: undefined, now, olderThanMs: 0, kinds: ['secondary'] })).toMatchObject({ action: 'skip', reason: 'working-copy-dirty' })
+    expect(WorkspaceCleanupModel.decide({ thread: { ...secondary, workingCopyState: 'unknown' }, archived: new Set(), activity: undefined, now, olderThanMs: 0, kinds: ['secondary'] })).toMatchObject({ action: 'skip', reason: 'workspace-state-unknown' })
+    expect(WorkspaceCleanupModel.decide({ thread: { ...secondary, usedAt: [] }, archived: new Set(), activity: undefined, now, olderThanMs: 0, kinds: ['secondary'] })).toMatchObject({ action: 'skip', reason: 'workspace-state-unknown' })
+    expect(WorkspaceCleanupModel.decide({ thread: { ...secondary, unlandedCount: 1 }, archived: new Set(), activity: undefined, now, olderThanMs: 0, kinds: ['secondary'] })).toMatchObject({ action: 'skip', reason: 'has-work' })
+  })
+
   it('keeps a recently used, queued or unselected workspace', () => {
     expect(decide(idleThread({ usedAt: [now - HOUR] }))).toMatchObject({ action: 'skip', reason: 'too-recent' })
     expect(decide(idleThread({ integrationQueued: true }))).toMatchObject({ action: 'skip', reason: 'queued' })

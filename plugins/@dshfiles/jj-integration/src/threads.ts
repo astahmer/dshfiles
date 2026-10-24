@@ -1525,16 +1525,17 @@ export const createThreads = (options: {
             continue
           }
           if (current.workingCopyState !== 'clean' || current.unlanded.length > 0) {
-            results.push({
-              name: expected.name,
-              path: expected.path,
-              status: 'has-work',
-              message: 'The workspace now has uncommitted or unlanded work, or its state cannot be verified.',
-            })
+            const message =
+              current.workingCopyState === 'unknown'
+                ? 'The working-copy state could not be verified.'
+                : current.workingCopyState === 'dirty'
+                  ? 'The workspace has uncommitted changes.'
+                  : 'The workspace has unlanded work.'
+            results.push({ name: expected.name, path: expected.path, status: 'has-work', message })
             continue
           }
           await jj(['--ignore-working-copy', 'workspace', 'forget', expected.name], input.repoRoot)
-          await rm(current.path, { recursive: true, force: true })
+          await rm(current.path, { recursive: true, force: false })
           results.push({ name: expected.name, path: expected.path, status: 'discarded', message: null })
         } catch (error) {
           results.push({ name: expected.name, path: expected.path, status: 'error', message: error instanceof Error ? error.message : String(error) })
