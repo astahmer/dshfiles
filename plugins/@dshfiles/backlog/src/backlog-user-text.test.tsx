@@ -49,7 +49,7 @@ describe('backlog sent mentions', () => {
         root.render(<BacklogMentionChip node={{ id: 'backlog', start: 0, end: 5, data: { id: 12, title: 'Composer drops chips' } }} interactive />)
       })
       const button = container.querySelector('button')
-      expect(button?.textContent).toBe('@b:12 Composer drops chips')
+      expect(button?.textContent).toBe('b:12 · Composer drops chips')
       expect(button?.getAttribute('data-ref-chip')).toBe('backlog')
 
       await act(async () => button?.click())
@@ -72,7 +72,7 @@ describe('backlog sent mentions', () => {
       root.render(<BacklogMentionChip node={{ id: 'backlog', start: 0, end: 4, data: { id: 7, title: null } }} interactive={false} />)
     })
     expect(container.querySelector('button')).toBeNull()
-    expect(container.querySelector('[data-ref-chip="backlog"]')?.textContent).toBe('@b:7')
+    expect(container.querySelector('[data-ref-chip="backlog"]')?.textContent).toBe('b:7')
     act(() => root.unmount())
     container.remove()
   })

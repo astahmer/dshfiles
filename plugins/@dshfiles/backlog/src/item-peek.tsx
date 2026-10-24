@@ -41,6 +41,7 @@ import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { ActivityDescription } from './activity-description.js'
+import { BacklogReferenceChip } from './backlog-reference-chip.js'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
@@ -644,14 +645,19 @@ const LinkRow = (props: {
   readonly thread: ComposerThread | undefined
   readonly threadLabel: string
   readonly openThread: OpenThread
-  readonly select: (id: number) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const api = useApi(backlogApi)
   const link = props.link
+  const linkedItem = useQuery({
+    queryKey: ['dshfiles-backlog', 'reference-title', link.target],
+    enabled: link.type === 'item',
+    staleTime: 30_000,
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: Number(link.target) }, { signal })),
+  })
   const Icon = linkIcons[link.type]
   const openAction = (): (() => void) | undefined => {
     if (link.type === 'thread') return () => props.openThread(link.target)
-    if (link.type === 'item') return () => props.select(Number(link.target))
     if (link.type === 'url') return () => void window.open(link.target, '_blank', 'noopener,noreferrer')
     return undefined
   }
@@ -659,7 +665,9 @@ const LinkRow = (props: {
   return (
     <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-      {open === undefined ? (
+      {link.type === 'item' ? (
+        <BacklogReferenceChip id={Number(link.target)} itemTitle={linkedItem.data?.ok === true ? linkedItem.data.value.item.title : null} />
+      ) : open === undefined ? (
         <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
       ) : (
         <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
@@ -972,7 +980,6 @@ const PeekBody = (props: {
                       thread={link.type === 'thread' ? threadsById.get(link.target) : undefined}
                       threadLabel={link.type === 'thread' ? threadLabel(link.target) : linkLabel(link)}
                       openThread={props.openThread}
-                      select={props.select}
                     />
                   ))}
                 </ul>
