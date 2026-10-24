@@ -35,7 +35,7 @@ export class SourceControlModel {
     })
   }
 
-  /** Mutable, empty, single-parent, undescribed ancestors of @ that `jj abandon` can drop safely. */
+  /** Mutable, empty, single-parent ancestors of @ that `jj abandon` can drop safely. */
   static readonly emptyAncestorCandidates = <Row extends LinkedRevision>(revisions: readonly Row[]): Row[] => {
     const byId = new Map(revisions.map(revision => [revision.commitId, revision]))
     const workingCopy = revisions.find(revision => revision.workingCopy)
@@ -49,7 +49,7 @@ export class SourceControlModel {
       seen.add(commitId)
       const revision = byId.get(commitId)
       if (revision === undefined || revision.immutable) continue
-      if (revision.empty && revision.parents.length === 1 && revision.description.trim().length === 0) candidates.push(revision)
+      if (revision.empty && revision.parents.length === 1) candidates.push(revision)
       queue.push(...revision.parents)
     }
     return candidates.slice(0, 50)

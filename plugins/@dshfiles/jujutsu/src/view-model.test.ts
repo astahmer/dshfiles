@@ -96,8 +96,8 @@ describe('changed file tree', () => {
 
 describe('source control groups', () => {
   const revisions = [
-    revision('d', ['c'], { workingCopy: true }),
-    revision('c', ['b'], { empty: true }),
+    revision('d', ['c'], { workingCopy: true, empty: true, description: 'wip' }),
+    revision('c', ['b'], { empty: true, description: 'wip' }),
     revision('b', ['a'], { empty: true, description: 'kept placeholder' }),
     revision('a', [], { immutable: true, empty: true }),
   ]
@@ -114,8 +114,8 @@ describe('source control groups', () => {
     expect(groups[0]?.child).toBeNull()
   })
 
-  it('only offers undescribed mutable empty ancestors for cleanup', () => {
-    expect(SourceControlModel.emptyAncestorCandidates(revisions).map(row => row.commitId)).toEqual([commit('c')])
+  it('offers mutable empty ancestors for cleanup even when they have descriptions', () => {
+    expect(SourceControlModel.emptyAncestorCandidates(revisions).map(row => row.commitId)).toEqual([commit('c'), commit('b')])
   })
 
   it('moves a revision together with its descendants', () => {
