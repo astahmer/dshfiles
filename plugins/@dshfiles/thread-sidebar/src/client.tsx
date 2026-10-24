@@ -130,7 +130,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
-import { workspaceName } from './workspace-paths.js'
+import { workspaceName, workspaceNameLabel } from './workspace-paths.js'
 import {
   failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
@@ -941,6 +941,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showProject = rowStyle.project || props.parentTitle !== undefined
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
+  const workspaceLabel = workspaceNameLabel(props.workspaceName, props.workspaceTitle)
   const metaLine = showProject || showMachine || showPath || childCount > 0
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined || props.integrationQueuedAt !== undefined
   const openAside = useAsideOpen()
@@ -1191,9 +1192,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>
                   ) : null}
-                  {props.workspaceName === undefined ? null : (
+                  {workspaceLabel === undefined ? null : (
                     <span className="dshx:shrink-0 dshx:truncate" data-testid="thread-workspace-name">
-                      · {props.workspaceName}
+                      · {workspaceLabel}
                     </span>
                   )}
                   {props.parentTitle === undefined ? null : (
