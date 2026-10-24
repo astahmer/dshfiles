@@ -141,6 +141,32 @@ describe('submitReply', () => {
     expect(context.view.text).toBe('')
   })
 
+  it('saves an attachment-only comment without dispatching an empty reply', async () => {
+    const context = await setup()
+    context.saveGate.resolve()
+    let dispatchStarted = false
+
+    await submitReply({
+      text: '',
+      files: [screenshot],
+      save: async files => {
+        await context.mutation.mutate({ id: context.id, text: '', files: files.map(fileInput) })
+      },
+      dispatch: {
+        ...dispatchPort(Promise.resolve({ kind: 'dispatched' })),
+        dispatch: async () => {
+          dispatchStarted = true
+          return { kind: 'dispatched' }
+        },
+      },
+      view: context.viewPort,
+    })
+
+    expect(context.storedComments()).toMatchObject([{ detail: '', attachments: [{ name: 'screenshot.png' }] }])
+    expect(dispatchStarted).toBe(false)
+    expect(context.view.failures).toEqual([])
+  })
+
   it('rolls the comment back and restores the text and files when the save fails', async () => {
     const context = await setup()
     let dispatchStarted = false

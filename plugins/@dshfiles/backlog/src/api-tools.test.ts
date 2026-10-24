@@ -2,6 +2,27 @@ import { describe, expect, test } from 'vitest'
 import { backlogApi } from './api.js'
 
 describe('backlog tool exposure', () => {
+  test('comments allow attachment-only replies but reject empty replies', async () => {
+    const schema = backlogApi.methods.comment.input
+    if (schema === undefined) throw new Error('Comment input schema is missing')
+    const image = {
+      id: 'c711b896-58bc-4a23-b4fa-2148657bc21a',
+      kind: 'image',
+      name: 'screenshot.png',
+      mediaType: 'image/png',
+      bytes: 4,
+      width: 1,
+      height: 1,
+      data: 'iVBORw==',
+    }
+
+    const validate = (value: unknown) => schema['~standard'].validate(value)
+
+    expect((await validate({ id: 1, text: '', files: [image] })).issues).toBeUndefined()
+    expect((await validate({ id: 1, text: 'Progress update' })).issues).toBeUndefined()
+    expect((await validate({ id: 1, text: '  ' })).issues).toBeDefined()
+    expect((await validate({ id: 1, text: '', files: [] })).issues).toBeDefined()
+  })
   test('every panel verb a human can take is a named tool', () => {
     const tools = Object.values(backlogApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name).sort()).toEqual([

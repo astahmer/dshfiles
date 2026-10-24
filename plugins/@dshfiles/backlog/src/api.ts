@@ -5,6 +5,21 @@ import { BacklogItems } from './item.js'
 const idSchema = z.number().int().positive()
 const freshnessSchema = z.enum(BacklogItems.freshnessStates)
 const fileInputSchema = BacklogItems.attachmentSchema.omit({ createdAt: true }).extend({ data: z.string().min(1).max(24_000_000) })
+
+const commentInputSchema = z
+  .object({
+    id: idSchema,
+    text: z.string().max(BacklogItems.maxBodyChars).describe('Reply text; it may be empty only when the comment includes an attachment.'),
+    files: z
+      .array(fileInputSchema)
+      .max(BacklogItems.maxAttachments)
+      .optional()
+      .describe('Images or files the comment carries: base64 `data` without a data-URL prefix, with kind, name, media type and byte size.'),
+  })
+  .strict()
+  .refine(input => input.text.trim().length > 0 || (input.files?.length ?? 0) > 0, {
+    message: 'A comment needs text or at least one attachment.',
+  })
 const fileOutputSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: z.object({ dataUrl: z.string().min(1), path: z.string().min(1).optional() }).strict() }).strict(),
   z.object({ ok: z.literal(false), reason: z.literal('not-found') }).strict(),
@@ -405,18 +420,7 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_dismiss_proposal', readOnly: false, render: renderDetailPreview },
     }),
     comment: method({
-      input: z
-        .object({
-          id: idSchema,
-          text: z.string().max(BacklogItems.maxBodyChars).describe('Reply text; it may be empty only when the comment includes an attachment.'),
-          files: z
-            .array(fileInputSchema)
-            .max(BacklogItems.maxAttachments)
-            .optional()
-            .describe('Images or files the comment carries: base64 `data` without a data-URL prefix, with kind, name, media type and byte size.'),
-        })
-        .strict()
-        .refine(input => input.text.trim() !== '' || (input.files?.length ?? 0) > 0, 'Add reply text or at least one attachment.'),
+      input: commentInputSchema,
       output: detailResultSchema,
       description: `Add a progress comment to a backlog item with text or attachments; references in the text become links. ${writeNote}`,
       tool: { name: 'backlog_comment', readOnly: false, render: renderDetailPreview },
