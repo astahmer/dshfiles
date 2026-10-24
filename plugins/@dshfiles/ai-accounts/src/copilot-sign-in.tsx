@@ -53,14 +53,9 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
   }
   const cancel = useMutation({
     mutationFn: () => accounts.cancelCopilotLogin({ instanceId, confirm: true, requestId }),
-    onSuccess: () =>
-      queryClient.setQueryData(queryKey, {
-        instanceId: instanceId,
-        status: 'idle',
-        userCode: null,
-        verificationUri: null,
-        message: 'GitHub sign-in was cancelled.',
-      } satisfies CopilotLoginState),
+    // The Host may ignore this intent's stale cancellation while a newer sign-in is waiting.
+    // Re-read its authoritative status; inventing idle here would erase the newer code and stop its polling.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey, exact: true }),
   })
   const signOut = useMutation({
     mutationFn: () => accounts.signOutCopilot({ instanceId: instanceId }),
