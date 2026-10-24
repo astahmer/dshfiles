@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
-import type { SessionCreateRequest, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
+import type {} from '@deepseek-ai/dsh-client-file-upload'
+import type { PromptContentPart, SessionCreateRequest, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { BlockAssembler, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions } from '@deepseek-ai/dsh-llm'
@@ -17,8 +18,10 @@ import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import { defineHost, definePromptSection } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { AgentComments } from './agent-dispatch.js'
+import { BacklogStartContext } from './backlog-start-context.js'
 import { createAiActivityTracker } from './ai-activity.js'
 import { backlogApi } from './api.js'
 import { writeAttachmentFile } from './attachment-file.js'
@@ -654,11 +657,16 @@ const startThreadForItems = async (
   if (items.length === 0) {
     throw new PluginApiError(`No backlog item matched ${input.ids.map(id => `b:${String(id)}`).join(', ')}.`, { code: 'item-not-found' })
   }
+  if (missing.length > 0) {
+    throw new PluginApiError(`Could not load every requested backlog item: ${missing.map(id => `b:${String(id)}`).join(', ')}.`, { code: 'item-not-found' })
+  }
+  const context = await BacklogStartContext.prepare({ details: items, readFile: request => store.readFile(request) })
   const agent = input.agent === undefined ? null : await agentForStart(ctx, input.agent)
   const details = items.map(detail => startThreadItemOf({ ...detail.item, preview: detail.item.body.slice(0, PREVIEW_CHARS) }))
   const heading = StartThreadForm.message(details)
   const raw = input.message ?? heading
-  const message = agent === null ? raw : AgentComments.opening(agent, raw)
+  const fullMessage = `${raw}\n\n${context.text}`
+  const message = agent === null ? fullMessage : AgentComments.opening(agent, fullMessage)
   const placement = StartThreadPlacementPlan.of({
     workspaceId: input.workspaceId,
     cwd: input.cwd,
@@ -697,14 +705,30 @@ const startThreadForItems = async (
   } catch (error) {
     logFailure('Backlog thread kept its created title')(error)
   }
-  if (message !== '') {
-    try {
-      // SAFETY: SessionRequestId is a type-only brand over a Host-minted unique id.
-      const requestId = randomUUID() as SessionRequestId
-      await controller.prompt({ requestId, sessionId, mode: 'queue', content: [{ type: 'text', text: message }] }, AbortSignal.timeout(30_000))
-    } catch (error) {
-      logFailure('Backlog thread started without its first message')(error)
+  try {
+    const content: PromptContentPart[] = [{ type: 'text', text: message }]
+    const uploadSignal = AbortSignal.timeout(120_000)
+    for (const attachment of context.attachments) {
+      if (attachment.type === 'image') {
+        content.push({ type: 'image', data: attachment.data, mediaType: attachment.mediaType, name: attachment.name })
+        continue
+      }
+      const uploaded = await ctx.fileUploads.uploadStream({
+        sessionId,
+        data: Readable.from([attachment.bytes]),
+        name: attachment.name,
+        signal: uploadSignal,
+      })
+      content.push({ type: 'file', receiptId: uploaded.receiptId })
     }
+    // SAFETY: SessionRequestId is a type-only brand over a Host-minted unique id.
+    const requestId = randomUUID() as SessionRequestId
+    await controller.prompt({ requestId, sessionId, mode: 'queue', content }, AbortSignal.timeout(120_000))
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown error'
+    throw new PluginApiError(`Session ${sessionId} was created, but mandatory backlog context was not delivered: ${reason}`, {
+      code: 'thread-context-not-delivered',
+    })
   }
   const actor = actorOf(caller)
   const linked: number[] = []
