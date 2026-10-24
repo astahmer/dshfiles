@@ -17,6 +17,7 @@ import {
   THREAD_NOTIFICATION_CATEGORIES,
   ThreadNotificationModel,
   storedNotificationSoundsMuted,
+  storedNotificationsMuted,
   type ThreadNotificationCategories,
   type ThreadNotificationCategory,
   type ThreadNotificationDelivery,
@@ -72,6 +73,7 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
   const [permission, setPermission] = useState(readBrowserNotificationPermission)
   const [audioUnavailable, setAudioUnavailable] = useState(false)
   const notificationSoundsMuted = storedNotificationSoundsMuted.useValue()
+  const notificationsMuted = storedNotificationsMuted.useValue()
   const hasSystemRoute = THREAD_NOTIFICATION_CATEGORIES.some(category =>
     ThreadNotificationModel.notificationRouteHasSystem(props.categories[category].delivery),
   )
@@ -103,16 +105,20 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
       <FieldLegend>{props.t('threadSidebarNotifications')}</FieldLegend>
       <FieldDescription>{props.t('threadSidebarNotificationPrivacy')}</FieldDescription>
       <FieldDescription>{props.t('threadSidebarSoundScopeHint')}</FieldDescription>
-      <Button
-        size="sm"
-        type="button"
-        variant="outline"
-        className="dshx:justify-self-start"
-        aria-pressed={notificationSoundsMuted}
-        onClick={() => storedNotificationSoundsMuted.set(!notificationSoundsMuted)}
-      >
-        {props.t(notificationSoundsMuted ? 'threadSidebarUnmuteNotificationSounds' : 'threadSidebarMuteNotificationSounds')}
-      </Button>
+      <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
+        <Button size="sm" type="button" variant="outline" aria-pressed={notificationsMuted} onClick={() => storedNotificationsMuted.set(!notificationsMuted)}>
+          {props.t(notificationsMuted ? 'threadSidebarResumeNotifications' : 'threadSidebarSnoozeNotifications')}
+        </Button>
+        <Button
+          size="sm"
+          type="button"
+          variant="outline"
+          aria-pressed={notificationSoundsMuted}
+          onClick={() => storedNotificationSoundsMuted.set(!notificationSoundsMuted)}
+        >
+          {props.t(notificationSoundsMuted ? 'threadSidebarUnmuteNotificationSounds' : 'threadSidebarMuteNotificationSounds')}
+        </Button>
+      </div>
       {audioUnavailable ? (
         <Alert variant="warning">
           <AlertDescription>{props.t('threadSidebarAudioUnavailable')}</AlertDescription>

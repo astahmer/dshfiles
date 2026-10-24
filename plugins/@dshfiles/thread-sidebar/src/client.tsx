@@ -192,12 +192,13 @@ import { captureThreadMentionInsertion, requestThreadMentionInsertion, ThreadMen
 import {
   ThreadNotificationModel,
   legacyNotificationPreferences,
+  storedNotificationsMuted,
   type ThreadInteractionStatus,
   type ThreadNotificationCategory,
   type ThreadFinishNotificationCategory,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
-import { createNotificationSoundPaletteAction } from './notification-sound-palette-action.js'
+import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import {
@@ -2465,7 +2466,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const notifyThread = (category: ThreadNotificationCategory, eventId: string, sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
     const categoryPreferences = preferences.notificationCategories[category]
-    if (!ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) || isMuteActive(mutedThreads[sessionId], Date.now())) return
+    if (
+      storedNotificationsMuted.get() === true ||
+      !ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) ||
+      isMuteActive(mutedThreads[sessionId], Date.now())
+    )
+      return
     const session = sessionState.byId[sessionId]
     if (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
     const inApp = ThreadNotificationModel.notificationRouteHasInApp(categoryPreferences.delivery)
@@ -3810,6 +3816,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (!isPrimarySurface) return
     const actions: readonly PaletteAction[] = [
       createNotificationSoundPaletteAction(latestRowActions.current.props.tSidebar),
+      createNotificationSnoozePaletteAction(latestRowActions.current.props.tSidebar),
       ...(asideOpener === null
         ? []
         : [

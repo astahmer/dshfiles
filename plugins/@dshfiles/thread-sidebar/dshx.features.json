@@ -1023,14 +1023,19 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds, mute or unmute tones globally from the command palette, and grant system permission explicitly.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
         "click button \"Thread sidebar\"",
         "expect group \"Thread notifications\"",
         "expect button \"Approval needed: Off\"",
-        "expect button \"Turn stopped: Off\""
+        "expect button \"Turn stopped: Off\"",
+        "expect button \"Snooze notifications\"",
+        "click button \"Snooze notifications\"",
+        "expect button \"Resume notifications\"",
+        "click button \"Resume notifications\"",
+        "expect button \"Snooze notifications\""
       ],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
@@ -1041,9 +1046,10 @@
           "coveredBy": ["thread-sidebar.notifications-settings"]
         }
       ],
-      "states": ["off", "in-app", "system", "both", "permission-needed", "permission-granted"],
+      "states": ["off", "in-app", "system", "both", "silent", "permission-needed", "permission-granted"],
       "failureModes": [
         "System permission is requested only by the explicit Allow system notifications action; notification delivery never prompts on its own.",
+        "Global silent mode suppresses in-app alerts, system notifications and notification sounds until resumed; events during silence are not replayed.",
         "OS notification title and body are generic and omit thread titles, prompts, and raw error details; details stay inside DSH.",
         "Muted, selected, excluded subagent, or already-delivered events do not notify; event claims are bounded to the most recent 5,000 per browser.",
         "Only completed, stopped, and error endings notify; approvals and questions come from pending interactions instead.",
@@ -1073,6 +1079,12 @@
           "id": "thread-sidebar.notification-sound-palette-toggle-execution",
           "file": "plugins/@dshfiles/thread-sidebar/src/notification-sound-palette-action.test.ts",
           "testName": "executing the palette action toggles shared mute state in both directions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-silent-mode-toggle",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-sound-palette-action.test.ts",
+          "testName": "the notification palette action toggles silent mode in both directions"
         },
         {
           "kind": "unit-test",

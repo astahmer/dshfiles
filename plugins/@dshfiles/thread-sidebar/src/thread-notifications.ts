@@ -25,6 +25,12 @@ export const storedNotificationSoundsMuted = createStoredValue({
   fallback: false,
 })
 
+export const storedNotificationsMuted = createStoredValue({
+  key: 'dshfiles.thread-sidebar.notifications-muted.v1',
+  schema: z.boolean(),
+  fallback: false,
+})
+
 export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   'approval-needed': { delivery: 'off', sound: false, soundPreset: 'soft', volume: 0.5 },
   'input-needed': { delivery: 'off', sound: false, soundPreset: 'chime', volume: 0.5 },

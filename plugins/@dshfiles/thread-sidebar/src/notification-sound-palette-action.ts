@@ -1,6 +1,6 @@
 import type { PaletteAction } from '@dshfiles/command-palette/api'
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
-import { storedNotificationSoundsMuted } from './thread-notifications.js'
+import { storedNotificationSoundsMuted, storedNotificationsMuted } from './thread-notifications.js'
 
 export const createNotificationSoundPaletteAction = (t: ThreadSidebarTranslate): PaletteAction & { readonly label: () => string } => ({
   id: '@dshfiles/thread-sidebar/notification-sounds/toggle',
@@ -9,5 +9,15 @@ export const createNotificationSoundPaletteAction = (t: ThreadSidebarTranslate):
   group: 'command',
   run: () => {
     storedNotificationSoundsMuted.set(storedNotificationSoundsMuted.get() !== true)
+  },
+})
+
+export const createNotificationSnoozePaletteAction = (t: ThreadSidebarTranslate): PaletteAction & { readonly label: () => string } => ({
+  id: '@dshfiles/thread-sidebar/notifications/toggle',
+  label: () => t(storedNotificationsMuted.get() === true ? 'threadSidebarResumeNotifications' : 'threadSidebarSnoozeNotifications'),
+  aliases: ['snooze notifications', 'silent mode', 'resume notifications'],
+  group: 'command',
+  run: () => {
+    storedNotificationsMuted.set(storedNotificationsMuted.get() !== true)
   },
 })

@@ -1,17 +1,21 @@
 import assert from 'node:assert/strict'
 import { PaletteApi } from '@dshfiles/command-palette/api'
 import { beforeEach, test } from 'vitest'
-import { createNotificationSoundPaletteAction } from './notification-sound-palette-action.js'
-import { storedNotificationSoundsMuted } from './thread-notifications.js'
+import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
+import { storedNotificationSoundsMuted, storedNotificationsMuted } from './thread-notifications.js'
 
 const labels = {
   threadSidebarMuteNotificationSounds: 'Mute notification sounds',
   threadSidebarUnmuteNotificationSounds: 'Unmute notification sounds',
+  threadSidebarSnoozeNotifications: 'Snooze notifications',
+  threadSidebarResumeNotifications: 'Resume notifications',
 } as const
 
 const translate = (key: Parameters<import('./thread-view-manager.js').ThreadSidebarTranslate>[0]): string => {
   if (key === 'threadSidebarMuteNotificationSounds') return labels.threadSidebarMuteNotificationSounds
   if (key === 'threadSidebarUnmuteNotificationSounds') return labels.threadSidebarUnmuteNotificationSounds
+  if (key === 'threadSidebarSnoozeNotifications') return labels.threadSidebarSnoozeNotifications
+  if (key === 'threadSidebarResumeNotifications') return labels.threadSidebarResumeNotifications
   return key
 }
 
@@ -33,6 +37,7 @@ beforeEach(() => {
   })
   Object.defineProperty(globalThis, 'window', { value: {}, configurable: true })
   storedNotificationSoundsMuted.set(false)
+  storedNotificationsMuted.set(false)
 })
 
 test('the palette action label reflects the current mute state', () => {
@@ -42,6 +47,24 @@ test('the palette action label reflects the current mute state', () => {
     assert.equal(action.label(), 'Mute notification sounds')
     storedNotificationSoundsMuted.set(true)
     assert.equal(action.label(), 'Unmute notification sounds')
+  } finally {
+    dispose()
+  }
+})
+
+test('the notification palette action toggles silent mode in both directions', () => {
+  const action = createNotificationSnoozePaletteAction(translate)
+  assert.equal(action.label(), 'Snooze notifications')
+  const dispose = PaletteApi.registerAction(action)
+  try {
+    const registered = PaletteApi.getSnapshot().actions.find(candidate => candidate.id === '@dshfiles/thread-sidebar/notifications/toggle')
+    assert.ok(registered !== undefined)
+    const context = { thread: null, workspace: null, workspaces: [], themePreference: 'system' as const }
+    registered.run(context)
+    assert.equal(storedNotificationsMuted.get(), true)
+    assert.equal(action.label(), 'Resume notifications')
+    registered.run(context)
+    assert.equal(storedNotificationsMuted.get(), false)
   } finally {
     dispose()
   }
