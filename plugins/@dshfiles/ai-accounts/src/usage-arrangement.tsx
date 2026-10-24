@@ -2,24 +2,61 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, EyeIcon, EyeOffIcon, TagIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
+import { useApi } from '@dshfiles/dshx/client'
+import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { usePreferences } from './use-preferences.js'
-import { UsageOverviewModel, type UsageLayout } from './usage-overview-model.js'
+import type { UsageLayout } from './usage-overview-model.js'
+import { aiAccountsApi, type AccountReorder } from './api.js'
+import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
+import { AccountOrderModel } from './account-order-model.js'
 
 const DRAG_TYPE = 'application/x-dshfiles-ai-accounts-usage'
 
-/** The shared order and hidden list behind the usage strip and popover; a write the Host refuses leaves them as they were. */
+/** The page, sidebar and edge share the Host store order. Legacy cosmetic settings never become routing priority. */
 export const useUsageLayout = () => {
-  const { settings, usageOrder, hiddenUsageAccounts } = usePreferences()
-  const layout: UsageLayout = { order: usageOrder, hidden: hiddenUsageAccounts }
-  const saveHidden = (ids: string[]): void => void settings.set('hiddenUsageAccounts', ids).catch(() => false)
+  const { settings, hiddenUsageAccounts } = usePreferences()
+  const api = useApi(aiAccountsApi)
+  const queryClient = useQueryClient()
+  const fileQuery = useQuery(aiAccountsQueries.file(api))
+  const accounts = fileQuery.data?.accounts ?? []
+  const layout: UsageLayout = { order: accounts.map(account => account.instanceId), hidden: hiddenUsageAccounts }
+  const pending = useIsMutating({ mutationKey: aiAccountsKeys.orderMutation }) > 0
+  const reorder = useMutation({
+    mutationKey: aiAccountsKeys.orderMutation,
+    scope: { id: 'ai-accounts-order' },
+    mutationFn: (input: AccountReorder) => api.reorderAccount(input),
+    onSuccess: next => acceptAccountOrder(queryClient, next),
+    onError: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.file }),
+  })
+  const preference = useMutation({
+    mutationFn: async (input: { readonly hidden: string[] } | { readonly shortNames: boolean }) => {
+      const saved = 'hidden' in input ? await settings.set('hiddenUsageAccounts', input.hidden) : await settings.set('usageShortNames', input.shortNames)
+      if (!saved) throw new Error('The Host refused to save this display preference.')
+    },
+  })
+  const saveHidden = (ids: string[]): void => preference.mutate({ hidden: ids })
   return {
     layout,
+    pending,
+    ready: fileQuery.data !== undefined && !fileQuery.isError,
+    error: reorder.isError
+      ? `Could not change account priority: ${errorMessage(reorder.error, 'The Host may need updating. Retry after it is updated.')}`
+      : preference.isError
+        ? errorMessage(preference.error, 'Could not save display preference.')
+        : fileQuery.isError
+          ? 'Account priority is unavailable. Retry when the account Host is available.'
+          : null,
+    movingId: reorder.variables?.instanceId ?? null,
+    neighborIndex: (shownIds: readonly string[], id: string, direction: -1 | 1): number => AccountOrderModel.neighborIndex(accounts, shownIds, id, direction),
     hide: (id: string): void => saveHidden([...hiddenUsageAccounts.filter(hidden => hidden !== id), id]),
     show: (id: string): void => saveHidden(hiddenUsageAccounts.filter(hidden => hidden !== id)),
     showAll: (): void => saveHidden([]),
-    setShortNamesShown: (shown: boolean): void => void settings.set('usageShortNames', shown).catch(() => false),
-    move: (input: { readonly shownIds: readonly string[]; readonly id: string; readonly toIndex: number }): void =>
-      void settings.set('usageOrder', UsageOverviewModel.moveAccount({ order: usageOrder, ...input })).catch(() => false),
+    setShortNamesShown: (shown: boolean): void => preference.mutate({ shortNames: shown }),
+    move: (input: { readonly shownIds: readonly string[]; readonly id: string; readonly toIndex: number }): void => {
+      if (pending || fileQuery.isError) return
+      const target = AccountOrderModel.moveTarget(accounts, input)
+      if (target !== null) reorder.mutate(target)
+    },
   }
 }
 
@@ -46,6 +83,11 @@ export const ArrangeableAccount = (props: {
   const [dropTarget, setDropTarget] = useState(false)
   const index = props.shownIds.indexOf(props.id)
   const move = (toIndex: number): void => props.arrangement.move({ shownIds: props.shownIds, id: props.id, toIndex })
+  const previousIndex = props.arrangement.neighborIndex(props.shownIds, props.id, -1)
+  const nextIndex = props.arrangement.neighborIndex(props.shownIds, props.id, 1)
+  const disabled = props.arrangement.pending || !props.arrangement.ready
+  const statusId = props.arrangement.movingId !== null && props.shownIds.includes(props.arrangement.movingId) ? props.arrangement.movingId : props.shownIds[0]
+  const showStatus = statusId === props.id
   const hiddenCount = props.arrangement.layout.hidden.length
   return (
     <ContextMenu>
@@ -53,12 +95,13 @@ export const ArrangeableAccount = (props: {
         <div
           className={cn(props.className, dropTarget && 'dshx:rounded-md dshx:ring-2 dshx:ring-ring/60')}
           aria-label={props.focusable === true ? `${props.name}: drag to reorder, or open the context menu to move or hide` : undefined}
-          draggable
+          aria-busy={props.arrangement.pending && showStatus}
+          draggable={!disabled}
           tabIndex={props.focusable === true ? 0 : undefined}
           onDragEnd={() => setDropTarget(false)}
           onDragLeave={() => setDropTarget(false)}
           onDragOver={event => {
-            if (!event.dataTransfer.types.includes(DRAG_TYPE)) return
+            if (disabled || !event.dataTransfer.types.includes(DRAG_TYPE)) return
             event.preventDefault()
             event.dataTransfer.dropEffect = 'move'
             setDropTarget(true)
@@ -71,7 +114,7 @@ export const ArrangeableAccount = (props: {
             event.preventDefault()
             setDropTarget(false)
             const dragged = event.dataTransfer.getData(DRAG_TYPE)
-            if (dragged === '' || dragged === props.id || !props.shownIds.includes(dragged)) return
+            if (disabled || dragged === '' || dragged === props.id || !props.shownIds.includes(dragged)) return
             props.arrangement.move({ shownIds: props.shownIds, id: dragged, toIndex: index })
           }}
           onKeyDown={event => {
@@ -82,14 +125,16 @@ export const ArrangeableAccount = (props: {
           }}
         >
           {props.children}
+          {showStatus && props.arrangement.pending ? <span role="status">Saving account priority…</span> : null}
+          {showStatus && props.arrangement.error !== null ? <span role="alert">{props.arrangement.error}</span> : null}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="dshx-root">
-        <ContextMenuItem disabled={index <= 0} onSelect={() => move(index - 1)}>
+        <ContextMenuItem disabled={disabled || previousIndex === -1} onSelect={() => move(previousIndex)}>
           {props.direction === 'row' ? <ArrowLeftIcon /> : <ArrowUpIcon />}
           {props.direction === 'row' ? 'Move left' : 'Move up'}
         </ContextMenuItem>
-        <ContextMenuItem disabled={index === -1 || index >= props.shownIds.length - 1} onSelect={() => move(index + 1)}>
+        <ContextMenuItem disabled={disabled || nextIndex === -1} onSelect={() => move(nextIndex)}>
           {props.direction === 'row' ? <ArrowRightIcon /> : <ArrowDownIcon />}
           {props.direction === 'row' ? 'Move right' : 'Move down'}
         </ContextMenuItem>

@@ -13,6 +13,8 @@ import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 import { AccountWriteQueue } from './account-write-queue.js'
+import { AccountOrderModel } from './account-order-model.js'
+import type { AccountReorder } from './api.js'
 
 /**
  * Account profiles on disk.
@@ -311,23 +313,27 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
       return persistAccountFile({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) })
     })
 
+  const reorderAccount = (input: AccountReorder): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      const accounts = AccountOrderModel.reorder(file.accounts, input)
+      if (accounts.every((account, index) => account === file.accounts[index])) return file
+      return persistAccountFile({ ...file, accounts })
+    })
+
   const moveAccount = (instanceId: string, direction: AccountOrderDirection): Promise<AccountStoreFile> =>
     mutate(async () => {
       const file = await readAccountFile()
-      const currentIndex = file.accounts.findIndex(account => account.instanceId === instanceId)
-      const current = file.accounts[currentIndex]
+      const current = file.accounts.find(account => account.instanceId === instanceId)
       if (current === undefined) throw new Error(`Account '${instanceId}' is no longer available.`)
-
-      const indexesInGroup = file.accounts.flatMap((account, index) => (account.kind === current.kind ? [index] : []))
-      const positionInGroup = indexesInGroup.indexOf(currentIndex)
-      const nextIndex = indexesInGroup[positionInGroup + (direction === 'earlier' ? -1 : 1)]
-      if (nextIndex === undefined) return file
-      const next = file.accounts[nextIndex]
-      if (next === undefined) return file
-
-      const accounts = [...file.accounts]
-      accounts[currentIndex] = next
-      accounts[nextIndex] = current
+      const group = file.accounts.filter(account => account.kind === current.kind)
+      const target = group[group.indexOf(current) + (direction === 'earlier' ? -1 : 1)]
+      if (target === undefined) return file
+      const accounts = AccountOrderModel.reorder(file.accounts, {
+        instanceId,
+        targetInstanceId: target.instanceId,
+        placement: direction === 'earlier' ? 'before' : 'after',
+      })
       return persistAccountFile({ ...file, accounts })
     })
 
@@ -374,6 +380,7 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
     upsertAccount,
     removeAccount,
     moveAccount,
+    reorderAccount,
     setDistribution,
     readAccountIdentity,
   }

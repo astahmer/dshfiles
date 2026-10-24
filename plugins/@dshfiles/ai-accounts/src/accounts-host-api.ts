@@ -133,6 +133,11 @@ export const accountsHostApi = aiAccountsApi.host({
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
+  reorderAccount: async ({ input, ctx }) => {
+    await accountStoreService.reorderAccount(input)
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
+  },
   setDistribution: async ({ input, ctx }) => {
     await accountStoreService.setDistribution(input.distribution)
     await refreshRoutes(ctx)

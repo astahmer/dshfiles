@@ -87,6 +87,17 @@ Feature: AI Accounts
     Then widening the usage popover from its grip lays the accounts out side by side
     And the usage popover keeps its size until its grip is double-clicked
 
+  @scenario:ai-accounts.shared-priority @scenario:ai-accounts.shared-priority-usage
+  Scenario: Sidebar moves, page moves and drag share real routing priority
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    And request distribution is set to Priority
+    And the second Command Code account is moved earlier from its usage menu
+    Then the page and usage strip keep one priority through page moves, drag and reload
+    When a new thread asks the first account's model a question
+    Then the reordered first healthy account serves the request
+
   @scenario:ai-accounts.pool-failover
   Scenario: A rate-limited account hands the turn to a healthy one
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

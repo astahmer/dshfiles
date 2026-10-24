@@ -29,7 +29,6 @@ export const usePreferences = () => {
     footerButton: value?.footerButton ?? DEFAULT_CLIENT_SETTINGS.footerButton,
     meterLabel: meterLabelSchema.parse(value?.meterLabel),
     usageWindowLayout: usageWindowLayoutSchema.parse(value?.usageWindowLayout),
-    usageOrder: Array.isArray(value?.usageOrder) ? value.usageOrder.filter(id => typeof id === 'string') : [],
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
     usageShortNames: value?.usageShortNames ?? true,
     usageShortNameOverrides: value?.usageShortNameOverrides ?? {},

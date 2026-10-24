@@ -1,10 +1,11 @@
 import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
-import { queryOptions } from '@dshfiles/plugin-ui/query'
+import { queryOptions, type QueryClient } from '@dshfiles/plugin-ui/query'
 import { z } from 'zod'
 import {
   accountKindSchema,
   aiAccountsApi,
   usageCardSchema,
+  type AccountsFile,
   type AccountsCatalog,
   type AccountsUsage,
   type NativeProviders,
@@ -19,6 +20,7 @@ const LIVE_RELOAD_POLL_MS = 3_500
 
 export const aiAccountsKeys = {
   file: ['ai-accounts', 'file'] as const,
+  orderMutation: ['ai-accounts', 'account-order'] as const,
   usage: ['ai-accounts', 'usage'] as const,
   secretCatalogKeys: (cwd: string | null) => ['ai-accounts', 'secret-catalog-keys', cwd] as const,
   credential: (ref: string) => ['ai-accounts', 'credential', ref] as const,
@@ -87,6 +89,13 @@ const keepLastGoodUsage = (previous: AccountsUsage | null | undefined, next: Acc
 
 const hasPendingLiveReload = (state: NativeProviders | undefined): boolean =>
   state?.liveReload === true && state.providers.some(provider => provider.enabled !== provider.running && provider.lockedReason === null)
+
+/** A committed Host answer updates every surface; cancel earlier reads and reconcile concurrent Host changes. */
+export const acceptAccountOrder = async (client: QueryClient, file: AccountsFile): Promise<void> => {
+  await client.cancelQueries({ queryKey: aiAccountsKeys.file })
+  client.setQueryData(aiAccountsKeys.file, file)
+  await client.invalidateQueries({ queryKey: aiAccountsKeys.file })
+}
 
 export const aiAccountsQueries = {
   secretCatalogKeys: (accounts: Pick<AccountsClient, 'secretCatalogKeys'>, cwd: string | null) =>

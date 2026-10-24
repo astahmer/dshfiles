@@ -136,4 +136,55 @@ describe('account store priming', () => {
     expect((await store.accountStoreService.readAccountFile()).accounts.map(account => account.instanceId)).toEqual(['codex-test', 'second'])
     expect(store.accountStoreService.readAccountFileSync().distribution).toBe('priority')
   })
+
+  it('persists a target reorder and refreshes the synchronous canonical store cache', async () => {
+    const store = await loadStoreWith([accountDraft, { ...accountDraft, instanceId: 'disabled', enabled: false }, { ...accountDraft, instanceId: 'last' }])
+    const moved = await store.accountStoreService.reorderAccount({ instanceId: 'last', targetInstanceId: 'codex-test', placement: 'before' })
+    expect(moved.accounts.map(account => account.instanceId)).toEqual(['last', 'codex-test', 'disabled'])
+    // Check before any async read can repair a stale sync cache.
+    expect(store.accountStoreService.readAccountFileSync().accounts).toEqual(moved.accounts)
+    expect((await store.accountStoreService.readAccountFile()).accounts).toEqual(moved.accounts)
+
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const { createAccountPool } = await import('./account-pool.js')
+    const pool = createAccountPool({ distribution: 'priority' })
+    pool.replace(
+      configFromAccountsFile(moved).codexAccounts.map(account => ({
+        id: account.instanceId,
+        kind: 'codex',
+        label: account.displayName,
+        enabled: account.enabled,
+      })),
+    )
+    expect(pool.acquire({ candidateIds: ['codex-test', 'disabled', 'last'] })?.id).toBe('last')
+  })
+
+  it('serializes overlapping reorder, save, distribution and remove without lost updates', async () => {
+    const first = { ...accountDraft, kind: 'github-copilot' as const }
+    const second = { ...first, instanceId: 'second' }
+    const removed = { ...first, instanceId: 'removed' }
+    const store = await loadStoreWith([first, second, removed])
+    await Promise.all([
+      store.accountStoreService.reorderAccount({ instanceId: 'second', targetInstanceId: 'codex-test', placement: 'before' }),
+      store.accountStoreService.upsertAccount({ ...first, displayName: 'Edited concurrently' }),
+      store.accountStoreService.setDistribution('priority'),
+      store.accountStoreService.removeAccount('removed'),
+    ])
+    const file = await store.accountStoreService.readAccountFile()
+    expect(file.accounts.map(account => account.instanceId)).toEqual(['second', 'codex-test'])
+    expect(file.accounts[1]?.displayName).toBe('Edited concurrently')
+    expect(file.distribution).toBe('priority')
+  })
+
+  it('rejects stale targets/orders, then accepts the next write after a rejection', async () => {
+    const store = await loadStoreWith([accountDraft, { ...accountDraft, instanceId: 'second' }])
+    const input = { instanceId: 'second', targetInstanceId: 'codex-test', placement: 'before' as const, expectedOrder: ['codex-test', 'second'] }
+    const outcomes = await Promise.allSettled([store.accountStoreService.reorderAccount(input), store.accountStoreService.reorderAccount(input)])
+    expect(outcomes.map(outcome => outcome.status)).toEqual(['fulfilled', 'rejected'])
+    await expect(store.accountStoreService.reorderAccount({ instanceId: 'second', targetInstanceId: 'gone', placement: 'before' })).rejects.toThrow(
+      /no longer available/,
+    )
+    await store.accountStoreService.moveAccount('second', 'later')
+    expect((await store.accountStoreService.readAccountFile()).accounts.map(account => account.instanceId)).toEqual(['codex-test', 'second'])
+  })
 })

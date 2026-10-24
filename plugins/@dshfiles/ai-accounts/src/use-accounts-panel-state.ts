@@ -1,13 +1,13 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
-import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountWriteQueue } from './account-write-queue.js'
 import type { AccountRemovalTarget } from './account-remove-machine.js'
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
-import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
+import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { AccountsRules, aiAccountsApi, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
@@ -23,6 +23,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [enqueueWrite] = useState(() => AccountWriteQueue.create())
+  const reordering = useIsMutating({ mutationKey: aiAccountsKeys.orderMutation }) > 0
   // The slug the store holds for the selection when a queued write runs; an earlier rename in the queue moves it.
   const storedSelectionId = useRef<string | null>(null)
   useEffect(() => {
@@ -32,7 +33,8 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const fileQuery = useQuery(aiAccountsQueries.file(accounts))
   const file = fileQuery.data ?? null
   const setFile = (next: AccountsFile): void => {
-    queryClient.setQueryData(aiAccountsKeys.file, next)
+    // Saved edits carry order too: an older read must not restore priority from before the write.
+    void acceptAccountOrder(queryClient, next)
   }
   const load = async (): Promise<void> => {
     const result = await fileQuery.refetch({ throwOnError: true })
@@ -131,10 +133,15 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     },
   })
   const moveAccountMutation = useMutation({
+    mutationKey: aiAccountsKeys.orderMutation,
+    scope: { id: 'ai-accounts-order' },
     mutationFn: (input: { readonly instanceId: string; readonly direction: AccountOrderDirection }) => enqueueWrite(() => accounts.moveAccount(input)),
     onMutate: () => setNotice(null),
-    onSuccess: next => setFile(next),
-    onError: error => setNotice(`Could not reorder account: ${String(error)}`),
+    onSuccess: next => acceptAccountOrder(queryClient, next),
+    onError: error => {
+      setNotice(`Could not reorder account: ${String(error)}`)
+      return queryClient.invalidateQueries({ queryKey: aiAccountsKeys.file })
+    },
   })
   const removeMutation = useMutation({
     mutationFn: async (target: AccountRemovalTarget) => {
@@ -331,7 +338,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     notice: notice ?? (fileQuery.isError && file === null ? 'The account host did not answer.' : null),
     setNotice,
     saving: saveMutation.isPending,
-    reordering: moveAccountMutation.isPending,
+    reordering,
     load,
     save,
     persist,

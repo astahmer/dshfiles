@@ -141,17 +141,17 @@ describe('footer summary', () => {
       },
       noLayout,
     )
-    expect(items.map(item => item.instanceId)).toEqual(['roomy', 'low', 'spent'])
+    expect(items.map(item => item.instanceId)).toEqual(['roomy', 'spent', 'low'])
     expect(UsageOverviewModel.mostCritical(items)?.instanceId).toBe('spent')
   })
 
-  it('sinks accounts with a spent window below usable ones until the user orders them', () => {
+  it('never sinks an exhausted account below a lower-priority account', () => {
     const both: AccountsUsage = {
       readAt: 0,
       hostName: 'mac',
       cards: [card('spent', [window('Weekly limit', 0, HOUR)]), card('usable', [window('Weekly limit', 40, HOUR)])],
     }
-    expect(UsageOverviewModel.overviewSections(both, 'all', noLayout).cards.map(item => item.instanceId)).toEqual(['usable', 'spent'])
+    expect(UsageOverviewModel.overviewSections(both, 'all', noLayout).cards.map(item => item.instanceId)).toEqual(['spent', 'usable'])
     expect(UsageOverviewModel.overviewSections(both, 'all', { order: ['spent'], hidden: [] }).cards.map(item => item.instanceId)).toEqual(['spent', 'usable'])
   })
 })
@@ -178,10 +178,11 @@ describe('usage layout', () => {
     expect(UsageOverviewModel.stripItems(mixed, { order: ['c'], hidden: ['b'] }).map(item => item.instanceId)).toEqual(['c', 'a'])
   })
 
-  it('moves an account among the shown ones and keeps the remembered rest after them', () => {
-    expect(UsageOverviewModel.moveAccount({ order: ['x', 'a'], shownIds: ['a', 'b', 'c'], id: 'c', toIndex: 0 })).toEqual(['c', 'a', 'b', 'x'])
-    expect(UsageOverviewModel.moveAccount({ order: [], shownIds: ['a', 'b', 'c'], id: 'a', toIndex: 1 })).toEqual(['b', 'a', 'c'])
-    expect(UsageOverviewModel.moveAccount({ order: [], shownIds: ['a', 'b'], id: 'b', toIndex: 9 })).toEqual(['a', 'b'])
+  it('uses the canonical account order even when the quota sweep still has the earlier order', () => {
+    const layout = { order: ['c', 'signed-out', 'b', 'a'], hidden: ['b'] }
+    expect(UsageOverviewModel.overviewSections(mixed, 'all', layout).cards.map(item => item.instanceId)).toEqual(['c', 'a'])
+    expect(UsageOverviewModel.stripItems(mixed, layout).map(item => item.instanceId)).toEqual(['c', 'a'])
+    expect(UsageOverviewModel.overviewSections(mixed, 'all', layout).unavailable.map(item => item.instanceId)).toEqual(['signed-out'])
   })
 })
 

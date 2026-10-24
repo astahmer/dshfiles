@@ -141,6 +141,33 @@ compatible account in account-list order; move accounts up or down within each
 provider group to change that order. Round-robin advances within each compatible
 provider/model group, while Balanced favors accounts used least recently.
 
+### Shared account priority
+
+The accounts page, sidebar meters and usage popover share the Host's account-list
+order. Move an account on the page, drag a meter/card onto another account, or
+use its context menu (Shift+F10) to move it earlier/later. Moves change real
+same-provider routing priority, not just the display. Other provider groups,
+hidden accounts and disabled accounts are preserved. Priority uses the new order
+for the next eligible request; an in-flight request and cross-provider fallback
+chains are unchanged.
+
+While a move saves, order controls are disabled across these surfaces. A failed
+or stale move reports an error and rereads the Host; retry against the refreshed
+order. Legacy cosmetic `usageOrder` settings remain readable by old clients but
+are ignored, never silently migrated into routing priority. Hiding a usage tile
+remains a separate display preference and keeps the existing recovery behavior.
+The matching agent action is `ai_accounts_reorder_account` (user request required).
+This change includes Host storage/API code, so an existing Host needs a normal
+user-managed restart after rebuilding.
+
+For synthetic UI evidence, open **AI Accounts**, add two **Command Code**
+accounts against the existing loopback fake-provider fixture, and select
+**Request distribution → Priority**. Keep the page rail and wide sidebar strip
+visible together. Move the second meter left in its context menu, move the first
+account earlier on the page, then drag the second meter before the first and
+reload. The `ai-accounts.shared-priority` journey covers this path without real
+sign-in or provider traffic.
+
 ## Usage
 
 A usage strip sits above the sidebar foot (the thread sidebar's
@@ -159,7 +186,7 @@ names), turns them off. Clicking a meter
 opens the popover, which filters by provider and lists one card per enabled
 account with quota, each showing its machine, session, weekly and monthly bars,
 reset times and snapshot age; accounts with a spent window carry a "Limit
-reached" badge and sink below the usable ones until you order them. Accounts
+reached" badge without changing their priority order. Accounts
 without quota data (signed out, failing) fold into one "N hidden" line that
 expands. The grip in the popover's far corner resizes it both ways; wide
 enough, the cards sit side by side in a grid, and the size is kept until you
