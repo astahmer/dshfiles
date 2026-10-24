@@ -2,9 +2,12 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { useCallback, useSyncExternalStore } from 'react'
 
 import { MemoryPanel } from './memory-panel.tsx'
 import { MemoryFocusModel } from './memory-focus.ts'
@@ -16,18 +19,24 @@ const PANEL_ID = 'dshfiles-memory-panel'
 
 export default defineClient({
   name: '@dshfiles/memory',
-  inject: ['slots', 'sessions', 'uiWorkspace', 'layout'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'workspaces'],
   setup(ctx, decorate) {
     ctx.effect(() => installMemoryReferenceLinks(), 'memory reference links')
     const openThread = (sessionId: string): void => {
       const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate.id === sessionId)
       if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
     }
-    const PanelView = (): JSX.Element => (
-      <PluginQueryProvider>
-        <MemoryPanel openThread={openThread} />
-      </PluginQueryProvider>
-    )
+    const PanelView = (): JSX.Element => {
+      const subscribe = useCallback((listener: () => void) => ctx.workspaces.list.subscribe(listener), [])
+      const readWorkspaces = useCallback(() => ctx.workspaces.list.getSnapshot().items, [])
+      const workspaces = useSyncExternalStore(subscribe, readWorkspaces, readWorkspaces)
+      const projectPaths = EntityLabels.projectsOf(workspaces).map(workspace => workspace.path)
+      return (
+        <PluginQueryProvider>
+          <MemoryPanel openThread={openThread} projectPaths={projectPaths} />
+        </PluginQueryProvider>
+      )
+    }
     const ReferenceOverlay = (): JSX.Element => (
       <PluginQueryProvider>
         <MemoryReferenceOverlay

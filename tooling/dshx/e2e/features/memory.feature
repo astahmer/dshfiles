@@ -14,7 +14,7 @@ Feature: Thread memory panel
     And forgetting it with a reason removes it from the list
 
   @scenario:memory.panel-first-note
-  Scenario: Write the first memory on a profile memory has no project for
+  Scenario: Write the first memory on a profile with a registered project
     Given the isolated plugin profile "@dshfiles/memory" is booted
     When the Memory panel is opened
     And the Add memory dialog is given the project path "/work/e2e-project" and the note "Backlog items are never deleted."

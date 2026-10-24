@@ -42,8 +42,14 @@ When('the Memory panel is opened', async ({ page }: { page: Page }) => {
 When('the Add memory dialog is given the project path {string} and the note {string}', async ({ page }: { page: Page }, project: string, text: string) => {
   await page.getByRole('button', { name: 'Add memory', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add a memory', exact: true })
-  // A profile memory has no project for yet has no list to choose from: the path is typed instead.
-  await dialog.getByRole('textbox', { name: 'New note project path', exact: true }).fill(project)
+  const projectPathInput = dialog.getByRole('textbox', { name: 'New note project path', exact: true })
+  if (await projectPathInput.isVisible()) {
+    await projectPathInput.fill(project)
+  } else {
+    const projectPicker = dialog.getByRole('combobox', { name: 'Note project', exact: true })
+    await projectPicker.click()
+    await page.getByRole('option').nth(1).click()
+  }
   await dialog.getByRole('textbox', { name: 'New note text', exact: true }).fill(text)
   await dialog.getByRole('button', { name: 'Add memory', exact: true }).click()
   await expect(dialog).toBeHidden()

@@ -147,7 +147,7 @@ const AddMemoryDialog = (props: {
   )
 }
 
-export const MemoryPanel = (props: { readonly openThread: (sessionId: string) => void }): JSX.Element => {
+export const MemoryPanel = (props: { readonly openThread: (sessionId: string) => void; readonly projectPaths: readonly string[] }): JSX.Element => {
   const api = useApi(memoryApi)
   const [tab, setTab] = useState<MemoryTab>('notes')
   const [project, setProject] = useState('')
@@ -186,7 +186,14 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
     setSelectedNoteId(null)
     setSelectedThreadId(null)
   }, [project])
-  const projectItems = useMemo(() => projects.data ?? [], [projects.data])
+  const projectItems = useMemo(
+    () =>
+      props.projectPaths.map(projectPath => {
+        const knownProject = projects.data?.find(item => item.project === projectPath)
+        return knownProject ?? { project: projectPath, notes: 0, threads: 0 }
+      }),
+    [projects.data, props.projectPaths],
+  )
   const defaultAddProject = useMemo(() => [...projectItems].sort((left, right) => right.notes - left.notes)[0]?.project ?? '', [projectItems])
   const selectedProject = projectItems.find(item => item.project === project)
   const noteCreated = (id: number): void => {
