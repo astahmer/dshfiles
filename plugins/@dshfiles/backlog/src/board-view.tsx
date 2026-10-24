@@ -12,7 +12,7 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
-import { itemTransitionName, withViewTransition } from './view-transition.js'
+import { itemTransitionName } from './view-transition.js'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 /** Cards mounted per column before scrolling near the end reveals another batch. */
@@ -235,7 +235,7 @@ export const BoardView = (props: {
   }
 
   const move = (id: number, status: BacklogStatus): void => {
-    withViewTransition(() => actions.patch({ id, status }))
+    actions.patch({ id, status })
     actions.update.mutate({ id, status })
   }
 
@@ -287,9 +287,7 @@ export const BoardView = (props: {
       const target = columnAt(upEvent.clientX, upEvent.clientY)
       if (target === null) return
       const moved = draggedItems.filter(candidate => candidate.status !== target)
-      withViewTransition(() => {
-        for (const candidate of moved) actions.patch({ id: candidate.id, status: target })
-      })
+      for (const candidate of moved) actions.patch({ id: candidate.id, status: target })
       for (const candidate of moved) actions.update.mutate({ id: candidate.id, status: target })
     }
     dragCleanup.current = cancel

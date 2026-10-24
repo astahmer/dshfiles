@@ -18,6 +18,17 @@ const showFeed = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await expect(feed(page)).toBeVisible()
 }
+const countViewTransitions = async (page: Page): Promise<void> => {
+  await page.evaluate(() => {
+    document.documentElement.dataset['viewTransitionCount'] = '0'
+    const startViewTransition = document.startViewTransition.bind(document)
+    document.startViewTransition = callback => {
+      const count = Number(document.documentElement.dataset['viewTransitionCount'] ?? 0)
+      document.documentElement.dataset['viewTransitionCount'] = String(count + 1)
+      return startViewTransition(callback)
+    }
+  })
+}
 
 const contextTarget = async (page: Page, id: number, view: string): Promise<Locator> => {
   const itemName = `Item b:${String(id)}`
@@ -273,11 +284,13 @@ Then('search results list both {string} and {string}', async ({ page }: { page: 
 
 When('item b:{int} is moved to In progress on the board', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
+  await countViewTransitions(page)
   await page
     .getByRole('article', { name: `Card b:${String(id)}` })
     .getByRole('button', { name: `Status of b:${String(id)}` })
     .click()
   await page.getByRole('menuitem', { name: 'In progress' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
 })
 
 Then('the board columns follow the status order through Dropped', async ({ page }: { page: Page }) => {
@@ -718,10 +731,12 @@ When('the selected board cards are dragged to {string}', async ({ page }: { page
   const source = await card.boundingBox()
   const target = await page.locator(`[data-backlog-column="${status}"]`).boundingBox()
   if (source === null || target === null) throw new Error('Board drag bounds are unavailable')
+  await countViewTransitions(page)
   await page.mouse.move(source.x + 30, source.y + 20)
   await page.mouse.down()
   await page.mouse.move(target.x + 40, target.y + 60, { steps: 12 })
   await page.mouse.up()
+  await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
 })
 
 When('the selected board card context menu moves all selected items to {string}', async ({ page }: { page: Page }, status: string) => {
