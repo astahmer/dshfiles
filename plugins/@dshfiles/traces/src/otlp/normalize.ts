@@ -44,7 +44,7 @@ const isContentAttribute = (key: string): boolean => CONTENT_ATTRIBUTE_KEYS.has(
 
 /** The traces API's own dispatch spans: storing them would make every panel poll a trace of itself. */
 export const SELF_API_ID = 'traces'
-const SELF_API_IDS = new Set([SELF_API_ID, 'traces-alerts'])
+const SELF_API_IDS = new Set([SELF_API_ID, 'traces-alerts', 'traces-boards'])
 
 export type NormalizedEvent = {
   readonly name: string

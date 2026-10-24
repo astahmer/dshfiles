@@ -5,6 +5,7 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { otlpExportTarget, publishLocalOtlpEndpoint } from '@dshfiles/dshx/tracing'
 import { alertsApiHost, startAlerts } from './alerts/alerts-host.js'
 import { tracesApi } from './api.js'
+import { createBoardsApiHost } from './boards/boards-host.js'
 import { ReceiverDiagnosis } from './diagnosis.js'
 import { OtlpBody } from './otlp/decode.js'
 import { SpanNormalizer } from './otlp/normalize.js'
@@ -139,6 +140,8 @@ const api = tracesApi.host({
   clear: () => requireRuntime().store.clear(),
 })
 
+const boardsApi = createBoardsApiHost(() => requireRuntime().store)
+
 const setupHost = (context: Context): Effect<void> => {
   const logger = context.logger('traces')
   const store = openTraceStore({ path: dshHomePath('plugins', 'traces', 'traces.db') })
@@ -192,7 +195,7 @@ const setupHost = (context: Context): Effect<void> => {
 
 export default defineHost({
   name: 'traces',
-  apis: [api, alertsApiHost],
+  apis: [api, alertsApiHost, boardsApi],
   settings: [ownedSettings],
   setup: setupHost,
 })
