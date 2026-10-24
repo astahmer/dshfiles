@@ -33,12 +33,14 @@ type QuotaContinuationDomain = Domain<typeof quotaContinuationDomain>
 type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
 type SessionControllerService = SessionController
 type SessionInspectionEvents = Awaited<ReturnType<SessionControllerService['inspect']>>['events']
+type SessionListItems = Awaited<ReturnType<SessionControllerService['list']>>['items']
 type SessionControllerPort = {
   inspect: (
     sessionId: Parameters<SessionControllerService['inspect']>[0],
     signal?: Parameters<SessionControllerService['inspect']>[1],
   ) => Promise<{ readonly events: SessionInspectionEvents }>
   prompt: SessionControllerService['prompt']
+  list?: SessionControllerService['list']
   selectModel?: SessionControllerService['selectModel']
 }
 type AgentUserMessage = Agent['inbox']['nextTurn'][number]
@@ -58,6 +60,7 @@ type ServiceOptions = {
   readonly readResetAt: (accountId: string) => Promise<number | null>
   readonly schedule?: SchedulePort
   readonly sessionController?: SessionControllerPort
+  readonly archivedSessionIds?: () => readonly string[]
   readonly now?: () => number
 }
 type QuotaContinuationService = {
@@ -105,7 +108,7 @@ const hasNewerUserWork = (record: QuotaContinuationRecord, activities: readonly 
 const snoozeUntil = (duration: SnoozeDuration, now: number): number | null => (duration === 'unsnooze' ? null : now + SNOOZE_MS[duration])
 
 const requestIdFor = (continuationId: string): SessionRequestId => {
-  // SessionRequestId is a type-only opaque brand; the persisted UUID is its stable identity.
+  // SAFETY: SessionRequestId is a type-only opaque brand; this persisted UUID is its stable identity.
   return continuationId as SessionRequestId
 }
 
@@ -118,6 +121,7 @@ const createQuotaContinuationService = ({
   readResetAt,
   schedule: scheduleOverride,
   sessionController: sessionControllerOverride,
+  archivedSessionIds: readArchivedSessionIds = () => context.workspaceRegistry?.archivedSessionIds.map(String) ?? [],
   now = Date.now,
 }: ServiceOptions): QuotaContinuationService => {
   let domainOpening: Promise<QuotaContinuationDomain> | undefined
@@ -512,11 +516,30 @@ const createQuotaContinuationService = ({
   const list = async (): Promise<{ scheduleAvailable: boolean; continuations: QuotaContinuationSummary[] }> => {
     const nowAtList = now()
     const scheduleAvailable = schedule() !== undefined
-    const continuations = (await allRecords())
-      .filter(isActive)
+    const archivedSessionIds = new Set(readArchivedSessionIds())
+    const records = (await allRecords())
+      .filter(record => isActive(record) && !archivedSessionIds.has(record.sessionId))
       .sort((left, right) => right.failedAt - left.failedAt)
       .slice(0, MAX_CONTINUATIONS)
-      .map(record => summary(record, nowAtList, scheduleAvailable))
+    const sessionMetadata = new Map<string, SessionListItems[number]>()
+    const controller = sessionController()
+    if (controller?.list !== undefined && records.length > 0) {
+      try {
+        const listed = await controller.list({}, AbortSignal.timeout(15_000))
+        for (const item of listed.items) sessionMetadata.set(String(item.sessionId), item)
+      } catch {
+        context.logger.warn('ai-accounts: could not read Session labels for quota recovery')
+      }
+    }
+    const continuations = records.map(record => {
+      const item = sessionMetadata.get(record.sessionId)
+      const result = summary(record, nowAtList, scheduleAvailable)
+      const title = item?.projections?.values.title
+      const enriched = { ...result }
+      if (typeof title === 'string' && title.trim() !== '') enriched.title = title
+      if (item?.cwd !== undefined) enriched.cwd = item.cwd
+      return enriched
+    })
     return { scheduleAvailable, continuations }
   }
 
