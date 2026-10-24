@@ -39,7 +39,15 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 
 import { ActivityDescription } from './activity-description.js'
 import { ActorThreadLink } from './actor-thread-link.js'
@@ -1145,7 +1153,10 @@ const PeekBody = (props: {
 }
 
 /** The selected item, editable in place: a side panel beside the list, or the whole panel when expanded. */
+const ITEM_PEEK_WIDTH = { min: 320, initial: 460 } as const
+
 const ItemPeek = (props: {
+  readonly panelRoot: RefObject<HTMLElement | null>
   readonly id: number
   readonly threads: readonly ComposerThread[]
   readonly summary: BacklogSummaryView | undefined
@@ -1165,6 +1176,8 @@ const ItemPeek = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const api = useApi(backlogApi)
+  const [width, setWidth] = useState<number>(ITEM_PEEK_WIDTH.initial)
+  const resizeStart = useRef<{ readonly pointerId: number; readonly startX: number; readonly startWidth: number } | null>(null)
   const summary = props.summary
   // The list row already holds most of the item, so the inspector opens filled and the full detail swaps in.
   const placeholder =
@@ -1176,16 +1189,60 @@ const ItemPeek = (props: {
     queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: props.id }, { signal })),
     placeholderData: () => placeholder,
   })
+  const regionWidth = props.panelRoot.current?.querySelector<HTMLElement>('[data-backlog-content-region]')?.clientWidth ?? window.innerWidth
+  const maxWidth = Math.max(ITEM_PEEK_WIDTH.min, Math.min(regionWidth * 0.55, regionWidth - 320))
+  const compact = regionWidth <= 672
+  const effectiveWidth = Math.min(width, maxWidth)
+  const resize = (nextWidth: number): void => setWidth(Math.min(maxWidth, Math.max(ITEM_PEEK_WIDTH.min, nextWidth)))
+  const onResizeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'ArrowLeft') resize(width + 24)
+    else if (event.key === 'ArrowRight') resize(width - 24)
+    else if (event.key === 'Home') resize(ITEM_PEEK_WIDTH.min)
+    else if (event.key === 'End') resize(Number.MAX_SAFE_INTEGER)
+    else return
+    event.preventDefault()
+  }
+  const onResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    resizeStart.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: effectiveWidth }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const onResizePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const start = resizeStart.current
+    if (start === null || start.pointerId !== event.pointerId) return
+    resize(start.startWidth + start.startX - event.clientX)
+  }
+  const onResizePointerEnd = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (resizeStart.current?.pointerId === event.pointerId) resizeStart.current = null
+  }
   return (
     <aside
       aria-label="Item detail"
+      style={props.expanded || props.embedded === true || compact ? undefined : { width: effectiveWidth }}
       className={cn(
-        'dshx:flex dshx:min-h-0 dshx:flex-col dshx:bg-background',
+        'dshx:relative dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background',
         props.expanded || props.embedded === true
           ? 'dshx:min-w-0 dshx:flex-1'
-          : 'dshx:w-[460px] dshx:max-w-[55%] dshx:shrink-0 dshx:border-l dshx:border-border dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-right-2 dshx:duration-150 dshx:@max-pane-compact:absolute dshx:@max-pane-compact:inset-0 dshx:@max-pane-compact:z-20 dshx:@max-pane-compact:w-auto dshx:@max-pane-compact:max-w-none dshx:@max-pane-compact:border-l-0',
+          : 'dshx:min-w-0 dshx:max-w-[55%] dshx:shrink-0 dshx:border-l dshx:border-border dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-right-2 dshx:duration-150 dshx:@max-pane-compact:absolute dshx:@max-pane-compact:inset-0 dshx:@max-pane-compact:z-20 dshx:@max-pane-compact:w-auto dshx:@max-pane-compact:max-w-none dshx:@max-pane-compact:border-l-0',
       )}
     >
+      {props.expanded || props.embedded === true ? null : (
+        <div
+          role="separator"
+          aria-label="Resize item detail"
+          aria-orientation="vertical"
+          aria-valuemin={ITEM_PEEK_WIDTH.min}
+          aria-valuemax={maxWidth}
+          aria-valuenow={effectiveWidth}
+          tabIndex={0}
+          onKeyDown={onResizeKeyDown}
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerEnd}
+          onPointerCancel={onResizePointerEnd}
+          className="dshx:absolute dshx:inset-y-0 dshx:left-0 dshx:z-10 dshx:w-2 dshx:-translate-x-1/2 dshx:cursor-col-resize dshx:touch-none dshx:outline-none dshx:before:absolute dshx:before:inset-y-0 dshx:before:left-1/2 dshx:before:w-0.5 dshx:before:-translate-x-1/2 dshx:before:bg-transparent dshx:hover:before:bg-primary dshx:focus-visible:before:bg-primary dshx:@max-pane-compact:hidden"
+        />
+      )}
       {detail.data === undefined ? null : detail.data.ok ? (
         <PeekBody
           detail={detail.data.value}

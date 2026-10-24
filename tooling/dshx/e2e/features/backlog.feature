@@ -75,7 +75,8 @@ Feature: Backlog
     And the board columns do not scroll horizontally
     And the In progress column holds "Child step, part of b:1"
     When backlog item b:1 is opened
-    Then it is referenced by "Child step, part of b:1"
+    Then the item detail can be resized without being cut off
+    And it is referenced by "Child step, part of b:1"
     When the backlink to b:2 is followed
     Then its activity records the move "inbox → doing" by the user
 

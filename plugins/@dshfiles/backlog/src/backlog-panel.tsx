@@ -669,6 +669,7 @@ export const BacklogPanel = (props: {
     openId === null ? null : (
       <BacklogPeek.Panel
         key={openId}
+        panelRoot={panelRoot}
         id={openId}
         triageOff={triageOff}
         threads={threads}

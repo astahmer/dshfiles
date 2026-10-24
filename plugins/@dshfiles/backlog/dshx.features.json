@@ -240,7 +240,8 @@
         "hover menuitem \"Project\"",
         "click menuitemradio \"sample\"",
         "click article \"Card b:1\"",
-        "expect complementary \"Item detail\""
+        "expect complementary \"Item detail\"",
+        "expect separator \"Resize item detail\""
       ],
       "surfaces": ["client", "host", "tool"],
       "configuration": [],

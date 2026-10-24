@@ -335,6 +335,28 @@ Then('the In progress column holds {string}', async ({ page }: { page: Page }, t
   })
 })
 
+Then('the item detail can be resized without being cut off', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-item-detail-resize', async () => {
+    const detail = peek(page)
+    const splitter = detail.getByRole('separator', { name: 'Resize item detail', exact: true })
+    const region = page.locator('[data-backlog-content-region]')
+    const before = Number(await splitter.getAttribute('aria-valuenow'))
+    const splitterBox = await splitter.boundingBox()
+    if (splitterBox === null) throw new Error('The item detail splitter is not visible.')
+    await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + splitterBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(splitterBox.x + splitterBox.width / 2 - 80, splitterBox.y + splitterBox.height / 2, { steps: 4 })
+    await page.mouse.up()
+    const after = Number(await splitter.getAttribute('aria-valuenow'))
+    expect(after).toBeGreaterThan(before)
+    const detailBox = await detail.boundingBox()
+    const regionBox = await region.boundingBox()
+    if (detailBox === null || regionBox === null) throw new Error('The item detail or its content region has no layout box.')
+    expect(detailBox.y).toBeCloseTo(regionBox.y, 0)
+    expect(detailBox.y + detailBox.height).toBeCloseTo(regionBox.y + regionBox.height, 0)
+  })
+})
+
 When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await feed(page)
