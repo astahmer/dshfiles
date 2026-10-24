@@ -41,6 +41,11 @@ function turnOf(node: ChatNode | undefined): number | undefined {
   return location?.kind === 'turn' || location?.kind === 'step' ? location.turn.turn : undefined
 }
 
+/** The row's Step, so a focus request (`@dshfiles/chat/chat-focus`) can find it; tool rows carry their call id natively. */
+function stepOf(node: ChatNode | undefined): number | undefined {
+  return node?.location.kind === 'step' ? node.location.step.step : undefined
+}
+
 /**
  * Subscribe, apply Turn-process visibility, and dispatch one stable Context key.
  * Policy reads select this seat's own conclusion, so a mode change re-renders
@@ -154,6 +159,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-chat-group-part={groupPart}
       data-chat-flow-kind={routedNode.kind}
       data-chat-turn={turn}
+      data-chat-step={stepOf(routedNode)}
       data-turn-process-member={processMember || undefined}
       data-turn-process-hidden={processHidden || undefined}
       data-turn-process-answer={compactAnswer || undefined}

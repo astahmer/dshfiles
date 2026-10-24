@@ -302,3 +302,13 @@
 .modalAction {
   min-width: 72px;
 }
+
+/* dshfiles fork: the row a focus request (`@dshfiles/chat/chat-focus`) landed on. */
+.column [data-chat-focus] {
+  border-radius: var(--dsw-radius-sm);
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
+  /* Inside the box: a folded process group's scroll body clips anything drawn outside its rows. */
+  outline-offset: -2px;
+  background-color: color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)) 6%, transparent);
+  transition: outline-color 400ms ease;
+}

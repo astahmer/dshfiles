@@ -22,6 +22,10 @@
     "./turn-error-action": {
       "types": "./src/turn-error-action.ts",
       "default": "./dist/turn-error-action.js"
+    },
+    "./chat-focus": {
+      "types": "./src/chat-focus.ts",
+      "default": "./dist/chat-focus.js"
     }
   },
   "scripts": {
@@ -30,6 +34,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

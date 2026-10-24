@@ -43,6 +43,9 @@
     "src/native/conversation-nodes/turn-tail.ts",
     "src/native/contract/slots.ts",
     "src/native/locale.ts",
-    "src/native/chat/markdown-image-links.ts"
+    "src/native/chat/markdown-image-links.ts",
+    "src/native/chat/ChatNodeSeat.tsx",
+    "src/native/chat/TurnTailNodeView.tsx",
+    "src/native/chat/ChatView.module.css"
   ]
 }

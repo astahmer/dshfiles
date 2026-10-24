@@ -2,6 +2,8 @@
 
 ![Open a thread on its latest messages](docs/screenshots/windowed-transcript.png)
 
+![Scroll to a turn, step or tool call on request](docs/screenshots/focus-from-plugin.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -45,6 +47,29 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/conversation-nodes/turn-tail.ts`    | an open Turn with no `turn/end` yet also yields a tail with `closing: null`, so extension rows under `conversation.chat.turnTail` show while the Turn streams and no per-message actions appear                                                                                                   |
 | `src/transcript-window.ts`                      | new: which rows are mounted (latest 24, +24 per step, anchored by the first mounted row's identity, widened to a restored anchor or a Turn jump before the Host is asked for older pages)                                                                                                         |
 | `src/client-entry.tsx`                          | new: dshx client entry calling the native `apply`                                                                                                                                                                                                                                                 |
+| `src/chat-focus.ts`                             | new: the published `@dshfiles/chat/chat-focus` contract — a Turn/Step/tool-call focus, its opaque view-request encoding, and the cross-thread pending request (below)                                                                                                                             |
+| `src/chat-focus-reveal.ts`                      | new: takes a focus from the native `viewRequest` or the pending request, jumps with the rail's `navigateToTurn`, opens folded groups with `beforematch` and highlights the row                                                                                                                    |
+| `src/native/chat/ChatView.tsx` (also)           | reads the native `viewRequest`/`completeViewRequest`/`openView` Conversation View props, runs `useChatFocus`, and provides `openView` to the Turn-tail seats                                                                                                                                      |
+| `src/native/chat/ChatNodeSeat.tsx`              | tags each row with `data-chat-step`, so a Step focus can find it (a tool row already carries the native `data-chat-call-id`)                                                                                                                                                                     |
+| `src/native/chat/TurnTailNodeView.tsx`          | adds the thread's `openView` to every `conversation.chat.turnTail` entry's owner props (`ChatTurnTailExtras`)                                                                                                                                                                                     |
+| `src/native/contract/slots.ts` (also)           | `TurnTailOwnerProps` extends `ChatTurnTailExtras`                                                                                                                                                                                                                                                 |
+| `src/native/chat/ChatView.module.css`           | outlines (inside its box, so a folded group's scroll body does not clip it) and tints the row carrying `data-chat-focus`                                                                                                                                                                         |
+
+### Focus a Turn, Step or tool call from another plugin
+
+`@dshfiles/chat/chat-focus` is how a plugin scrolls Chat to one Turn (`{ turn }`), Step (`{ turn, step }`) or tool call
+(`{ turn, step, toolCallId }`) and highlights it — the traces plugin's **Show in chat** uses it.
+
+- Inside the thread, a `conversation.view` entry calls the native `openView(CHAT_VIEW_ID, encodeChatFocus(focus))` it
+  is handed: the shell selects Chat, which consumes the `viewRequest`. A Turn-footer entry
+  (`conversation.chat.turnTail`) gets the same `openView` in its owner props, for the opposite direction.
+- From outside it (a sidebar panel), call `requestChatFocus({ sessionId, focus })` right after
+  `uiWorkspace.openSession`. The request waits up to 30 s for that thread's Chat to mount; a view of ours that the thread
+  reopens on instead forwards it with `takeChatFocus` and `openView`.
+
+Chat jumps through the turn rail's navigation (unloaded history pages in), opens the folded process group with the
+`beforematch` event browser find uses, scrolls the row to the middle and outlines it for 4 s. A tool call or Step that
+never appears within 4 s lands on its Turn.
 
 The latest **Task stopped** or **Turn error** notice from a turn a restart cut
 off, or whose model request failed (upstream outage, rate limit, transport),

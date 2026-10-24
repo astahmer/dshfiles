@@ -17,6 +17,7 @@ import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '..
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
+import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
@@ -64,7 +65,7 @@ const MOTION_TAIL_MS = 800
 export function ChatView({
   useSession, useChat, useConversation, useSessions, renderSlot,
   sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, fileMentions,
-  usePresentation, useProjection, t,
+  usePresentation, useProjection, t, viewRequest, completeViewRequest, openView,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
   const groupedView = useConversation(snapshot => snapshot.views.grouped('chat'))
@@ -263,6 +264,10 @@ export function ChatView({
     transcriptView,
   })
   followingTail.current = scroll.followingTail
+  useChatFocus({
+    sessionId, viewRequest, completeViewRequest, ready: scroll.initialized,
+    railItems, navigateToTurn: scroll.navigateToTurn, listRef: scroll.listRef,
+  })
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
   return (
@@ -292,10 +297,12 @@ export function ChatView({
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
             <MarkdownDelegateProvider openFile={requestOpenMarkdownFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
-              {renderSlot('conversation.chat.flow', {
-                entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
-                cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
-              }, { hookContext: flowContext })}
+              <ConversationViewOpenerContext.Provider value={openView}>
+                {renderSlot('conversation.chat.flow', {
+                  entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
+                  cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
+                }, { hookContext: flowContext })}
+              </ConversationViewOpenerContext.Provider>
             </MarkdownDelegateProvider>
             {/* No pending placeholders: questions (ui-user-questions) and approvals
                 (ApprovalPanel) both take over the composer, so a flow card would

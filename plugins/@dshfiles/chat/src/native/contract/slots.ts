@@ -2,6 +2,7 @@
 // The turn-error action seat lives in its own published contract module.
 import type {} from '../../turn-error-action.ts'
 export type { TurnErrorActionOwnerProps } from '../../turn-error-action.ts'
+import type { ChatTurnTailExtras } from '../../chat-focus.ts'
 import type { RefObject } from 'react'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
@@ -55,8 +56,8 @@ export interface OpenFileOptions {
   readonly line?: number
 }
 
-/** Owner currency of the completed-Turn extension chain. */
-export interface TurnTailOwnerProps {
+/** Owner currency of the completed-Turn extension chain; the fork adds the thread's View opener (`openView`). */
+export interface TurnTailOwnerProps extends ChatTurnTailExtras {
   turn: TurnLocation
   seq: number
   openFile: (path: string) => void

@@ -1496,6 +1496,9 @@ importers:
       '@deepseek-ai/dsh-api-workspace-controller':
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(423b0975ded0003cb2a5408fd1fd6375)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4

@@ -4,6 +4,7 @@ export default defineConfig({
   name: '@dshfiles/chat',
   modules: {
     'turn-error-action': 'src/turn-error-action.ts',
+    'chat-focus': 'src/chat-focus.ts',
   },
   client: {
     entry: 'src/client-entry.tsx',
