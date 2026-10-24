@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, prewarmSibling, traceBootPhase, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
+import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-accounts-workspace.js'
 import { readScenarioKeys, recordScenarioPass, scenarioIdOfTest } from './scenario-cache.mjs'
 import { ClientBootCheckModel } from '../../packages/dshx/src/project/client-boot-check.js'
 import { DSHFILES_ROOT } from '../../packages/dshx/src/project/local-bundles.js'
@@ -282,6 +283,8 @@ Given('the isolated AI Accounts and owned Chat plugin profile is booted', async 
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/chat'],
     profileLabel: 'ai-accounts-owned-chat',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
   })
   await visitIsolatedPluginProfile(page, profile)
 })
@@ -290,6 +293,8 @@ Given('the isolated AI Accounts and model effort picker plugin profile is booted
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/model-effort-picker'],
     profileLabel: 'ai-accounts-model-fallback',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
   })
   await visitIsolatedPluginProfile(page, profile)
 })

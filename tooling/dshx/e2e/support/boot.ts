@@ -9,6 +9,7 @@ import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/pro
 import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scratch-processes.mjs'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
+import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-accounts-workspace.js'
 
 // Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
 // Turbo result) depends only on the repository.
@@ -220,6 +221,8 @@ interface ComposedBootRequest {
   readonly timeoutMs: number
   readonly additionalBundleIds: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
+  /** Stable recipe identity permits prewarming; each sibling still runs seedHome in its own new home. */
+  readonly seedKey?: string
   readonly cordisPatch?: string
 }
 
@@ -251,9 +254,11 @@ const killPrewarmedHostsOnExit = (): void => {
 process.once('exit', killPrewarmedHostsOnExit)
 
 const compositionKeyOf = (request: ComposedBootRequest): string | undefined => {
-  if (request.seedHome !== undefined) return undefined
+  if (request.seedHome !== undefined && request.seedKey === undefined) return undefined
   const hash = createHash('sha256')
-  hash.update(`${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}`)
+  hash.update(
+    `${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}\0${request.seedKey ?? ''}`,
+  )
   return hash.digest('hex')
 }
 
@@ -320,16 +325,18 @@ export const bootComposedPluginProfile = async (request: {
   readonly timeoutMs?: number
   readonly additionalBundleIds?: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
+  /** Stable recipe identity permits prewarming; each sibling still runs seedHome in its own new home. */
+  readonly seedKey?: string
   readonly cordisPatch?: string
 }): Promise<BootedProfile> => {
+  if (request.seedKey !== undefined && (request.seedHome === undefined || request.seedKey.trim() === '')) {
+    throw new Error('A non-empty seedKey requires a deterministic seedHome recipe.')
+  }
   const composed: ComposedBootRequest = {
-    packageIds: request.packageIds,
-    profileLabel: request.profileLabel,
+    ...request,
     timeoutMs: request.timeoutMs ?? 90_000,
     additionalBundleIds: request.additionalBundleIds ?? [],
   }
-  if (request.seedHome !== undefined) composed.seedHome = request.seedHome
-  if (request.cordisPatch !== undefined) composed.cordisPatch = request.cordisPatch
   const compositionKey = compositionKeyOf(composed)
   if (compositionKey !== undefined) {
     const slot = prewarmSlots.get(compositionKey)
@@ -352,5 +359,10 @@ export const bootComposedPluginProfile = async (request: {
   return profile
 }
 
-export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> =>
-  bootComposedPluginProfile({ packageIds: [packageId], profileLabel: packageId, timeoutMs })
+export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> => {
+  const request = { packageIds: [packageId] as const, profileLabel: packageId, timeoutMs }
+  if (packageId === '@dshfiles/ai-accounts') {
+    return bootComposedPluginProfile({ ...request, seedHome: seedAiAccountsWorkspace, seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY })
+  }
+  return bootComposedPluginProfile(request)
+}
