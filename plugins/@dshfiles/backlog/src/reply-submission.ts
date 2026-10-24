@@ -27,6 +27,7 @@ export const submitReply = async <File>(input: {
   readonly save: (files: readonly File[]) => Promise<void>
   readonly dispatch: ReplyDispatch | null
   readonly view: ReplyView<File>
+  readonly onAnswering?: (answering: boolean) => void
 }): Promise<void> => {
   input.view.clear()
   try {
@@ -49,10 +50,13 @@ export const submitReply = async <File>(input: {
     return
   }
   if (outcome.kind !== 'skipped' || outcome.reason !== 'reply-only' || !input.dispatch.smartReplyAnswers || input.files.length > 0) return
+  input.onAnswering?.(true)
   try {
     const answered = await input.dispatch.answerReply()
     if (!answered.ok) input.view.fail(`${SAVED}, but an AI answer could not be generated: ${answered.reason}`)
   } catch (error) {
     input.view.fail(`${SAVED}, but an AI answer could not be generated: ${errorMessage(error, 'Generation failed.')}`)
+  } finally {
+    input.onAnswering?.(false)
   }
 }

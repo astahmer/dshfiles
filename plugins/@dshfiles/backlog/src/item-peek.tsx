@@ -395,6 +395,7 @@ const Conversation = (props: {
   readonly itemId: number
   readonly threadLabel: ThreadLabel
   readonly openThread: OpenThread
+  readonly agentReplying: boolean
 }): JSX.Element => {
   const attention = props.attention
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
@@ -502,6 +503,21 @@ const Conversation = (props: {
           </li>
         )
       })}
+      {props.agentReplying ? (
+        <li
+          role="status"
+          aria-label="Agent is thinking"
+          className="dshx:relative dshx:flex dshx:items-center dshx:gap-2.5 dshx:text-xs dshx:text-muted-foreground"
+        >
+          <span
+            aria-hidden
+            className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
+          >
+            <span className="dshx:size-1.5 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+          </span>
+          <span className="dshx:animate-pulse">Thinking…</span>
+        </li>
+      ) : null}
     </ol>
   )
 }
@@ -514,6 +530,7 @@ const CommentBox = (props: {
   readonly smartThreadRouting: boolean
   readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
+  readonly onAnswering: (answering: boolean) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
@@ -552,6 +569,7 @@ const CommentBox = (props: {
                 answerReply: () => dispatch.answerReply({ item: props.item, text }),
                 smartReplyAnswers: props.smartReplyAnswers,
               },
+        onAnswering: props.onAnswering,
         view: {
           clear: () => {
             setText('')
@@ -757,6 +775,7 @@ const PeekBody = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const [agentReplying, setAgentReplying] = useState(false)
   const item = props.detail.item
   const scroller = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -999,6 +1018,7 @@ const PeekBody = (props: {
               itemId={item.id}
               threadLabel={threadLabel}
               openThread={props.openThread}
+              agentReplying={agentReplying}
             />
             <CommentBox
               item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
@@ -1008,6 +1028,7 @@ const PeekBody = (props: {
               smartThreadRouting={props.smartThreadRouting}
               smartReplyAnswers={props.smartReplyAnswers}
               threadStartNotifications={props.threadStartNotifications}
+              onAnswering={setAgentReplying}
             />
           </Section>
         </div>

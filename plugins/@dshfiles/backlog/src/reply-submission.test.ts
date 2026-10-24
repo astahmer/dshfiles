@@ -172,6 +172,34 @@ describe('submitReply', () => {
     expect(dispatchStarted).toBe(false)
   })
 
+  it('shows and clears the thinking state while generating an AI answer', async () => {
+    const context = await setup()
+    context.saveGate.resolve()
+    const answer = deferred<{ readonly ok: true }>()
+    const answering: boolean[] = []
+    const submitted = submitReply({
+      text: 'Could you explain this?',
+      files: [],
+      save: async () => {
+        await context.mutation.mutate({ id: context.id, text: 'Could you explain this?' })
+      },
+      dispatch: {
+        ...dispatchPort(Promise.resolve({ kind: 'skipped', reason: 'reply-only' })),
+        answerReply: () => answer.promise,
+        smartReplyAnswers: true,
+      },
+      view: context.viewPort,
+      onAnswering: value => answering.push(value),
+    })
+
+    await expect.poll(() => answering).toEqual([true])
+    answer.resolve({ ok: true })
+    await submitted
+
+    expect(answering).toEqual([true, false])
+    expect(context.view.failures).toEqual([])
+  })
+
   it('keeps the saved comment and reports a failed dispatch without restoring the input', async () => {
     const context = await setup()
     context.saveGate.resolve()
