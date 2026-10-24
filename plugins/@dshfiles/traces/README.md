@@ -16,6 +16,10 @@
 
 ![A browser thread switch with its dshx calls and the Host spans they caused in one trace](docs/screenshots/browser-interaction-traces.png)
 
+![Span ↔ transcript links](docs/screenshots/trace-transcript-links.png)
+
+![List-price cost on traces](docs/screenshots/span-cost.png)
+
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
 list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, metric
@@ -23,7 +27,8 @@ charts, a service/operation overview and error groups.
 
 It is a generic viewer: anything that speaks OTLP/HTTP can send to it, with any `service.name`, resource, scope,
 span kind or attribute key. DSH-specific touches are enrichments only: a span carrying `dsh.session.id` gets an
-**Open thread** button.
+**Open thread** button that lands Chat on its turn, step or tool call, each turn's footer gets a **Trace** button,
+and `dshx.cost.usd` shows as list-price cost ([below](#trace--transcript-links)).
 
 Choice: **build with dshx**. The marketplace has exporters (LoongSuite, dsh-observe) but no in-DSH viewer, and an
 external viewer (otel-desktop-viewer, Jaeger) cannot open a DSH thread or serve agent tools.
@@ -61,10 +66,10 @@ turn count even without the attribute.
 
 - **Summary**: traces, spans, error spans, total trace time, model calls (`gen_ai.operation.name = chat`, one per
   attempt), tool calls (`execute_tool`), trace and model-call p50 · p95, and `gen_ai.usage.*` token totals summed over
-  model calls only (the turn span repeats them as its own totals). Unclassified producers fall back to the span-name
-  prefix (`chat `, `execute_tool `, `invoke_agent`).
-- **Turns**: the thread's traces newest first; a row opens the panel's span waterfall and span detail (without Open
-  thread, since it is this thread).
+  model calls only (the turn span repeats them as its own totals), and the list-price **Cost** when spans are priced.
+  Unclassified producers fall back to the span-name prefix (`chat `, `execute_tool `, `invoke_agent`).
+- **Turns**: the thread's traces newest first, each with its cost; a row opens the panel's span waterfall and span
+  detail, where **Show in chat** replaces Open thread for this thread's spans.
 - **Logs**: records correlated with one of the thread's traces, or carrying its `dsh.session.id`; a span's
   **Logs for this span** narrows them.
 - **Empty**: says that nothing carried this thread's id yet, plus the receiver diagnosis (exporter elsewhere or off,
@@ -133,6 +138,34 @@ The header's **Views** menu opens any board and saves the panel's current view (
 window, open board) under a name, then reapplies it. Saved views are browser presentation state (localStorage), not a
 dashboard builder; `traces_breakdown` gives an agent the same groupings.
 
+## Trace ↔ transcript links
+
+Replaces session replay: the transcript is the replay, and each side links to the other.
+
+- **Span → Chat.** The span panel's **Open thread** (Traces panel) or **Show in chat** (the thread's own Traces tab)
+  opens the thread's Chat scrolled to and outlining what the span belongs to: the nearest span at or above it carrying
+  `dsh.turn` names the turn, its `dsh.step` the step and, on a tool span, `gen_ai.tool.call.id` the tool call. A plugin
+  span nested under a tool call therefore lands on that tool call; a subagent's span opens the subagent's thread.
+- **Turn → trace.** Every Turn footer (`conversation.chat.turnTail`) gets a **Trace** button that opens the thread's
+  Traces tab on that turn's trace (`traces_search` with `sessionId` and `turn`). A turn exported a moment after it
+  ended is retried for 20 s before the tab says no trace was recorded for it.
+
+Both directions use DSH's own Conversation View focus request — every `conversation.view` entry is handed
+`openView(view, focus)` and the `viewRequest` addressed to it — plus the owned Chat fork's
+[`@dshfiles/chat/chat-focus`](../chat/README.md#focus-a-turn-step-or-tool-call-from-another-plugin) contract: the
+focus encoding, the pending request a panel leaves before it opens a thread, and the View opener Chat hands its Turn
+footers. With the stock Chat row the Trace button does not render and Open thread opens the thread unfocused.
+
+## List-price cost
+
+[`@dshfiles/agent-telemetry`](../agent-telemetry/README.md#list-price-cost-on-model-spans) stamps `dshx.cost.usd` on
+each priced model-call span (models.dev prices AI Accounts keeps, the usage ledger's source) and the turn's sum on
+`invoke_agent`. This plugin only sums the model-call spans, never the turn span that repeats them: the thread
+summary's **Cost** and per-turn cost in the Turns list, a span's own cost in the span panel, and **Model calls and
+cost** per service and model (calls, tokens, cost) above the Operations table. `traces_session_summary` returns
+`costUsd` and `turnCosts`, `traces_search` each trace's `costUsd`, and `traces_list_services` the `models` table. A span
+without the attribute (older spans, other senders) shows no cost rather than $0.
+
 ## Settings (`dshfiles-traces`)
 
 | Setting                 | Default     | Effect                                                                                                                                  |
@@ -162,25 +195,25 @@ How the modes map to `OTEL_EXPORTER_OTLP_ENDPOINT`:
 Every read the panel makes is a read-only tool; the destructive verbs (`traces_clear`, `traces_alert_delete`) need an
 explicit opt-in.
 
-| Tool                     | What it returns                                                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `traces_search`          | Traces newest first; filter by service, operation, error status, min duration, time, text, DSH session.              |
-| `traces_get`             | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.                       |
-| `traces_list_services`   | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window.                            |
-| `traces_search_logs`     | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, DSH session, time. |
-| `traces_list_metrics`    | Metrics per service and name: type, unit, points, series, last value.                                                |
-| `traces_get_metric`      | One metric's series per attribute set over a window (value, counter increase, or distribution mean).                 |
-| `traces_service_map`     | Services with span count, error rate and latency; cross-service parent → child calls with counts.                    |
-| `traces_error_groups`    | Error spans grouped by service, operation, error type and message shape, with a sample trace.                        |
-| `traces_session_summary` | One thread's spans, errors, turns, model and tool calls, durations, model latency and token totals.                  |
-| `traces_status`          | Receiver mode, address, state, counters, forwarding, store size, exporter targets and a diagnosis.                   |
-| `traces_clear`           | Deletes every stored trace, log record and metric point; requires `confirm: true`.                                   |
-| `traces_alerts`          | Alert rules with filter, threshold, state and last value; firing count; the newest firing/resolved events.           |
-| `traces_alert_save`      | Creates or replaces a rule (also enables or disables it); only when the user asked.                                  |
-| `traces_alert_mute`      | Mutes a rule for some minutes, or unmutes it; only when the user asked.                                              |
-| `traces_alert_delete`    | Removes a rule (a firing one resolves); requires `confirm: true`.                                                    |
-| `traces_alerts_evaluate` | Evaluates every enabled rule now; only when the user asked.                                                          |
-| `traces_breakdown`       | Groups a window's spans by service, span name or an attribute with count, error rate, percentiles and one measure.   |
+| Tool                     | What it returns                                                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `traces_search`          | Traces newest first with their cost; filter by service, operation, error status, min duration, time, text, DSH session, turn.                 |
+| `traces_get`             | One trace as a depth-first span tree with offsets, attributes, events and resource attributes.                                                |
+| `traces_list_services`   | Per service and operation: count, error rate, p50/p95/p99 and max duration over a window; model calls, tokens and cost per service and model. |
+| `traces_search_logs`     | Log records newest first; filter by service, min severity, text, one attribute, trace or span id, DSH session, time.                          |
+| `traces_list_metrics`    | Metrics per service and name: type, unit, points, series, last value.                                                                         |
+| `traces_get_metric`      | One metric's series per attribute set over a window (value, counter increase, or distribution mean).                                          |
+| `traces_service_map`     | Services with span count, error rate and latency; cross-service parent → child calls with counts.                                             |
+| `traces_error_groups`    | Error spans grouped by service, operation, error type and message shape, with a sample trace.                                                 |
+| `traces_session_summary` | One thread's spans, errors, turns, model and tool calls, durations, model latency, token totals, cost in total and per turn.                  |
+| `traces_status`          | Receiver mode, address, state, counters, forwarding, store size, exporter targets and a diagnosis.                                            |
+| `traces_clear`           | Deletes every stored trace, log record and metric point; requires `confirm: true`.                                                            |
+| `traces_alerts`          | Alert rules with filter, threshold, state and last value; firing count; the newest firing/resolved events.                                    |
+| `traces_alert_save`      | Creates or replaces a rule (also enables or disables it); only when the user asked.                                                           |
+| `traces_alert_mute`      | Mutes a rule for some minutes, or unmutes it; only when the user asked.                                                                       |
+| `traces_alert_delete`    | Removes a rule (a firing one resolves); requires `confirm: true`.                                                                             |
+| `traces_alerts_evaluate` | Evaluates every enabled rule now; only when the user asked.                                                                                   |
+| `traces_breakdown`       | Groups a window's spans by service, span name or an attribute with count, error rate, percentiles and one measure.                            |
 
 ## Decisions
 
@@ -198,7 +231,12 @@ explicit opt-in.
   characters, 128 attributes of 2,048 characters, 64 list items and 32 events.
 - **Storage.** SQLite (`node:sqlite`, like usage and memory) at `$DSH_HOME/plugins/traces/traces.db`: spans, one row
   per trace (root, duration, counts, services, session) and deduplicated resource attributes. Retention drops whole
-  traces so a kept trace never loses part of its tree.
+  traces so a kept trace never loses part of its tree. A thread's traces are those with any span of its Session
+  (indexed `spans (session_id, trace_id)`), not the trace row's single session: a subagent's turns share their parent's
+  trace, and picking one session per trace used to hide that trace from one of the two threads.
+- **Cost at span end, not at query time.** Agent telemetry prices each call when it ends and this viewer sums one
+  attribute, so the cost also reaches any external OTLP backend and keeps the price in force when the call ran; the
+  viewer needs no pricing catalog. Spans recorded before that change show no cost.
 - **Self-spans.** dshx records a span for every API dispatch; the traces API's own (`dshx.api.id = traces`) are
   dropped at ingest so the panel's 5-second polling never shows up as traces of itself.
 - **Logs.** `POST /v1/logs` (JSON or protobuf, same decoder and bounds) stores records with severity, body (8 KiB),
@@ -218,4 +256,4 @@ explicit opt-in.
 
 - Histogram bucket heatmaps and p95 from buckets; multiple metrics on one chart.
 - Alerts: an announcement while no DSH page is open needs a Host notification service (gap 82).
-- Out of scope: a dashboard builder and a query builder, session replay.
+- Out of scope: a dashboard builder and a query builder. Session replay is covered by the trace ↔ transcript links.

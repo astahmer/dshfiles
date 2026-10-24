@@ -6,6 +6,8 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState } from 'react'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
+import type { OpenThread } from './open-thread.js'
+import { ThreadLinks } from './thread-links.js'
 import { ServiceDot } from './trace-list.js'
 import type { AttributeValue, SpanRow, TraceDetail } from './types.js'
 
@@ -45,13 +47,15 @@ export const AttributeTable = (props: {
 const SpanDetailPanel = (props: {
   readonly traceId: string
   readonly span: SpanRow
-  /** Absent where the trace already belongs to the open thread: the span panel then has no Open thread button. */
-  readonly onOpenThread?: ((sessionId: string) => string | null) | undefined
+  readonly spans: readonly SpanRow[]
+  readonly onOpenThread?: OpenThread | undefined
+  readonly currentSessionId?: string | undefined
   readonly onShowLogs: (spanId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
   const [threadError, setThreadError] = useState<string | null>(null)
   const span = props.span
+  const target = useMemo(() => ThreadLinks.targetOf(props.spans, span.spanId), [props.spans, span.spanId])
   const costUsd = TraceFormat.spanCostUsd(span.attributes)
   return (
     <aside
@@ -83,16 +87,17 @@ const SpanDetailPanel = (props: {
           </Button>
         </div>
         {span.statusMessage === null ? null : <p className="dshx:break-words dshx:text-xs dshx:text-destructive">{span.statusMessage}</p>}
-        {span.sessionId === null || props.onOpenThread === undefined ? null : (
+        {target === null || props.onOpenThread === undefined ? null : (
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                if (span.sessionId !== null) setThreadError(props.onOpenThread?.(span.sessionId) ?? null)
-              }}
+              data-testid="span-open-thread"
+              data-focus-turn={target.focus?.turn}
+              data-focus-tool-call={target.focus?.toolCallId}
+              onClick={() => setThreadError(props.onOpenThread?.(target) ?? null)}
             >
-              <MessageSquareIcon /> {props.t('openThread')}
+              <MessageSquareIcon /> {target.sessionId === props.currentSessionId ? props.t('showInChat') : props.t('openThread')}
             </Button>
             {threadError === null ? null : <span className="dshx:text-xs dshx:text-destructive">{threadError}</span>}
           </div>
@@ -149,8 +154,10 @@ const SpanDetailPanel = (props: {
 
 export const TraceDetailView = (props: {
   readonly trace: TraceDetail
-  /** Absent where the trace already belongs to the open thread: the span panel then has no Open thread button. */
-  readonly onOpenThread?: ((sessionId: string) => string | null) | undefined
+  /** Opens the span's thread focused on its turn, step or tool call; absent hides the button. */
+  readonly onOpenThread?: OpenThread | undefined
+  /** The thread whose Traces tab shows this trace: its spans say Show in chat instead of Open in thread. */
+  readonly currentSessionId?: string | undefined
   readonly onShowLogs: (spanId: string) => void
   readonly t: TracesTranslate
 }): JSX.Element => {
@@ -257,7 +264,15 @@ export const TraceDetailView = (props: {
         </ol>
       </section>
       {selected === undefined ? null : (
-        <SpanDetailPanel traceId={trace.traceId} span={selected} onOpenThread={props.onOpenThread} onShowLogs={props.onShowLogs} t={props.t} />
+        <SpanDetailPanel
+          traceId={trace.traceId}
+          span={selected}
+          spans={trace.spans}
+          onOpenThread={props.onOpenThread}
+          currentSessionId={props.currentSessionId}
+          onShowLogs={props.onShowLogs}
+          t={props.t}
+        />
       )}
     </div>
   )

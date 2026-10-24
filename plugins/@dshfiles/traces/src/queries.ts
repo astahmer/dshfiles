@@ -16,6 +16,7 @@ export const tracesKeys = {
   errors: (windowMinutes: number) => ['traces', 'errors', windowMinutes] as const,
   serviceMap: (windowMinutes: number) => ['traces', 'service-map', windowMinutes] as const,
   sessionSummary: (sessionId: string) => ['traces', 'session-summary', sessionId] as const,
+  turnTrace: (input: { readonly sessionId: string; readonly turn: number }) => ['traces', 'turn-trace', input.sessionId, input.turn] as const,
   metrics: (windowMinutes: number, search: string) => ['traces', 'metrics', windowMinutes, search] as const,
   metric: (input: { readonly name: string; readonly service: string; readonly windowMinutes: number }) => ['traces', 'metric', input] as const,
 }
@@ -94,6 +95,14 @@ export const tracesQueries = {
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.serviceMap({ windowMinutes }, { signal: hostSignal }) }),
       refetchInterval: POLL_MS * 2,
       retry: 1,
+    }),
+  /** The newest trace holding one of the thread's turns; a Host older than the `turn` filter fails it. */
+  turnTrace: (client: TracesClient, input: { readonly sessionId: string; readonly turn: number }) =>
+    queryOptions({
+      queryKey: tracesKeys.turnTrace(input),
+      queryFn: ({ signal }) =>
+        runHostRequest({ signal, request: hostSignal => client.list({ sessionId: input.sessionId, turn: input.turn, limit: 1 }, { signal: hostSignal }) }),
+      retry: false,
     }),
   sessionSummary: (client: TracesClient, sessionId: string) =>
     queryOptions({

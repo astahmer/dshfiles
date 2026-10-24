@@ -38,6 +38,7 @@ import { TraceDetailView } from './trace-detail.js'
 import { LogsView, type LogCorrelation } from './log-list.js'
 import { MetricsView } from './metrics-view.js'
 import { ModelCostTable } from './model-costs.js'
+import { createThreadOpener } from './open-thread.js'
 import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { storedTracesView, tracesViewSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
@@ -92,16 +93,7 @@ export const TracesPanel = (props: {
     },
   })
 
-  const openThread = (sessionId: string): string | null => {
-    const workspaceList = props.workspaces.list.getSnapshot()
-    if (workspaceList.phase === 'ready' && workspaceList.archivedSessionIds.some(archivedId => archivedId === sessionId)) return t('threadUnavailable')
-    const sessionList = props.sessions.list.getSnapshot()
-    const availableId = sessionList.ids.find(candidate => candidate === sessionId)
-    const session = availableId === undefined ? undefined : sessionList.byId[availableId]
-    if (session === undefined) return t('threadUnavailable')
-    props.uiWorkspace.openSession(session.id)
-    return null
-  }
+  const openThread = createThreadOpener({ ...props, unavailable: () => t('threadUnavailable') })
 
   const status = statusQuery.data
   const traces = listQuery.data?.pages.flatMap(page => page.traces) ?? []
@@ -370,7 +362,11 @@ export const TracesPanel = (props: {
 
         <TabsContent value="alerts">
           {view.tab === 'alerts' ? (
-            <AlertsView onOpenTrace={openedTraceId => update({ traceId: openedTraceId, tab: 'traces' })} onOpenThread={openThread} t={props.tAlerts} />
+            <AlertsView
+              onOpenTrace={openedTraceId => update({ traceId: openedTraceId, tab: 'traces' })}
+              onOpenThread={sessionId => openThread({ sessionId, focus: null })}
+              t={props.tAlerts}
+            />
           ) : null}
         </TabsContent>
       </Tabs>

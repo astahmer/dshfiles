@@ -62,7 +62,8 @@ Also `compaction`, `chat <model>` with `dsh.llm.purpose` for title and compactio
 input), `gen_ai.response.finish_reasons`, `gen_ai.response.time_to_first_token`, `gen_ai.tool.name`,
 `gen_ai.tool.call.id`, `error.type`, plus `dsh.session.id` (on every span), `dsh.turn`, `dsh.step`,
 `dsh.session.parent_id`, `dsh.trace.parent_link` and `dsh.session.cwd` (the Session's working directory — a local
-path).
+path). Each priced model-call span also carries `dshx.cost.usd` (list price from AI Accounts' models.dev catalog, the
+usage ledger's source) and `dshx.cost.price_id`, and `invoke_agent` the turn's sum.
 
 By default no message text, tool argument, tool result, approval reason, job label or provider error message leaves
 the Host; span status messages are error types or codes. The `captureContent` setting
@@ -235,8 +236,11 @@ Each thread also has a **Traces** tab in its conversation view, after
 Trajectory: the traces in which any span carries that thread's
 `dsh.session.id` (agent turn, step, model and tool spans, and the plugin spans
 nested under them), a summary (spans, errors, model and tool calls, total and
-p50/p95 durations, `gen_ai.usage.*` token totals over model calls), the span
-waterfall per turn and the thread's correlated logs. Agent-tool calls into dshx
+p50/p95 durations, `gen_ai.usage.*` token totals over model calls, list-price cost in
+total and per turn), the span waterfall per turn and the thread's correlated logs. A span's **Show in chat** / **Open
+thread** lands the thread's Chat on the span's turn, step or tool call, and each turn's footer has a **Trace** button
+back to its trace ([trace ↔ transcript links](../plugins/@dshfiles/traces/README.md#trace--transcript-links), through
+the native Conversation View focus request and `@dshfiles/chat/chat-focus`). Agent-tool calls into dshx
 APIs carry the calling Session as `dsh.session.id` on their dispatch span, so a
 thread's own plugin work shows even without an agent telemetry exporter. Agents
 read the same through `traces_session_summary`, and `traces_search` /

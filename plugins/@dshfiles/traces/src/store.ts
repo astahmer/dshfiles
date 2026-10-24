@@ -122,6 +122,7 @@ export type TraceListQuery = {
   readonly toMs?: number | undefined
   readonly search?: string | undefined
   readonly sessionId?: string | undefined
+  readonly turn?: number | undefined
   readonly cursor?: string | undefined
   readonly limit?: number | undefined
 }
@@ -708,6 +709,12 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     if (query.sessionId !== undefined) {
       conditions.push('t.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ?)')
       parameters.push(query.sessionId)
+    }
+    if (query.turn !== undefined) {
+      conditions.push(
+        `EXISTS (SELECT 1 FROM spans s WHERE s.trace_id = t.trace_id AND ${SpanCost.attribute('dsh.turn')} = ?${query.sessionId === undefined ? '' : ' AND s.session_id = ?'})`,
+      )
+      parameters.push(query.turn, ...(query.sessionId === undefined ? [] : [query.sessionId]))
     }
     if (query.search !== undefined) {
       const pattern = `%${escapeLike(query.search)}%`

@@ -106,6 +106,13 @@ describe('list-price cost from dshx.cost.usd', () => {
     expect(store.sessionSummary('thread-b')).toMatchObject({ traces: 1, turnCosts: [{ turn: 1, costUsd: 0.25, modelCalls: 1 }] })
   })
 
+  test('finds the trace of one thread turn', () => {
+    const store = seed()
+    expect(store.list({ sessionId: 'thread-a', turn: 2 }).traces.map(trace => trace.traceId)).toEqual([traceId(2)])
+    expect(store.list({ sessionId: 'thread-a', turn: 1 }).traces.map(trace => trace.traceId)).toEqual([traceId(1)])
+    expect(store.list({ sessionId: 'thread-a', turn: 9 }).traces).toEqual([])
+  })
+
   test('reports model calls, tokens and cost per service and model in the overview', () => {
     expect(seed().stats({ windowMinutes: 60, limit: 10 }).models).toEqual([
       { service: 'dshfiles', provider: 'openai', model: 'gpt-test', calls: 5, inputTokens: 5_000, outputTokens: 500, costUsd: 0.78 },

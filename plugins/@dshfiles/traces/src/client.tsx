@@ -1,21 +1,26 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { ConvViewOwnerProps, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { ChatTurnTailExtras } from '@dshfiles/chat/chat-focus'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AlertNotifier } from './alerts/alert-notifier.js'
 import { TRACES_ALERTS_LOCALE_NAMESPACE, tracesAlertsLocale } from './alerts/alerts-locale.js'
 import { TRACES_LOCALE_NAMESPACE, tracesLocale } from './locales.js'
+import { createThreadOpener } from './open-thread.js'
 import { TracesPanel } from './panel.js'
 import { SessionTracesView } from './session-view.js'
+import { ThreadLinks } from './thread-links.js'
+import { TurnTraceButton } from './turn-trace-button.js'
 import { storedTracesView } from './view-state.js'
 
 const PANEL_ID = 'traces'
-const SESSION_VIEW_ID = 'dshfiles-traces'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -23,6 +28,8 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
     <path d="M3 3v18" strokeOpacity="0.5" />
   </svg>
 )
+
+type SessionViewProps = { readonly sessionId: string } & Partial<Pick<ConvViewOwnerProps, 'viewRequest' | 'openView' | 'completeViewRequest'>>
 
 export default defineClient({
   name: '@dshfiles/traces',
@@ -38,18 +45,31 @@ export default defineClient({
       storedTracesView.set({ ...storedTracesView.get(), tab: 'alerts' })
       if (isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
     }
+    const openThread = createThreadOpener({
+      sessions: ctx.sessions,
+      workspaces: ctx.workspaces,
+      uiWorkspace: ctx.uiWorkspace,
+      unavailable: () => translate('threadUnavailable'),
+    })
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label, locale: TRACES_LOCALE_NAMESPACE }, PanelGlyph),
     )
     // A conversation view tab after the native Trajectory view (order 10); Chat is 0.
     ctx.slots.inject('conversation.view', () =>
       ctx.slots.register(
-        { name: 'conversation.view', id: SESSION_VIEW_ID, order: 11, label, locale: TRACES_LOCALE_NAMESPACE, inject: sessionId => ({ sessionId }) },
-        decorate((props: { readonly sessionId: string }) => (
+        { name: 'conversation.view', id: ThreadLinks.viewId, order: 11, label, locale: TRACES_LOCALE_NAMESPACE, inject: sessionId => ({ sessionId }) },
+        decorate((props: SessionViewProps) => (
           <PluginQueryProvider>
-            <SessionTracesView sessionId={props.sessionId} t={translate} />
+            <SessionTracesView {...props} openThread={openThread} t={translate} />
           </PluginQueryProvider>
         )),
+      ),
+    )
+    // Under each Turn, after the other footer notes: jump to the thread's Traces tab on that turn's trace.
+    ctx.slots.inject('conversation.chat.turnTail', () =>
+      ctx.slots.register(
+        { name: 'conversation.chat.turnTail', id: 'dshfiles-traces-turn-trace', order: 90, locale: TRACES_LOCALE_NAMESPACE },
+        (props: { readonly turn: TurnLocation } & ChatTurnTailExtras) => <TurnTraceButton turn={props.turn.turn} openView={props.openView} t={translate} />,
       ),
     )
     ctx.slots.inject('main', () =>

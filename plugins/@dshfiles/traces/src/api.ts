@@ -36,6 +36,12 @@ export const listInputSchema = z
     toMs: z.number().int().nonnegative().optional().describe('Only traces starting before this Unix time in milliseconds.'),
     search: z.string().trim().min(1).max(200).optional().describe('Literal text matched against a trace id, span names, attribute JSON and status messages.'),
     sessionId: z.string().min(1).max(256).optional().describe('Only traces whose spans carry this dsh.session.id.'),
+    turn: z
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe("Only traces with a span of this dsh.turn; with sessionId, that thread's turn (a subagent's turns share the parent's trace)."),
     cursor: z.string().min(1).max(64).optional().describe('next_cursor from a previous page.'),
     limit: z.number().int().min(1).max(200).optional().describe('Traces per page, 1 to 200; defaults to 50.'),
   })
@@ -99,7 +105,7 @@ export const tracesApi = defineApi({
       input: listInputSchema,
       output: traceListSchema,
       description:
-        'Search stored OpenTelemetry traces, newest first: root span, duration, span and error counts, services and list-price cost of their model calls. Filter by service, operation, error status, minimum duration, time range, text or DSH session. Read-only.',
+        'Search stored OpenTelemetry traces, newest first: root span, duration, span and error counts, services and list-price cost of their model calls. Filter by service, operation, error status, minimum duration, time range, text, DSH session or turn. Read-only.',
       tool: { name: 'traces_search', readOnly: true, render: compactJson },
     }),
     trace: method({

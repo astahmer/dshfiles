@@ -1,3 +1,5 @@
+import type { ConvViewOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { ChatFocusModel } from '@dshfiles/chat/chat-focus'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -5,8 +7,10 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { tracesApi, type LogsInput } from './api.js'
+import type { OpenThread } from './open-thread.js'
+import { ThreadLinks } from './thread-links.js'
 import { TraceFormat } from './format.js'
 import type { TracesLocaleKey, TracesTranslate } from './locales.js'
 import { LogRow, type LogCorrelation } from './log-list.js'
@@ -17,6 +21,8 @@ import { TraceList } from './trace-list.js'
 import type { SessionSummary } from './types.js'
 
 const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+const TURN_TRACE_RETRY_MS = 1_500
+const TURN_TRACE_WAIT_MS = 20_000
 
 const pair = (left: number | null, right: number | null): string =>
   `${left === null ? '–' : TraceFormat.duration(left)} · ${right === null ? '–' : TraceFormat.duration(right)}`
@@ -63,13 +69,65 @@ const SummaryGrid = (props: { readonly summary: SessionSummary; readonly t: Trac
 
 type Section = 'turns' | 'logs'
 
+/** The native Conversation View props this tab reads; absent on a Host shell without View focus requests. */
+type ConversationViewProps = Partial<Pick<ConvViewOwnerProps, 'viewRequest' | 'openView' | 'completeViewRequest'>>
+
 /** The current thread's telemetry: traces carrying its dsh.session.id, a waterfall per trace, its logs and a summary. */
-export const SessionTracesView = (props: { readonly sessionId: string; readonly t: TracesTranslate }): JSX.Element => {
+export const SessionTracesView = (
+  props: ConversationViewProps & { readonly sessionId: string; readonly openThread: OpenThread; readonly t: TracesTranslate },
+): JSX.Element => {
   const t = props.t
   const client = useApi(tracesApi)
   const [section, setSection] = useState<Section>('turns')
   const [traceId, setTraceId] = useState<string | null>(null)
   const [correlation, setCorrelation] = useState<LogCorrelation | null>(null)
+  const [turnFocus, setTurnFocus] = useState<{ readonly turn: number; readonly since: number } | null>(null)
+  const [missingTurn, setMissingTurn] = useState<number | null>(null)
+  const { viewRequest, completeViewRequest, openView, sessionId } = props
+
+  // A Turn footer's Trace button addresses this tab with one of the thread's turns.
+  useEffect(() => {
+    if (viewRequest === null || viewRequest === undefined || viewRequest.view !== ThreadLinks.viewId) return
+    completeViewRequest?.()
+    const focus = ThreadLinks.decodeFocus(viewRequest.focus)
+    if (focus === null) return
+    setSection('turns')
+    setMissingTurn(null)
+    setTraceId(null)
+    setTurnFocus({ turn: focus.turn, since: Date.now() })
+  }, [viewRequest, completeViewRequest])
+
+  // A panel that opened this thread for Chat while it reopened on this tab: hand the focus on to Chat.
+  useEffect(() => {
+    if (openView === undefined) return
+    const pending = ChatFocusModel.take(sessionId)
+    if (pending !== null) openView(ChatFocusModel.viewId, ChatFocusModel.encode(pending))
+  }, [sessionId, openView])
+
+  // A just-finished turn is exported a moment later, so the lookup retries for a while before saying it has no trace.
+  const turnQuery = useQuery({
+    ...tracesQueries.turnTrace(client, { sessionId, turn: turnFocus?.turn ?? 0 }),
+    enabled: turnFocus !== null,
+    refetchInterval: TURN_TRACE_RETRY_MS,
+  })
+  useEffect(() => {
+    if (turnFocus === null || turnQuery.isFetching || turnQuery.isPending) return
+    const found = turnQuery.data?.traces[0]
+    if (found !== undefined) {
+      setTurnFocus(null)
+      setTraceId(found.traceId)
+      return
+    }
+    if (!turnQuery.isError && Date.now() - turnFocus.since < TURN_TRACE_WAIT_MS) return
+    setTurnFocus(null)
+    setMissingTurn(turnFocus.turn)
+  }, [turnFocus, turnQuery.isFetching, turnQuery.isPending, turnQuery.isError, turnQuery.data, turnQuery.dataUpdatedAt])
+
+  const showInThread: OpenThread = target => {
+    if (target.sessionId !== sessionId || openView === undefined) return props.openThread(target)
+    openView(ChatFocusModel.viewId, target.focus === null ? '' : ChatFocusModel.encode(target.focus))
+    return null
+  }
   const summaryQuery = useQuery({ ...tracesQueries.sessionSummary(client, props.sessionId), placeholderData: keepPreviousData })
   const statusQuery = useQuery(tracesQueries.status(client))
   const listQuery = useInfiniteQuery({
@@ -140,6 +198,16 @@ export const SessionTracesView = (props: { readonly sessionId: string; readonly 
               </Button>
             ) : null}
           </div>
+          {turnFocus === null ? null : (
+            <p className="dshx:text-sm dshx:text-muted-foreground" data-testid="traces-turn-pending">
+              {t('turnTraceLoading', { turn: turnFocus.turn })}
+            </p>
+          )}
+          {missingTurn === null ? null : (
+            <Alert data-testid="traces-turn-missing">
+              <AlertDescription>{t('turnTraceMissing', { turn: missingTurn })}</AlertDescription>
+            </Alert>
+          )}
           {section === 'turns' && traceId === null ? (
             <>
               {listQuery.isError ? (
@@ -152,7 +220,10 @@ export const SessionTracesView = (props: { readonly sessionId: string; readonly 
                 hasMore={listQuery.hasNextPage}
                 loadingMore={listQuery.isFetchingNextPage}
                 onLoadMore={() => void listQuery.fetchNextPage()}
-                onOpen={setTraceId}
+                onOpen={openedTraceId => {
+                  setMissingTurn(null)
+                  setTraceId(openedTraceId)
+                }}
                 t={t}
               />
             </>
@@ -168,6 +239,8 @@ export const SessionTracesView = (props: { readonly sessionId: string; readonly 
                 <TraceDetailView
                   key={traceQuery.data.traceId}
                   trace={traceQuery.data}
+                  onOpenThread={showInThread}
+                  currentSessionId={sessionId}
                   onShowLogs={spanId => {
                     setCorrelation({ traceId: traceQuery.data.traceId, spanId })
                     setSection('logs')

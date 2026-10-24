@@ -164,6 +164,11 @@ const en = {
   modelCosts: 'Model calls and cost',
   model: 'Model',
   calls: 'Calls',
+  showInChat: 'Show in chat',
+  turnTrace: 'Trace',
+  turnTraceLabel: 'Open the trace of turn {turn}',
+  turnTraceLoading: 'Finding the trace of turn {turn}…',
+  turnTraceMissing: 'No trace recorded for turn {turn} yet. Spans arrive a few seconds after the work, and only while a receiver or exporter is set up.',
   externalModeTitle: 'Telemetry goes to an external viewer',
   externalModeBody: 'The receiver is off in external mode. Switch the Traces setting “mode” to plugin or both to store telemetry here.',
 } as const
@@ -324,6 +329,11 @@ const zh = {
   modelCosts: '模型调用与费用',
   model: '模型',
   calls: '调用',
+  showInChat: '在对话中显示',
+  turnTrace: '追踪',
+  turnTraceLabel: '打开第 {turn} 轮的追踪',
+  turnTraceLoading: '正在查找第 {turn} 轮的追踪…',
+  turnTraceMissing: '第 {turn} 轮尚无追踪记录。Span 会在工作发生后数秒内到达，且仅在配置了接收器或导出器时记录。',
   externalModeTitle: '遥测数据发往外部查看器',
   externalModeBody: '外部模式下接收器关闭。把追踪设置 “mode” 改为 plugin 或 both 即可在此存储遥测数据。',
 } as const
