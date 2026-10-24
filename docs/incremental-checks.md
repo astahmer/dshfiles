@@ -98,7 +98,7 @@ Measured on 2026-10-25 with the same mutation method plus a throwaway file-level
 
 ### Skipping the build for source-only related runs
 
-`--build=auto` skips the Turbo build only when every selected package runs in related mode, no selected test file loads `dist` or its own package name, and no workspace dependency's built entry is missing. The default stays `--build=always` because a cold workspace has no outputs to run against. One source edit per scenario, a fresh edit for each variant:
+`--build=auto` skips the Turbo build only when every selected package runs in related mode, no selected test file loads `dist` or its own package name, and no workspace dependency's built entry is missing. The default is `--build=auto`; pass `--build=always` on a cold workspace, which has no outputs to run against. One source edit per scenario, a fresh edit for each variant:
 
 | Package                                        | Build + tests | `--build=auto` | Result                                                              |
 | ---------------------------------------------- | ------------- | -------------- | ------------------------------------------------------------------- |
@@ -127,9 +127,35 @@ Coverage selection pays only where the average test file runtime dwarfs Vitest s
 
 ### The larger cost: dependent fan-out
 
-A one-file edit in `usage` selected 1 related package plus 11 full dependent suites and took 95.3s, yet only 12 of those 276 dependent test files statically reach `@dshfiles/usage` (4%). Rebuilding `usage` and running those 12 tests across six packages took about 23s of test time plus the build. That consumer-related selection is the highest-leverage follow-up, with full-suite fallback for the known dynamic-input packages; its recall under a real regression was not verified here because the probe mutation broke the build instead of the behavior.
+A one-file edit in `usage` selected 1 related package plus 11 full dependent suites and took 95.3s, yet only 12 of those 276 dependent test files statically reach `@dshfiles/usage` (4%). Narrowing those dependents is now the default and is measured in the next section.
 
-Verdict: enable build skipping for leaf packages (measured 7-15x on that case, no failures), and treat coverage selection as a targeted tool for the real-JJ suites only. Neither touches the dependent fan-out, which is the dominant remaining cost.
+Verdict: build skipping for leaf packages and consumer narrowing are enabled by default (7-15x on leaf edits, 94-97% fewer dependent tests), coverage selection stays a targeted tool for the real-JJ suites, and Jev stays out of test selection.
+
+### Narrowing the dependent suites
+
+The default `--consumers=related` replaces each dependent full suite with the test files whose static import closure reaches a changed package, plus every test that boots a built bundle (a `dist/` load, or a `dsh`/`node` spawn) because those can exercise code without importing it. Dependents whose tests reach nothing and boot nothing are skipped, a dependent whose test command is not Vitest keeps its full suite, and the changed package itself always keeps its full suite. `--consumers=full` restores the previous behavior.
+
+| Changed package   | Full dependent tests                                     | Narrowed default                                                                                     |
+| ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `usage`           | 276 in 11 packages, plus 148 in the three dynamic suites | **10** files (background-jobs 2, backlog 1, memory 4, jujutsu 1, thread-sidebar 2, jj-integration 0) |
+| `credential-port` | 365 in 16 packages                                       | **26** files                                                                                         |
+| `plugin-ui`       | 46 dependent packages                                    | **93** files                                                                                         |
+| `backlog`         | 17                                                       | **0**                                                                                                |
+
+With a compiling `usage` mutation (`session-log.ts`: `lastIndexOf` became `indexOf`), the narrowed lane finished in 10s (cached 6s build plus 10 test files) against 273s to run `jj-integration`, `jujutsu` and `thread-sidebar` in full. The mutation failed four narrowed `background-jobs` tests and passed after restoring the source. The same mutation left `jj-integration` (316 tests) and `jujutsu` (224 tests) passing, and their baseline runs pass too; single failures seen in one heavier run were flakes that did not reproduce.
+
+Residual risk: a dynamic dependent test that exercises the changed package neither through a static import nor a bundle boot would be skipped. `--consumers=full` covers that case.
+
+### Can Jev pick the tests inside one plugin?
+
+A known fault-revealing one-line mutation in `backlog` (`activity-description.tsx`, one test covers the line). Jev (`jev-latest`) ranked all 56 backlog test files with the diff plus each test's first 2,400 characters:
+
+| Ranker                                              | Calls | Wall                                    | True test selected?       |
+| --------------------------------------------------- | ----- | --------------------------------------- | ------------------------- |
+| Jev per-test, threshold 0.5                         | 56    | 9.6s (p50 161ms, 932 input tokens each) | **No** (probability 0.12) |
+| `vitest related --run src/activity-description.tsx` | -     | 2.35s (446ms vitest)                    | Yes, exactly that test    |
+
+Restricted to the nine tests that `vitest related` already selects for a `usage` line mutation, Jev still put every one below 0.5 (median 0.13) in 1.8s for nine calls. The earlier 22/22 sample used much smaller test sources and easier cases; it does not generalize. Ranking is O(tests) calls at about 160ms, so a 56-test plugin costs about 9s to rank against roughly 1-3s to run the related set: even a perfect ranker loses to running the selected tests, and this one missed the true test in both runs.
 
 ## Validation
 
