@@ -443,7 +443,7 @@
     {
       "id": "auto-triage",
       "title": "Triage new items automatically",
-      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
+      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A duplicate is recorded as a directional relation to its canonical item; when completed, it resolves that canonical item too unless the user set the canonical status by hand. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
       "surfaces": ["client", "host", "settings", "tool"],
       "configuration": [],
       "states": ["off", "proposed", "applied", "dismissed"],

@@ -280,14 +280,60 @@ describe('triage proposals', () => {
     const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'parent epic', actor: user })
     await store.capture({ text: 'paste drops chips', actor: user })
+    await store.link({ id: 2, link: { type: 'item', target: '1', provenance: 'extracted' }, actor: user })
     await store.propose({ id: 2, proposal: { kind: 'bug', duplicateOf: 1, confidence: 0.5, reason: 'Broken.', source: 'model', at: 9 } })
     expect(store.list({}).items.find(entry => entry.id === 2)?.proposal?.kind).toBe('bug')
 
     const accepted = await store.applyProposal({ id: 2, actor: user })
     expect(accepted.ok && accepted.value.item.kind).toBe('bug')
     expect(accepted.ok && accepted.value.item.humanFields).toEqual(['kind'])
-    expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: '1' }])
+    expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: '1', relation: 'duplicates' }])
     expect(accepted.ok && accepted.value.item.proposal).toBeNull()
+  })
+
+  it('resolves the canonical item when a confirmed duplicate is completed', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'canonical work', actor: user })
+    await store.capture({ text: 'duplicate work', actor: user })
+    await store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
+    await store.applyProposal({ id: 2, actor: user })
+    await store.propose({ id: 2, proposal: { status: 'done', confidence: 0.9, reason: 'Work completed.', source: 'jev', at: 9 } })
+
+    await store.applyProposal({ id: 2, actor: user })
+
+    const duplicate = store.get(2)
+    const canonical = store.get(1)
+    expect(duplicate.ok && duplicate.value.item.status).toBe('done')
+    expect(canonical.ok && canonical.value.item.status).toBe('done')
+    expect(canonical.ok && canonical.value.item.events.at(-1)?.detail).toBe('inbox → done (duplicate b:2 resolved)')
+  })
+
+  it('closes the canonical item when an agent marks its confirmed duplicate done', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'canonical work', actor: user })
+    await store.capture({ text: 'duplicate work', actor: user })
+    await store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
+    await store.applyProposal({ id: 2, actor: user })
+
+    await store.update({ id: 2, status: 'done', actor: agent })
+
+    const canonical = store.get(1)
+    expect(canonical.ok && canonical.value.item.status).toBe('done')
+  })
+
+  it('leaves a canonical item whose status the user chose untouched when its duplicate is completed', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'canonical work', actor: user })
+    await store.capture({ text: 'duplicate work', actor: user })
+    await store.update({ id: 1, status: 'doing', actor: user })
+    await store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
+    await store.applyProposal({ id: 2, actor: user })
+    await store.propose({ id: 2, proposal: { status: 'done', confidence: 0.9, reason: 'Work completed.', source: 'jev', at: 9 } })
+
+    await store.applyProposal({ id: 2, actor: user })
+
+    const canonical = store.get(1)
+    expect(canonical.ok && canonical.value.item.status).toBe('doing')
   })
 
   it('clears agent attention when a done suggestion is accepted', async () => {

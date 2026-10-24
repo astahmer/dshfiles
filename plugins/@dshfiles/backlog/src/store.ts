@@ -134,7 +134,7 @@ export interface BacklogStore {
   propose(input: { readonly id: number; readonly proposal: BacklogProposal }): Promise<BacklogResult<BacklogDetail>>
   /**
    * Applies a proposal. For `system` (automatic triage) fields the user set by hand are left alone; for a person or an
-   * agent accepting it, every field applies. A duplicate is linked and commented, never closed.
+   * agent accepting it, every field applies. Completing a confirmed duplicate also resolves its canonical item unless its status was set by hand.
    */
   applyProposal(input: {
     readonly id: number
@@ -352,6 +352,32 @@ const createBacklogStore = ({
 
   const find = (id: number): BacklogItem | undefined => records.get(id)
 
+  const closeDuplicateTargets = async (source: BacklogItem): Promise<void> => {
+    for (const link of source.links) {
+      if (link.type !== 'item' || link.relation !== 'duplicates') continue
+      const targetId = Number(link.target)
+      if (!Number.isSafeInteger(targetId)) continue
+      const target = find(targetId)
+      if (target === undefined || target.status === 'done' || target.status === 'dropped' || target.humanFields.includes('status')) continue
+      const change = { status: 'done' as const, ...closedStateChange({ item: target, status: 'done' }) }
+      await touch(target, { kind: 'system' }, { kind: 'moved', detail: `${target.status} → done (duplicate b:${String(source.id)} resolved)` }, change)
+    }
+  }
+
+  const touchAndCloseDuplicates = async (
+    item: BacklogItem,
+    actor: BacklogActor,
+    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>,
+    change: Partial<BacklogItem>,
+  ): Promise<BacklogDetail> => {
+    const detail = await touch(item, actor, event, change)
+    if (change.status === 'done' && item.status !== 'done') {
+      const resolved = find(item.id)
+      if (resolved !== undefined) await closeDuplicateTargets(resolved)
+    }
+    return detail
+  }
+
   const attachmentOf = (file: BacklogFileInput, at: number): BacklogAttachment => {
     const attachment: BacklogAttachment = {
       id: file.id,
@@ -567,14 +593,14 @@ const createBacklogStore = ({
           ...(change.snoozedUntil === undefined ? [] : [change.snoozedUntil === null ? 'woke it' : 'snoozed it']),
           ...(clearedSuggestion ? ['cleared closed-item suggestion'] : []),
         ]
-        return { ok: true, value: await touch(item, actor, { kind: 'edited', detail: details.join('; ') }, change) }
+        return { ok: true, value: await touchAndCloseDuplicates(item, actor, { kind: 'edited', detail: details.join('; ') }, change) }
       }
       if (actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, ...userChanged])]
       const detail =
         change.status === undefined
           ? `${changed.join(', ')}`
           : `${item.status} → ${change.status}${changed.length > 1 ? `; ${changed.filter(field => field !== 'status').join(', ')}` : ''}`
-      return { ok: true, value: await touch(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail }, change) }
+      return { ok: true, value: await touchAndCloseDuplicates(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail }, change) }
     },
     link: async ({ id, link, remove, actor }) => {
       const item = find(id)
@@ -679,7 +705,9 @@ const createBacklogStore = ({
         applied.tags = chosen.tags
       }
       if (chosen.duplicateOf !== undefined && records.has(chosen.duplicateOf)) {
-        change.links = BacklogItems.uniqueLinks([...item.links, { type: 'item', target: String(chosen.duplicateOf) }])
+        const duplicateTarget = String(chosen.duplicateOf)
+        const existingLinks = item.links.filter(link => link.type !== 'item' || link.target !== duplicateTarget)
+        change.links = BacklogItems.uniqueLinks([...existingLinks, { type: 'item', target: duplicateTarget, relation: 'duplicates' }])
         applied.duplicateOf = chosen.duplicateOf
       }
       Object.assign(change, closedStateChange({ item, status: change.status ?? item.status }))
@@ -688,7 +716,10 @@ const createBacklogStore = ({
         const owned = (['kind', 'status', 'title', 'tags'] as const).filter(field => applied[field] !== undefined)
         change.humanFields = [...new Set([...item.humanFields, ...owned])]
       }
-      return { ok: true, value: await touch(item, actor, { kind: 'triaged', detail: `applied ${BacklogTriage.describe(applied) || 'nothing'}` }, change) }
+      return {
+        ok: true,
+        value: await touchAndCloseDuplicates(item, actor, { kind: 'triaged', detail: `applied ${BacklogTriage.describe(applied) || 'nothing'}` }, change),
+      }
     },
     applySignal: async ({ id, status, link, reason }) => {
       const item = find(id)
@@ -713,7 +744,7 @@ const createBacklogStore = ({
       if (moves) change.status = status
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
       const sourceThread = link.type === 'thread' ? { threadId: link.target } : {}
-      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail, ...sourceThread }, change) }
+      return { ok: true, value: await touchAndCloseDuplicates(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail, ...sourceThread }, change) }
     },
     applyThreadAttention: async ({ id, threadId, attention, reason }) => {
       const item = find(id)
