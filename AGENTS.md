@@ -293,8 +293,10 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
   that restates it. Reads set `readOnly: true`; write tools say in their
   description that they may run only when the user asked; a destructive verb
   takes an explicit opt-in argument with no default, so a bare request cannot
-  destroy work. Presentation-only state (tab layout, a lightbox, a draft) is not
-  a tool. When no Host verb exists, record the gap in
+  destroy work. For each new user-visible state transition, include a way to see
+  the resulting state and, where meaningful, reverse or reopen it; test both
+  paths or state why the transition is intentionally irreversible.
+  Presentation-only state (tab layout, a lightbox, a draft) is not a tool. When no Host verb exists, record the gap in
   [`plans/dsh-host-gaps.md`](plans/dsh-host-gaps.md) instead of faking the action
   client-side. The per-owner audit and backlog live in
   [`docs/agent-tool-parity.md`](docs/agent-tool-parity.md).
