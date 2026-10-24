@@ -1,5 +1,6 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useSyncExternalStore, type ReactNode } from 'react'
+import { PageReviewContextModel } from './review-page-context.js'
 import { ReviewSurface } from './review-surface.js'
 import type { SessionFocus } from './session-focus.js'
 
@@ -22,5 +23,13 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     () => (sessionId === undefined ? undefined : props.sessions.list.getSnapshot().byId[sessionId]?.cwd),
     noBody,
   )
-  return <ReviewSurface workspacePath={cwd} variant="page" sessionId={sessionId === undefined ? undefined : String(sessionId)} />
+  const page = useSyncExternalStore(PageReviewContextModel.subscribe, PageReviewContextModel.read, noBody)
+  return (
+    <ReviewSurface
+      turn={page?.turn}
+      workspacePath={page?.workspacePath ?? cwd}
+      variant="page"
+      sessionId={page?.sessionId ?? (sessionId === undefined ? undefined : String(sessionId))}
+    />
+  )
 }

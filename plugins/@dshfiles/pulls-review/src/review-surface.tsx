@@ -27,6 +27,7 @@ import { threadsAt, type CommentBinding, type DiffLayout } from './review-diffs.
 import { ReviewFileSection } from './review-file-section.js'
 import { useReviewMarks } from './review-marks.js'
 import { ReviewModel, type ReviewFile, type ReviewGroup, type ReviewSource } from './review-model.js'
+import type { PageReviewContext } from './review-page-context.js'
 import { reviewSettings } from './settings.js'
 
 const NO_PREFS: { readonly layout: DiffLayout; readonly wrap: boolean; readonly hideViewed: boolean } = { layout: 'unified', wrap: false, hideViewed: false }
@@ -77,12 +78,12 @@ const readTurnComparison = (source: Extract<ReviewSource, { kind: 'turn' }>, ind
 }
 
 export interface ReviewSurfaceProps {
-  readonly turn?: Extract<ReviewSource, { kind: 'turn' }>
+  readonly turn?: Extract<ReviewSource, { kind: 'turn' }> | undefined
   readonly workspacePath?: string | undefined
   readonly initialFileIndex?: number | undefined
   readonly initialFile?: string | undefined
   readonly variant: 'tab' | 'page'
-  readonly onExpand?: (() => void) | undefined
+  readonly onExpand?: ((context: PageReviewContext) => void) | undefined
   readonly sessionId?: string | undefined
 }
 
@@ -135,8 +136,14 @@ export const ReviewSurface = (props: ReviewSurfaceProps): ReactNode => {
         : ReviewModel.workspaceGroups(workspaceResult, files)
   const source: ReviewSource | undefined = mode === 'turn' ? (props.turn !== undefined && turnSummary !== undefined ? props.turn : undefined) : workspaceSource
 
-  const loading = mode === 'turn' ? summary.isPending : workspace.isPending
-  const failure = mode === 'turn' ? summary.error : (workspace.error ?? (workspace.data?.status === 'failed' ? new Error(workspace.data.message) : null))
+  const workspaceMissing = mode === 'workspace' && (props.workspacePath === undefined || props.workspacePath.length === 0)
+  const loading = mode === 'turn' ? summary.isPending : !workspaceMissing && workspace.isPending
+  const failure =
+    mode === 'turn'
+      ? summary.error
+      : workspaceMissing
+        ? null
+        : (workspace.error ?? (workspace.data?.status === 'failed' ? new Error(workspace.data.message) : null))
   const retry = (): void => {
     if (mode === 'turn') void summary.refetch()
     else void workspace.refetch()
@@ -165,6 +172,8 @@ export const ReviewSurface = (props: ReviewSurfaceProps): ReactNode => {
               <RefreshCw aria-hidden /> Retry
             </Button>
           </>
+        ) : workspaceMissing ? (
+          <span>No thread workspace to review. Open a thread, then open this page again.</span>
         ) : (
           <span>No changes to review yet.</span>
         )}
@@ -209,7 +218,7 @@ interface ReviewBodyProps {
   readonly initialFileIndex?: number | undefined
   readonly initialFile?: string | undefined
   readonly variant: 'tab' | 'page'
-  readonly onExpand?: (() => void) | undefined
+  readonly onExpand?: ((context: PageReviewContext) => void) | undefined
   readonly sessionId?: string | undefined
 }
 
@@ -485,7 +494,7 @@ const ReviewBody = (props: ReviewBodyProps): ReactNode => {
               )}
               <DropdownMenuSeparator />
               {props.onExpand !== undefined && (
-                <DropdownMenuItem onSelect={props.onExpand}>
+                <DropdownMenuItem onSelect={() => props.onExpand?.({ turn: props.turn, workspacePath: props.workspacePath, sessionId: props.sessionId })}>
                   <Expand aria-hidden /> Open full page
                 </DropdownMenuItem>
               )}

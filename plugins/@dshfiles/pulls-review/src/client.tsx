@@ -8,6 +8,8 @@ import { createSettingsClientRuntime, provideSettingsContext } from '@dshfiles/d
 import { GitPullRequest } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import type { ReactNode } from 'react'
+import type { PageReviewContext } from './review-page-context.js'
+import { PageReviewContextModel } from './review-page-context.js'
 import { PullsReviewPanel } from './panel.js'
 import { REVIEW_TAB_ID, REVIEW_TAB_KIND, REVIEW_TAB_PATTERN, createReviewTabBody } from './review-tab.js'
 import { ReviewModel } from './review-model.js'
@@ -28,12 +30,15 @@ export default defineClientPlugin({
     const focus = createSessionFocus(ctx.sidebarRight.mounted)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-pulls-review: remember the on-screen thread')
 
-    const openMainPage = (): void => {
-      if (ctx.get('layout') === undefined) return
+    const openMainPage = (context: PageReviewContext): void => {
+      PageReviewContextModel.set(context)
+      const layout = ctx.get('layout')
+      if (layout === undefined) return
+      // SAFETY: the layout registry's `main` key is opaque at runtime; this plugin registers that exact key above.
       try {
-        ctx.layout.selectPanel(MAIN_PANEL_ID as MainPanelId)
+        layout.selectPanel(MAIN_PANEL_ID as MainPanelId)
       } catch {
-        // A profile without the frame layout keeps the Sidebar review; the page is not reachable there.
+        // A profile without the frame layout's panels keeps the Sidebar review; the page is not reachable there.
       }
     }
 

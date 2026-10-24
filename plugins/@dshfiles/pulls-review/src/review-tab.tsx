@@ -4,6 +4,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
+import type { PageReviewContext } from './review-page-context.js'
 import { ReviewModel, type ReviewSource } from './review-model.js'
 import { ReviewSurface } from './review-surface.js'
 
@@ -16,7 +17,7 @@ const navigationSchema = z.object({ params: z.object({ index: z.number().int().n
 
 export interface ReviewTabBodyOptions {
   readonly sessions: ISessions
-  readonly onExpand?: (() => void) | undefined
+  readonly onExpand?: ((context: PageReviewContext) => void) | undefined
 }
 
 /** The `changes-review` tab body: an all-files review of the turn the address names. */
