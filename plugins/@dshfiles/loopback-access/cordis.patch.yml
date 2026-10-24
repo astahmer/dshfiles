@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-loopback-access
+      name: '@dshfiles/loopback-access'
