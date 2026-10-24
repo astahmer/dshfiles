@@ -1,6 +1,6 @@
 # AI Accounts
 
-![Manage provider account drafts](docs/screenshots/account-lifecycle.png)
+![Responsive account workspace with unsigned synthetic accounts](docs/screenshots/account-workspace.png)
 
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 OpenCode Go and Command Code accounts each become their own route in the model
@@ -24,6 +24,20 @@ quota readings and history, not estimated request counts or spend.
 The page stacks account cards above the selected account in narrow panes.
 **Page options · routing and display** contains the existing global options and
 **Copy accounts file path**. Save, revert, retry and removal behavior is unchanged.
+
+[480px capture](docs/screenshots/account-workspace-narrow.png). Both new captures
+use unsigned synthetic Copilot profiles and the existing static model catalog;
+no sign-in was started and model visibility is not proof of entitlement.
+
+Recorded on 2026-10-24 against upstream: 436 package tests, typecheck,
+plugin/styles builds, Host import and catalog validation pass. The new real
+Chromium journey passes at 360/480/768/1024px pane widths, covering both add
+controls, search/priority, checked switches, tabs and existing auth/usage fields.
+The account-specific scratch seed was also exercised through both new-account
+rename and persisted-account reuse. Desktop/narrow capture diagnostics report
+zero errors or warnings; owned scratch processes were stopped afterward.
+Shared verifier prerequisites were composed only in a separate test workspace.
+Broad legacy Codex journeys and real provider approval were deliberately not run.
 
 ## Providers
 
