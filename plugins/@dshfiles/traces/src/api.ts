@@ -99,7 +99,7 @@ export const tracesApi = defineApi({
       input: listInputSchema,
       output: traceListSchema,
       description:
-        'Search stored OpenTelemetry traces, newest first: root span, duration, span and error counts, services. Filter by service, operation, error status, minimum duration, time range, text or DSH session. Read-only.',
+        'Search stored OpenTelemetry traces, newest first: root span, duration, span and error counts, services and list-price cost of their model calls. Filter by service, operation, error status, minimum duration, time range, text or DSH session. Read-only.',
       tool: { name: 'traces_search', readOnly: true, render: compactJson },
     }),
     trace: method({
@@ -118,7 +118,8 @@ export const tracesApi = defineApi({
         })
         .strict(),
       output: traceStatsSchema,
-      description: 'Per service and per operation (span name) over a window: span count, error count and rate, p50/p95/p99 and max duration in ms. Read-only.',
+      description:
+        'Per service and per operation (span name) over a window: span count, error count and rate, p50/p95/p99 and max duration in ms; plus model calls per service and model with token sums and list-price cost (dshx.cost.usd). Read-only.',
       tool: { name: 'traces_list_services', readOnly: true, render: compactJson },
     }),
     metrics: method({
@@ -177,7 +178,7 @@ export const tracesApi = defineApi({
       input: z.object({ sessionId: z.string().min(1).max(256).describe('DSH Session id, matched against dsh.session.id on any span of a trace.') }).strict(),
       output: sessionSummarySchema,
       description:
-        "One DSH thread's telemetry at a glance: traces and spans carrying its dsh.session.id (plugin spans nested under them included), error spans, turns, model and tool calls, first and last time, total and percentile trace durations, model-call latency, and gen_ai.usage token totals over model calls. Pair with traces_search sessionId for the traces and traces_search_logs sessionId for its logs. Read-only.",
+        "One DSH thread's telemetry at a glance: traces and spans carrying its dsh.session.id (plugin spans nested under them included), error spans, turns, model and tool calls, first and last time, total and percentile trace durations, model-call latency, gen_ai.usage token totals over model calls, and list-price cost (dshx.cost.usd) in total and per turn. Pair with traces_search sessionId for the traces and traces_search_logs sessionId for its logs. Read-only.",
       tool: { name: 'traces_session_summary', readOnly: true, render: compactJson },
     }),
     status: method({

@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { z } from 'zod'
 import type { NormalizedLog, NormalizedMetricPoint, NormalizedSpan } from './otlp/normalize.js'
+import { SpanCost } from './span-cost.js'
 import { buildSpanTree } from './span-tree.js'
 import { LatencyStats } from './stats.js'
 import {
@@ -12,6 +13,7 @@ import {
   type LogList,
   type MetricSeries,
   type MetricSummary,
+  type ModelUsage,
   type ServiceMap,
   type SessionSummary,
   type SpanKind,
@@ -205,6 +207,7 @@ const traceRowSchema = z.object({
   error_count: z.number(),
   services: z.string(),
   session_id: z.string().nullable(),
+  cost_usd: z.number().nullable(),
 })
 
 const spanRowSchema = z.object({
@@ -721,7 +724,9 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     const where = conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`
     const rows = z.array(traceRowSchema).parse(
       prepare(
-        `SELECT trace_id, root_name, root_service, start_us, end_us, span_count, error_count, services, session_id FROM traces t ${where}
+        `SELECT trace_id, root_name, root_service, start_us, end_us, span_count, error_count, services, session_id,
+             (SELECT SUM(${SpanCost.modelCallCost}) FROM spans s WHERE s.trace_id = t.trace_id) AS cost_usd
+           FROM traces t ${where}
            ORDER BY t.start_us DESC, t.trace_id DESC LIMIT ?`,
       ).all(...parameters, limit + 1),
     )
@@ -738,6 +743,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         errorCount: row.error_count,
         services: z.array(z.string()).parse(JSON.parse(row.services)),
         sessionId: row.session_id,
+        costUsd: row.cost_usd,
       })),
       nextCursor: rows.length > limit && last !== undefined ? encodeCursor(last.start_us, last.trace_id) : null,
     }
@@ -785,6 +791,41 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
+  /** Model calls per service and model over a window: calls, gen_ai.usage token sums and the dshx.cost.usd sum. */
+  const modelUsageOf = (query: { readonly sinceUs: number; readonly service?: string | undefined }): ModelUsage[] => {
+    const attribute = SpanCost.attribute
+    const rows = z
+      .array(
+        z.object({
+          service: z.string(),
+          provider: z.string().nullable(),
+          model: z.string(),
+          calls: z.number(),
+          input_tokens: z.number().nullable(),
+          output_tokens: z.number().nullable(),
+          cost_usd: z.number().nullable(),
+        }),
+      )
+      .parse(
+        prepare(
+          `SELECT s.service, ${attribute('gen_ai.provider.name')} AS provider, COALESCE(${attribute('gen_ai.request.model')}, s.name) AS model,
+             COUNT(*) AS calls, SUM(${attribute('gen_ai.usage.input_tokens')}) AS input_tokens,
+             SUM(${attribute('gen_ai.usage.output_tokens')}) AS output_tokens, SUM(${attribute(SpanCost.attributeKey)}) AS cost_usd
+           FROM spans s WHERE s.start_us >= ? AND ${SpanCost.isModelCall}${query.service === undefined ? '' : ' AND s.service = ?'}
+           GROUP BY 1, 2, 3 ORDER BY cost_usd IS NULL, cost_usd DESC, calls DESC LIMIT 50`,
+        ).all(query.sinceUs, ...(query.service === undefined ? [] : [query.service])),
+      )
+    return rows.map(row => ({
+      service: row.service,
+      provider: row.provider,
+      model: row.model,
+      calls: row.calls,
+      inputTokens: row.input_tokens ?? 0,
+      outputTokens: row.output_tokens ?? 0,
+      costUsd: row.cost_usd,
+    }))
+  }
+
   const statsOf = (query: { readonly windowMinutes: number; readonly service?: string | undefined; readonly limit: number }): TraceStats => {
     const sinceUs = (now() - query.windowMinutes * 60_000) * 1000
     const samples = z
@@ -802,6 +843,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     return {
       windowMinutes: query.windowMinutes,
       spans: samples.length,
+      models: modelUsageOf({ sinceUs, service: query.service }),
       services: [...LatencyStats.groupBy(samples, sample => sample.service)]
         .map(([service, group]) => ({ service, ...LatencyStats.summarize(group) }))
         .sort(byCount),
@@ -898,11 +940,16 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
           output_tokens: z.number().nullable(),
           cache_read_tokens: z.number().nullable(),
           reasoning_tokens: z.number().nullable(),
+          cost_usd: z.number().nullable(),
+          turn: z.number().nullable(),
+          span_session_id: z.string().nullable(),
         }),
       )
       .parse(
         prepare(
-          `SELECT s.trace_id, s.name, s.service, s.start_us, s.end_us, s.status_code,
+          `SELECT s.trace_id, s.name, s.service, s.start_us, s.end_us, s.status_code, s.session_id AS span_session_id,
+             ${SpanCost.modelCallCost} AS cost_usd,
+             ${attribute('dsh.turn')} AS turn,
              ${attribute('gen_ai.operation.name')} AS operation,
              ${attribute('gen_ai.usage.input_tokens')} AS input_tokens,
              ${attribute('gen_ai.usage.output_tokens')} AS output_tokens,
@@ -930,6 +977,9 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }))
     const withUsage = modelCalls.filter(row => row.input_tokens !== null || row.output_tokens !== null)
     const sum = (values: readonly (number | null)[]): number => values.reduce<number>((total, value) => total + (value ?? 0), 0)
+    const priced = modelCalls.filter(row => row.cost_usd !== null)
+    // A subagent's calls share its parent's trace but carry their own Session and turn numbers.
+    const ownPriced = priced.filter(row => row.span_session_id === sessionId)
     return {
       sessionId,
       traces: traces.length,
@@ -952,6 +1002,16 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
               cacheRead: sum(withUsage.map(row => row.cache_read_tokens)),
               reasoning: sum(withUsage.map(row => row.reasoning_tokens)),
             },
+      costUsd: priced.length === 0 ? null : sum(priced.map(row => row.cost_usd)),
+      turnCosts: [
+        ...LatencyStats.groupBy(
+          ownPriced.filter(row => row.turn !== null),
+          row => String(row.turn),
+        ).values(),
+      ]
+        .map(group => ({ turn: group[0]?.turn ?? 0, costUsd: sum(group.map(row => row.cost_usd)), modelCalls: group.length }))
+        .sort((left, right) => left.turn - right.turn)
+        .slice(-500),
       services: [...new Set(rows.map(row => row.service))].sort(),
     }
   }

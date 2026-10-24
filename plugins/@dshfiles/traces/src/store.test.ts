@@ -67,6 +67,7 @@ describe('trace store', () => {
       errorCount: 1,
       services: ['db', 'web'],
       sessionId: 'session-a',
+      costUsd: null,
     })
   })
 

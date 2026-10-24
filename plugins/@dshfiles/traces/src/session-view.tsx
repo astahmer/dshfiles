@@ -55,6 +55,8 @@ const SummaryGrid = (props: { readonly summary: SessionSummary; readonly t: Trac
           t={props.t}
         />
       )}
+      {/* An older Host omits costUsd until it restarts. */}
+      {(summary.costUsd ?? null) === null ? null : <Stat label="statCost" value={TraceFormat.usd(summary.costUsd)} t={props.t} />}
     </section>
   )
 }

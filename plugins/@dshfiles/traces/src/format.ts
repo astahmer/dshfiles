@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { AttributeValue } from './types.js'
 
 const formatDuration = (milliseconds: number | null): string => {
@@ -64,7 +65,26 @@ const visibleRows = <Row extends CollapsibleRow>(rows: readonly Row[], collapsed
   return shown
 }
 
+/** List-price USD: cents for a dollar or more, three significant digits below it, so a $0.0004 call is not "$0.00". */
+const formatUsd = (usd: number | null | undefined): string => {
+  if (usd === null || usd === undefined) return '—'
+  if (usd === 0) return '$0'
+  if (usd < 0.0001) return '<$0.0001'
+  if (usd >= 1) return `$${usd.toFixed(2)}`
+  return `$${usd.toPrecision(3).replace(/\.?0+$/, '')}`
+}
+
+/** The `dshx.cost.usd` agent telemetry put on a span, or null. */
+const costSchema = z.number().nonnegative().finite()
+
+const spanCostUsd = (attributes: Readonly<Record<string, AttributeValue>>): number | null => {
+  const cost = costSchema.safeParse(attributes['dshx.cost.usd'])
+  return cost.success ? cost.data : null
+}
+
 export class TraceFormat {
+  static readonly usd = formatUsd
+  static readonly spanCostUsd = spanCostUsd
   static readonly duration = formatDuration
   static readonly percent = formatPercent
   static readonly clock = formatClock

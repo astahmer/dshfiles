@@ -37,6 +37,7 @@ import { EmptyStoreGuide, exportBlocked, ReceiverBadge, ReceiverMessage } from '
 import { TraceDetailView } from './trace-detail.js'
 import { LogsView, type LogCorrelation } from './log-list.js'
 import { MetricsView } from './metrics-view.js'
+import { ModelCostTable } from './model-costs.js'
 import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { storedTracesView, tracesViewSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
@@ -332,7 +333,10 @@ export const TracesPanel = (props: {
 
         <TabsContent value="operations">
           {statsQuery.data === undefined ? null : (
-            <OperationsTable stats={statsQuery.data} onPick={(service, operation) => update({ service, operation, tab: 'traces', traceId: null })} t={t} />
+            <div className="dshx:flex dshx:flex-col dshx:gap-4">
+              <ModelCostTable models={statsQuery.data.models ?? []} t={t} />
+              <OperationsTable stats={statsQuery.data} onPick={(service, operation) => update({ service, operation, tab: 'traces', traceId: null })} t={t} />
+            </div>
           )}
         </TabsContent>
 

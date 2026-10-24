@@ -25,6 +25,8 @@ export const TraceList = (props: {
   readonly t: TracesTranslate
 }): JSX.Element => {
   const longest = Math.max(1, ...props.traces.map(trace => trace.durationMs))
+  // An older Host omits costUsd until it restarts.
+  const priced = props.traces.some(trace => typeof trace.costUsd === 'number')
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2">
       <Table aria-label={props.t('tabTraces')}>
@@ -33,6 +35,7 @@ export const TraceList = (props: {
             <TableHead className="dshx:w-28 dshx:@max-pane-narrow:hidden">{props.t('started')}</TableHead>
             <TableHead>{props.t('root')}</TableHead>
             <TableHead className="dshx:w-40 dshx:@max-pane-narrow:w-20">{props.t('duration')}</TableHead>
+            {priced ? <TableHead className="dshx:w-20 dshx:text-right">{props.t('cost')}</TableHead> : null}
             <TableHead className="dshx:w-16 dshx:text-right dshx:@max-pane-narrow:hidden">{props.t('spanCount')}</TableHead>
             <TableHead className="dshx:w-16 dshx:text-right">{props.t('errorCount')}</TableHead>
           </TableRow>
@@ -83,6 +86,11 @@ export const TraceList = (props: {
                   <span className="dshx:w-16 dshx:shrink-0 dshx:text-right dshx:font-mono dshx:text-xs">{TraceFormat.duration(trace.durationMs)}</span>
                 </div>
               </TableCell>
+              {priced ? (
+                <TableCell className="dshx:text-right dshx:font-mono dshx:text-xs" data-trace-cost={trace.costUsd ?? undefined}>
+                  {TraceFormat.usd(trace.costUsd ?? null)}
+                </TableCell>
+              ) : null}
               <TableCell className="dshx:text-right dshx:font-mono dshx:text-xs dshx:@max-pane-narrow:hidden">{trace.spanCount}</TableCell>
               <TableCell className="dshx:text-right">
                 {trace.errorCount > 0 ? (

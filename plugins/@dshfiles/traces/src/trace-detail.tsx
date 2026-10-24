@@ -52,6 +52,7 @@ const SpanDetailPanel = (props: {
 }): JSX.Element => {
   const [threadError, setThreadError] = useState<string | null>(null)
   const span = props.span
+  const costUsd = TraceFormat.spanCostUsd(span.attributes)
   return (
     <aside
       className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-md dshx:border dshx:border-border dshx:p-3"
@@ -70,6 +71,11 @@ const SpanDetailPanel = (props: {
           <Badge variant={span.status === 'error' ? 'destructive' : span.status === 'ok' ? 'success' : 'muted'}>{span.status}</Badge>
           <span className="dshx:font-mono">{TraceFormat.duration(span.durationMs)}</span>
           <span className="dshx:text-muted-foreground">+{TraceFormat.duration(span.offsetMs)}</span>
+          {costUsd === null ? null : (
+            <Badge variant="outline" className="dshx:font-mono" data-span-cost={costUsd} title={props.t('costHint')}>
+              {TraceFormat.usd(costUsd)}
+            </Badge>
+          )}
         </div>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
           <Button variant="outline" size="sm" onClick={() => props.onShowLogs(span.spanId)}>

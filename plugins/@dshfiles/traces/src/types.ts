@@ -22,6 +22,7 @@ export const traceSummarySchema = z
     errorCount: z.number().int().nonnegative(),
     services: z.array(z.string()),
     sessionId: z.string().nullable(),
+    costUsd: z.number().nonnegative().nullable().describe('Sum of dshx.cost.usd (list price) over its model-call spans; null when none is priced.'),
   })
   .strict()
 export type TraceSummary = z.infer<typeof traceSummarySchema>
@@ -82,10 +83,24 @@ export type OperationStats = z.infer<typeof operationStatsSchema>
 
 export const serviceStatsSchema = latencySchema.extend({ service: z.string() }).strict()
 
+export const modelUsageSchema = z
+  .object({
+    service: z.string(),
+    provider: z.string().nullable(),
+    model: z.string(),
+    calls: z.number().int().nonnegative(),
+    inputTokens: z.number().nonnegative(),
+    outputTokens: z.number().nonnegative(),
+    costUsd: z.number().nonnegative().nullable().describe('Sum of dshx.cost.usd (list price); null when no call is priced.'),
+  })
+  .strict()
+export type ModelUsage = z.infer<typeof modelUsageSchema>
+
 export const traceStatsSchema = z
   .object({
     windowMinutes: z.number().int().positive(),
     spans: z.number().int().nonnegative(),
+    models: z.array(modelUsageSchema).describe('Model-call spans per service and model, most expensive first (at most 50).'),
     services: z.array(serviceStatsSchema),
     operations: z.array(operationStatsSchema),
   })
@@ -128,6 +143,14 @@ export const sessionSummarySchema = z
     traceLatency: latencySchema.describe('Per-trace duration percentiles; errorCount counts traces with an error span.'),
     modelLatency: latencySchema.describe('Per model-call duration percentiles.'),
     tokens: tokenTotalsSchema.nullable().describe('Sums of gen_ai.usage.* over model-call spans; null when none carries usage.'),
+    costUsd: z
+      .number()
+      .nonnegative()
+      .nullable()
+      .describe('List-price USD: sum of dshx.cost.usd over model-call spans (subagent calls in its traces included); null when none is priced.'),
+    turnCosts: z
+      .array(z.object({ turn: z.number().int().nonnegative(), costUsd: z.number().nonnegative(), modelCalls: z.number().int().nonnegative() }).strict())
+      .describe("This thread's own priced turns (dsh.turn), oldest first, at most the last 500."),
     services: z.array(z.string()),
   })
   .strict()
