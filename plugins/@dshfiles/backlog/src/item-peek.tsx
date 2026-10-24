@@ -537,37 +537,41 @@ const CommentBox = (props: {
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
   const [pending, setPending] = useState(false)
+  const submitting = useRef(false)
   const [failed, setFailed] = useState<string | null>(null)
   const attachments = useComposerFiles({ onError: setFailed })
 
   /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
-  const submit = async (): Promise<void> => {
+  const submit = async (submittedText: string): Promise<void> => {
     const files = [...attachments.files]
-    if ((text.trim() === '' && files.length === 0) || pending) return
+    if ((submittedText.trim() === '' && files.length === 0) || submitting.current) return
+    submitting.current = true
     setPending(true)
     setFailed(null)
     try {
       await submitReply({
-        text,
+        text: submittedText,
         files,
         save: async saved => {
           const payload = saved.map(fileInput)
-          await actions.comment.mutateAsync(payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload })
+          await actions.comment.mutateAsync(
+            payload.length === 0 ? { id: props.item.id, text: submittedText } : { id: props.item.id, text: submittedText, files: payload },
+          )
         },
         dispatch:
           dispatch === null
             ? null
             : {
-                dispatch: () =>
+                dispatch: ({ text: replyText }) =>
                   dispatch.dispatch({
                     item: props.item,
-                    text,
+                    text: replyText,
                     files: files.map(fileInput),
                     open: props.openCreatedByDefault,
                     smartThreadRouting: props.smartThreadRouting,
                     notificationDelivery: props.threadStartNotifications,
                   }),
-                answerReply: () => dispatch.answerReply({ item: props.item, text }),
+                answerReply: ({ text: replyText }) => dispatch.answerReply({ item: props.item, text: replyText }),
                 smartReplyAnswers: props.smartReplyAnswers,
               },
         onAnswering: props.onAnswering,
@@ -584,6 +588,7 @@ const CommentBox = (props: {
         },
       })
     } finally {
+      submitting.current = false
       setPending(false)
     }
   }
@@ -601,7 +606,7 @@ const CommentBox = (props: {
         submitLabel="Reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
         pending={pending}
-        onSubmit={() => void submit()}
+        onSubmit={submittedText => void submit(submittedText)}
       />
       {failed === null ? null : (
         <p role="alert" className="dshx:text-[11px] dshx:text-destructive">

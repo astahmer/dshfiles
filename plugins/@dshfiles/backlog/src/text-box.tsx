@@ -8,6 +8,7 @@ import { AttachFilesButton, AttachmentTray, pasteFiles, useComposerFiles, useFil
 import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'
+import { replyTextAtSubmit } from './reply-input.js'
 
 export type ComposerFiles = ReturnType<typeof useComposerFiles>
 
@@ -29,7 +30,7 @@ export const BacklogTextBox = (props: {
   readonly submitLabel?: string
   readonly submitDisabled?: boolean
   readonly pending?: boolean
-  readonly onSubmit?: () => void
+  readonly onSubmit?: (text: string) => void
   readonly onCancel?: () => void
   readonly onBlur?: () => void
   readonly onFocus?: () => void
@@ -64,7 +65,7 @@ export const BacklogTextBox = (props: {
   }
 
   const submit = (): void => {
-    props.onSubmit?.()
+    props.onSubmit?.(reply ? replyTextAtSubmit(input.current, props.value) : props.value)
   }
 
   const blur = (event: FocusEvent<HTMLDivElement>): void => {
