@@ -235,6 +235,12 @@ const unreadCountForView = (input: {
 
 const latestThreadActivityAt = (updatedAt: number, finishedAt: number | undefined): number => Math.max(updatedAt, finishedAt ?? 0)
 
+const nextLocalDateBoundary = (now: number): number => {
+  const nextDay = new Date(now)
+  nextDay.setHours(24, 0, 0, 0)
+  return nextDay.getTime()
+}
+
 const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
   if (!Number.isFinite(updatedAt)) return 'older'
   const date = new Date(updatedAt)
@@ -303,5 +309,6 @@ export class ThreadViewModel {
   static readonly unreadCountForView = unreadCountForView
   static readonly latestActivityAt = latestThreadActivityAt
   static readonly dateGroup = threadDateGroup
+  static readonly nextLocalDateBoundary = nextLocalDateBoundary
   static readonly groupEntries = groupThreadEntries
 }

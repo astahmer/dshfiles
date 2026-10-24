@@ -2886,13 +2886,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
 
   useEffect(() => {
-    const nextBoundary = [nextIdleAt, nextMuteWake, nextSettledArchiveAt]
+    const nextBoundary = [nextIdleAt, nextMuteWake, nextSettledArchiveAt, ThreadViewModel.nextLocalDateBoundary(now)]
       .filter((value): value is number => value !== null)
       .sort((left, right) => left - right)[0]
     if (nextBoundary === undefined) return
     const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextBoundary - Date.now() + 1))
     return () => window.clearTimeout(timer)
-  }, [nextIdleAt, nextMuteWake, nextSettledArchiveAt])
+  }, [nextIdleAt, nextMuteWake, nextSettledArchiveAt, now])
 
   // A snooze that ran out wakes the thread at once (through `now`); dropping its entry keeps the settings small.
   const mutesAwake = useMemo(() => withoutExpiredMutes(mutedThreads, now), [mutedThreads, now])

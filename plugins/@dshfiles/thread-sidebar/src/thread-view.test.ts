@@ -63,6 +63,16 @@ describe('thread view grouping', () => {
     expect(groups).toMatchObject([{ label: 'Shared project', threads: [{ id: 'remote-thread' }, { id: 'local-thread' }] }])
   })
 
+  it('refreshes the date-group clock at local midnight', () => {
+    const beforeMidnight = new Date(2026, 9, 24, 23, 59, 50).getTime()
+    const afterMidnight = ThreadViewModel.nextLocalDateBoundary(beforeMidnight) + 1
+    const recentActivity = new Date(2026, 9, 25, 0, 2).getTime()
+
+    expect(ThreadViewModel.dateGroup(recentActivity, beforeMidnight)).toBe('lastSevenDays')
+    expect(ThreadViewModel.dateGroup(recentActivity, afterMidnight)).toBe('today')
+    expect(new Date(afterMidnight).getDate()).toBe(25)
+  })
+
   it('groups activity by local calendar date and leaves none as one flat list', () => {
     const now = new Date(2025, 3, 10, 12).getTime()
     expect(ThreadViewModel.dateGroup(new Date(2025, 3, 10, 1).getTime(), now)).toBe('today')
