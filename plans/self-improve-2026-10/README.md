@@ -147,11 +147,15 @@ progressive disclosure. Do not build a third mechanism.
 
 ### W4 — Search tooling
 
-- [ ] **T9. fff-search guards**: reject or narrow out-of-workspace roots instead
-      of indexing `$HOME`; precheck that the root exists and answer
-      `path does not exist: X` (86 instant errors); default excludes for
-      `node_modules`, `.dsh`, `.cache`, `Library`, `.git`. Native `glob` is core-owned,
-      so this is the only lever. Effort S–M.
+- [x] **T9. fff-search guards** (`jj:ookyuulnxxln`): the tool `path` is resolved
+      and stat'ed once in the Host, so a root that does not exist answers
+      `path does not exist: X` before an index is built, `~`/`~/x` expands, and a
+      root that contains the workspace (`~/dev` from a thread workspace) is
+      refused instead of indexing every checkout under it. Default excludes were
+      measured unnecessary: fff honours `.gitignore` (`node_modules`, `.cache`
+      are never indexed) and refuses `/` and `$HOME` itself, and a host-side
+      post-filter cannot keep the reported total honest. Native `glob` stays
+      core-owned.
 
 ### W5 — Workspace and integration hygiene
 
@@ -294,6 +298,18 @@ node scripts/self-improve.ts validate
 Every task states its metric above; a task is done only with a before/after pair
 from the same window and the confounders named (provider outage, user
 interruption, forked-Session duplication).
+
+## Progress (2026-10-24 run)
+
+| Task | State | Receipt                                                                                                                                                          |
+| ---- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T9   | done  | `jj:ookyuulnxxln` — missing path, `~`, glob file path and ancestor refusal covered by 13 fff-search tests; build, import, `test:boot` and `features:check` clean |
+
+Evidence behind it: the week's session logs hold `fff-search could not index …:
+Invalid path …` against thread paths (a `dshfiles-threads-threads` typo, deleted
+checkouts, pnpm store paths) and `could not index /Users/astahmer` / `~/dev`
+attempts, while `grep`/`glob` tool spans since fff landed report 0 errors — the
+tool itself is healthy, only the path contract leaked through.
 
 ## Progress (2026-10-22 run)
 
