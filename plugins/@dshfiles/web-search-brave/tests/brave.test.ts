@@ -1,3 +1,4 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import { BraveSearchModel } from '../src/brave.js'
 
@@ -56,6 +57,17 @@ describe('searchBrave', () => {
     expect(calls[0]?.url).toContain('api.search.brave.com/res/v1/web/search')
     expect(calls[0]?.url).toContain('q=node+api')
     expect(calls[0]?.headers.get('x-subscription-token')).toBe('key-123')
+  })
+
+  it('records a brave search span with the request options and result count, never the query or key', async () => {
+    using recorder = recordSpans()
+    await BraveSearchModel.search(
+      { query: 'synthetic private query' },
+      { ...options, fetch: async () => new Response(JSON.stringify(payload), { status: 200 }) },
+    )
+    const span = recorder.span('brave search')
+    expect(span.attributes).toEqual({ 'dshx.web-search-brave.count': 5, 'dshx.web-search-brave.safesearch': 'moderate', 'dshx.web-search-brave.results': 2 })
+    expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic private query|key-123/)
   })
 
   it('surfaces a rejected key with guidance', async () => {

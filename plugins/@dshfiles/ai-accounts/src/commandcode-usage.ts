@@ -6,6 +6,7 @@ import type { UsageCard } from './api.js'
 import { CommandCodeProviderModel, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
+import { providerFetch } from './provider-request.js'
 
 type JsonValue = string | number | boolean | null | undefined | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -166,7 +167,12 @@ export const readCommandCodeUsage = async (
   }
   const headers = { ...COMMAND_CODE_HEADERS, authorization: `Bearer ${key}` }
   const getJson = async (path: string): Promise<{ readonly status: number; readonly body: JsonValue }> => {
-    const response = await fetch(`${base}${path}`, { headers, redirect: 'error', signal: ProviderUsageModel.usageSignal(signal) })
+    const response = await providerFetch({
+      provider: 'commandcode',
+      operation: 'usage',
+      url: `${base}${path}`,
+      init: { headers, redirect: 'error', signal: ProviderUsageModel.usageSignal(signal) },
+    })
     return { status: response.status, body: response.ok ? await response.json() : undefined }
   }
   try {

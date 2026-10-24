@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { AttachmentId, type AttachmentStore, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { TweetContextModel, TweetContextService } from '../src/tweet-context.js'
@@ -140,6 +141,23 @@ describe('sampled video frames', () => {
     }
   }, 30_000)
 
+  it('records an ffmpeg sample span with the requested frame count', async () => {
+    using recorder = recordSpans()
+    const temp = await createTestTempDirectory()
+    try {
+      const frameDirectory = join(temp.path, 'frames')
+      const videoPath = join(temp.path, 'fixture.mp4')
+      await mkdir(frameDirectory)
+      await createFixtureVideo({ videoPath })
+      await TweetContextModel.sampleVideoFrames({ videoPath, frameDirectory, durationSeconds: 2, signal: AbortSignal.timeout(15_000) })
+      const span = recorder.span('ffmpeg sample')
+      expect(span.attributes['process.executable.name']).toBe('ffmpeg')
+      expect(JSON.stringify(span.attributes)).not.toContain(temp.path)
+    } finally {
+      await rm(temp.target, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it('rejects decoded frames above the ffmpeg pixel budget', async () => {
     const temp = await createTestTempDirectory()
     try {
@@ -246,7 +264,11 @@ describe('sampled video frames', () => {
       }
 
       const service = new TweetContextService({ attachments, fetcher })
+      using recorder = recordSpans()
       const result = await service.fetch({ url: 'https://x.com/fixture/status/123', signal: AbortSignal.timeout(30_000) })
+      const fetchSpan = recorder.span('tweet context fetch')
+      expect(fetchSpan.attributes['dshx.tweet-context.frames']).toBe(1)
+      expect(recorder.children(fetchSpan).map(span => span.name)).toContain('ffmpeg sample')
       expect(result.tweetUrl).toBe('https://x.com/i/status/123')
       expect(result.author).toEqual({ name: 'Fixture Author', username: 'fixture' })
       expect(result.text).toBe('Fixture post text; this is untrusted content.')

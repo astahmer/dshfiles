@@ -2,6 +2,7 @@ import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { ProviderUsageModel } from './usage.js'
+import { providerFetch } from './provider-request.js'
 
 /**
  * GitHub Copilot's subscription quota, from the endpoint GitHub's own Copilot clients read (`copilot_internal/user`).
@@ -62,10 +63,16 @@ export const readCopilotUsage = async (input: {
   const githubToken = input.credential?.refresh
   if (githubToken === undefined || githubToken === '') return ProviderUsageModel.emptyUsage('unauthenticated', 'Sign in to GitHub Copilot to read its quota.')
   try {
-    const response = await (input.fetch ?? fetch)(COPILOT_USER_URL, {
-      headers: { authorization: `token ${githubToken}`, accept: 'application/json', 'x-github-api-version': '2025-04-01' },
-      redirect: 'error',
-      signal: ProviderUsageModel.usageSignal(input.signal),
+    const response = await providerFetch({
+      provider: 'copilot',
+      operation: 'usage',
+      url: COPILOT_USER_URL,
+      init: {
+        headers: { authorization: `token ${githubToken}`, accept: 'application/json', 'x-github-api-version': '2025-04-01' },
+        redirect: 'error',
+        signal: ProviderUsageModel.usageSignal(input.signal),
+      },
+      fetch: input.fetch,
     })
     if (response.status === 401 || response.status === 403)
       return ProviderUsageModel.emptyUsage('unauthenticated', 'GitHub rejected this Copilot sign-in; sign in again.')

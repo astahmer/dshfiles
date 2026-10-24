@@ -28,8 +28,9 @@ import { McpOAuthModel, oauthGrantSchema, type OAuthGrant, type PendingAuthoriza
 import { redactingLogger } from './redaction.js'
 import { ClientReconciler, type ClientTarget } from './reconcile.js'
 import { McpServerStateModel } from './server-state.js'
+import { createTracedRegistrySearch } from './registry-search-host.js'
 
-const registrySearchService = McpCatalogModel.createRegistrySearchService({ fetch: (input, init) => globalThis.fetch(input, init) })
+const registrySearchService = createTracedRegistrySearch({ fetch: (input, init) => globalThis.fetch(input, init) })
 
 const ENTRY_ID = 'mcp-servers'
 const PACKAGE_NAME = '@dshfiles/mcp-servers'

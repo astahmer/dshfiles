@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { providerFetch } from './provider-request.js'
 
 const OPENCODE_GO_MODELS_URL = 'https://opencode.ai/zen/go/v1/models'
 
@@ -13,9 +14,11 @@ export const parseOpenCodeGoCatalog = (payload: unknown): readonly string[] => [
 export const fetchOpenCodeGoCatalog = async (signal?: AbortSignal): Promise<readonly string[]> => {
   const timeout = AbortSignal.timeout(10_000)
   const requestSignal = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
-  const response = await fetch(OPENCODE_GO_MODELS_URL, {
-    headers: { accept: 'application/json' },
-    signal: requestSignal,
+  const response = await providerFetch({
+    provider: 'opencode-go',
+    operation: 'catalog',
+    url: OPENCODE_GO_MODELS_URL,
+    init: { headers: { accept: 'application/json' }, signal: requestSignal },
   })
   if (!response.ok) throw new Error(`OpenCode Go model catalog request failed (${response.status}).`)
   return parseOpenCodeGoCatalog(await response.json())

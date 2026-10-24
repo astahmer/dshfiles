@@ -9,6 +9,7 @@ import { satisfies, valid, validRange } from 'semver'
 import { z } from 'zod'
 import type { MarketplaceInstallOutput, MarketplaceListInput, MarketplaceListOutput } from './api.js'
 import { DEFAULT_HUB_BASE_URL, normalizeHubBaseUrl } from './settings.js'
+import { withSpan } from '@dshfiles/dshx/tracing'
 
 const PAGE_SIZE = 24
 const HUB_TIMEOUT_MS = 15_000
@@ -181,7 +182,11 @@ function hubUrl(baseUrl: string, pathname: string, search?: URLSearchParams): UR
   return url
 }
 
-async function fetchJson(dependencies: MarketplaceHostDependencies, url: URL, signal: AbortSignal): Promise<unknown> {
+function fetchJson(dependencies: MarketplaceHostDependencies, url: URL, signal: AbortSignal): Promise<unknown> {
+  return withSpan('marketplace hub request', { kind: 'client', attributes: { 'server.address': url.host } }, () => fetchUntracedJson(dependencies, url, signal))
+}
+
+async function fetchUntracedJson(dependencies: MarketplaceHostDependencies, url: URL, signal: AbortSignal): Promise<unknown> {
   const response = await dependencies.fetch(url, {
     headers: { accept: 'application/json' },
     // Do not follow an API miss into a localized HTML page. A manual response

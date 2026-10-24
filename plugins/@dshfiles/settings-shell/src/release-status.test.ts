@@ -1,4 +1,6 @@
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
+import { checkDshRelease } from './release-check-host.js'
 import { fetchDshReleaseStatus, releaseStatusFromGitHub } from './release-status.js'
 
 const githubRelease = (input: { readonly tag: string; readonly body?: string; readonly draft?: boolean }) => ({
@@ -55,6 +57,18 @@ describe('DSH GitHub release status', () => {
     expect(status.latestVersion).toBe('0.2.1-rc.2')
     expect(called[0]?.redirect).toBe('error')
     expect(called[0]?.headers).toMatchObject({ accept: 'application/vnd.github+json' })
+  })
+
+  it('records a dsh release check span with whether an update exists', async () => {
+    using recorder = recordSpans()
+    const fetcher: typeof fetch = async () =>
+      new Response(JSON.stringify([githubRelease({ tag: 'dsh-v0.2.1-rc.2' }), githubRelease({ tag: 'dsh-v0.2.1-rc.1' })]), { status: 200 })
+    await checkDshRelease({ currentVersion: '0.2.1-rc.1', fetch: fetcher, signal: new AbortController().signal })
+    expect(recorder.span('dsh release check').attributes).toEqual({
+      'server.address': 'api.github.com',
+      'dshx.settings-shell.available': true,
+      'dshx.settings-shell.releases': 1,
+    })
   })
 
   it('rejects malformed release payloads', () => {

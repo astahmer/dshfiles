@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { readCodexResetCredits, type CodexResetCredits } from './codex-reset-credits.js'
 import { CodexHomeModel } from './codex-home.js'
+import { providerFetch } from './provider-request.js'
 
 type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -105,15 +106,20 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): P
   try {
     const [credits, response] = await Promise.all([
       readCodexResetCredits(codexHome, signal),
-      fetch('https://chatgpt.com/backend-api/wham/usage', {
-        headers: {
-          authorization: `Bearer ${auth.tokens.access_token}`,
-          'chatgpt-account-id': accountId,
-          accept: 'application/json',
-          [LUNA_RESERVE_HEADER]: '1',
+      providerFetch({
+        provider: 'codex',
+        operation: 'usage',
+        url: 'https://chatgpt.com/backend-api/wham/usage',
+        init: {
+          headers: {
+            authorization: `Bearer ${auth.tokens.access_token}`,
+            'chatgpt-account-id': accountId,
+            accept: 'application/json',
+            [LUNA_RESERVE_HEADER]: '1',
+          },
+          redirect: 'error',
+          signal: ProviderUsageModel.usageSignal(signal),
         },
-        redirect: 'error',
-        signal: ProviderUsageModel.usageSignal(signal),
       }),
     ])
     if (response.status === 401 || response.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Codex rejected this login; sign in again.')
@@ -150,9 +156,11 @@ export const readOpenCodeUsage = async (apiKey: string, signal?: AbortSignal): P
   if (apiKey.trim().length === 0) return ProviderUsageModel.emptyUsage('unauthenticated')
   if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
   try {
-    const response = await fetch('https://opencode.ai/zen/go/v1/usage', {
-      headers: { authorization: `Bearer ${apiKey.trim()}`, accept: 'application/json' },
-      signal: ProviderUsageModel.usageSignal(signal),
+    const response = await providerFetch({
+      provider: 'opencode',
+      operation: 'usage',
+      url: 'https://opencode.ai/zen/go/v1/usage',
+      init: { headers: { authorization: `Bearer ${apiKey.trim()}`, accept: 'application/json' }, signal: ProviderUsageModel.usageSignal(signal) },
     })
     if (response.status === 401 || response.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'OpenCode rejected this key.')
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `OpenCode returned ${String(response.status)} for usage.`)

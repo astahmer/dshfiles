@@ -195,8 +195,8 @@ const readBoundedJson = async (response: Response): Promise<RegistryPayload> => 
   return registryPayloadSchema.parse(payload)
 }
 
-type RegistrySearchFetcher = (input: URL, init: RequestInit) => Promise<Response>
-type RegistrySearchService = { readonly search: (input: { readonly query: string }) => Promise<RegistryEntry[]> }
+export type RegistrySearchFetcher = (input: URL, init: RequestInit) => Promise<Response>
+export type RegistrySearchService = { readonly search: (input: { readonly query: string }) => Promise<RegistryEntry[]> }
 
 export class McpCatalogModel {
   static readonly providers = providers

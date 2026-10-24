@@ -1,5 +1,6 @@
 import { WebError, type WebSearchRequest, type WebSearchResult, type WebSearchSource } from '@deepseek-ai/dsh-web'
 import { z } from 'zod'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 
 const BRAVE_SEARCH_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search'
 const SEARCH_TIMEOUT_MS = 15_000
@@ -85,7 +86,19 @@ export class BraveSearchModel {
   }
 
   /** One Brave Web Search call; the seam enforces `maxResults` on the way back, so this asks for the configured count. */
-  static async search(request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal): Promise<WebSearchResult> {
+  static search(request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal): Promise<WebSearchResult> {
+    return withSpan(
+      'brave search',
+      { kind: 'client', attributes: pluginAttributes({ plugin: 'web-search-brave', attributes: { count: options.count, safesearch: options.safesearch } }) },
+      async span => {
+        const result = await BraveSearchModel.searchUntraced(request, options, signal)
+        span.setAttribute('dshx.web-search-brave.results', result.sources.length)
+        return result
+      },
+    )
+  }
+
+  private static async searchUntraced(request: WebSearchRequest, options: BraveSearchOptions, signal?: AbortSignal): Promise<WebSearchResult> {
     const url = new URL(BRAVE_SEARCH_ENDPOINT)
     url.searchParams.set('q', request.query)
     url.searchParams.set('count', String(options.count))

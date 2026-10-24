@@ -7,6 +7,7 @@ import { AttachmentId, type AttachmentStore, type ImageAttachmentRef } from '@de
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { InferValue, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { z } from 'zod'
+import { withSpan } from '@dshfiles/dshx/tracing'
 
 const MAX_API_RESPONSE_BYTES = 1_000_000
 const MAX_VIDEO_BYTES = 25_000_000
@@ -324,8 +325,14 @@ const runFfmpeg = async (input: {
     input.outputPattern,
   ]
 
-  await new Promise<void>((resolveExecution, rejectExecution) => {
-    execFile('ffmpeg', args, { signal: input.signal, timeout: FFMPEG_TIMEOUT_MS, maxBuffer: 1_000_000, windowsHide: true }, error => {
+  await withSpan('ffmpeg sample', { kind: 'client', attributes: { 'process.executable.name': 'ffmpeg', 'dshx.tweet-context.frames': input.frameCount } }, () =>
+    runFfmpegProcess({ args, signal: input.signal }),
+  )
+}
+
+const runFfmpegProcess = (input: { readonly args: readonly string[]; readonly signal: AbortSignal }): Promise<void> =>
+  new Promise<void>((resolveExecution, rejectExecution) => {
+    execFile('ffmpeg', [...input.args], { signal: input.signal, timeout: FFMPEG_TIMEOUT_MS, maxBuffer: 1_000_000, windowsHide: true }, error => {
       if (error === null) {
         resolveExecution()
         return
@@ -341,7 +348,6 @@ const runFfmpeg = async (input: {
       rejectExecution(new Error('ffmpeg could not decode this X video.'))
     })
   })
-}
 
 const sampleVideoFrames = async (input: {
   readonly videoPath: string
@@ -490,11 +496,10 @@ export class TweetContextService {
   }
 
   readonly fetch = (input: { readonly url: string; readonly signal: AbortSignal }): Promise<TweetContextOutput> =>
-    fetchTweetContext({
-      url: input.url,
-      attachments: this.#attachments,
-      fetcher: this.#fetcher,
-      signal: input.signal,
+    withSpan('tweet context fetch', { kind: 'client', attributes: { 'server.address': 'api.fxtwitter.com' } }, async span => {
+      const output = await fetchTweetContext({ url: input.url, attachments: this.#attachments, fetcher: this.#fetcher, signal: input.signal })
+      span.setAttribute('dshx.tweet-context.frames', output.video?.frames.length ?? 0)
+      return output
     })
 }
 

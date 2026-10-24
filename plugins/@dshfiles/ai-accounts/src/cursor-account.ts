@@ -7,6 +7,7 @@ import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel } from './usage.js'
+import { providerFetch } from './provider-request.js'
 
 type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -102,10 +103,11 @@ export const readCursorUsage = async (keyEnv: string, signal?: AbortSignal, reso
   if (cookie === undefined)
     return ProviderUsageModel.emptyUsage('unsupported', 'This Cursor token does not identify a user, so its dashboard usage cannot be read.')
   try {
-    const response = await fetch(CURSOR_USAGE_URL, {
-      headers: { cookie, accept: 'application/json' },
-      redirect: 'error',
-      signal: ProviderUsageModel.usageSignal(signal),
+    const response = await providerFetch({
+      provider: 'cursor',
+      operation: 'usage',
+      url: CURSOR_USAGE_URL,
+      init: { headers: { cookie, accept: 'application/json' }, redirect: 'error', signal: ProviderUsageModel.usageSignal(signal) },
     })
     if (response.status === 401 || response.status === 403)
       return ProviderUsageModel.emptyUsage('unauthenticated', `Cursor rejected this login; run ${CURSOR_LOGIN_HINT}.`)

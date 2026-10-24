@@ -7,6 +7,7 @@ import type { UsageCard } from './api.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
+import { providerFetch } from './provider-request.js'
 
 export interface ClaudeAccountServiceDependencies {
   readonly readFile: typeof readFile
@@ -196,10 +197,16 @@ const fetchUsage = async (configDir: string, dependencies: ClaudeAccountServiceD
     return { card: ProviderUsageModel.emptyUsage('unauthenticated', 'The Claude Code login has expired. Run Claude Code once to refresh it.') }
   }
   try {
-    const response = await dependencies.fetch(CLAUDE_USAGE_URL, {
-      headers: { authorization: `Bearer ${credential.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20', accept: 'application/json' },
-      redirect: 'error',
-      signal: ProviderUsageModel.usageSignal(signal),
+    const response = await providerFetch({
+      provider: 'claude',
+      operation: 'usage',
+      url: CLAUDE_USAGE_URL,
+      init: {
+        headers: { authorization: `Bearer ${credential.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20', accept: 'application/json' },
+        redirect: 'error',
+        signal: ProviderUsageModel.usageSignal(signal),
+      },
+      fetch: dependencies.fetch,
     })
     if (response.status === 401 || response.status === 403)
       return { card: ProviderUsageModel.emptyUsage('unauthenticated', 'Claude rejected this login; sign in again.') }

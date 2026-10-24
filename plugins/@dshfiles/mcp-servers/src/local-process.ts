@@ -1,4 +1,5 @@
 import { terminateManagedProcess } from '@dshfiles/dshx/host'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 
 export type LocalProcessStatus = 'not-configured' | 'starting' | 'running' | 'exited' | 'stopping' | 'stopped' | 'stop-unconfirmed'
@@ -25,16 +26,23 @@ export class ManagedLocalCommand {
     handle.stderr?.resume()
   }
 
-  static async start(runtime: SubprocessRuntime, command: LocalCommand, env: Readonly<Record<string, string>>): Promise<ManagedLocalCommand> {
-    const executable = await runtime.resolveExecutable(command.command, env)
-    const handle = runtime.spawn({
-      argv: [executable, ...command.args],
-      cwd: command.cwd,
-      env: { ...env },
-      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
-      graceMs: 5_000,
+  /** One `mcp server start` span for resolving and spawning the command; the running server is not a span. */
+  static start(
+    runtime: Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'>,
+    command: LocalCommand,
+    env: Readonly<Record<string, string>>,
+  ): Promise<ManagedLocalCommand> {
+    return withSpan('mcp server start', { kind: 'client', attributes: { 'dshx.mcp-servers.argument_count': command.args.length } }, async () => {
+      const executable = await runtime.resolveExecutable(command.command, env)
+      const handle = runtime.spawn({
+        argv: [executable, ...command.args],
+        cwd: command.cwd,
+        env: { ...env },
+        stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
+        graceMs: 5_000,
+      })
+      return new ManagedLocalCommand(handle)
     })
-    return new ManagedLocalCommand(handle)
   }
 
   get status(): LocalProcessStatus {

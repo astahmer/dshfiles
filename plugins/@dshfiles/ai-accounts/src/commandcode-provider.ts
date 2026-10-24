@@ -17,6 +17,7 @@ import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { streamCommandCodeCli } from './commandcode-cli.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { isEmptyCompletion } from './empty-response.js'
+import { providerFetch } from './provider-request.js'
 
 /**
  * Command Code as a provider.
@@ -130,9 +131,11 @@ const messagesOnlyById = (id: string): boolean => id.startsWith('anthropic/') ||
 export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions): Promise<readonly CatalogEntry[]> => {
   const base = CommandCodeProviderModel.resolveBase(options.baseUrl)
   if (options.apiKey.length === 0) return FALLBACK
-  const response = await fetch(`${base}/provider/v1/models`, {
-    headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' },
-    signal: options.signal ?? null,
+  const response = await providerFetch({
+    provider: 'commandcode',
+    operation: 'catalog',
+    url: `${base}/provider/v1/models`,
+    init: { headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' }, signal: options.signal ?? null },
   })
   if (!response.ok) return FALLBACK
   const parsed = commandCodeCatalogResponseSchema.safeParse(await response.json())

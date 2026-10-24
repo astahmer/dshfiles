@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { providerFetch } from './provider-request.js'
 
 /**
  * Codex reset credits.
@@ -80,14 +81,19 @@ export const readCodexResetCredits = async (codexHome: string, signal?: AbortSig
   if (accountId === undefined) return emptyResetCredits
 
   try {
-    const response = await fetch(RESET_CREDITS_URL, {
-      headers: {
-        authorization: `Bearer ${auth.tokens.access_token}`,
-        'chatgpt-account-id': accountId,
-        accept: 'application/json',
+    const response = await providerFetch({
+      provider: 'codex',
+      operation: 'credits',
+      url: RESET_CREDITS_URL,
+      init: {
+        headers: {
+          authorization: `Bearer ${auth.tokens.access_token}`,
+          'chatgpt-account-id': accountId,
+          accept: 'application/json',
+        },
+        redirect: 'error',
+        signal: signal === undefined ? AbortSignal.timeout(5_000) : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
       },
-      redirect: 'error',
-      signal: signal === undefined ? AbortSignal.timeout(5_000) : AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
     })
     if (!response.ok) return emptyResetCredits
     return parseCredits(await response.json())

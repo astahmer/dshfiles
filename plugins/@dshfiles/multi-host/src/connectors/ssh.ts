@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { spawn, type ChildProcess } from 'node:child_process'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { hostConnectorSchema } from '../records.js'
 import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
 import { reserveLoopbackEndpoint } from './loopback.js'
@@ -66,7 +67,24 @@ export interface SshProcessResult {
  * One bounded remote process: resolves with its exit status and both streams instead of throwing on a non-zero exit,
  * which remote commands need to report their own failure. Cancellation and ssh startup failures still reject.
  */
-const runSshProcess = async ({
+const runSshProcess = (input: {
+  readonly sshTarget: string
+  readonly command: string
+  readonly timeoutMs?: number | undefined
+  readonly maxOutputBytes?: number | undefined
+  readonly signal?: AbortSignal | undefined
+}): Promise<SshProcessResult> =>
+  withSpan('ssh command', { kind: 'client', attributes: { 'process.executable.name': 'ssh' } }, async span => {
+    const result = await runUntracedSshProcess(input)
+    span.setAttributes({
+      'process.exit.code': result.code ?? -1,
+      ...pluginAttributes({ plugin: 'multi-host', attributes: { timed_out: result.timedOut, output_exceeded: result.outputExceeded } }),
+    })
+    if (result.code !== 0) span.setStatus('error', result.timedOut ? 'timeout' : 'exit')
+    return result
+  })
+
+const runUntracedSshProcess = async ({
   sshTarget,
   command,
   timeoutMs = 12_000,
@@ -204,19 +222,19 @@ const stopChild = async (child: ChildProcess): Promise<void> => {
   ])
 }
 
-const openTunnel = async ({
-  sshTarget,
-  remotePort,
-  localAddress,
-  localPort,
-  signal,
-}: {
+interface TunnelRequest {
   readonly sshTarget: string
   readonly remotePort: number
   readonly localAddress: string
   readonly localPort: number
   readonly signal?: AbortSignal | undefined
-}): Promise<ChildProcess> => {
+}
+
+/** One `ssh tunnel open` span until the loopback forward listens (or fails); the long-lived forward is not a span. */
+const openTunnel = (request: TunnelRequest): Promise<ChildProcess> =>
+  withSpan('ssh tunnel open', { kind: 'client', attributes: { 'process.executable.name': 'ssh' } }, () => openUntracedTunnel(request))
+
+const openUntracedTunnel = async ({ sshTarget, remotePort, localAddress, localPort, signal }: TunnelRequest): Promise<ChildProcess> => {
   const target = sshTargetOf(sshTarget)
   const child = spawn('ssh', [...sshOptions({ verbose: true }), '-N', '-L', `${localAddress}:${localPort}:127.0.0.1:${remotePort}`, target], {
     stdio: ['ignore', 'ignore', 'pipe'],

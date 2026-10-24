@@ -9,7 +9,8 @@ import { createSettingsTools, type SettingsSurface } from './settings-tools.js'
 import { settingsShellApi } from './shell-api.js'
 import { settingsShellSettings } from './settings.js'
 import { PORTED_FROM, WELCOME_PORTED_FROM } from './upstream.js'
-import { fetchDshReleaseStatus, type DshReleaseStatus } from './release-status.js'
+import { checkDshRelease } from './release-check-host.js'
+import type { DshReleaseStatus } from './release-status.js'
 
 const packageVersionSchema = z.object({ version: z.string() })
 const settingsProviderSchema = z.object({ documentPath: z.string() })
@@ -48,7 +49,7 @@ const dshReleaseStatus = async (signal: AbortSignal): Promise<DshReleaseStatus> 
   signal.throwIfAborted()
   if (releaseStatusCache !== undefined && releaseStatusCache.expiresAt > Date.now()) return releaseStatusCache.value
   if (releaseStatusRequest !== undefined) return releaseStatusRequest
-  const request = fetchDshReleaseStatus({
+  const request = checkDshRelease({
     currentVersion: installedVersion('@deepseek-ai/dsh'),
     fetch: globalThis.fetch,
     signal,
