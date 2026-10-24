@@ -86,8 +86,33 @@ export class RevisionReads {
     return { revisions, truncated }
   }
 
-  static async details(run: JjRun, commitId: string): Promise<RevisionDetails> {
-    if (!JujutsuMutationModel.isCommitId(commitId)) throw new Error('Invalid revision id.')
+  /**
+   * A full commit id, a unique hex prefix or a change id → the full commit id.
+   * `jj log` resolves prefixes and change ids; a prefix matching two revisions
+   * errors rather than guessing, which is the same rule the CLI applies.
+   */
+  static async resolveCommitId(run: JjRun, reference: string): Promise<string> {
+    if (JujutsuMutationModel.isCommitId(reference)) return reference
+    let stdout: string
+    try {
+      const resolved = await run(
+        [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', reference, '--limit', '2', '--template', 'commit_id'],
+        { outputLimit: 1_000 },
+      )
+      stdout = resolved.stdout
+    } catch (error) {
+      if (error instanceof Error && /cancelled|timed out/.test(error.message)) throw error
+      // jj exits non-zero for both "no such revision" and an ambiguous prefix; neither is a repo failure.
+      throw new Error(`"${reference}" does not name exactly one revision. Use a longer commit id prefix, or the full id from jj log.`)
+    }
+    const ids = [...new Set(stdout.split('\n').map(line => line.trim()).filter(line => JujutsuMutationModel.isCommitId(line)))]
+    if (ids.length === 1 && ids[0] !== undefined) return ids[0]
+    if (ids.length === 0) throw new Error(`No revision matches "${reference}". Check the id against jj log and try again.`)
+    throw new Error(`"${reference}" matches more than one revision (${ids.map(id => id.slice(0, 12)).join(', ')}). Use a longer prefix.`)
+  }
+
+  static async details(run: JjRun, reference: string): Promise<RevisionDetails> {
+    const commitId = await RevisionReads.resolveCommitId(run, reference)
     try {
       await run([RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', commitId, '--limit', '1', '--template', 'commit_id'], {
         outputLimit: 1_000,

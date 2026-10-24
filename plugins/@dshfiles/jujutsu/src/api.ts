@@ -29,6 +29,13 @@ export const revisionSchema = z.object({
 const repoPathSchema = z.string().min(1).max(2048)
 const repoIdSchema = z.string().uuid()
 const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
+/**
+ * A revision the caller names, as a full commit id, a unique hex prefix or a
+ * change id — what `jj log` prints and what a chat reference carries. Read-only
+ * tools resolve it against the repository; mutations still take full ids so a
+ * typo can never pick the wrong revision to rewrite.
+ */
+const revisionRefSchema = z.string().regex(/^(?:[a-f0-9]{4,64}|[k-z]{4,32})$/)
 const remoteNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/)
 const bookmarkNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/)
 export const workspaceNameSchema = z
@@ -277,7 +284,7 @@ export const jujutsuApi = defineApi({
       },
     }),
     details: method({
-      input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),
+      input: z.object({ repoId: repoIdSchema, commitId: revisionRefSchema }),
       output: z.union([detailsSchema, readFailureSchema]),
       description: 'One revision: its description, files, patch and evolution log. Read-only.',
       tool: {

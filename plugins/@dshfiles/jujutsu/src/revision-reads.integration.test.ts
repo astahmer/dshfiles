@@ -56,6 +56,34 @@ test('details of an @ that another jj process already rewrote still load instead
   )
 })
 
+test('details accept a hex prefix or a change id, which is what jj log and chat references print', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  await writeFile(join(repo, 'prefixed.txt'), 'one\n')
+  jj(['status'])
+  const commitId = workingCopyCommitId(jj)
+  const changeId = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'change_id.shortest(8)']).trim()
+
+  const byPrefix = await RevisionReads.details(run, commitId.slice(0, 12))
+  assert.deepEqual(
+    byPrefix.files.map(file => [file.path, file.status]),
+    [['prefixed.txt', 'A']],
+  )
+  const byChange = await RevisionReads.details(run, changeId)
+  assert.deepEqual(
+    byChange.files.map(file => file.path),
+    ['prefixed.txt'],
+  )
+})
+
+test('an unknown prefix reports that no revision matches instead of a stale-revision message', async () => {
+  const { run } = await scratchRepo()
+
+  await assert.rejects(
+    () => RevisionReads.details(run, 'deadbeef1234'),
+    /does not name exactly one revision/u,
+  )
+})
+
 test('details never snapshot the working copy, so a read cannot rewrite @ under other agents', async () => {
   const { repo, jj, run } = await scratchRepo()
   await writeFile(join(repo, 'tracked.txt'), 'base\n')
