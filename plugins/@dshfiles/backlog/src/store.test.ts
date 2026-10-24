@@ -66,6 +66,14 @@ describe('triage', () => {
     ])
   })
 
+  it('preserves title characters beyond the title limit in the body', () => {
+    const title = 'x'.repeat(BacklogItems.maxTitleChars + 1)
+    const triaged = BacklogItems.triage(`${title}\n\nDetails`)
+
+    expect(triaged.title).toBe(title.slice(0, BacklogItems.maxTitleChars))
+    expect(triaged.body).toBe(`${title.slice(BacklogItems.maxTitleChars)}\n\nDetails`)
+  })
+
   it('keeps a project mention as a workspace reference without assigning the project', () => {
     const triaged = BacklogItems.triage('Investigate workspace:%2Fwork%2Fdshfiles')
     expect(triaged.links).toEqual([{ type: 'workspace', target: '%2Fwork%2Fdshfiles', provenance: 'extracted' }])

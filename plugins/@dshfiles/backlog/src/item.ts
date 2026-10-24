@@ -177,10 +177,16 @@ const triage = (text: string) => {
   const content = prefixKind === undefined || prefix === null ? trimmed : trimmed.slice(prefix[0].length)
   const [firstLine = '', ...rest] = content.split('\n')
   const titleLine = firstLine.trim() === '' ? content.trim() : firstLine.trim()
+  const titleWithoutTags = titleLine.replace(/(\s+#[a-z][\w-]{0,59})+$/i, '')
   const kind: BacklogKind = prefixKind ?? (titleLine.endsWith('?') ? 'question' : 'task')
+  const bodyFromTitle = titleWithoutTags.slice(MAX_TITLE_CHARS)
   return {
-    title: titleLine.replace(/(\s+#[a-z][\w-]{0,59})+$/i, '').slice(0, MAX_TITLE_CHARS) || 'Untitled',
-    body: rest.join('\n').trim().slice(0, MAX_BODY_CHARS),
+    title: titleWithoutTags.slice(0, MAX_TITLE_CHARS) || 'Untitled',
+    body: [bodyFromTitle, rest.join('\n')]
+      .filter(part => part !== '')
+      .join('\n')
+      .trim()
+      .slice(0, MAX_BODY_CHARS),
     kind,
     tags: extractTags(trimmed),
     links: extractLinks(trimmed),
