@@ -92,6 +92,45 @@ Do not wire Jev into test selection. On this repository the static graph had no 
 
 Unverified here: cold-CI behaviour, browser journey selection, flaky outcomes, and the eight full-suite packages above. `node --run bench:selection` reproduces the mutation comparison; `--jev` adds the gate when `JEV_API_KEY` is set.
 
+## Skipping the build, and coverage instead of full suites
+
+Measured on 2026-10-25 with the same mutation method plus a throwaway file-level per-test coverage index (a temporary `@vitest/coverage-v8`, not committed). Both experiments asked whether a specific cost can be removed without losing failures.
+
+### Skipping the build for source-only related runs
+
+`--build=auto` skips the Turbo build only when every selected package runs in related mode, no selected test file loads `dist` or its own package name, and no workspace dependency's built entry is missing. The default stays `--build=always` because a cold workspace has no outputs to run against. One source edit per scenario, a fresh edit for each variant:
+
+| Package                                        | Build + tests | `--build=auto` | Result                                                              |
+| ---------------------------------------------- | ------------- | -------------- | ------------------------------------------------------------------- |
+| `shared-streams` (leaf)                        | 17.9s         | **1.7s**       | pass, build skipped                                                 |
+| `traces` (leaf)                                | 22.1s         | **1.6s**       | pass, build skipped                                                 |
+| `secret-catalog` (leaf)                        | 11.9s         | **0.8s**       | pass, build skipped                                                 |
+| `prompt-stash` (test loads `../dist/index.js`) | 22.3s         | 23.0s          | pass, build still required                                          |
+| `usage` (11 full dependent suites)             | 95.3s         | 95.3s          | one dependent suite failed here for a pre-existing workspace reason |
+
+The saving applies to leaf packages: 443 of the 1760 commits touching plugins since 2026-08-01 changed only packages with no workspace dependents. Every other plugin edit keeps its build because its dependents run their full suites against the rebuilt package. A cold workspace is detected through the missing dependency entry: with the `dshx` dist moved away, the probe returned `unbuilt workspace dependency @dshfiles/dshx`.
+
+### Coverage instead of a full suite
+
+Method: run each test file once with V8 coverage, keep the source files it actually executed (not merely imported), select the tests whose recorded files intersect the change, and fall back to the full suite when the changed file is absent or the index is stale. Index cost and one mutation per package:
+
+| Package          | Full suite   | Index build       | Ratio     | Mutation: selected / all | Selected run | Missed failures |
+| ---------------- | ------------ | ----------------- | --------- | ------------------------ | ------------ | --------------- |
+| `jj-integration` | 205.8-261.9s | 154.1s            | 0.6-0.75x | 3 / 37                   | **7.8s**     | 0               |
+| `project-checks` | 12.5-17.7s   | 34.7s             | 2-2.8x    | 4-5 / 9                  | 1.7-16.5s    | 0               |
+| `thread-sidebar` | 14.4s        | 416.5s collection | 29x       | not scored               | -            | -               |
+| `ai-accounts`    | 12.2s        | 173.6s collection | 14x       | not scored               | -            | -               |
+
+The first index run counted imported-but-unexecuted files, which made every test appear to cover every source file; the execution-only filter is what the `jj-integration` and `project-checks` rows use. The `thread-sidebar` and `ai-accounts` rows are collection cost only (those indexes were not rebuilt), and both are far above their suite cost.
+
+Coverage selection pays only where the average test file runtime dwarfs Vitest startup, which here means the real-JJ suites: the index costs 0.75 of one suite, then each change runs about 8s instead of 206-262s, so one reuse covers the index. It does not pay for ordinary full-suite packages, and an index must be rebuilt whenever a test file changes, so it needs a content-keyed cache shared across workspaces before it is worth wiring.
+
+### The larger cost: dependent fan-out
+
+A one-file edit in `usage` selected 1 related package plus 11 full dependent suites and took 95.3s, yet only 12 of those 276 dependent test files statically reach `@dshfiles/usage` (4%). Rebuilding `usage` and running those 12 tests across six packages took about 23s of test time plus the build. That consumer-related selection is the highest-leverage follow-up, with full-suite fallback for the known dynamic-input packages; its recall under a real regression was not verified here because the probe mutation broke the build instead of the behavior.
+
+Verdict: enable build skipping for leaf packages (measured 7-15x on that case, no failures), and treat coverage selection as a targeted tool for the real-JJ suites only. Neither touches the dependent fan-out, which is the dominant remaining cost.
+
 ## Validation
 
 Dependency migration replaced 35 SDK link specifications, including the tool-meta package added on main while this work was in progress; one root install discovers 43 projects. The plugin workspace contract and shared Cordis module identity were verified. Selection regression tests cover owner/dependent selection, manifests/configs/fixtures/deletions, shared profile inputs, source-only libraries, dynamic-input fallbacks, CLI rejection and documentation-only skips.
