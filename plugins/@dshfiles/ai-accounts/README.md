@@ -143,6 +143,10 @@ provider/model group, while Balanced favors accounts used least recently.
 
 ### Shared account priority
 
+![Canonical account priority on the page and sidebar](docs/screenshots/shared-priority.png)
+
+_Synthetic loopback accounts, quota and credential references; no real sign-in._
+
 The accounts page, sidebar meters and usage popover share the Host's account-list
 order. Move an account on the page, drag a meter/card onto another account, or
 use its context menu (Shift+F10) to move it earlier/later. Moves change real
@@ -167,6 +171,15 @@ visible together. Move the second meter left in its context menu, move the first
 account earlier on the page, then drag the second meter before the first and
 reload. The `ai-accounts.shared-priority` journey covers this path without real
 sign-in or provider traffic.
+
+Recorded on 2026-10-24 in an upstream-based workspace: 441 package tests and
+60 focused order/store/query/routing tests pass, as do typecheck, build, Host
+import and catalog validation. The real Chromium journey passed all five
+assertions (menu, page move, drag, reload and actual fake-provider selection).
+Scratch doctor passed, the fresh post-navigation screenshot reported no errors
+or warnings, and all owned processes were stopped. Shared verifier prerequisites
+were composed only in a separate verification workspace. Real-provider behavior
+and broad baseline Codex browser journeys were not exercised.
 
 ## Usage
 
@@ -210,8 +223,8 @@ failed request on an account route does, per kind: connection failure
 exhausted, sign-in failure, request too large. The options run in order:
 retry the same account (count and doubling backoff), continue on Luna Reserve
 (Codex), fail over to the next account of the same provider kind that offers
-the model (Priority uses account-list order; other modes use usage-strip order;
-hidden accounts are skipped), wait out a declared reset, resend earlier images
+the model (the shared account-list/usage-strip order is used; hidden accounts
+are skipped), wait out a declared reset, resend earlier images
 as file placeholders, then fail the turn or hand the failure to DSH's own retry
 and compaction. Defaults: connection → retry twice, then fail over; exhausted →
 Luna Reserve, then fail over; rate limit → fail over, then wait up to a minute;
