@@ -462,6 +462,211 @@
           "testName": "lists metrics and charts a cumulative counter as its increase, per attribute set"
         }
       ]
+    },
+    {
+      "id": "alert-rules",
+      "title": "Alert rules over stored telemetry",
+      "summary": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule is ok or firing, resolves after two clear evaluations so a flapping signal fires once, and keeps a bounded history. A firing rule shows in the Alerts tab with its value, sample trace and threads, marks the Alerts tab and the panel with a red count and a banner, announces itself in an in-app banner (and a browser notification when allowed) wherever the user is, and marks the threads its spans carry unread through thread-sidebar. Rules can be created, edited, enabled, muted and deleted (with confirmation) in the tab or by agent tools. Four built-in rules ship with conservative thresholds.",
+      "reach": [
+        "seed otlp-sample-trace",
+        "click button \"Traces\"",
+        "click tab \"Alerts*\"",
+        "click button \"New rule\"",
+        "fill label \"Rule name*\" \"Sample order errors\"",
+        "fill label \"Service\" \"dshx-sample\"",
+        "fill label \"Minimum spans*\" \"1\"",
+        "click button \"Save rule\"",
+        "click button \"Evaluate now\"",
+        "expect list \"Firing alerts\""
+      ],
+      "surfaces": ["client", "host", "tool", "storage", "integration"],
+      "configuration": [],
+      "states": ["ok", "firing", "resolved", "muted", "disabled", "no-data", "flapping", "owner-missing"],
+      "failureModes": [
+        "Error-rate and latency rules stay quiet below their minimum span count, so one failed span is not a 100% error rate.",
+        "A firing rule resolves only after two clear evaluations in a row, so a signal that swings every minute fires once.",
+        "A span counts in the window it ended in, so a 20-minute turn that started before the window still trips a duration rule.",
+        "A muted rule still evaluates and records its incident but announces nothing and marks no thread.",
+        "Disabling or deleting a firing rule resolves its incident instead of leaving it firing in history.",
+        "Without thread-sidebar the alert still fires and its event says why no thread was marked.",
+        "A Host older than alerts answers owner-missing: the tab says a restart loads it and the notifier stops polling.",
+        "Routine evaluations (no transition, no failure) and the alerts API dispatch spans are not stored, so the timer and the notifier poll never bury real traces.",
+        "An announced alert is claimed in localStorage, so several tabs announce it once, and a reload after a long absence announces nothing old."
+      ],
+      "externalDependencies": [
+        {
+          "id": "thread-attention",
+          "boundary": "@dshfiles/thread-sidebar thread-sidebar-attention markUnread, called in process through its dshx contract.",
+          "deterministicFake": "Unit tests pass a recording markThread port; the browser journey runs without thread-sidebar and asserts nothing about thread marks."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.alerts-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces-alerts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-error-rate",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-evaluator.test.ts",
+          "testName": "error rate is the failed share and waits for the minimum samples"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-latency",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-evaluator.test.ts",
+          "testName": "latency uses the nearest-rank percentile and names the slow spans"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-throughput",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-evaluator.test.ts",
+          "testName": "throughput is spans per minute and a below rule trips on silence"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-duration",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-evaluator.test.ts",
+          "testName": "duration fires on any span over the threshold, longest first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-flapping",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-evaluator.test.ts",
+          "testName": "a flapping signal fires once instead of on every swing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-resolve",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-evaluator.test.ts",
+          "testName": "resolves only after 2 clear evaluations in a row"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-window",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "counts only spans that ended inside the window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-fire-mark-resolve",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "fires, marks the threads behind it, then resolves after two quiet evaluations"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-muted",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "a muted rule records its incident without announcing or marking threads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-close-incident",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "disabling or removing a firing rule resolves its incident"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-owner-missing",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "says why no thread was marked when the attention owner is missing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-evaluation-span",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "records one evaluation span with its rule, transition and firing counts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-builtin-seed",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "seeds the built-in rules once, so an edit or removal survives a reopen"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-history-bound",
+          "file": "plugins/@dshfiles/traces/src/alerts/alert-engine.test.ts",
+          "testName": "keeps the newest 500 events"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-tools",
+          "file": "plugins/@dshfiles/traces/src/alerts/alerts-api.test.ts",
+          "testName": "alerts read with one tool and write with four, boards only read"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-delete-confirm",
+          "file": "plugins/@dshfiles/traces/src/alerts/alerts-api.test.ts",
+          "testName": "delete refuses to run without an explicit confirm"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.alerts-self-spans",
+          "file": "plugins/@dshfiles/traces/src/otlp/self-spans.test.ts",
+          "testName": "keeps an alert evaluation that changed a rule or failed, and drops a routine one"
+        }
+      ]
+    },
+    {
+      "id": "boards-and-saved-views",
+      "title": "Boards and saved views",
+      "summary": "A Boards tab breaks the window's spans down with built-in boards: slow tools (execute_tool by gen_ai.tool.name), failing plugins (dshx API dispatch by dshx.plugin.package), model latency by provider (chat spans with time to first token), jobs (by dsh.job.kind) and jj commands, each row with count, error rate and percentiles; a row opens the trace list filtered to its spans. A Views menu opens any board and saves or reapplies named views of the panel (tab, trace filters, log filters, window). traces_breakdown gives agents the same breakdowns. Not a dashboard builder.",
+      "reach": [
+        "seed otlp-sample-trace",
+        "click button \"Traces\"",
+        "click tab \"Boards\"",
+        "click radio \"Slow tools\"",
+        "expect text \"execute_tool spans by gen_ai.tool.name, slowest p95 first.\""
+      ],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["empty", "grouped", "measured", "truncated", "drill-down", "saved", "applied"],
+      "failureModes": [
+        "Spans without the grouping attribute group as (not set) instead of disappearing.",
+        "An attribute key that could escape the SQLite JSON path is refused by the input schema.",
+        "Saved views are this browser's presentation state: they never leave localStorage and have no agent tool."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "traces.boards-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/traces-alerts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.boards-slow-tools",
+          "file": "plugins/@dshfiles/traces/src/boards/breakdown.test.ts",
+          "testName": "groups tool calls by tool name, slowest p95 first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.boards-measure",
+          "file": "plugins/@dshfiles/traces/src/boards/breakdown.test.ts",
+          "testName": "reports a numeric attribute in milliseconds and groups missing values as null"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.boards-filters",
+          "file": "plugins/@dshfiles/traces/src/boards/breakdown.test.ts",
+          "testName": "matches an attribute filter and groups by span name or service"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.boards-key-guard",
+          "file": "plugins/@dshfiles/traces/src/boards/breakdown.test.ts",
+          "testName": "rejects an attribute key that could escape the JSON path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.boards-self-spans",
+          "file": "plugins/@dshfiles/traces/src/otlp/self-spans.test.ts",
+          "testName": "drops the dispatch spans of every traces API, so panel and notifier polling never trace themselves"
+        }
+      ]
     }
   ]
 }

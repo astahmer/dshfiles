@@ -64,7 +64,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | backlog                                                                                                                                           | 16                   | 16                                                                                                       | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | hmr-gate | 1 | 1 (`hmr_gate_status`) | 0 | 0 |
-| traces | 12 | 11 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_metrics`, `traces_get_metric`, `traces_list_services`, `traces_error_groups`, `traces_session_summary`, `traces_status`, `traces_clear`) | 0 | 0 |
+| traces | 19 | 17 (`traces_search`, `traces_get`, `traces_search_logs`, `traces_service_map`, `traces_list_metrics`, `traces_get_metric`, `traces_list_services`, `traces_error_groups`, `traces_session_summary`, `traces_status`, `traces_clear`, `traces_alerts`, `traces_alert_save`, `traces_alert_mute`, `traces_alert_delete`, `traces_alerts_evaluate`, `traces_breakdown`) | 0 | 2 (saved views, notification permission) |
 | agent-telemetry | 0 | 0 | 0 | 0 |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
@@ -397,6 +397,15 @@ The per-thread **Traces** conversation tab reads `traces_session_summary` (its
 summary tiles), `traces_search` with `sessionId` (its turn list) and
 `traces_search_logs` with `sessionId` (its logs); `traces_status` carries the
 `diagnosis` its empty state shows.
+The **Alerts** tab binds the `traces-alerts` contract: `traces_alerts` reads the
+rules, their state and the history; `traces_alert_save` creates, edits, enables
+and disables a rule; `traces_alert_mute` mutes or unmutes; `traces_alert_delete`
+requires `confirm: true`; `traces_alerts_evaluate` is the Evaluate now button.
+The write tools say they run only when the user asked. The **Boards** tab reads
+`traces_breakdown` (`traces-boards` contract) with the board's filter and
+grouping. Saved views and the browser-notification permission are this
+browser's presentation state (localStorage, a browser permission prompt), so
+they carry no tool: an agent reproduces a view with the same search filters.
 
 ### model-effort-picker, usage, memory, optmem
 

@@ -10,6 +10,10 @@
 
 ![Per-thread Traces tab with summary and span waterfall](docs/screenshots/thread-traces-tab.png)
 
+![Alert rules over stored telemetry](docs/screenshots/alert-rules.png)
+
+![Boards and saved views](docs/screenshots/boards-and-saved-views.png)
+
 A local OpenTelemetry viewer inside DSH, in the spirit of [Maple Local](https://maple.dev/): one OTLP/HTTP receiver on
 `127.0.0.1:4318`, an embedded SQLite store, a typed query API with agent tools, and a **Traces** panel with a trace
 list, a span waterfall, a per-span attribute panel, log search correlated with traces and spans, a service map, metric
@@ -65,6 +69,63 @@ from [`@dshfiles/agent-telemetry`](../agent-telemetry/README.md) (or any exporte
 `traces_session_summary`, `traces_search` with `sessionId` and `traces_search_logs` with `sessionId`, so an agent sees
 the same data.
 
+## Alerts
+
+Rules run on the Host every minute (and on **Evaluate now**) over the stored spans, in the spirit of Maple's alerts:
+
+| Kind         | Value                                          | Threshold                 |
+| ------------ | ---------------------------------------------- | ------------------------- |
+| `error-rate` | failed share of the matching spans             | 0 to 1 (0.2 = 20%)        |
+| `latency`    | p50/p90/p95/p99 duration of the matching spans | ms                        |
+| `throughput` | matching spans per minute                      | spans/min, above or below |
+| `span-count` | matching spans in the window                   | spans, above or below     |
+| `duration`   | any matching span longer than the threshold    | ms (a 15-minute turn, …)  |
+
+Each rule has a filter (service, span name exact or a `prefix*`, one attribute `key=value` or `key=*`), a window (a
+span counts in the window it **ended** in), a comparator, a minimum span count (error-rate and latency stay quiet below
+it), a severity, and three switches: enabled, announce, mark threads.
+
+- **States.** `ok` or `firing`. A rule fires on the first breaching evaluation and resolves after **two** clear
+  evaluations in a row, so a signal that swings every minute fires once. Disabling or deleting a firing rule resolves
+  it. History keeps the newest 500 firing/resolved events with their value, sample count, sample trace and threads.
+- **Delivery.** A firing rule shows in the **Alerts** tab with its value and sample trace, puts a red count on the tab
+  and a banner above the other tabs, and is announced in-app wherever the user is (a `shell.overlay` client polls
+  `traces-alerts/feed` every 15 s and renders the Host `Toast`; with permission from the Alerts tab, also a browser
+  notification). The announced event id is shared across tabs in localStorage, so one alert is announced once, and a
+  reload after a long absence announces nothing older than 10 minutes. With **mark threads**, the threads its spans
+  carry (`dsh.session.id`, at most five) are marked unread through thread-sidebar's `thread-sidebar-attention`
+  contract; without thread-sidebar the event records why nothing was marked. A muted rule (1 h, 4 h, 24 h) still
+  evaluates and records events but announces and marks nothing.
+- **Built-in rules**, seeded once when `alerts.db` is created (edits and deletions stick), enabled with conservative
+  thresholds: model call error rate (`chat *`) over 20% in 10 min with at least 5 calls, marking threads; jj p95
+  (`jj *`) over 5 s in 15 min with at least 5 runs; an agent turn (`invoke_agent*`) over 15 min, marking its thread
+  (only finished turns export a span); and, off by default, plugin API error rate (`rpc.system=dshx`) over 20% with at
+  least 20 calls.
+- **Storage.** `$DSH_HOME/plugins/traces/alerts.db`, apart from the span store so alert changes never migrate it. At
+  most 50 rules; an evaluation samples the newest 20,000 matching spans per rule.
+- **Its own telemetry.** Each evaluation is a `traces alerts evaluate` span with `dshx.traces.rules`, `.transitions`
+  and `.firing`; this receiver drops the routine ones (no transition, no failure) and the `traces-alerts` /
+  `traces-boards` dispatch spans, so the timer and the notifier poll never bury real traces. External viewers see all.
+- **Gaps** ([ledger](../../../plans/dsh-host-gaps.md) 82–84): no Host-side announcement service (nothing is announced
+  while no DSH page is open), no activity-timeline ingest, and thread attention without a reason.
+
+## Boards and saved views
+
+The **Boards** tab is a small fixed set of breakdowns over the window's spans, each row with count, error rate and
+p50/p95/p99, and a row opens the trace list filtered to its spans:
+
+| Board                     | Spans                          | One row per            |
+| ------------------------- | ------------------------------ | ---------------------- |
+| Slow tools                | `execute_tool *`               | `gen_ai.tool.name`     |
+| Failing plugins           | `rpc.system=dshx` API dispatch | `dshx.plugin.package`  |
+| Model latency by provider | `chat *`, with TTFT p50 · p95  | `gen_ai.provider.name` |
+| Jobs                      | `job *`                        | `dsh.job.kind`         |
+| jj commands               | `jj *`                         | span name              |
+
+The header's **Views** menu opens any board and saves the panel's current view (tab, trace filters, log filters,
+window, open board) under a name, then reapplies it. Saved views are browser presentation state (localStorage), not a
+dashboard builder; `traces_breakdown` gives an agent the same groupings.
+
 ## Settings (`dshfiles-traces`)
 
 | Setting                 | Default     | Effect                                                                                                                                  |
@@ -91,7 +152,8 @@ How the modes map to `OTEL_EXPORTER_OTLP_ENDPOINT`:
 
 ## Agent tools
 
-Every read the panel makes is a read-only tool; the one destructive verb needs an explicit opt-in.
+Every read the panel makes is a read-only tool; the destructive verbs (`traces_clear`, `traces_alert_delete`) need an
+explicit opt-in.
 
 | Tool                     | What it returns                                                                                                      |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
@@ -106,6 +168,12 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 | `traces_session_summary` | One thread's spans, errors, turns, model and tool calls, durations, model latency and token totals.                  |
 | `traces_status`          | Receiver mode, address, state, counters, forwarding, store size, exporter targets and a diagnosis.                   |
 | `traces_clear`           | Deletes every stored trace, log record and metric point; requires `confirm: true`.                                   |
+| `traces_alerts`          | Alert rules with filter, threshold, state and last value; firing count; the newest firing/resolved events.           |
+| `traces_alert_save`      | Creates or replaces a rule (also enables or disables it); only when the user asked.                                  |
+| `traces_alert_mute`      | Mutes a rule for some minutes, or unmutes it; only when the user asked.                                              |
+| `traces_alert_delete`    | Removes a rule (a firing one resolves); requires `confirm: true`.                                                    |
+| `traces_alerts_evaluate` | Evaluates every enabled rule now; only when the user asked.                                                          |
+| `traces_breakdown`       | Groups a window's spans by service, span name or an attribute with count, error rate, percentiles and one measure.   |
 
 ## Decisions
 
@@ -142,4 +210,5 @@ Every read the panel makes is a read-only tool; the one destructive verb needs a
 ## Follow-ups
 
 - Histogram bucket heatmaps and p95 from buckets; multiple metrics on one chart.
-- Out of scope: alerting, dashboards and a query builder, session replay.
+- Alerts: an announcement while no DSH page is open needs a Host notification service (gap 82).
+- Out of scope: a dashboard builder and a query builder, session replay.

@@ -169,6 +169,24 @@ thread's own plugin work shows even without an agent telemetry exporter. Agents
 read the same through `traces_session_summary`, and `traces_search` /
 `traces_search_logs` with `sessionId`.
 
+**Alerts and boards.** Alert rules run on the traces Host every minute over the
+stored spans: error rate, latency percentile, throughput, span count, or any span
+longer than N (a turn over 15 minutes), each with a service / span-name prefix /
+attribute filter, window, threshold and severity. A rule is `ok` or `firing`,
+resolves after two clear evaluations, and keeps a bounded history. Firing shows
+in the panel's Alerts tab (red count, banner), is announced in-app through the
+Host `Toast` from a shell overlay (a browser notification once allowed), and
+marks the threads its spans carry unread through thread-sidebar's attention
+contract. Built-in rules ship enabled with conservative thresholds (model call
+error rate > 20 %, jj p95 > 5 s, turn > 15 min; plugin API errors off). The
+Boards tab groups spans by tool, plugin, provider (with time to first token),
+job kind and jj command, and named views save the panel's filters. Agents use
+`traces_alerts`, `traces_alert_save` / `_mute` / `_delete`,
+`traces_alerts_evaluate` and `traces_breakdown`. Each evaluation is itself a
+`traces alerts evaluate` span; this receiver keeps only the ones that changed a
+rule or failed. Nothing is announced while no DSH page is open: no Host service
+lets a plugin notify the user ([gap 82](../plans/dsh-host-gaps.md)).
+
 ## Decision (2026-10-24): fork LoongSuite as `@dshfiles/agent-telemetry`
 
 LoongSuite was adopted on 2026-10-23 (below) and replaced the next day by a port, because reading its source on DSH
