@@ -22,6 +22,7 @@ describe('memory tool exposure', () => {
       'memory_start_block',
       'memory_thread_detail',
       'memory_threads',
+      'memory_usage',
       'related_threads',
     ])
     const readOnly = tools
@@ -41,6 +42,7 @@ describe('memory tool exposure', () => {
       'memory_start_block',
       'memory_thread_detail',
       'memory_threads',
+      'memory_usage',
       'related_threads',
     ])
   })
@@ -51,9 +53,9 @@ describe('memory tool exposure', () => {
     expect(memoryApi.methods.archiveNote.description).toMatch(/Call only when the user asked/u)
     expect(memoryApi.methods.restoreNote.description).toMatch(/Call only when the user asked/u)
     expect(memoryApi.methods.reviewNotes.description).toMatch(/suggestions only/u)
-    // usage needs the full MemoryUsage schema; preview duplicates memory_read and would count as an
-    // agent memory-tool call; rateCitation would let an Agent rate its own citations; createNote and
-    // redigest are the panel's own verbs (an Agent writes notes with memory_note and digests idle anyway).
+    // usage needs the full MemoryUsage schema, so the Agent gets the bounded usageSummary instead;
+    // preview duplicates memory_read and would count as an agent memory-tool call; rateCitation would let
+    // an Agent rate its own citations; createNote and redigest are the panel's own verbs.
     for (const name of ['usage', 'preview', 'rateCitation', 'createNote', 'redigest'] as const) {
       expect(memoryApi.methods[name].tool).toBeUndefined()
     }

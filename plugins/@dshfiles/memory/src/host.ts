@@ -28,6 +28,7 @@ import { memoryReferenceKey } from './memory-reference.ts'
 import { projectPathFor } from './project-path.ts'
 import { MemoryGuidance } from './guidance.ts'
 import { ProjectScripts, type WorkspaceScripts } from './project-scripts.ts'
+import { renderUsageSummary, snapshotOf } from './usage-summary.js'
 import { workspaceScriptsApi } from './workspace-scripts-api.ts'
 import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices, type SessionTitleRead } from './runtime.ts'
 import { MemorySessionList } from './session-list.ts'
@@ -563,6 +564,10 @@ const panelApi = memoryApi.host({
     }),
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
   usage: ({ input }) => usage(input.days ?? 30),
+  usageSummary: async ({ input }) => {
+    const days = input.days ?? 30
+    return { summary: renderUsageSummary(snapshotOf(await usage(days), days)) }
+  },
   projects: async () => {
     await projectNormalization
     return [...requireStore().projects()]

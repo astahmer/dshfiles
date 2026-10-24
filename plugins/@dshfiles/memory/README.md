@@ -26,9 +26,10 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
 - **Tools.** `memory_search` (digests, valid notes and indexed messages; FTS5 porter words plus trigram identifiers,
   BM25 fused by reciprocal rank, recency decay, project and note-type boosts), `memory_read` (a digest, a note, or a
   bounded raw excerpt read back from the session log), `memory_note` (add, update with a reason — the old row stays as
-  superseded history — or forget with a reason), `find_threads` (the composed finder described below), and
-  `related_threads` (explicit lineage first, inferred same-workspace/topic candidates second). Note types follow Claude
-  Code: `user`, `feedback`, `project`, `reference`, with `scope`, `confidence` and the source thread and message.
+  superseded history — or forget with a reason), `find_threads` (the composed finder described below),
+  `related_threads` (explicit lineage first, inferred same-workspace/topic candidates second), and `memory_usage`
+  (whether memory earns its keep: store size, blocks served, citations, digest sources, per-tool empty and cited
+  counts, ratings and memory's own cost — counters only, never stored content). Note types follow Claude Code: `user`, `feedback`, `project`, `reference`, with `scope`, `confidence` and the source thread and message.
 - **An agent's own scope.** When `@dshfiles/agents` is installed and the thread was started by an agent with a
   `memoryScope`, the block also carries the notes filed under that scope (`agent:<handle>` by default), and only those
   threads see them, and a subagent inherits its spawning thread's scope through up to four parent hops. Memory keeps one

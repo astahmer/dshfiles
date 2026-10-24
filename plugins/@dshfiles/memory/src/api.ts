@@ -243,6 +243,13 @@ export const memoryApi = defineApi({
       description:
         "Memory's state and whether it earns its keep: stored digests, notes and indexed messages; its own digest and Jev cost per day; start-block size and the requests that carried it; memory tool calls, hits and citations; heuristic correction counts and ratings; per-day activity, recent events and the most-cited notes.",
     }),
+    usageSummary: method({
+      input: z.object({ days: z.number().int().min(1).max(365).optional().describe('Activity window in days; default 30.') }).strict(),
+      output: toolOutput,
+      description:
+        "Whether memory is earning its keep, as counters rather than charts: store size, start blocks served, citations, digests by source, per-tool calls with empty and cited counts, citation ratings and corrections, and memory's own list-price cost over the window. Read-only; use it to judge retrieval rather than to read stored content.",
+      tool: { name: 'memory_usage', readOnly: true, render: output => output.summary },
+    }),
     search: method({
       input: searchInput,
       output: toolOutput,
