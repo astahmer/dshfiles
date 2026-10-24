@@ -17,6 +17,7 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
   panel moves there, and the side tab's _Move to main area_ row moves it back. Settings then fills a tab in that panel,
   listing every section and plugin page; a narrow panel shows that list and one section at a time with a back button,
   while a wide one keeps the dialog's two columns. The panel owns its tab, so closing it leaves Settings closed.
+- **Narrow windows**: dialogs and main-view tabs replace the wide section list with a searchable section picker. Header actions keep accessible names while collapsing to icons; the thread side panel keeps its existing drill/back behavior.
 - **Expand**: the dialog's expand button fills the window (VS Code's maximize); _Open in a tab_ moves an open dialog
   into the main view, keeping the section.
 - Picking the Settings tab, or a reload that lands on it, reopens Settings there; leaving the panel closes it. With no
