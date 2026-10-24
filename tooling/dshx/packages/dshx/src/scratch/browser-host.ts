@@ -2,6 +2,7 @@ import { appendFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import type { Page } from 'playwright'
 import { ScratchStateRuntime } from './state.js'
+import { chromiumLaunchOptions } from '../project/chromium-launch-options.js'
 
 /**
  * Long-lived headless Chromium for one scratch DSH. `dshx dev open` and `shot` attach over CDP, so the page and its
@@ -55,6 +56,7 @@ const watch = (page: Page): void => {
 
 const { chromium } = await import('playwright')
 const context = await chromium.launchPersistentContext(userDataDir, {
+  ...(await chromiumLaunchOptions()),
   headless: true,
   viewport: { width: 1440, height: 900 },
   args: [`--remote-debugging-port=${cdpPort}`],

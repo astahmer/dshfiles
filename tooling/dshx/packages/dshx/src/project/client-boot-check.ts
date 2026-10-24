@@ -4,6 +4,8 @@ import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
 import { ScratchProfileRuntime } from './scratch-profile.js'
+import { resolveDshExecutable } from './dsh-executable.js'
+import { chromiumLaunchOptions } from './chromium-launch-options.js'
 import { StartupDialogs } from './startup-dialogs.js'
 import type { BrowserBootEvidence, SlotRenderFailure } from './browser-boot.js'
 export { compositionFailures }
@@ -185,7 +187,6 @@ const waitForHostResponse = async (url: string, timeoutMs = HOST_RESPONSE_TIMEOU
 }
 
 export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<ClientBootCheckResult> => {
-  const executable = options.executable ?? 'dsh'
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const port = options.port === 0 ? await findFreePort() : options.port
   let output = ''
@@ -209,6 +210,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     } catch {
       throw new Error('Client boot requires a prepared isolated profileRoot with package.json.')
     }
+    const executable = await resolveDshExecutable(options.executable)
     const dump = await readProfileComposition({
       projectRoot: options.projectRoot,
       profile: options.profile,
@@ -245,8 +247,9 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
           await waitForHostResponse(launchUrl)
           try {
             const { chromium, firefox, webkit } = (await import('playwright')) as typeof import('playwright')
-            const engine = { chromium, firefox, webkit }[options.browserName ?? 'chromium']
-            const browser = await engine.launch({ headless: true })
+            const browserName = options.browserName ?? 'chromium'
+            const engine = { chromium, firefox, webkit }[browserName]
+            const browser = await engine.launch({ headless: true, ...(browserName === 'chromium' ? await chromiumLaunchOptions() : {}) })
             try {
               const page = await browser.newPage()
               // Attach before the navigation: a Slot that abdicates logs its crash once, and a reader attached after the
