@@ -1262,7 +1262,7 @@
     {
       "id": "client-reload-banner",
       "title": "Offer a page reload when the running client bundles are behind",
-      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Reload to apply updates banner naming the plugins a reload would load, with the button that does it.",
+      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner immediately below the Restart DSH to apply updates banner, naming the plugins a reload would load, with the button that does it.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["current", "stale-rebuild", "other-release", "added-entry"],

@@ -1692,7 +1692,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            {props.renderSlot('sidebar.footer.above', {})}
             {reloadPendingLabel === null ? null : (
               <Popover open={reloadPopoverOpen} onOpenChange={setReloadPopoverOpen}>
                 <PopoverTrigger asChild>
@@ -1715,6 +1714,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
+            {props.renderSlot('sidebar.footer.above', {})}
           </div>
         ) : null}
 
