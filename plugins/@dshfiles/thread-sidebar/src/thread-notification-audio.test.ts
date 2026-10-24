@@ -53,6 +53,15 @@ const createdContexts: FakeAudioContext[] = []
 const installFakeAudio = (options?: { readonly audioContext?: boolean }): void => {
   createdContexts.length = 0
   const browser = options?.audioContext === false ? {} : { AudioContext: FakeAudioContext }
+  const values = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    },
+    configurable: true,
+  })
   Object.defineProperty(globalThis, 'window', { value: browser, configurable: true })
 }
 
@@ -75,6 +84,17 @@ test('a notification sound resumes the audio context and starts a tone without a
   await vi.waitFor(() => assert.equal(context.oscillators.length > 0, true))
   assert.equal(context.state, 'running')
   assert.equal(context.resumeCalls.length, 1)
+})
+
+test('a temporary global mute suppresses notification tones without blocking previews', async () => {
+  const audio = await loadAudioModel()
+  const { storedNotificationSoundsMuted } = await import('./thread-notifications.js')
+  assert.equal(storedNotificationSoundsMuted.set(true), true)
+  audio.play('chime', 0.5)
+  assert.equal(createdContexts.length, 0)
+  assert.equal(storedNotificationSoundsMuted.get(), true)
+  assert.equal(await audio.preview('chime', 0.5), true)
+  assert.equal(createdContexts.length, 1)
 })
 
 test('previewing a sound reports success and starts a tone', async () => {

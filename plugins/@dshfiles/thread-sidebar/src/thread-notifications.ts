@@ -19,6 +19,12 @@ export interface ThreadNotificationCategoryPreferences {
 
 export type ThreadNotificationCategories = Readonly<Record<ThreadNotificationCategory, ThreadNotificationCategoryPreferences>>
 
+export const storedNotificationSoundsMuted = createStoredValue({
+  key: 'dshfiles.thread-sidebar.notification-sounds-muted.v1',
+  schema: z.boolean(),
+  fallback: false,
+})
+
 export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   'approval-needed': { delivery: 'off', sound: false, soundPreset: 'soft', volume: 0.5 },
   'input-needed': { delivery: 'off', sound: false, soundPreset: 'chime', volume: 0.5 },

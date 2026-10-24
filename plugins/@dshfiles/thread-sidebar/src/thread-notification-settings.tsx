@@ -16,6 +16,7 @@ import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
   THREAD_NOTIFICATION_CATEGORIES,
   ThreadNotificationModel,
+  storedNotificationSoundsMuted,
   type ThreadNotificationCategories,
   type ThreadNotificationCategory,
   type ThreadNotificationDelivery,
@@ -70,6 +71,7 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
   const id = useId()
   const [permission, setPermission] = useState(readBrowserNotificationPermission)
   const [audioUnavailable, setAudioUnavailable] = useState(false)
+  const notificationSoundsMuted = storedNotificationSoundsMuted.useValue()
   const hasSystemRoute = THREAD_NOTIFICATION_CATEGORIES.some(category =>
     ThreadNotificationModel.notificationRouteHasSystem(props.categories[category].delivery),
   )
@@ -101,6 +103,16 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
       <FieldLegend>{props.t('threadSidebarNotifications')}</FieldLegend>
       <FieldDescription>{props.t('threadSidebarNotificationPrivacy')}</FieldDescription>
       <FieldDescription>{props.t('threadSidebarSoundScopeHint')}</FieldDescription>
+      <Button
+        size="sm"
+        type="button"
+        variant="outline"
+        className="dshx:justify-self-start"
+        aria-pressed={notificationSoundsMuted}
+        onClick={() => storedNotificationSoundsMuted.set(!notificationSoundsMuted)}
+      >
+        {props.t(notificationSoundsMuted ? 'threadSidebarUnmuteNotificationSounds' : 'threadSidebarMuteNotificationSounds')}
+      </Button>
       {audioUnavailable ? (
         <Alert variant="warning">
           <AlertDescription>{props.t('threadSidebarAudioUnavailable')}</AlertDescription>
