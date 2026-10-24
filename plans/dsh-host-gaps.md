@@ -213,8 +213,31 @@ before filing a new one; add a comment with our measurement when it is additive.
 ## Upstream asks we still have to file
 
 Rows marked `upstream` with no discussion above: 1, 5, 13, 14, 16, 17, 18, 19, 21,
-24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75, 76, 78, 79, 80, 81, 82. File the smallest of them with a
+24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75, 76, 78, 79, 80, 81, 82, 85. File the smallest of them with a
 measurement, not a feature wish.
+
+### Drafts ready to file: tracing (rows 78–82, 85)
+
+One discussion, "Lifecycle events a tracing plugin needs", with one numbered ask per row. Each names the event or
+hook, the payload, and what a plugin does with it today. Filing is a public post: the user decides when.
+
+1. **Around-step hook (row 78).** A waterfall such as `agent/step(this, step, next)` that runs the step body inside
+   it, like `tools/execute` and `llm/stream` already do for tools and model streams. Today `step/start`/`step/end`
+   are post-commit events, so a tracer cannot make the step the active context; loop work between the model stream
+   and the tool calls lands unparented.
+2. **Paired question-wait events (row 79).** `user-questions/waiting { callId, timeoutMs }` when a timed
+   `ask_user_question` returns `pending`, and `user-questions/answered { callId, outcome }` when its late reply is
+   admitted. Today the wait is only inferable by folding the projection.
+3. **Queued-at time for inbox messages (row 80).** A `queuedAt` on each message `agent/inbox/spliced` reports (or an
+   `agent/inbox/queued` event). Today only the splice moment is known, so queue wait cannot be measured.
+4. **Continuation resume event (row 81).** A session event when a stored quota continuation is resumed, naming the
+   blocked turn, so block→resume becomes one span instead of two unrelated turns.
+5. **Host-side user notification (row 82).** A Host service (`ctx.notify({ title, body, sessionId?, level })`)
+   that the Web client renders as a toast/system notification, so a plugin can announce something with no plugin page
+   mounted. Today a client overlay polls the Host for it.
+6. **`traceparent` on native requests (row 85).** Let the browser Connection forward a `traceparent` header (or
+   envelope field) on every RPC, and have native controllers (`session/follow`, `session/create`, `session/prompt`)
+   expose it to plugin listeners, so a browser interaction and the Host work it starts are one trace.
 
 ## Triage, 2026-10-19
 
