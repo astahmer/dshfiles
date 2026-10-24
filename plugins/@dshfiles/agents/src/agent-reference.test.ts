@@ -13,8 +13,15 @@ describe('agent reference matches', () => {
     ])
   })
 
-  it('leaves an email address, a menu scope, an unknown handle and a longer slug alone', () => {
-    const text = 'mail luna@dsh.dev, @agent:luna, @nobody, @luna-extra'
+  it('recognizes brace-wrapped references alongside existing plain mentions', () => {
+    expect(agentReferenceMatches('Ask @{luna}, then @dsh.', handles)).toEqual([
+      { handle: 'luna', start: 4, end: 11 },
+      { handle: 'dsh', start: 18, end: 22 },
+    ])
+  })
+
+  it('leaves an email address, a menu scope, unknown handles and longer slugs alone', () => {
+    const text = 'mail luna@dsh.dev, @agent:luna, @nobody, @{nobody}, @luna-extra'
     expect(agentReferenceMatches(text, handles)).toEqual([])
   })
 

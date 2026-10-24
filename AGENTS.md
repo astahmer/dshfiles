@@ -124,6 +124,10 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
   `jj:main` or `jj:94526da8`. A `thread-<id>` workspace directory is not itself
   a revision or bookmark: call it a JJ workspace in prose, and link its actual
   revision with `jj:` when one is relevant. Never invent `jj:thread-<id>`.
+- Refer to a configured DSH Agent with the explicit `@{handle}` link reference
+  (for example, `@{luna}`) when linking to it in prose. Plain `@handle` remains
+  the dispatch mention syntax; do not use it as a substitute when a link is
+  intended.
 
 ## Version control
 

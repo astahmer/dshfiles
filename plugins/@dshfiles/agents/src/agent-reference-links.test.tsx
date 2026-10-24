@@ -29,6 +29,17 @@ describe('agent reference links', () => {
     stop()
   })
 
+  it('renders a brace-wrapped assistant reference as a clickable agent link', () => {
+    document.body.innerHTML = '<div data-conversation-session="s"><div data-author="assistant"><p>Thanks @{luna}!</p></div></div>'
+    const stop = installAgentReferenceLinks({ handles: () => handles })
+
+    const link = document.querySelector('[data-dshfiles-agent-reference="luna"]')
+    expect(link?.textContent).toBe('@{luna}')
+    expect(link?.getAttribute('role')).toBe('link')
+    expect(link?.getAttribute('aria-label')).toBe('Preview agent @luna')
+    stop()
+  })
+
   it('leaves an unknown handle, a scope and a code example alone', () => {
     document.body.innerHTML = [
       '<div data-conversation-session="s">',
