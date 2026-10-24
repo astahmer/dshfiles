@@ -2,6 +2,13 @@ Feature: AI Accounts
 
   AI Accounts policy settings are available in the real Settings UI.
 
+  @scenario:ai-accounts.account-workspace
+  Scenario: Browse a standalone responsive account workspace
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a standalone account workspace has two provider accounts
+    Then account search preserves priority and the existing settings and usage controls
+    And the account workspace fits narrow and split panes
+
   @smoke
   @scenario:ai-accounts.account-draft
   @scenario:ai-accounts.save-policy

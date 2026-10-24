@@ -42,7 +42,7 @@ export const SessionSection = (props: { readonly state: AccountsPanelState; read
       index="05"
       title="Session"
     >
-      <dl className="dshx:grid dshx:grid-cols-1 dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-3">
+      <dl className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:@max-pane-narrow:grid-cols-1">
         {facts.map(fact => (
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1" key={fact.label}>
             <dt className="dshx:text-xs dshx:text-muted-foreground">{fact.label}</dt>

@@ -11,6 +11,7 @@ When('a GitHub Copilot account is added', async ({ page }: { page: Page }) => {
 })
 
 Then('it offers GitHub device-code sign-in', async ({ page }: { page: Page }) => {
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-github-copilot-sign-in', async () => {
     await expect(page.getByRole('button', { name: 'Sign in with GitHub', exact: true })).toBeVisible()
     await expect(page.getByText('GitHub device-code sign-in; OAuth is stored in DSH credentials', { exact: true })).toBeVisible()

@@ -8,6 +8,23 @@ picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
+## Account workspace
+
+Open **AI Accounts** in the global panel list. **Add account** keeps the provider
+menu; creating an account needs no setup wizard. Select a provider card to open
+**Models**, **Settings** or **Usage**. Search matches observed identities, plans
+and known model IDs without changing account priority.
+
+**Settings** keeps the existing **Session** authentication controls. Its
+**Advanced** section contains route identifiers, picker appearance, runtime paths
+and API-key setup. Identity and plan are read-only provider observations;
+credential availability is not proof that a token is valid. **Usage** shows real
+quota readings and history, not estimated request counts or spend.
+
+The page stacks account cards above the selected account in narrow panes.
+**Page options · routing and display** contains the existing global options and
+**Copy accounts file path**. Save, revert, retry and removal behavior is unchanged.
+
 ## Providers
 
 | Kind           | Login                                                                                                                                                    | Model route | Quota                                                                                                                       |
@@ -63,7 +80,7 @@ browse project/local entries. Imports go directly from the Host into DSH
 credentials. When Secret Catalog is unavailable, use the dialog's manual key
 field or configure the environment reference yourself.
 
-**Copy accounts file path** in the page toolbar copies the active runtime JSON
+**Copy accounts file path** under **Page options · routing and display** copies the active runtime JSON
 path for advanced editing. That file stores account settings and reference names,
 not secret values. The checked-in `profiles/web/ai-accounts.json` is only the
 seed for a new runtime profile.
