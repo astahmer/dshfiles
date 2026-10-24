@@ -1,6 +1,6 @@
 import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
@@ -9,6 +9,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
+import { BoardScrollAnchors, type BoardColumnScrollAnchor } from './board-scroll-anchor.js'
 import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
@@ -150,6 +151,7 @@ const BoardCard = (props: {
     >
       <article
         tabIndex={-1}
+        data-backlog-card-id={item.id}
         aria-label={`Card b:${String(item.id)}`}
         aria-selected={props.selected}
         onPointerDown={event => props.startDrag(event, item, rename.openSoon, event.shiftKey, event.metaKey || event.ctrlKey)}
@@ -194,6 +196,14 @@ export const BoardView = (props: {
   const [pages, setPages] = useState<Partial<Record<BacklogStatus, number>>>({})
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
   const selectionAnchor = useRef<number | null>(null)
+  const boardRoot = useRef<HTMLDivElement>(null)
+  const scrollAnchors = useRef<BoardColumnScrollAnchor[]>([])
+  useLayoutEffect(() => {
+    const root = boardRoot.current
+    if (root === null) return
+    BoardScrollAnchors.restore(root, scrollAnchors.current)
+    scrollAnchors.current = BoardScrollAnchors.capture(root)
+  }, [props.items])
   const orderedItems = useMemo(
     () =>
       boardStatuses.flatMap(status =>
@@ -297,7 +307,10 @@ export const BoardView = (props: {
   }
 
   return (
-    <div className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-auto dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}>
+    <div
+      ref={boardRoot}
+      className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-auto dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}
+    >
       {boardStatuses.map(status => {
         const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
         const target = over === status && drag !== null && props.items.some(item => drag.ids.includes(item.id) && item.status !== status)
@@ -329,9 +342,12 @@ export const BoardView = (props: {
               </button>
             </header>
             <div
+              data-backlog-column-scroll
               className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5"
               onScroll={event => {
                 const element = event.currentTarget
+                const root = boardRoot.current
+                if (root !== null) scrollAnchors.current = BoardScrollAnchors.capture(root)
                 if (element.scrollHeight - element.scrollTop - element.clientHeight > 240) return
                 setPages(current => {
                   const page = current[status] ?? 1
