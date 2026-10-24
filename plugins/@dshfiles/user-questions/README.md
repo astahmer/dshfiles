@@ -1,5 +1,7 @@
 # @dshfiles/user-questions
 
+![An answered question form stays closed while its reply waits for admission](docs/screenshots/answered-question-stays-closed.png)
+
 Owned fork of DSH's native question form (`ask_user_question` and plan review). It keeps the native composer takeover,
 answer panels and late-reply node, and stops an answered `continued` form from flashing back while its reply waits for
 admission (b:270).

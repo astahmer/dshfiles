@@ -20,6 +20,12 @@
           "id": "user-questions.answered-stays-closed-upstream",
           "reason": "src/native/index.ts is upstream revision 69f2241e of packages/client/ui-user-questions verbatim, whose browser-plugin.client.spec.ts covers both states (an answered form stays closed across the claimed-reply gap; a discarded reply stays revealable). The vendored components import browser-only native bundles this repository's Vitest cannot load; scripts/native-fork-diff.mjs proves every other vendored file equals the pinned tag."
         }
+      ],
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
+        "press Enter",
+        "expect text \"Which layout should the release notes use?\""
       ]
     }
   ]
