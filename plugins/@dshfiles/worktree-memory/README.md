@@ -37,6 +37,13 @@ listed tree root is refused, and a recycled pid (another start time) too. A job 
 its Session records the kill; any other tree gets SIGTERM children-first, then SIGKILL after 3 s on the exact
 identities that were signalled.
 
+The panel offers the verb at three scopes: one tree, one section — the `Stop all (N)` button in a workspace header,
+so a leaked pile goes without expanding the card — and the sticky footer's `Stop everything (N)`, which covers every
+listed tree except a job whose owning thread is mid-turn: that one is left to its own Stop so the turn cannot fail,
+and the footer says how many it left alone. A bulk stop names the tree count before it arms, continues in batches of
+200 (the API's target limit) and reports one summary. `Stop detached (N)` keeps the narrower leftovers-only verb, per
+section and in the footer.
+
 ## Agent tools
 
 `worktree_memory_snapshot` (read-only) and `worktree_memory_stop` (requires `confirm: true`).

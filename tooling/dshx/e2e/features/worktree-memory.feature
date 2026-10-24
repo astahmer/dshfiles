@@ -12,3 +12,10 @@ Feature: Worktree memory (RAM panel)
     Then the decoy is listed as a detached tree of its workspace
     And the RAM sidebar entry shows the detached memory
     And stopping the decoy from the panel ends the process
+
+  @scenario:worktree-memory.stop-section
+  Scenario: A section stop ends every process listed for its workspace
+    Given the isolated plugin composition of "@dshfiles/worktree-memory, @dshfiles/workspace-folder-picker" is booted
+    When a detached decoy process runs inside a registered workspace
+    And the RAM panel is opened
+    Then stopping the workspace section from its header ends the process

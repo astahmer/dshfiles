@@ -29,6 +29,7 @@ export const processTreeSchema = z.object({
   category: z.enum(processCategoryValues),
   jobId: z.string().max(128).nullable(),
   sessionId: z.string().max(128).nullable(),
+  ownerRunning: z.boolean().default(false).describe('A live job whose owning Session is mid-turn; a bulk stop leaves it to that thread’s own Stop.'),
 })
 export type ProcessTree = z.infer<typeof processTreeSchema>
 

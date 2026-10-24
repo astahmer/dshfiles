@@ -23,6 +23,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useState } from 'react'
 import { worktreeMemoryApi } from './api.js'
 import type { WorktreeMemoryKey, WorktreeMemoryTranslate } from './locales.js'
+import { bulkStoppable } from './stop-scope.js'
 import {
   emptyCategoryBytes,
   processCategoryValues,
@@ -36,6 +37,8 @@ import {
 
 const snapshotKey = ['worktree-memory', 'snapshot'] as const
 const POLL_MS = 5_000
+// The stop API refuses more than 200 targets, so a page-wide stop continues in batches until every listed tree is asked for.
+const STOP_BATCH_SIZE = 200
 // The sidebar badge is always mounted, so it polls far less often than the open panel; both share one cache entry.
 const BADGE_POLL_MS = 30_000
 
@@ -175,21 +178,23 @@ const StopButton = (props: {
   readonly armKey: string
   readonly trees: readonly ProcessTree[]
   readonly label: string
+  readonly armedLabel?: string
   readonly subject: string
   readonly controls: StopControls
   readonly t: WorktreeMemoryTranslate
 }): JSX.Element => {
   const armed = props.controls.armed === props.armKey
+  const armedLabel = props.armedLabel ?? props.t('stopConfirm')
   return (
     <Button
-      aria-label={`${armed ? props.t('stopConfirm') : props.label} ${props.subject}`}
+      aria-label={`${armed ? armedLabel : props.label} ${props.subject}`}
       variant={armed ? 'destructive' : 'outline'}
       size="sm"
       className="dshx:shrink"
       disabled={props.controls.pending}
       onClick={() => (armed ? props.controls.stop(props.trees) : props.controls.arm(props.armKey))}
     >
-      {armed ? props.t('stopConfirm') : props.label}
+      {armed ? armedLabel : props.label}
     </Button>
   )
 }
@@ -263,42 +268,56 @@ const GroupCard = (props: {
   const Chevron = props.open ? ChevronDownIcon : ChevronRightIcon
   const running = group.threads.filter(thread => thread.running).length
   const title = group.kind === 'elsewhere' ? t('elsewhere') : group.title
+  const stoppable = bulkStoppable(group.trees)
   return (
     <section className={cn('dshx:flex dshx:flex-col dshx:rounded-lg', props.open && 'dshx:bg-muted/40')} data-workspace-group={group.key}>
-      <button
-        type="button"
-        className="dshx:flex dshx:w-full dshx:items-start dshx:gap-2 dshx:rounded-lg dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-muted/60"
-        aria-expanded={props.open}
-        onClick={props.onToggle}
-      >
-        <GroupIcon kind={group.kind} />
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium" title={group.path}>
-              {title}
+      <div className="dshx:flex dshx:items-start dshx:gap-2 dshx:rounded-lg dshx:px-3 dshx:py-2 dshx:hover:bg-muted/60">
+        <button
+          type="button"
+          className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-start dshx:gap-2 dshx:text-left"
+          aria-expanded={props.open}
+          onClick={props.onToggle}
+        >
+          <GroupIcon kind={group.kind} />
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+            <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+              <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium" title={group.path}>
+                {title}
+              </span>
+              {group.detachedCount === 0 ? null : (
+                <Badge variant="outline" className={DETACHED_BADGE}>
+                  {group.detachedCount} {t('detachedTotal')}
+                </Badge>
+              )}
+              <span className="dshx:ml-auto dshx:shrink-0 dshx:text-sm dshx:font-medium dshx:tabular-nums">{formatBytes(group.bytes)}</span>
+            </div>
+            <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+              {[
+                group.project,
+                group.threadCount === 0
+                  ? null
+                  : `${count(group.threadCount, 'thread', 'threads', t)}${running === 0 ? '' : ` · ${String(running)} ${t('running')}`}`,
+                count(group.trees.length, 'process', 'processes', t),
+              ]
+                .filter(part => part !== null)
+                .join(' · ')}
             </span>
-            {group.detachedCount === 0 ? null : (
-              <Badge variant="outline" className={DETACHED_BADGE}>
-                {group.detachedCount} {t('detachedTotal')}
-              </Badge>
-            )}
-            <span className="dshx:ml-auto dshx:shrink-0 dshx:text-sm dshx:font-medium dshx:tabular-nums">{formatBytes(group.bytes)}</span>
+            <CategoryBar bytes={groupCategoryBytes(group)} total={group.bytes} className="dshx:max-w-80" />
           </div>
-          <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-            {[
-              group.project,
-              group.threadCount === 0
-                ? null
-                : `${count(group.threadCount, 'thread', 'threads', t)}${running === 0 ? '' : ` · ${String(running)} ${t('running')}`}`,
-              count(group.trees.length, 'process', 'processes', t),
-            ]
-              .filter(part => part !== null)
-              .join(' · ')}
-          </span>
-          <CategoryBar bytes={groupCategoryBytes(group)} total={group.bytes} className="dshx:max-w-80" />
-        </div>
-        <Chevron aria-hidden className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-      </button>
+          <Chevron aria-hidden className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+        </button>
+        {stoppable.length === 0 ? null : (
+          <StopButton
+            armKey={`group-all:${group.key}`}
+            trees={stoppable}
+            label={t('stopAll', { count: stoppable.length })}
+            armedLabel={t('stopConfirmCount', { count: stoppable.length })}
+            subject={title}
+            controls={props.controls}
+            t={t}
+          />
+        )}
+      </div>
       {props.open ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:px-3 dshx:pb-3 dshx:pl-9">
           {group.threads.length === 0 ? null : (
@@ -342,7 +361,7 @@ const GroupCard = (props: {
           {group.detachedCount < 2 ? null : (
             <div className="dshx:flex dshx:justify-end">
               <StopButton
-                armKey={`group:${group.key}`}
+                armKey={`group-detached:${group.key}`}
                 trees={group.trees.filter(tree => tree.origin === 'detached')}
                 label={`${t('stopDetached')} (${String(group.detachedCount)})`}
                 subject={title}
@@ -380,8 +399,20 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
   })
 
   const stop = useMutation({
-    mutationFn: async (trees: readonly ProcessTree[]) =>
-      api.stop({ targets: trees.map(tree => ({ pid: tree.pid, startedAt: tree.startedAt })), confirm: true }),
+    mutationFn: async (trees: readonly ProcessTree[]) => {
+      const total: StopResult = { stopped: 0, viaJob: 0, missing: 0, refused: 0 }
+      for (let index = 0; index < trees.length; index += STOP_BATCH_SIZE) {
+        const result = await api.stop({
+          targets: trees.slice(index, index + STOP_BATCH_SIZE).map(tree => ({ pid: tree.pid, startedAt: tree.startedAt })),
+          confirm: true,
+        })
+        total.stopped += result.stopped
+        total.viaJob += result.viaJob
+        total.missing += result.missing
+        total.refused += result.refused
+      }
+      return total
+    },
     onSuccess: result => {
       setArmed(null)
       setStopOutcome(result)
@@ -415,6 +446,9 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
       return next
     })
   const detached = groups.flatMap(group => group.trees.filter(tree => tree.origin === 'detached'))
+  const listedTrees = groups.flatMap(group => group.trees)
+  const stoppableTrees = bulkStoppable(listedTrees)
+  const leftRunning = listedTrees.length - stoppableTrees.length
   const pressure = PRESSURE[value?.pressure ?? 'unknown']
 
   return (
@@ -528,13 +562,35 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
         </div>
       </div>
 
-      {value === undefined || value.detachedCount === 0 ? null : (
+      {value === undefined || listedTrees.length === 0 ? null : (
         <footer className="dshx:sticky dshx:bottom-0 dshx:flex dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:px-5 dshx:py-2 dshx:@max-pane-narrow:px-3">
           <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:text-muted-foreground">
-            {value.detachedCount} {t('detachedTotal')} · <span className="dshx:tabular-nums">{formatBytes(value.detachedBytes)}</span>
+            {count(listedTrees.length, 'process', 'processes', t)} · <span className="dshx:tabular-nums">{formatBytes(value.trackedBytes)}</span>
+            {value.detachedCount === 0 ? '' : ` · ${String(value.detachedCount)} ${t('detachedTotal')}`}
+            {leftRunning === 0 ? '' : ` · ${t('leftRunning', { count: leftRunning })}`}
           </span>
           <span className="dshx:ml-auto" />
-          <StopButton armKey="all-detached" trees={detached} label={t('stopDetached')} subject={formatBytes(value.detachedBytes)} controls={controls} t={t} />
+          {detached.length < 2 ? null : (
+            <StopButton
+              armKey="all-detached"
+              trees={detached}
+              label={`${t('stopDetached')} (${String(detached.length)})`}
+              subject={formatBytes(value.detachedBytes)}
+              controls={controls}
+              t={t}
+            />
+          )}
+          {stoppableTrees.length === 0 ? null : (
+            <StopButton
+              armKey="all-everything"
+              trees={stoppableTrees}
+              label={t('stopEverything', { count: stoppableTrees.length })}
+              armedLabel={t('stopConfirmCount', { count: stoppableTrees.length })}
+              subject={formatBytes(value.trackedBytes)}
+              controls={controls}
+              t={t}
+            />
+          )}
         </footer>
       )}
     </div>

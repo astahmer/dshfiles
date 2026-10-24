@@ -143,6 +143,7 @@ export class ProcessTable {
     const byPid = new Map(input.rows.map(row => [row.pid, row]))
     const groups = new Map<string, ResolvedGroup & { trees: ProcessTree[] }>()
     const { hostChildren, orphans } = ProcessTable.candidates(input)
+    const runningSessionIds = new Set(input.sessions.filter(session => session.running).map(session => session.sessionId))
     const jobsByRoot = ProcessTable.matchJobs(
       hostChildren.flatMap(pid => {
         const root = byPid.get(pid)
@@ -176,6 +177,7 @@ export class ProcessTable {
         category: ProcessTable.classify(members.map(row => row.command).join('\n'), heaviest.command),
         jobId: job?.id ?? null,
         sessionId: job?.owner ?? null,
+        ownerRunning: job !== undefined && job.owner !== null && runningSessionIds.has(job.owner),
       }
       const existing = groups.get(group.key)
       if (existing === undefined) groups.set(group.key, { ...group, trees: [tree] })

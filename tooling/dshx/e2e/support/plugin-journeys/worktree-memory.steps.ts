@@ -95,6 +95,22 @@ Then('stopping the decoy from the panel ends the process', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
+Then('stopping the workspace section from its header ends the process', async ({ page }: { page: Page }) => {
+  const decoy = requireDecoy(page)
+  const pid = decoy.pid ?? 0
+  await recordAssertion(page, 'worktree-memory-stops-a-whole-workspace-section', async () => {
+    const group = page.locator(`[data-workspace-group="${decoy.workspace}"]`)
+    await expect(group).toBeVisible({ timeout: 30_000 })
+    // The section verb sits in the header, so a workspace stop never needs the card expanded first.
+    await group.getByRole('button', { name: /^Stop all \(\d+\)/ }).click()
+    await group.getByRole('button', { name: /^Confirm stop \(\d+\)/ }).click()
+    await expect(page.getByRole('status').filter({ hasText: /^Stopped 1/ })).toBeVisible()
+    await expect.poll(() => isAlive(pid), { timeout: 10_000 }).toBe(false)
+    await expect(page.locator(`[data-process-pid="${String(pid)}"]`)).toHaveCount(0, { timeout: 15_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
 After(async ({ page }: { page: Page }) => {
   const decoy = decoys.get(page)
   if (decoy === undefined) return

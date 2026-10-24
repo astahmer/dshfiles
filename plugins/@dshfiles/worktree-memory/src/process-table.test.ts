@@ -61,6 +61,7 @@ describe('ProcessTable', () => {
       origin: 'job',
       jobId: 'bash-1',
       sessionId: 'session-a',
+      ownerRunning: true,
       name: 'vitest run',
       category: 'tests',
       processCount: 3,
@@ -68,6 +69,18 @@ describe('ProcessTable', () => {
       cwd: '/dev/app-threads/thread-a/packages/web',
     })
     expect(snapshot.categoryBytes.tests).toBe(504_000 * 1024)
+  })
+
+  it('marks a job tree whose thread finished its turn as safe for a bulk stop', () => {
+    const snapshot = ProcessTable.snapshot(
+      baseInput({
+        rows: [row(HOST, 1, 1, 'dsh'), row(650, HOST, 2_000, 'bash -c pnpm lint')],
+        cwds: new Map([[650, '/dev/app']]),
+        jobs: [{ id: 'bash-idle', label: 'pnpm lint', owner: 'session-idle', startedAt: T0 + 500 }],
+        sessions: [{ sessionId: 'session-idle', cwd: '/dev/app', running: false, updatedAt: T0, title: 'Lint pass' }],
+      }),
+    )
+    expect(snapshot.groups[0]?.trees[0]).toMatchObject({ pid: 650, origin: 'job', jobId: 'bash-idle', ownerRunning: false })
   })
 
   it('counts orphans inside a jj sibling checkout as detached and ignores orphans outside every workspace', () => {
