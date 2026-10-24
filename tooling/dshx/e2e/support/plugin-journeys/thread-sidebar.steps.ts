@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
+import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -105,20 +105,38 @@ const dragRowToSectionHeader = async (page: Page, row: Locator, header: Locator)
 
 const sectionOfSidebar = (page: Page, section: string): Locator => threadSidebar(page).locator(`section[data-thread-section="${section}"]`)
 
+/**
+ * Right after boot the client restores its first selection, creating a blank session of its own when it has none to
+ * reopen. A New thread click that lands before that restore settles is overridden by it: the page opens the click's
+ * session, then the restore selects its own. So wait for the restored selection first, then for the URL to name a
+ * session the Host created after the click, rather than trusting the first `session/create` answer.
+ */
 const startBlankThread = async (page: Page): Promise<string> => {
-  const createResponsePromise = page.waitForResponse(
-    response => {
-      const request = response.request()
-      return request.method() === 'POST' && request.postData()?.includes('session/create') === true
-    },
-    { timeout: 15_000 },
-  )
-  await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
-  const createResponse = await createResponsePromise
-  const parsedResponse = createdSessionResponseSchema.safeParse(await createResponse.json())
-  if (!parsedResponse.success) throw new Error('The Host returned an invalid session ID after New thread was clicked.')
-  const createdThreadId = parsedResponse.data.result.value.sessionId
-  await expect.poll(() => currentThreadId(page)).toBe(createdThreadId)
+  await expect.poll(() => currentThreadId(page), { message: 'The page never restored its first thread selection after boot.', timeout: 15_000 }).not.toBeNull()
+  const createdThreadIds = new Set<string>()
+  const recordCreatedThread = async (response: Response): Promise<void> => {
+    const request = response.request()
+    if (request.method() !== 'POST' || request.postData()?.includes('session/create') !== true) return
+    const parsed = createdSessionResponseSchema.safeParse(await response.json().catch(() => null))
+    if (parsed.success) createdThreadIds.add(parsed.data.result.value.sessionId)
+  }
+  page.on('response', recordCreatedThread)
+  try {
+    await sidebarNavigation(page).getByRole('button', { name: 'New thread', exact: true }).click()
+    await expect
+      .poll(
+        () => {
+          const threadId = currentThreadId(page)
+          return threadId !== null && createdThreadIds.has(threadId)
+        },
+        { message: 'The page did not open a session the Host created after New thread was clicked.', timeout: 15_000 },
+      )
+      .toBe(true)
+  } finally {
+    page.off('response', recordCreatedThread)
+  }
+  const createdThreadId = currentThreadId(page)
+  if (createdThreadId === null) throw new Error('The page left the new thread before its composer rendered.')
   await expect(page.getByRole('textbox').first()).toBeVisible()
   return createdThreadId
 }
