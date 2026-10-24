@@ -22,6 +22,11 @@ const nativeProviders = (provider: { readonly enabled: boolean; readonly running
 })
 
 describe('ai-accounts queries', () => {
+  it('refreshes stale usage when the window regains focus', async () => {
+    const options = aiAccountsQueries.usage({ usage: async () => overTheWire({ readAt: 1, hostName: 'mac', cards: [] }) }, 60_000)
+    expect(options.refetchOnWindowFocus).toBe(true)
+  })
+
   it('reads usage from an older Host by filling the labels it does not send', async () => {
     const options = aiAccountsQueries.usage(
       { usage: async () => overTheWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', kind: 'codex', enabled: true, usage: usageCard }] }) },
