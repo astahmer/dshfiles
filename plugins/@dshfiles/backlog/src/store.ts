@@ -18,6 +18,7 @@ import {
 import { z } from 'zod'
 import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
+import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
 export const backlogDomain = defineDomain({
@@ -160,6 +161,11 @@ export interface BacklogStore {
     readonly attention: 'blocked' | 'waiting' | 'none'
     readonly reason: string
   }): Promise<BacklogResult<BacklogDetail>>
+  /**
+   * A thread's question was answered, so the `needs-input` request that thread made is settled: the user decided. An
+   * attention set by hand, or raised by another thread, waits for its own owner.
+   */
+  settleAnsweredQuestion(input: { readonly id: number; readonly threadId: string; readonly reason: string }): Promise<BacklogResult<BacklogDetail>>
   /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
   acknowledge(input: { readonly ids: readonly number[] }): Promise<void>
   dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
@@ -752,6 +758,20 @@ const createBacklogStore = ({
       return {
         ok: true,
         value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})`, threadId }, { attention: 'none' }),
+      }
+    },
+    settleAnsweredQuestion: async ({ id, threadId, reason }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (!ThreadLifecycle.answeredQuestionSettles({ item, threadId })) return { ok: true, value: detailOf(item) }
+      return {
+        ok: true,
+        value: await touch(
+          item,
+          { kind: 'agent', sessionId: threadId },
+          { kind: 'edited', detail: `attention: none (${reason})`, threadId },
+          { attention: 'none' },
+        ),
       }
     },
     acknowledge: async ({ ids }) => {

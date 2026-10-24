@@ -427,6 +427,31 @@ describe('thread turn signals', () => {
     const cleared = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'none', reason: 'the thread works again' })
     expect(cleared.ok && cleared.value.item.attention).toBe('blocked')
   })
+
+  it('settles a request for input once its own thread answered the question', async () => {
+    const store = await workingItem()
+    await store.update({ id: 1, attention: 'needs-input', actor: agent })
+    expect(store.list({ inbox: true }).items.map(item => item.id)).toEqual([1])
+
+    const settled = await store.settleAnsweredQuestion({ id: 1, threadId: 'session-abc123', reason: 'the thread’s question was answered' })
+    expect(settled.ok && settled.value.item.attention).toBe('none')
+    expect(settled.ok && settled.value.item.events.at(-1)?.detail).toBe('attention: none (the thread’s question was answered)')
+    expect(settled.ok && settled.value.item.events.at(-1)?.threadId).toBe('session-abc123')
+    expect(settled.ok && settled.value.item.humanFields).toEqual([])
+    expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
+  it('leaves a request for input another thread raised, or the user set, alone', async () => {
+    const store = await workingItem()
+    await store.update({ id: 1, attention: 'needs-input', actor: agent })
+    const elsewhere = await store.settleAnsweredQuestion({ id: 1, threadId: 'session-other', reason: 'another thread answered' })
+    expect(elsewhere.ok && elsewhere.value.item.attention).toBe('needs-input')
+
+    await store.update({ id: 1, attention: 'none', actor: user })
+    await store.update({ id: 1, attention: 'needs-input', actor: user })
+    const handSet = await store.settleAnsweredQuestion({ id: 1, threadId: 'session-abc123', reason: 'the thread’s question was answered' })
+    expect(handSet.ok && handSet.value.item.attention).toBe('needs-input')
+  })
 })
 
 describe('attention and inbox', () => {

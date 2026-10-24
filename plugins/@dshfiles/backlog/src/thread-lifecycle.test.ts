@@ -97,3 +97,39 @@ describe('resolution candidates', () => {
     expect(ThreadLifecycle.openToResolution(item({ events: [{ at: 1, actor: 'agent:session-abc', kind: 'commented', detail: 'still working' }] }))).toBe(true)
   })
 })
+
+describe('answered questions', () => {
+  const asked = (
+    fields: Partial<Pick<BacklogItem, 'attention' | 'humanFields' | 'events'>> = {},
+  ): Pick<BacklogItem, 'attention' | 'humanFields' | 'events'> => ({
+    attention: 'needs-input',
+    humanFields: [],
+    events: [
+      {
+        at: 1,
+        actor: 'agent:session-abc',
+        kind: 'edited',
+        detail: 'attention',
+        threadId: 'session-abc',
+        fieldChanges: [{ field: 'attention', before: 'none', after: 'needs-input' }],
+      },
+    ],
+    ...fields,
+  })
+
+  it('settles a request for input when the thread that asked reaches an answer', () => {
+    expect(ThreadLifecycle.answeredQuestionSettles({ item: asked(), threadId: 'session-abc' })).toBe(true)
+  })
+
+  it('leaves a request another thread raised, or the user set, waiting for its own owner', () => {
+    expect(ThreadLifecycle.answeredQuestionSettles({ item: asked(), threadId: 'session-other' })).toBe(false)
+    expect(ThreadLifecycle.answeredQuestionSettles({ item: asked({ humanFields: ['attention'] }), threadId: 'session-abc' })).toBe(false)
+    expect(ThreadLifecycle.answeredQuestionSettles({ item: asked({ attention: 'blocked' }), threadId: 'session-abc' })).toBe(false)
+  })
+
+  it('matches a legacy attention edit by the actor that wrote it, with no thread recorded', () => {
+    const legacy = asked({ events: [{ at: 1, actor: 'agent:session-abc', kind: 'edited', detail: 'attention' }] })
+    expect(ThreadLifecycle.answeredQuestionSettles({ item: legacy, threadId: 'session-abc' })).toBe(true)
+    expect(ThreadLifecycle.answeredQuestionSettles({ item: asked({ events: [] }), threadId: 'session-abc' })).toBe(false)
+  })
+})

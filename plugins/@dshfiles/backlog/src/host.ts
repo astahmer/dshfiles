@@ -30,6 +30,7 @@ import { StartThreadForm, startThreadItemOf } from './start-thread.js'
 import { StartThreadPlacementPlan } from './start-thread-workspace.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogProjectTarget } from './project-target.js'
+import { BacklogQuestionReply } from './question-reply.js'
 import { BacklogSignals } from './signals.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { JevClient } from './jev-client.js'
@@ -455,6 +456,16 @@ const onThreadTurn = (ctx: Context, session: Session, reason: TurnEndReason): vo
   if (!outcome.stalled) scheduleResolution(ctx, session, currentSettings())
 }
 
+/** The user, or another Agent answering for them, decided what a thread asked: its items stop waiting on the user. */
+const onQuestionAnswered = (ctx: Context, session: Session): void => {
+  void backlogFor(ctx)
+    .then(async store => {
+      for (const item of store.referencing({ type: 'thread', target: session.id }))
+        await store.settleAnsweredQuestion({ id: item.id, threadId: session.id, reason: 'the thread’s question was answered' })
+    })
+    .catch(logFailure('Backlog question answer signal failed'))
+}
+
 /** A user naming `b:12` in a thread is working on it: link the thread and start the item. */
 const onSessionEvent = (ctx: Context, session: Session, event: SessionEvent): void => {
   if (!currentSettings().lifecycleSignals) return
@@ -462,7 +473,12 @@ const onSessionEvent = (ctx: Context, session: Session, event: SessionEvent): vo
     onThreadTurn(ctx, session, event.data.reason)
     return
   }
-  if (event.type !== 'user/message' || event.data.source.kind !== 'user') return
+  if (event.type !== 'user/message') return
+  if (BacklogQuestionReply.isAnswer(event.data.source)) {
+    onQuestionAnswered(ctx, session)
+    return
+  }
+  if (event.data.source.kind !== 'user') return
   const ids = BacklogSignals.mentionsIn(event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n'))
   if (ids.length === 0) return
   void backlogFor(ctx)

@@ -1,7 +1,7 @@
 import type { Message } from '@deepseek-ai/dsh-llm'
 import type { TurnEndReason } from '@deepseek-ai/dsh-session/types'
 
-import type { BacklogItem } from './item.js'
+import type { BacklogEvent, BacklogItem } from './item.js'
 
 /** What one finished thread turn means for the backlog items that thread is linked to. */
 export interface ThreadTurnOutcome {
@@ -37,6 +37,21 @@ const openToResolution = (item: Pick<BacklogItem, 'status' | 'humanFields' | 'pr
   const last = item.events.at(-1)
   const dismissed = last?.kind === 'triaged' && last.detail.startsWith('dismissed')
   return item.status === 'doing' && !item.humanFields.includes('status') && (item.proposal ?? null) === null && dismissed !== true
+}
+
+/** An event that changed the item's attention, so the last one says who set the flag the item carries now. */
+const changesAttention = (event: Pick<BacklogEvent, 'detail' | 'fieldChanges'>): boolean =>
+  event.detail === 'attention' || (event.fieldChanges?.some(change => change.field === 'attention') ?? false)
+
+/**
+ * A question the thread answered settles the request for input that same thread made. A flag the user set by hand, or
+ * one another agent raised, waits for its own owner: answering a question elsewhere says nothing about it.
+ */
+const answeredQuestionSettles = (input: { readonly item: Pick<BacklogItem, 'attention' | 'humanFields' | 'events'>; readonly threadId: string }): boolean => {
+  if ((input.item.attention ?? 'none') !== 'needs-input' || input.item.humanFields.includes('attention')) return false
+  const asked = input.item.events.findLast(changesAttention)
+  if (asked === undefined) return false
+  return asked.threadId === input.threadId || asked.actor === `agent:${input.threadId}`
 }
 
 /** What a finished thread's turn says about the items it works on, before any item is touched. */
@@ -76,4 +91,5 @@ export class ThreadLifecycle {
   static readonly replyText = replyText
   static readonly openToResolution = openToResolution
   static readonly idleThreadNudges = idleThreadNudges
+  static readonly answeredQuestionSettles = answeredQuestionSettles
 }
