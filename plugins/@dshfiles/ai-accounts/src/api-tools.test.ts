@@ -18,6 +18,7 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_quota',
       'ai_accounts_refresh_pricing',
       'ai_accounts_refresh_quota',
+      'ai_accounts_reorder_account',
       'ai_accounts_resume_continuation',
       'ai_accounts_set_auto_retry',
       'ai_accounts_set_distribution',

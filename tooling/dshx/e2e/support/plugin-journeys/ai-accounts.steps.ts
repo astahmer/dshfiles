@@ -322,6 +322,56 @@ When('a second healthy Command Code account is added', async ({ page }: { page: 
   await addCommandCodeAccount(page, { name: 'Command Code 2', key: 'e2e-fake-key-BRAVO2' })
 })
 
+const usageStrip = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ })
+
+When('the second Command Code account is moved earlier from its usage menu', async ({ page }: { page: Page }) => {
+  const second = usageStrip(page).getByRole('button', { name: /^Command Code 2:/ })
+  await expect(second).toBeVisible()
+  await second.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Move left', exact: true }).click()
+})
+
+Then('the page and usage strip keep one priority through page moves, drag and reload', async ({ page }: { page: Page }) => {
+  const assertOrder = async (first: 'Command Code 1' | 'Command Code 2'): Promise<void> => {
+    const tiles = usageStrip(page).getByRole('button', { name: /^Command Code [12]:/ })
+    await expect(tiles).toHaveCount(2)
+    await expect(tiles.nth(0)).toHaveAttribute('aria-label', new RegExp(`^${first}:`))
+    const cards = providerAccounts(page)
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('button', { name: /^Command Code [12] /u }) })
+    await expect(cards).toHaveCount(2)
+    await expect(cards.nth(0)).toContainText(first)
+  }
+  await recordAssertion(page, 'ai-accounts-usage-menu-updates-page-priority', () => assertOrder('Command Code 2'))
+  await recordAssertion(page, 'ai-accounts-page-move-updates-usage-priority', async () => {
+    await page.getByRole('button', { name: 'Move Command Code 1 earlier in account order', exact: true }).click()
+    await assertOrder('Command Code 1')
+  })
+  await recordAssertion(page, 'ai-accounts-drag-updates-shared-priority', async () => {
+    const drag = (name: string) =>
+      usageStrip(page)
+        .locator('[draggable="true"]')
+        .filter({ has: page.getByRole('button', { name: new RegExp(`^${name}:`) }) })
+    await drag('Command Code 2').dragTo(drag('Command Code 1'))
+    await assertOrder('Command Code 2')
+  })
+  await page.reload()
+  await openAccountsPanel(page)
+  await recordAssertion(page, 'ai-accounts-shared-priority-persists-after-reload', () => assertOrder('Command Code 2'))
+})
+
+Then('the reordered first healthy account serves the request', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-shared-priority-controls-wire-account', async () => {
+    await expect(page.getByText('Answered by BRAVO2', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    const keys = fakeCommandCodeFor(page)
+      .requests.filter(request => request.kind === 'turn')
+      .map(request => request.key)
+    expect(keys.length).toBeGreaterThan(0)
+    expect(new Set(keys)).toEqual(new Set(['e2e-fake-key-BRAVO2']))
+  })
+  await finishJourneyAssertions(page)
+})
+
 const usagePopover = (page: Page) => page.getByRole('region', { name: 'AI account usage', exact: true })
 const usageCardTop = async (page: Page, name: string): Promise<number> =>
   (

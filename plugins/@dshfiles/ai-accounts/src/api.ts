@@ -23,6 +23,15 @@ const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
 export const accountOrderDirectionSchema = z.enum(['earlier', 'later'])
 
+export const accountReorderSchema = z.object({
+  instanceId: z.string().min(1).max(64),
+  targetInstanceId: z.string().min(1).max(64),
+  placement: z.enum(['before', 'after']),
+  /** Optional same-provider snapshot: reject a stale drag rather than overwrite a concurrent priority change. */
+  expectedOrder: z.array(z.string().min(1).max(64)).max(64).optional(),
+})
+export type AccountReorder = z.infer<typeof accountReorderSchema>
+
 export const accountModeSchema = z.enum(['direct', 'authOverlay'])
 
 export const accountStateSchema = z.enum(['healthy', 'cooling', 'disabled', 'unconfigured'])
@@ -369,6 +378,17 @@ export const aiAccountsApi = defineApi({
       tool: {
         name: 'ai_accounts_move_account',
         render: output => `Account order updated (${String(output.accounts.length)} account(s)).`,
+      },
+    }),
+    /** Atomically place an account before or after another account of the same provider. */
+    reorderAccount: method({
+      input: accountReorderSchema,
+      output: accountsFileSchema,
+      description:
+        'Atomically change true account priority by placing an account before or after a same-provider target. Other provider groups are unchanged. Call only when the user asked for that order.',
+      tool: {
+        name: 'ai_accounts_reorder_account',
+        render: output => `Account priority updated (${String(output.accounts.length)} account(s)).`,
       },
     }),
     /** Change how requests are spread across compatible account routes. */

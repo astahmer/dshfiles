@@ -39,7 +39,7 @@ export const aiAccountsSettings = defineSettings({
     meterLabel: Schema.union(['both', 'percent', 'reset']).default('both'),
     /** Show the governing quota window only, or all account windows side by side/stacked in the wide sidebar strip. */
     usageWindowLayout: Schema.union(['binding', 'horizontal', 'vertical']).default('binding'),
-    /** Account ids in the order the usage strip and popover list them; unlisted accounts follow. */
+    /** Legacy cosmetic order, retained for old clients only. New clients use the account store; never migrate this into routing priority. */
     usageOrder: Schema.array(Schema.string()).default([]),
     /** Account ids the usage strip and popover leave out. */
     hiddenUsageAccounts: Schema.array(Schema.string()).default([]),
@@ -154,7 +154,6 @@ const readLunaReserveRouting = (): boolean =>
 
 const recoverySettingsSchema = z.object({
   failureRecovery: recoveryPolicySchema,
-  usageOrder: z.array(z.string()).catch([]),
   hiddenUsageAccounts: z.array(z.string()).catch([]),
 })
 
@@ -165,7 +164,8 @@ const readRecoverySettings = (): {
   readonly hiddenUsageAccounts: readonly string[]
 } => {
   const parsed = recoverySettingsSchema.parse(readLiveSettings())
-  return { policy: parsed.failureRecovery, usageOrder: parsed.usageOrder, hiddenUsageAccounts: parsed.hiddenUsageAccounts }
+  // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.
+  return { policy: parsed.failureRecovery, usageOrder: [], hiddenUsageAccounts: parsed.hiddenUsageAccounts }
 }
 
 const quotaRetrySettingsSchema = z.object({

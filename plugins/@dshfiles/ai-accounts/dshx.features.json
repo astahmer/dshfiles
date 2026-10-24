@@ -56,7 +56,8 @@
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover. Page moves and usage-tile drag/menu moves share the Host's real account priority, with serialized writes and stale-order protection.",
+      "reach": ["click button \"AI Accounts\"", "expect complementary \"Provider accounts\"", "expect combobox \"Request distribution\""],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
@@ -85,6 +86,7 @@
         "A provider rate limit cools the account that served the request and may rebind its retry.",
         "All eligible accounts are cooling down and no route can be selected.",
         "Distribution never mixes provider kinds or models with incompatible request capabilities.",
+        "Cross-provider moves and stale drag snapshots are rejected; the client shows the error and rereads the Host order.",
         "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts."
       ],
       "externalDependencies": [
@@ -137,6 +139,23 @@
           "kind": "gherkin",
           "id": "ai-accounts.priority-order",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.shared-priority",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.atomic-priority-order",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-order-model.test.ts",
+          "testName": "atomically inserts before a target without dropping hidden, disabled or unlisted accounts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.shared-priority-cache",
+          "file": "plugins/@dshfiles/ai-accounts/src/accounts-queries.test.ts",
+          "testName": "updates page and usage subscribers together, cancels stale reads and reconciles a concurrent Host change"
         },
         {
           "kind": "gherkin",
@@ -198,8 +217,8 @@
         {
           "key": "usageOrder",
           "defaultValue": "[]",
-          "constraints": "Ordered account ID list; unknown IDs are ignored.",
-          "coveredBy": ["ai-accounts.quota-display"]
+          "constraints": "Legacy cosmetic order retained for old clients; ignored by current routing and usage surfaces, never migrated into account priority.",
+          "coveredBy": ["ai-accounts.shared-priority-usage"]
         },
         {
           "key": "hiddenUsageAccounts",
@@ -244,6 +263,11 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.quota-display",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.shared-priority-usage",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {

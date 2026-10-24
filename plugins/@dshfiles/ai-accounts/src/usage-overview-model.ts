@@ -47,8 +47,6 @@ const windowRank = (label: string): number => {
   return 4
 }
 
-const cardExhausted = (card: OverviewCard): boolean => card.usage.status === 'ok' && UsageOverviewModel.isCardLimited(card.usage.windows)
-
 const arrange = <Item extends { readonly instanceId: string }>(items: readonly Item[], order: readonly string[]): Item[] => {
   const rank = (id: string): number => {
     const index = order.indexOf(id)
@@ -85,7 +83,7 @@ export class UsageOverviewModel {
 
   /**
    * Enabled cards for the tab, split three ways: the ones with quota to show
-   * (spent ones below usable ones until the user orders them), the ones without
+   * (in canonical account priority), the ones without
    * quota data (signed out, failing), and the ones the user hid.
    */
   static overviewSections = (
@@ -95,14 +93,17 @@ export class UsageOverviewModel {
   ): { readonly cards: OverviewCard[]; readonly unavailable: OverviewCard[]; readonly hidden: OverviewCard[] } => {
     const enabled = (usage?.cards ?? []).filter(card => card.enabled && (tab === 'all' || card.kind === tab))
     const visible = enabled.filter(card => !layout.hidden.includes(card.instanceId))
-    const cards = visible
-      .filter(hasQuota)
-      .map(card => ({ ...card, usage: { ...card.usage, windows: UsageOverviewModel.sortWindows(card.usage.windows) } }))
-      .sort((left, right) => Number(cardExhausted(left)) - Number(cardExhausted(right)))
+    const cards = visible.filter(hasQuota).map(card => ({ ...card, usage: { ...card.usage, windows: UsageOverviewModel.sortWindows(card.usage.windows) } }))
     return {
       cards: arrange(cards, layout.order),
-      unavailable: visible.filter(card => !hasQuota(card)),
-      hidden: enabled.filter(card => layout.hidden.includes(card.instanceId)),
+      unavailable: arrange(
+        visible.filter(card => !hasQuota(card)),
+        layout.order,
+      ),
+      hidden: arrange(
+        enabled.filter(card => layout.hidden.includes(card.instanceId)),
+        layout.order,
+      ),
     }
   }
 
@@ -162,23 +163,6 @@ export class UsageOverviewModel {
   /** The one item a narrow surface shows: the lowest percent left, the sooner reset breaking a tie. */
   static mostCritical = (items: readonly QuotaSummaryItem[]): QuotaSummaryItem | undefined =>
     [...items].sort((left, right) => left.percentRemaining - right.percentRemaining || resetOrder(left.resetsAt) - resetOrder(right.resetsAt))[0]
-
-  /**
-   * Moves `id` to `toIndex` among the ids a surface shows, and keeps the
-   * remembered position of every id it does not show (hidden, signed out,
-   * another tab) after them.
-   */
-  static moveAccount = (input: {
-    readonly order: readonly string[]
-    readonly shownIds: readonly string[]
-    readonly id: string
-    readonly toIndex: number
-  }): string[] => {
-    const others = input.shownIds.filter(id => id !== input.id)
-    const index = Math.max(0, Math.min(others.length, input.toIndex))
-    const shown = [...others.slice(0, index), input.id, ...others.slice(index)]
-    return [...shown, ...input.order.filter(id => !shown.includes(id))]
-  }
 
   /** "4d 12h", "1h 11m", "9m", "now", or null without a known reset. */
   static formatResetShort = (resetsAt: number | null, now: number): string | null => {
