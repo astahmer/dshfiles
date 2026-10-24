@@ -93,7 +93,7 @@ const menuItemTextPosition = async (item: Locator, label: string): Promise<numbe
   }, label)
 
 const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
-  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Status', 'Kind', 'Project', 'Pin item']
+  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Copy item as Markdown', 'Status', 'Kind', 'Project', 'Pin item']
   if (includeOpenItem) labels.push('Open item')
   const attention = menu.getByRole('menuitem', { name: 'Attention', exact: true })
   if ((await attention.locator('span[title]').count()) === 0) labels.push('Attention')
@@ -116,6 +116,7 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
   await expect(menu.getByRole('menuitem', { name: /^(Unpin item|Pin item)$/ })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Copy item ID', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Copy item link', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Copy item as Markdown', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toHaveCount(0)
   if (includeOpenItem) await expect(menu.getByRole('menuitem', { name: 'Open item', exact: true })).toBeVisible()
   await expectContextMenuLabelsAligned(menu, includeOpenItem)
@@ -452,6 +453,18 @@ When('backlog item b:{int} copies its ID and link from the context menu', async 
   await contextMenu(page).getByRole('menuitem', { name: 'Copy item link', exact: true }).click()
   await recordAssertion(page, 'backlog-copy-item-link', async () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`b:${String(id)}`)
+  })
+})
+
+When('backlog item b:{int} copies its Markdown from the context menu', async ({ page }: { page: Page }, id: number) => {
+  const origin = new URL(page.url()).origin
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+  const target = await contextTarget(page, id, 'feed')
+
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Copy item as Markdown', exact: true }).click()
+  await recordAssertion(page, 'backlog-copy-item-markdown', async () => {
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`b:${String(id)}`)
   })
 })
 

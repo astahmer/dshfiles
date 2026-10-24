@@ -222,6 +222,7 @@ Feature: Backlog
     When ArrowUp is pressed from the empty backlog composer
     Then backlog item b:2 receives composer keyboard focus
     When backlog item b:1 copies its ID and link from the context menu
+    And backlog item b:1 copies its Markdown from the context menu
     And backlog item b:1 is moved to "In progress" from its feed context menu
     Then backlog item b:1 exposes all context actions in the "feed" view
     And backlog item b:1 exposes all context actions in the "items" view

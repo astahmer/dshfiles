@@ -23,10 +23,11 @@ import { BacklogItems } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { deleteSelection as deleteSelectedItems } from './delete-selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
+import { backlogItemMarkdown } from './item-markdown.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
 
 const NO_PROJECT = 'no-project'
-type BacklogMenuItem = Pick<BacklogSummaryView, 'id' | 'title' | 'kind' | 'status' | 'project' | 'pinned'> & {
+type BacklogMenuItem = Pick<BacklogSummaryView, 'id' | 'title' | 'kind' | 'status' | 'project' | 'pinned' | 'tags' | 'links'> & {
   readonly attention?: BacklogSummaryView['attention'] | undefined
   readonly preview?: BacklogSummaryView['preview'] | undefined
   readonly body?: string | undefined
@@ -98,6 +99,10 @@ export const BacklogItemMenu = (props: {
             <LinkIcon aria-hidden className="dshx:size-3.5" />
             {many ? 'Copy item links' : 'Copy item link'}
             {countSuffix}
+          </ContextMenuItem>
+          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(backlogItemMarkdown(item))}>
+            <CopyIcon aria-hidden className="dshx:size-3.5" />
+            Copy item as Markdown
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuSub>
