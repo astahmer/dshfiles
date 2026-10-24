@@ -10,6 +10,10 @@ Cursor sessions run outside DSH.
 
 ## Account serving the active chat
 
+![Actual account used by a synthetic chat](docs/screenshots/active-chat-account.png)
+
+_Synthetic loopback account and chat; no real provider sign-in._
+
 The sidebar quota strip highlights the **actual account on the wire**, including
 pool distribution and failover—not just the selected model's provider. During a
 request it says **In use by active chat**; once idle it says **Last used by active

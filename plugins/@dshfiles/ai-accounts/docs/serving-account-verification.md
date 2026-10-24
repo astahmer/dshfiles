@@ -42,9 +42,9 @@ late completion/cancellation, native-source forgetting, retention, strict metada
 raw API/tool authorization and query cancellation across chats. They do not prove
 browser rendering. The account-specific Gherkin scenarios
 `ai-accounts.active-chat-switch` and `ai-accounts.active-chat-account` are the
-browser checks; use the existing focused browser runner after its executable
-selection prerequisite is coordinated. Do not import unrelated shared verifier
-changes into this patch.
+browser checks. Run only those scenarios with the focused Playwright runner when
+validating this boundary. The shared stock-CLI/browser selectors and isolated
+workspace recipe are test infrastructure, not a product runtime prerequisite.
 
 ## Deterministic UI reach (scratch only)
 
@@ -68,6 +68,21 @@ changes into this patch.
    instance and fake provider. Never reuse personal account screenshots, start
    real sign-in, or point a synthetic route at an external provider.
 
-A local build/import check is not evidence that the browser journeys passed.
-Review their fresh receipts and a new synthetic screenshot before publishing;
-never verify against the live runtime, profile, secrets or provider consent.
+## Recorded evidence
+
+On 2026-10-24, the upstream-based contribution passed 441 package tests,
+typecheck, plugin/styles builds, Host import and catalog validation. Both real
+Chromium scenarios above passed (zero failures/skips), proving actual failover,
+foreground chat switches, blank-draft clearing and the hidden-meter source chip.
+The corrected catalog reach also passed after a synthetic tool turn.
+
+The screenshot is a new 1440×900 capture from stock DSH 0.2.1-rc.2 with a
+loopback-only fake provider. Scratch doctor passed; there were no page errors,
+failed requests, warnings or attribution/slot errors. Five native optional VS
+Code icon HTTP 404s and their resource-console errors were observed across
+navigations; they are not hidden or fixed here. All owned scratch processes were
+stopped and token-bearing state removed after capture.
+
+Real provider sign-in/inference, broad baseline Codex journeys, live activation
+and cross-OS behavior remain unverified. Never verify against the live runtime,
+profile, secrets or provider consent.
