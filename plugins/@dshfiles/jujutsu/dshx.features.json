@@ -259,8 +259,8 @@
     {
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The dock names the active DSH project, JJ workspace and nearest bookmark; clicking opens its Jujutsu panel.",
-      "reach": ["seed rebase-ready-thread", "expect button \"sample (thread-*\"", "expect text \"main+*\""],
+      "summary": "The dock names the active DSH project, JJ workspace and nearest bookmark; the change bar separately reports exact revisions ahead of or behind its selected base.",
+      "reach": ["seed rebase-ready-thread", "click text \"New Session\"", "expect text \"1 revision ahead of main\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -285,10 +285,22 @@
           "coveredBy": ["jujutsu.composer-context"]
         }
       ],
-      "states": ["project-name", "default-workspace", "thread-workspace", "bookmark-ancestry"],
+      "states": [
+        "project-name",
+        "default-workspace",
+        "thread-workspace",
+        "bookmark-ancestry",
+        "ahead",
+        "behind",
+        "diverged",
+        "up-to-date",
+        "missing-base",
+        "count-unavailable"
+      ],
       "failureModes": [
         "Isolated JJ thread workspaces retain the owning DSH project's name.",
-        "An unavailable JJ integration falls back to the registered workspace title; the repository path remains in the tooltip."
+        "An unavailable JJ integration falls back to the registered workspace title; the repository path remains in the tooltip.",
+        "A missing base, failed bounded count or older Host never displays a false zero revision count."
       ],
       "externalDependencies": [
         {

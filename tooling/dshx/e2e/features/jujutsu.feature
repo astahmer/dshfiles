@@ -77,6 +77,7 @@ Feature: Jujutsu revision interactions
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And the repository is registered and a thread is started in it
     Then the composer dock names the project, thread workspace and bookmark in one chip
+    And the composer summary shows an exact revision count against main
 
   @scenario:jujutsu.workspace-session
   Scenario: Provision a workspace at a revision and open a session there on request

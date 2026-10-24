@@ -27,6 +27,7 @@ const repositorySchema = z.object({
     label: z.string().max(256),
     found: z.boolean(),
   }),
+  revisionCounts: z.object({ ahead: z.number().int().nonnegative(), behind: z.number().int().nonnegative() }).strict().optional().nullable(),
   totals: z.object({ files: z.number().int().min(0), additions: z.number().int().min(0), deletions: z.number().int().min(0) }).nullable(),
   files: z.array(z.object({ path: z.string().max(2048), status: fileStatusSchema })).max(500),
   filesTruncated: z.boolean(),

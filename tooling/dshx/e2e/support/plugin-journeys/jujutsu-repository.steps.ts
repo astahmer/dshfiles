@@ -463,6 +463,11 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
   await finishJourneyAssertions(page)
 })
 
+Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
+  const summary = page.getByRole('status').filter({ hasText: /(?:\d+ revisions? ahead of main|\d+ revisions? behind main|Up to date with main)/u })
+  await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
+})
+
 After(async ({ page }: { page: Page }) => {
   const repository = repositories.get(page)
   if (repository === undefined) return

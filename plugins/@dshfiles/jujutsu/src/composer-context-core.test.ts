@@ -31,6 +31,21 @@ describe('composer base setting', () => {
       '@',
     ])
   })
+
+  it('counts exact revisions on either side of a selected base', () => {
+    expect(ComposerContextModel.revisionCountRevsets('abc123')).toEqual({ ahead: '::@ ~ ::abc123', behind: '::abc123 ~ ::@' })
+    expect(ComposerContextModel.parseRevisionCount('xxx', false)).toBe(3)
+    expect(ComposerContextModel.parseRevisionCount('', false)).toBe(0)
+    expect(ComposerContextModel.parseRevisionCount('xx', true)).toBeNull()
+    expect(ComposerContextModel.parseRevisionCount('x?x', false)).toBeNull()
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 0, behind: 0 } })).toBe('Up to date with main')
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 1, behind: 0 } })).toBe('1 revision ahead of main')
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 2, behind: 1 } })).toBe(
+      '2 revisions ahead of main · 1 revision behind main',
+    )
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: false, counts: null })).toBe('main unavailable')
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: null })).toBe('Revision count unavailable')
+  })
 })
 
 describe('parseStatTotals', () => {

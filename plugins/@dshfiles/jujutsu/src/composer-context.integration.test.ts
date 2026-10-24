@@ -63,6 +63,20 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   ])
   expect(nearest.trim()).toBe('["main"]')
   expect(runJj(repo, home, ['--ignore-working-copy', 'bookmark', 'list', '-T', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE]).trim()).toBe('"main"')
+  const baseCommitId = runJj(repo, home, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '-r',
+    ComposerContextModel.composerBaseTarget({ kind: 'bookmark', name: 'main' }),
+    '--limit',
+    '2',
+    '-T',
+    'commit_id ++ "\\n"',
+  ]).trim()
+  const revisionCountRevsets = ComposerContextModel.revisionCountRevsets(baseCommitId)
+  expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.ahead, '-T', '"x"']).length).toBe(2)
+  expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.behind, '-T', '"x"']).length).toBe(0)
   const missing = runJj(repo, home, [
     '--ignore-working-copy',
     'log',
@@ -100,7 +114,16 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
     { path: 'feature.txt', additions: 1, deletions: 0 },
     { path: 'new file.txt', additions: 1, deletions: 0 },
   ])
-})
+
+  const featureCommitId = runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id']).trim()
+  runJj(repo, home, ['new', '-r', 'main', '-m', 'sibling'])
+  runJj(repo, home, ['bookmark', 'set', 'main', '-r', '@'])
+  runJj(repo, home, ['edit', featureCommitId])
+  const siblingCommitId = runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id']).trim()
+  const divergedRevsets = ComposerContextModel.revisionCountRevsets(siblingCommitId)
+  expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', divergedRevsets.ahead, '-T', '"x"']).length).toBe(1)
+  expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', divergedRevsets.behind, '-T', '"x"']).length).toBe(1)
+}, 15_000)
 
 test('composer reads spawn jj again for view reads only after an operation lands', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-composer-reads-'))

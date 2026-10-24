@@ -42,6 +42,30 @@ const composerBaseTarget = (base: ComposerBase): string => {
 const composerDiffRange = (base: ComposerBase): readonly string[] =>
   base.kind === 'parent' ? ['-r', '@'] : ['--from', 'fork_point(' + composerBaseTarget(base) + ' | @)', '--to', '@']
 
+/** Exact ancestry counts use one template character per revision, so bounded output also bounds the count. */
+const parseRevisionCount = (stdout: string, truncated: boolean): number | null => {
+  if (truncated || !/^x*$/.test(stdout)) return null
+  return stdout.length
+}
+
+const revisionCountRevsets = (targetCommitId: string): { readonly ahead: string; readonly behind: string } => ({
+  ahead: '::@ ~ ::' + targetCommitId,
+  behind: '::' + targetCommitId + ' ~ ::@',
+})
+
+const revisionSummary = (input: {
+  readonly baseLabel: string
+  readonly baseFound: boolean
+  readonly counts: { readonly ahead: number; readonly behind: number } | null | undefined
+}): string => {
+  if (!input.baseFound) return input.baseLabel + ' unavailable'
+  if (input.counts === null || input.counts === undefined) return 'Revision count unavailable'
+  if (input.counts.ahead === 0 && input.counts.behind === 0) return 'Up to date with ' + input.baseLabel
+  const ahead = input.counts.ahead > 0 ? `${String(input.counts.ahead)} revision${input.counts.ahead === 1 ? '' : 's'} ahead of ${input.baseLabel}` : null
+  const behind = input.counts.behind > 0 ? `${String(input.counts.behind)} revision${input.counts.behind === 1 ? '' : 's'} behind ${input.baseLabel}` : null
+  return [ahead, behind].filter((summary): summary is string => summary !== null).join(' · ')
+}
+
 /** Totals from the last line of `jj diff --stat`; null when the summary line is missing (e.g. truncated output). */
 const parseStatTotals = (stdout: string): { files: number; additions: number; deletions: number } | null => {
   const lastLine = stdout.trimEnd().split(/\r?\n/).at(-1) ?? ''
@@ -88,6 +112,9 @@ export class ComposerContextModel {
   static readonly composerBaseSetting = composerBaseSetting
   static readonly composerBaseTarget = composerBaseTarget
   static readonly composerDiffRange = composerDiffRange
+  static readonly parseRevisionCount = parseRevisionCount
+  static readonly revisionCountRevsets = revisionCountRevsets
+  static readonly revisionSummary = revisionSummary
   static readonly parsePatchFileStats = parsePatchFileStats
   static readonly parseStatTotals = parseStatTotals
 }

@@ -23,7 +23,7 @@ import { z } from 'zod'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
-import { composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
+import { ComposerContextModel, composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
 import { installChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
@@ -195,6 +195,11 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
 
   const fileCount = repository.totals?.files ?? repository.files.length
   const heading = context.base.kind === 'parent' ? 'Uncommitted' : 'Since ' + repository.base.label
+  const revisionSummary = ComposerContextModel.revisionSummary({
+    baseLabel: repository.base.label,
+    baseFound: repository.base.found,
+    counts: repository.revisionCounts,
+  })
   const openFile = (path: string): void => {
     openInEditor({ path, cwd: repository.root })
   }
@@ -231,6 +236,9 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
             </>
           )}
         </Button>
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground" role="status">
+          {revisionSummary}
+        </span>
         <BasePicker
           base={context.base}
           onChoose={next => {

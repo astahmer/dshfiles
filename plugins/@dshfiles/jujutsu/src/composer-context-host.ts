@@ -33,6 +33,8 @@ const headSchema = z.object({
 })
 
 const fileRowSchema = z.object({ path: z.string().max(2048), status: z.string().max(32) })
+const baseRevisionIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
+const baseRevisionIdsSchema = z.array(baseRevisionIdSchema).max(2)
 const nameListSchema = z.array(z.string().max(256)).max(64)
 const MAX_FILES = 500
 
@@ -130,11 +132,15 @@ export const composerContextHost = (directRun: RunJj) => {
       if (head === undefined) return { repository: null }
       const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
       const range = ComposerContextModel.composerDiffRange(input.base)
-      const [nearest, baseTarget, stat, files, localBookmarks, workspaces] = await Promise.all([
+      const [nearest, baseTarget, baseRevision, stat, files, localBookmarks, workspaces] = await Promise.all([
         read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
         read(
           ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE],
           16_000,
+        ).catch(() => null),
+        read(
+          ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', 'commit_id ++ "\\n"'],
+          256,
         ).catch(() => null),
         read(['diff', ...range, '--stat'], 256_000).catch(() => null),
         read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
@@ -145,6 +151,27 @@ export const composerContextHost = (directRun: RunJj) => {
         result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
       const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
       const targetBookmarks = baseTarget === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
+      const baseRevisionIds =
+        baseRevision === null || baseRevision.truncated || baseRevision.stdout.trim().length === 0
+          ? []
+          : baseRevisionIdsSchema.parse(baseRevision.stdout.trim().split('\n'))
+      const resolvedBaseCommitId = baseRevisionIds.length === 1 ? baseRevisionIds[0] : undefined
+      const readRevisionCount = async (revset: string): Promise<number | null> => {
+        try {
+          const result = await read(['log', '--no-graph', '--revisions', revset, '--template', '"x"'], 1_000_000)
+          return ComposerContextModel.parseRevisionCount(result.stdout, result.truncated)
+        } catch {
+          return null
+        }
+      }
+      const revisionCounts =
+        resolvedBaseCommitId === undefined
+          ? null
+          : await (async () => {
+              const revsets = ComposerContextModel.revisionCountRevsets(resolvedBaseCommitId)
+              const [ahead, behind] = await Promise.all([readRevisionCount(revsets.ahead), readRevisionCount(revsets.behind)])
+              return ahead === null || behind === null ? null : { ahead, behind }
+            })()
       const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
       const bookmarkNames =
         localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
@@ -161,7 +188,8 @@ export const composerContextHost = (directRun: RunJj) => {
           conflict: head.conflict,
           bookmarks: head.bookmarks,
           nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
-          base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: targetBookmarks.length > 0 },
+          base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: resolvedBaseCommitId !== undefined },
+          revisionCounts,
           totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
           files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
           filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,

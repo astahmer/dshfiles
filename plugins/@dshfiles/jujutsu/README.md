@@ -1,5 +1,7 @@
 # @dshfiles/jujutsu
 
+![Show exact revision counts against the selected base](docs/screenshots/composer-context.png)
+
 ![Remove a workspace from the graph](docs/screenshots/workspace-removal.png)
 
 ![Locate landmarks and compare revision ancestry](docs/screenshots/graph-navigation.png)
