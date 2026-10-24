@@ -6,7 +6,7 @@ import { ChevronDownIcon, ChevronUpIcon, PlusIcon, StarIcon } from '@dshfiles/pl
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import type { AccountDraft, AccountsCatalog } from './api.js'
-import { catalogForCuration, parseAdditionalModelId } from './model-curation-model.js'
+import { ModelCurationModel } from './model-curation-model.js'
 
 type CatalogModel = AccountsCatalog['models'][number]
 
@@ -30,8 +30,8 @@ export const ModelCuration = (props: {
   const { additionalModelIds, hiddenModelIds, favoriteModelIds, modelOrder, reasoningDefaults } = props.account
   const [modelIdInput, setModelIdInput] = useState({ instanceId: props.account.instanceId, value: '' })
   const modelIdValue = modelIdInput.instanceId === props.account.instanceId ? modelIdInput.value : ''
-  const catalog = catalogForCuration({ catalog: props.catalog, additionalModelIds, hiddenModelIds })
-  const customModelId = parseAdditionalModelId(modelIdValue, props.account)
+  const catalog = ModelCurationModel.catalogForCuration({ catalog: props.catalog, additionalModelIds, hiddenModelIds })
+  const customModelId = ModelCurationModel.parseAdditionalModelId(modelIdValue, props.account)
   const duplicateModelId = customModelId !== null && catalog.some(model => model.id === customModelId)
   const listed = modelOrder.filter(id => catalog.some(model => model.id === id))
   const ordered = [
@@ -63,12 +63,14 @@ export const ModelCuration = (props: {
   }
 
   const toggleFavorite = (modelId: string): void => {
-    const nextFavorites = new Set(favoriteModelIds)
-    if (nextFavorites.has(modelId)) nextFavorites.delete(modelId)
-    else nextFavorites.add(modelId)
-    const favoritesFirst = ordered.filter(model => nextFavorites.has(model.id)).map(model => model.id)
-    const rest = ordered.filter(model => !nextFavorites.has(model.id)).map(model => model.id)
-    props.onChange({ favoriteModelIds: [...nextFavorites], modelOrder: [...favoritesFirst, ...rest] })
+    props.onChange(
+      ModelCurationModel.toggleFavoriteModel({
+        modelId,
+        orderedModelIds: ordered.map(model => model.id),
+        favoriteModelIds,
+        hiddenModelIds,
+      }),
+    )
   }
 
   const toggleHidden = (modelId: string): void => {
