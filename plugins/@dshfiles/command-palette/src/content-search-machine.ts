@@ -26,14 +26,15 @@ interface ContentSearchContext {
   readonly state: ContentState
 }
 
-type ContentSearchEvent = { readonly type: 'query.change'; readonly query: string; readonly available: boolean }
+type ContentSearchEvent = { readonly type: 'query.change'; readonly query: string; readonly available: boolean } | { readonly type: 'query.refresh' }
 type ContentSearchOutput =
   | { readonly kind: 'done'; readonly requestId: number; readonly hits: readonly ContentHit[] }
   | { readonly kind: 'failed'; readonly requestId: number }
 
 const NO_CONTENT: ContentState = { status: 'idle', hits: [] }
 
-const hasSearchInput = ({ event }: { readonly event: ContentSearchEvent }): boolean => event.available && event.query.trim().length > 0
+const hasSearchInput = ({ event }: { readonly event: ContentSearchEvent }): boolean =>
+  event.type === 'query.change' && event.available && event.query.trim().length > 0
 
 // SAFETY: XState uses these empty carriers for inference; runtime values come from the input and typed events.
 export const contentSearchMachine = setup({
@@ -59,6 +60,10 @@ export const contentSearchMachine = setup({
       if (event.type !== 'query.change') return {}
       const requestId = context.requestId + 1
       return { query: event.query, requestId, activeRequestId: requestId, state: { ...context.state, status: 'searching' as const } }
+    }),
+    refreshSearch: assign(({ context }) => {
+      const requestId = context.requestId + 1
+      return { requestId, activeRequestId: requestId, state: { ...context.state, status: 'searching' as const } }
     }),
     clearSearch: assign(() => ({ query: '', activeRequestId: null, state: NO_CONTENT })),
     failSearch: assign(() => ({ activeRequestId: null, state: { status: 'failed' as const, hits: [] } })),
@@ -98,6 +103,7 @@ export const contentSearchMachine = setup({
           { guard: 'hasSearchInput', target: 'searching', reenter: true, actions: 'beginSearch' },
           { target: 'idle', actions: 'clearSearch' },
         ],
+        'query.refresh': { target: 'searching', reenter: true, actions: 'refreshSearch' },
       },
     },
     settled: {
@@ -106,12 +112,17 @@ export const contentSearchMachine = setup({
           { guard: 'hasSearchInput', target: 'searching', actions: 'beginSearch' },
           { target: 'idle', actions: 'clearSearch' },
         ],
+        'query.refresh': { target: 'searching', actions: 'refreshSearch' },
       },
     },
   },
 })
 
-export const useContentSearch = (query: string, search: ContentSearch | null): ContentState => {
+export const useContentSearch = (
+  query: string,
+  search: ContentSearch | null,
+  sourceRevision: readonly { readonly id: string; readonly updatedAt: number }[],
+): ContentState => {
   const latestSearch = useRef(search)
   latestSearch.current = search
   const client = useMemo<ContentSearchClient>(
@@ -125,6 +136,23 @@ export const useContentSearch = (query: string, search: ContentSearch | null): C
   )
   const debouncedQuery = useDebouncedValue({ value: query.trim(), delayMs: 200 })
   const [snapshot, send] = useMachine(contentSearchMachine, { input: { client } })
-  useEffect(() => send({ type: 'query.change', query: debouncedQuery, available: search !== null }), [debouncedQuery, search, send])
+  const searchCycle = useRef({ query: '', search, sourceRevision, retries: 0 })
+  useEffect(() => {
+    const cycle = searchCycle.current
+    if (cycle.query !== debouncedQuery || cycle.search !== search) {
+      searchCycle.current = { query: debouncedQuery, search, sourceRevision, retries: 0 }
+      send({ type: 'query.change', query: debouncedQuery, available: search !== null })
+      return
+    }
+    if (debouncedQuery.length === 0 || search === null) {
+      cycle.sourceRevision = sourceRevision
+      cycle.retries = 0
+      return
+    }
+    const state = snapshot.context.state
+    if (state.status !== 'done' || state.hits.length > 0 || cycle.retries >= 2 || cycle.sourceRevision === sourceRevision) return
+    searchCycle.current = { ...cycle, sourceRevision, retries: cycle.retries + 1 }
+    send({ type: 'query.refresh' })
+  }, [debouncedQuery, search, snapshot.context.state, sourceRevision, send])
   return snapshot.context.state
 }

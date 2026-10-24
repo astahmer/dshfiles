@@ -249,7 +249,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const missingSessionId =
     (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
 
-  const content = useContentSearch(view === 'content' ? deferredQuery : '', props.searchContent)
+  const content = useContentSearch(view === 'content' ? deferredQuery : '', props.searchContent, props.threads)
   const contentRows = useMemo(() => {
     if (view !== 'content') return []
     const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))

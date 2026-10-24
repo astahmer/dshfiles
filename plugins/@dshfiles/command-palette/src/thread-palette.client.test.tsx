@@ -317,6 +317,39 @@ describe('Threads tab project scope', () => {
   const here = { id: 'session-here', title: 'Here work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 }
   const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1 }
 
+  it('retries empty content results when fresh Host activity updates the thread list', async () => {
+    let attempts = 0
+    const searchContent = vi.fn(async () => {
+      attempts += 1
+      if (attempts === 1) return []
+      return [{ sessionId: 'session-fresh', snippet: 'fresh marker' }]
+    })
+    const palette = (updatedAt: number) => (
+      <ThreadPalette
+        mode="all"
+        threads={[{ id: 'session-fresh', title: 'Fresh thread', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt }]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={searchContent}
+        onBacklogCapture={vi.fn(() => true)}
+        onAsk={vi.fn(async () => {})}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    const view = render(palette(1))
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '#fresh marker' } })
+    await waitFor(() => expect(searchContent).toHaveBeenCalledTimes(1))
+    await screen.findByText('No matches.', { exact: true })
+
+    view.rerender(palette(2))
+    await screen.findByRole('option', { name: /fresh marker/ })
+    expect(searchContent).toHaveBeenCalledTimes(2)
+  })
+
   it('lists only the current project on Threads and every project on Everything', async () => {
     const view = (mode: 'all' | 'threads') =>
       render(

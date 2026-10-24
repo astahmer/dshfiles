@@ -6,7 +6,7 @@ import { selectModelForNewThread } from '../threads.js'
 const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
 const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const paletteOption = (page: Page, name: RegExp) => paletteDialog(page).getByRole('option', { name })
-const contentSearchJourneys = new WeakMap<Page, { readonly marker: string }>()
+const contentSearchJourneys = new WeakMap<Page, { readonly marker: string; readonly releasePrompt: () => void }>()
 
 const openPalette = async (page: Page): Promise<void> => {
   await page.keyboard.press('Meta+Shift+P')
@@ -160,11 +160,19 @@ When('a searchable user message is sent to a new thread', async ({ page }: { pag
   await expect(paletteDialog(page)).not.toBeVisible()
   await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
 
+  let releasePrompt: () => void = () => {}
+  const promptGate = new Promise<void>(resolve => {
+    releasePrompt = () => resolve()
+  })
+  await page.route('**/api/session/prompt', async route => {
+    await promptGate
+    await route.continue()
+  })
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions' })
   await composer.fill(marker)
   await composer.press('Enter')
   await expect(page.getByText(marker, { exact: true }).first()).toBeVisible()
-  contentSearchJourneys.set(page, { marker })
+  contentSearchJourneys.set(page, { marker, releasePrompt })
 })
 
 Then('thread content search finds the message and opens its thread', async ({ page }: { page: Page }) => {
@@ -172,7 +180,15 @@ Then('thread content search finds the message and opens its thread', async ({ pa
   if (journey === undefined) throw new Error('No user-message thread was recorded for this content-search journey.')
 
   const matchingResult = paletteDialog(page).getByRole('option').filter({ hasText: journey.marker })
-  await recordAssertion(page, 'thread-content-search-settles-with-matching-snippet', () => expect(matchingResult).toBeVisible({ timeout: 30_000 }))
+  try {
+    await recordAssertion(page, 'thread-content-search-first-observes-pending-submission-as-empty', () =>
+      expect(paletteDialog(page).getByText('No matches.', { exact: true })).toBeVisible({ timeout: 30_000 }),
+    )
+  } finally {
+    journey.releasePrompt()
+  }
+  await recordAssertion(page, 'thread-content-search-refreshes-after-host-accepts-message', () => expect(matchingResult).toBeVisible({ timeout: 30_000 }))
+  await page.unroute('**/api/session/prompt')
   await matchingResult.click()
   await recordAssertion(page, 'thread-content-search-opens-the-matching-session', async () => {
     await expect(paletteDialog(page)).not.toBeVisible()
