@@ -2,6 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } fro
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import { ProfileOrchestrator } from '../src/profile/index.js'
 import type { DshCommandResult, DshCommandRunner, DshCommandRunOptions } from '../src/profile/index.js'
@@ -136,7 +137,7 @@ describe('DSH installation resolution', () => {
       support: 'experimental',
       adapterId: 'protocol-2',
       protocolGeneration: 'protocol-2',
-      supportedRange: '>=0.2.0-rc.1 <0.3.0-0',
+      supportedRange: PROTOCOL_2_COMPATIBILITY.dshRange,
     })
     expect(installation.diagnostics).toEqual([expect.objectContaining({ code: 'DSHX5101', severity: 'warning', file: project.packageFile })])
   })

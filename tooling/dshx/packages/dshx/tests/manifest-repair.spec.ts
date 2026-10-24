@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { ManifestRepairService } from '../src/project/index.js'
 
@@ -57,7 +58,7 @@ describe('deterministic manifest repair plan', () => {
     expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-layout')
     expect(manifest.dsh.client.inject).not.toContain('@deepseek-ai/dsh-client-ui-conversation')
     expect(manifest.dsh.client.inject).not.toContain('@deepseek-ai/dsh-client-ui-renderer')
-    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-layout']).toBe('>=0.2.0-rc.1 <0.3.0-0')
+    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-layout']).toBe(PROTOCOL_2_COMPATIBILITY.dshRange)
   })
 
   it('declares typed SDK providers as peers and preserves existing peer ranges', async () => {
@@ -77,7 +78,7 @@ describe('deterministic manifest repair plan', () => {
       peerDependencies: Record<string, string>
     }
     expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-renderer')
-    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-renderer']).toBe('>=0.2.0-rc.1 <0.3.0-0')
+    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-ui-renderer']).toBe(PROTOCOL_2_COMPATIBILITY.dshRange)
     expect(manifest.peerDependencies['@deepseek-ai/dsh']).toBe('>=0.2.0-rc.1 <0.3.0-0')
   })
 
