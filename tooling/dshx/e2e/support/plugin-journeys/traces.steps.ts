@@ -546,7 +546,21 @@ Then('the thread logs list only its own records', async ({ page }: { page: Page 
   })
 })
 
+Then('the thread Requests tab lists only its requests', async ({ page }: { page: Page }) => {
+  await conversationTab(page, 'Requests').click()
+  const view = page.getByTestId('requests-session-view')
+  await recordAssertion(page, 'traces-thread-requests-tab', async () => {
+    await expect(view).toBeVisible()
+    const rows = view.locator('tbody tr[data-session-id]')
+    await expect(view.getByText('No requests in this range.', { exact: true })).toBeVisible()
+    const currentSessionId = await view.getAttribute('data-session-id')
+    expect(currentSessionId).toBeTruthy()
+    expect(await rows.evaluateAll(elements => elements.every(row => row.getAttribute('data-session-id') === currentSessionId))).toBe(true)
+  })
+})
+
 Then('the thread Traces tab fits a 480 px wide window', async ({ page }: { page: Page }) => {
+  await conversationTab(page, 'Traces').click()
   await page.setViewportSize({ width: 480, height: 900 })
   await sessionView(page).getByRole('radio', { name: 'Turns', exact: true }).click()
   await recordAssertion(page, 'traces-thread-tab-narrow', async () => {

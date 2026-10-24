@@ -57,7 +57,7 @@ Feature: Traces
 
   @scenario:traces.thread-tab-browser-journey
   Scenario: A thread's Traces tab shows only that thread's telemetry
-    Given the isolated Traces profile with "@dshfiles/ai-accounts" is booted with the receiver on a free port
+    Given the isolated Traces profile with "@dshfiles/ai-accounts,@dshfiles/usage" is booted with the receiver on a free port
     When a Command Code account backed by a local fake provider is added
     And a thread on the fake model is asked "first question"
     And the thread Traces tab is opened
@@ -66,4 +66,5 @@ Feature: Traces
     Then the thread Traces tab summarizes only this thread's telemetry
     And a turn opens its span waterfall with the plugin span nested under the tool call
     And the thread logs list only its own records
+    And the thread Requests tab lists only its requests
     And the thread Traces tab fits a 480 px wide window

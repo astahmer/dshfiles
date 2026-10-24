@@ -8,7 +8,7 @@
 
 ![Metric list with one chart per metric](docs/screenshots/metric-charts.png)
 
-![Per-thread Traces tab with summary and span waterfall](docs/screenshots/thread-traces-tab.png)
+![Per-thread Requests tab scoped to the selected thread](docs/screenshots/thread-traces-tab.png)
 
 ![Alert rules over stored telemetry](docs/screenshots/alert-rules.png)
 
@@ -62,7 +62,8 @@ interaction made as client spans and the Host spans those calls caused nested un
 Every thread gets a **Traces** tab in its conversation view, right after **Trajectory** (a `conversation.view`
 entry, `order: 11`; Trajectory is 10 and only shows with developer tools on). It shows that thread's telemetry only:
 every trace in which any span carries `dsh.session.id` = the thread's Session id, so plugin spans nested under an agent
-turn count even without the attribute.
+turn count even without the attribute. A **Requests** tab follows at `order: 12`; it reuses the Usage request log and
+filters it by the current Session id, with the same status, search and sorting controls.
 
 - **Summary**: traces, spans, error spans, total trace time, model calls (`gen_ai.operation.name = chat`, one per
   attempt), tool calls (`execute_tool`), trace and model-call p50 · p95, and `gen_ai.usage.*` token totals summed over

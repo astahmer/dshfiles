@@ -259,11 +259,18 @@
     {
       "id": "thread-traces-tab",
       "title": "Per-thread Traces tab",
-      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn list that opens the span waterfall, and the thread's correlated logs. With nothing stored it says why, from the receiver's diagnosis.",
-      "reach": ["seed tool-call-thread", "seed otlp-session-turns", "click tab \"Traces\"", "expect region \"Thread telemetry summary\""],
+      "summary": "A Traces tab in the conversation view, after Trajectory, shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent turn, model and tool spans and the plugin spans nested under them), a summary of spans, errors, model and tool calls, total and p50/p95 durations and gen_ai.usage token totals and list-price cost, a turn list that opens the span waterfall, and the thread's correlated logs. A Requests tab follows and reuses Usage's request log scoped to the open Session id. With nothing stored it says why, from the receiver's diagnosis.",
+      "reach": [
+        "seed tool-call-thread",
+        "seed otlp-session-turns",
+        "click tab \"Traces\"",
+        "expect region \"Thread telemetry summary\"",
+        "click tab \"Requests\"",
+        "expect region \"Request log\""
+      ],
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [],
-      "states": ["empty", "summarized", "trace-open", "logs", "no-exporter"],
+      "states": ["empty", "summarized", "trace-open", "logs", "requests", "no-exporter"],
       "failureModes": [
         "Token totals count model-call spans only, because the turn span repeats the same usage as its own totals.",
         "A trace counts for the thread when any of its spans carries the thread's dsh.session.id, so plugin spans without the attribute still show under their turn.",

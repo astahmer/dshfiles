@@ -15,6 +15,7 @@ import { TRACES_ALERTS_LOCALE_NAMESPACE, tracesAlertsLocale } from './alerts/ale
 import { TRACES_LOCALE_NAMESPACE, tracesLocale } from './locales.js'
 import { createThreadOpener } from './open-thread.js'
 import { TracesPanel } from './panel.js'
+import { SessionRequestsView } from './session-requests-view.js'
 import { SessionTracesView } from './session-view.js'
 import { ThreadLinks } from './thread-links.js'
 import { TurnTraceButton } from './turn-trace-button.js'
@@ -61,6 +62,31 @@ export default defineClient({
         decorate((props: SessionViewProps) => (
           <PluginQueryProvider>
             <SessionTracesView {...props} openThread={openThread} t={translate} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.view', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.view',
+          id: 'dshfiles-traces-requests',
+          order: 12,
+          label: () => translate('tabRequests'),
+          locale: TRACES_LOCALE_NAMESPACE,
+          inject: sessionId => ({ sessionId }),
+        },
+        decorate((props: SessionViewProps) => (
+          <PluginQueryProvider>
+            <SessionRequestsView
+              {...props}
+              openThread={target => {
+                const opened = openThread({ sessionId: target.sessionId, focus: null })
+                if (opened === null) return 'opened'
+                if (target.parentSessionId !== null && openThread({ sessionId: target.parentSessionId, focus: null }) === null) return 'parent'
+                return 'missing'
+              }}
+            />
           </PluginQueryProvider>
         )),
       ),

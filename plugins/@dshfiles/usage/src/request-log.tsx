@@ -61,6 +61,7 @@ const threadLabel = (row: RequestView): string => {
 export const RequestLog = (props: {
   readonly range: { readonly from: number; readonly to: number }
   readonly purposes: readonly RequestPurpose[] | undefined
+  readonly sessionId?: string
   readonly search: string
   readonly onSearch: (search: string) => void
   readonly openThread: OpenThread
@@ -73,13 +74,14 @@ export const RequestLog = (props: {
   const query: RequestQuery = {
     from: props.range.from,
     to: props.range.to,
-    ...(props.purposes === undefined ? {} : { purposes: [...props.purposes] }),
-    ...(search.length === 0 ? {} : { search }),
-    ...(status === 'all' ? {} : { status }),
     sort: sort.column,
     direction: sort.direction,
     limit: PAGE_SIZE,
   }
+  if (props.purposes !== undefined) query.purposes = [...props.purposes]
+  if (props.sessionId !== undefined) query.sessionId = props.sessionId
+  if (search.length > 0) query.search = search
+  if (status !== 'all') query.status = status
   const page = useQuery({
     queryKey: ['dshfiles-usage', 'requests', query],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.requests(query, { signal: hostSignal }) }),
@@ -166,7 +168,7 @@ export const RequestLog = (props: {
               </TableRow>
             ) : null}
             {data?.rows.map(row => (
-              <TableRow key={row.id} className="dshx:cursor-pointer" onClick={() => open(row)}>
+              <TableRow key={row.id} className="dshx:cursor-pointer" data-session-id={row.sessionId} onClick={() => open(row)}>
                 <TableCell className="dshx:max-w-56">
                   <button
                     type="button"

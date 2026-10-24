@@ -26,6 +26,7 @@
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/usage": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

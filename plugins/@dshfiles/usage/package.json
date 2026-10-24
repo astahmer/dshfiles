@@ -18,6 +18,10 @@
       "types": "./src/api.ts",
       "default": "./dist/api.js"
     },
+    "./request-log": {
+      "types": "./src/request-log.tsx",
+      "default": "./dist/request-log.js"
+    },
     "./session-log": {
       "types": "./src/session-log.ts",
       "default": "./dist/session-log.js"
