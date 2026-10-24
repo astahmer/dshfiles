@@ -18,12 +18,12 @@ export interface BacklogReferenceMatch {
 }
 
 /** The item number a written `b:<id>` token names, or undefined when it cannot name an item. */
-export const backlogReferenceId = (raw: string | undefined): number | undefined => {
+const backlogReferenceId = (raw: string | undefined): number | undefined => {
   const id = Number(raw)
   return Number.isSafeInteger(id) && id > 0 && id <= MAX_ITEM_ID ? id : undefined
 }
 
-export const backlogReferenceMatches = (text: string): readonly BacklogReferenceMatch[] =>
+const backlogReferenceMatches = (text: string): readonly BacklogReferenceMatch[] =>
   [...text.matchAll(itemReference)].flatMap(match => {
     const id = backlogReferenceId(match[1])
     if (id === undefined) return []
@@ -54,4 +54,10 @@ export const backlogReferencePreviewRequestSchema = z
 export type BacklogReferencePreviewRequest = z.infer<typeof backlogReferencePreviewRequestSchema>
 
 /** How a rendered reference finds the item it names, for the card's header and accessible name. */
-export const backlogReferenceLabel = (id: number): string => `b:${String(id)}`
+const backlogReferenceLabel = (id: number): string => `b:${String(id)}`
+
+export class BacklogReference {
+  static readonly id = backlogReferenceId
+  static readonly matches = backlogReferenceMatches
+  static readonly label = backlogReferenceLabel
+}

@@ -101,8 +101,6 @@ export const previewAgentReference = (handle: string, element: Element): boolean
   return true
 }
 
-const previewAt = (element: Element): boolean => previewAgentReference(element.getAttribute('data-dshfiles-agent-reference') ?? '', element)
-
 /**
  * A sent user message renders `@handle` through the native file-mention rule, as an inert file chip whose title is the
  * original `@mention`. It names an agent when the title is exactly one, so the same card serves both spellings.

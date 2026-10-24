@@ -91,6 +91,7 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
     list: async request => {
       const key = JSON.stringify(request)
       const recordedSessions = await runtimes.recordedSessions()
+      // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `recent` is reassigned across awaits and its narrowing does not reach the `.some` callback.
       const cached = recent
       if (
         cached !== undefined &&

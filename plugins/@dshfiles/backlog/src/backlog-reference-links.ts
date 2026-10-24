@@ -1,4 +1,4 @@
-import { backlogReferenceMatches, backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema, backlogReferenceLabel } from './backlog-reference.js'
+import { BacklogReference, backlogReferencePreviewEvent, backlogReferencePreviewRequestSchema } from './backlog-reference.js'
 import { BacklogAnchorModel } from './backlog-anchor.js'
 
 const referenceSelector = '[data-dshfiles-backlog-reference]'
@@ -31,7 +31,7 @@ const linkFor = (block: Element, segment: TextSegment, id: number, start: number
   const link = document.createElement('span')
   link.setAttribute('data-dshfiles-backlog-reference', String(id))
   link.setAttribute('role', 'link')
-  link.setAttribute('aria-label', `Preview backlog item ${backlogReferenceLabel(id)}`)
+  link.setAttribute('aria-label', `Preview backlog item ${BacklogReference.label(id)}`)
   link.tabIndex = 0
   BacklogAnchorModel.idOf(link)
   const range = document.createRange()
@@ -48,7 +48,7 @@ const markReferences = (blocks: Iterable<Element>): void => {
   for (const block of blocks) {
     const segments = textSegments(block)
     const text = segments.map(segment => segment.node.textContent ?? '').join('')
-    const matches = backlogReferenceMatches(text)
+    const matches = BacklogReference.matches(text)
     for (const match of [...matches].reverse()) {
       const segment = segments.find(candidate => match.start >= candidate.start && match.end <= candidate.end)
       if (segment !== undefined) linkFor(block, segment, match.id, match.start, match.end)

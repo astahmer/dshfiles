@@ -214,7 +214,8 @@ export const StartThreadDialog = (props: {
                 if (continuation === null) return
                 event.preventDefault()
                 const textarea = event.currentTarget
-                mode === 'per-item' ? setInstructions(continuation.value) : setMessage(continuation.value)
+                if (mode === 'per-item') setInstructions(continuation.value)
+                else setMessage(continuation.value)
                 requestAnimationFrame(() => textarea.setSelectionRange(continuation.caret, continuation.caret))
               }}
               value={mode === 'per-item' ? instructions : message}

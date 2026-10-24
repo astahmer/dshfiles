@@ -34,7 +34,7 @@ import { ThreadLifecycle } from './thread-lifecycle.js'
 import { JevClient } from './jev-client.js'
 import { ReplyAgentSelection } from './reply-agent-selection.js'
 import { ReplyRouting } from './reply-routing.js'
-import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
+import { BacklogTriage, type TriageServices } from './triage.js'
 
 interface OpenedBacklog {
   readonly store: BacklogStore

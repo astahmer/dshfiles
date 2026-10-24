@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { backlogReferenceMatches } from './backlog-reference.js'
+import { BacklogReference } from './backlog-reference.js'
 
-const ids = (text: string): readonly number[] => backlogReferenceMatches(text).map(match => match.id)
+const ids = (text: string): readonly number[] => BacklogReference.matches(text).map(match => match.id)
 
 describe('backlog references', () => {
   it('finds an item id wherever prose, inline code or punctuation puts it', () => {
@@ -14,13 +14,13 @@ describe('backlog references', () => {
   })
 
   it('stops at the number, not at the word after it', () => {
-    const [match] = backlogReferenceMatches('b:12ties')
+    const [match] = BacklogReference.matches('b:12ties')
     expect(match).toBeUndefined()
     expect(ids('b:12,')).toEqual([12])
   })
 
   it('reports the exact span a link should cover', () => {
-    const [match] = backlogReferenceMatches('see b:42')
+    const [match] = BacklogReference.matches('see b:42')
     expect(match).toEqual({ id: 42, start: 4, end: 8 })
   })
 

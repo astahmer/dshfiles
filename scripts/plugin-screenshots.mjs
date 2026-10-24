@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { DshxFeatureCatalogSchema } from '../tooling/dshx/packages/dshx/src/project/features.ts'
-import { embedScreenshot, gatedPlugins, missingScreenshotPlugins, screenshotProblems, targetFeatures } from './plugin-screenshots-core.mjs'
+import { PluginScreenshots } from './plugin-screenshots-core.mjs'
 
 const repositoryRoot = resolve(import.meta.dirname, '..')
 const pluginsRoot = join(repositoryRoot, 'plugins', '@dshfiles')
@@ -77,7 +77,7 @@ const readCatalog = name => {
   return { name, directory: join(pluginsRoot, name), catalog: parsed.data }
 }
 
-const plugins = gatedPlugins({
+const plugins = PluginScreenshots.gatedPlugins({
   catalogs: readdirSync(pluginsRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .map(entry => readCatalog(entry.name)),
@@ -114,7 +114,7 @@ const kilobytes = bytes => `${Math.round(bytes / 1024)} KB`
 
 const problemsOf = plugin => {
   const readmePath = readmeOf(plugin)
-  return screenshotProblems({
+  return PluginScreenshots.screenshotProblems({
     reachable: plugin.reachable.length,
     screenshots: screenshotsOf(plugin),
     readme: existsSync(readmePath) ? readFileSync(readmePath, 'utf8') : undefined,
@@ -146,7 +146,7 @@ const runScratch = args => {
 
 const capture = plugin => {
   const outcome = { plugin: plugin.name, screenshots: [], failures: [] }
-  const features = targetFeatures({
+  const features = PluginScreenshots.targetFeatures({
     catalog: plugin.catalog,
     picked: values.feature ?? [],
     ...(primaryFeatures[plugin.name] === undefined ? {} : { primary: primaryFeatures[plugin.name] }),
@@ -171,7 +171,10 @@ const capture = plugin => {
       copyFileSync(shot.data.screenshot, join(directory, file))
       const readmePath = readmeOf(plugin)
       const alt = plugin.catalog.features.find(candidate => candidate.id === feature)?.title ?? feature
-      writeFileSync(readmePath, embedScreenshot({ readme: readFileSync(readmePath, 'utf8'), imagePath: `${screenshotDirectory}/${file}`, alt }))
+      writeFileSync(
+        readmePath,
+        PluginScreenshots.embedScreenshot({ readme: readFileSync(readmePath, 'utf8'), imagePath: `${screenshotDirectory}/${file}`, alt }),
+      )
       outcome.screenshots.push({ feature, file, bytes: statSync(join(directory, file)).size })
     } finally {
       rmSync(evidence, { recursive: true, force: true })
@@ -194,7 +197,7 @@ if (values['missing-only'] === true && (values.check === true || values.missing 
   console.error('--missing-only selects capture targets and cannot be combined with --check or --missing.')
   process.exit(2)
 }
-const captureScope = values['missing-only'] === true ? missingScreenshotPlugins({ plugins: scope, screenshotsOf }) : scope
+const captureScope = values['missing-only'] === true ? PluginScreenshots.missingScreenshotPlugins({ plugins: scope, screenshotsOf }) : scope
 
 if (values.check === true || values.missing === true) {
   const rows = scope.map(plugin => ({ plugin, problems: problemsOf(plugin) }))

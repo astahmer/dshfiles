@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 
 import { BacklogAnchorModel } from './backlog-anchor.js'
 import {
-  backlogReferenceLabel,
+  BacklogReference,
   backlogReferencePreviewEvent,
   backlogReferencePreviewRequestSchema,
   type BacklogReferencePreviewRequest,
@@ -114,7 +114,7 @@ export const BacklogReferenceOverlay = (props: {
         data-dshfiles-backlog-preview
       >
         <PopoverHeader>
-          <PopoverTitle>Backlog · {backlogReferenceLabel(request.id)}</PopoverTitle>
+          <PopoverTitle>Backlog · {BacklogReference.label(request.id)}</PopoverTitle>
         </PopoverHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
           {preview.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Loading backlog item…</p> : null}
@@ -123,7 +123,7 @@ export const BacklogReferenceOverlay = (props: {
               {errorMessage(preview.error, 'Backlog item is unavailable.')}
             </p>
           ) : null}
-          {missing ? <p className="dshx:text-xs dshx:text-muted-foreground">No backlog item {backlogReferenceLabel(request.id)}.</p> : null}
+          {missing ? <p className="dshx:text-xs dshx:text-muted-foreground">No backlog item {BacklogReference.label(request.id)}.</p> : null}
           {detail === undefined ? null : (
             <>
               <p className="dshx:text-sm dshx:font-medium">{detail.item.title}</p>

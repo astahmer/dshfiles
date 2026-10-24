@@ -24,8 +24,6 @@ import {
 import { agentsApi, type AgentPresetRow } from './api.js'
 import type { AgentCatalog, AgentDispatchRequest, AgentThreadTarget } from './dispatch.js'
 
-const QUERY_ROOT = AGENTS_QUERY_ROOT
-
 export interface AgentsPanelProject {
   readonly id: WorkspaceId
   readonly title: string
@@ -79,9 +77,9 @@ const targetOf = (value: string, projects: readonly AgentsPanelProject[]): Agent
 export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const api = useApi(agentsApi)
   const client = useQueryClient()
-  const list = useQuery({ queryKey: [QUERY_ROOT, 'list'], queryFn: ({ signal }) => api.list(undefined, { signal }) })
-  const presets = useQuery({ queryKey: [QUERY_ROOT, 'presets'], queryFn: () => props.loadPresets(), staleTime: 60_000 })
-  const catalog = useQuery({ queryKey: [QUERY_ROOT, 'catalog'], queryFn: () => props.loadCatalog(), staleTime: 60_000 })
+  const list = useQuery({ queryKey: [AGENTS_QUERY_ROOT, 'list'], queryFn: ({ signal }) => api.list(undefined, { signal }) })
+  const presets = useQuery({ queryKey: [AGENTS_QUERY_ROOT, 'presets'], queryFn: () => props.loadPresets(), staleTime: 60_000 })
+  const catalog = useQuery({ queryKey: [AGENTS_QUERY_ROOT, 'catalog'], queryFn: () => props.loadCatalog(), staleTime: 60_000 })
   const agents = useMemo(() => list.data?.agents ?? [], [list.data])
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -106,13 +104,13 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const projects = props.listProjects()
   const current = useMemo(() => agents.find(agent => agent.handle === selected) ?? null, [agents, selected])
   const threads = useQuery({
-    queryKey: [QUERY_ROOT, 'threads', selected ?? ''],
+    queryKey: [AGENTS_QUERY_ROOT, 'threads', selected ?? ''],
     queryFn: () => props.loadThreads(selected ?? ''),
     enabled: selected !== null,
   })
   const agentThreadIds = (threads.data ?? []).map(thread => thread.sessionId)
   const schedules = useQuery({
-    queryKey: [QUERY_ROOT, 'schedules', ...agentThreadIds],
+    queryKey: [AGENTS_QUERY_ROOT, 'schedules', ...agentThreadIds],
     queryFn: () => props.loadSchedules(agentThreadIds),
     enabled: agentThreadIds.length > 0,
   })
@@ -126,7 +124,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     // The first open shows the new-agent form without the plus button's state, so no selected agent means creating.
     mutationFn: () => api.save({ agent: Agents.normalizeDraft(draft, { creating: current === null }) }),
     onSuccess: async result => {
-      await client.invalidateQueries({ queryKey: [QUERY_ROOT, 'list'] })
+      await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
       if (result.kind === 'limit') {
         setNotice({ ok: false, reason: `At most ${String(agentLimits.agents)} agents are kept.` })
         return
@@ -141,7 +139,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const remove = useMutation({
     mutationFn: (handle: string) => api.remove({ handle, confirm: true }),
     onSuccess: async result => {
-      await client.invalidateQueries({ queryKey: [QUERY_ROOT, 'list'] })
+      await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
       setConfirmingDelete(false)
       if (result.kind === 'built-in') {
         setNotice({ ok: false, reason: 'The built-in @dsh agent cannot be removed.' })
@@ -169,7 +167,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       }
       setPrompt('')
       setNotice({ ok: true })
-      await client.invalidateQueries({ queryKey: [QUERY_ROOT, 'list'] })
+      await client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
     },
     onError: error => setNotice({ ok: false, reason: errorMessage(error, 'The thread was not started.') }),
   })

@@ -1,7 +1,7 @@
 /** The canonical spelling of one Backlog mention in a sent message, and the parser that reads it back. */
 import { z } from 'zod'
 
-import { backlogReferenceId } from './backlog-reference.js'
+import { BacklogReference } from './backlog-reference.js'
 
 const SUFFIX = ' (backlog item; backlog_get has its details)'
 const titleSchema = z.string()
@@ -45,7 +45,7 @@ export const nextBacklogMention = (text: string, from: number): BacklogMentionMa
     itemReference.lastIndex = start
     const match = itemReference.exec(text)
     if (match === null) continue
-    const id = backlogReferenceId(match[1])
+    const id = BacklogReference.id(match[1])
     if (id === undefined) continue
     const tokenEnd = start + match[0].length
     quotedTitle.lastIndex = tokenEnd

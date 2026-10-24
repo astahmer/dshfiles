@@ -4,12 +4,12 @@
  * catalog feature a capture walks.
  */
 
-export const isUiBundle = catalog => catalog?.kind === 'bundle' && catalog.features.some(feature => feature.surfaces.includes('client'))
+const isUiBundle = catalog => catalog?.kind === 'bundle' && catalog.features.some(feature => feature.surfaces.includes('client'))
 
-export const reachableFeatures = catalog => (catalog?.features ?? []).filter(feature => Array.isArray(feature.reach) && feature.reach.length > 0)
+const reachableFeatures = catalog => (catalog?.features ?? []).filter(feature => Array.isArray(feature.reach) && feature.reach.length > 0)
 
 /** The plugins the check gates: UI bundles that do not declare, with a reason, that they render no surface. */
-export const gatedPlugins = ({ catalogs, ignored }) =>
+const gatedPlugins = ({ catalogs, ignored }) =>
   catalogs
     .filter(catalog => isUiBundle(catalog.catalog) && ignored[catalog.name] === undefined)
     .map(catalog => ({ ...catalog, reachable: reachableFeatures(catalog.catalog) }))
@@ -19,7 +19,7 @@ export const gatedPlugins = ({ catalogs, ignored }) =>
  * A UI plugin needs one screenshot its README embeds. A plugin with no reach steps cannot be captured at all, which the
  * message says instead of asking for a hand-made image of an unverified screen.
  */
-export const screenshotProblems = ({ reachable, screenshots, readme, sizeLimitBytes }) => {
+const screenshotProblems = ({ reachable, screenshots, readme, sizeLimitBytes }) => {
   const problems = []
   if (screenshots.length === 0) problems.push(reachable === 0 ? 'no screenshot (catalog has no reach steps to capture)' : 'no screenshot')
   if (readme === undefined) problems.push('no README')
@@ -34,7 +34,7 @@ export const screenshotProblems = ({ reachable, screenshots, readme, sizeLimitBy
 }
 
 /** The screenshot goes under the README title, before the prose that describes the plugin. */
-export const embedScreenshot = ({ readme, imagePath, alt }) => {
+const embedScreenshot = ({ readme, imagePath, alt }) => {
   if (readme.includes(imagePath)) return readme
   const lines = readme.split('\n')
   const heading = lines.findIndex(line => line.startsWith('# '))
@@ -43,9 +43,9 @@ export const embedScreenshot = ({ readme, imagePath, alt }) => {
 }
 
 /** `--feature` picks specific features; otherwise a plugin's own picks, or its first reachable feature. */
-export const missingScreenshotPlugins = ({ plugins, screenshotsOf }) => plugins.filter(plugin => screenshotsOf(plugin).length === 0)
+const missingScreenshotPlugins = ({ plugins, screenshotsOf }) => plugins.filter(plugin => screenshotsOf(plugin).length === 0)
 
-export const targetFeatures = ({ catalog, picked, primary }) => {
+const targetFeatures = ({ catalog, picked, primary }) => {
   const reachable = reachableFeatures(catalog).map(feature => feature.id)
   const named = picked.filter(feature => reachable.includes(feature))
   if (named.length > 0) return named
@@ -53,4 +53,14 @@ export const targetFeatures = ({ catalog, picked, primary }) => {
   if (preferred.length > 0) return preferred
   const first = reachable[0]
   return first === undefined ? [] : [first]
+}
+
+export class PluginScreenshots {
+  static isUiBundle = isUiBundle
+  static reachableFeatures = reachableFeatures
+  static gatedPlugins = gatedPlugins
+  static screenshotProblems = screenshotProblems
+  static embedScreenshot = embedScreenshot
+  static missingScreenshotPlugins = missingScreenshotPlugins
+  static targetFeatures = targetFeatures
 }

@@ -1,7 +1,7 @@
 import type { UserTextNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { useRef, type MouseEvent } from 'react'
 
-import { backlogReferenceLabel } from './backlog-reference.js'
+import { BacklogReference } from './backlog-reference.js'
 import { previewBacklogReference } from './backlog-reference-links.js'
 
 interface BacklogMentionChipProps {
@@ -10,7 +10,7 @@ interface BacklogMentionChipProps {
 }
 
 const labelOf = (data: { readonly id: number; readonly title: string | null }): string =>
-  data.title === null || data.title.trim() === '' ? backlogReferenceLabel(data.id) : `${backlogReferenceLabel(data.id)} ${data.title}`
+  data.title === null || data.title.trim() === '' ? BacklogReference.label(data.id) : `${BacklogReference.label(data.id)} ${data.title}`
 
 /** One sent Backlog mention, rendered like its composer chip and opening the shared preview card when interactive. */
 export const BacklogMentionChip = ({ node, interactive }: BacklogMentionChipProps): JSX.Element => {

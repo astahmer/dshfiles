@@ -19,9 +19,9 @@ export default defineClientPlugin({
         inject: sessionId => {
           const directory = api.models.directoryFor(sessionId)
           const available = api.raw.ctx.sessions.subagentAddress(sessionId) === undefined
-          let remoteDirectory = remoteDirectories.get(directory)
-          if (remoteDirectory === undefined) {
-            remoteDirectory = new RemoteModelDirectory(directory, async () => {
+          const remoteDirectory =
+            remoteDirectories.get(directory) ??
+            new RemoteModelDirectory(directory, async () => {
               const ownership = await remoteApi.sessionRuntime({ sessionId })
               if (!ownership.ok) throw new Error(`${ownership.message} (${ownership.code})`)
               if (ownership.runtimeId === null) {
@@ -55,21 +55,18 @@ export default defineClientPlugin({
                 failures: catalog.failures,
               }
             })
-            remoteDirectories.set(directory, remoteDirectory)
-          }
-          const selectedDirectory = remoteDirectory
+          remoteDirectories.set(directory, remoteDirectory)
           const injected = {
             available,
             sessionId,
-            directory: selectedDirectory.store,
+            directory: remoteDirectory.store,
             load: () => {
               if (!available) return
-              if (remoteDirectory === undefined) directory.load().catch(() => undefined)
-              else void remoteDirectory.load()
+              void remoteDirectory.load()
             },
             select: (selection: Parameters<typeof directory.select>[0]) => {
               if (!available) return Promise.resolve(undefined)
-              return remoteDirectory === undefined ? directory.select(selection) : remoteDirectory.select(selection)
+              return remoteDirectory.select(selection)
             },
           }
           return injected

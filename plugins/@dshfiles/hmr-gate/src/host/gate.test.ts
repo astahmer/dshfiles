@@ -4,7 +4,12 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { HmrGateModel, digestOf, hostArtifactOf } from './gate.js'
 
-const packageWith = (manifest: object, entryPath: string): string => {
+interface FixtureManifest {
+  readonly main?: string
+  readonly exports?: Readonly<Record<'.', string>>
+}
+
+const packageWith = (manifest: FixtureManifest, entryPath: string): string => {
   const root = mkdtempSync(join(tmpdir(), 'hmr-gate-'))
   writeFileSync(join(root, 'package.json'), JSON.stringify(manifest))
   mkdirSync(join(root, entryPath, '..'), { recursive: true })
