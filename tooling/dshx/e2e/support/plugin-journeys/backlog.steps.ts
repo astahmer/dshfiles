@@ -847,7 +847,7 @@ When('a message with the serialized backlog mention is sent', async ({ page }: {
 
 Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
   await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
-    const chip = page.getByRole('button', { name: `Backlog item ${reference} ${title}`, exact: true })
+    const chip = page.getByRole('button', { name: `Backlog item ${reference} · ${title}`, exact: true })
     await expect(chip).toBeVisible()
     // The serialized title and tool hint must not stay in the bubble.
     await expect(page.getByText('backlog_get has its details')).toHaveCount(0)
