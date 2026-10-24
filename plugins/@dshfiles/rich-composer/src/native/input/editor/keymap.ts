@@ -144,13 +144,21 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
         const selection = $getSelection()
         if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
         const anchor = selection.anchor
-        const lineText = anchor.getNode().getTextContent().slice(0, anchor.offset)
-        const unordered = /^(\s*)([-*+])\s+(.+)$/.exec(lineText)
-        const ordered = /^(\s*)(\d+)\.\s+(.+)$/.exec(lineText)
+        const nodeText = anchor.getNode().getTextContent()
+        const lineText = nodeText.slice(0, anchor.offset)
+        const unordered = /^(\s*)([-*+])\s+(.*)$/.exec(lineText)
+        const ordered = /^(\s*)(\d+)\.\s+(.*)$/.exec(lineText)
         const match = unordered ?? ordered
         if (match === null) return false
-        const [, indent, marker] = match
-        if (indent === undefined || marker === undefined) return false
+        const [, indent, marker, content] = match
+        if (indent === undefined || marker === undefined || content === undefined) return false
+        if (content === '') {
+          if (nodeText !== lineText) return false
+          anchor.set(anchor.key, anchor.offset - lineText.length, 'text')
+          selection.insertText('')
+          event.preventDefault()
+          return true
+        }
         selection.insertParagraph()
         selection.insertText(unordered === null ? `${indent}${String(Number(marker) + 1)}. ` : `${indent}${marker} `)
         event.preventDefault()

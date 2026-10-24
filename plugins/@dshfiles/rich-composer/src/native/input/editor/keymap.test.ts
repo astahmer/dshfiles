@@ -10,6 +10,43 @@ afterEach(() => {
 })
 
 describe('composer list continuation', () => {
+  it.each(['- ', '1. '])('removes an empty list marker on Shift+Enter: %s', marker => {
+    const editor = createEditor({ namespace: 'composer-keymap-empty-list-test' })
+    disposers.push(
+      registerComposerKeymap(editor, {
+        arbitrate: () => 'pass',
+        space: () => false,
+        dismissPopup: () => undefined,
+        canSubmit: () => true,
+        submit: () => undefined,
+        intakeFiles: () => undefined,
+        pasteText: () => undefined,
+      }),
+    )
+    const rootElement = document.createElement('div')
+    rootElement.contentEditable = 'true'
+    editor.setRootElement(rootElement)
+    editor.setEditable(true)
+    disposers.push(() => editor.setRootElement(null))
+    editor.update(() => {
+      const paragraph = $createParagraphNode()
+      const text = $createTextNode(marker)
+      paragraph.append(text)
+      $getRoot().append(paragraph)
+      text.selectEnd()
+    }, { discrete: true })
+
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true })
+    editor.update(() => {
+      editor.dispatchCommand(KEY_ENTER_COMMAND, enter)
+    }, { discrete: true })
+
+    expect(enter.defaultPrevented).toBe(true)
+    editor.getEditorState().read(() => {
+      expect($getRoot().getChildren().map(paragraph => paragraph.getTextContent())).toEqual([''])
+    })
+  })
+
   it('prevents the browser from adding a second line break after the continued marker', () => {
     const editor = createEditor({ namespace: 'composer-keymap-test' })
     disposers.push(
