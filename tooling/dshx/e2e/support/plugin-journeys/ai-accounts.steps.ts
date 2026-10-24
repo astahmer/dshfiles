@@ -39,32 +39,33 @@ const openAccountsPanel = async (page: Page): Promise<void> => {
 When('a standalone account workspace has two provider accounts', async ({ page }: { page: Page }) => {
   await openAccountsPanel(page)
   await expect(page.getByRole('button', { name: 'Add your first account', exact: true })).toBeVisible()
-  // Both empty state and header use the real upstream provider menu.
+  // Use unsigned synthetic Copilot profiles: Codex creation can read the OS user's real home even in scratch.
+  // Both empty state and header use the real upstream provider menu; never start sign-in.
   for (const trigger of ['Add your first account', 'Add account']) {
     await page.getByRole('button', { name: trigger, exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'GitHub Copilot account', exact: true }).click()
   }
-  await expect(page.getByRole('heading', { name: 'Codex 2', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'GitHub Copilot 2', exact: true })).toBeVisible()
 })
 
 Then('account search preserves priority and the existing settings and usage controls', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-standalone-tabs-and-search', async () => {
     const search = page.getByRole('searchbox', { name: 'Search accounts and known models', exact: true })
-    await search.fill('Codex 2')
-    const card = providerAccounts(page).getByRole('list', { name: 'Codex accounts', exact: true }).getByRole('listitem')
+    await search.fill('GitHub Copilot 2')
+    const card = providerAccounts(page).getByRole('list', { name: 'GitHub Copilot accounts', exact: true }).getByRole('listitem')
     await expect(card).toHaveCount(1)
     await expect(card).toContainText('#2')
-    await expect(card.getByRole('button', { name: 'Move Codex 2 earlier in account order', exact: true })).toBeEnabled()
+    await expect(card.getByRole('button', { name: 'Move GitHub Copilot 2 earlier in account order', exact: true })).toBeEnabled()
     await expect(card.getByRole('switch')).toHaveAttribute('data-state', 'checked')
     await search.fill('not-a-known-account')
     await expect(providerAccounts(page).getByText('No accounts match. Search includes known models only.')).toBeVisible()
     await search.clear()
-    await expect(providerAccounts(page).getByRole('list', { name: 'Codex accounts', exact: true }).getByRole('listitem')).toHaveCount(2)
+    await expect(providerAccounts(page).getByRole('list', { name: 'GitHub Copilot accounts', exact: true }).getByRole('listitem')).toHaveCount(2)
     await page.getByRole('searchbox', { name: 'Search models', exact: true }).fill('not-a-model')
     await expect(page.getByRole('tab', { name: 'Models', exact: true })).toHaveAttribute('aria-selected', 'true')
     await page.getByRole('tab', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Display name', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Copy sign-in command', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in with GitHub', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Connect account', exact: true })).toHaveCount(0)
     await page.getByText('Advanced', { exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Route slug', exact: true })).toBeVisible()
