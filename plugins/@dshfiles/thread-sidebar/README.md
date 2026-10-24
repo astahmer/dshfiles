@@ -352,9 +352,12 @@ Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
 in this browser by older versions are copied there once. **Thread notifications**
 are configured in Settings › Thread sidebar, separately for approval requests,
 questions, completed turns, stopped turns, and failed turns. Each category can be
-off, in-app, system, or both, with an optional sound preset and volume; settings
-follow the user through Host settings. A stopped turn covers a cancellation, a
-blocked turn, and one that hit its token ceiling. System permission is requested
+off, in-app, system, or both, with an optional sound preset and volume. In-app
+notifications can be placed at any corner or center edge of the sidebar, dismissed
+with the close button, and timed out after 3, 5, 10, 15, 30 or 60 seconds; choose
+Never to leave them until dismissed. These settings follow the user through Host
+settings. A stopped turn covers a cancellation, a blocked turn, and one that hit
+its token ceiling. System permission is requested
 only after an explicit action, and OS notification text stays generic (no prompt,
 thread title, or raw error details). Sounds use one browser audio context,
 unlocked by the first user gesture and resumed before every tone, so an alert in a

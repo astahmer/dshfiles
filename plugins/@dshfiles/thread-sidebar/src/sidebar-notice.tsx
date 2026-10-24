@@ -1,4 +1,6 @@
 import { AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { XIcon } from '@dshfiles/plugin-ui/icons'
 
 export interface SidebarNotice {
   readonly tone: 'danger' | 'warning' | 'success'
@@ -92,11 +94,17 @@ export const SidebarNoticeMessage = (props: { readonly message: string }): JSX.E
   <AlertDescription className="dshx:text-xs dshx:whitespace-nowrap">{props.message}</AlertDescription>
 )
 
+export const SidebarNotificationDismissButton = (props: { readonly label: string; readonly onDismiss: () => void }): JSX.Element => (
+  <Button size="icon-xs" type="button" variant="ghost" aria-label={props.label} onClick={props.onDismiss}>
+    <XIcon />
+  </Button>
+)
+
 export const scheduleSuccessNoticeDismissal = (
   notice: SidebarNotice,
   setNotice: (update: (current: SidebarNotice | null) => SidebarNotice | null) => void,
 ): (() => void) | undefined => {
-  if (notice.tone !== 'success' && notice.durationMs === undefined) return
+  if (notice.durationMs === 0 || (notice.tone !== 'success' && notice.durationMs === undefined)) return
 
   const timer = setTimeout(() => {
     setNotice(current => (current === notice ? null : current))

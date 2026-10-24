@@ -20,6 +20,12 @@ test('the settings schema and the preference decoder agree on every field', () =
   assert.equal(decoded.workspaceFilter, null)
 })
 
+test('notification settings accept a no-timeout value in the Host schema', () => {
+  const resolved = threadSidebarSettings.schema({ notificationDurationSeconds: 0, notificationPlacement: 'top-right' })
+  assert.equal(resolved.notificationDurationSeconds, 0)
+  assert.equal(resolved.notificationPlacement, 'top-right')
+})
+
 test('remote threads share view groups by default and can be separated', () => {
   const { separateRemoteThreads, ...older } = DEFAULT_PREFERENCES
   assert.equal(separateRemoteThreads, false)
@@ -215,6 +221,18 @@ test('legacy desktop alerts migrate to per-category system delivery unless the n
     },
   }
   assert.deepEqual(SidebarPreferencesModel.decode(custom)?.notificationCategories, custom.notificationCategories)
+})
+
+test('notification placement and timeout survive preference decoding and older values get defaults', () => {
+  const { notificationPlacement: _notificationPlacement, notificationDurationSeconds: _notificationDurationSeconds, ...older } = DEFAULT_PREFERENCES
+  assert.equal(SidebarPreferencesModel.decode(older)?.notificationPlacement, 'bottom-center')
+  assert.equal(SidebarPreferencesModel.decode(older)?.notificationDurationSeconds, 5)
+
+  const custom = { ...DEFAULT_PREFERENCES, notificationPlacement: 'top-right', notificationDurationSeconds: 0 } satisfies typeof DEFAULT_PREFERENCES
+  assert.equal(SidebarPreferencesModel.decode(custom)?.notificationPlacement, 'top-right')
+  assert.equal(SidebarPreferencesModel.decode(custom)?.notificationDurationSeconds, 0)
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, notificationPlacement: 'middle' }), null)
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, notificationDurationSeconds: 61 }), null)
 })
 
 test('malformed notification categories reject Host preferences rather than reaching the sidebar', () => {

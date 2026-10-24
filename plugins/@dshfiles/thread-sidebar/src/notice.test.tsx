@@ -1,4 +1,6 @@
+// @vitest-environment jsdom
 import assert from 'node:assert/strict'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
 import { afterEach, test, vi } from 'vitest'
 import {
@@ -8,6 +10,7 @@ import {
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
   MAX_PENDING_SIDEBAR_NOTICES,
   scheduleSuccessNoticeDismissal,
+  SidebarNotificationDismissButton,
   SidebarNoticeMessage,
   sidebarNoticeQueueReducer,
   SUCCESS_NOTICE_DURATION_MS,
@@ -15,6 +18,7 @@ import {
 } from './sidebar-notice.js'
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
 })
 
@@ -31,6 +35,21 @@ const createNoticeState = (initialNotice: SidebarNotice | null) => {
     update,
   }
 }
+
+test('notification close button calls the dismiss action', () => {
+  let dismissals = 0
+  render(
+    <SidebarNotificationDismissButton
+      label="Dismiss notification"
+      onDismiss={() => {
+        dismissals += 1
+      }}
+    />,
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }))
+  assert.equal(dismissals, 1)
+})
 
 test('notice message uses the visible alert column and stays on one line', () => {
   const html = renderToString(<SidebarNoticeMessage message="Thread link copied." />)
@@ -105,6 +124,17 @@ test('a configured partial-archive notice also expires after its selected durati
   vi.advanceTimersByTime(1)
   assert.equal(state.current, null)
   dispose?.()
+})
+
+test('a zero-duration notification stays until the user dismisses it', () => {
+  vi.useFakeTimers()
+  const notification: SidebarNotice = { tone: 'success', message: 'Turn finished.', durationMs: 0 }
+  const state = createNoticeState(notification)
+
+  assert.equal(scheduleSuccessNoticeDismissal(notification, state.update), undefined)
+  vi.advanceTimersByTime(60_000)
+  assert.equal(state.current, notification)
+  assert.equal(vi.getTimerCount(), 0)
 })
 
 test('a success timeout does not dismiss a replacement notice', () => {

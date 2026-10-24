@@ -138,7 +138,7 @@ Feature: Thread sidebar journeys
     Then the selected attention color survives a browser reload
 
   @scenario:thread-sidebar.notifications-settings
-  Scenario: Configure category-specific notification routes and sounds
+  Scenario: Configure notification delivery, placement, dismissal timeout, and sounds
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When notification routes and sounds are configured in Settings
     Then previewing a notification sound plays a tone through the browser audio context

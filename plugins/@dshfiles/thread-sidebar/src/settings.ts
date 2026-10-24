@@ -3,7 +3,7 @@ import { defineSettings } from '@dshfiles/dshx/settings'
 import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, SIDEBAR_ORDER_SECTIONS, SIDEBAR_SECTIONS, THREAD_ROW_ACTIONS } from './organization.js'
 import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
 import { THREAD_DELAYS } from './thread-delays.js'
-import { threadNotificationCategoriesSchema } from './thread-notifications.js'
+import { THREAD_NOTIFICATION_PLACEMENTS, threadNotificationCategoriesSchema } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
 const ids = (): Schema<string[]> => Schema.array(Schema.string()).default([]).hidden()
@@ -78,6 +78,8 @@ export const threadSidebarSettings = defineSettings({
     notificationCategories: Schema.transform(Schema.any(), value => threadNotificationCategoriesSchema.parse(value))
       .default(DEFAULT_PREFERENCES.notificationCategories)
       .hidden(),
+    notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),
+    notificationDurationSeconds: Schema.natural().max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds).hidden(),
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
       .description('When DSH starts again, continue the threads that were working when it stopped (a restart, a crash or a forced stop).'),

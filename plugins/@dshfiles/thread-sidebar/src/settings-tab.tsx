@@ -104,7 +104,10 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
       {storageWarning ? <Alert variant="warning">{props.t('threadSidebarStorageFailure')}</Alert> : null}
       <ThreadNotificationSettings
         categories={preferences.notificationCategories}
+        notificationPlacement={preferences.notificationPlacement}
+        notificationDurationSeconds={preferences.notificationDurationSeconds}
         onChange={notificationCategories => updatePreferences({ notificationCategories, desktopNotificationsEnabled: false })}
+        onPresentationChange={updatePreferences}
         t={props.t}
       />
       <FieldSet>

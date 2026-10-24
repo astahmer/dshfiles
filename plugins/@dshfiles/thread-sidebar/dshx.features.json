@@ -1023,7 +1023,7 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure in-app notification placement and timeout, dismiss in-app notices, configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
@@ -1035,7 +1035,9 @@
         "click button \"Snooze notifications\"",
         "expect button \"Resume notifications\"",
         "click button \"Resume notifications\"",
-        "expect button \"Snooze notifications\""
+        "expect button \"Snooze notifications\"",
+        "expect button \"In-app notification position\"",
+        "expect button \"In-app notification timeout\""
       ],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
@@ -1043,6 +1045,20 @@
           "key": "notificationCategories",
           "defaultValue": "all categories off; per-category sound disabled",
           "constraints": "Host-synced category settings; each of the five categories selects off, in-app, system, or both, plus an optional sound preset and volume.",
+          "coveredBy": ["thread-sidebar.notifications-settings"]
+        },
+        {
+          "key": "notificationPlacement",
+          "defaultValue": "bottom-center",
+          "constraints": "One of six in-app notification positions: top or bottom, aligned left, center, or right within the sidebar.",
+          "choices": ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"],
+          "coveredBy": ["thread-sidebar.notifications-settings"]
+        },
+        {
+          "key": "notificationDurationSeconds",
+          "defaultValue": "5",
+          "constraints": "Integer from 0 to 60; 0 means notifications stay until dismissed.",
+          "choices": ["0", "3", "5", "10", "15", "30", "60"],
           "coveredBy": ["thread-sidebar.notifications-settings"]
         }
       ],

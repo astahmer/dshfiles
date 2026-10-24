@@ -8,6 +8,8 @@ export type ThreadNotificationCategory = (typeof THREAD_NOTIFICATION_CATEGORIES)
 const THREAD_FINISH_NOTIFICATION_CATEGORIES = ['turn-finished', 'stopped', 'failed'] as const
 export type ThreadFinishNotificationCategory = (typeof THREAD_FINISH_NOTIFICATION_CATEGORIES)[number]
 export type ThreadNotificationDelivery = 'off' | 'in-app' | 'system' | 'both'
+export const THREAD_NOTIFICATION_PLACEMENTS = ['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'] as const
+export type ThreadNotificationPlacement = (typeof THREAD_NOTIFICATION_PLACEMENTS)[number]
 export type ThreadNotificationSound = 'soft' | 'chime' | 'bright' | 'low'
 
 export interface ThreadNotificationCategoryPreferences {

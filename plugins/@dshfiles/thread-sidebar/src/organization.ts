@@ -4,7 +4,7 @@ import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/cl
 import type { FinishedSubagentsMode } from './thread-children.js'
 import type { ThreadDelay } from './thread-delays.js'
 import type { ThreadMutes } from './thread-mute.js'
-import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories } from './thread-notifications.js'
+import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories, type ThreadNotificationPlacement } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
 import { WorkspacePaths } from './workspace-paths.js'
 
@@ -138,6 +138,8 @@ export interface SidebarPreferences {
   /** Kept only to migrate older Host/browser settings into per-category routes. */
   desktopNotificationsEnabled: boolean
   notificationCategories: ThreadNotificationCategories
+  notificationPlacement: ThreadNotificationPlacement
+  notificationDurationSeconds: number
   applyActionsToChildThreads: boolean
   /** Continue the threads a stopped Host cut off once it starts again. */
   resumeAfterRestart: boolean
@@ -207,6 +209,8 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   includeSubagentAttention: false,
   desktopNotificationsEnabled: false,
   notificationCategories: DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+  notificationPlacement: 'bottom-center',
+  notificationDurationSeconds: 5,
   applyActionsToChildThreads: true,
   resumeAfterRestart: true,
   maxChildren: 3,

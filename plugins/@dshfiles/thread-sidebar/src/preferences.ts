@@ -13,7 +13,12 @@ import {
 } from './organization.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
-import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, threadNotificationCategoriesSchema } from './thread-notifications.js'
+import {
+  DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+  THREAD_NOTIFICATION_PLACEMENTS,
+  ThreadNotificationModel,
+  threadNotificationCategoriesSchema,
+} from './thread-notifications.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
@@ -122,6 +127,8 @@ const preferencesInputSchema = z
     includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
     desktopNotificationsEnabled: z.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled),
     notificationCategories: threadNotificationCategoriesSchema.optional(),
+    notificationPlacement: z.enum(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement),
+    notificationDurationSeconds: z.number().int().min(0).max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds),
     applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
     resumeAfterRestart: z.boolean().default(DEFAULT_PREFERENCES.resumeAfterRestart),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),

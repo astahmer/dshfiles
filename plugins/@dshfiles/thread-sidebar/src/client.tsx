@@ -135,6 +135,7 @@ import {
   failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
   scheduleSuccessNoticeDismissal,
+  SidebarNotificationDismissButton,
   SidebarNoticeMessage,
   sidebarNoticeQueueReducer,
   type SidebarNotice,
@@ -196,6 +197,7 @@ import {
   type ThreadInteractionStatus,
   type ThreadNotificationCategory,
   type ThreadFinishNotificationCategory,
+  type ThreadNotificationPlacement,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
@@ -315,6 +317,15 @@ const notificationNoticeTones = {
   stopped: 'warning',
   failed: 'danger',
 } as const satisfies Record<ThreadNotificationCategory, SidebarNotice['tone']>
+
+const notificationPlacementClasses = {
+  'top-left': 'dshx:top-3 dshx:justify-start',
+  'top-center': 'dshx:top-3 dshx:justify-center',
+  'top-right': 'dshx:top-3 dshx:justify-end',
+  'bottom-left': 'dshx:bottom-3 dshx:justify-start',
+  'bottom-center': 'dshx:bottom-3 dshx:justify-center',
+  'bottom-right': 'dshx:bottom-3 dshx:justify-end',
+} satisfies Record<ThreadNotificationPlacement, string>
 
 const finishNotificationMessageKeys = {
   'turn-finished': { title: 'threadSidebarNotificationTitle', body: 'threadSidebarNotificationDone' },
@@ -1414,6 +1425,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const settingsId = useId()
   const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
   const notice = noticeQueueState.current
+  const isThreadNotification = noticeQueueState.currentIsNotification
   const setNotice = useCallback((notice: SidebarNotice | null): void => dispatchNoticeQueue({ type: 'set', notice }), [dispatchNoticeQueue])
   const updateNotice = useCallback(
     (update: (current: SidebarNotice | null) => SidebarNotice | null): void => dispatchNoticeQueue({ type: 'update', update }),
@@ -2485,7 +2497,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         notice: {
           tone: notificationNoticeTones[category],
           message: `${title}: ${session.displayTitle ?? fallbackBody}`,
-          durationMs: 5_000,
+          durationMs: preferences.notificationDurationSeconds * 1_000,
           actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'),
           onAction: () => openThread(sessionId),
         },
@@ -4238,6 +4250,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {notice.actionLabel}
             </Button>
           ) : null}
+          {isThreadNotification ? (
+            <SidebarNotificationDismissButton label={props.tSidebar('threadSidebarDismissNotification')} onDismiss={() => setNotice(null)} />
+          ) : null}
         </div>
       </Alert>
     )
@@ -4722,7 +4737,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         {isTransientNotice && noticeAlert !== null ? (
           <div
             data-testid="thread-sidebar-transient-notice"
-            className="dshx:pointer-events-none dshx:absolute dshx:inset-x-2 dshx:bottom-3 dshx:z-20 dshx:flex dshx:justify-center"
+            className={cn(
+              'dshx:pointer-events-none dshx:absolute dshx:inset-x-2 dshx:z-20 dshx:flex',
+              isThreadNotification ? notificationPlacementClasses[preferences.notificationPlacement] : 'dshx:bottom-3 dshx:justify-center',
+            )}
           >
             {noticeAlert}
           </div>

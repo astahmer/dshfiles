@@ -15,12 +15,14 @@ import { useId, useState } from 'react'
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
   THREAD_NOTIFICATION_CATEGORIES,
+  THREAD_NOTIFICATION_PLACEMENTS,
   ThreadNotificationModel,
   storedNotificationSoundsMuted,
   storedNotificationsMuted,
   type ThreadNotificationCategories,
   type ThreadNotificationCategory,
   type ThreadNotificationDelivery,
+  type ThreadNotificationPlacement,
   type ThreadNotificationSound,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
@@ -61,15 +63,33 @@ const permissionLabelKeys = {
 
 const deliveryOptions: readonly ThreadNotificationDelivery[] = ['off', 'in-app', 'system', 'both']
 const soundOptions: readonly ThreadNotificationSound[] = ['soft', 'chime', 'bright', 'low']
+const notificationDurations = [0, 3, 5, 10, 15, 30, 60] as const
+
+const placementLabelKeys = {
+  'top-left': 'threadSidebarNotificationTopLeft',
+  'top-center': 'threadSidebarNotificationTopCenter',
+  'top-right': 'threadSidebarNotificationTopRight',
+  'bottom-left': 'threadSidebarNotificationBottomLeft',
+  'bottom-center': 'threadSidebarNotificationBottomCenter',
+  'bottom-right': 'threadSidebarNotificationBottomRight',
+} as const
 
 interface ThreadNotificationSettingsProps {
   readonly categories: ThreadNotificationCategories
+  readonly notificationPlacement: ThreadNotificationPlacement
+  readonly notificationDurationSeconds: number
   readonly onChange: (categories: ThreadNotificationCategories) => void
+  readonly onPresentationChange: (presentation: {
+    readonly notificationPlacement?: ThreadNotificationPlacement
+    readonly notificationDurationSeconds?: number
+  }) => void
   readonly t: ThreadSidebarTranslate
 }
 
 export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProps): JSX.Element => {
   const id = useId()
+  const placementId = `${id}-placement`
+  const timeoutId = `${id}-timeout`
   const [permission, setPermission] = useState(readBrowserNotificationPermission)
   const [audioUnavailable, setAudioUnavailable] = useState(false)
   const notificationSoundsMuted = storedNotificationSoundsMuted.useValue()
@@ -118,6 +138,80 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
         >
           {props.t(notificationSoundsMuted ? 'threadSidebarUnmuteNotificationSounds' : 'threadSidebarMuteNotificationSounds')}
         </Button>
+      </div>
+      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@max-pane-narrow:grid-cols-1">
+        <div className="dshx:grid dshx:min-w-0 dshx:gap-1">
+          <Label htmlFor={placementId} className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+            {props.t('threadSidebarNotificationPlacement')}
+          </Label>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                id={placementId}
+                aria-label={props.t('threadSidebarNotificationPlacement')}
+                size="sm"
+                type="button"
+                variant="outline"
+                className="dshx:min-w-0 dshx:justify-start"
+              >
+                {props.t(placementLabelKeys[props.notificationPlacement])}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup
+                value={props.notificationPlacement}
+                onValueChange={value => {
+                  const notificationPlacement = THREAD_NOTIFICATION_PLACEMENTS.find(placement => placement === value)
+                  if (notificationPlacement !== undefined) props.onPresentationChange({ notificationPlacement })
+                }}
+              >
+                {THREAD_NOTIFICATION_PLACEMENTS.map(placement => (
+                  <DropdownMenuRadioItem key={placement} value={placement}>
+                    {props.t(placementLabelKeys[placement])}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="dshx:grid dshx:min-w-0 dshx:gap-1">
+          <Label htmlFor={timeoutId} className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+            {props.t('threadSidebarNotificationTimeout')}
+          </Label>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                id={timeoutId}
+                aria-label={props.t('threadSidebarNotificationTimeout')}
+                size="sm"
+                type="button"
+                variant="outline"
+                className="dshx:min-w-0 dshx:justify-start"
+              >
+                {props.notificationDurationSeconds === 0
+                  ? props.t('threadSidebarNotificationUntilDismissed')
+                  : props.t('threadSidebarNotificationDurationSeconds', { count: props.notificationDurationSeconds })}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuRadioGroup
+                value={String(props.notificationDurationSeconds)}
+                onValueChange={value => {
+                  const duration = notificationDurations.find(option => String(option) === value)
+                  if (duration !== undefined) props.onPresentationChange({ notificationDurationSeconds: duration })
+                }}
+              >
+                {notificationDurations.map(seconds => (
+                  <DropdownMenuRadioItem key={seconds} value={String(seconds)}>
+                    {seconds === 0
+                      ? props.t('threadSidebarNotificationUntilDismissed')
+                      : props.t('threadSidebarNotificationDurationSeconds', { count: seconds })}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       {audioUnavailable ? (
         <Alert variant="warning">
