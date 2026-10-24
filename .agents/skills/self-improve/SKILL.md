@@ -39,6 +39,16 @@ Bound the run: **at most 3 opportunities investigated, at most 1 change
 implemented** unless the user asks for more. Time-box the whole run and say what
 was left unfinished rather than silently exceeding it.
 
+### Scheduling a run
+
+When the user asks to run this weekly, create a `schedule_create` reminder in the
+current thread. A reminder inherits that thread's account and model, so the model
+chosen in the composer is what future runs use — a different model means a
+different thread. Use `weekly` timing and a prompt that restates: run
+`review --since=7d`, investigate at most three candidates, implement at most one
+change, record the ledger verdict, and say what next week's review should see
+move. Keep the thread alive; archiving it drops the schedule.
+
 ## 1. Review, then mine
 
 ```sh

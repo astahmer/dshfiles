@@ -74,6 +74,41 @@ node scripts/self-improve.ts review --since=7d --projects=dshfiles --top=3
 The cadence is a schedule, not a daemon: a `schedule_create` weekly reminder in a
 long-lived thread, or a manual run. Nothing runs model calls on its own.
 
+### Setting the cadence
+
+**Manual.** Run `node scripts/self-improve.ts review --since=7d` whenever you want
+one; the second run over the same corpus is seconds because the extraction cache
+already holds both windows.
+
+**Scheduled.** A reminder belongs to one thread and runs with that thread's model,
+so the account is chosen once, where the model is:
+
+1. Open a long-lived thread for this work — not a throwaway. Pick the account and
+   model in the composer (or `thread_select_model` on that thread) before
+   scheduling; the reminder inherits them, and changing the model later changes
+   what future runs use.
+2. Ask for the reminder in that thread, e.g. "schedule the self-improve review
+   every Monday at 09:00", and let it create a `weekly` schedule with this prompt:
+
+```
+Run the weekly self-improve review now: node scripts/self-improve.ts review
+--since=7d. Read the candidates, open the named Session events for at most three,
+and discard any a provider outage, the user's own decision or a legitimately long
+task explains. Record survivors in the ledger (one entry each, with a root-cause
+hypothesis). Implement at most one change on an eligible surface in this thread's
+own JJ workspace, validate it with a check that could have failed, and record the
+verdict. Update b:359 with the run's numbers. Report what next week's review
+should see move.
+```
+
+3. Keep that thread for the cadence. A schedule is Session-scoped: it survives a
+   Host restart with the thread, after downtime delivers only the latest missed
+   occurrence, and archiving the thread ends it.
+
+Both paths use the same command and the same artifact, so a manual run mid-week
+does not disturb the scheduled one — the review always compares the last complete
+window with the one before it.
+
 ### `mine`
 
 Walks `$DSH_HOME/sessions/<project>/<session>/session[.vN].jsonl.zstd`, decoding
