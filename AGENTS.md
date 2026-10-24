@@ -116,6 +116,12 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
 
 ## References in chat
 
+- Whenever a referenced entity has a native link/reference form, use it in the
+  message so it renders as a link instead of leaving a bare identifier or label.
+  For example, use `b:<id>` for backlog items, `jj:<name>` for Jujutsu revisions
+  and bookmarks, and the native rich session reference for DSH conversations.
+  Keep these references unformatted in ordinary prose; don't wrap them in quotes
+  or code spans that can prevent the reference renderer from recognizing them.
 - Refer to DSH conversations with their native session reference (the rich
   thread/session reference), not a code-formatted or abbreviated `session-…`
   or `thread-…` identifier. Include the conversation title or a short purpose
@@ -128,6 +134,8 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
   (for example, `@{luna}`) when linking to it in prose. Plain `@handle` remains
   the dispatch mention syntax; do not use it as a substitute when a link is
   intended.
+- Use Markdown links for ordinary URLs and repository files when the chat
+  renderer does not provide a native reference form.
 
 ## Version control
 
