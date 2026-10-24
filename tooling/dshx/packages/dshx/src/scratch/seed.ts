@@ -344,6 +344,8 @@ const openFakeProviderAccount = async (input: { readonly state: ScratchState; re
     .filter({ hasText: `Renamed to ${FAKE_PROVIDER_ROUTE_SLUG}.` })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs })
+  // Renaming remounts the detail pane, resetting its tab and Advanced section.
+  await openAccountSettings()
   return accountName
 }
 
