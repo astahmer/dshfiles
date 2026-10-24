@@ -61,7 +61,8 @@ export const OpenConfigAction = (props: {
           title={path ?? undefined}
           type="button"
         >
-          {t('openDocument')}
+          <CodeIcon aria-hidden="true" className="dshx:hidden dshx:size-3.5 dshx:@max-pane-compact:block" />
+          <span className="dshx:@max-pane-compact:sr-only">{t('openDocument')}</span>
         </button>
         {path !== null && (
           <DropdownMenu onOpenChange={open => open && send({ type: 'menu.open' })}>

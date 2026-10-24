@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "localhost-with-lan",
+      "title": "Keep localhost available when LAN access is enabled",
+      "summary": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Native loopback-only instances remain unchanged.",
+      "surfaces": ["host", "integration", "api", "tool"],
+      "configuration": [],
+      "states": ["starting", "native-loopback", "forwarding", "stopped", "failed"],
+      "failureModes": [
+        "An occupied loopback port rejects startup and rolls back listeners instead of taking over another application.",
+        "Unavailable IPv6 leaves the IPv4 loopback listener available; other listener failures are not hidden.",
+        "HTTPS is forwarded as TLS, so the supplied certificate must also cover localhost.",
+        "Localhost needs its own native launch-token login because authentication cookies are authority-bound."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "loopback listen",
+          "file": "plugins/@dshfiles/loopback-access/src/forwarder.test.ts",
+          "testName": "records bounded listen and connect spans without forwarded bytes or addresses"
+        },
+        {
+          "kind": "custom",
+          "span": "loopback connect",
+          "file": "plugins/@dshfiles/loopback-access/src/forwarder.test.ts",
+          "testName": "records bounded listen and connect spans without forwarded bytes or addresses"
+        }
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "loopback-access.authenticated-lan-and-localhost", "featureFile": "tooling/dshx/e2e/features/loopback-access.feature" },
+        {
+          "kind": "unit-test",
+          "id": "loopback-access.native-loopback-policy",
+          "file": "plugins/@dshfiles/loopback-access/src/access.test.ts",
+          "testName": "leaves a native loopback bind unchanged: %s"
+        }
+      ]
+    }
+  ]
+}
