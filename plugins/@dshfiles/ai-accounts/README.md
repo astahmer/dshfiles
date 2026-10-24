@@ -8,6 +8,42 @@ picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
+## Quick setup
+
+Use **Add account** on the accounts page or the trailing sidebar **+**. Both open
+the same setup without leaving the active chat. Choose a provider to allocate a
+disabled, retry-safe profile. Connect it to enable it, or **Finish later** to
+keep it disabled. **Connect account** / **Reauthenticate** on the existing page
+reopens setup for a saved profile; save pending edits first.
+
+- **Codex:** **Continue with Codex** runs the installed official OpenAI CLI with
+  device authentication in fresh private staging. Only a successful, verified
+  token pair is atomically adopted. Existing credentials require explicit
+  replacement consent; cancel, expiry and stale setup callbacks preserve them.
+  DSH never installs the CLI automatically.
+- **GitHub Copilot:** **Sign in with GitHub** shows device approval in the Web GUI.
+  Closing pending setup cancels its intent, not a newer sign-in. Failed or stale
+  authorization does not overwrite an existing grant.
+- **Keyed accounts:** enter a masked key or import from Secret Catalog. Values
+  stay in DSH credentials, never account JSON, localStorage or chat. Successful
+  storage confirms credential presence, not provider validation.
+
+New Codex and Claude profiles use private homes under the active account store;
+they never inherit the Host user's global login. Managed Codex route slugs are
+read-only: rename the display name instead. Legacy manual overlays retain their
+containment checks. Claude subscription login remains owned by unmodified Claude
+Code; this setup does not implement Claude.ai OAuth. Cursor stays quota-only.
+
+Agent tools share the setup and sign-in APIs but receive metadata only: device
+codes and approval URLs are browser-only. Starting/cancelling login requires a
+user request; cancellation requires explicit confirmation. Accepted credential
+writes cannot be undone by closing setup. Applying these Host changes requires
+a user-managed restart; older Hosts show an unavailable/retry error.
+
+Unit tests use fake subprocesses and private temporary credential fixtures. Real
+OpenAI/GitHub approval and installed CLI compatibility require separate human
+verification; automated UI journeys never start real sign-in.
+
 ## Providers
 
 | Kind           | Login                                                                                                                                                    | Model route | Quota                                                                                                                       |

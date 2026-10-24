@@ -1,8 +1,10 @@
 import { mkdir, readFile, rename, writeFile, chmod } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
-import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
+import { AccountDraftModel } from './account-draft.js'
+import { AccountHomePolicy } from './account-home-policy.js'
+import { createSetupAccountInputSchema, type CreateSetupAccountInput } from './api.js'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import { CodexHomeModel, describeCodexAuth, materializeCodexShadowHome, CodexHomeError } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
@@ -24,7 +26,7 @@ import { AccountWriteQueue } from './account-write-queue.js'
  * which stays inside each Codex home where its owner put it.
  */
 
-const STORE_PATH = resolve(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'accounts.json')
+const STORE_PATH = AccountHomePolicy.filePath()
 
 const DEFAULT_SHADOW_ROOT = join(CodexHomeModel.accountHome(), '.codex-dshx')
 
@@ -49,12 +51,9 @@ const storeFileSchema = accountsFileSchema.extend({
 })
 
 export class AccountStoreModel {
-  static readonly filePath = (): string => STORE_PATH
-  static readonly codexLayoutFor = (profile: Pick<AccountDraft, 'homePath' | 'shadowHomePath' | 'instanceId'>, shadowRoot: string) =>
-    CodexHomeModel.resolveLayout({
-      homePath: profile.homePath,
-      shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(shadowRoot.replace(/\/$/u, ''), profile.instanceId),
-    })
+  static readonly filePath = AccountHomePolicy.filePath
+  static readonly isManagedSetupHome = AccountHomePolicy.isManagedSetupHome
+  static readonly codexLayoutFor = AccountHomePolicy.codexLayoutFor
 }
 
 const parseJson = (raw: string): unknown => {
@@ -288,6 +287,38 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
     ),
   })
 
+  /** Setup is insert-only; retries never overwrite an edited profile. */
+  const createSetupAccount = (input: CreateSetupAccountInput): Promise<{ readonly instanceId: string; readonly file: AccountStoreFile }> =>
+    mutate(async () => {
+      const request = createSetupAccountInputSchema.parse(input)
+      const instanceId = `${request.kind}_work_${request.requestId.replaceAll('-', '').toLowerCase()}`
+      const file = await readAccountFile()
+      if (file.accounts.some(account => account.instanceId === instanceId)) return { instanceId, file }
+      const generated = AccountDraftModel.newAccountDraft({ kind: request.kind, existing: file.accounts })
+      const privateHome = join(dirname(dependencies.filePath), 'homes', instanceId)
+      const draft: AccountDraft = {
+        ...generated,
+        instanceId,
+        enabled: false,
+        homePath: request.kind === 'codex' || request.kind === 'claude' ? privateHome : generated.homePath,
+        shadowHomePath: request.kind === 'codex' ? privateHome : generated.shadowHomePath,
+        apiKeyEnv: generated.apiKeyEnv === '' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+      }
+      return { instanceId, file: await persistAccountFile({ ...file, accounts: [...file.accounts, draft] }) }
+    })
+
+  /** Finish against the latest profile under the same writer guard; never recreate a removed account or overwrite newer settings. */
+  const completeSetupAccount = (instanceId: string, verify: (draft: AccountDraft, file: AccountStoreFile) => Promise<boolean>): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      const current = file.accounts.find(account => account.instanceId === instanceId)
+      if (current === undefined) throw new Error('This account was removed.')
+      if (!(await verify(current, file))) throw new Error('Complete sign-in or store a key first.')
+      return current.enabled
+        ? file
+        : persistAccountFile({ ...file, accounts: file.accounts.map(account => (account === current ? { ...current, enabled: true } : account)) })
+    })
+
   /** Create or update a profile; a rename replaces the previous id in place. */
   const upsertAccount = (draft: AccountDraft, previousInstanceId?: string): Promise<AccountStoreFile> =>
     mutate(async () => {
@@ -371,6 +402,8 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
     readAccountFile,
     writeAccountFile,
     buildAccountsFile,
+    createSetupAccount,
+    completeSetupAccount,
     upsertAccount,
     removeAccount,
     moveAccount,

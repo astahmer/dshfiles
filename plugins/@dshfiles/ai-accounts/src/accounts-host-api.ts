@@ -1,4 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApiCaller } from '@dshfiles/dshx/api'
+import type { CopilotLoginState } from './api.js'
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { SecretCatalogCredentialBridge } from '@dshfiles/credential-port'
 import { accountRuntime } from './account-runtime.js'
@@ -116,6 +118,26 @@ export const accountsHostApi = aiAccountsApi.host({
     accountRuntime(ctx)?.usageCache?.invalidate()
     return { imported: true, apiKeyEnv: account.apiKeyEnv }
   },
+  createSetupAccount: async ({ input, ctx }) => {
+    const created = await accountStoreService.createSetupAccount(input)
+    accountRuntime(ctx)?.usageCache?.invalidate()
+    await refreshRoutes(ctx)
+    return { instanceId: created.instanceId, file: await accountsFile(ctx) }
+  },
+  completeSetupAccount: async ({ input, ctx }) => {
+    await accountStoreService.completeSetupAccount(input.instanceId, async (draft, file) => {
+      const observed = await accountStoreService.buildAccountsFile(
+        { ...file, accounts: [draft] },
+        [],
+        resolveKeyFromContext(ctx),
+        async id => (await createCopilotCredentialsService(ctx.get('credentials')).read(id)) !== undefined,
+      )
+      return observed.accounts[0]?.signedIn === true
+    })
+    accountRuntime(ctx)?.usageCache?.invalidate()
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
+  },
   save: async ({ input, ctx }) => {
     await accountStoreService.upsertAccount(input.draft, input.previousInstanceId)
     accountRuntime(ctx)?.usageCache?.invalidate()
@@ -139,10 +161,11 @@ export const accountsHostApi = aiAccountsApi.host({
     return accountsFile(ctx)
   },
   identity: async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId),
-  beginCopilotLogin: async ({ input, ctx }) => copilotLoginFor(ctx).begin(input.instanceId),
-  copilotLoginStatus: async ({ input, ctx }) => copilotLoginFor(ctx).state(input.instanceId),
+  beginCopilotLogin: async ({ input, ctx, caller }) =>
+    AccountsHostApiModel.copilotForCaller(await copilotLoginFor(ctx).begin(input.instanceId, input.requestId), caller),
+  copilotLoginStatus: async ({ input, ctx, caller }) => AccountsHostApiModel.copilotForCaller(copilotLoginFor(ctx).state(input.instanceId), caller),
   cancelCopilotLogin: async ({ input, ctx }) => {
-    copilotLoginFor(ctx).cancel(input.instanceId)
+    copilotLoginFor(ctx).cancel(input.instanceId, input.requestId)
     return { cancelled: true }
   },
   signOutCopilot: async ({ input, ctx }) => {
@@ -307,6 +330,10 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
 }
 
 export class AccountsHostApiModel {
+  static copilotForCaller(state: CopilotLoginState, caller: ApiCaller): CopilotLoginState {
+    return caller.kind === 'client' ? state : { ...state, userCode: null, verificationUri: null }
+  }
+
   static readonly accountsFile = accountsFile
   static readonly readAccountsUsage = readAccountsUsage
   static readonly readQuotaResetAt = readQuotaResetAt

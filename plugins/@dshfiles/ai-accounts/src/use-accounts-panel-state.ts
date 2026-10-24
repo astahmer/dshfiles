@@ -32,7 +32,8 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const fileQuery = useQuery(aiAccountsQueries.file(accounts))
   const file = fileQuery.data ?? null
   const setFile = (next: AccountsFile): void => {
-    queryClient.setQueryData(aiAccountsKeys.file, next)
+    void queryClient.cancelQueries({ queryKey: aiAccountsKeys.file, exact: true }).then(() => queryClient.setQueryData(aiAccountsKeys.file, next))
+    void queryClient.invalidateQueries({ queryKey: aiAccountsKeys.usage })
   }
   const load = async (): Promise<void> => {
     const result = await fileQuery.refetch({ throwOnError: true })
@@ -71,9 +72,12 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
 
   // The editor follows the selection, and keeps unsaved edits across re-reads and renames.
   const followedId = useRef<string | null>(null)
+  const previousSelected = useRef<AccountProfile | null>(null)
   useEffect(() => {
     const previouslyFollowed = followedId.current
-    setDraft(current => AccountDraftModel.followSelection({ current, selected, selectedId, followedId: previouslyFollowed }))
+    const baseline = previousSelected.current
+    setDraft(current => AccountDraftModel.followSelection({ current, selected, selectedId, followedId: previouslyFollowed, previousSelected: baseline }))
+    previousSelected.current = selected
     if (selected !== null) followedId.current = selected.instanceId
   }, [selected, selectedId])
 

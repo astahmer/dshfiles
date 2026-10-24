@@ -2,7 +2,7 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChartColumnIcon } from '@dshfiles/plugin-ui/icons'
+import { ChartColumnIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useRef, useState, type RefObject } from 'react'
@@ -180,14 +180,14 @@ const UsagePopoverContent = (props: {
  * thread sidebar seats it above its foot; the stock sidebar stacks footer
  * actions above Settings, so there it renders in place.
  */
-export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
+export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void; readonly onAddAccount: () => void }): JSX.Element | null => {
   const { footerButton } = usePreferences()
   // A disabled strip mounts nothing: no usage query, no clock and no layout subscription behind an empty surface.
   if (!footerButton) return null
   return <QuotaStripBody {...props} />
 }
 
-const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
+const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void; readonly onAddAccount: () => void }): JSX.Element => {
   const { meterLabel, usageWindowLayout, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
@@ -252,6 +252,12 @@ const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX
                 </ArrangeableAccount>
               ))
             )}
+            <AddAccountPreviewButton
+              onClick={() => {
+                setOpen(false)
+                props.onAddAccount()
+              }}
+            />
           </div>
         </PopoverAnchor>
         <UsagePopoverContent close={() => setOpen(false)} keepOpenWithin={stripRef} onOpenUsageHistory={props.onOpenUsageHistory} />
@@ -311,9 +317,40 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
  * strip in place unless a seat above the foot already holds it. The "Sidebar
  * usage" switch hides both.
  */
-export const QuotaFooter = (props: { readonly wide: boolean; readonly stripSeated: boolean; readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
+export const QuotaFooter = (props: {
+  readonly wide: boolean
+  readonly stripSeated: boolean
+  readonly onAddAccount: () => void
+  readonly onOpenUsageHistory: () => void
+}): JSX.Element | null => {
   const { footerButton } = usePreferences()
   if (!footerButton) return null
-  if (!props.wide) return <QuotaRailButton onOpenUsageHistory={props.onOpenUsageHistory} />
-  return props.stripSeated ? null : <QuotaStrip onOpenUsageHistory={props.onOpenUsageHistory} />
+  if (!props.wide)
+    return (
+      <div className="dshx-root dshx:flex dshx:flex-col dshx:items-center dshx:gap-1">
+        <QuotaRailButton onOpenUsageHistory={props.onOpenUsageHistory} />
+        <AddAccountPreviewButton onClick={props.onAddAccount} />
+      </div>
+    )
+  return props.stripSeated ? null : <QuotaStrip onOpenUsageHistory={props.onOpenUsageHistory} onAddAccount={props.onAddAccount} />
 }
+
+const AddAccountPreviewButton = (props: { readonly onClick: () => void }): JSX.Element => (
+  <TooltipProvider delayDuration={200}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          aria-label="Add AI account"
+          className={cn(meterButtonClass, 'dshx:size-8 dshx:justify-center dshx:border dshx:border-dashed')}
+          onClick={props.onClick}
+          type="button"
+        >
+          <PlusIcon className="dshx:size-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="dshx-root" side="top">
+        Add account
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)

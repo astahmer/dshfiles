@@ -10,6 +10,7 @@ import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
 export const AccountIdentitySection = (props: { readonly state: AccountsPanelState; readonly draft: AccountDraft }): JSX.Element => {
   const draft = props.draft
+  const managedCodexRoute = draft.kind === 'codex' && draft.homePath !== '' && draft.homePath === draft.shadowHomePath
   const { accounts, selected, selectedId, setDraft, setNotice, load, commitRename, saveMode } = props.state
   return (
     <NumberedSection
@@ -44,7 +45,16 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
       title="Account identity"
     >
       <div className="dshx:grid dshx:grid-cols-1 dshx:gap-x-3 dshx:gap-y-2.5 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-2">
-        <LabelledControl hint={saveMode === 'auto' ? `${ROUTE_SLUG_HINT} Saved when you leave the field.` : ROUTE_SLUG_HINT} label="Route slug">
+        <LabelledControl
+          hint={
+            managedCodexRoute
+              ? 'This route identifies its private login home. Use Display name to rename it.'
+              : saveMode === 'auto'
+                ? `${ROUTE_SLUG_HINT} Saved when you leave the field.`
+                : ROUTE_SLUG_HINT
+          }
+          label="Route slug"
+        >
           {id => (
             <Input
               id={id}
@@ -54,6 +64,7 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
                 if (event.key === 'Enter') void commitRename()
               }}
               value={draft.instanceId}
+              readOnly={managedCodexRoute}
             />
           )}
         </LabelledControl>

@@ -1,18 +1,43 @@
+import { setupOperationId } from './account-setup-controller.js'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { aiAccountsApi, type CopilotLoginState } from './api.js'
+import { beginLoginQuery } from './login-query.js'
 
-export const CopilotSignIn = (props: { readonly instanceId: string; readonly signedIn: boolean }): JSX.Element => {
+export const CopilotSignIn = (props: { readonly instanceId: string; readonly signedIn: boolean; readonly onConnected?: () => void }): JSX.Element => {
+  const { instanceId, onConnected } = props
+  const [requestId] = useState(setupOperationId)
   const accounts = useApi(aiAccountsApi)
   const queryClient = useQueryClient()
-  const queryKey = ['ai-accounts', 'copilot-login', props.instanceId] as const
+  const queryKey = ['ai-accounts', 'copilot-login', instanceId] as const
+  const alive = useRef(true)
+  const ownsAttempt = useRef(false)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+      if (ownsAttempt.current) void accounts.cancelCopilotLogin({ instanceId, confirm: true, requestId }).catch(() => undefined)
+    }
+  }, [accounts, instanceId, requestId])
+  const begin = useMutation({
+    mutationFn: () => beginLoginQuery(queryClient, queryKey, () => accounts.beginCopilotLogin({ instanceId: instanceId, requestId })),
+    onSuccess: next => {
+      ownsAttempt.current = next.status === 'starting' || next.status === 'waiting'
+      if (!alive.current) {
+        if (ownsAttempt.current) void accounts.cancelCopilotLogin({ instanceId, confirm: true, requestId }).catch(() => undefined)
+        return
+      }
+      queryClient.setQueryData(queryKey, next)
+    },
+  })
   const statusQuery = useQuery({
     queryKey,
-    queryFn: () => accounts.copilotLoginStatus({ instanceId: props.instanceId }),
+    queryFn: ({ signal }) => accounts.copilotLoginStatus({ instanceId: instanceId }, { signal }),
+    enabled: !begin.isPending,
     refetchInterval: query => {
       const status = query.state.data?.status
       return status === 'starting' || status === 'waiting' ? 1_000 : false
@@ -20,21 +45,17 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
     retry: false,
   })
   const status: CopilotLoginState = statusQuery.data ?? {
-    instanceId: props.instanceId,
+    instanceId: instanceId,
     status: 'idle',
     userCode: null,
     verificationUri: null,
     message: null,
   }
-  const begin = useMutation({
-    mutationFn: () => accounts.beginCopilotLogin({ instanceId: props.instanceId }),
-    onSuccess: next => queryClient.setQueryData(queryKey, next),
-  })
   const cancel = useMutation({
-    mutationFn: () => accounts.cancelCopilotLogin({ instanceId: props.instanceId }),
+    mutationFn: () => accounts.cancelCopilotLogin({ instanceId, confirm: true, requestId }),
     onSuccess: () =>
       queryClient.setQueryData(queryKey, {
-        instanceId: props.instanceId,
+        instanceId: instanceId,
         status: 'idle',
         userCode: null,
         verificationUri: null,
@@ -42,14 +63,14 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
       } satisfies CopilotLoginState),
   })
   const signOut = useMutation({
-    mutationFn: () => accounts.signOutCopilot({ instanceId: props.instanceId }),
+    mutationFn: () => accounts.signOutCopilot({ instanceId: instanceId }),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'file'] }),
         queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'usage'] }),
       ])
       queryClient.setQueryData(queryKey, {
-        instanceId: props.instanceId,
+        instanceId: instanceId,
         status: 'idle',
         userCode: null,
         verificationUri: null,
@@ -65,6 +86,15 @@ export const CopilotSignIn = (props: { readonly instanceId: string; readonly sig
       queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'usage'] }),
     ])
   }, [queryClient, status.status])
+
+  const connected = useRef(false)
+  useEffect(() => {
+    if (status.status === 'complete' && begin.isSuccess && !connected.current) {
+      connected.current = true
+      ownsAttempt.current = false
+      onConnected?.()
+    }
+  }, [status.status, begin.isSuccess, onConnected])
 
   const active = status.status === 'starting' || status.status === 'waiting'
   const error = begin.error !== null || cancel.error !== null || signOut.error !== null || status.status === 'error'

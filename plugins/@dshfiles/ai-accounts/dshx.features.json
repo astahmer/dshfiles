@@ -2,6 +2,52 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "quick-account-setup",
+      "title": "Connect an account without leaving the chat",
+      "summary": "The sidebar + and existing accounts page share one cancellable setup. The Host allocates a disabled retry-safe profile and private homes, then confirms credential presence before enabling it.",
+      "reach": ["click button \"Add AI account\"", "expect dialog \"Add account\""],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["choosing", "creating", "connecting", "waiting-for-provider", "saving-key", "error", "connected", "finished-later"],
+      "failureModes": [
+        "Old Hosts show an unavailable/retry error instead of pretending setup succeeded.",
+        "Cancellation and stale callbacks cannot replace existing credentials or close a newer setup.",
+        "Accepted credential writes cannot be rolled back by closing setup."
+      ],
+      "externalDependencies": [
+        {
+          "id": "provider-approval",
+          "boundary": "Official Codex CLI device approval and existing GitHub device OAuth; DSH owns credential persistence.",
+          "deterministicFake": "Fake CLI/device responses and private temporary fixtures; browser journeys never start real sign-in."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.sidebar-add",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.setup-lifecycle",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-setup.test.ts",
+          "testName": "does not enable or close a newer setup after a delayed old key write"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "ai-accounts codex device login",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-login-process.test.ts",
+          "testName": "records a bounded CLI lifetime span without paths, device codes or raw errors"
+        }
+      ]
+    },
+    {
       "id": "account-lifecycle",
       "title": "Manage provider account drafts",
       "summary": "Add, edit, enable, and persist account profiles; confirm removals, keep canceled profiles, and retry failed removals.",
@@ -293,7 +339,7 @@
         {
           "key": "usageShortNameOverrides",
           "defaultValue": "{}",
-          "constraints": "Account id → strip short name, at most 6 characters; empty falls back to the picker tag, then the initials.",
+          "constraints": "Account id \u2192 strip short name, at most 6 characters; empty falls back to the picker tag, then the initials.",
           "coveredBy": ["ai-accounts.strip-short-names"]
         }
       ],
@@ -408,7 +454,7 @@
         {
           "key": "workHours",
           "defaultValue": "{\"days\":[1,2,3,4,5],\"startHour\":9,\"endHour\":18}",
-          "constraints": "Days are Date.getDay() values (0 = Sunday); startHour 0–23, endHour 1–24 and after startHour.",
+          "constraints": "Days are Date.getDay() values (0 = Sunday); startHour 0\u201323, endHour 1\u201324 and after startHour.",
           "coveredBy": ["ai-accounts.coverage-none-free", "ai-accounts.handoff-plan"]
         }
       ],

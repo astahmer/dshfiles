@@ -321,7 +321,13 @@ const openFakeProviderAccount = async (input: { readonly state: ScratchState; re
     return existing.displayName
   }
   await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
-  await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
+  await page
+    .getByRole('dialog', { name: 'Add account', exact: true })
+    .getByRole('button', { name: 'Command Code account', exact: true })
+    .click({ timeout: timeoutMs })
+  const setup = page.getByRole('dialog', { name: /^Configure Command Code \d+ key$/u })
+  await setup.getByRole('button', { name: 'Cancel', exact: true }).click({ timeout: timeoutMs })
+  await setup.waitFor({ state: 'hidden', timeout: timeoutMs })
   const accountHeading = page.getByRole('heading', { name: /^Command Code \d+$/u }).last()
   await accountHeading.waitFor({ state: 'visible', timeout: timeoutMs })
   const accountName = (await accountHeading.innerText()).trim()
@@ -390,6 +396,9 @@ const configureFakeProviderThread = async (input: {
   await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.apiKey ?? 'dshx-dev-fake-key', { timeout: timeoutMs })
   await keyDialog.getByRole('button', { name: /^(?:Store key|Replace key)$/u }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
+  // Quick setup allocates disabled profiles. Enable only after the synthetic key and loopback URL are saved.
+  const disabled = page.getByRole('switch', { name: 'Hidden from model picker', exact: true })
+  if (await disabled.isVisible()) await disabled.click({ timeout: timeoutMs })
   await page.keyboard.press('Escape')
 
   await openSeedThreadComposer(page, timeoutMs)

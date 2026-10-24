@@ -34,6 +34,10 @@ export const createCopilotLoginService = (input: {
   const states = new Map<string, CopilotLoginState>()
   const controllers = new Map<string, AbortController>()
   const tasks = new Map<string, Promise<void>>()
+  const requestIds = new Map<string, string | undefined>()
+  let disposed = false
+  const live = (instanceId: string, controller: AbortController): boolean =>
+    !disposed && controllers.get(instanceId) === controller && !controller.signal.aborted && input.isCopilotAccount(instanceId)
 
   const state = (instanceId: string): CopilotLoginState => states.get(instanceId) ?? initialState(instanceId)
 
@@ -43,9 +47,11 @@ export const createCopilotLoginService = (input: {
     tasks.delete(instanceId)
   }
 
-  const begin = async (instanceId: string): Promise<CopilotLoginState> => {
-    if (!input.isCopilotAccount(instanceId)) throw new Error('This GitHub Copilot account is no longer available.')
+  const begin = async (instanceId: string, requestId?: string): Promise<CopilotLoginState> => {
+    if (disposed || !input.isCopilotAccount(instanceId)) throw new Error('This GitHub Copilot account is no longer available.')
+    if (requestId !== undefined && requestIds.get(instanceId) === requestId && controllers.has(instanceId)) return state(instanceId)
     cancel(instanceId)
+    requestIds.set(instanceId, requestId)
     const controller = new AbortController()
     controllers.set(instanceId, controller)
     states.set(instanceId, { ...initialState(instanceId), status: 'starting', message: 'Connecting to GitHub…' })
@@ -53,44 +59,70 @@ export const createCopilotLoginService = (input: {
     const login = input.login ?? copilotOAuth?.login
     if (login === undefined) throw new Error('The GitHub Copilot OAuth provider is unavailable.')
     let phase: 'github' | 'credential-storage' = 'github'
-    const task = login({
-      signal: controller.signal,
-      prompt: async () => '',
-      notify: event => {
-        if (event.type === 'device_code') {
-          const verificationUri = URL.parse(event.verificationUri)
-          if (verificationUri === null || verificationUri.protocol !== 'https:' || verificationUri.hostname !== 'github.com') {
-            states.set(instanceId, { ...initialState(instanceId), status: 'error', message: 'GitHub returned an untrusted verification link.' })
-            controller.abort()
-            return
-          }
-          states.set(instanceId, {
-            instanceId,
-            status: 'waiting',
-            userCode: event.userCode,
-            verificationUri: verificationUri.href,
-            message: 'Enter this code on GitHub to authorize Copilot.',
-          })
-          return
-        }
-        if (event.type === 'progress') {
-          states.set(instanceId, { ...state(instanceId), message: 'Waiting for GitHub authorization…' })
-        }
-      },
-    })
+    // Observe the original grant before login; compare under the credential owner's mutation lock.
+    const before = credentials.read(instanceId)
+    void before.catch(() => undefined)
+    const timer = setTimeout(() => {
+      if (!live(instanceId, controller)) return
+      states.set(instanceId, { ...initialState(instanceId), status: 'error', message: 'GitHub sign-in expired. Start again.' })
+      controller.abort()
+    }, 15 * 60_000)
+    timer.unref()
+    controller.signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
+    const task = Promise.resolve()
+      .then(() =>
+        login({
+          signal: controller.signal,
+          prompt: async () => '',
+          notify: event => {
+            if (!live(instanceId, controller)) return
+            if (event.type === 'device_code') {
+              const verificationUri = URL.parse(event.verificationUri)
+              if (verificationUri?.href !== 'https://github.com/login/device' || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/u.test(event.userCode)) {
+                states.set(instanceId, { ...initialState(instanceId), status: 'error', message: 'GitHub returned an untrusted verification link.' })
+                controller.abort()
+                return
+              }
+              states.set(instanceId, {
+                instanceId,
+                status: 'waiting',
+                userCode: event.userCode,
+                verificationUri: verificationUri.href,
+                message: 'Enter this code on GitHub to authorize Copilot.',
+              })
+              return
+            }
+            if (event.type === 'progress') {
+              states.set(instanceId, { ...state(instanceId), message: 'Waiting for GitHub authorization…' })
+            }
+          },
+        }),
+      )
       .then(async credential => {
-        if (controller.signal.aborted) return
+        if (!live(instanceId, controller)) return
+        const original = await before
+        if (!live(instanceId, controller)) return
         phase = 'credential-storage'
-        await credentials.modify({ instanceId, mutate: async () => credential })
-        states.set(instanceId, { ...state(instanceId), status: 'complete', message: 'GitHub Copilot is connected.' })
+        await credentials.modify({
+          instanceId,
+          mutate: async current => {
+            // Throw, rather than returning undefined: the owner must not delete or replace an existing grant.
+            if (!live(instanceId, controller)) throw new Error('Stale GitHub sign-in')
+            if (JSON.stringify(current) !== JSON.stringify(original)) throw new Error('GitHub credential changed during sign-in')
+            return credential
+          },
+        })
+        if (!live(instanceId, controller)) return
+        states.set(instanceId, { ...initialState(instanceId), status: 'complete', message: 'GitHub Copilot is connected.' })
         input.onChange()
       })
       .catch(cause => {
-        if (controller.signal.aborted) return
+        if (!live(instanceId, controller)) return
         const current = state(instanceId)
-        states.set(instanceId, { ...current, status: 'error', message: failureMessage(cause, phase, current) })
+        states.set(instanceId, { ...initialState(instanceId), status: 'error', message: failureMessage(cause, phase, current) })
       })
       .finally(() => {
+        clearTimeout(timer)
         if (controllers.get(instanceId) === controller) controllers.delete(instanceId)
         if (tasks.get(instanceId) === task) tasks.delete(instanceId)
       })
@@ -98,13 +130,14 @@ export const createCopilotLoginService = (input: {
     return state(instanceId)
   }
 
-  const cancelLogin = (instanceId: string): void => {
+  const cancelLogin = (instanceId: string, requestId?: string): void => {
+    if (requestId !== undefined && requestIds.get(instanceId) !== requestId) return
     cancel(instanceId)
     states.set(instanceId, { ...initialState(instanceId), message: 'GitHub sign-in was cancelled.' })
   }
 
   const signOut = async (instanceId: string): Promise<void> => {
-    if (!input.isCopilotAccount(instanceId)) throw new Error('This GitHub Copilot account is no longer available.')
+    if (disposed || !input.isCopilotAccount(instanceId)) throw new Error('This GitHub Copilot account is no longer available.')
     cancel(instanceId)
     await credentials.remove(instanceId)
     states.set(instanceId, { ...initialState(instanceId), status: 'idle', message: 'GitHub Copilot was disconnected.' })
@@ -116,7 +149,16 @@ export const createCopilotLoginService = (input: {
     state,
     cancel: cancelLogin,
     signOut,
+    reconcile: (): void => {
+      for (const id of controllers.keys()) if (!input.isCopilotAccount(id)) cancelLogin(id)
+      for (const id of states.keys()) {
+        if (input.isCopilotAccount(id)) continue
+        states.delete(id)
+        requestIds.delete(id)
+      }
+    },
     dispose: (): void => {
+      disposed = true
       for (const controller of controllers.values()) controller.abort()
       controllers.clear()
       tasks.clear()

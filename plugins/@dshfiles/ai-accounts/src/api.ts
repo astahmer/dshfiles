@@ -18,6 +18,9 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
 
 export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
 
+export const createSetupAccountInputSchema = z.object({ kind: accountKindSchema, requestId: z.uuid() }).strict()
+export type CreateSetupAccountInput = z.infer<typeof createSetupAccountInputSchema>
+
 /** Model-facing text for a structured result the tools below return. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -347,6 +350,21 @@ export const aiAccountsApi = defineApi({
       }),
       output: z.object({ imported: z.literal(true), apiKeyEnv: z.string().max(128) }),
     }),
+    /** Create a fresh setup account once per request, without replacing any existing profile. */
+    createSetupAccount: method({
+      input: createSetupAccountInputSchema,
+      output: z.object({ instanceId: z.string().min(1).max(64), file: accountsFileSchema }),
+      description:
+        'Create one account for setup with an idempotent UUID requestId and private Codex/Claude home. Reusing the requestId returns the existing account without overwriting it. Call only when the user asked to add that account.',
+      tool: { name: 'ai_accounts_create_setup_account', render: output => `Account ${output.instanceId} is ready for setup.` },
+    }),
+    completeSetupAccount: method({
+      input: z.object({ instanceId: z.string().min(1).max(64) }).strict(),
+      output: accountsFileSchema,
+      description:
+        'Finish setup by enabling the current saved account only after credential presence is confirmed. Never recreates a removed account or overwrites newer settings. Call only when the user asked to connect that account.',
+      tool: { name: 'ai_accounts_complete_setup_account', render: () => 'Account setup finished.' },
+    }),
     /** Create or update one account by its instance id. */
     save: method({
       input: z.object({
@@ -355,6 +373,9 @@ export const aiAccountsApi = defineApi({
         previousInstanceId: z.string().min(1).max(64).optional(),
       }),
       output: accountsFileSchema,
+      description:
+        'Save an account profile or change its enabled/model settings. Stores references and metadata only, never credential values. Call only when the user asked to edit that account.',
+      tool: { name: 'ai_accounts_save_account', render: output => `Saved account settings (${String(output.accounts.length)} account(s)).` },
     }),
     /** Remove one account. */
     remove: method({
@@ -395,18 +416,25 @@ export const aiAccountsApi = defineApi({
     }),
     /** Start the GitHub device-code flow for one saved Copilot account. */
     beginCopilotLogin: method({
-      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      input: z.object({ instanceId: z.string().min(1).max(64), requestId: z.uuid().optional() }).strict(),
       output: copilotLoginStateSchema,
+      description:
+        'Start GitHub Copilot device sign-in for a saved account. The user approves in the Web GUI; agent responses omit device codes and URLs. Call only when the user asked to sign in with GitHub.',
+      tool: { name: 'ai_accounts_begin_copilot_login', render: output => compactJson({ ...output, userCode: null, verificationUri: null }) },
     }),
     /** Read the current non-secret state of a Copilot sign-in flow. */
     copilotLoginStatus: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: copilotLoginStateSchema,
+      description: 'Read GitHub Copilot sign-in status without device codes or URLs for agent callers. Read-only.',
+      tool: { name: 'ai_accounts_copilot_login_status', readOnly: true, render: output => compactJson({ ...output, userCode: null, verificationUri: null }) },
     }),
     /** Cancel a device-code flow that has not completed. */
     cancelCopilotLogin: method({
-      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      input: z.object({ instanceId: z.string().min(1).max(64), confirm: z.literal(true), requestId: z.uuid().optional() }).strict(),
       output: z.object({ cancelled: z.literal(true) }),
+      description: 'Cancel a pending GitHub Copilot sign-in. Explicit confirm: true is required. Call only when the user asked to cancel sign-in.',
+      tool: { name: 'ai_accounts_cancel_copilot_login', render: () => 'GitHub Copilot sign-in cancelled.' },
     }),
     /** Remove one Copilot account's stored OAuth grant. */
     signOutCopilot: method({
