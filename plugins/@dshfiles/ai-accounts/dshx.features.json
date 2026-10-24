@@ -2,6 +2,38 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "active-chat-account",
+      "title": "See which account serves the active chat",
+      "summary": "Existing sidebar quota meters highlight the foreground chat's actual wire account, including failover. Idle chats show the last successful account; hidden or unavailable quota gets a source chip. Model selection alone never claims attribution.",
+      "reach": ["seed tool-call-thread", "expect group \"AI accounts usage\""],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["unknown", "attempting", "succeeded", "failed", "last-successful"],
+      "failureModes": [
+        "Missing or older Hosts, native routes and unknown sources show no guessed highlight.",
+        "Title/compaction traffic and delayed previous-chat results cannot overwrite foreground attribution.",
+        "Failed requests never replace the persisted last success. Agents cannot read another Session."
+      ],
+      "externalDependencies": [
+        {
+          "id": "account-request-stream",
+          "boundary": "Native main Agent request and LLM stream observations; no synthetic Session events.",
+          "deterministicFake": "Loopback Command Code fake provider for successful turns and failover; no real sign-in."
+        }
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "ai-accounts.active-chat-account", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        { "kind": "gherkin", "id": "ai-accounts.active-chat-switch", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.serving-account",
+          "file": "plugins/@dshfiles/ai-accounts/src/serving-account.test.ts",
+          "testName": "separates failed attempts from last successful, follows failover, and preserves only success across restart"
+        }
+      ],
+      "telemetry": [{ "kind": "automatic", "source": "api-dispatch" }]
+    },
+    {
       "id": "account-lifecycle",
       "title": "Manage provider account drafts",
       "summary": "Add, edit, enable, and persist account profiles; confirm removals, keep canceled profiles, and retry failed removals.",

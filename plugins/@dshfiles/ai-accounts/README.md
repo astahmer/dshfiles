@@ -8,6 +8,26 @@ picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
+## Account serving the active chat
+
+The sidebar quota strip highlights the **actual account on the wire**, including
+pool distribution and failover—not just the selected model's provider. During a
+request it says **In use by active chat**; once idle it says **Last used by active
+chat** for the last successful request. Hidden or unavailable quota gets a compact
+source chip. Switching to another chat or a blank draft cannot keep the previous
+chat's highlight. The collapsed rail shows the same source.
+
+Attempts are ephemeral. Only successful main requests retain routing metadata,
+for at most 2,000 chats and 90 days; no prompts, responses, credentials, title or
+compaction requests are stored. Native/unknown routes clear an old account source.
+An older Host shows no guessed highlight. The read-only agent tool
+`ai_accounts_serving_account` can read only its calling Session; authenticated
+browser/Host calls must name a Session explicitly.
+
+This adds a Host API/storage owner, so an existing Host needs the user's normal
+restart after rebuild. No priority, provider-auth or account-page behavior changes.
+See [synthetic verification and UI reach](docs/serving-account-verification.md).
+
 ## Providers
 
 | Kind           | Login                                                                                                                                                    | Model route | Quota                                                                                                                       |

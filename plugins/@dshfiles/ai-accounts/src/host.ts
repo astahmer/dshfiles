@@ -1,4 +1,6 @@
 import { activateAccountRuntime } from './account-runtime.js'
+import { createServingAccountService, ServingAccountModel } from './serving-account.js'
+import { servingAccountHostApi } from './serving-account-host.js'
 import { configFromAccountsFile } from './account-config.js'
 export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
@@ -92,13 +94,19 @@ const PRICING_CHECK_MS = 30 * 60_000
 export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials', 'agents'],
-  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi],
+  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],
   setup: api => {
     const ctx = api.raw.ctx
     const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
+    const servingAccount = createServingAccountService(ctx)
+    runtime.servingAccount = servingAccount
+    ctx.effect(() => () => {
+      if (runtime.servingAccount === servingAccount) delete runtime.servingAccount
+      void servingAccount.close().catch(() => ctx.logger.warn('ai-accounts: serving account storage could not close cleanly'))
+    })
     const usageHistory = createUsageHistoryService(ctx)
     const fastModeUsageHistory = createFastModeUsageHistoryService(ctx, {
       readRetentionDays: async () => (await usageHistory.readSettings()).retentionDays,
@@ -672,15 +680,24 @@ export default definePlugin({
           // Credited only after the upstream answers, so a failed attempt is never "used",
           // and to the account a fail-over put on the wire rather than the chosen route.
           if (!routes.has(options.provider)) return next()
-          return explainSilentRejections(creditServedAttempt(next(), {
+          const accountId = accountForRequest(options)
+          const active = options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId)
+          const actualRoute = routes.get(accountId)
+          // Only a routed main Agent step can claim attribution. Side purposes and native requests never can.
+          const attempt = ServingAccountModel.startRequest(servingAccount, options, active, accountId, actualRoute?.kind)
+          const chunks = attempt === undefined ? next() : ServingAccountModel.observe(next(), servingAccount, attempt)
+          return explainSilentRejections(
+            creditServedAttempt(chunks, {
               pool: {
                 noteServed: accountId => {
                   pool.noteServed(accountId)
                   recovery.noteServed(accountId)
                 },
               },
-              accountId: accountForRequest(options),
-            }), options)
+              accountId,
+            }),
+            options,
+          )
         }),
       )
 
@@ -715,7 +732,11 @@ export default definePlugin({
                   offersModel: (provider, model) => modelForRoute(provider, model) !== undefined,
                   pool,
                 })
-                if (preflight.kind === 'unserved') throw RequestAccountRouting.unservedProviderError(request.provider)
+                if (preflight.kind === 'unserved') {
+                  activeAccountRoutes.delete(id)
+                  servingAccount.forget(id)
+                  throw RequestAccountRouting.unservedProviderError(request.provider)
+                }
                 if (preflight.kind === 'route') {
                   ctx.logger.warn(
                     `ai-accounts: selection names provider "${request.provider}" with no adapter; serving this request from ${preflight.provider}`,
@@ -724,6 +745,7 @@ export default definePlugin({
                 }
                 if (!routes.has(request.provider)) {
                   activeAccountRoutes.delete(id)
+                  servingAccount.forget(id)
                   return request
                 }
                 const distribution = pool.distribution()
@@ -748,6 +770,7 @@ export default definePlugin({
             )
             const offTurnStopping = agent.ctx.on('agent/turn-stopping', () => {
               activeAccountRoutes.delete(id)
+              servingAccount.clear(id)
               const restored = fallbackRouter.turnEnded(id)
               if (restored === undefined) return
               void ctx
@@ -845,11 +868,13 @@ export default definePlugin({
             )
             agent.ctx.on('agent/disposed', () => {
               activeAccountRoutes.delete(id)
+              servingAccount.clear(id)
               recovery.forget(id)
               fallbackRouter.forget(id)
             })
             return () => {
               activeAccountRoutes.delete(id)
+              servingAccount.clear(id)
               offRequest()
               offTurnStopping()
               offRequestError()

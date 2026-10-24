@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { expect, it } from 'vitest'
 
-it('declares the credential remote accessed during fresh client boot', () => {
+it('declares credential and native Session services needed during fresh client boot', () => {
   const source = ts.createSourceFile(
     'client.tsx',
     readFileSync(new URL('./client.tsx', import.meta.url), 'utf8'),
@@ -29,4 +29,5 @@ it('declares the credential remote accessed during fresh client boot', () => {
   visit(source)
   expect(dependencies).toContain('remote')
   expect(dependencies).toContain('remote.credentials')
+  expect(dependencies).toContain('sessions')
 })

@@ -294,7 +294,53 @@ const selectAccountModel = async (page: Page, model: string): Promise<void> => {
   await option.click()
 }
 
-const stripMeter = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ }).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
+const usageStrip = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ })
+const stripMeter = (page: Page) => usageStrip(page).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
+const expectActiveAccount = async (page: Page, accountId: string): Promise<void> => {
+  const active = usageStrip(page).locator('[data-active-account]')
+  await expect(active).toHaveCount(1)
+  await expect(active).toHaveAttribute('data-active-account', accountId)
+  await expect(active).toHaveAttribute('aria-current', 'true')
+  await expect(active).toContainText('Last used by active chat')
+}
+
+When('two healthy threads use different accounts', async ({ page }: { page: Page }) => {
+  for (const [accountId, answer] of [
+    ['commandcode_work', 'ALPHA1'],
+    ['commandcode_work_2', 'BRAVO2'],
+  ] as const) {
+    await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+    await page.getByRole('button', { name: /^Select model/ }).click()
+    await selectAccountModel(page, `${accountId}/gpt-6-luna`)
+    const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    await composer.fill(`Verify the source of chat ${answer}.`)
+    await composer.press('Enter')
+    await expect(page.getByText(`Answered by ${answer}`, { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    await expectActiveAccount(page, accountId)
+  }
+})
+
+Then('the sidebar account source follows thread switches', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-source-switches-with-chat-and-clears-for-draft', async () => {
+    const chats = page.getByRole('treeitem', { name: /^Fake thread title(?:\s|$)/u })
+    await expect(chats).toHaveCount(2)
+    await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+    await expect(usageStrip(page).locator('[data-active-account]')).toHaveCount(0)
+    await chats.nth(1).click()
+    await expect(page.getByText('Answered by ALPHA1', { exact: true })).toBeVisible()
+    await expectActiveAccount(page, 'commandcode_work')
+    await chats.nth(0).click()
+    await expect(page.getByText('Answered by BRAVO2', { exact: true })).toBeVisible()
+    await expectActiveAccount(page, 'commandcode_work_2')
+  })
+  await recordAssertion(page, 'ai-accounts-hidden-meter-keeps-actual-source-chip', async () => {
+    await usageStrip(page).locator('[data-active-account]').click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Hide Command Code 2', exact: true }).click()
+    await expectActiveAccount(page, 'commandcode_work_2')
+    await expect(usageStrip(page).locator('[data-active-account]')).toHaveAttribute('aria-label', /Quota unavailable or hidden/)
+  })
+  await finishJourneyAssertions(page)
+})
 
 Then('the usage strip shows its short name, renamed from AI Accounts settings', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-strip-shows-initials-by-default', () => expect(stripMeter(page)).toContainText('CC'))
@@ -410,6 +456,7 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
     expect(chatKeys[0]).toBe('e2e-fake-key-LIMITED')
     expect(chatKeys.at(-1)).toBe('e2e-fake-key-BRAVO2')
     expect(new Set(chatKeys)).toEqual(new Set(['e2e-fake-key-LIMITED', 'e2e-fake-key-BRAVO2']))
+    await expectActiveAccount(page, 'commandcode_work_2')
   })
   // The account rail reads runtime health with its usage poll; reopening the app reads it now instead of a minute later.
   await page.reload()

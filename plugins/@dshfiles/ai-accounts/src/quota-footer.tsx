@@ -17,6 +17,12 @@ import { useQuotaClock } from './quota-clock.js'
 import { UsageOverview } from './usage-overview.js'
 import { UsageOverviewModel, type QuotaSummaryItem } from './usage-overview-model.js'
 
+interface QuotaSurfaceProps {
+  readonly onOpenUsageHistory: () => void
+  readonly activeAccountId: string | null
+  readonly activeAccountRunning: boolean
+}
+
 const RESET_UNIT = { now: 'now', minutes: 'min', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
 /** Each account's strip short name: its override in settings, then its picker tag, then its initials. */
@@ -180,14 +186,14 @@ const UsagePopoverContent = (props: {
  * thread sidebar seats it above its foot; the stock sidebar stacks footer
  * actions above Settings, so there it renders in place.
  */
-export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
+export const QuotaStrip = (props: QuotaSurfaceProps): JSX.Element | null => {
   const { footerButton } = usePreferences()
   // A disabled strip mounts nothing: no usage query, no clock and no layout subscription behind an empty surface.
   if (!footerButton) return null
   return <QuotaStripBody {...props} />
 }
 
-const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
+const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
   const { meterLabel, usageWindowLayout, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
@@ -195,6 +201,7 @@ const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX
   const withShortName = useShortNames()
   const stripRef = useRef<HTMLDivElement>(null)
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
+  const activeLabel = props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'
   // Minutes and reset countdowns are all the closed strip shows, so its clock wakes on those boundaries instead of
   // every second; the open overview keeps its own second-resolution clock.
   const now = useQuotaClock({ resetsAt: items.map(item => item.resetsAt) })
@@ -211,6 +218,9 @@ const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX
             ref={stripRef}
             role="group"
           >
+            {props.activeAccountId !== null && !items.some(item => item.instanceId === props.activeAccountId) ? (
+              <ActiveAccountWithoutQuota accountId={props.activeAccountId} label={activeLabel} onClick={() => setOpen(current => !current)} />
+            ) : null}
             {items.length === 0 ? (
               <button aria-label={label} className={meterButtonClass} onClick={() => setOpen(current => !current)} type="button">
                 <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
@@ -231,16 +241,20 @@ const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX
                     <TooltipTrigger asChild>
                       <button
                         aria-expanded={open}
-                        aria-label={describeItem(item, now, usageWindowLayout)}
+                        aria-current={props.activeAccountId === item.instanceId ? 'true' : undefined}
+                        data-active-account={props.activeAccountId === item.instanceId ? item.instanceId : undefined}
+                        aria-label={`${describeItem(item, now, usageWindowLayout)}${props.activeAccountId === item.instanceId ? `. ${activeLabel}` : ''}`}
                         className={cn(
                           meterButtonClass,
                           usageWindowLayout === 'vertical' && 'dshx:h-auto dshx:min-h-8 dshx:py-1',
                           open && 'dshx:text-foreground',
+                          props.activeAccountId === item.instanceId && 'dshx:bg-primary/10 dshx:text-foreground dshx:ring-1 dshx:ring-primary/60',
                         )}
                         onClick={() => setOpen(current => !current)}
                         type="button"
                       >
                         <SummaryItem item={item} label={meterLabel} now={now} showShortName={usageShortNames} windowLayout={usageWindowLayout} />
+                        {props.activeAccountId === item.instanceId ? <span className="dshx:text-[10px]">{activeLabel}</span> : null}
                       </button>
                     </TooltipTrigger>
                     {open ? null : (
@@ -261,7 +275,7 @@ const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX
 }
 
 /** Collapsed rail: one button with the most critical account, opening the usage popover. */
-const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
+const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage()
@@ -269,23 +283,34 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
   const now = useQuotaClock({ resetsAt: items.map(item => item.resetsAt) })
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
-  const critical = UsageOverviewModel.mostCritical(items)
+  const api = useApi(aiAccountsApi)
+  const file = useQuery(aiAccountsQueries.file(api))
+  const activeProfile = file.data?.accounts.find(account => account.instanceId === props.activeAccountId)
+  const critical = props.activeAccountId === null ? UsageOverviewModel.mostCritical(items) : items.find(item => item.instanceId === props.activeAccountId)
+  const activeLabel = props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <button
-          aria-label={label}
+          aria-label={activeProfile === undefined ? label : `${activeProfile.displayName}. ${activeLabel}`}
+          aria-current={activeProfile === undefined ? undefined : 'true'}
+          data-active-account={activeProfile?.instanceId}
           className={cn(
             meterButtonClass,
             'dshx:h-auto dshx:min-h-8 dshx:flex-col dshx:gap-0.5 dshx:overflow-hidden dshx:py-1',
             open && 'dshx:bg-accent dshx:text-foreground',
+            activeProfile !== undefined && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
           )}
-          title={items.map(item => describeItem(item, now)).join('\n') || label}
           type="button"
         >
           {/* The rail is ~56px wide: the glyph over the percent, no account tag or reset, so nothing clips. */}
+          {activeProfile === undefined ? null : <span className="dshx:text-[10px]">{props.activeAccountRunning ? 'In use' : 'Last used'}</span>}
           {critical === undefined ? (
-            <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
+            activeProfile === undefined ? (
+              <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
+            ) : (
+              <ProviderGlyph kind={activeProfile.kind} className="dshx:size-4 dshx:shrink-0" />
+            )
           ) : (
             <>
               <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
@@ -311,9 +336,31 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
  * strip in place unless a seat above the foot already holds it. The "Sidebar
  * usage" switch hides both.
  */
-export const QuotaFooter = (props: { readonly wide: boolean; readonly stripSeated: boolean; readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
+export const QuotaFooter = (props: QuotaSurfaceProps & { readonly wide: boolean; readonly stripSeated: boolean }): JSX.Element | null => {
   const { footerButton } = usePreferences()
   if (!footerButton) return null
-  if (!props.wide) return <QuotaRailButton onOpenUsageHistory={props.onOpenUsageHistory} />
-  return props.stripSeated ? null : <QuotaStrip onOpenUsageHistory={props.onOpenUsageHistory} />
+  if (!props.wide) return <QuotaRailButton {...props} />
+  return props.stripSeated ? null : <QuotaStrip {...props} />
+}
+
+/** A known account source stays visible even when its quota meter is hidden or unavailable. */
+const ActiveAccountWithoutQuota = (props: { readonly accountId: string; readonly label: string; readonly onClick: () => void }): JSX.Element | null => {
+  const api = useApi(aiAccountsApi)
+  const file = useQuery(aiAccountsQueries.file(api))
+  const account = file.data?.accounts.find(candidate => candidate.instanceId === props.accountId)
+  if (account === undefined) return null
+  return (
+    <button
+      aria-current="true"
+      aria-label={`${account.displayName}. ${props.label}. Quota unavailable or hidden.`}
+      data-active-account={account.instanceId}
+      className={cn(meterButtonClass, 'dshx:bg-primary/10 dshx:text-foreground dshx:ring-1 dshx:ring-primary/60')}
+      onClick={props.onClick}
+      type="button"
+    >
+      <ProviderGlyph kind={account.kind} className="dshx:size-3.5" />
+      <span className="dshx:max-w-28 dshx:truncate">{account.displayName}</span>
+      <span className="dshx:text-[10px]">{props.label}</span>
+    </button>
+  )
 }
