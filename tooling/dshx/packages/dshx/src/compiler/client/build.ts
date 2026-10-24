@@ -151,6 +151,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const hasHostCommandRegistry = HostCommandsModel.hasRegistry',
           'export const runHostCommand = HostCommandsModel.run',
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `export { ApiClientLifecycle } from ${JSON.stringify(CLIENT_API_PATH)}`,
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',
           'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
@@ -188,7 +189,9 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       if (id === `${VIRTUAL_CLIENT_PUBLIC}-settings`) {
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
+          `import { createSettingsClientRuntime, provideSettingsContext } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
+          'export { createSettingsClientRuntime, provideSettingsContext }',
           '',
         ].join('\n')
       }

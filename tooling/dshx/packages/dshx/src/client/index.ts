@@ -23,7 +23,7 @@ export type {
   SlotContribution,
   SlotOptions,
 } from './types.js'
-export { useApi, useApiQuery } from '../api/client.js'
+export { ApiClientLifecycle, useApi, useApiQuery } from '../api/client.js'
 export const createApiClient = ApiRuntimeModel.createClient
 /** Call a dshx API discovered through `dshxRegistryApi` without importing its contract. */
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
