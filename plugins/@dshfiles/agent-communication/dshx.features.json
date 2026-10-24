@@ -136,6 +136,16 @@
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
           "testName": "persists the history search operation through the activity schema"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -237,6 +247,16 @@
           "file": "plugins/@dshfiles/agent-communication/src/integration.test.ts",
           "testName": "G: a completed workspace agent is not reopened to gather integration context"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -260,6 +280,12 @@
           "id": "agent-communication.api-browser-post",
           "file": "plugins/@dshfiles/agent-communication/src/api-operations.test.ts",
           "testName": "browses pages without reading or acknowledging and posts as a browser principal"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -298,6 +324,16 @@
           "id": "agent-communication.schema-one-passive-migration",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
           "testName": "migrates schema version 1 records to passive delivery without notification replay"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

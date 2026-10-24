@@ -99,6 +99,22 @@
           "id": "mcp-servers.preferences",
           "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "mcp server start",
+          "file": "plugins/@dshfiles/mcp-servers/src/mcp-spans.test.ts",
+          "testName": "records an mcp server start span with the argument count, never argv or environment"
+        }
       ]
     },
     {
@@ -154,6 +170,16 @@
           "file": "plugins/@dshfiles/mcp-servers/src/mcp-mentions.test.ts",
           "testName": "serializes selected MCP entities as explicit, non-path prompt references"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -176,6 +202,18 @@
           "kind": "not-applicable",
           "id": "mcp-servers.registry-search",
           "reason": "Registry search calls the fixed public endpoint https://registry.modelcontextprotocol.io from the Host with no override, so a browser journey would depend on the live network; the curated provider list is shown by the lifecycle journey and the parsing is unit-tested."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "mcp registry search",
+          "file": "plugins/@dshfiles/mcp-servers/src/mcp-spans.test.ts",
+          "testName": "records an mcp registry search span with the status and result count, never the query"
         }
       ]
     },
@@ -263,6 +301,12 @@
           "file": "plugins/@dshfiles/mcp-servers/src/oauth.test.ts",
           "testName": "accepts only a bare HTTP(S) origin for the callback"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -290,8 +334,26 @@
           "testName": "targets only the selected servers an enable or disable would change"
         }
       ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Batch enable, disable and remove MCP servers renders browser state and starts no Host work of its own."
+        }
+      ],
       "reach": ["click button \"MCP servers\"", "expect checkbox \"Select all servers\""]
     }
   ],
-  "kind": "bundle"
+  "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/catalog.ts",
+      "tracedBy": "mcp registry search",
+      "reason": "The registry search runs inside createTracedRegistrySearch (src/registry-search-host.ts), which opens the span; this module stays importable by the Client."
+    },
+    {
+      "file": "src/host.ts",
+      "tracedBy": "mcp registry search",
+      "reason": "Passes globalThis.fetch into createTracedRegistrySearch, which opens the mcp registry search span around each request."
+    }
+  ]
 }

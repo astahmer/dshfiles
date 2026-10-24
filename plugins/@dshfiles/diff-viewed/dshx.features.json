@@ -60,6 +60,12 @@
           "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
           "testName": "keeps a mark to its own turn"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -127,6 +133,12 @@
           "id": "diff-viewed.host-owned-view-state-host-domain-wiring",
           "file": "plugins/@dshfiles/diff-viewed/src/host.test.ts",
           "testName": "opens the durable marks domain and closes it on unload"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

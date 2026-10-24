@@ -48,6 +48,12 @@
           "id": "input-trigger.quoted-multiword",
           "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Codex-style @ token targeting renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -73,6 +79,12 @@
           "kind": "not-applicable",
           "id": "input-trigger.claim-restore-browser",
           "reason": "This package ships no / command source of its own, so a standalone browser journey would need another bundle's command and would test that bundle's copy as much as this one's; the restore path runs end to end in the btw journey btw.command-chip-restore (a persisted /btw chip across a reload) and the roster polling is covered by tests/resolve-claim.test.ts."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Restore a persisted command chip renders browser state and starts no Host work of its own."
         }
       ]
     }

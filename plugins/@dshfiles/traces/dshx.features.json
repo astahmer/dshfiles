@@ -162,6 +162,22 @@
           "id": "traces.self-telemetry-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/traces.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "otlp ingest",
+          "file": "plugins/@dshfiles/traces/src/receiver.test.ts",
+          "testName": "records an otlp ingest span for logs and metrics but none for traces, which would feed back into itself"
+        }
       ]
     },
     {
@@ -228,6 +244,16 @@
           "file": "plugins/@dshfiles/traces/src/format.test.ts",
           "testName": "hides the descendants of collapsed spans only"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -273,6 +299,16 @@
           "id": "traces.store-session-logs",
           "file": "plugins/@dshfiles/traces/src/store.test.ts",
           "testName": "finds the logs of a session through its traces or its dsh.session.id attribute"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -333,6 +369,16 @@
           "file": "plugins/@dshfiles/traces/src/store.test.ts",
           "testName": "drops the oldest logs past the count limit and expired ones by age"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -378,6 +424,16 @@
           "file": "plugins/@dshfiles/traces/src/api-tools.test.ts",
           "testName": "every traces capability is a named tool and only clear writes"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -413,6 +469,16 @@
           "id": "traces.service-map-cycle",
           "file": "plugins/@dshfiles/traces/src/service-map-layout.test.ts",
           "testName": "terminates on a cycle and keeps isolated services"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -460,6 +526,16 @@
           "id": "traces.store-metric-series",
           "file": "plugins/@dshfiles/traces/src/store.test.ts",
           "testName": "lists metrics and charts a cumulative counter as its increase, per attribute set"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -608,6 +684,16 @@
           "file": "plugins/@dshfiles/traces/src/otlp/self-spans.test.ts",
           "testName": "keeps an alert evaluation that changed a rule or failed, and drops a routine one"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -665,6 +751,16 @@
           "id": "traces.boards-self-spans",
           "file": "plugins/@dshfiles/traces/src/otlp/self-spans.test.ts",
           "testName": "drops the dispatch spans of every traces API, so panel and notifier polling never trace themselves"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

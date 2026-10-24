@@ -143,6 +143,22 @@
           "file": "plugins/@dshfiles/memory/src/store.test.ts",
           "testName": "drops digests and indexed messages past retention but keeps notes"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jev classify",
+          "file": "plugins/@dshfiles/memory/src/jev.test.ts",
+          "testName": "records a jev classify span with the question, status and token counts, never the key or text"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
       ]
     },
     {
@@ -210,6 +226,12 @@
           "id": "memory.start-block-agent-scope-inheritance",
           "file": "plugins/@dshfiles/memory/src/agent-scope.test.ts",
           "testName": "a subagent inherits the scope of the agent whose thread spawned it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -284,6 +306,16 @@
           "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
           "testName": "ranks with BM25 unless hybrid is asked for and an embedding provider loads"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -305,6 +337,12 @@
           "kind": "gherkin",
           "id": "memory.panel-first-note",
           "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ],
       "reach": ["click button \"Memory\"", "expect tab \"Notes\""]
@@ -343,6 +381,12 @@
           "kind": "gherkin",
           "id": "memory.reference-digest",
           "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ],
       "reach": [
@@ -394,6 +438,12 @@
           "testName": "flags, as heuristics, a citation the user then corrects and one the agent later revises"
         }
       ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Show what memory costs and whether it holds up renders browser state and starts no Host work of its own."
+        }
+      ],
       "reach": ["click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""]
     },
     {
@@ -419,6 +469,12 @@
           "id": "memory.batch-forget",
           "file": "plugins/@dshfiles/memory/src/note-selection.test.ts",
           "testName": "forgets every selected note and keeps the failed ones out of the cleared set"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Forget a selection of notes renders browser state and starts no Host work of its own."
         }
       ],
       "reach": ["click button \"Memory\"", "click button \"Select notes\"", "expect checkbox \"Select all visible notes\""]

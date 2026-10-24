@@ -63,6 +63,18 @@
           "id": "web-search-brave.no-browser-journey",
           "reason": "The backend calls the fixed public Brave endpoint from the Host with no base-URL override, so a browser journey would need a real key and the live network; the request, mapping and failure paths run against an injected fetch in tests/brave.test.ts."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "secret"
+        },
+        {
+          "kind": "custom",
+          "span": "brave search",
+          "file": "plugins/@dshfiles/web-search-brave/tests/brave.test.ts",
+          "testName": "records a brave search span with the request options and result count, never the query or key"
+        }
       ]
     }
   ]

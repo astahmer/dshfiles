@@ -82,6 +82,12 @@
           "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
           "testName": "forwards search and sort and exposes author, avatar, stars, update date and total"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -136,6 +142,12 @@
           "id": "plugin-marketplace.guarded-plugin-install-unit-inactive-bundle-rejected",
           "file": "plugins/@dshfiles/plugin-marketplace/tests/host-service.test.ts",
           "testName": "rejects a zero exit when the bundle was not activated"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

@@ -67,6 +67,32 @@
           "id": "agent-telemetry.turn-trace-journey",
           "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "enter_ai_application_system",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "emits enter → invoke_agent → react step → chat and execute_tool with the GenAI attributes"
+        },
+        {
+          "kind": "custom",
+          "span": "invoke_agent <agent>",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "emits enter → invoke_agent → react step → chat and execute_tool with the GenAI attributes"
+        },
+        {
+          "kind": "custom",
+          "span": "react step",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "emits enter → invoke_agent → react step → chat and execute_tool with the GenAI attributes"
+        },
+        {
+          "kind": "custom",
+          "span": "chat <model>",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "emits enter → invoke_agent → react step → chat and execute_tool with the GenAI attributes"
+        }
       ]
     },
     {
@@ -101,6 +127,14 @@
           "kind": "gherkin",
           "id": "agent-telemetry.tool-nesting-journey",
           "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "execute_tool <tool>",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "runs the tool body with its execute_tool span active, so plugin spans nest under it"
         }
       ]
     },
@@ -142,6 +176,14 @@
           "kind": "gherkin",
           "id": "agent-telemetry.subagent-trace-journey",
           "featureFile": "tooling/dshx/e2e/features/agent-telemetry.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "enter_ai_application_system",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "puts a subagent created inside the parent tool body under that execute_tool span, in one trace"
         }
       ]
     },
@@ -189,6 +231,32 @@
           "id": "agent-telemetry.wait-spans-browser",
           "reason": "Approval waits need an approval-policy prompt, retry waits an upstream failure and compaction a context overflow; the loopback fake provider produces none of them deterministically. The recorded event shapes are driven through the coordinator in src/coordinator.test.ts; the journey covers the background-job span a real bash call opens."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "approval wait",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "records approval, model retry and background job waits under the right parent"
+        },
+        {
+          "kind": "custom",
+          "span": "llm retry wait",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "records approval, model retry and background job waits under the right parent"
+        },
+        {
+          "kind": "custom",
+          "span": "job <kind>",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "records approval, model retry and background job waits under the right parent"
+        },
+        {
+          "kind": "custom",
+          "span": "compaction",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "records a compaction call under its compaction span and a title call under the turn"
+        }
       ]
     },
     {
@@ -225,6 +293,14 @@
           "kind": "not-applicable",
           "id": "agent-telemetry.content-capture-browser",
           "reason": "Content capture changes only span attribute values, and the Traces viewer stores GenAI content as its size while redactGenAiContent is on (its default), so a browser journey would show the same panel either way. Both modes are asserted on recorded spans in src/coordinator.test.ts."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "chat <model>",
+          "file": "plugins/@dshfiles/agent-telemetry/src/coordinator.test.ts",
+          "testName": "puts content on spans when switched on, as bounded JSON"
         }
       ]
     }

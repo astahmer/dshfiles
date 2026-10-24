@@ -32,6 +32,12 @@
           "id": "session-search.no-browser-surface",
           "reason": "The bundle replaces a Host service backend and renders no UI of its own; the palette and memory finder that call it are verified by their own catalogs, and the cached reads are unit-tested in src/engine-listing.test.ts and src/engine-titles.test.ts."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     }
   ]

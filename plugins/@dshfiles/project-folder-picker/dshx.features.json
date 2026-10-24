@@ -42,6 +42,12 @@
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "browses one matching directory and keeps ambiguous or incomplete listings explicit"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Search projects and browse folder paths renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -59,6 +65,12 @@
           "id": "project-folder-picker.keyboard-wrap",
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "wraps keyboard selection and handles an empty list"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Select project folders with keyboard navigation renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -84,6 +96,12 @@
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "lists recents, then projects, then workspaces on Everything, each folder once"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Library rendering recent folders the host plugin reads through its own API; the Host read is that plugin catalog api-dispatch span."
+        }
       ]
     },
     {
@@ -101,6 +119,12 @@
           "id": "project-folder-picker.directory-mode",
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "preserves project mode by default and starts directory mode at Host home"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Start directly in the Host folder browser renders browser state and starts no Host work of its own."
         }
       ]
     }

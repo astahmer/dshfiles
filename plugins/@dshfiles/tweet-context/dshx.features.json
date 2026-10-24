@@ -74,6 +74,24 @@
           "id": "tweet-context.live-provider-availability",
           "reason": "Automated tests deliberately do not call FxEmbed or the live video CDN: availability and public-post retention are third-party concerns. The complete response, download, ffmpeg, and attachment projection path is exercised with local fixtures."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "tweet context fetch",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "fetches fixed post and video fixtures, samples frames, and blocks unsafe media hosts and redirects"
+        },
+        {
+          "kind": "custom",
+          "span": "ffmpeg sample",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "records an ffmpeg sample span with the requested frame count"
+        }
       ]
     }
   ]

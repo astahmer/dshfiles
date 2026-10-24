@@ -57,6 +57,12 @@
           "id": "fff-search.no-browser-surface",
           "reason": "grep and glob are agent tools with no browser UI of their own; the search behaviour runs against a real fff index in tests/fff-search.test.ts."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     }
   ]

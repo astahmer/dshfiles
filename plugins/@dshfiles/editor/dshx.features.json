@@ -108,6 +108,12 @@
           "file": "plugins/@dshfiles/editor/src/write-file.test.ts",
           "testName": "accepts a root reached through a symlinked prefix"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -142,6 +148,12 @@
           "id": "editor.workspace-file-index-unit-fresh-cache",
           "file": "plugins/@dshfiles/editor/src/workspace-files.test.ts",
           "testName": "answers indexing, then ready, and serves a fresh index without walking again"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

@@ -43,6 +43,12 @@
           "file": "plugins/@dshfiles/request-messages/src/polyfill.test.ts",
           "testName": "dispatches once when two copies are loaded"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
       ]
     }
   ],

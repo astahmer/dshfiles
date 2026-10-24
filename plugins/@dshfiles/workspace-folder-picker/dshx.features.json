@@ -32,6 +32,12 @@
           "id": "workspace-folder-picker.sidebar-folder-mode",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     }
   ]

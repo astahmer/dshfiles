@@ -45,6 +45,12 @@
           "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
           "testName": "interrupts Host waiters without cancelling their durable question"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -85,6 +91,12 @@
           "id": "agent-questions.question-expiry-unit-durable-reattach",
           "file": "plugins/@dshfiles/agent-questions/src/storage.test.ts",
           "testName": "reattaches to a deferred outcome and file path after JSON domain reopen"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -141,6 +153,12 @@
           "file": "plugins/@dshfiles/agent-questions/src/storage.test.ts",
           "testName": "preserves anchored feedback and late resolution receipts across JSON domain reopen"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -164,6 +182,12 @@
           "file": "plugins/@dshfiles/agent-questions/src/revisioned-feedback.test.ts",
           "testName": "accepts batches of 20 and rejects larger batches before resolving any item"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -183,6 +207,12 @@
           "kind": "not-applicable",
           "id": "agent-questions.question-card-layout-needs-model-turn",
           "reason": "The card only renders while a model turn calls ask_user_question, which dshx dev reach steps cannot trigger; check it on a live question at 800px and 420px pane widths."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Steady countdown and compact native question card renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -222,6 +252,12 @@
           "id": "agent-questions.inbox-native-answerability",
           "file": "plugins/@dshfiles/agent-questions/src/question-inbox.test.ts",
           "testName": "marks continued native forms answerable only for live root Sessions"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

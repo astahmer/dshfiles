@@ -87,6 +87,12 @@
           "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
           "testName": "a pause rejection is logged, not thrown at the session loop"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Counts goal rounds from Session events already in memory and pauses through the native goal service; it does no I/O of its own and runs inside the turn agent-telemetry traces."
+        }
       ]
     },
     {
@@ -113,6 +119,12 @@
           "id": "goal-stall-guard.continuation-tool-registration",
           "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
           "testName": "registers the supplemental continuation tools"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

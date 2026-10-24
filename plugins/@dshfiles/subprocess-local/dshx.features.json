@@ -32,7 +32,39 @@
           "id": "subprocess-local.no-browser-surface",
           "reason": "The fork replaces the Host subprocess service and renders no UI; every shell journey in the e2e suite runs through it, and the poll backoff is measured in tests/group-exit-poll.test.ts."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The subprocess runtime other plugins spawn through: the caller command span (jj <subcommand>, secret <verb>, project-checks run) already covers the exit wait this backoff shortens."
+        }
       ]
+    }
+  ],
+  "ioDelegation": [
+    {
+      "file": "src/native/index.ts",
+      "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
+    },
+    {
+      "file": "src/native/linux-scope.ts",
+      "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
+    },
+    {
+      "file": "src/native/process-inspector.ts",
+      "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
+    },
+    {
+      "file": "src/native/spawn.ts",
+      "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
+    },
+    {
+      "file": "src/native/windows-inspector.ts",
+      "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
+    },
+    {
+      "file": "src/native/windows-job.ts",
+      "reason": "The subprocess runtime other plugins spawn through; each caller opens the span for its own command (jj, secret, project-checks run), so a runtime span would duplicate it."
     }
   ]
 }

@@ -107,6 +107,22 @@
           "file": "plugins/@dshfiles/background-jobs/src/history.test.ts",
           "testName": "keeps the durable record when a state file is malformed"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "background-jobs history pass",
+          "file": "plugins/@dshfiles/background-jobs/src/history.test.ts",
+          "testName": "records a background-jobs history pass span with the files it read"
+        }
       ]
     },
     {
@@ -132,6 +148,12 @@
           "id": "background-jobs.batch-stop-partial",
           "file": "plugins/@dshfiles/background-jobs/src/job-selection.test.ts",
           "testName": "reports requested, already-finished and failed kills separately"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Stop a selection of running jobs renders browser state and starts no Host work of its own."
         }
       ],
       "reach": ["click button \"Jobs\"", "expect checkbox \"Select all running jobs\""]

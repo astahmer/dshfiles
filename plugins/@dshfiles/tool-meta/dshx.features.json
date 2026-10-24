@@ -77,6 +77,12 @@
           "file": "plugins/@dshfiles/tool-meta/src/tool-call-tree.test.tsx",
           "testName": "warns once when the renderer stops dispatching through renderSlot"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Start time and duration on every tool call renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

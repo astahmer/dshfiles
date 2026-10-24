@@ -44,6 +44,12 @@
           "file": "plugins/@dshfiles/send-after-upload/src/pending-send-machine.test.ts",
           "testName": "reports a failed upload instead of sending, and can be dismissed"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Send when the attachment upload finishes renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

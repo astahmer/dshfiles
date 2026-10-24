@@ -27,6 +27,7 @@ const feature = {
       testName: 'edits pending text messages',
     },
   ],
+  telemetry: [{ kind: 'automatic', source: 'api-dispatch' }],
 }
 
 describe('plugin feature metadata', () => {
@@ -48,6 +49,23 @@ describe('plugin feature metadata', () => {
         features: [{ ...feature, configuration: [{ ...feature.configuration[0], defaultValue: '80', coveredBy: ['missing'] }] }],
       }),
     ).toEqual(expect.arrayContaining([expect.stringContaining('coveredBy'), expect.stringContaining('choices must include defaultValue')]))
+  })
+
+  it('requires telemetry on every feature and agent-tool on tool surfaces', () => {
+    const withTelemetry = (patch: Record<string, unknown>) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
+    expect(withTelemetry({ telemetry: [] })).toEqual(expect.arrayContaining([expect.stringContaining('telemetry')]))
+    expect(withTelemetry({ telemetry: [{ kind: 'automatic', source: 'unknown' }] })).toEqual(expect.arrayContaining([expect.stringContaining('telemetry')]))
+    expect(withTelemetry({ surfaces: ['tool'] })).toEqual([expect.stringContaining('list { kind: automatic, source: agent-tool }')])
+    const notApplicable = [{ kind: 'not-applicable', reason: 'Client presentation only; no Host call.' }]
+    expect(withTelemetry({ telemetry: notApplicable })).toEqual([])
+    expect(withTelemetry({ surfaces: ['tool'], telemetry: notApplicable })).toEqual([expect.stringContaining('list { kind: automatic, source: agent-tool }')])
+    expect(withTelemetry({ telemetry: [...notApplicable, { kind: 'automatic', source: 'api-dispatch' }] })).toEqual([
+      expect.stringContaining('a not-applicable telemetry rationale stands alone'),
+    ])
+    expect(withTelemetry({ telemetry: [{ kind: 'custom', span: 'Backlog Triage', file: 'x.test.ts', testName: 'y' }] })).toEqual([
+      expect.stringContaining('span names are lowercase'),
+    ])
+    expect(withTelemetry({ telemetry: [{ kind: 'custom', span: 'jj <subcommand>', file: 'x.test.ts', testName: 'y' }] })).toEqual([])
   })
 
   it('accepts reach steps a scratch DSH can run and rejects ones it cannot', () => {

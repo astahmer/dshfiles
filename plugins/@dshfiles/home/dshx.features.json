@@ -64,6 +64,12 @@
           "file": "plugins/@dshfiles/home/src/home-model.test.ts",
           "testName": "hides only the native pieces the settings replace"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: New thread screen branding and shortcuts renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

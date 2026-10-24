@@ -40,6 +40,12 @@
           "id": "hmr-gate.plugins-row-no-gherkin-journey",
           "reason": "A deferral needs a plugin whose Host half is rebuilt on disk while the Host keeps the old one loaded; no Gherkin scenario sets that up yet. The feature's reach steps open the empty row on a scratch DSH with dshx dev open, and the defer and release decisions are unit-tested in src/host/gate.test.ts."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     }
   ]

@@ -89,6 +89,16 @@
           "file": "plugins/@dshfiles/activity-timeline/src/service.test.ts",
           "testName": "rejects malformed ingest payloads instead of storing them"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -147,6 +157,16 @@
           "file": "plugins/@dshfiles/activity-timeline/src/condensation.test.ts",
           "testName": "fold a burst with one cause into one attention row that counts them and keeps every event id"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -197,6 +217,12 @@
           "id": "activity-timeline.receipts-safe-status-and-dedupe",
           "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
           "testName": "maps failure and cancellation truthfully and deduplicates receipt replay"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

@@ -40,6 +40,12 @@
           "id": "workspace-nav.new-thread-composer-no-gherkin-journey",
           "reason": "No Gherkin scenario holds session/create in flight yet; the feature's reach steps open the New thread composer on a scratch DSH with dshx dev open, the request shape is unit-tested in tests/new-thread-request.test.ts, and the provisional row and its removal on refusal belong to @dshfiles/session-controller."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open a New thread's composer before the Host creates its Session renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

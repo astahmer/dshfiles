@@ -41,6 +41,18 @@
           "id": "jujutsu.graph-navigation",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
+        }
       ]
     },
     {
@@ -160,6 +172,18 @@
           "id": "jujutsu.revision-date",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
+        }
       ]
     },
     {
@@ -224,6 +248,12 @@
           "file": "plugins/@dshfiles/jujutsu/src/host.test.ts",
           "testName": "stores review progress for every browser on the Host"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -273,6 +303,18 @@
           "id": "jujutsu.composer-context",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
+        }
       ]
     },
     {
@@ -321,6 +363,18 @@
           "file": "plugins/@dshfiles/jujutsu/src/bookmark-set.integration.test.ts",
           "testName": "set bookmark creates a name and moves an existing bookmark to any visible revision"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
+        }
       ]
     },
     {
@@ -365,6 +419,18 @@
           "kind": "gherkin",
           "id": "jujutsu.workspace-session",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
         }
       ]
     },
@@ -458,6 +524,12 @@
           "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
           "testName": "re-strips a prefix React rewrites and stops linking a token that changed"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open Jujutsu references from a chat message renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -498,6 +570,18 @@
           "kind": "gherkin",
           "id": "jujutsu.workspace-cleanup",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
         }
       ]
     },
@@ -543,6 +627,18 @@
           "kind": "not-applicable",
           "id": "jujutsu.workspace-removal-no-gherkin-journey",
           "reason": "No Gherkin scenario removes a workspace from the graph yet; the feature's reach steps seed a thread workspace on a scratch DSH with dshx dev open and stop at the inline confirmation, and the forget path itself runs against a real jj repository in src/fileset.integration.test.ts."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jujutsu/src/jj-span.test.ts",
+          "testName": "records a jj log span with flag names only and whether output was cut"
         }
       ]
     },
@@ -613,8 +709,21 @@
           "id": "jujutsu.panel-scopes-no-gherkin-journey",
           "reason": "No Gherkin scenario walks per-tab repository scopes yet; the feature's reach steps open a second Jujutsu tab on a scratch DSH with dshx dev open and switch between tabs to prove each keeps its own view, the scope rules are unit-tested in src/panel-scope.test.ts, and the main-tabs side (main-tabs.panel-scope-*) is owned and verified by the @dshfiles/main-tabs catalog."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Keep one repository per Jujutsu tab, thread and dock renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ],
-  "kind": "bundle"
+  "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/host.ts",
+      "tracedBy": "jj <subcommand>",
+      "reason": "Every jj spawn here goes through runAt, which wraps it in withJjSpan from src/jj-span.ts."
+    }
+  ]
 }

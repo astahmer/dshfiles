@@ -86,6 +86,12 @@
           "file": "plugins/@dshfiles/workbench/src/layout-store.test.ts",
           "testName": "keeps the side-panel layout apart from the main-area one"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Arrange plugin panels in independent layouts renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -192,6 +198,12 @@
           "file": "plugins/@dshfiles/workbench/src/saved-layouts.test.ts",
           "testName": "renames in place, keeping the arrangement, and ignores an absent source"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Keep one docking surface in the right column and a bottom panel renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -226,6 +238,12 @@
           "id": "workbench.early-panel-registration-unit-shared-registry-instance",
           "file": "plugins/@dshfiles/workbench/src/registry.test.ts",
           "testName": "shares one page-wide instance across bundles through a global symbol"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Queue panel-open requests before mount renders browser state and starts no Host work of its own."
         }
       ]
     }

@@ -116,6 +116,18 @@
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "identifies non-thread secondary workspaces by their owning JJ checkout"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
+          "testName": "records a jj workspace span with the exit code and marks a failed run"
+        }
       ]
     },
     {
@@ -208,6 +220,18 @@
           "id": "jj-integration.destination-failure-retry",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
           "testName": "keeps the deferred move after a failed first send until a successful retry claims it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
+          "testName": "records a jj workspace span with the exit code and marks a failed run"
         }
       ]
     },
@@ -374,6 +398,12 @@
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
           "testName": "holds the first send only when that Session is due its own workspace"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: New thread prepares its destination while the draft is written renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -416,6 +446,12 @@
           "kind": "gherkin",
           "id": "jj-integration.thread-workspace-menu-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -575,6 +611,22 @@
           "file": "plugins/@dshfiles/jj-integration/src/workspace-sync-outcome.test.ts",
           "testName": "reports a refusal as a safe no-change outcome with the next step, not a failed sync"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
+          "testName": "records a jj workspace span with the exit code and marks a failed run"
+        }
       ]
     },
     {
@@ -614,6 +666,12 @@
           "id": "jj-integration.turn-end-offer",
           "file": "plugins/@dshfiles/jj-integration/src/inline-integrate.test.ts",
           "testName": "offers one click for a finished turn whose described work is ready"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -747,6 +805,18 @@
           "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
           "testName": "shows every blocker while the failing one stays primary"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/jj-integration/src/jj-span.test.ts",
+          "testName": "records a jj workspace span with the exit code and marks a failed run"
+        }
       ]
     },
     {
@@ -785,6 +855,12 @@
           "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
           "testName": "blocks pending work on the specific reason, hardest first"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Thread integration prioritises what needs attention renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -821,6 +897,12 @@
           "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
           "testName": "shows every blocker while the failing one stays primary"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Thread integration row details renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -838,6 +920,12 @@
           "kind": "not-applicable",
           "id": "jj-integration.empty-presentation",
           "reason": "Presentation-only empty state: the filter bar and groups are hidden, which the reach proves in the running client."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Thread integration with no thread workspaces renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -874,6 +962,12 @@
           "id": "jj-integration.recent-projects",
           "file": "plugins/@dshfiles/jj-integration/src/recent-projects.test.ts",
           "testName": "folds thread workspaces into their project, dedupes, skips blanks and unknown folders, and stops at the limit"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

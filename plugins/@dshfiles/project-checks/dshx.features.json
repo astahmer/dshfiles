@@ -258,6 +258,18 @@
           "file": "plugins/@dshfiles/project-checks/src/remote.test.ts",
           "testName": "installs on the first run and whenever the tracked paths changed"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "project-checks run",
+          "file": "plugins/@dshfiles/project-checks/src/managed-process.test.ts",
+          "testName": "records a project-checks run span with the executable, argument count and exit code, never argv"
+        }
       ]
     },
     {
@@ -280,6 +292,12 @@
           "id": "project-checks.native-hook-receipts-unit-native-hook-duration",
           "file": "plugins/@dshfiles/project-checks/src/api.test.ts",
           "testName": "accepts fractional durations recorded by the native Hook Protocol"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -341,6 +359,12 @@
           "id": "project-checks.activity-projection-legacy-and-bounded-backfill",
           "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
           "testName": "reads legacy receipts and bounds newer-first backfill to retained evidence"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

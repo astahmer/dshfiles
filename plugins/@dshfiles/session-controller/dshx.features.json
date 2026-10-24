@@ -19,7 +19,23 @@
           "file": "plugins/@dshfiles/session-controller/tests/browser-event.test.ts",
           "testName": "drops provider replay state from assistant events and keeps everything else"
         },
-        { "kind": "gherkin", "id": "session-controller.lean-session-follow", "featureFile": "tooling/dshx/e2e/features/chat.feature" }
+        {
+          "kind": "gherkin",
+          "id": "session-controller.lean-session-follow",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "session tail read",
+          "file": "plugins/@dshfiles/session-controller/tests/host/tail-log-persistence.test.ts",
+          "testName": "records a session tail read span with the thread, bytes and frames it read"
+        }
       ]
     }
   ]

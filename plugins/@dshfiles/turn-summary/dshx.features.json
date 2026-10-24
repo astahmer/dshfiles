@@ -55,6 +55,12 @@
           "file": "plugins/@dshfiles/turn-summary/src/turn-activity.test.ts",
           "testName": "lists each successfully edited file once and leaves a still-running command unjudged"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: A summary line under each finished turn renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

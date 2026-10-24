@@ -45,6 +45,12 @@
           "id": "ai-accounts.account-removal",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -136,6 +142,22 @@
           "kind": "gherkin",
           "id": "ai-accounts.github-copilot",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts-copilot.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        },
+        {
+          "kind": "custom",
+          "span": "ai-accounts provider request",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-request.test.ts",
+          "testName": "records an ai-accounts provider request span with host and status, never the path or credentials"
         }
       ]
     },
@@ -240,6 +262,18 @@
           "file": "plugins/@dshfiles/ai-accounts/src/accounts-queries.test.ts",
           "testName": "keeps the last good quota of each account through a failed or unreadable poll"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "ai-accounts provider request",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-request.test.ts",
+          "testName": "records an ai-accounts provider request span with host and status, never the path or credentials"
+        }
       ]
     },
     {
@@ -283,6 +317,12 @@
           "id": "ai-accounts.strip-short-names-unit-length",
           "file": "plugins/@dshfiles/ai-accounts/src/usage-overview-model.test.ts",
           "testName": "cuts an override to six characters so one account cannot widen the strip"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Short names in the sidebar usage strip renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -349,6 +389,12 @@
           "id": "ai-accounts.pricing-cost-unit-error-retains-cache",
           "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
           "testName": "keeps the last catalog when models.dev answers an error or nothing priced"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -438,6 +484,12 @@
           "file": "plugins/@dshfiles/ai-accounts/src/quota-pace-model.test.ts",
           "testName": "ends a window at the next one when a banked reset restarted it early"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -487,6 +539,18 @@
           "id": "ai-accounts.luna-reserve-wire-model-unit",
           "file": "plugins/@dshfiles/ai-accounts/src/codex-luna-reserve.test.ts",
           "testName": "sends the reserve slug while on reserve and the chosen model otherwise"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "ai-accounts provider request",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-request.test.ts",
+          "testName": "records an ai-accounts provider request span with host and status, never the path or credentials"
         }
       ]
     },
@@ -539,6 +603,16 @@
           "kind": "gherkin",
           "id": "ai-accounts.failure-recovery",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
         }
       ]
     },
@@ -627,6 +701,12 @@
           "id": "ai-accounts.quota-auto-resume",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -663,8 +743,24 @@
           "id": "ai-accounts.credential-recovery",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open credential setup from failed turns renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ],
-  "kind": "bundle"
+  "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/claude-cli.ts",
+      "reason": "Claude Code CLI transport of a model stream: each stream runs under agent-telemetry chat <model> span, and the CLI child lives as long as that stream."
+    },
+    {
+      "file": "src/commandcode-cli.ts",
+      "reason": "Command Code generate stream of a model call: it runs under agent-telemetry chat <model> span for that stream."
+    }
+  ]
 }

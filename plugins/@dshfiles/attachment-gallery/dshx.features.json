@@ -45,6 +45,12 @@
           "file": "plugins/@dshfiles/plugin-ui/tests/image-lightbox.test.tsx",
           "testName": "navigates images with arrow keys, side controls, and thumbnails"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Navigate image previews renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ],

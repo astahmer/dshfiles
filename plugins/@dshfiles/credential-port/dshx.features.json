@@ -27,6 +27,12 @@
           "file": "plugins/@dshfiles/credential-port/src/index.test.ts",
           "testName": "rejects a scope the catalog cannot address"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "secret"
+        }
       ]
     }
   ]

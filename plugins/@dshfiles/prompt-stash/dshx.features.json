@@ -60,6 +60,12 @@
           "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
           "testName": "opens the declared domain and serves the shared prompt library"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -79,6 +85,12 @@
           "kind": "gherkin",
           "id": "prompt-stash.cursor-insertion",
           "featureFile": "tooling/dshx/e2e/features/prompt-stash.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Insert prompt text without submitting renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -117,6 +129,12 @@
           "id": "prompt-stash.recent-user-prompts-unit-recent-history-bounds",
           "file": "plugins/@dshfiles/prompt-stash/src/recent-prompts.test.ts",
           "testName": "deduplicates stable node identities and bounds the visible history"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Browse recent text-only user messages renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -167,6 +185,12 @@
           "id": "prompt-stash.draft-and-sent-history-host-wiring",
           "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
           "testName": "serves saved drafts through the same Host store"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -222,6 +246,12 @@
           "id": "prompt-stash.draft-attachment-retention-unit-dispose",
           "file": "plugins/@dshfiles/prompt-stash/src/draft-attachment-retention.test.ts",
           "testName": "releases every held thread when the plugin unloads"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Keep draft attachments across thread navigation renders browser state and starts no Host work of its own."
         }
       ]
     }

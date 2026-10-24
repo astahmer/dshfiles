@@ -18,7 +18,17 @@
           "file": "plugins/@dshfiles/chat/tests/resume-interrupted.test.tsx",
           "testName": "disables Resume while pending, reports errors, and hides after acceptance"
         },
-        { "kind": "gherkin", "id": "chat.resume-interrupted", "featureFile": "tooling/dshx/e2e/features/chat.feature" }
+        {
+          "kind": "gherkin",
+          "id": "chat.resume-interrupted",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -38,7 +48,17 @@
           "file": "plugins/@dshfiles/chat/tests/transcript-window.test.ts",
           "testName": "mounts the latest rows first and widens toward older rows"
         },
-        { "kind": "gherkin", "id": "chat.windowed-transcript", "featureFile": "tooling/dshx/e2e/features/chat.feature" }
+        {
+          "kind": "gherkin",
+          "id": "chat.windowed-transcript",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open a thread on its latest messages renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -64,6 +84,12 @@
           "kind": "gherkin",
           "id": "chat.image-links",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open image links in the gallery renders browser state and starts no Host work of its own."
         }
       ]
     }

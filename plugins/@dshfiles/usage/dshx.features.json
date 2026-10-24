@@ -12,8 +12,8 @@
       "failureModes": [
         "A log the writer is still appending to keeps its torn final frame for the next pass instead of failing.",
         "A stored fold state that no longer decodes restarts that log from its first byte; rows upsert by event sequence, so nothing doubles.",
-        "Without the AI Accounts price cache every cost reads as unknown (\u2013) and the request still counts.",
-        "Title generation keeps no usage in the log: its tokens come only from the live llm/stream observer, so titles generated while the plugin was not loaded show \u2013.",
+        "Without the AI Accounts price cache every cost reads as unknown (–) and the request still counts.",
+        "Title generation keeps no usage in the log: its tokens come only from the live llm/stream observer, so titles generated while the plugin was not loaded show –.",
         "Memory-digest calls are not stored as session-log requests; they are counted only while the live observer is loaded."
       ],
       "externalDependencies": [
@@ -89,6 +89,18 @@
           "file": "plugins/@dshfiles/usage/src/cost.test.ts",
           "testName": "prices routes from the AI Accounts catalog file and re-prices when the catalog changes"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "usage index",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "records a usage index span with the files and rows of one pass"
+        }
       ]
     },
     {
@@ -124,6 +136,12 @@
           "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
           "testName": "searches by model, provider or project and counts every status for the chips"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Request log renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -141,6 +159,12 @@
           "kind": "gherkin",
           "id": "usage.charts-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Usage charts renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -207,6 +231,12 @@
           "file": "plugins/@dshfiles/usage/src/jev-usage-card.test.tsx",
           "testName": "renders the DSH-only estimate and source counts"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -246,6 +276,12 @@
           "file": "plugins/@dshfiles/usage/src/activity.test.ts",
           "testName": "reports tool executions and Jev outcomes without storing sensitive payloads"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Tool and Jev activity report renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -278,6 +314,22 @@
           "kind": "not-applicable",
           "id": "usage.otel-no-browser-ui",
           "reason": "This capability is a Host-only read API for Agent tools; it adds no browser UI or GUI workflow."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "usage metrics export",
+          "file": "plugins/@dshfiles/usage/src/otel-exporter.test.ts",
+          "testName": "records a usage metrics export span with the collector host and status"
         }
       ]
     }

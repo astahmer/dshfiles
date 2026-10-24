@@ -26,6 +26,12 @@
         "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
         "press Enter",
         "expect text \"Which layout should the release notes use?\""
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: An answered question form stays closed while its reply waits for admission renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

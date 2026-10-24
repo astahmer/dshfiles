@@ -20,6 +20,12 @@
           "id": "model-effort-picker.search-empty-catalog",
           "featureFile": "tooling/dshx/e2e/features/model-effort-picker.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Search and select provider models renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -61,6 +67,12 @@
           "kind": "gherkin",
           "id": "model-effort-picker.fast-mode-supported",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The picker calls @dshfiles/ai-accounts, whose api-dispatch spans that catalog lists; this plugin serves no Host method of its own."
         }
       ]
     },
@@ -115,6 +127,12 @@
           "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",
           "testName": "rotates only through the configured routes, and offers nothing when no other route qualifies"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Swap to the next account offering the same model renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -142,6 +160,12 @@
           "kind": "gherkin",
           "id": "model-effort-picker.fallbacks-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Chain edits go through the @dshfiles/ai-accounts API, whose api-dispatch spans that catalog lists; this plugin serves no Host method of its own."
         }
       ]
     }

@@ -56,6 +56,12 @@
           "file": "plugins/@dshfiles/frame-layout/src/regions.test.ts",
           "testName": "clamps the bottom row so it can never swallow the frame"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Hand the frame's regions to plugin surfaces renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -94,6 +100,12 @@
           "id": "frame-layout.panel-width-persistence-unit-clamp",
           "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
           "testName": "clamps stored widths into the drag range instead of trusting them"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Persist the frame's dragged panel widths renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -139,6 +151,12 @@
           "id": "frame-layout.collapsed-state-persistence-unit-narrow",
           "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
           "testName": "leaves a narrow frame's auto-collapse to the frame"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Persist the collapsed sidebar renders browser state and starts no Host work of its own."
         }
       ]
     }

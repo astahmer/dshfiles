@@ -58,6 +58,12 @@
           "file": "plugins/@dshfiles/queue-reorder/src/queue-order.test.ts",
           "testName": "reports an item that is no longer pending"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -141,6 +147,12 @@
           "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
           "testName": "decodeQueuedRows tolerates malformed rows and marks unknown blocks as not editable"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -176,6 +188,12 @@
           "id": "queue-reorder.queued-message-preview-unit-unicode-safe-limit",
           "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
           "testName": "clips by Unicode code point and appends one ellipsis"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Preview queued message text renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -262,6 +280,12 @@
           "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
           "testName": "lists other top-level threads, newest first, without blank drafts or subagents"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -293,6 +317,12 @@
           "id": "queue-reorder.queued-attachment-previews-unit-order",
           "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
           "testName": "previews each image and file in message order and skips text"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Preview queued attachments renders browser state and starts no Host work of its own."
         }
       ]
     }

@@ -39,6 +39,12 @@
           "file": "plugins/@dshfiles/session-source-port/src/index.test.ts",
           "testName": "an id no source owns resolves to nothing"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "An in-memory registry of remote session sources; lookups are synchronous map reads with no I/O to time."
+        }
       ]
     }
   ]

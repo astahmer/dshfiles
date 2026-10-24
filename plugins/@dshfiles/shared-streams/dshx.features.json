@@ -72,6 +72,12 @@
           "file": "plugins/@dshfiles/shared-streams/src/shim-lifecycle.test.ts",
           "testName": "serves two tabs of one URL from one socket and closes it after the last tab leaves"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "A browser SharedWorker shim around EventSource; it runs only in the browser, where dshx tracing does not exist."
+        }
       ]
     }
   ]

@@ -20,6 +20,12 @@
           "id": "ui-styles.isolated-boot-sheet",
           "featureFile": "tooling/dshx/e2e/features/ui-styles.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: One shared plugin stylesheet renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]

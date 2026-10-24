@@ -57,6 +57,12 @@
           "file": "plugins/@dshfiles/mentions/src/mention-ranking.test.ts",
           "testName": "caps the menu and ranks 500 entries in well under a frame"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Ranked @ mentions for files and threads renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -111,6 +117,12 @@
           "id": "mentions.main-tabs-new-tab",
           "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
           "testName": "opens a Mod-clicked thread in a new tab even in preview mode, and navigates to it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Referenced threads open on click renders browser state and starts no Host work of its own."
         }
       ]
     }

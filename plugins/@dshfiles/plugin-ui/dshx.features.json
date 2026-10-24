@@ -24,6 +24,12 @@
           "file": "plugins/@dshfiles/plugin-ui/tests/query.test.tsx",
           "testName": "is one client per bundle"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Provide host-backed client queries renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -53,6 +59,12 @@
           "id": "plugin-ui.stored-value-failure",
           "file": "plugins/@dshfiles/plugin-ui/tests/stored-value.test.tsx",
           "testName": "keeps the value in memory and reports false when storage refuses the write"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Persist schema-validated client values renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -84,6 +96,12 @@
           "file": "plugins/@dshfiles/plugin-ui/tests/table.test.tsx",
           "testName": "renders the empty row across every column"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Compose validated forms and accessible data tables renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -101,6 +119,12 @@
           "id": "plugin-ui.debounce-latest",
           "file": "plugins/@dshfiles/plugin-ui/tests/debounced-value.test.tsx",
           "testName": "publishes only the last value after the delay"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Debounce fast-changing client input renders browser state and starts no Host work of its own."
         }
       ]
     }

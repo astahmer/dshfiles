@@ -55,6 +55,16 @@
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "continues ids after a Host restart"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -99,6 +109,12 @@
           "kind": "gherkin",
           "id": "backlog.jev-settings-panel",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Configure Jev from the Backlog panel renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -162,6 +178,12 @@
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "hides dormant items from the feed until something touches them"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -181,6 +203,12 @@
           "kind": "gherkin",
           "id": "backlog.inline-edit",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Rename an item in place renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -230,6 +258,16 @@
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "answers backlinks for items and for any linked target"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -269,15 +307,51 @@
           "id": "backlog.multi-select",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
-        { "kind": "gherkin", "id": "backlog.board-multi-select", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
-        { "kind": "gherkin", "id": "backlog.selection-collapsed-scope", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
-        { "kind": "gherkin", "id": "backlog.board-multi-drag", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
-        { "kind": "gherkin", "id": "backlog.board-drag-unselected", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
-        { "kind": "gherkin", "id": "backlog.selection-visible-scope", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
-        { "kind": "gherkin", "id": "backlog.list-selection-feed", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
-        { "kind": "gherkin", "id": "backlog.list-selection-inbox", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
-        { "kind": "gherkin", "id": "backlog.list-selection-search", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
-        { "kind": "gherkin", "id": "backlog.list-selection-projects", "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature" },
+        {
+          "kind": "gherkin",
+          "id": "backlog.board-multi-select",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.selection-collapsed-scope",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.board-multi-drag",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.board-drag-unselected",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.selection-visible-scope",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.list-selection-feed",
+          "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.list-selection-inbox",
+          "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.list-selection-search",
+          "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.list-selection-projects",
+          "featureFile": "tooling/dshx/e2e/features/backlog-selection.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.multi-select-toggle",
@@ -295,6 +369,12 @@
           "id": "backlog.multi-select-open-item-seed",
           "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
           "testName": "starts a modifier selection from the open item only when nothing is selected"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Select items in ranges and batch-edit them renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -329,12 +409,22 @@
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "backlog.item-context-actions", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        {
+          "kind": "gherkin",
+          "id": "backlog.item-context-actions",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.selection-open-item-seed",
           "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
           "testName": "starts a modifier selection from the open item only when nothing is selected"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Apply every context-menu action to the selection renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -418,6 +508,26 @@
           "testName": "dismisses a proposal without changing the item"
         }
       ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "jev classify",
+          "file": "plugins/@dshfiles/backlog/src/jev-client.test.ts",
+          "testName": "records a jev classify span with status and token counts, never the key or text"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ],
       "failureModes": [
         "A failing or missing Jev key or model is skipped; the item stays in the Inbox.",
         "A model answer with invalid fields keeps only the valid ones; a duplicate it was not shown is ignored."
@@ -494,6 +604,26 @@
           "id": "backlog.backfill-host-looked-at",
           "file": "plugins/@dshfiles/backlog/src/backfill.test.ts",
           "testName": "records that triage looked at an item without making it look recently active"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "jev classify",
+          "file": "plugins/@dshfiles/backlog/src/jev-client.test.ts",
+          "testName": "records a jev classify span with status and token counts, never the key or text"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
         }
       ]
     },
@@ -612,6 +742,18 @@
           "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
           "testName": "suggests nothing when the reply only reports progress, leaves work, or Jev fails"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/backlog/src/jj-runner.test.ts",
+          "testName": "records a jj log span with flag names only and the exit code"
+        }
       ]
     },
     {
@@ -648,6 +790,12 @@
           "id": "backlog.mentions-unit-serialize",
           "file": "plugins/@dshfiles/backlog/src/backlog-mentions.test.ts",
           "testName": "sends a chip as text naming b:<id>, so the thread signal sees it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Mention backlog items with @ renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -729,6 +877,12 @@
           "file": "plugins/@dshfiles/backlog/src/backlog-mention-text.test.ts",
           "testName": "reads a whole serialized mention back into its id and title"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Preview a referenced item from a conversation renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -780,6 +934,16 @@
           "id": "backlog.search-unit-recency",
           "file": "plugins/@dshfiles/backlog/src/search.test.ts",
           "testName": "filters by recency and matches ids exactly"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -841,6 +1005,12 @@
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "hides a snoozed item until its time, then lets it resurface"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -875,6 +1045,12 @@
           "id": "backlog.activity-host-provenance",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "stamps who made a link"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -944,6 +1120,12 @@
           "id": "backlog.rich-capture-attachment-file",
           "file": "plugins/@dshfiles/backlog/src/attachment-file.test.ts",
           "testName": "writes the bytes under the two ids with an extension from the media type"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -1052,6 +1234,12 @@
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "keeps the images a comment carries on its own event and reads them back"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -1106,6 +1294,12 @@
           "file": "plugins/@dshfiles/backlog/src/capture-project.test.ts",
           "testName": "keeps the project it just used, and forgets it when remembering is off"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -1149,6 +1343,16 @@
           "id": "backlog.capture-project-target-missing",
           "file": "plugins/@dshfiles/backlog/src/project-target.test.ts",
           "testName": "keeps the workspace when jj cannot say which project it came from"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "jj"
         }
       ]
     },
@@ -1269,6 +1473,16 @@
           "file": "plugins/@dshfiles/backlog/src/start-thread-workspace.test.ts",
           "testName": "keeps a bare folder instead of provisioning a workspace for it"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -1316,6 +1530,16 @@
           "id": "backlog.jev-secret-setup-status",
           "file": "plugins/@dshfiles/backlog/src/jev-setup-status.test.ts",
           "testName": "suggests setup when the key is missing or its reference cannot resolve"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "secret"
         }
       ]
     }

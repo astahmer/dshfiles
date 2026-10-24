@@ -40,6 +40,12 @@
           "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
           "testName": "throws synchronously for a target that disappeared, scheduling nothing"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client palette commands that navigate between registered panels; nothing runs on the Host."
+        }
       ]
     },
     {
@@ -81,6 +87,12 @@
           "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
           "testName": "navigates only after onSelect has returned, so the shell can consume the token first"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client palette commands over the session list the client already holds; nothing runs on the Host."
+        }
       ]
     },
     {
@@ -103,6 +115,12 @@
           "id": "sidebar-commands.thread-sidebar-palette-actions-unit-palette-capability-ack",
           "file": "plugins/@dshfiles/sidebar-commands/src/go-to.test.ts",
           "testName": "leads with palette actions only when the thread sidebar acknowledged the palette"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client palette registration gated by a client-side capability probe; nothing runs on the Host."
         }
       ]
     }

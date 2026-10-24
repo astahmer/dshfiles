@@ -40,6 +40,12 @@
           "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
           "testName": "corrupt directory stays untouched and rejects writes instead of replacing user data"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -73,6 +79,12 @@
           "id": "multi-host.host-page-browser",
           "reason": "The Hosts page needs registered hosts, which the loopback SSH journey does not seed. The catalog reach drives the real page with the multi-host-hosts scratch seed (dshx dev open multi-host/host-management), and the store/order unit tests prove hide, reorder and order persistence."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -103,6 +115,18 @@
           "kind": "gherkin",
           "id": "multi-host.ssh-identity-profile",
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "ssh command",
+          "file": "plugins/@dshfiles/multi-host/src/connectors/connector-spans.test.ts",
+          "testName": "records an ssh command span that fails on a refused target before ssh starts"
         }
       ]
     },
@@ -142,6 +166,18 @@
           "file": "plugins/@dshfiles/multi-host/tests/native-rpc-outcome.test.ts",
           "testName": "reports an admitted create as unknown after its reply is lost and reconciles without replay"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "<namespace>/<method>",
+          "file": "plugins/@dshfiles/multi-host/src/connectors/connector-spans.test.ts",
+          "testName": "records one <namespace>/<method> gateway span with the outcome code, never the arguments"
+        }
       ]
     },
     {
@@ -171,6 +207,12 @@
           "file": "plugins/@dshfiles/multi-host/tests/directory-listing.test.ts",
           "testName": "lists folders and folder symlinks, hidden ones last, with crumbs; files are left out"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -197,6 +239,12 @@
           "id": "multi-host.inventory-merge",
           "file": "plugins/@dshfiles/multi-host/tests/inventory.test.ts",
           "testName": "a thread in both sources appears once with its stored title and started-here flag"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -235,8 +283,21 @@
           "id": "multi-host.waiting-banner-ui",
           "reason": "No provider credential is available to the headless E2E scratch runtime, so it cannot run a remote agent turn that calls ask_user_question. The banner is driven in the scratch UI with `dshx dev open multi-host/waiting-on-host` against a free-model remote runtime instead."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     }
   ],
-  "kind": "bundle"
+  "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/connectors/loopback.ts",
+      "tracedBy": "<namespace>/<method>",
+      "reason": "Raw TCP forward and port probe for the SSH tunnel; every request through it is a gateway <namespace>/<method> span and the tunnel itself an ssh tunnel open span."
+    }
+  ]
 }

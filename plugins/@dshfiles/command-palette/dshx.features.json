@@ -68,6 +68,12 @@
           "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
           "testName": "lists only the current project on Threads and every project on Everything"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Search threads and workspace files renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -120,6 +126,12 @@
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
           "testName": "actions match labels and aliases, preserve ties, and use frecency"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Browser-only action registry: actions are registered and run in the client, so no Host work exists to trace."
+        }
       ]
     },
     {
@@ -161,6 +173,12 @@
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
           "testName": "empty file search lists frecent paths before walk order"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Rank recently used actions and files renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -193,6 +211,12 @@
           "id": "command-palette.prefix-routing-unit-command-content-line",
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
           "testName": "palette prefixes route to thread, command, content, and line views"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Route prefixed searches to the right content renders browser state and starts no Host work of its own."
         }
       ],
       "reach": [
@@ -293,6 +317,12 @@
           "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
           "testName": "keeps only the first line and bounds the title"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Ask DSH from an empty palette renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -333,6 +363,12 @@
           "id": "command-palette.performance-unit-open-large-dataset",
           "file": "plugins/@dshfiles/command-palette/src/palette-perf.test.ts",
           "testName": "opening the palette prepares 2,000 threads, 20,000 files and 200 frecency entries in under 50 ms"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Keep palette ranking within the interaction budget renders browser state and starts no Host work of its own."
         }
       ]
     }

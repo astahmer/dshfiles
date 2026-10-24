@@ -57,6 +57,12 @@
           "id": "apply-patch.no-browser-surface",
           "reason": "apply_patch is an agent tool with no browser UI of its own; its edit semantics are covered by tests/apply-edits.test.ts and the Host bundle is import-checked after each build."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     }
   ]

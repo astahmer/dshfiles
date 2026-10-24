@@ -71,6 +71,16 @@
           "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
           "testName": "treats a systemd --user subreaper as the adopter of a detached tree"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     }
   ]

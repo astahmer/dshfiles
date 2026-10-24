@@ -329,6 +329,12 @@
           "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
           "testName": "retitles a scoped tab wherever its set is, and saves the title and scope for a reload"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Browser-like tabs above the main view renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -407,6 +413,12 @@
           "file": "plugins/@dshfiles/main-tabs/src/start-suggestions.test.ts",
           "testName": "shows the bound command named after the panel, and nothing when it has none"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open a new tab with suggestions of what to show renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -435,6 +447,12 @@
           "id": "main-tabs.machine-unit-close-active",
           "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
           "testName": "closes the active tab and navigates to its right neighbour"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Jump between tabs from the keyboard renders browser state and starts no Host work of its own."
         }
       ],
       "reach": [
@@ -494,6 +512,12 @@
           "file": "plugins/@dshfiles/main-tabs/src/host-target.test.ts",
           "testName": "files a jj thread workspace and a subagent under the project they belong to"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Keep tabs across reloads, per project or globally renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -550,6 +574,12 @@
           "kind": "gherkin",
           "id": "main-tabs.backlog-capture-with-thread-tab",
           "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Typing in Backlog with a kept thread tab renders browser state and starts no Host work of its own."
         }
       ]
     }

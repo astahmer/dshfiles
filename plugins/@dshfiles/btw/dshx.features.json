@@ -38,6 +38,12 @@
           "file": "plugins/@dshfiles/btw/src/prefix-cache.test.ts",
           "testName": "reads the first request after the fork seed, not the copied source requests"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: /btw side chat renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -63,6 +69,12 @@
           "id": "btw.chip-restore",
           "file": "plugins/@dshfiles/btw/src/btw-source.test.ts",
           "testName": "answers a persisted /btw chip with its claim and performs nothing"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Persisted /btw command chip renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -122,6 +134,12 @@
           "id": "btw.shortcut-pass",
           "file": "plugins/@dshfiles/btw/src/main-view-thread.test.ts",
           "testName": "has no target on a panel or the New thread screen"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open a side question from the palette, a shortcut or the composer renders browser state and starts no Host work of its own."
         }
       ]
     }

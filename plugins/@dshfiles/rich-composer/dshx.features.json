@@ -27,6 +27,12 @@
           "file": "plugins/@dshfiles/rich-composer/tests/paste-references.test.ts",
           "testName": "turns canonical session mentions into structured references and preserves surrounding text"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Paste session mentions as reference chips renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -53,6 +59,12 @@
           "kind": "not-applicable",
           "id": "rich-composer.thread-title-rename",
           "reason": "The in-place header editor is exercised end to end by its scratch reach; mounting the slot in a unit harness would require the full Conversation runtime."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Rename a thread from its header title renders browser state and starts no Host work of its own."
         }
       ]
     }

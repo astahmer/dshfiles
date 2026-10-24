@@ -162,6 +162,7 @@ describe('checkProjectManifest', () => {
             failureModes: ['The active conversation rejects the message.'],
             externalDependencies: [],
             verification: [{ kind: 'gherkin', id: 'plugin.send-message', featureFile: 'tests/plugin.feature' }],
+            telemetry: [{ kind: 'not-applicable', reason: 'Client presentation only; the message goes through the native composer.' }],
           },
         ],
       }),

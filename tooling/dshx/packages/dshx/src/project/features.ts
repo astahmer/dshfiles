@@ -12,6 +12,35 @@ const verificationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('not-applicable'), id: scenarioIdSchema, reason: z.string().min(20) }).strict(),
 ])
 
+/**
+ * Spans a feature's work emits without plugin code: `api-dispatch` (the `<api id>/<method>` server span of every dshx API
+ * method the plugin serves), `agent-tool` (`execute_tool <name>` from agent-telemetry's `tools/execute` hook),
+ * `model-stream` (`chat <model>` for a `ctx.llm` stream), and the shared helpers another owned plugin opens for it:
+ * `jj` (jujutsu / jj-integration APIs), `secret` (`secretCatalogValues`), `multi-host` (gateway requests).
+ */
+export const DshxTelemetrySourceSchema = z.enum(['api-dispatch', 'agent-tool', 'model-stream', 'jj', 'secret', 'multi-host'])
+
+/** `<word>` marks a dynamic part of a span name (`jj <subcommand>`); everything else is literal. */
+const spanNameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-z_<][a-z0-9_./ <>-]*$/u, 'span names are lowercase `<subject> <verb>`; mark a dynamic part as <word>')
+
+const telemetrySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('automatic'), source: DshxTelemetrySourceSchema }).strict(),
+  z.object({ kind: z.literal('custom'), span: spanNameSchema, file: z.string().min(1), testName: z.string().min(1) }).strict(),
+  z.object({ kind: z.literal('not-applicable'), reason: z.string().min(20) }).strict(),
+])
+
+const ioDelegationSchema = z
+  .object({
+    file: z.string().min(1),
+    tracedBy: spanNameSchema.optional(),
+    reason: z.string().min(20),
+  })
+  .strict()
+
 const configurationOptionSchema = z
   .object({
     key: z.string().min(1),
@@ -140,6 +169,13 @@ export const DshxFeatureSchema = z
     failureModes: z.array(z.string().min(1)).min(1),
     externalDependencies: z.array(externalDependencySchema),
     verification: z.array(verificationSchema).min(1),
+    telemetry: z
+      .array(telemetrySchema)
+      .min(1)
+      .refine(
+        entries => entries.length === 1 || entries.every(entry => entry.kind !== 'not-applicable'),
+        'a not-applicable telemetry rationale stands alone: drop it or the span entries',
+      ),
     reach: reachSchema.optional(),
   })
   .strict()
@@ -149,6 +185,7 @@ export const DshxFeatureCatalogSchema = z
     schemaVersion: z.literal(1),
     kind: z.enum(['bundle', 'library', 'infrastructure']),
     features: z.array(DshxFeatureSchema).min(1),
+    ioDelegation: z.array(ioDelegationSchema).optional(),
   })
   .strict()
 
@@ -167,6 +204,9 @@ export const featureCatalogIssues = (value: unknown): readonly string[] => {
     for (const verification of feature.verification) {
       if (verificationIds.has(verification.id)) issues.push(`features.${feature.id}.verification.${verification.id}: duplicate verification id`)
       verificationIds.add(verification.id)
+    }
+    if (feature.surfaces.includes('tool') && !feature.telemetry.some(entry => entry.kind === 'automatic' && entry.source === 'agent-tool')) {
+      issues.push(`features.${feature.id}.telemetry: a tool surface emits execute_tool spans; list { kind: automatic, source: agent-tool }`)
     }
     for (const option of feature.configuration) {
       const uncovered = option.coveredBy.filter(verificationId => !feature.verification.some(verification => verification.id === verificationId))

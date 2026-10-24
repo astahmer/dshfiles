@@ -32,6 +32,12 @@
           "file": "plugins/@dshfiles/settings-shell/src/upstream-version.test.ts",
           "testName": "matches the native Settings package this workspace builds against"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Native Settings shell, ported renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -65,6 +71,22 @@
           "id": "settings-shell.release-status",
           "file": "plugins/@dshfiles/settings-shell/src/release-status.test.ts",
           "testName": "lists releases after the installed version and keeps their links on GitHub"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "dsh release check",
+          "file": "plugins/@dshfiles/settings-shell/src/release-status.test.ts",
+          "testName": "records a dsh release check span with whether an update exists"
         }
       ]
     },
@@ -115,6 +137,12 @@
           "file": "plugins/@dshfiles/settings-shell/src/settings-preference.test.ts",
           "testName": "opens a tab when main-tabs is loaded, the dialog otherwise, unless the user chose"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Settings as a main-view tab renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -153,6 +181,12 @@
           "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
           "testName": "drills into a side-panel section and goes back to the section list"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Settings in the side panel renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -182,6 +216,12 @@
           "id": "settings-shell.machine-unit-dialog",
           "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
           "testName": "opens the dialog on a section, expands it, and forgets the section on close"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Settings dialog, expandable renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -215,6 +255,12 @@
           "file": "plugins/@dshfiles/settings-shell/src/settings-search.test.ts",
           "testName": "finds settings by title, description and key, never hidden ones, and counts them per page"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Search Settings inline renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -244,6 +290,12 @@
           "id": "settings-shell.schema-unit-controls",
           "file": "plugins/@dshfiles/settings-shell/src/schema-form/schema-model.test.ts",
           "testName": "turns each visible setting into a titled field with the control its type calls for"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Plugin settings with real controls renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -276,6 +328,12 @@
           "id": "settings-shell.reset-while-saving",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Modified settings and reset to default renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -302,6 +360,12 @@
           "kind": "gherkin",
           "id": "settings-shell.open-config-menu",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open the configuration file elsewhere renders browser state and starts no Host work of its own."
         }
       ]
     }

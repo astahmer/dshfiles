@@ -188,6 +188,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "a session without a workspace falls back to the project its recorded cwd belongs to"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -258,6 +264,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "archive adapter explicitly refuses to stop Host activity"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -302,7 +314,7 @@
         {
           "key": "views",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
-          "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
+          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
@@ -328,7 +340,7 @@
         {
           "key": "viewPresets",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
-          "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
+          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
       ],
@@ -566,6 +578,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
           "testName": "maps an unchanged legacy default to its matching default tab"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Configure saved thread views renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -700,6 +718,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-machine.test.ts",
           "testName": "scans immediately when enabled and on its actor-owned interval"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -752,6 +776,12 @@
           "id": "thread-sidebar.section-order-unit-remote-inventory",
           "file": "plugins/@dshfiles/thread-sidebar/src/remote-thread-inventory.test.ts",
           "testName": "remote inventory enriches started-here threads without adding host-only sessions"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Group remote threads with each view renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -813,6 +843,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
           "testName": "older preferences default settled-thread auto-archive to disabled and record no settle times"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Archive a settled thread once its delay passes renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -835,7 +871,7 @@
         {
           "key": "mutedThreads",
           "defaultValue": "{}",
-          "constraints": "Hidden; session id \u2192 { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
+          "constraints": "Hidden; session id → { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
           "coveredBy": ["thread-sidebar.thread-mute"]
         }
       ],
@@ -875,6 +911,12 @@
           "id": "thread-sidebar.thread-mute-unit-migration",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-mute.test.ts",
           "testName": "browser-only mutes migrate once, skipping expired ones and threads the Host already mutes"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Mute or snooze a thread renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -916,6 +958,12 @@
           "id": "thread-sidebar.manual-unread-unit-host-record",
           "file": "plugins/@dshfiles/thread-sidebar/src/attention-store.test.ts",
           "testName": "marking a thread unread by hand keeps its finish"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -962,6 +1010,12 @@
           "id": "thread-sidebar.finished-turn-attention-unit-migration",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
           "testName": "browser attention carries over its needs-you timestamps and manual marks"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -1031,6 +1085,12 @@
           "id": "thread-sidebar.notifications-unit-deduplication",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
           "testName": "event claims deduplicate ids and retain only the newest 5,000"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -1139,6 +1199,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/slot-takeover.test.ts",
           "testName": "the seat above the foot exists only once this sidebar declares it"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Customize sidebar navigation and sections renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -1168,6 +1234,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "a footer seat that renders nothing never overflows and takes no gap"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Reach Settings, sidebar pages, and hidden footer actions from both More menus renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -1194,6 +1266,12 @@
           "kind": "not-applicable",
           "id": "thread-sidebar.client-reload-banner-needs-external-rebuild",
           "reason": "The banner only shows while the page runs an older bundle than the Host serves, and a browser journey can only reach that by rebuilding a client bundle while the page's hot-reload channel is down; the harness's in-process seeds keep that channel healthy, so the page applies the rebuild instead. Verified by unit tests plus a scripted scratch run with the channel blocked: the banner listed the rebuilt plugin and its reload button reloaded the page."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -1290,17 +1368,19 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/navigation-history.test.ts",
           "testName": "the history menu jumps to any visited entry and keeps the rest for back and forward"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
-      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a \u201cparent thread unavailable\u201d header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
-      "reach": [
-        "click button \"Sidebar settings\"",
-        "click button \"Finished subagents: Fold into \u201cN finished\u201d\"",
-        "expect menuitemradio \"Hide them\""
-      ],
+      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
+      "reach": ["click button \"Sidebar settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -1324,7 +1404,7 @@
       "states": ["collapsed", "expanded", "nested", "copied", "finished-folded", "parent-unavailable"],
       "failureModes": [
         "Child chains preserve inherited workspace identity.",
-        "A branch whose nearest listed ancestor is missing from the corpus groups under one \u201cparent thread unavailable\u201d header and never renders as a top-level thread row.",
+        "A branch whose nearest listed ancestor is missing from the corpus groups under one “parent thread unavailable” header and never renders as a top-level thread row.",
         "The unavailable branch header archives every thread in it, and archived threads of that branch stay hidden until the view filters for archived, where the same header restores them.",
         "Copied links omit credentials and unsupported path-based routes."
       ],
@@ -1437,6 +1517,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
           "testName": "thread reference keeps the native session mention and title presentation"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -1506,6 +1592,12 @@
           "id": "thread-sidebar.session-header-actions-unit-action-failure",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
           "testName": "reports failed Host mutations beside the action"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -1587,6 +1679,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
           "testName": "dismiss removes one recovery candidate without changing other entries"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -1639,6 +1737,16 @@
           "kind": "not-applicable",
           "id": "thread-sidebar.interrupted-turn-threads-no-browser-journey",
           "reason": "The state needs a Host that stopped mid-turn, which no UI step can produce: a browser journey would first need a new dshx dev seed that opens a turn, kills the scratch Host without the managed-restart handshake, and boots it again."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -1727,6 +1835,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention-dom.test.ts",
           "testName": "the main composer session ignores an aside conversation on screen beside it"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -1769,6 +1883,12 @@
           "id": "thread-sidebar.skill-mentions-unit-slash-invocation",
           "file": "plugins/@dshfiles/thread-sidebar/src/skill-mention.test.ts",
           "testName": "routes a selected skill through the existing slash invocation"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -1820,6 +1940,12 @@
           "kind": "gherkin",
           "id": "thread-sidebar.usage-limit-group",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar-usage-limit.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Group provider-blocked threads under Usage limit renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -1907,6 +2033,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "the shipped row order lists every hover action once, with settle in archive slot"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open a thread in the right side panel renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -1945,6 +2077,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
           "testName": "retries a search that could not answer yet before calling the lookup degraded"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -1970,6 +2108,12 @@
           "id": "thread-sidebar.inventory-poll-collapsed",
           "file": "plugins/@dshfiles/thread-sidebar/src/inventory-poll.test.ts",
           "testName": "a schedule stopped for a hidden surface stays quiet through a visibility cycle"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -2035,6 +2179,12 @@
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-list-navigation.test.ts",
           "testName": "expands and collapses child rows with Right and Left"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Navigate and multi-select threads from the keyboard renders browser state and starts no Host work of its own."
+        }
       ]
     },
     {
@@ -2068,6 +2218,12 @@
           "id": "thread-sidebar.rename-title-route",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
           "testName": "routes rename, fork, stop and model selection to the named thread"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Edit a thread title from its row menu renders browser state and starts no Host work of its own."
         }
       ]
     },
@@ -2115,6 +2271,12 @@
           "id": "thread-sidebar.continue-in-project-unit-host-fork",
           "file": "plugins/@dshfiles/session-controller/tests/host/continue-in.test.ts",
           "testName": "runs the continuation in the destination project and tells the model where it came from"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }

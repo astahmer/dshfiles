@@ -108,6 +108,16 @@
           "id": "agents.thread-workspace-picker",
           "featureFile": "tooling/dshx/e2e/features/agents.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     },
     {
@@ -157,6 +167,16 @@
           "kind": "gherkin",
           "id": "agents.comment-autocomplete",
           "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ],
       "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"", "expect text \"@dsh\""]
@@ -209,6 +229,12 @@
           "kind": "gherkin",
           "id": "agents.mention-preview",
           "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Preview an agent from its mention renders browser state and starts no Host work of its own."
         }
       ],
       "reach": [

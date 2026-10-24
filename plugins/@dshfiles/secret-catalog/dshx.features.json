@@ -83,6 +83,18 @@
           "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
           "testName": "routes picker browsing and workspace registration through the Host Remote contracts"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        }
       ]
     },
     {
@@ -140,6 +152,18 @@
           "id": "secret-catalog.bounded-secret-reveal-unit-secret-cli-output-redaction",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "does not expose CLI stdout for copy and mutation commands"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ],
       "reach": ["seed fake-secret-cli", "click button \"Secret Catalog\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
@@ -202,6 +226,18 @@
           "id": "secret-catalog.inline-quick-add-unit-draft-issues",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-form.test.ts",
           "testName": "names the first reason a draft cannot be saved"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ]
     },
@@ -290,6 +326,18 @@
           "file": "plugins/@dshfiles/secret-catalog/src/secret-operations.test.ts",
           "testName": "adds manual local aliases over stdin without putting their values in argv or output"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        }
       ]
     },
     {
@@ -344,6 +392,18 @@
           "id": "secret-catalog.inline-reference-setup-partial-failure",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-setup-flow.test.ts",
           "testName": "keeps a stored reference for retry when binding fails, without creating a second secret"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ]
     },
@@ -418,6 +478,28 @@
           "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-repair-model.test.ts",
           "testName": "warns before a global write lands in a symlinked config, and only then"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret resolve",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-resolver.test.ts",
+          "testName": "records a secret resolve span with the alias, environment and scope, never the value"
+        }
       ]
     },
     {
@@ -434,6 +516,22 @@
           "kind": "gherkin",
           "id": "secret-catalog.agent-tools",
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "secret resolve",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-resolver.test.ts",
+          "testName": "records a secret resolve span with the alias, environment and scope, never the value"
         }
       ]
     },
@@ -480,6 +578,18 @@
           "id": "secret-catalog.backlog-jev-target",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-input-bind.test.ts",
           "testName": "recognizes only the Backlog Jev secret setting as a setup target"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ]
     },
@@ -543,6 +653,24 @@
           "id": "secret-catalog.jev-chat-turn-latest-only",
           "file": "plugins/@dshfiles/secret-catalog/src/jev-chat-turn-timeline.test.ts",
           "testName": "only offers on the greatest observed turn in each session"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "secret <verb>",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
+          "testName": "records a secret <verb> span with flag names only, never the alias or the value"
+        },
+        {
+          "kind": "custom",
+          "span": "secret resolve",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-resolver.test.ts",
+          "testName": "records a secret resolve span with the alias, environment and scope, never the value"
         }
       ]
     }

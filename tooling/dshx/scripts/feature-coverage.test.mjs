@@ -36,13 +36,18 @@ const withFixture = async callback => {
           failureModes: ['The Host fails before publishing the bundle.'],
           externalDependencies: [],
           verification: [{ kind: 'gherkin', id: 'demo.boot-profile', featureFile: 'tooling/dshx/e2e/features/demo.feature' }],
+          telemetry: [{ kind: 'automatic', source: 'api-dispatch' }],
         },
       ],
     }),
   )
+  await mkdir(resolve(pluginRoot, 'src'), { recursive: true })
+  await writeFile(resolve(pluginRoot, 'dshx.config.ts'), "export default defineConfig({ name: '@dshfiles/demo', host: { entry: 'src/host.ts' } })\n")
+  await writeFile(resolve(pluginRoot, 'src/host.ts'), "import { demoApi } from './api.js'\nexport const host = demoApi\n")
+  await writeFile(resolve(pluginRoot, 'src/api.ts'), "export const demoApi = defineApi({ id: 'demo' })\n")
   const featureFile = resolve(featureRoot, 'demo.feature')
   await writeFile(featureFile, 'Feature: Demo boot\n  @scenario:demo.boot-profile\n  Scenario: Boot the disposable profile\n')
-  return callback({ root, featureFile, catalogFile: resolve(pluginRoot, 'dshx.features.json') })
+  return callback({ root, pluginRoot, featureFile, catalogFile: resolve(pluginRoot, 'dshx.features.json') })
 }
 
 const runCheck = (root, mode = '--check') => spawnSync(process.execPath, ['--experimental-strip-types', scriptPath, mode, '--root', root], { encoding: 'utf8' })
@@ -122,5 +127,140 @@ test('lets a bundle feature declare its missing browser journey only with an exp
     await writeFile(catalogFile, JSON.stringify(catalog))
     const withRationale = runCheck(root)
     assert.equal(withRationale.status, 0, withRationale.stderr)
+  })
+})
+
+const editCatalog = async (catalogFile, change) => {
+  const catalog = JSON.parse(await readFile(catalogFile, 'utf8'))
+  change(catalog)
+  await writeFile(catalogFile, JSON.stringify(catalog))
+}
+
+const spanTest = (body = "using recorder = recordSpans()\n    await run()\n    expect(recorder.span('demo sync').attributes).toBeDefined()") =>
+  `import { recordSpans } from '@dshfiles/dshx/tracing'\n\ntest('records the demo sync span', async () => {\n    ${body}\n})\n\ntest('another test', () => {})\n`
+
+const customEntry = { kind: 'custom', span: 'demo sync', file: 'plugins/@dshfiles/demo/src/sync.test.ts', testName: 'records the demo sync span' }
+
+test('requires a telemetry entry on every feature', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      delete catalog.features[0].telemetry
+    })
+    const result = runCheck(root)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /features\.0\.telemetry/)
+  })
+})
+
+test('rejects an automatic source the package code does not back', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].telemetry = [{ kind: 'automatic', source: 'model-stream' }]
+    })
+    const result = runCheck(root)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /feature boot-profile telemetry model-stream needs a ctx\.llm stream/)
+  })
+})
+
+test('requires agent-tool on a tool surface', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surfaces = ['host', 'tool']
+      catalog.features[0].telemetry = [{ kind: 'not-applicable', reason: 'Nothing worth tracing happens in this feature.' }]
+    })
+    const result = runCheck(root)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /a tool surface emits execute_tool spans/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surfaces = ['host']
+    })
+    assert.equal(runCheck(root).status, 0, runCheck(root).stderr)
+  })
+})
+
+test('checks a custom span against the Host source and a recordSpans test that names it', async () => {
+  await withFixture(async ({ root, pluginRoot, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].telemetry = [customEntry]
+    })
+    const missing = runCheck(root)
+    assert.equal(missing.status, 1)
+    assert.match(missing.stderr, /span "demo sync" is not emitted by any Host source string/)
+    assert.match(missing.stderr, /telemetry test file plugins\/@dshfiles\/demo\/src\/sync\.test\.ts does not exist/)
+
+    await writeFile(
+      resolve(pluginRoot, 'src/host.ts'),
+      "import { withSpan } from '@dshfiles/dshx/tracing'\nexport const run = () => withSpan('demo sync', {}, async () => 1)\n",
+    )
+    await writeFile(resolve(pluginRoot, 'src/sync.test.ts'), spanTest('await run()'))
+    const unrecorded = runCheck(root)
+    assert.equal(unrecorded.status, 1)
+    assert.match(unrecorded.stderr, /telemetry test records the demo sync span must call recordSpans\(\)/)
+    assert.match(unrecorded.stderr, /never names span "demo sync"/)
+
+    await writeFile(resolve(pluginRoot, 'src/sync.test.ts'), spanTest())
+    const recorded = runCheck(root)
+    assert.equal(recorded.status, 0, recorded.stderr)
+    assert.match(recorded.stdout, /telemetry \(0 automatic, 1 custom span entries, 0 not applicable\)/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].telemetry = [{ ...customEntry, testName: 'records a renamed span' }]
+    })
+    assert.match(runCheck(root).stderr, /telemetry test records a renamed span was not found/)
+  })
+})
+
+test('matches a dynamic span name against a template literal and a concrete test assertion', async () => {
+  await withFixture(async ({ root, pluginRoot, catalogFile }) => {
+    await writeFile(
+      resolve(pluginRoot, 'src/host.ts'),
+      'import { withSpan } from "@dshfiles/dshx/tracing"\nexport const run = (verb) => withSpan(`demo ${verb}`, {}, async () => 1)\n',
+    )
+    await writeFile(resolve(pluginRoot, 'src/sync.test.ts'), spanTest())
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].telemetry = [{ ...customEntry, span: 'demo <verb>' }]
+    })
+    const result = runCheck(root)
+    assert.equal(result.status, 0, result.stderr)
+  })
+})
+
+test('fails Host I/O without a span until it opens one or names its delegation', async () => {
+  await withFixture(async ({ root, pluginRoot, catalogFile }) => {
+    await writeFile(resolve(pluginRoot, 'src/host.ts'), "import { demoApi } from './api.js'\nimport './network.js'\nexport const host = demoApi\n")
+    await writeFile(resolve(pluginRoot, 'src/network.ts'), "export const load = () => fetch('https://example.invalid')\n")
+    await writeFile(resolve(pluginRoot, 'src/client-only.ts'), "export const load = () => fetch('/browser')\n")
+    const untraced = runCheck(root)
+    assert.equal(untraced.status, 1)
+    assert.match(untraced.stderr, /Host file src\/network\.ts does I\/O \(fetch\) without a span/)
+    assert.doesNotMatch(untraced.stderr, /client-only/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.ioDelegation = [{ file: 'src/network.ts', tracedBy: 'demo sync', reason: 'The caller opens the demo sync span around every request.' }]
+    })
+    assert.match(runCheck(root).stderr, /tracedBy "demo sync" is not a custom span declared by this catalog/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.ioDelegation = [{ file: 'src/network.ts', reason: 'The caller opens the demo sync span around every request.' }]
+    })
+    assert.equal(runCheck(root).status, 0, runCheck(root).stderr)
+
+    await writeFile(
+      resolve(pluginRoot, 'src/network.ts'),
+      "import { withSpan } from '@dshfiles/dshx/tracing'\nexport const load = () => withSpan('demo load', {}, () => fetch('https://example.invalid'))\n",
+    )
+    assert.match(runCheck(root).stderr, /ioDelegation src\/network\.ts opens its own span; remove the entry/)
+  })
+})
+
+test('ignores type-only Node network imports', async () => {
+  await withFixture(async ({ root, pluginRoot }) => {
+    await writeFile(
+      resolve(pluginRoot, 'src/host.ts'),
+      "import type { ServerResponse } from 'node:http'\nimport { demoApi } from './api.js'\nexport const host = demoApi\n",
+    )
+    assert.equal(runCheck(root).status, 0, runCheck(root).stderr)
   })
 })

@@ -1,7 +1,8 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DshxFeatureCatalogSchema } from '../packages/dshx/src/project/features.ts'
+import { DshxFeatureCatalogSchema, featureCatalogIssues } from '../packages/dshx/src/project/features.ts'
+import { readPackageRelative, telemetryIssues } from './telemetry-coverage.mjs'
 
 const argumentsList = process.argv.slice(2)
 const mode = argumentsList[0]
@@ -99,6 +100,7 @@ const catalogs = []
 const declaredVerificationIds = new Set()
 const expectedGherkin = new Map()
 const counts = { gherkin: 0, 'unit-test': 0, 'host-test': 0, 'not-applicable': 0 }
+const telemetryCounts = { automatic: 0, custom: 0, 'not-applicable': 0 }
 
 for (const plugin of packages) {
   const featureReference = plugin.manifest.dshx?.features
@@ -123,17 +125,13 @@ for (const plugin of packages) {
     for (const issue of parsed.error.issues) errors.push(`${plugin.name}: ${featureReference} ${issue.path.join('.')}: ${issue.message}`)
     continue
   }
-  const featureIssues = []
-  const featureIds = new Set()
-  const packageVerificationIds = new Set()
+  const featureIssues = [...featureCatalogIssues(rawCatalog)]
   const prefix = `${plugin.name.slice('@dshfiles/'.length)}.`
   const hasBundleMetadata = typeof plugin.manifest.dsh === 'object' && plugin.manifest.dsh !== null && !Array.isArray(plugin.manifest.dsh)
   if (parsed.data.kind === 'bundle' && !hasBundleMetadata) featureIssues.push('bundle catalog requires package DSH bundle metadata')
   if (parsed.data.kind === 'library' && hasBundleMetadata) featureIssues.push('library catalog cannot be attached to a DSH bundle package')
   if (parsed.data.kind === 'infrastructure' && !hasBundleMetadata) featureIssues.push('infrastructure catalog requires package DSH bundle metadata')
   for (const feature of parsed.data.features) {
-    if (featureIds.has(feature.id)) featureIssues.push(`duplicate feature id ${feature.id}`)
-    featureIds.add(feature.id)
     const kinds = new Set(feature.verification.map(item => item.kind))
     if (parsed.data.kind === 'bundle' && !kinds.has('gherkin') && !kinds.has('not-applicable')) {
       featureIssues.push(`bundle feature ${feature.id} needs a Gherkin browser scenario or an explicit not-applicable rationale`)
@@ -144,8 +142,6 @@ for (const plugin of packages) {
     }
     for (const verification of feature.verification) {
       if (!verification.id.startsWith(prefix)) featureIssues.push(`verification ${verification.id} must start with ${prefix}`)
-      if (packageVerificationIds.has(verification.id)) featureIssues.push(`verification id ${verification.id} is declared more than once in this package`)
-      packageVerificationIds.add(verification.id)
       if (declaredVerificationIds.has(verification.id)) featureIssues.push(`verification id ${verification.id} is not globally unique`)
       declaredVerificationIds.add(verification.id)
       counts[verification.kind] += 1
@@ -159,12 +155,9 @@ for (const plugin of packages) {
         if (!isWithin(workspaceRoot, testFile)) {
           featureIssues.push(`test path ${verification.file} must stay inside the repository`)
         } else {
-          try {
-            const source = await readFile(testFile, 'utf8')
-            if (!source.includes(verification.testName)) featureIssues.push(`test reference ${verification.testName} was not found in ${verification.file}`)
-          } catch {
-            featureIssues.push(`test file ${verification.file} does not exist`)
-          }
+          const source = (await readFile(testFile, 'utf8').catch(() => undefined)) ?? (await readPackageRelative(plugin.root, verification.file))
+          if (source === undefined) featureIssues.push(`test file ${verification.file} does not exist`)
+          else if (!source.includes(verification.testName)) featureIssues.push(`test reference ${verification.testName} was not found in ${verification.file}`)
         }
       }
     }
@@ -172,6 +165,9 @@ for (const plugin of packages) {
   if (parsed.data.kind === 'infrastructure' && !parsed.data.features.some(feature => feature.verification.some(item => item.kind === 'unit-test'))) {
     featureIssues.push('infrastructure catalogs need at least one package unit-test reference')
   }
+  const telemetry = await telemetryIssues({ workspaceRoot, packageRoot: plugin.root, catalog: parsed.data })
+  featureIssues.push(...telemetry.issues)
+  for (const [kind, count] of Object.entries(telemetry.counts)) telemetryCounts[kind] += count
   for (const issue of featureIssues) errors.push(`${plugin.name}: ${issue}`)
   catalogs.push({ ...plugin, catalog: parsed.data })
 }
@@ -196,21 +192,27 @@ for (const [verificationId, files] of allScenarioTags) {
   if (!expectedGherkin.has(verificationId)) errors.push(`Orphan @scenario:${verificationId} tag in ${relative(workspaceRoot, files[0])}.`)
 }
 
+const telemetrySummary = () =>
+  `${String(telemetryCounts.automatic)} automatic, ${String(telemetryCounts.custom)} custom span entries, ${String(telemetryCounts['not-applicable'])} not applicable`
+
 const featureCount = catalogs.reduce((total, plugin) => total + plugin.catalog.features.length, 0)
 const configCount = catalogs.reduce((total, plugin) => total + plugin.catalog.features.reduce((count, feature) => count + feature.configuration.length, 0), 0)
 
 if (isReportMode) {
   process.stdout.write(`# Plugin feature coverage\n\n`)
   process.stdout.write(
-    `Packages: ${String(packages.length)}; catalogs: ${String(catalogs.length)}; features: ${String(featureCount)}; configuration options: ${String(configCount)}; Gherkin: ${String(counts.gherkin)}; unit tests: ${String(counts['unit-test'])}; Host tests: ${String(counts['host-test'])}; not applicable: ${String(counts['not-applicable'])}.\n\n`,
+    `Packages: ${String(packages.length)}; catalogs: ${String(catalogs.length)}; features: ${String(featureCount)}; configuration options: ${String(configCount)}; Gherkin: ${String(counts.gherkin)}; unit tests: ${String(counts['unit-test'])}; Host tests: ${String(counts['host-test'])}; not applicable: ${String(counts['not-applicable'])}; telemetry: ${telemetrySummary()}.\n\n`,
   )
-  process.stdout.write(`| Package | Feature | Configuration | Verification | External test boundary |\n|---|---|---|---|---|\n`)
+  process.stdout.write(`| Package | Feature | Configuration | Verification | Telemetry | External test boundary |\n|---|---|---|---|---|---|\n`)
   for (const plugin of catalogs) {
     for (const feature of plugin.catalog.features) {
       const verification = feature.verification.map(item => `${item.kind}: \`${item.id}\``).join('; ')
       const external = feature.externalDependencies.map(dependency => `${dependency.id}: ${dependency.deterministicFake}`).join('; ') || 'none'
+      const telemetry = feature.telemetry
+        .map(entry => (entry.kind === 'automatic' ? entry.source : entry.kind === 'custom' ? `\`${entry.span}\`` : 'n/a'))
+        .join(', ')
       process.stdout.write(
-        `| ${plugin.name} | ${feature.id}: ${feature.title} | ${feature.configuration.map(option => `\`${option.key}\``).join(', ') || 'none'} | ${verification} | ${external} |\n`,
+        `| ${plugin.name} | ${feature.id}: ${feature.title} | ${feature.configuration.map(option => `\`${option.key}\``).join(', ') || 'none'} | ${verification} | ${telemetry} | ${external} |\n`,
       )
     }
   }
@@ -222,6 +224,6 @@ if (errors.length > 0) {
   process.exitCode = 1
 } else {
   process.stdout.write(
-    `Validated ${String(packages.length)} package catalogs, ${String(featureCount)} features, ${String(configCount)} configuration options, ${String(counts.gherkin)} Gherkin scenarios, ${String(counts['unit-test'])} unit tests, and ${String(counts['host-test'])} Host tests.\n`,
+    `Validated ${String(packages.length)} package catalogs, ${String(featureCount)} features, ${String(configCount)} configuration options, ${String(counts.gherkin)} Gherkin scenarios, ${String(counts['unit-test'])} unit tests, ${String(counts['host-test'])} Host tests, and telemetry (${telemetrySummary()}).\n`,
   )
 }

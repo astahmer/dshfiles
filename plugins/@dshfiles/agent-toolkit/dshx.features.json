@@ -107,6 +107,12 @@
           "file": "plugins/@dshfiles/agent-toolkit/src/package-versions.test.ts",
           "testName": "names the package of a module specifier"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
       ]
     },
     {
@@ -132,6 +138,12 @@
           "kind": "gherkin",
           "id": "agent-toolkit.palette",
           "featureFile": "tooling/dshx/e2e/features/agent-toolkit.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Open the agent toolkit from the command palette renders browser state and starts no Host work of its own."
         }
       ]
     }

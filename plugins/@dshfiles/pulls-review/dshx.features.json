@@ -77,6 +77,18 @@
           "file": "plugins/@dshfiles/pulls-review/tests/report.spec.ts",
           "testName": "renders the range, totals and one line per scope with its files"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "jj <subcommand>",
+          "file": "plugins/@dshfiles/pulls-review/src/jj.test.ts",
+          "testName": "records a jj diff span with flag names only"
+        }
       ]
     },
     {
@@ -136,6 +148,16 @@
           "id": "pulls-review.ai-scope-summaries-browser",
           "reason": "A *successful* summary needs a configured provider account and the scratch/e2e profiles have none, so no browser journey can drive one. The failure footer is asserted by the catalog reach, and the route, protocol and failure paths by unit tests."
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
       ]
     },
     {
@@ -161,6 +183,12 @@
           "id": "pulls-review.batch-reviewed-marks",
           "file": "plugins/@dshfiles/pulls-review/tests/reviewed.spec.ts",
           "testName": "marks and unmarks a batch without duplicating or dropping other paths"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Mark a selection of scope files reviewed renders browser state and starts no Host work of its own."
         }
       ],
       "reach": ["click button \"pulls.review\"", "expect checkbox \"Select all files in this scope\""]

@@ -17,6 +17,12 @@
           "id": "shared-runtime.client-boot",
           "featureFile": "tooling/dshx/e2e/features/shared-runtime.feature"
         }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Share the client UI runtime renders browser state and starts no Host work of its own."
+        }
       ]
     }
   ]
