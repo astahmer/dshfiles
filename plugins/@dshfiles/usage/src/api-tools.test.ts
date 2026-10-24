@@ -96,7 +96,8 @@ describe('usage tool exposure', () => {
     expect(usageApi.methods.recordJevUsage.tool).toBeUndefined()
     expect(usageApi.methods.refresh.description ?? '').toMatch(/Call only when the user asked/u)
     expect(usageApi.methods.activity.description ?? '').toMatch(/last 30 days/u)
-    expect(usageApi.methods.activity.description ?? '').toMatch(/which skills or tools are used most/u)
+    expect(usageApi.methods.activity.description ?? '').toMatch(/which commands or tests took the most time/u)
+    expect(usageApi.methods.activity.description ?? '').toMatch(/compound\/ambiguous shell commands are omitted/u)
   })
 
   test('Jev usage report is read-only and request recording stays internal', () => {

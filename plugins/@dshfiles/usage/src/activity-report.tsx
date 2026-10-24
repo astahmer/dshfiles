@@ -18,6 +18,42 @@ const TOOL_CATEGORY_LABELS = {
 const formatDuration = (duration: number | null): string =>
   duration === null ? '—' : duration < 1_000 ? `${duration} ms` : `${(duration / 1_000).toFixed(1)} s`
 
+type TimeDistributionItem = { readonly identifier: string; readonly calls: number; readonly totalDurationMs: number; readonly detail?: string }
+
+const TimeDistribution = (props: {
+  readonly heading: string
+  readonly emptyLabel: string
+  readonly rows: readonly TimeDistributionItem[]
+  readonly totalDurationMs: number
+}): JSX.Element => (
+  <section className="dshx:mt-4 dshx:rounded-md dshx:bg-muted/50 dshx:p-3">
+    <h3 className="dshx:text-sm dshx:font-medium">{props.heading}</h3>
+    {props.rows.length === 0 ? (
+      <p className="dshx:mt-2 dshx:text-sm dshx:text-muted-foreground">{props.emptyLabel}</p>
+    ) : (
+      <ol className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2">
+        {props.rows.map(row => {
+          const share = props.totalDurationMs === 0 ? 0 : (row.totalDurationMs / props.totalDurationMs) * 100
+          return (
+            <li key={row.identifier} className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_auto] dshx:items-center dshx:gap-x-3 dshx:gap-y-1">
+              <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{row.identifier}</span>
+              <span className="dshx:text-xs dshx:text-muted-foreground">
+                {formatDuration(row.totalDurationMs)} · {Math.round(share)}% · {row.calls} calls{row.detail === undefined ? '' : ` · ${row.detail}`}
+              </span>
+              <div
+                className="dshx:col-span-2 dshx:h-1.5 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted"
+                aria-label={`${row.identifier}: ${Math.round(share)}% of measured time`}
+              >
+                <div className="dshx:h-full dshx:rounded-full dshx:bg-primary" style={{ width: `${share}%` }} />
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+    )}
+  </section>
+)
+
 export const UsageActivityReport = (props: { readonly range: { readonly from: number; readonly to: number } }): JSX.Element => {
   const api = useApi(usageApi)
   const query = useQuery({
@@ -28,6 +64,10 @@ export const UsageActivityReport = (props: { readonly range: { readonly from: nu
   if (query.isPending) return <p className="dshx:text-sm dshx:text-muted-foreground">Loading activity…</p>
   if (query.isError) return <p className="dshx:text-sm dshx:text-destructive">{errorMessage(query.error, 'Could not load activity telemetry.')}</p>
   const report = query.data
+  const commandDistribution = report.commandDistribution ?? []
+  const testRunDistribution = report.testRunDistribution ?? []
+  const commandDurationTotalMs = report.commandDurationTotalMs ?? 0
+  const testRunDurationTotalMs = report.testRunDurationTotalMs ?? 0
   const callsForCategory = (category: ToolCategory): number => {
     if (report.categories.length > 0) return report.categories.find(row => row.category === category)?.calls ?? 0
     return report.tools.filter(row => row.category === category).reduce((total, row) => total + row.calls, 0)
@@ -70,6 +110,27 @@ export const UsageActivityReport = (props: { readonly range: { readonly from: nu
             </div>
           ))}
         </dl>
+        <TimeDistribution
+          heading="Time by command"
+          emptyLabel="No safely identifiable command timings in this range."
+          rows={commandDistribution.map(row => ({ identifier: row.command, calls: row.calls, totalDurationMs: row.totalDurationMs }))}
+          totalDurationMs={commandDurationTotalMs}
+        />
+        <TimeDistribution
+          heading="Time by test runner"
+          emptyLabel="No recognized test-run timings in this range."
+          rows={testRunDistribution.map(row => ({
+            identifier: row.runner,
+            calls: row.calls,
+            totalDurationMs: row.totalDurationMs,
+            detail: `${row.successes} succeeded, ${row.errors} errors, ${row.interrupted} interrupted, ${row.unknown} unknown, ${row.pending} pending`,
+          }))}
+          totalDurationMs={testRunDurationTotalMs}
+        />
+        <p className="dshx:mt-2 dshx:text-xs dshx:text-muted-foreground">
+          Only bounded normalized executable/subcommand and runner identifiers are retained; raw arguments, outputs, paths, prompts and secrets are excluded.
+          Compound or ambiguous commands are omitted. Runner outcomes reflect shell-call status, not parsed test output. Times are wall-clock and may overlap.
+        </p>
         {report.categoryOutcomes.length > 0 && (
           <p className="dshx:mt-2 dshx:text-xs dshx:text-muted-foreground">
             {report.categoryOutcomes

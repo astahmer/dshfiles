@@ -20,7 +20,11 @@ const jevRecord: JevUsageRecord = {
 
 const emptySlice = { path: '/session/log', sessionId: 'session-a', offset: 1, size: 1, mtimeMs: 1, state: '{}', session: null, rows: [] }
 
-const toolRow = (row: Pick<ToolExecutionRow, 'id' | 'name' | 'startedAt' | 'endedAt'>): ToolExecutionRow => ({
+const toolRow = (
+  row: Pick<ToolExecutionRow, 'id' | 'name' | 'startedAt' | 'endedAt'> & Partial<Pick<ToolExecutionRow, 'normalizedCommand' | 'testRunner'>>,
+): ToolExecutionRow => ({
+  normalizedCommand: null,
+  testRunner: null,
   sessionId: 'session-a',
   seq: 1,
   turn: 1,
@@ -44,7 +48,7 @@ describe('usage activity telemetry', () => {
       previous.exec(`
         DROP TABLE tools;
         PRAGMA user_version = 4;
-        INSERT OR REPLACE INTO meta (key, value) VALUES ('foldVersion', '1');
+        INSERT OR REPLACE INTO meta (key, value) VALUES ('foldVersion', '2');
         INSERT INTO files (path, session_id, offset, size, mtime_ms, state) VALUES ('/session/log', 'session-a', 10, 10, 1, '{}');
       `)
       previous.close()
@@ -191,6 +195,8 @@ describe('usage activity telemetry', () => {
             name: 'shell.run',
             category: 'tool',
             owner: null,
+            normalizedCommand: 'pnpm test',
+            testRunner: 'pnpm:test',
             startedAt: now + 100,
             endedAt: now + 300,
             outcome: 'success',
@@ -204,6 +210,8 @@ describe('usage activity telemetry', () => {
             name: 'shell.run',
             category: 'plugin',
             owner: '@dshfiles/terminal',
+            normalizedCommand: 'pnpm test:e2e',
+            testRunner: 'pnpm:test:e2e',
             startedAt: now + 400,
             endedAt: now + 900,
             outcome: 'error',
@@ -244,6 +252,7 @@ describe('usage activity telemetry', () => {
           unknown: 0,
           pending: 0,
           averageDurationMs: 500,
+          totalDurationMs: 500,
           durationMs: { averageMs: 500, p50Ms: 500, p90Ms: 500, maxMs: 500 },
           timestamps: { firstStarted: now + 400, lastStarted: now + 400, firstEnded: now + 900, lastEnded: now + 900 },
         }),
@@ -258,6 +267,7 @@ describe('usage activity telemetry', () => {
           unknown: 0,
           pending: 0,
           averageDurationMs: 200,
+          totalDurationMs: 200,
           durationMs: { averageMs: 200, p50Ms: 200, p90Ms: 200, maxMs: 200 },
           timestamps: { firstStarted: now + 100, lastStarted: now + 100, firstEnded: now + 300, lastEnded: now + 300 },
         }),
@@ -270,6 +280,19 @@ describe('usage activity telemetry', () => {
         expect.objectContaining({ category: 'plugin', calls: 1, errors: 1, successRate: 0 }),
         expect.objectContaining({ category: 'tool', calls: 1, successes: 1, successRate: 1 }),
       ])
+      expect(report.commandDurationTotalMs).toBe(700)
+      expect(report.testRunDurationTotalMs).toBe(700)
+      expect(report.commandDistribution).toEqual([
+        { command: 'pnpm test:e2e', calls: 1, totalDurationMs: 500 },
+        { command: 'pnpm test', calls: 1, totalDurationMs: 200 },
+      ])
+      expect(report.testRunDistribution).toEqual([
+        { runner: 'pnpm:test:e2e', calls: 1, totalDurationMs: 500, successes: 0, errors: 1, interrupted: 0, unknown: 0, pending: 0 },
+        { runner: 'pnpm:test', calls: 1, totalDurationMs: 200, successes: 1, errors: 0, interrupted: 0, unknown: 0, pending: 0 },
+      ])
+      const pluginReport = store.activity({ from: now, to: now + 1_000, category: 'plugin' })
+      expect(pluginReport.commandDistribution).toEqual([{ command: 'pnpm test:e2e', calls: 1, totalDurationMs: 500 }])
+      expect(pluginReport.commandDurationTotalMs).toBe(500)
       expect(report.events).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ kind: 'jev', source: 'backlog', outcome: 'success', at: now + 150, endedAt: now + 225 }),

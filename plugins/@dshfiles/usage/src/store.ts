@@ -15,7 +15,7 @@ import {
   jevUsageOutcomeSchema,
   jevUsageSourceSchema,
 } from './jev-usage.js'
-import { UsageFoldModel, type RequestRow, type SessionMeta } from './fold.js'
+import { UsageFoldModel, type RequestRow, type SessionMeta, type ToolExecutionRow } from './fold.js'
 import { createOtlpMetricsRequest, type OtlpCounterInput, type OtlpHistogramInput, type OtlpTemporality } from './otel-metrics.js'
 
 /**
@@ -124,6 +124,8 @@ const MIGRATIONS: readonly string[] = [
   CREATE INDEX tools_category_started ON tools (category, started_at);
   CREATE INDEX tools_outcome_started ON tools (outcome, started_at);
   `,
+  `ALTER TABLE tools ADD COLUMN normalized_command TEXT CHECK (normalized_command IS NULL OR length(normalized_command) BETWEEN 1 AND 80);`,
+  `ALTER TABLE tools ADD COLUMN test_runner TEXT CHECK (test_runner IS NULL OR length(test_runner) BETWEEN 1 AND 80);`,
 ]
 
 export interface RouteBand {
@@ -140,7 +142,7 @@ export interface Rates {
 }
 
 /** Bump whenever the fold reads a log differently. */
-const FOLD_VERSION = 2
+const FOLD_VERSION = 3
 
 /** Live side calls wait this long for the log row they duplicate before they count on their own. */
 const LIVE_MATCH_WAIT_MS = 10 * 60_000
@@ -213,9 +215,22 @@ const toolRowSchema = z.object({
   name: z.string().min(1).max(120),
   category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
   owner: textColumn,
+  normalizedCommand: z.string().max(80).nullable().default(null),
+  testRunner: z.string().max(80).nullable().default(null),
   startedAt: z.number().int(),
   endedAt: z.number().int().nullable(),
   outcome: z.enum(['success', 'error', 'interrupted', 'unknown', 'pending']),
+})
+const durationTotalSchema = z.object({ totalDurationMs: z.number().int().nonnegative() })
+const identifierActivityRowSchema = z.object({
+  identifier: z.string(),
+  calls: z.number().int(),
+  totalDurationMs: z.number().int().nonnegative(),
+  successes: z.number().int(),
+  errors: z.number().int(),
+  interrupted: z.number().int(),
+  unknown: z.number().int(),
+  pending: z.number().int(),
 })
 const toolActivityRowSchema = z.object({
   name: z.string(),
@@ -232,6 +247,7 @@ const toolActivityRowSchema = z.object({
   firstEndedAt: numberColumn,
   lastEndedAt: numberColumn,
   averageDurationMs: numberColumn,
+  totalDurationMs: z.number().int().nonnegative(),
   p50DurationMs: numberColumn,
   p90DurationMs: numberColumn,
   maxDurationMs: numberColumn,
@@ -434,11 +450,12 @@ export const openUsageStore = (path: string) => {
   }
 
   const upsertToolExecution = (row: z.infer<typeof toolRowSchema>): void => {
-    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    prepare(`INSERT INTO tools (id, session_id, seq, turn, step, name, started_at, ended_at, outcome, category, owner, normalized_command, test_runner)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (id) DO UPDATE SET turn = excluded.turn, step = excluded.step, name = excluded.name,
         started_at = excluded.started_at, ended_at = excluded.ended_at, outcome = excluded.outcome,
-        category = excluded.category, owner = excluded.owner`).run(
+        category = excluded.category, owner = excluded.owner, normalized_command = excluded.normalized_command,
+        test_runner = excluded.test_runner`).run(
       row.id,
       row.sessionId,
       row.seq,
@@ -450,6 +467,8 @@ export const openUsageStore = (path: string) => {
       row.outcome,
       row.category,
       row.owner,
+      row.normalizedCommand,
+      row.testRunner,
     )
   }
 
@@ -476,11 +495,11 @@ export const openUsageStore = (path: string) => {
     readonly state: string
     readonly session: SessionMeta | null
     readonly rows: readonly RequestRow[]
-    readonly tools?: readonly z.infer<typeof toolRowSchema>[]
+    readonly tools?: readonly ToolExecutionRow[]
   }): void =>
     transaction(() => {
       for (const row of slice.rows) upsertRequest(row, true)
-      for (const row of slice.tools ?? []) upsertToolExecution(row)
+      for (const row of slice.tools ?? []) upsertToolExecution(toolRowSchema.parse(row))
       pruneTelemetry()
       if (slice.session !== null) upsertSession(slice.session)
       prepare(
@@ -930,6 +949,7 @@ export const openUsageStore = (path: string) => {
         MIN(t.started_at) AS firstStartedAt, MAX(t.started_at) AS lastStartedAt,
         MIN(t.ended_at) AS firstEndedAt, MAX(t.ended_at) AS lastEndedAt,
         AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
+        COALESCE(SUM(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END), 0) AS totalDurationMs,
         ds.p50DurationMs, ds.p90DurationMs,
         MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs
       FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category AND ds.owner IS t.owner AND ds.name = t.name
@@ -946,6 +966,37 @@ export const openUsageStore = (path: string) => {
         query.limit ?? 100,
       ),
     )
+    const identifierRows = (column: 'normalized_command' | 'test_runner') =>
+      z.array(identifierActivityRowSchema).parse(
+        prepare(`SELECT ${column} AS identifier, COUNT(*) AS calls,
+            COALESCE(SUM(CASE WHEN ended_at IS NOT NULL THEN ended_at - started_at END), 0) AS totalDurationMs,
+            SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END) AS successes,
+            SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END) AS errors,
+            SUM(CASE WHEN outcome = 'interrupted' THEN 1 ELSE 0 END) AS interrupted,
+            SUM(CASE WHEN outcome = 'unknown' THEN 1 ELSE 0 END) AS unknown,
+            SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS pending
+          FROM tools WHERE started_at >= ? AND started_at < ? AND ${column} IS NOT NULL AND (? IS NULL OR category = ?)
+          GROUP BY ${column} ORDER BY totalDurationMs DESC, calls DESC, identifier LIMIT 10`).all(
+          query.from,
+          query.to,
+          query.category ?? null,
+          query.category ?? null,
+        ),
+      )
+    const commandRows = identifierRows('normalized_command')
+    const testRunRows = identifierRows('test_runner')
+    const identifierDurationTotal = (column: 'normalized_command' | 'test_runner') =>
+      durationTotalSchema.parse(
+        prepare(`SELECT COALESCE(SUM(ended_at - started_at), 0) AS totalDurationMs FROM tools
+          WHERE started_at >= ? AND started_at < ? AND ended_at IS NOT NULL AND ${column} IS NOT NULL AND (? IS NULL OR category = ?)`).get(
+          query.from,
+          query.to,
+          query.category ?? null,
+          query.category ?? null,
+        ),
+      ).totalDurationMs
+    const commandDurationTotalMs = identifierDurationTotal('normalized_command')
+    const testRunDurationTotalMs = identifierDurationTotal('test_runner')
     const events = [
       ...z
         .array(jevEventRowSchema)
@@ -1132,6 +1183,20 @@ export const openUsageStore = (path: string) => {
           maxMs: row.maxDurationMs,
         },
         averageDurationMs: row.averageDurationMs === null ? null : Math.round(row.averageDurationMs),
+        totalDurationMs: row.totalDurationMs,
+      })),
+      commandDurationTotalMs,
+      testRunDurationTotalMs,
+      commandDistribution: commandRows.map(row => ({ command: row.identifier, calls: row.calls, totalDurationMs: row.totalDurationMs })),
+      testRunDistribution: testRunRows.map(row => ({
+        runner: row.identifier,
+        calls: row.calls,
+        totalDurationMs: row.totalDurationMs,
+        successes: row.successes,
+        errors: row.errors,
+        interrupted: row.interrupted,
+        unknown: row.unknown,
+        pending: row.pending,
       })),
       events,
       jev: {

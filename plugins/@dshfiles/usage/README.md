@@ -28,7 +28,11 @@ call observations. Observation only.
   exclude calls outside DSH; labels are not verified billing identities.
 - **Tools & Jev**: tool counts split into skill, plugin API, plugin, MCP, DSH
   and other sources, with per-tool/plugin counts, outcome totals and latency
-  statistics, next to Jev request totals per calling plugin (Backlog, Memory).
+  statistics. It ranks normalized shell executable/subcommands and recognized
+  test runners by summed wall-clock duration, share, call count and recorded
+  shell-call outcome (not parsed test output); parallel calls can overlap.
+  Compound or ambiguous shell calls are omitted.
+  Jev request totals per calling plugin (Backlog, Memory) appear alongside.
   The read-only `usage_activity_report` Agent tool defaults to the last 30 days
   and answers rankings such as most-used skills or MCP tools; optional `days`
   (not with explicit `from`/`to`), `category`, `limit` and `eventLimit` narrow
@@ -72,10 +76,16 @@ Tool executions are derived from durable `tool/call` + `tool/result` session
 records. Calls are paired in the resumable fold and persisted locally for up to
 365 days as event sequence and turn/step, sanitized tool name, source category,
 optional plugin owner, timestamps, duration and outcome (`success`, `error`,
-`interrupted`, `unknown` or `pending`). Categories come from the live dshx
-registry (`api`, `plugin`, `mcp`, `tool`); recognized skill-loader calls retain
-only a bounded skill ID parsed from the call's `name` field. Other arguments are
-never persisted. Error means the recorded result marks `isError`; the report
+`interrupted`, `unknown` or `pending`). Shell calls additionally retain a bounded
+normalized executable/subcommand and, when recognized, a test-runner identifier
+(e.g. `pnpm:test:e2e` or `vitest`) for aggregate time/call/outcome reports.
+Compound or ambiguous shell commands have no command identifier. Categories come
+from the live dshx registry (`api`, `plugin`, `mcp`, `tool`); recognized
+skill-loader calls retain only a bounded skill ID parsed from the call's `name`
+field. Raw command arguments, file paths, outputs, prompts, credentials, and
+test-case names are never persisted. This covers recognized shell invocations in
+DSH session logs, not commands run in external terminals; complex or unsupported
+wrappers may be omitted rather than guessed. Error means the recorded result marks `isError`; the report
 does not infer a process exit code from tool output. Unfinished calls older than
 24 hours are finalized as `unknown`, so crashed sessions cannot leave permanent
 pending rows.

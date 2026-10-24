@@ -242,8 +242,15 @@
     {
       "id": "usage-activity-report",
       "title": "Tool and Jev activity report",
-      "summary": "Local tool-use counts by Skill, Plugin API, Plugin, MCP, DSH and other sources, with per-tool/plugin counts, error/interruption outcomes and latency statistics, plus Jev request outcomes, durations and tokens per calling plugin (read from the same jev_requests rows as the Jev usage card) over the selected date range. Tool categories come from the dshx registry; arguments, outputs, prompts, credentials and raw errors are not stored.",
-      "reach": ["click button \"Usage analytics\"", "click tab \"Tools & Jev\"", "expect heading \"Jev requests\"", "expect heading \"Tool executions\""],
+      "summary": "Local tool-use counts by Skill, Plugin API, Plugin, MCP, DSH and other sources, with per-tool/plugin counts, error/interruption outcomes, latency statistics, and top-10 normalized command and test-runner wall-clock distributions; plus Jev request outcomes, durations and tokens per calling plugin (read from the same jev_requests rows as the Jev usage card) over the selected date range. Only bounded executable/subcommand and test-runner identifiers are stored. Raw command arguments, paths, outputs, prompts, credentials, raw errors and test case names are not stored.",
+      "reach": [
+        "click button \"Usage analytics\"",
+        "click tab \"Tools & Jev\"",
+        "expect heading \"Jev requests\"",
+        "expect heading \"Tool executions\"",
+        "expect heading \"Time by command\"",
+        "expect heading \"Time by test runner\""
+      ],
       "surfaces": ["client", "storage", "integration"],
       "configuration": [],
       "states": ["empty", "loading", "populated", "filtered-range"],

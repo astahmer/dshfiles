@@ -231,9 +231,31 @@ export const activityReportSchema = z.object({
           .optional(),
         durationMs: latencyStatsSchema.optional(),
         averageDurationMs: z.number().int().nullable(),
+        totalDurationMs: z.number().int().nonnegative().default(0),
       }),
     )
     .max(100),
+  commandDurationTotalMs: z.number().int().nonnegative().default(0),
+  testRunDurationTotalMs: z.number().int().nonnegative().default(0),
+  commandDistribution: z
+    .array(z.object({ command: z.string().min(1).max(80), calls: z.number().int(), totalDurationMs: z.number().int().nonnegative() }))
+    .max(10)
+    .default([]),
+  testRunDistribution: z
+    .array(
+      z.object({
+        runner: z.string().min(1).max(80),
+        calls: z.number().int(),
+        totalDurationMs: z.number().int().nonnegative(),
+        successes: z.number().int(),
+        errors: z.number().int(),
+        interrupted: z.number().int(),
+        unknown: z.number().int(),
+        pending: z.number().int(),
+      }),
+    )
+    .max(10)
+    .default([]),
   events: z
     .array(
       z.discriminatedUnion('kind', [
@@ -371,7 +393,7 @@ export const usageApi = defineApi({
       input: activityInputSchema,
       output: activityReportSchema,
       description:
-        'Read local tool-use statistics, Jev request totals by calling plugin (backlog, memory), and recent tool/Jev events. Omit inputs for the last 30 days, or specify days (1–365), or from/to Unix milliseconds. Ranked rows include individual skill names, MCP tools and plugin owners; category can filter rankings. Includes successes, errors, interruptions, unknowns, timestamps, durations and recent outcomes. Use this to answer “which skills or tools are used most?” or “what failed recently?”. No prompts, arguments, results or secrets are stored. Tool times are filtered by start time in the half-open [from, to) range; recent tool and Jev events are combined and capped by eventLimit.',
+        'Read local tool-use statistics, normalized shell command and test-runner time distributions, Jev request totals by calling plugin (backlog, memory), and recent tool/Jev events. Omit inputs for the last 30 days, or specify days (1–365), or from/to Unix milliseconds. Includes top normalized command and runner identifiers with call counts, wall-clock duration and recorded shell-call outcomes (not parsed test results), plus skill/MCP/plugin rankings, successes, errors, interruptions, timestamps and recent outcomes. Shell command arguments, paths, outputs, test case names and secrets are never stored; compound/ambiguous shell commands are omitted. Use this to answer “which commands or tests took the most time?” or “what failed recently?”. Tool times are filtered by start time in the half-open [from, to) range; recent tool and Jev events are combined and capped by eventLimit.',
       tool: { name: 'usage_activity_report', readOnly: true, render: compactJson },
     }),
     otelMetrics: method({
