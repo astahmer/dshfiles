@@ -158,6 +158,37 @@ drop policy are in the [dshx tracing guide](../tooling/dshx/docs/guides/tracing.
 Add a span at a work-unit boundary in an owned plugin with `withSpan`; do not
 log the same event a second way.
 
+### Browser interactions (`dshfiles-web`)
+
+The GUI records four slow interactions as root spans of service
+`dshfiles-web`, through `@dshfiles/dshx/tracing/client`:
+
+| Span            | Opened by                         | Ends when                                     |
+| --------------- | --------------------------------- | --------------------------------------------- |
+| `thread switch` | thread-sidebar row, main-tabs tab | the chat transcript of that thread painted    |
+| `new thread`    | workspace-nav (any New thread)    | `session/create` settled and the view painted |
+| `panel open`    | main-tabs tab                     | the next paint after the panel was selected   |
+| `composer send` | rich-composer submit              | the Host admitted (or refused) the prompt     |
+
+While one is open, every dshx API call the page makes becomes its `client`
+child and carries its `traceparent` in the request envelope, so the Host's
+`<api id>/<method>` server span (and the `jj`, `secret`, Jev spans under it)
+lands in the same trace: one trace from click to Host work. Long tasks of
+200 ms or more are `longtask` events on the interaction. Native requests
+(`session/follow`, `session/prompt`, `session/create`) carry no trace context,
+so their time shows in the browser span only.
+
+The page never talks to the OTLP receiver directly. dshx serves a
+`browser-traces` API from whichever plugin leads its registry; it validates and
+bounds every batch, rate-limits all pages together and forwards through the same
+target as Host spans (environment endpoint, else the in-DSH receiver, else
+nothing recorded at all: the page asks the Host once and stays silent while
+the answer is off). The resource is an engine class and a mobile flag only. The
+new Host route needs a **DSH Host restart**; the client halves arrive by HMR and
+stay silent against an old Host. Details: [browser spans in the dshx tracing
+guide](../tooling/dshx/docs/guides/tracing.md#browser-spans-dshfilesdshxtracingclient).
+Using them in a performance audit: [performance](performance.md#browser-interaction-traces).
+
 ## In-DSH viewer (`@dshfiles/traces`)
 
 The seed installs `@dshfiles/traces` (row `dshfiles-traces`). Its Host runs an

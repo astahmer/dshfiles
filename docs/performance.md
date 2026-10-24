@@ -245,6 +245,31 @@ The chat turn-tail and header control each read `threadAt` for the same open Ses
 
 Evidence: the live `:3080` Host probe (10 s, before the fix) measured p50 4 ms, p90 20 ms, p99 1,136 ms, max 1,136 ms, with one >250 ms stall; machine load was 25–31. This confirms Host stalls can magnify an unnecessary extra read, not that they explain all user-visible delay. The live page had no selected thread or integration offer, so no honest click-to-offer before/after timing was available. In the scratch E2E run, `jj-integration.turn-end-integrate-browser-journey` passed (1.7 min total journey); no comparable pre-change run was taken. `thread-query-keys.test.ts` verifies shared Session keys, per-Session isolation, and path-prefix invalidation. Do not treat the E2E wall time or Host-lag sample as a measured latency improvement.
 
+## Browser interaction traces
+
+`thread switch`, `new thread`, `panel open` and `composer send` are root spans of service `dshfiles-web` (see
+[observability](observability.md#browser-interactions-dshfiles-web)). They do not replace the probes: `switch-probe.mjs`
+still owns DOM size, bytes and request counts. What they add is attribution per click, kept in the Traces panel:
+
+| Read in the trace                                                           | Classifies the cost as                                               |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| a Host `<api id>/<method>` server span (or its `jj` child) ≫ 250 ms         | Host work or Host stall (confirm with `host-lag.mjs`)                |
+| browser `client` span ≫ its server child                                    | browser queue or transport (requests waiting for a connection)       |
+| `longtask` events, `dshx.interaction.long_task_ms` near the span's duration | rendering on the main thread                                         |
+| a long interaction with no slow child and no long task                      | a native request (`session/follow`, `session/create`): no Host child |
+
+Find them with `traces_search` (`service: "dshfiles-web"`, `operation: "thread switch"`, `minDurationMs: 250`) or the
+Traces panel's service filter; `traces_list_services` gives p50/p95/p99 per interaction, which is the before/after
+number to keep in this file once a Host restart has loaded the forwarding route. An outcome of `timeout` (10 s) or
+`superseded` is not a duration: filter on `dshx.interaction.outcome=completed`.
+
+First reading (2026-10-24, scratch `dshx dev`, not the live GUI, so no budget claim): one sidebar `thread switch`
+took 210 ms to the transcript paint; its four dshx calls (`jujutsu-composer/context`, `jj-threads/threadAt`,
+`jj-threads/destination`, `chat-resume/available`) each stayed open 520–680 ms in the browser and were then cancelled
+by the switch (`dshx.api.outcome=aborted`). The `threadAt` and `destination` Host spans took 19–25 ms, so most of
+their browser time was waiting (the "client span ≫ server child" row); `context` was Host work (660 ms, 459 ms of it in
+`jj log`). Worth measuring on :3080 before reading more into it.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
