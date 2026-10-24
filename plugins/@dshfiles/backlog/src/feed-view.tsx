@@ -6,6 +6,7 @@ import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-sc
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import { ActorThreadLink } from './actor-thread-link.js'
 import { backlogSortTime, sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import type { BacklogStatus } from './item.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
@@ -28,13 +29,13 @@ const dayLabel = (time: number, now: number): string => {
   return new Date(time).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-/** "Agent 80c6ed moved it inbox → doing · 4 updates" — one line for everything after the capture. */
-const activityLine = (item: BacklogSummaryView): string | null => {
+/** "Agent 80c6ed moved it inbox → doing · 4 updates": the actor stays separate so it can link to its thread. */
+const activityLine = (item: BacklogSummaryView): { readonly actorId: string; readonly summary: string } | null => {
   const last = item.activity.last
   if (last === null) return null
   const verb = ItemGlyphs.describeEvent(last, item.attention)
   const more = item.activity.count > 1 ? ` · ${String(item.activity.count)} updates` : ''
-  return `${ItemGlyphs.actorName(last.actor)} ${verb}${more}`
+  return { actorId: last.actor, summary: `${verb}${more}` }
 }
 
 const Chip = (props: { readonly children: ReactNode; readonly className?: string }): JSX.Element => (
@@ -57,11 +58,12 @@ const FeedEntry = (props: {
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
   readonly triageOff: boolean
+  readonly openThread: (sessionId: string) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
   const author = item.actors.find(actor => actor.role === 'owner')?.id ?? item.actors[0]?.id
-  const summary = activityLine(item)
+  const activity = activityLine(item)
   const closed = item.status === 'done' || item.status === 'dropped'
   const rename = useBacklogInlineRename(() => props.select(item.id))
   return (
@@ -161,11 +163,13 @@ const FeedEntry = (props: {
             )}
             {item.freshness === 'fresh' ? null : <Chip className={cn(item.freshness === 'stale' && 'dshx:text-warning')}>{item.freshness}</Chip>}
           </div>
-          {summary === null ? null : (
+          {activity === null ? null : (
             <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-              <span aria-hidden className="dshx:h-px dshx:w-3 dshx:bg-border" />
-              <span className="dshx:truncate">{summary}</span>
-              <span>· {ItemGlyphs.ago(item.lastActivityAt)}</span>
+              <span aria-hidden className="dshx:h-px dshx:w-3 dshx:shrink-0 dshx:bg-border" />
+              <span className="dshx:min-w-0 dshx:truncate">
+                <ActorThreadLink actorId={activity.actorId} openThread={props.openThread} /> <span>{activity.summary}</span>
+              </span>
+              <span className="dshx:shrink-0">· {ItemGlyphs.ago(item.lastActivityAt)}</span>
             </p>
           )}
         </div>
@@ -225,6 +229,7 @@ export const FeedView = (props: {
   readonly startThread: (items: readonly StartThreadItem[]) => void
   readonly projectPaths: readonly string[]
   readonly triageOff: boolean
+  readonly openThread: (sessionId: string) => void
 }): JSX.Element => {
   const now = props.now
   const menuActions = useBacklogActions()
@@ -289,6 +294,7 @@ export const FeedView = (props: {
           startThread={props.startThread}
           projectPaths={props.projectPaths}
           triageOff={props.triageOff}
+          openThread={props.openThread}
         />
       </div>
     )

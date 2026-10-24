@@ -916,6 +916,7 @@ export const BacklogPanel = (props: {
                   now={now}
                   projectPaths={projectPaths}
                   startThread={openStartThread}
+                  openThread={props.openThread}
                 />
               )}
               {view === 'items' && (

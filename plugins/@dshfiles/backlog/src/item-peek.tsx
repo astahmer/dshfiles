@@ -41,6 +41,7 @@ import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { ActivityDescription } from './activity-description.js'
+import { ActorThreadLink } from './actor-thread-link.js'
 import { BacklogReferenceChip } from './backlog-reference-chip.js'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
@@ -534,7 +535,7 @@ const Conversation = (props: {
                   return (
                     <div key={String(position)}>
                       <p>
-                        <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
+                        <ActorThreadLink actorId={event.actor} openThread={props.openThread} />{' '}
                         <ActivityDescription
                           description={ItemGlyphs.describeEvent(event, attention)}
                           threadId={threadId}
