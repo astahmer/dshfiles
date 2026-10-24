@@ -29,7 +29,7 @@ const SEVERITY_FLOORS = [
   { value: 17, key: 'severityError' },
 ] as const
 
-const logsViewSchema = z
+export const logsViewSchema = z
   .object({
     search: z.string().max(200).catch(''),
     service: z.string().max(256).nullable().catch(null),
@@ -38,7 +38,7 @@ const logsViewSchema = z
   })
   .strip()
 
-const storedLogsView = createStoredValue({
+export const storedLogsView = createStoredValue({
   key: 'dshfiles.traces.logs-view.v1',
   schema: logsViewSchema,
   fallback: { search: '', service: null, minSeverity: 0, attribute: '' },

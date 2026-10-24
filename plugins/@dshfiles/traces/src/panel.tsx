@@ -28,6 +28,8 @@ import { FiringAlertsBanner, FiringAlertsCount } from './alerts/alert-badges.js'
 import type { TracesAlertsTranslate } from './alerts/alerts-locale.js'
 import { AlertsView, useFiringCount } from './alerts/alerts-view.js'
 import { tracesApi, type ListInput } from './api.js'
+import { BoardsView } from './boards/boards-view.js'
+import { SavedViewsMenu } from './boards/saved-views.js'
 import { ErrorGroups, OperationsTable, ServiceStrip } from './insights.js'
 import type { TracesTranslate } from './locales.js'
 import { tracesKeys, tracesQueries } from './queries.js'
@@ -122,6 +124,7 @@ export const TracesPanel = (props: {
               {status.store.traces} {t('traces')} · {status.store.spans} {t('spans')} · {status.store.logs} {t('logs')} {t('storedSummary')}
             </span>
           )}
+          <SavedViewsMenu t={props.tAlerts} />
           <Button variant="outline" size="sm" aria-label={t('refresh')} onClick={() => void queryClient.invalidateQueries({ queryKey: tracesKeys.all })}>
             <RefreshCwIcon />
             <span className="dshx:@max-pane-compact:sr-only">{t('refresh')}</span>
@@ -175,6 +178,7 @@ export const TracesPanel = (props: {
             <TabsTrigger value="metrics">{t('tabMetrics')}</TabsTrigger>
             <TabsTrigger value="operations">{t('tabOperations')}</TabsTrigger>
             <TabsTrigger value="errors">{t('tabErrors')}</TabsTrigger>
+            <TabsTrigger value="boards">{props.tAlerts('tabBoards')}</TabsTrigger>
             <TabsTrigger value="alerts">
               {props.tAlerts('tabAlerts')} <FiringAlertsCount firing={firing} />
             </TabsTrigger>
@@ -343,6 +347,23 @@ export const TracesPanel = (props: {
           {errorsQuery.data === undefined ? null : (
             <ErrorGroups groups={errorsQuery.data.groups} onOpenTrace={sampleTraceId => update({ traceId: sampleTraceId, tab: 'traces' })} t={t} />
           )}
+        </TabsContent>
+
+        <TabsContent value="boards">
+          {view.tab === 'boards' ? (
+            <BoardsView
+              windowMinutes={view.windowMinutes}
+              onDrillDown={drillDown =>
+                update({
+                  tab: 'traces',
+                  traceId: null,
+                  service: null,
+                  ...('operation' in drillDown ? { operation: drillDown.operation, search: '' } : { operation: null, search: drillDown.search }),
+                })
+              }
+              t={props.tAlerts}
+            />
+          ) : null}
         </TabsContent>
 
         <TabsContent value="alerts">
