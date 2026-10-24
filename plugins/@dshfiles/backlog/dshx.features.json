@@ -1140,6 +1140,14 @@
         "click text \"Describe me with a screenshot\"",
         "expect complementary \"Item detail\"",
         "expect textbox \"Comment\"",
+        "fill textbox \"Comment\" \"A first reply\"",
+        "press Enter",
+        "expect text \"A first reply\"",
+        "click button \"Edit your reply\"",
+        "fill textbox \"Edit reply\" \"Updated reply\"",
+        "press Meta+Enter",
+        "expect text \"Updated reply\"",
+        "expect button \"Delete your reply\"",
         "expect button \"Add an image or file\"",
         "click button \"Edit description\"",
         "expect button \"Attach an image or file to this item\"",
@@ -1209,6 +1217,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.rich-item-text",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.reply-edit-delete-keyboard",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

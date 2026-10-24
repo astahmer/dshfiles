@@ -399,6 +399,10 @@ const Conversation = (props: {
   readonly agentReplying: boolean
 }): JSX.Element => {
   const attention = props.attention
+  const actions = useBacklogActions()
+  const [editingComment, setEditingComment] = useState<string | null>(null)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentFailure, setCommentFailure] = useState<string | null>(null)
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set())
   const threadIdsByEvent = new Map<BacklogEvent, string>()
@@ -414,24 +418,106 @@ const Conversation = (props: {
     else runs.push({ kind: 'changes', events: [event] })
   }
   return (
-    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
+    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-4">
       <span aria-hidden className="dshx:absolute dshx:inset-y-2 dshx:left-[9px] dshx:w-px dshx:bg-border" />
       {runs.map((run, index) => {
-        if (run.kind === 'comment')
+        if (run.kind === 'comment') {
+          const commentId = run.event.commentId
+          const canEdit = run.event.actor === 'user' && commentId !== undefined
+          const isEditing = commentId !== undefined && editingComment === commentId
           return (
-            <li key={`c:${String(index)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
+            <li key={`c:${commentId ?? String(index)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
               <ItemGlyphs.ActorAvatar actorId={run.event.actor} className="dshx:z-10 dshx:mt-0.5 dshx:size-5" />
               <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
                 <p className="dshx:text-xs dshx:text-muted-foreground">
                   <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
                 </p>
                 <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
-                  <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
-                  <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
+                  {isEditing ? (
+                    <>
+                      <textarea
+                        aria-label="Edit reply"
+                        autoFocus
+                        className="dshx:min-h-20 dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-sm dshx:focus-visible:outline-2 dshx:focus-visible:outline-ring"
+                        value={commentDraft}
+                        onChange={event => setCommentDraft(event.target.value)}
+                        onKeyDown={event => {
+                          if (event.key === 'Escape') setEditingComment(null)
+                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                            event.preventDefault()
+                            if (commentId !== undefined && commentDraft.trim() !== '') {
+                              void actions.editComment
+                                .mutateAsync({ id: props.itemId, commentId, text: commentDraft })
+                                .then(() => setEditingComment(null))
+                                .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be saved.')))
+                            }
+                          }
+                        }}
+                      />
+                      <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
+                        <Button
+                          size="sm"
+                          disabled={commentDraft.trim() === '' || actions.editComment.isPending}
+                          onClick={() => {
+                            if (commentId === undefined) return
+                            void actions.editComment
+                              .mutateAsync({ id: props.itemId, commentId, text: commentDraft })
+                              .then(() => setEditingComment(null))
+                              .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be saved.')))
+                          }}
+                        >
+                          Save reply
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingComment(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
+                      <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
+                      {canEdit ? (
+                        <div className="dshx:flex dshx:flex-wrap dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Edit your reply"
+                            onClick={() => {
+                              setCommentFailure(null)
+                              setCommentDraft(run.event.detail)
+                              setEditingComment(commentId ?? null)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Delete your reply"
+                            onClick={() => {
+                              if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
+                              void actions.deleteComment
+                                .mutateAsync({ id: props.itemId, commentId })
+                                .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  {commentFailure === null ? null : (
+                    <p role="alert" className="dshx:text-xs dshx:text-destructive">
+                      {commentFailure}
+                    </p>
+                  )}
                 </div>
               </div>
             </li>
           )
+        }
         const first = run.events[0]
         if (first === undefined) return null
         const expanded = open.has(index) || run.events.length === 1

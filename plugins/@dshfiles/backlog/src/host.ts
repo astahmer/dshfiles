@@ -792,6 +792,8 @@ const backlogApiHost = backlogApi.host({
   link: async ({ ctx, input, caller }) => (await backlogFor(ctx)).link({ ...input, actor: actorOf(caller) }),
   startThread: async ({ ctx, input, caller }) => startThreadForItems(ctx, input, caller),
   comment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).comment({ ...input, actor: actorOf(caller) }),
+  editComment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).editComment({ ...input, actor: actorOf(caller) }),
+  deleteComment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).deleteComment({ ...input, actor: actorOf(caller) }),
 })
 
 /**

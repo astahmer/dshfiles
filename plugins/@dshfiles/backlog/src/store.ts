@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import {
@@ -116,6 +117,13 @@ export interface BacklogStore {
     readonly files?: readonly BacklogFileInput[] | undefined
     readonly actor: BacklogActor
   }): Promise<BacklogResult<BacklogDetail>>
+  editComment(input: {
+    readonly id: number
+    readonly commentId: string
+    readonly text: string
+    readonly actor: BacklogActor
+  }): Promise<BacklogResult<BacklogDetail>>
+  deleteComment(input: { readonly id: number; readonly commentId: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   /** The item and every other item, for a triage pass to read. */
   triageInput(id: number): { readonly item: BacklogItem; readonly others: readonly BacklogItem[] } | undefined
   /** What one backfill run should triage, oldest first, and how many eligible items it leaves for a later run. */
@@ -288,7 +296,13 @@ const createBacklogStore = ({
   const backlinksOf = (id: number): BacklogSummary[] => referencing({ type: 'item', target: String(id) })
 
   const detailOf = (item: BacklogItem): BacklogDetail => ({
-    item: { ...item, freshness: BacklogItems.freshness(item, now(), dormantDays()) },
+    item: {
+      ...item,
+      events: item.events.map((event, index) =>
+        event.kind === 'commented' && event.commentId === undefined ? { ...event, commentId: `legacy-${String(event.at)}-${String(index)}` } : event,
+      ),
+      freshness: BacklogItems.freshness(item, now(), dormantDays()),
+    },
     backlinks: backlinksOf(item.id),
   })
 
@@ -302,7 +316,7 @@ const createBacklogStore = ({
   const touch = async (
     item: BacklogItem,
     actor: BacklogActor,
-    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments'>,
+    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>,
     change: Partial<BacklogItem>,
   ): Promise<BacklogDetail> => {
     const at = now()
@@ -576,8 +590,42 @@ const createBacklogStore = ({
       const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(text), ...callerLinks(actor)])
       const sourceThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? { threadId: actor.sessionId } : {}
       const event = { kind: 'commented' as const, detail: text.slice(0, BacklogItems.maxBodyChars), ...sourceThread }
-      if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, attachments }, { links }) }
-      return { ok: true, value: await touch(item, actor, event, { links }) }
+      if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, commentId: randomUUID(), attachments }, { links }) }
+      return { ok: true, value: await touch(item, actor, { ...event, commentId: randomUUID() }, { links }) }
+    },
+    editComment: async ({ id, commentId, text, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (actor.kind !== 'user') return { ok: false, reason: 'not-found' }
+      const commentIndex = item.events.findIndex(
+        (event, index) =>
+          event.kind === 'commented' &&
+          event.actor === 'user' &&
+          (event.commentId === commentId || (event.commentId === undefined && commentId === `legacy-${String(event.at)}-${String(index)}`)),
+      )
+      const comment = item.events[commentIndex]
+      if (comment === undefined) return { ok: false, reason: 'not-found' }
+      const events = item.events.map((event, index) =>
+        index === commentIndex ? { ...event, commentId, detail: text.slice(0, BacklogItems.maxBodyChars) } : event,
+      )
+      const edited: BacklogItem = { ...item, events }
+      return { ok: true, value: await touch(edited, actor, { kind: 'edited', detail: 'edited a reply' }, {}) }
+    },
+    deleteComment: async ({ id, commentId, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (actor.kind !== 'user') return { ok: false, reason: 'not-found' }
+      const commentIndex = item.events.findIndex(
+        (event, index) =>
+          event.kind === 'commented' &&
+          event.actor === 'user' &&
+          (event.commentId === commentId || (event.commentId === undefined && commentId === `legacy-${String(event.at)}-${String(index)}`)),
+      )
+      const comment = item.events[commentIndex]
+      if (comment === undefined) return { ok: false, reason: 'not-found' }
+      for (const attachment of comment.attachments ?? []) await files.delete(fileKey(id, attachment.id))
+      const events = item.events.filter((_event, index) => index !== commentIndex)
+      return { ok: true, value: await touch({ ...item, events }, actor, { kind: 'edited', detail: 'deleted a reply' }, {}) }
     },
     triageInput: id => {
       const item = find(id)

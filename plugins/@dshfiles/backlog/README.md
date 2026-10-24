@@ -116,7 +116,7 @@ leave them alone. Nothing is deleted; `dropped` closes an item.
 The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
 for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
 A description's files are kept with the item; a reply's files belong to that comment and open in the
-same gallery from the conversation.
+same gallery from the conversation. User-authored replies can be edited or deleted; their actions and the edit form are keyboard-operable, with visible focus and accessible labels. Reply cards have a little extra separation in the activity list.
 
 ## References in a conversation
 

@@ -591,6 +591,58 @@ describe('attention and inbox', () => {
     })
   })
 
+  it('edits and deletes only the current user’s replies and removes deleted reply attachments', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1_000 })
+    await store.capture({ text: 'reply editing', actor: user })
+    const commented = await store.comment({
+      id: 1,
+      text: 'original reply',
+      files: [{ id: 'comment-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
+      actor: user,
+    })
+    expect(commented.ok).toBe(true)
+    if (!commented.ok) return
+    const commentId = commented.value.item.events.find(event => event.kind === 'commented')?.commentId
+    expect(commentId).toBeDefined()
+    if (commentId === undefined) return
+
+    const edited = await store.editComment({ id: 1, commentId, text: 'updated reply', actor: user })
+    expect(edited.ok && edited.value.item.events.some(event => event.commentId === commentId && event.detail === 'updated reply')).toBe(true)
+    expect(await store.editComment({ id: 1, commentId, text: 'not yours', actor: { kind: 'agent', sessionId: 'other-thread' } })).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
+
+    const deleted = await store.deleteComment({ id: 1, commentId, actor: user })
+    expect(deleted.ok && deleted.value.item.events.some(event => event.commentId === commentId)).toBe(false)
+    expect(await store.readFile({ id: 1, attachmentId: 'comment-image-1' })).toEqual({ ok: false, reason: 'not-found' })
+  })
+
+  it('keeps older user replies editable without stored comment ids', async () => {
+    const items = memoryTable<BacklogItem>()
+    const files = memoryFiles()
+    const store = BacklogModel.createStore({ items, files, now: () => 1_000 })
+    await store.capture({ text: 'legacy reply', actor: user })
+    const captured = items.rows.get('1')
+    expect(captured).toBeDefined()
+    if (captured === undefined) return
+    await items.put('1', {
+      ...captured,
+      events: [...captured.events, { at: 500, actor: 'user', kind: 'commented', detail: 'written before reply editing' }],
+    })
+
+    const reopened = BacklogModel.createStore({ items, files, now: () => 1_000 })
+    const detail = reopened.get(1)
+    expect(detail.ok).toBe(true)
+    if (!detail.ok) return
+    const reply = detail.value.item.events.find(event => event.kind === 'commented')
+    expect(reply?.commentId).toMatch(/^legacy-/)
+    if (reply?.commentId === undefined) return
+
+    const edited = await reopened.editComment({ id: 1, commentId: reply.commentId, text: 'edited legacy reply', actor: user })
+    expect(edited.ok && edited.value.item.events.some(event => event.commentId === reply.commentId && event.detail === 'edited legacy reply')).toBe(true)
+  })
+
   it('takes the kind, status and project the composer set, and records them as the user owns them', async () => {
     const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1 })
     const detail = await store.capture({ text: 'fix the composer', kind: 'bug', status: 'doing', project: '/work/dshfiles', actor: user })

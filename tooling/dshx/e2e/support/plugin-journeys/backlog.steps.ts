@@ -923,6 +923,58 @@ Then('the item activity shows the comment', async ({ page }: { page: Page }) => 
   await finishJourneyAssertions(page)
 })
 
+When('a reply with an image is added', async ({ page }: { page: Page }) => {
+  const itemPeek = peek(page)
+  await itemPeek.locator('input[type="file"]').setInputFiles(join(attachmentFixtures, 'red.png'))
+  await expect(itemPeek.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  const comment = itemPeek.getByRole('textbox', { name: 'Comment', exact: true })
+  await comment.fill('Original reply')
+  await comment.press('Enter')
+  await expect(itemPeek.getByRole('list', { name: 'Activity' })).toContainText('Original reply')
+})
+
+When('the user reply is edited with keyboard navigation', async ({ page }: { page: Page }) => {
+  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  const edit = activity.getByRole('button', { name: 'Edit your reply', exact: true })
+  await edit.focus()
+  await page.keyboard.press('Enter')
+  const editor = activity.getByRole('textbox', { name: 'Edit reply', exact: true })
+  await expect(editor).toBeVisible()
+  await editor.fill('Edited reply')
+  await editor.focus()
+  await page.keyboard.press('Tab')
+  const save = activity.getByRole('button', { name: 'Save reply', exact: true })
+  await expect(save).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(activity).toContainText('Edited reply')
+})
+
+Then('the edited reply keeps its attachment', async ({ page }: { page: Page }) => {
+  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  await expect(activity).toContainText('Edited reply')
+  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+})
+
+When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {
+  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  let confirmationMessage: string | undefined
+  page.once('dialog', dialog => {
+    confirmationMessage = dialog.message()
+    void dialog.accept()
+  })
+  await activity.getByRole('button', { name: 'Delete your reply', exact: true }).click()
+  expect(confirmationMessage).toBe('Delete this reply? This cannot be undone.')
+})
+
+Then('the reply and its attachment are removed from the activity', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-reply-delete-attachment', async () => {
+    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    await expect(activity).not.toContainText('Edited reply')
+    await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the capture composer offers a project picker', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-project-scope-picker', async () => {
     await expect(page.getByRole('combobox', { name: 'Filter by project', exact: true })).toBeVisible()

@@ -58,6 +58,7 @@ const eventSchema = z
   .object({
     at: z.number().int().nonnegative(),
     actor: actorIdSchema,
+    commentId: z.string().min(1).max(128).optional(),
     kind: z.enum(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
     detail: z.string().max(MAX_BODY_CHARS),
     threadId: z.string().min(1).max(MAX_TARGET_CHARS).optional(),

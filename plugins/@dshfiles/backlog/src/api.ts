@@ -416,6 +416,16 @@ export const backlogApi = defineApi({
       description: `Add a progress comment to a backlog item with text or attachments; references in the text become links. ${writeNote}`,
       tool: { name: 'backlog_comment', readOnly: false, render: renderDetailPreview },
     }),
+    editComment: method({
+      input: z.object({ id: idSchema, commentId: z.string().min(1).max(128), text: z.string().min(1).max(BacklogItems.maxBodyChars) }).strict(),
+      output: detailResultSchema,
+      description: 'Edit one of the current user’s previous replies in the backlog panel.',
+    }),
+    deleteComment: method({
+      input: z.object({ id: idSchema, commentId: z.string().min(1).max(128) }).strict(),
+      output: detailResultSchema,
+      description: 'Delete one of the current user’s previous replies in the backlog panel.',
+    }),
   },
 })
 
