@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-tools'
 import { BlockAssembler, createUserMessage, type GenerateOptions } from '@deepseek-ai/dsh-llm'
@@ -9,7 +10,9 @@ import { definePlugin, defineTool } from '@dshfiles/dshx/host'
 import { pullsReviewApi, type SummarizeResult } from './api.js'
 import { createJjRun } from './jj.js'
 import { renderScopeReport } from './report.js'
+import { closeThreads, reviewCommentsApiHost, threadsFor } from './review-comments-host.js'
 import { ReviewWorkspaceModel } from './review.js'
+import { reviewSettings } from './settings.js'
 import { PullsReviewSummaryModel } from './summarize.js'
 
 /** The thread's own provider, as its last request recorded it. */
@@ -61,10 +64,23 @@ const modelCall = async (
 export default definePlugin({
   id: 'dshfiles-pulls-review',
   uses: ['rpc', 'commands', 'tools'],
-  inject: ['subprocess'],
+  inject: ['storageDomain', 'subprocess'],
+  settings: [reviewSettings],
   setup(api) {
     const ctx = api.raw.ctx
     const run = createJjRun(ctx)
+
+    ctx.effect(() => {
+      void threadsFor(ctx).catch(() => undefined)
+      return async () => {
+        await closeThreads()
+      }
+    }, 'pulls-review: review comment store')
+
+    const comments = api.rpc.register(reviewCommentsApiHost)
+    void comments.catch((error: unknown) =>
+      ctx.logger.warn('pulls-review: review comment API registration failed: %s', error instanceof Error ? error.message : String(error)),
+    )
 
     const registration = api.rpc.register(
       pullsReviewApi.host({

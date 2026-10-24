@@ -13,13 +13,13 @@ const panelButton = (page: Page) =>
 
 When('the pulls.review panel is opened from the sidebar', async ({ page }: { page: Page }) => {
   await panelButton(page).click()
-  await expect(page.getByRole('heading', { name: 'pulls.review', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Filter changed files', exact: true })).toBeVisible({ timeout: 30_000 })
 })
 
 Then('the pulls.review panel reads the thread workspace against {string}', async ({ page }: { page: Page }, base: string) => {
   await recordAssertion(page, 'pulls-review-reads-thread-workspace', async () => {
-    await expect(page.getByText(`${base}..@`, { exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(/^\d+ files?$/).first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(`${base}..@`, { exact: false }).first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(/· \d+ files? ·/).first()).toBeVisible({ timeout: 30_000 })
   })
 })
 
@@ -38,24 +38,33 @@ Then('the thread shows the pulls.review scope report', async ({ page }: { page: 
 })
 
 /**
- * The e2e profile boots no model provider, so a started thread's workspace is clean against main and the panel lists
- * no file to review. Write one working-copy change into that thread's checkout: the panel reads it like any agent edit.
+ * The e2e profile boots no model provider, so a started thread's workspace is clean against main and the review lists
+ * no file. Write one working-copy change into that thread's checkout: the surface reads it like any agent edit.
  */
 When('the thread workspace holds one changed file', async ({ page }: { page: Page }) => {
   const workspace = threadWorkspacePathFor(page)
-  await writeFile(join(workspace, THREAD_CHANGE), '# Batch review fixture\n\nOne changed file to review.\n')
+  await writeFile(join(workspace, THREAD_CHANGE), '# Review fixture\n\nOne changed file to review.\n')
 })
 
-When('the scope files are selected for batch review', async ({ page }: { page: Page }) => {
-  await page.getByRole('checkbox', { name: 'Select all files in this scope', exact: true }).check()
-  await expect(page.getByText('1 selected', { exact: true })).toBeVisible()
+When('the changed file is marked viewed', async ({ page }: { page: Page }) => {
+  await page.getByRole('checkbox', { name: `Mark ${THREAD_CHANGE} as viewed`, exact: true }).check()
 })
 
-Then('marking the selection reviewed marks every file reviewed', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Mark selected reviewed', exact: true }).click()
-  await recordAssertion(page, 'pulls-review-batch-marks-the-scope', async () => {
-    await expect(page.getByText('1/1 reviewed', { exact: true })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('1 selected', { exact: true })).toHaveCount(0)
+Then('the review reads every changed file as viewed', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'pulls-review-progress-marks-the-file', async () => {
+    await expect(page.getByText('1/1 viewed', { exact: true })).toBeVisible({ timeout: 15_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('every changed file is marked viewed from the review menu', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Review actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Mark all viewed', exact: true }).click()
+})
+
+Then('the review reports all files viewed', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'pulls-review-progress-marks-all', async () => {
+    await expect(page.getByText('1/1 viewed', { exact: true })).toBeVisible({ timeout: 15_000 })
   })
   await finishJourneyAssertions(page)
 })
