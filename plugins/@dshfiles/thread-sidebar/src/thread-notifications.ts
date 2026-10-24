@@ -99,11 +99,17 @@ const claimNotificationEvent = (knownIds: readonly string[], eventId: string) =>
 }
 
 /** Claim a bounded per-browser event id before delivery, so mounted tabs do not repeat it. */
-const claimThreadNotification = (eventId: string): boolean => {
-  const claim = claimNotificationEvent(deliveredNotificationIds.get() ?? [], eventId)
-  if (!claim.claimed) return false
-  return deliveredNotificationIds.set([...claim.notificationIds])
-}
+export const createThreadNotificationClaimer =
+  (ledger: { readonly get: () => string[]; readonly set: (next: string[]) => boolean }): ((eventId: string) => boolean) =>
+  (eventId: string): boolean => {
+    const claim = claimNotificationEvent(ledger.get(), eventId)
+    if (!claim.claimed) return false
+    // A failed persistence write still leaves this tab's in-memory claim in place; deliver the event anyway.
+    ledger.set([...claim.notificationIds])
+    return true
+  }
+
+const claimThreadNotification = createThreadNotificationClaimer(deliveredNotificationIds)
 
 export interface ThreadInteractionStatus {
   readonly pendingInteractionKey: string | undefined
