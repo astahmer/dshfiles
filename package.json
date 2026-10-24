@@ -29,6 +29,7 @@
     "typecheck": "turbo run typecheck typecheck:scripts --filter=!dshfiles-plugins --filter=!dshx-workspace",
     "test": "turbo run test test:scripts test:tooling --filter=!dshfiles-plugins --filter=!dshx-workspace",
     "test:selection": "node --test scripts/test-selection.test.mjs",
+    "bench:selection": "node scripts/test-selection-bench.mjs",
     "test:changed": "node scripts/test-selection.mjs changed",
     "test:related": "node scripts/test-selection.mjs related",
     "test:tooling": "pnpm --dir tooling/dshx run test:browser-cache && pnpm --dir tooling/dshx run test:evidence && pnpm --dir tooling/dshx run test:inventory && pnpm --dir tooling/dshx run test:feature-coverage && pnpm --dir tooling/dshx run test:browser-tasks",

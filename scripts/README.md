@@ -18,6 +18,7 @@ live in their owning package.
 | `pnpm screenshots`                   | `plugin-screenshots.mjs`             | Capture each UI plugin's feature from a running scratch DSH into its `docs/screenshots/`.     |
 | `pnpm check:screenshots`             | `plugin-screenshots.mjs --check`     | Every UI plugin ships a screenshot its README embeds ([rule](../docs/plugin-screenshots.md)). |
 | `pnpm typecheck:scripts`             | `tsc -p scripts/tsconfig.json`       | Typecheck the repository's TypeScript scripts.                                                |
+| `pnpm bench:selection`               | `test-selection-bench.mjs`           | Mutation benchmark: do related tests catch what a package's full suite catches?               |
 
 ## Incremental checks
 
