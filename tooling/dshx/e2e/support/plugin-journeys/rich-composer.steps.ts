@@ -1,7 +1,10 @@
+import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
+const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) =>
   page.getByRole('textbox', {
     name: 'Describe what you want to build, / commands, @ files or sessions',
@@ -24,6 +27,24 @@ Then('the pasted mention is displayed as a reference chip', async ({ page }: { p
     const chip = page.locator('[data-composer-chip="reference"]')
     await expect(chip).toHaveCount(1)
     await expect(chip).toHaveText('Pasted thread')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('an image is attached to a new thread composer', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  const composer = newThreadComposer(page)
+  await expect(composer).toBeVisible()
+  await expect(composer).toHaveAttribute('contenteditable', 'true')
+  await composer.click()
+  await page.locator('[data-composer-card] input[type="file"]').setInputFiles(join(attachmentFixtures, 'red.png'))
+})
+
+Then('the image is represented by an inline composer reference', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'rich-composer-image-attachment-creates-inline-reference', async () => {
+    const imageReference = page.locator('[data-composer-chip="image-attachment"]')
+    await expect(imageReference).toHaveCount(1)
+    await expect(imageReference).toHaveText('@Image 1')
   })
   await finishJourneyAssertions(page)
 })

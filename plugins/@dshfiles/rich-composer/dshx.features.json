@@ -36,6 +36,44 @@
       ]
     },
     {
+      "id": "image-attachment-reference",
+      "title": "Add inline references for image attachments",
+      "summary": "When an image enters the composer, it gets an ordered inline reference in the draft so users can point to specific screenshots in their message.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["composer-ready", "image-attached", "image-reference-visible"],
+      "failureModes": [
+        "An image rejected by attachment validation does not get an inline reference.",
+        "References preserve attachment order and remain tied to the image draft id."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"New session\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "expect text \"Image 1\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.image-attachment-reference",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.image-attachment-references",
+          "file": "plugins/@dshfiles/rich-composer/src/native/image-attachment-references.test.ts",
+          "testName": "inserts ordered inline labels tied to each image attachment"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-side draft composition: image labels are added to the editor alongside the existing attachment admission flow, with no new Host work."
+        }
+      ]
+    },
+    {
       "id": "rename-thread-title",
       "title": "Rename a thread from its header title",
       "summary": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The header keeps the breadcrumb shape, so ancestor crumbs still navigate and a subagent's lineage switcher is unchanged.",

@@ -28,6 +28,7 @@ import { createConversationStore, readConversationViewPreference } from './store
 import { formatFileMention } from '@deepseek-ai/dsh-file-reference/grammar'
 import { relativizeToCwd, workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import { ConversationController, UnsupportedImageMediaTypeError, isImageMediaType } from './service.ts'
+import { imageAttachmentReferences } from './image-attachment-references.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './contract/composer-blocks.ts'
@@ -541,6 +542,12 @@ export function apply(ctx: Context, config: Config = Config({})): void {
           }
           try {
             const drafts = conversation.createDrafts(sessionId, uploads)
+            const existingImageCount = conversation.resolveDraftAttachments(shell.snapshot.attachmentIds)
+              .filter(attachment => attachment.kind === 'image').length
+            references.push(...imageAttachmentReferences(
+              drafts.filter(attachment => attachment.kind === 'image'),
+              existingImageCount,
+            ))
             if (!shell.addFiles(references, drafts.map(draft => draft.id))) {
               conversation.releaseDraftAttachments(drafts)
               return t('attachment.dropBlocked')
