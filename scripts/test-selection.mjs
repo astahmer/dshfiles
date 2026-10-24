@@ -68,6 +68,51 @@ export const selectTests = ({ packages, files, deletedFiles = [] }) => {
   return [...selected.values()].filter(packageInfo => packageInfo.test !== undefined)
 }
 
+const testFilesOf = directory => {
+  const files = []
+  const walk = path => {
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.turbo') continue
+      const entryPath = join(path, entry.name)
+      if (entry.isDirectory()) walk(entryPath)
+      else if (/\.(test|spec)\.(ts|tsx)$/.test(entry.name)) files.push(entryPath)
+    }
+  }
+  if (existsSync(directory)) walk(directory)
+  return files
+}
+
+// A related run needs the owner's build when its tests load the built entry instead of source, or
+// import their own package name (which resolves to dist). Everything else runs source directly.
+const buildRequiredFor = ({ packages, sharedChecks }) => {
+  if (sharedChecks) return { required: true, reason: 'shared repository inputs' }
+  const full = packages.find(packageInfo => packageInfo.mode === 'full')
+  if (full) return { required: true, reason: `${full.name} runs its full suite` }
+  for (const packageInfo of packages) {
+    for (const testFile of testFilesOf(join(repositoryRoot, packageInfo.directory))) {
+      const content = readFileSync(testFile, 'utf8')
+      if (/['"`][^'"`\n]*\/dist\//.test(content))
+        return { required: true, reason: `${packageInfo.name} test loads dist: ${relative(repositoryRoot, testFile)}` }
+      if (content.includes(`${packageInfo.name}/`) || content.includes(`'${packageInfo.name}'`))
+        return { required: true, reason: `${packageInfo.name} test imports its built package name: ${relative(repositoryRoot, testFile)}` }
+    }
+  }
+  for (const packageInfo of packages) {
+    for (const dependencyName of packageInfo.dependencies) {
+      const shortName = dependencyName.replace(/^@dshfiles\//, '')
+      const dependencyDirectory = [`plugins/@dshfiles/${shortName}`, `tooling/dshx/packages/${shortName}`].find(candidate =>
+        existsSync(join(repositoryRoot, candidate, 'package.json')),
+      )
+      if (dependencyDirectory === undefined) continue
+      const dependencyManifest = JSON.parse(readFileSync(join(repositoryRoot, dependencyDirectory, 'package.json'), 'utf8'))
+      const entry = dependencyManifest.exports?.['.']?.default ?? dependencyManifest.main
+      if (entry !== undefined && !existsSync(join(repositoryRoot, dependencyDirectory, entry)))
+        return { required: true, reason: `unbuilt workspace dependency ${dependencyName}` }
+    }
+  }
+  return { required: false, reason: 'related tests import source only' }
+}
+
 const discoverPackages = () =>
   ['plugins/@dshfiles', 'tooling/dshx/packages'].flatMap(packageRoot =>
     readdirSync(join(repositoryRoot, packageRoot), { withFileTypes: true })
@@ -99,6 +144,7 @@ const main = () => {
       to: { type: 'string', default: '@' },
       'dry-run': { type: 'boolean', default: false },
       since: { type: 'string' },
+      build: { type: 'string', default: 'always' },
     },
     allowPositionals: true,
   })
@@ -130,9 +176,17 @@ const main = () => {
         path.startsWith('tooling/dshx/scripts/') ||
         path.startsWith('profiles/')),
   )
+  if (values.build !== 'always' && values.build !== 'auto') throw new Error('Expected --build always or auto.')
+  const buildDecision = buildRequiredFor({ packages: selection, sharedChecks })
+  const build = values.build === 'always' ? { required: true, reason: 'forced' } : buildDecision
   console.log(
     JSON.stringify(
-      { files, sharedChecks, packages: selection.map(packageInfo => ({ name: packageInfo.name, mode: packageInfo.mode, files: packageInfo.files })) },
+      {
+        files,
+        sharedChecks,
+        build,
+        packages: selection.map(packageInfo => ({ name: packageInfo.name, mode: packageInfo.mode, files: packageInfo.files })),
+      },
       null,
       2,
     ),
@@ -145,10 +199,13 @@ const main = () => {
     run({ args: ['run', 'test:tooling'] })
   }
   if (selection.length === 0) return
-  const buildFilters = selection.map(packageInfo => `--filter=${packageInfo.name}`)
-  if (files.some(path => path.startsWith('plugins/@dshfiles/') && /\.(ts|tsx|js|jsx|css|html)$/.test(path)))
-    buildFilters.push('--filter=...@dshfiles/plugin-ui')
-  run({ args: ['exec', 'turbo', 'run', 'build', ...buildFilters] })
+  if (!build.required) console.log(`test selection: skipped build (${build.reason}); pass --build=always on a cold workspace.`)
+  if (build.required) {
+    const buildFilters = selection.map(packageInfo => `--filter=${packageInfo.name}`)
+    if (files.some(path => path.startsWith('plugins/@dshfiles/') && /\.(ts|tsx|js|jsx|css|html)$/.test(path)))
+      buildFilters.push('--filter=...@dshfiles/plugin-ui')
+    run({ args: ['exec', 'turbo', 'run', 'build', ...buildFilters] })
+  }
   const full = selection.filter(packageInfo => packageInfo.mode === 'full')
   if (full.length > 0) run({ args: ['exec', 'turbo', 'run', 'test', ...full.map(packageInfo => `--filter=${packageInfo.name}`)] })
   for (const packageInfo of selection.filter(packageInfo => packageInfo.mode === 'related')) {

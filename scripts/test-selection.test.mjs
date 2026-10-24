@@ -14,6 +14,24 @@ const summarize = selection => selection.map(({ name, mode }) => ({ name, mode }
 const selectionScript = fileURLToPath(new URL('./test-selection.mjs', import.meta.url))
 
 const dryRun = path => JSON.parse(execFileSync(process.execPath, [selectionScript, 'related', path, '--dry-run'], { encoding: 'utf8' }))
+const dryRunAutoBuild = path =>
+  JSON.parse(execFileSync(process.execPath, [selectionScript, 'related', path, '--dry-run', '--build=auto'], { encoding: 'utf8' }))
+
+test('auto build skips source-only related runs and builds dist loaders and full dependents', () => {
+  assert.equal(dryRunAutoBuild('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
+  const distLoader = dryRunAutoBuild('plugins/@dshfiles/prompt-stash/src/host.ts')
+  assert.equal(distLoader.build.required, true)
+  assert.match(distLoader.build.reason, /loads dist/)
+  const dependent = dryRunAutoBuild('plugins/@dshfiles/usage/src/command-identifiers.ts')
+  assert.equal(dependent.build.required, true)
+  assert.match(dependent.build.reason, /full suite/)
+})
+
+test('CLI rejects an unknown build mode', () => {
+  const invalid = spawnSync(process.execPath, [selectionScript, 'related', selectionScript, '--dry-run', '--build=sometimes'], { encoding: 'utf8' })
+  assert.notEqual(invalid.status, 0)
+  assert.match(invalid.stderr, /--build always or auto/)
+})
 
 test('CLI routes script changes to shared checks but skips documentation', () => {
   assert.equal(dryRun(selectionScript).sharedChecks, true)
