@@ -37,6 +37,61 @@ Dependency changes run full dependent suites because consumers may import built 
 
 Vitest only follows static imports, including literal `import('./module')`. Files read through filesystem APIs, variable imports, subprocess inputs and external runtime state are not inferred. For changes crossing those boundaries, use `pnpm test` or the owning package's regular test command. These selective commands are a fast feedback lane, not a replacement for `pnpm check` or uncached browser/boot verification.
 
+## Can a cheap model pick the tests?
+
+Measured on 2026-10-24 on this checkout (Node 22.23.3, warm Turbo cache) with `scripts/test-selection-bench.mjs`, a mutation harness that records the test files the full package suite really fails and compares them with the files `vitest related` selects for the mutated source. Coverage truth came from one per-test-file V8 coverage pass over six ordinary packages (`shared-streams`, `memory`, `backlog`, `plugin-ui`, `usage`, `command-palette`: 116 test files, 221s to collect once).
+
+### What selection costs
+
+| Step                                                     | Wall time                                                                |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Package selection only (`pnpm test:related … --dry-run`) | 0.45-0.58s                                                               |
+| `pnpm test:related` after one source edit                | **22.5s** (build: `ui-styles` 11.5s + owner 9.4s; tests 0.5s)            |
+| `vitest related --run <file>` directly, no build         | 1.04s                                                                    |
+| Owner package full suite (`vitest run`)                  | 1.10s                                                                    |
+| Forced full owned-plugin suite, 132 tasks                | 291s wall, 628s of test-task time, median package 3.3s                   |
+| Warm full owned-plugin suite, everything cacheable       | 189s; `jj-integration` and `jujutsu` are `cache: false` and always rerun |
+
+Selection itself is not the cost: it decides in under a second. The authoritative lane spends about 20s rebuilding (`ui-styles` rescans every owned plugin for any plugin source edit) before running 0.5s of tests, while a direct `vitest related` run needs no build for same-package source changes.
+
+### What selection misses
+
+- Four real historical diffs, restricted to files unchanged since the commit: `vitest related` selected every test that covers a changed line (0 missed).
+- 23 one-line mutations across the six packages, 13 of them fault-revealing (16 failing test files): the related selection contained **all 16 failing files** (0 missed) and exactly the 38 files that cover the mutated line. Median full package suite was 2.9s against 0.67s for the related run.
+- The eight packages already forced to full suites (`ai-accounts`, `queue-reorder`, `thread-sidebar`, `goal-stall-guard`, `jj-integration`, `jujutsu`, `dshx`, `create-dshx`) were not benchmarked; they are the only known room for smarter selection, and their tests bind to filesystem, variable-import and real-JJ inputs where runtime coverage, not an LLM judgment, is the honest signal.
+
+### What Jev does with the same changes
+
+Jev's reachable contract is one `noul` probability per call (the Memory plugin's `JevClassifier`); it cannot enumerate tests in one call. Both uses were measured at `jev-latest`:
+
+| Use                                                       | Calls | Latency p50 / p90 | Input tokens per call | Result                                                                                                                                      |
+| --------------------------------------------------------- | ----- | ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-change gate: "does this break any test?"              | 23    | 160ms / 231ms     | 573                   | 74% accuracy against a 57% majority baseline; 2 false negatives, 4 false positives                                                          |
+| Per-test ranking: "does this diff affect this test file?" | 22    | 150ms / 190ms     | 755                   | 22/22 on the easy sample (test source shown); enumerating all 649 test files would cost about 97s and 0.5M input tokens per change (~$0.02) |
+
+Ranking every candidate test is slower than running the selected tests: a 15-test package needs about 2.3s of classification against 0.67s for the static related run, and the gate's two false negatives are exactly the risky changes it exists to catch. At the measured $0.042 per million input tokens, cost is negligible; latency and accuracy are not.
+
+### How established projects do it
+
+All production selectors found use dependency graphs, per-test coverage, or models trained on historical test outcomes, and all keep a safe fallback to the full suite:
+
+- Meta's predictive test selection learns from historical outcomes and cuts testing infrastructure cost by 2x while keeping over 95% of individual failures and over 99.9% of faulty changes ([paper](https://arxiv.org/abs/1810.05286)).
+- Develocity trains a model on Build Scan change/outcome history, offers conservative/standard/fast profiles, always runs new, changed, failed and flaky tests, and ships a simulator that replays history to estimate what it would have missed ([docs](https://docs.develocity.ai/2026.3/using-develocity/predictive-test-selection/)).
+- Datadog's Test Impact Analysis matches per-test coverage against changed files; it names library dependencies, compiler options, external services and data files as blind spots and falls back through tracked files and `ITR:NoSkip` ([docs](https://docs.datadoghq.com/tests/test_impact_analysis/)).
+- Azure Test Impact Analysis builds dependency maps for managed code and falls back to all tests for file types it cannot reason about; its guidance for trusting the selector is to run the selected tests and then the full suite and compare failures ([docs](https://learn.microsoft.com/en-us/azure/devops/pipelines/test/test-impact-analysis)).
+- `jest --findRelatedTests` and `vitest related` use the static import graph; Nx `affected` and Turborepo `--filter=...[base]` run a whole affected project's tests; `pytest-testmon` records runtime coverage per test ([Jest](https://jestjs.io/docs/cli#--findrelatedtests-spaceseparatedlistofsourcefiles), [testmon](https://github.com/tarpas/pytest-testmon)).
+- No production example was found of a model choosing repository tests by reading a diff without coverage or history; the LLM tools that appear in searches summarize a pull request and name tests, with no published recall.
+
+### Verdict
+
+Do not wire Jev into test selection. On this repository the static graph had no recall headroom to recover in ordinary packages, while a per-test LLM pass is slower than executing the selected tests and a per-change gate missed 2 of 13 real regressions. The measurable waste is elsewhere:
+
+1. Skip the build before related runs of same-package source changes (1.0s against 22.5s here), and keep the build when a test consumes another package's `dist`; document that boundary rather than rebuilding by default.
+2. If the eight full-suite packages should run less, record per-test coverage and select on it; that is the Datadog/Azure model and the only approach that sees their filesystem and dynamic-import dependencies.
+3. Keep the fallbacks: manifests, configs, fixtures, deletions, non-source files and the known dynamic-input packages stay on full suites.
+
+Unverified here: cold-CI behaviour, browser journey selection, flaky outcomes, and the eight full-suite packages above. `node --run bench:selection` reproduces the mutation comparison; `--jev` adds the gate when `JEV_API_KEY` is set.
+
 ## Validation
 
 Dependency migration replaced 35 SDK link specifications, including the tool-meta package added on main while this work was in progress; one root install discovers 43 projects. The plugin workspace contract and shared Cordis module identity were verified. Selection regression tests cover owner/dependent selection, manifests/configs/fixtures/deletions, shared profile inputs, source-only libraries, dynamic-input fallbacks, CLI rejection and documentation-only skips.
