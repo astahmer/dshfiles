@@ -11,11 +11,11 @@ import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useState } from 'react'
 import { z } from 'zod'
 import { purposeSchema, usageApi } from './api.js'
-import { UsageActivityReport } from './activity-report.js'
 import { UsageCharts } from './charts.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
+import { UsageToolsTab } from './tools-tab.js'
 
 const DAY_MS = 86_400_000
 
@@ -25,7 +25,7 @@ const preferencesSchema = z.object({
   customFrom: z.string().catch(''),
   customTo: z.string().catch(''),
   bucket: z.enum(['hour', 'day']).catch('day'),
-  groupBy: z.enum(['model', 'provider', 'project']).catch('model'),
+  groupBy: z.enum(['model', 'provider', 'project', 'purpose']).catch('model'),
   purposes: z.array(purposeSchema).catch([]),
 })
 
@@ -237,7 +237,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
           />
         </TabsContent>
         <TabsContent value="activity">
-          <UsageActivityReport range={range} />
+          <UsageToolsTab range={range} bucket={preferences.bucket} />
         </TabsContent>
       </Tabs>
     </section>
