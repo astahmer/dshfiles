@@ -1,8 +1,12 @@
 # Command Palette
 
+![Route prefixed searches to the right content](docs/screenshots/palette-prefix-routing.png)
+
 ![Register and invoke typed palette actions](docs/screenshots/action-registry.png)
 
 The app-wide searchable palette lives in this plugin and mounts into DSH's additive `shell.overlay` slot. It owns the UI, keyboard shortcut, action registry, thread/file/content search, and global theme/workspace actions. Thread Sidebar contributes sidebar navigation and actions for the currently open thread.
+
+Type `<` to switch into **Backlog** capture, then Enter opens the full Backlog composer with the typed draft carried over. The composer keeps its attachments, `@` mentions, tags, and link support; the Backlog plugin is required for the handoff.
 
 ## Threads tab scope
 

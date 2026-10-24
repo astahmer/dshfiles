@@ -196,6 +196,10 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         threadsPlaceholder: props.translate('commandPaletteThreadsPlaceholder'),
         allPlaceholder: props.translate('commandPaletteAllPlaceholder'),
         filesPlaceholder: props.translate('commandPaletteFilesPlaceholder'),
+        backlog: props.translate('commandPaletteBacklog'),
+        backlogPlaceholder: props.translate('commandPaletteBacklogPlaceholder'),
+        backlogOpen: props.translate('commandPaletteBacklogOpen'),
+        backlogUnavailable: props.translate('commandPaletteBacklogUnavailable'),
         recent: props.translate('commandPaletteRecent'),
         threads: props.translate('commandPaletteThreads'),
         destinations: props.translate('commandPaletteDestinations'),
@@ -248,6 +252,10 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       }}
       searchContent={props.searchContent}
       onAsk={question => props.askDsh({ question, workspaceId: askWorkspaceId })}
+      onBacklogCapture={text => {
+        const event = new CustomEvent('dshfiles:backlog-capture', { detail: { text }, cancelable: true })
+        return !window.dispatchEvent(event)
+      }}
       onOpenThread={sessionId => {
         const session = sessions.find(candidate => candidate.id === sessionId)
         if (session !== undefined) props.openSession(session.id)

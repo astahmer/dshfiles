@@ -27,7 +27,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { z } from 'zod'
 
 import { backlogApi, BacklogViews } from './api.js'
@@ -179,6 +179,7 @@ export const Composer = (props: {
   readonly inputRef?: RefObject<HTMLTextAreaElement>
   readonly variant: 'chat' | 'compact'
   readonly autoFocus?: boolean
+  readonly captureRequest?: { readonly id: number; readonly text: string }
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
@@ -213,13 +214,16 @@ export const Composer = (props: {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const input = props.inputRef ?? ownRef
 
-  const setText = (value: string): void => {
-    setTextState(value)
-    const next = { ...drafts.get() }
-    if (value === '') delete next[props.draftKey]
-    else next[props.draftKey] = value
-    drafts.set(next)
-  }
+  const setText = useCallback(
+    (value: string): void => {
+      setTextState(value)
+      const next = { ...drafts.get() }
+      if (value === '') delete next[props.draftKey]
+      else next[props.draftKey] = value
+      drafts.set(next)
+    },
+    [props.draftKey],
+  )
 
   const appendText = (chunk: string): void => {
     setTextState(current => {
@@ -232,6 +236,17 @@ export const Composer = (props: {
   useEffect(() => {
     if (props.status !== undefined && props.status !== null) setStatus(props.status)
   }, [props.status])
+
+  useEffect(() => {
+    const request = props.captureRequest
+    if (request === undefined) return
+    setText(request.text)
+    requestAnimationFrame(() => {
+      input.current?.focus()
+      input.current?.setSelectionRange(request.text.length, request.text.length)
+      setCaret(request.text.length)
+    })
+  }, [input, props.captureRequest, setText])
 
   useEffect(() => {
     if (props.projectFilter === undefined) return

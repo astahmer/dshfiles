@@ -102,6 +102,7 @@ test('palette prefixes route to thread, command, content, and line views', () =>
   assert.deepEqual(PaletteRules.parsePaletteQuery('thread:session-abc'), { prefix: 'thread:', text: 'session-abc' })
   assert.deepEqual(PaletteRules.parsePaletteQuery('SESSION:session-abc'), { prefix: 'session:', text: 'session-abc' })
   assert.deepEqual(PaletteRules.parsePaletteQuery('>toggle'), { prefix: '>', text: 'toggle' })
+  assert.deepEqual(PaletteRules.parsePaletteQuery('<bug: capture screenshot'), { prefix: '<', text: 'bug: capture screenshot' })
   assert.deepEqual(PaletteRules.parsePaletteQuery('#migration plan'), { prefix: '#', text: 'migration plan' })
   assert.deepEqual(PaletteRules.parsePaletteQuery(':42'), { prefix: ':', text: '42' })
   assert.deepEqual(PaletteRules.parsePaletteQuery('?'), { prefix: '?', text: '' })

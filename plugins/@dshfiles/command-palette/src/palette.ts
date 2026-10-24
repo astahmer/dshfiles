@@ -4,9 +4,9 @@ const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
 const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 
 /** Query prefixes route to threads, commands, thread content, editor lines, or the prefix list. */
-export type PalettePrefix = '>' | '#' | ':' | '?' | 'thread:' | 'session:'
+export type PalettePrefix = '>' | '<' | '#' | ':' | '?' | 'thread:' | 'session:'
 
-const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '#', ':', '?']
+const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '<', '#', ':', '?']
 
 const parsePaletteQuery = (query: string) => {
   const lowered = query.toLocaleLowerCase()

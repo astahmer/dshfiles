@@ -15,7 +15,7 @@ export interface PaletteThread {
   readonly archived: boolean
 }
 
-export type PaletteMode = 'all' | 'threads' | 'files'
+export type PaletteMode = 'all' | 'threads' | 'files' | 'backlog'
 export type PaletteThemePreference = 'light' | 'dark' | 'system'
 export const PALETTE_EVENT = 'dshfiles:command-palette'
 

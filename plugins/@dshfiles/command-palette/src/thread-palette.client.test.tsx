@@ -9,6 +9,10 @@ const copy: ThreadPaletteCopy = {
   threadsPlaceholder: 'Search threads…',
   allPlaceholder: 'Search everything…',
   filesPlaceholder: 'Search files…',
+  backlog: 'Backlog',
+  backlogPlaceholder: 'Capture an item…',
+  backlogOpen: 'Open capture composer',
+  backlogUnavailable: 'Install Backlog to capture this draft.',
   recent: 'Recent',
   threads: 'Threads',
   destinations: 'Destinations',
@@ -67,7 +71,7 @@ const context: PaletteActionContext = {
   themePreference: 'system',
 }
 
-const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {})) => {
+const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {}), onBacklogCapture: (text: string) => boolean = vi.fn(() => true)) => {
   const onClose = vi.fn()
   render(
     <ThreadPalette
@@ -80,6 +84,7 @@ const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {}
       copy={copy}
       searchContent={null}
       onAsk={onAsk}
+      onBacklogCapture={onBacklogCapture}
       onOpenThread={vi.fn()}
       onClose={onClose}
     />,
@@ -145,6 +150,40 @@ describe('ThreadPalette navigation', () => {
     await waitFor(() => expect(input.value).toBe('session-missing'))
     expect(screen.getByRole('tab', { name: 'Everything' }).getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(input)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('routes the < prefix to Backlog and carries capture text into its composer', async () => {
+    const capture = vi.fn(() => true)
+    const { onClose } = mount(
+      vi.fn(async () => {}),
+      capture,
+    )
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: '<bug: screenshot needs updating' } })
+
+    const row = await screen.findByRole('option', { name: /Open capture composer: bug: screenshot needs updating/ })
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(capture).toHaveBeenCalledWith('bug: screenshot needs updating')
+    expect(screen.queryByRole('tab', { name: 'Backlog' })).toBeNull()
+    expect(row).toBeTruthy()
+  })
+
+  it('keeps the draft open and explains the missing Backlog plugin', async () => {
+    const { onClose } = mount(
+      vi.fn(async () => {}),
+      () => false,
+    )
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: '<bug: keep this draft' } })
+    await screen.findByRole('option', { name: /Open capture composer: bug: keep this draft/ })
+
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+
+    expect(await screen.findByText('Install Backlog to capture this draft.')).toBeTruthy()
+    expect(input.value).toBe('<bug: keep this draft')
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -292,6 +331,7 @@ describe('Threads tab project scope', () => {
           copy={copy}
           searchContent={null}
           onAsk={vi.fn(async () => {})}
+          onBacklogCapture={vi.fn()}
           onOpenThread={vi.fn()}
           onClose={vi.fn()}
         />,

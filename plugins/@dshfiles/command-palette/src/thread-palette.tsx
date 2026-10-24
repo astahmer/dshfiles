@@ -22,6 +22,10 @@ export interface ThreadPaletteCopy {
   readonly threadsPlaceholder: string
   readonly allPlaceholder: string
   readonly filesPlaceholder: string
+  readonly backlog: string
+  readonly backlogPlaceholder: string
+  readonly backlogOpen: string
+  readonly backlogUnavailable: string
   readonly recent: string
   readonly threads: string
   readonly destinations: string
@@ -91,6 +95,7 @@ interface ThreadPaletteProps {
   readonly onOpenThread: (sessionId: string) => void
   /** Send one Ask DSH question and open the thread it creates; a rejection keeps the palette open. */
   readonly onAsk: (question: string) => Promise<void>
+  readonly onBacklogCapture: (text: string) => boolean
   readonly onClose: () => void
 }
 
@@ -102,6 +107,7 @@ type PaletteRow =
   | { readonly kind: 'line'; readonly line: number }
   | { readonly kind: 'help'; readonly prefix: PalettePrefix | ''; readonly label: string }
   | { readonly kind: 'ask'; readonly question: string }
+  | { readonly kind: 'backlog'; readonly text: string }
 
 const RESULT_LIMIT = 50
 const COMMAND_LIMIT = 30
@@ -126,6 +132,7 @@ const rowValue = (row: PaletteRow): string => {
   if (row.kind === 'line') return `line:${row.line}`
   if (row.kind === 'help') return `help:${row.prefix}`
   if (row.kind === 'ask') return 'ask-dsh'
+  if (row.kind === 'backlog') return `backlog:${row.text}`
   return `destination:${row.destination.id}`
 }
 
@@ -133,6 +140,7 @@ type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help' | 'ask
 
 const VIEW_BY_PREFIX = {
   '>': 'commands',
+  '<': 'backlog',
   '#': 'content',
   ':': 'line',
   '?': 'help',
@@ -265,17 +273,32 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             { prefix: 'thread:' as const, label: props.copy.helpThread },
             { prefix: 'session:' as const, label: props.copy.helpSession },
             { prefix: '>' as const, label: props.copy.helpCommands },
+            { prefix: '<' as const, label: props.copy.backlog },
             { prefix: '#' as const, label: props.copy.helpContent },
             { prefix: ':' as const, label: props.copy.helpLine },
             { prefix: '' as const, label: props.copy.helpNone },
           ]
         : [],
-    [props.copy.helpCommands, props.copy.helpContent, props.copy.helpLine, props.copy.helpNone, props.copy.helpSession, props.copy.helpThread, view],
+    [
+      props.copy.backlog,
+      props.copy.helpCommands,
+      props.copy.helpContent,
+      props.copy.helpLine,
+      props.copy.helpNone,
+      props.copy.helpSession,
+      props.copy.helpThread,
+      view,
+    ],
   )
 
   const askRows = useMemo<PaletteRow[]>(
     () => (view === 'ask' && deferredQuery.trim().length > 0 ? [{ kind: 'ask', question: deferredQuery.trim() }] : []),
     [deferredQuery, view],
+  )
+
+  const backlogRows = useMemo<PaletteRow[]>(
+    () => (view === 'backlog' ? [{ kind: 'backlog', text: (parsed.prefix === '<' ? parsed.text : query).trim() }] : []),
+    [parsed.prefix, parsed.text, query, view],
   )
 
   const goToFile: PaletteActionOption = useMemo(
@@ -316,6 +339,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const rows: PaletteRow[] = useMemo(
     () => [
       ...askRows,
+      ...backlogRows,
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
@@ -324,7 +348,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
       ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [askRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -334,6 +358,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     if (row.kind === 'ask') {
       // Enter can land before the deferred row catches up with the last keystroke; the live query wins.
       void submitAsk(query)
+      return
+    }
+    if (row.kind === 'backlog') {
+      if (!props.onBacklogCapture(row.text)) {
+        sendNavigation({ type: 'notice.show', message: props.copy.backlogUnavailable })
+        return
+      }
+      props.onClose()
       return
     }
     if (row.kind === 'help') {
@@ -420,6 +452,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
     files: { chip: props.copy.files, placeholder: props.copy.filesPlaceholder },
+    backlog: { chip: props.copy.backlog, placeholder: props.copy.backlogPlaceholder },
     commands: { chip: props.copy.viewCommands, placeholder: props.copy.commandsPlaceholder },
     content: { chip: props.copy.viewContent, placeholder: props.copy.contentPlaceholder },
     line: { chip: props.copy.viewLine, placeholder: props.copy.linePlaceholder },
@@ -523,7 +556,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               <Tabs
                 value={mode}
                 onValueChange={(value: string) => {
-                  if (value !== 'all' && value !== 'threads' && value !== 'files') return
+                  if (value !== 'all' && value !== 'threads' && value !== 'files' && value !== 'backlog') return
                   sendNavigation({ type: 'mode.change', mode: value })
                 }}
               >
@@ -531,6 +564,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   <TabsTrigger value="all">{props.copy.viewAll}</TabsTrigger>
                   <TabsTrigger value="threads">{props.copy.threads}</TabsTrigger>
                   <TabsTrigger value="files">{props.copy.files}</TabsTrigger>
+                  <TabsTrigger value="backlog">{props.copy.backlog}</TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
@@ -545,6 +579,19 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
                   : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
+            {backlogRows.length > 0 ? (
+              <CommandGroup heading={props.copy.backlog}>
+                {backlogRows.map(row => (
+                  <CommandItem key={rowValue(row)} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
+                    <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                    <span className="dshx:truncate dshx:text-sm">
+                      {row.kind === 'backlog' && row.text.length > 0 ? `${props.copy.backlogOpen}: ${row.text}` : props.copy.backlogOpen}
+                    </span>
+                    {shortcut(row)}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null}
             {askRows.length > 0 ? (
               <CommandGroup heading={props.copy.ask}>
                 {askRows.map(row => (

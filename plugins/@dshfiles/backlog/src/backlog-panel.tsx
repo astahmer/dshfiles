@@ -452,6 +452,7 @@ export const BacklogPanel = (props: {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
+  const [captureRequest, setCaptureRequest] = useState<{ readonly id: number; readonly text: string } | undefined>()
   const [startThreadItems, setStartThreadItems] = useState<readonly StartThreadItem[] | null>(null)
   const [backfillOpen, setBackfillOpen] = useState(false)
   const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
@@ -484,6 +485,12 @@ export const BacklogPanel = (props: {
   }, [revision.data, queryClient])
   // A conversation reference asks for one item; selecting it here is what the sidebar row cannot know.
   const focus = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.read, () => null)
+  const pendingCapture = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.readCapture, () => null)
+  useEffect(() => {
+    if (pendingCapture === null) return
+    setCaptureRequest(pendingCapture)
+    BacklogFocusModel.clearCapture()
+  }, [pendingCapture])
   useEffect(() => {
     if (focus === null) return
     setOpenId(focus)
@@ -1032,6 +1039,7 @@ export const BacklogPanel = (props: {
               onClearStatus={() => setCaptureStatus(null)}
               inputRef={captureComposer}
               onNavigateUp={navigateToNearestItem}
+              {...(captureRequest === undefined ? {} : { captureRequest })}
             />
           </div>
         </div>
