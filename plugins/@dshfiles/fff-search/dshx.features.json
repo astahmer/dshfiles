@@ -11,6 +11,8 @@
       "states": ["indexing", "warm", "idle-dropped", "worker-restarted"],
       "failureModes": [
         "An invalid regular expression is an error, not a literal search.",
+        "A path that does not exist is answered as path does not exist: <path>, not by indexing it.",
+        "A path outside the workspace that contains it is refused instead of indexing every checkout under it.",
         "A crashed worker fails its pending calls and the next search starts a fresh one.",
         "Agents created before the bundle loaded keep the stock tools until their next start."
       ],
@@ -51,6 +53,36 @@
           "id": "fff-search.glob-basenames",
           "file": "plugins/@dshfiles/fff-search/tests/fff-search.test.ts",
           "testName": "matches basenames at any depth and anchors to a directory"
+        },
+        {
+          "kind": "unit-test",
+          "id": "fff-search.glob-file-path",
+          "file": "plugins/@dshfiles/fff-search/tests/fff-search.test.ts",
+          "testName": "answers a file path with that file"
+        },
+        {
+          "kind": "unit-test",
+          "id": "fff-search.scope-missing-path",
+          "file": "plugins/@dshfiles/fff-search/tests/fff-search.test.ts",
+          "testName": "answers a missing path instead of indexing it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "fff-search.scope-workspace-ancestor",
+          "file": "plugins/@dshfiles/fff-search/tests/fff-search.test.ts",
+          "testName": "refuses a root that contains the workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "fff-search.scope-sibling-checkout",
+          "file": "plugins/@dshfiles/fff-search/tests/fff-search.test.ts",
+          "testName": "searches a checkout beside the workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "fff-search.scope-tilde",
+          "file": "plugins/@dshfiles/fff-search/tests/fff-search.test.ts",
+          "testName": "expands a tilde path to the home directory"
         },
         {
           "kind": "not-applicable",

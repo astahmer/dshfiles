@@ -1,4 +1,5 @@
 import type { FileFinder, GrepCursor } from '@ff-labs/fff-node'
+import { homedir } from 'node:os'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 
@@ -47,22 +48,44 @@ export class FffSearch {
     z.object({ id: z.number(), ok: z.literal(false), error: z.string() }),
   ])
 
-  /** Resolve the tool's optional `path` against the Agent's working directory into an index root and a narrowing. */
-  static scope(options: { workingDirectory: string; path: string | undefined; isFile: (path: string) => boolean }): SearchScope {
-    const target = options.path === undefined ? options.workingDirectory : resolve(options.workingDirectory, options.path)
-    const inside = relative(options.workingDirectory, target)
+  /** Resolve the tool's optional `path` to the absolute target the Host stats, expanding `~` as the model means it. */
+  static target(options: { workingDirectory: string; path: string | undefined; homeDirectory?: string }): string {
+    if (options.path === undefined) return options.workingDirectory
+    const homeDirectory = options.homeDirectory ?? homedir()
+    const expanded = options.path === '~' ? homeDirectory : options.path.startsWith(`~${sep}`) ? resolve(homeDirectory, options.path.slice(2)) : options.path
+    return isAbsolute(expanded) ? expanded : resolve(options.workingDirectory, expanded)
+  }
+
+  /**
+   * Resolve the target into an index root and a narrowing inside it. A missing path is a caller error, and a root that
+   * contains the Agent's workspace is refused: one search at `~/dev` would index every checkout under it.
+   */
+  static scope(options: { workingDirectory: string; path: string | undefined; target: string; stats: { isFile: boolean } | undefined }): SearchScope {
+    if (options.path === undefined) return { root: options.workingDirectory, directory: undefined, file: undefined }
+    if (options.stats === undefined) throw new Error(`path does not exist: ${options.path}`)
+    const inside = relative(options.workingDirectory, options.target)
     const outsideRoot = inside.startsWith('..') || isAbsolute(inside)
-    const isFile = options.isFile(target)
-    if (outsideRoot) {
-      if (!isFile) return { root: target, directory: undefined, file: undefined }
-      const parent = resolve(target, '..')
-      return { root: parent, directory: undefined, file: relative(parent, target).split(sep).join('/') }
-    }
-    const posix = inside.split(sep).join('/')
-    if (posix === '') return { root: options.workingDirectory, directory: undefined, file: undefined }
-    if (!isFile) return { root: options.workingDirectory, directory: posix, file: undefined }
-    const slash = posix.lastIndexOf('/')
-    return { root: options.workingDirectory, directory: slash === -1 ? undefined : posix.slice(0, slash), file: posix }
+    const parent = resolve(options.target, '..')
+    const scope: SearchScope = outsideRoot
+      ? options.stats.isFile
+        ? { root: parent, directory: undefined, file: relative(parent, options.target).split(sep).join('/') }
+        : { root: options.target, directory: undefined, file: undefined }
+      : FffSearch.#inside({ workingDirectory: options.workingDirectory, inside: inside.split(sep).join('/'), isFile: options.stats.isFile })
+    FffSearch.#refuseWorkspaceAncestor({ root: scope.root, workingDirectory: options.workingDirectory, path: options.path })
+    return scope
+  }
+
+  static #inside(options: { workingDirectory: string; inside: string; isFile: boolean }): SearchScope {
+    if (options.inside === '') return { root: options.workingDirectory, directory: undefined, file: undefined }
+    if (!options.isFile) return { root: options.workingDirectory, directory: options.inside, file: undefined }
+    const slash = options.inside.lastIndexOf('/')
+    return { root: options.workingDirectory, directory: slash === -1 ? undefined : options.inside.slice(0, slash), file: options.inside }
+  }
+
+  static #refuseWorkspaceAncestor(options: { root: string; workingDirectory: string; path: string }): void {
+    const inside = relative(options.root, options.workingDirectory)
+    if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) return
+    throw new Error(`path ${options.path} is outside the workspace and contains it; search from ${options.workingDirectory} or a path inside it`)
   }
 
   static grep(options: { finder: FileFinder; scope: SearchScope; pattern: string; include: string | undefined; workingDirectory: string }): GrepOutcome {
@@ -102,9 +125,10 @@ export class FffSearch {
       options.scope.directory === undefined ? options.pattern : `${options.scope.directory}/${options.pattern.includes('/') ? '' : '**/'}${options.pattern}`
     const result = options.finder.glob(anchored, { pageSize: FffSearch.maxGlobPaths })
     if (!result.ok) throw new Error(`glob failed: ${result.error}`)
+    const items = options.scope.file === undefined ? result.value.items : result.value.items.filter(item => item.relativePath === options.scope.file)
     return {
-      paths: result.value.items.map(item => FffSearch.#fromRoot(options.scope.root, item.relativePath, options.workingDirectory)),
-      total: result.value.totalMatched,
+      paths: items.map(item => FffSearch.#fromRoot(options.scope.root, item.relativePath, options.workingDirectory)),
+      total: options.scope.file === undefined ? result.value.totalMatched : items.length,
     }
   }
 
