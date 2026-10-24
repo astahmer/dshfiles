@@ -57,6 +57,20 @@ describe('panel scopes', () => {
     expect(PanelScopes.persisted(thread).view).toBe('source')
   })
 
+  it('replaces a remembered repository that was removed with the owning project', () => {
+    const scope = PanelScopes.thread('removed-workspace')
+    PanelScopes.remember(scope, { path: '/threads/removed-workspace' })
+
+    expect(
+      PanelScopes.initialPath({
+        scope,
+        defaultPath: '/work/dshfiles',
+        legacyPath: '/work/other',
+        registeredPaths: ['/work/dshfiles'],
+      }),
+    ).toBe('/work/dshfiles')
+  })
+
   it('keeps a panel request repository for the scope it was made for', () => {
     const scope = PanelScopes.thread('session-2')
 

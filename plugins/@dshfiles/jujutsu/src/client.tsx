@@ -267,7 +267,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [path, setPath] = usePanelScopeState(
     scope,
     'path',
-    () => initialRequest?.path ?? PanelScopes.initialPath({ scope, defaultPath: props.defaultPath ?? null, legacyPath: storedRepoPath.get() }),
+    () =>
+      initialRequest?.path ??
+      PanelScopes.initialPath({
+        scope,
+        defaultPath: props.defaultPath ?? null,
+        legacyPath: storedRepoPath.get(),
+        registeredPaths: props.projects.map(project => project.canonicalPath),
+      }),
   )
   const [pendingReferenceRequest, setPendingReferenceRequest] = useState(initialRequest?.reference ?? null)
   const [repoId, setRepoId] = useState<string | null>(null)
