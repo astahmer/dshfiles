@@ -65,6 +65,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Empty, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
@@ -3586,6 +3589,40 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       now,
     })
   }, [attentionIds, displayWorkspaces, now, tSidebar, threadView.groupBy, visibleRemoteThreads, visibleThreadEntries])
+  const boardColumnOptions = useMemo(
+    () =>
+      threadView.groupBy === 'status'
+        ? SIDEBAR_SECTIONS.map(section => ({ key: section, label: tSidebar(sectionLabels[section]) }))
+        : groupedThreadEntries.map(group => ({ key: group.key, label: group.label || tSidebar('threadSidebarAllThreads') })),
+    [groupedThreadEntries, tSidebar, threadView.groupBy],
+  )
+  const orderedBoardColumns = useMemo(
+    () =>
+      ThreadBoardViewModel.orderColumns(
+        boardColumnOptions.map(column => column.key),
+        boardViewSettings.columnOrder,
+      ),
+    [boardColumnOptions, boardViewSettings.columnOrder],
+  )
+  const visibleBoardColumns = useMemo(
+    () => orderedBoardColumns.filter(column => !boardViewSettings.hiddenColumns.includes(column)),
+    [boardViewSettings.hiddenColumns, orderedBoardColumns],
+  )
+  const renderedGroupedThreadEntries = isBoard
+    ? visibleBoardColumns.map(column => groupedThreadEntries.find(group => group.key === column)).filter(group => group !== undefined)
+    : groupedThreadEntries
+  const updateBoardColumnOrder = (column: string, direction: -1 | 1): void => {
+    storedThreadBoardView.set(
+      ThreadBoardViewModel.update(boardViewSettings, { columnOrder: ThreadBoardViewModel.moveColumn(orderedBoardColumns, column, direction) }),
+    )
+  }
+  const toggleBoardColumn = (column: string, visible: boolean): void => {
+    storedThreadBoardView.set(
+      ThreadBoardViewModel.update(boardViewSettings, {
+        hiddenColumns: ThreadBoardViewModel.toggleColumn(boardViewSettings.hiddenColumns, column, visible),
+      }),
+    )
+  }
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -4338,7 +4375,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               ))}
             </div>
           </div>
-          {showGroupControl || showFilterControl ? (
+          {showGroupControl || showFilterControl || isBoard ? (
             <div
               className={cn(
                 'dshx:grid dshx:gap-1',
@@ -4371,6 +4408,53 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         </DropdownMenuRadioItem>
                       ))}
                     </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              {isBoard ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="dshx:min-w-0 dshx:justify-start dshx:text-xs">
+                      {props.tSidebar('threadSidebarBoardColumns')}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="dshx-root dshx:min-w-56">
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarBoardColumns')}</DropdownMenuLabel>
+                    {orderedBoardColumns.map(column => {
+                      const option = boardColumnOptions.find(candidate => candidate.key === column)
+                      if (option === undefined) return null
+                      const visible = !boardViewSettings.hiddenColumns.includes(column)
+                      return (
+                        <DropdownMenuCheckboxItem
+                          checked={visible}
+                          disabled={visible && visibleBoardColumns.length <= 1}
+                          key={column}
+                          onCheckedChange={checked => toggleBoardColumn(column, checked === true)}
+                          onSelect={event => event.preventDefault()}
+                        >
+                          {option.label}
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarReorderColumns')}</DropdownMenuLabel>
+                    {orderedBoardColumns.map((column, index) => {
+                      const option = boardColumnOptions.find(candidate => candidate.key === column)
+                      if (option === undefined) return null
+                      return (
+                        <DropdownMenuSub key={column}>
+                          <DropdownMenuSubTrigger>{option.label}</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="dshx-root dshx:min-w-40">
+                            <DropdownMenuItem disabled={index === 0} onSelect={() => updateBoardColumnOrder(column, -1)}>
+                              {props.tSidebar('threadSidebarMoveLeft')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled={index === orderedBoardColumns.length - 1} onSelect={() => updateBoardColumnOrder(column, 1)}>
+                              {props.tSidebar('threadSidebarMoveRight')}
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
@@ -4788,7 +4872,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
             {threadView.groupBy === 'status'
-              ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
+              ? (isBoard ? visibleBoardColumns.filter(isSidebarSection) : renderedSections).map((section, index) => {
                   if (section === 'remote') {
                     return !preferences.separateRemoteThreads || props.openRemoteThreads === undefined ? null : (
                       <RemoteThreadsSection
@@ -4975,7 +5059,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     </section>
                   )
                 })
-              : groupedThreadEntries.map(group => {
+              : renderedGroupedThreadEntries.map(group => {
                   // A flat list under a hoisted group (Usage limit, Interrupted…) gets its own header, so its rows do
                   // not read as part of the group above.
                   const showHeader = group.showHeader || (!isBoard && hasHoistedGroups)
