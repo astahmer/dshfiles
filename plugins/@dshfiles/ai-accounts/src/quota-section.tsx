@@ -1,5 +1,5 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { NumberedSection } from './panel-primitives.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
@@ -13,31 +13,26 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
     <NumberedSection
       actions={
         <>
-          <Select onValueChange={days => setHistoryDays(Number(days))} value={String(historyDays)}>
-            <SelectTrigger aria-label="History range" className="dshx:h-6 dshx:text-xs" size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HISTORY_RANGES.map(days => (
-                <SelectItem key={days} value={String(days)}>
-                  {days}d
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            label="History range"
+            onValueChange={days => setHistoryDays(Number(days))}
+            options={HISTORY_RANGES.map(days => ({ value: String(days), label: `${days}d` }))}
+            triggerClassName="dshx:h-7 dshx:w-20 dshx:text-xs"
+            value={String(historyDays)}
+          />
           <Button disabled={selectedId === null} onClick={recordUsage} size="xs" type="button" variant="outline">
             Record now
           </Button>
         </>
       }
-      index="04"
       title="Quota"
     >
       <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
+      <h4 className="dshx:mt-5 dshx:text-sm dshx:font-medium">Remaining quota over time</h4>
       <QuotaHistoryChart
         ariaLabel={`Remaining quota over the last ${String(historyDays)} days`}
         emptyMessage="Not enough history yet. Quota is recorded on an interval; check back shortly."
-        height={160}
+        height={200}
         points={history}
       />
     </NumberedSection>

@@ -2,6 +2,36 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "account-workspace",
+      "title": "Browse the full-page account workspace",
+      "summary": "Search observed account metadata and known models, select provider cards, and switch between Models, Settings and Usage in a responsive page. Existing creation, authentication and persistence stay unchanged.",
+      "reach": ["click button \"AI Accounts\"", "expect searchbox \"Search accounts and known models\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["empty", "selected", "filtered", "no-matches", "models", "settings", "usage", "narrow"],
+      "failureModes": ["Search cannot discover unobserved provider models.", "Missing identity or plan is reported as unavailable, never inferred."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.account-workspace",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.account-workspace-search",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-page-model.test.ts",
+          "testName": "matches observed provider, identity and plan using all search terms"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only layout, tabs and search; writes still use the existing account-lifecycle API dispatch spans. No new Host work."
+        }
+      ]
+    },
+    {
       "id": "account-lifecycle",
       "title": "Manage provider account drafts",
       "summary": "Add, edit, enable, and persist account profiles; confirm removals, keep canceled profiles, and retry failed removals.",

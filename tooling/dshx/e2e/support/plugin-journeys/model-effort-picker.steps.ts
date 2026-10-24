@@ -221,9 +221,11 @@ When('two Command Code accounts offer the same model in a new thread', async ({ 
     ['Command Code 1', 'e2e-fake-key-ALPHA1'],
     ['Command Code 2', 'e2e-fake-key-BRAVO2'],
   ]) {
-    await panel.getByRole('button', { name: 'Add account', exact: true }).click()
+    await page.getByRole('button', { name: 'Add account', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+    await page.getByText('Advanced', { exact: true }).click()
     const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
     await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
     await baseUrl.blur()

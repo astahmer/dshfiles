@@ -6,9 +6,11 @@ import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '.
 const providerAccounts = (page: Page) => page.getByRole('complementary', { name: 'Provider accounts' })
 
 const addCommandCodeAccount = async (page: Page, input: { readonly name: string; readonly key: string }): Promise<void> => {
-  await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('button', { name: 'Add account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
   await expect(page.getByRole('heading', { name: input.name, exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await page.getByText('Advanced', { exact: true }).click()
   const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
   await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
   await baseUrl.blur()
@@ -33,6 +35,66 @@ const openAccountsPanel = async (page: Page): Promise<void> => {
   }
   await expect(providerAccounts(page)).toBeVisible()
 }
+
+When('a standalone account workspace has two provider accounts', async ({ page }: { page: Page }) => {
+  await openAccountsPanel(page)
+  await expect(page.getByRole('button', { name: 'Add your first account', exact: true })).toBeVisible()
+  // Use unsigned synthetic Copilot profiles: Codex creation can read the OS user's real home even in scratch.
+  // Both empty state and header use the real upstream provider menu; never start sign-in.
+  for (const trigger of ['Add your first account', 'Add account']) {
+    await page.getByRole('button', { name: trigger, exact: true }).click()
+    await page.getByRole('menuitem', { name: 'GitHub Copilot account', exact: true }).click()
+  }
+  await expect(page.getByRole('heading', { name: 'GitHub Copilot 2', exact: true })).toBeVisible()
+})
+
+Then('account search preserves priority and the existing settings and usage controls', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-standalone-tabs-and-search', async () => {
+    const search = page.getByRole('searchbox', { name: 'Search accounts and known models', exact: true })
+    await search.fill('GitHub Copilot 2')
+    const card = providerAccounts(page).getByRole('list', { name: 'GitHub Copilot accounts', exact: true }).getByRole('listitem')
+    await expect(card).toHaveCount(1)
+    await expect(card).toContainText('#2')
+    await expect(card.getByRole('button', { name: 'Move GitHub Copilot 2 earlier in account order', exact: true })).toBeEnabled()
+    await expect(card.getByRole('switch')).toHaveAttribute('data-state', 'checked')
+    await search.fill('not-a-known-account')
+    await expect(providerAccounts(page).getByText('No accounts match. Search includes known models only.')).toBeVisible()
+    await search.clear()
+    await expect(providerAccounts(page).getByRole('list', { name: 'GitHub Copilot accounts', exact: true }).getByRole('listitem')).toHaveCount(2)
+    await page.getByRole('searchbox', { name: 'Search models', exact: true }).fill('not-a-model')
+    await expect(page.getByRole('tab', { name: 'Models', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Display name', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in with GitHub', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Connect account', exact: true })).toHaveCount(0)
+    await page.getByText('Advanced', { exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Route slug', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Runtime paths', exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: 'Usage', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Record now', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'History range', exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Selected account', exact: true }).getByRole('button', { name: 'Usage history', exact: true })).toBeVisible()
+  })
+})
+
+Then('the account workspace fits narrow and split panes', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-responsive-pane-widths', async () => {
+    const workspace = page.getByRole('region', { name: 'AI Accounts workspace', exact: true })
+    for (const width of [360, 480, 768, 1024]) {
+      await workspace.evaluate((element, width) => {
+        element.style.width = `${width}px`
+      }, width)
+      for (const tab of ['Models', 'Settings', 'Usage']) {
+        await page.getByRole('tab', { name: tab, exact: true }).click()
+        await expect.poll(() => workspace.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
+      }
+    }
+    await workspace.evaluate(element => {
+      element.style.width = ''
+    })
+  })
+  await finishJourneyAssertions(page)
+})
 
 When('a provider request fails because its credential is missing', async ({ page }: { page: Page }) => {
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
@@ -69,6 +131,7 @@ When('a Codex account draft is edited in manual save mode', async ({ page }: { p
   await page.getByRole('button', { name: 'Add account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await page.getByRole('textbox', { name: 'Display name', exact: true }).fill('E2E Draft Account')
   await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes.' })).toBeVisible()
 })
@@ -84,6 +147,7 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
     await expect(page.getByRole('radio', { name: /Manual/ })).toBeChecked()
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Display name', exact: true })).toHaveValue('E2E Draft Account')
   })
   await finishJourneyAssertions(page)
@@ -91,7 +155,7 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
 
 When('a Codex account is ready for removal', async ({ page }: { page: Page }) => {
   await openAccountsPanel(page)
-  await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('button', { name: 'Add account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
 })
@@ -212,6 +276,7 @@ When('two Codex accounts are added with Priority distribution', async ({ page }:
     await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
     await expect(page.getByRole('heading', { name: accountName, exact: true })).toBeVisible()
   }
+  await page.getByText('Page options · routing and display', { exact: true }).click()
   const distribution = page.getByRole('combobox', { name: 'Request distribution' })
   await distribution.click()
   await page.getByRole('option', { name: /Priority/ }).click()
@@ -263,6 +328,7 @@ Then('the account shows the session and weekly windows the provider reports', as
   await providerAccounts(page)
     .getByRole('button', { name: /^Command Code 1 / })
     .click()
+  await page.getByRole('tab', { name: 'Usage', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
     await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
     await expect(page.getByText('75% left', { exact: true })).toBeVisible()
@@ -277,6 +343,7 @@ Then('the account shows the session and weekly windows the provider reports', as
 })
 
 Then('the failed account reports the provider error instead of a quota', async ({ page }: { page: Page }) => {
+  await page.getByRole('tab', { name: 'Usage', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-failed-quota-read-is-shown-as-an-error', async () => {
     await expect(page.getByText('Command Code returned 503 for billing.', { exact: true })).toBeVisible()
     await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toHaveCount(0)
@@ -415,13 +482,16 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
   await page.reload()
   await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'AI Accounts', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-rate-limited-account-is-cooling-down', async () => {
-    await expect(providerAccounts(page).getByRole('button', { name: 'Command Code 1 Rate limited', exact: true })).toBeVisible()
-    await expect(providerAccounts(page).getByRole('button', { name: 'Command Code 2 Authenticated', exact: true })).toBeVisible()
+    await expect(
+      providerAccounts(page).getByRole('list', { name: 'Command Code accounts', exact: true }).getByRole('listitem').filter({ hasText: 'Command Code 1' }),
+    ).toContainText('Rate limited')
+    await expect(providerAccounts(page).getByRole('button', { name: /^Command Code 2 / })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
 When('request distribution is set to Priority', async ({ page }: { page: Page }) => {
+  await page.getByText('Page options · routing and display', { exact: true }).click()
   const distribution = page.getByRole('combobox', { name: 'Request distribution' })
   await distribution.click()
   await page.getByRole('option', { name: /Priority/ }).click()

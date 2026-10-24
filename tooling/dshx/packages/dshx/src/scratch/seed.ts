@@ -309,6 +309,14 @@ const startFakeProvider = async (
 const openFakeProviderAccount = async (input: { readonly state: ScratchState; readonly page: Page; readonly timeoutMs: number }): Promise<string> => {
   const { page, timeoutMs } = input
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
+  const openAccountSettings = async (): Promise<void> => {
+    const settings = page.getByRole('tab', { name: 'Settings', exact: true })
+    // Legacy account editors expose the fields directly; the full-page editor uses tabs and Advanced.
+    if (!(await settings.isVisible())) return
+    await settings.click({ timeout: timeoutMs })
+    const advanced = page.locator('details').filter({ has: page.getByText('Advanced', { exact: true }) })
+    if ((await advanced.getAttribute('open', { timeout: timeoutMs })) === null) await advanced.locator('summary').click({ timeout: timeoutMs })
+  }
   const existing = await readFakeProviderAccount(input.state.home)
   if (existing !== undefined) {
     await accounts
@@ -318,13 +326,15 @@ const openFakeProviderAccount = async (input: { readonly state: ScratchState; re
       .first()
       .click({ timeout: timeoutMs })
     await page.getByRole('heading', { name: existing.displayName, exact: true }).last().waitFor({ state: 'visible', timeout: timeoutMs })
+    await openAccountSettings()
     return existing.displayName
   }
-  await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
+  await page.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
   await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
   const accountHeading = page.getByRole('heading', { name: /^Command Code \d+$/u }).last()
   await accountHeading.waitFor({ state: 'visible', timeout: timeoutMs })
   const accountName = (await accountHeading.innerText()).trim()
+  await openAccountSettings()
   const routeSlug = page.getByRole('textbox', { name: 'Route slug', exact: true }).last()
   await routeSlug.fill(FAKE_PROVIDER_ROUTE_SLUG, { timeout: timeoutMs })
   await routeSlug.blur()
@@ -334,6 +344,8 @@ const openFakeProviderAccount = async (input: { readonly state: ScratchState; re
     .filter({ hasText: `Renamed to ${FAKE_PROVIDER_ROUTE_SLUG}.` })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs })
+  // Renaming remounts the detail pane, resetting its tab and Advanced section.
+  await openAccountSettings()
   return accountName
 }
 
