@@ -17,12 +17,15 @@ export const COMPOSER_WORKSPACE_TEMPLATE = 'if(target.current_working_copy(), na
 
 export const COMPOSER_FILE_TEMPLATE = '"{\\"path\\":" ++ path.display().escape_json() ++ ",\\"status\\":" ++ status.escape_json() ++ "}\\n"'
 
-/** Settings store the base as one string: `parent`, `trunk`, or a local bookmark name. */
+/** Settings store the base as one string: `main`, `parent`, `trunk`, or a local bookmark name. */
+const defaultComposerBase: ComposerBase = { kind: 'bookmark', name: 'main' }
+
 export const composerBaseFromSetting = (value: unknown): ComposerBase => {
   if (value === 'trunk') return { kind: 'trunk' }
-  if (typeof value !== 'string' || value === 'parent' || value.length === 0) return { kind: 'parent' }
+  if (value === 'parent') return { kind: 'parent' }
+  if (typeof value !== 'string' || value.length === 0) return defaultComposerBase
   const bookmark = composerBaseSchema.safeParse({ kind: 'bookmark', name: value })
-  return bookmark.success ? bookmark.data : { kind: 'parent' }
+  return bookmark.success ? bookmark.data : defaultComposerBase
 }
 
 export const composerBaseSetting = (base: ComposerBase): string => (base.kind === 'bookmark' ? base.name : base.kind)
