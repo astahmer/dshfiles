@@ -253,8 +253,10 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
 
   const beginAdd = (): void => {
     if (props.settings.views.length >= MAX_THREAD_VIEWS) return
+    // getRandomValues also works on plain HTTP LAN pages, unlike randomUUID.
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
     setEditingView({
-      id: `custom-${crypto.randomUUID()}`,
+      id: `custom-${id}`,
       name: '',
       enabled: true,
       groupBy: 'status',
