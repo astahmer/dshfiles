@@ -3,6 +3,7 @@ import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { otlpExportTarget, publishLocalOtlpEndpoint } from '@dshfiles/dshx/tracing'
+import { alertsApiHost, startAlerts } from './alerts/alerts-host.js'
 import { tracesApi } from './api.js'
 import { ReceiverDiagnosis } from './diagnosis.js'
 import { OtlpBody } from './otlp/decode.js'
@@ -171,10 +172,12 @@ const setupHost = (context: Context): Effect<void> => {
   applySettings(currentSettings())
   const pruneTimer = setInterval(() => store.prune(retentionOf(currentSettings())), PRUNE_INTERVAL_MS)
   pruneTimer.unref()
+  const stopAlerts = startAlerts({ context, traces: store, path: dshHomePath('plugins', 'traces', 'alerts.db') })
   return {
     async *[Symbol.asyncIterator]() {
       yield async () => {
         clearInterval(pruneTimer)
+        stopAlerts()
         if (runtime === active) {
           runtime = undefined
           withdrawEndpoint()
@@ -189,7 +192,7 @@ const setupHost = (context: Context): Effect<void> => {
 
 export default defineHost({
   name: 'traces',
-  apis: [api],
+  apis: [api, alertsApiHost],
   settings: [ownedSettings],
   setup: setupHost,
 })

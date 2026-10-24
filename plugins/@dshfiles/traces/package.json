@@ -45,6 +45,7 @@
     "@deepseek-ai/dsh-home-paths": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/thread-sidebar": "workspace:*",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/api-logs": "0.222.0",
     "@opentelemetry/otlp-transformer": "0.222.0",

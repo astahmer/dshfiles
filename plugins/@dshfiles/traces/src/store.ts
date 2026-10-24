@@ -150,6 +150,31 @@ export type LogSearchQuery = {
   readonly limit?: number | undefined
 }
 
+/** Spans that ended after a time, narrowed like an alert rule or a board: service, span name (a trailing * is a prefix), one attribute. */
+export type SpanSampleQuery = {
+  readonly endedAfterMs: number
+  readonly service: string | null
+  readonly operation: string | null
+  readonly attribute: { readonly key: string; readonly value: string } | null
+  readonly groupAttribute?: string | undefined
+  readonly measureAttribute?: string | undefined
+  readonly limit: number
+}
+
+export type SpanSample = {
+  readonly traceId: string
+  readonly name: string
+  readonly service: string
+  readonly durationMs: number
+  readonly error: boolean
+  readonly sessionId: string | null
+  readonly group: string | null
+  readonly measure: number | null
+}
+
+/** Spans longer than this are not looked for: it bounds the start-time index scan of an end-time window. */
+const SAMPLE_LOOKBACK_US = 6 * 3_600_000_000
+
 export class TraceStoreError extends Error {
   constructor(
     readonly code: 'invalid-cursor' | 'not-found',
@@ -927,6 +952,65 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
+  const spanSamples = (query: SpanSampleQuery): { readonly samples: SpanSample[]; readonly truncated: boolean } => {
+    const sinceUs = Math.round(query.endedAfterMs * 1000)
+    const conditions = ['s.start_us >= ?', 's.end_us >= ?']
+    const parameters: SQLInputValue[] = [sinceUs - SAMPLE_LOOKBACK_US, sinceUs]
+    if (query.service !== null) {
+      conditions.push('s.service = ?')
+      parameters.push(query.service)
+    }
+    if (query.operation !== null) {
+      const prefix = query.operation.endsWith('*') ? query.operation.slice(0, -1) : null
+      conditions.push(prefix === null ? 's.name = ?' : "s.name LIKE ? ESCAPE '\\'")
+      parameters.push(prefix === null ? query.operation : `${escapeLike(prefix)}%`)
+    }
+    if (query.attribute !== null) {
+      conditions.push(query.attribute.value === '*' ? 'json_extract(s.attributes, ?) IS NOT NULL' : 'CAST(json_extract(s.attributes, ?) AS TEXT) = ?')
+      parameters.push(`$."${query.attribute.key}"`)
+      if (query.attribute.value !== '*') parameters.push(query.attribute.value)
+    }
+    const group = query.groupAttribute === undefined ? 'NULL' : 'CAST(json_extract(s.attributes, ?) AS TEXT)'
+    const measure = query.measureAttribute === undefined ? 'NULL' : 'json_extract(s.attributes, ?)'
+    const selectParameters = [
+      ...(query.groupAttribute === undefined ? [] : [`$."${query.groupAttribute}"`]),
+      ...(query.measureAttribute === undefined ? [] : [`$."${query.measureAttribute}"`]),
+    ]
+    const rows = z
+      .array(
+        z.object({
+          trace_id: z.string(),
+          name: z.string(),
+          service: z.string(),
+          duration_us: z.number(),
+          status_code: z.number(),
+          session_id: z.string().nullable(),
+          group_value: z.string().nullable(),
+          measure_value: z.unknown(),
+        }),
+      )
+      .parse(
+        prepare(
+          `SELECT s.trace_id, s.name, s.service, s.end_us - s.start_us AS duration_us, s.status_code, COALESCE(s.session_id, t.session_id) AS session_id,
+             ${group} AS group_value, ${measure} AS measure_value
+           FROM spans s LEFT JOIN traces t ON t.trace_id = s.trace_id WHERE ${conditions.join(' AND ')} ORDER BY s.end_us DESC LIMIT ?`,
+        ).all(...selectParameters, ...parameters, query.limit + 1),
+      )
+    return {
+      truncated: rows.length > query.limit,
+      samples: rows.slice(0, query.limit).map(row => ({
+        traceId: row.trace_id,
+        name: row.name,
+        service: row.service,
+        durationMs: usToMs(row.duration_us),
+        error: row.status_code === 2,
+        sessionId: row.session_id,
+        group: row.group_value,
+        measure: typeof row.measure_value === 'number' ? row.measure_value : null,
+      })),
+    }
+  }
+
   const summary = (): StoreSummary => {
     const row = z
       .object({ traces: z.number(), oldest: z.number().nullable(), newest: z.number().nullable() })
@@ -962,6 +1046,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     errorGroups,
     serviceMap,
     sessionSummary,
+    spanSamples,
     summary,
     clear,
     close: () => database.close(),

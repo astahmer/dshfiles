@@ -1,3 +1,4 @@
+import { isRoutineAlertEvaluation } from '../alerts/alert-engine.js'
 import type { AttributeValue } from '../types.js'
 import type {
   OtlpAnyValue,
@@ -43,6 +44,7 @@ const isContentAttribute = (key: string): boolean => CONTENT_ATTRIBUTE_KEYS.has(
 
 /** The traces API's own dispatch spans: storing them would make every panel poll a trace of itself. */
 export const SELF_API_ID = 'traces'
+const SELF_API_IDS = new Set([SELF_API_ID, 'traces-alerts'])
 
 export type NormalizedEvent = {
   readonly name: string
@@ -237,7 +239,8 @@ const normalizeTraceRequest = (request: OtlpTraceRequest, options: NormalizeOpti
           rejected += 1
           continue
         }
-        if (normalized.attributes['dshx.api.id'] === SELF_API_ID) {
+        const apiId = normalized.attributes['dshx.api.id']
+        if ((typeof apiId === 'string' && SELF_API_IDS.has(apiId)) || isRoutineAlertEvaluation(normalized)) {
           skippedSelf += 1
           continue
         }
