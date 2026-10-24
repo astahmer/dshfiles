@@ -5,7 +5,7 @@ export const WINDOW_OPTIONS = [15, 60, 1_440, 10_080] as const
 
 export const tracesViewSchema = z
   .object({
-    tab: z.enum(['traces', 'logs', 'map', 'metrics', 'operations', 'errors']).catch('traces'),
+    tab: z.enum(['traces', 'logs', 'map', 'metrics', 'operations', 'errors', 'alerts', 'boards']).catch('traces'),
     search: z.string().max(200).catch(''),
     service: z.string().max(256).nullable().catch(null),
     operation: z.string().max(256).nullable().catch(null),

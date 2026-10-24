@@ -24,6 +24,9 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ArrowLeftIcon, RefreshCwIcon, ScrollTextIcon, SearchIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
+import { FiringAlertsBanner, FiringAlertsCount } from './alerts/alert-badges.js'
+import type { TracesAlertsTranslate } from './alerts/alerts-locale.js'
+import { AlertsView, useFiringCount } from './alerts/alerts-view.js'
 import { tracesApi, type ListInput } from './api.js'
 import { ErrorGroups, OperationsTable, ServiceStrip } from './insights.js'
 import type { TracesTranslate } from './locales.js'
@@ -46,9 +49,11 @@ export const TracesPanel = (props: {
   readonly workspaces: IWorkspaces
   readonly uiWorkspace: UiWorkspace
   readonly t: TracesTranslate
+  readonly tAlerts: TracesAlertsTranslate
 }): JSX.Element => {
   const t = props.t
   const client = useApi(tracesApi)
+  const firing = useFiringCount()
   const queryClient = useQueryClient()
   const view = storedTracesView.useValue()
   const [traceId, setTraceId] = useState<string | null>(null)
@@ -159,6 +164,8 @@ export const TracesPanel = (props: {
         <ServiceStrip stats={statsQuery.data} onPick={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
       )}
 
+      <FiringAlertsBanner firing={view.tab === 'alerts' ? null : firing} onShow={() => update({ tab: 'alerts' })} t={props.tAlerts} />
+
       <Tabs value={view.tab} onValueChange={value => update({ tab: tracesViewSchema.shape.tab.parse(value) })} className="dshx:min-h-0 dshx:flex-1">
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
           <TabsList className="dshx:max-w-full dshx:justify-start dshx:overflow-x-auto">
@@ -168,8 +175,11 @@ export const TracesPanel = (props: {
             <TabsTrigger value="metrics">{t('tabMetrics')}</TabsTrigger>
             <TabsTrigger value="operations">{t('tabOperations')}</TabsTrigger>
             <TabsTrigger value="errors">{t('tabErrors')}</TabsTrigger>
+            <TabsTrigger value="alerts">
+              {props.tAlerts('tabAlerts')} <FiringAlertsCount firing={firing} />
+            </TabsTrigger>
           </TabsList>
-          {view.tab === 'traces' || view.tab === 'logs' ? null : (
+          {view.tab === 'traces' || view.tab === 'logs' || view.tab === 'alerts' ? null : (
             <Select value={String(view.windowMinutes)} onValueChange={value => update({ windowMinutes: Number(value) })}>
               <SelectTrigger size="sm" aria-label={t('window')} className="dshx:w-32">
                 <SelectValue />
@@ -333,6 +343,12 @@ export const TracesPanel = (props: {
           {errorsQuery.data === undefined ? null : (
             <ErrorGroups groups={errorsQuery.data.groups} onOpenTrace={sampleTraceId => update({ traceId: sampleTraceId, tab: 'traces' })} t={t} />
           )}
+        </TabsContent>
+
+        <TabsContent value="alerts">
+          {view.tab === 'alerts' ? (
+            <AlertsView onOpenTrace={openedTraceId => update({ traceId: openedTraceId, tab: 'traces' })} onOpenThread={openThread} t={props.tAlerts} />
+          ) : null}
         </TabsContent>
       </Tabs>
     </main>
