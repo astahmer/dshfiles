@@ -5,7 +5,7 @@
     {
       "id": "usage-index",
       "title": "Incremental request and tool index from session logs",
-      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations/outcomes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
+      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Reads only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
       "surfaces": ["host", "storage", "integration"],
       "configuration": [],
       "states": ["empty", "first-index", "incremental", "torn-frame", "unpriced-route", "catalog-refreshed"],
@@ -14,7 +14,8 @@
         "A stored fold state that no longer decodes restarts that log from its first byte; rows upsert by event sequence, so nothing doubles.",
         "Without the AI Accounts price cache every cost reads as unknown (–) and the request still counts.",
         "Title generation keeps no usage in the log: its tokens come only from the live llm/stream observer, so titles generated while the plugin was not loaded show –.",
-        "Memory-digest calls are not stored as session-log requests; they are counted only while the live observer is loaded."
+        "Memory-digest calls are not stored as session-log requests; they are counted only while the live observer is loaded.",
+        "A fold-version bump re-reads every session log once so tool rows gain returned-text sizes; until that pass finishes, older rows stay unmeasured."
       ],
       "externalDependencies": [
         {
@@ -147,24 +148,34 @@
     {
       "id": "usage-charts",
       "title": "Usage charts",
-      "summary": "Headline tiles with a previous-period comparison, cost over time stacked by model, provider or project, cost per model, provider and project (selecting one filters the request log), tokens split into input, cache read, cache write and output, cache hit ratio, requests and failures, TTFT and duration percentiles, and the top threads by cost, grouped hourly or daily.",
-      "reach": ["click button \"Usage analytics\"", "click tab \"Charts\"", "expect text \"Cost over time\""],
+      "summary": "Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), cost over time stacked by model, provider, project or purpose, cost per model, provider and project (selecting one filters the log), tokens split into input, cache read, cache write and output, cache hit ratio, requests and failures, TTFT and duration percentiles, and the top threads by cost, grouped hourly or daily. Grouping by purpose answers where tokens went: agent, subagent, compaction, title, memory summary or another side call. Cache savings are the difference between the input rate and the cache-read rate on cached prompt tokens, per list price.",
+      "reach": ["click button \"Usage analytics\"", "click tab \"Charts\"", "expect text \"Cost over time\"", "expect text \"Cache savings (estimate)\""],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["empty", "hourly", "daily", "custom-range", "grouped"],
-      "failureModes": ["Series beyond the five most expensive fold into Other so the legend stays readable."],
+      "states": ["empty", "hourly", "daily", "custom-range", "grouped", "grouped-by-purpose", "unpriced-route"],
+      "failureModes": [
+        "Series beyond the five most expensive fold into Other so the legend stays readable.",
+        "Cache savings and cost are list-price estimates from the models.dev catalog; an unpriced route contributes no savings and is counted in the unpriced tally.",
+        "A request without a turn (titles and some side calls) does not add a turn, so cost per turn is an average over requests that carry one."
+      ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
           "id": "usage.charts-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.cost-savings-turns",
+          "file": "plugins/@dshfiles/usage/src/cost.test.ts",
+          "testName": "reports cache savings and a turn count beside the list-price cost"
         }
       ],
       "telemetry": [
         {
-          "kind": "not-applicable",
-          "reason": "Client-only: Usage charts renders browser state and starts no Host work of its own."
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     },
@@ -241,22 +252,25 @@
     },
     {
       "id": "usage-activity-report",
-      "title": "Tool and Jev activity report",
-      "summary": "Local tool-use counts by Skill, Plugin API, Plugin, MCP, DSH and other sources, with per-tool/plugin counts, error/interruption outcomes, latency statistics, and top-10 normalized command and test-runner wall-clock distributions; plus Jev request outcomes, durations and tokens per calling plugin (read from the same jev_requests rows as the Jev usage card) over the selected date range. Only bounded executable/subcommand and test-runner identifiers are stored. Raw command arguments, paths, outputs, prompts, credentials, raw errors and test case names are not stored.",
+      "title": "Tool and skill analytics",
+      "summary": "Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles for calls, success rate, interruptions, wall time, returned tokens and the busiest category, plus the per-tool table with outcomes, latency and returned tokens, the top normalized command and test-runner wall-clock distributions, Jev request totals per calling plugin, and recent tool/Jev events. Returned tokens are a characters / 4 estimate of tool result text: only the text length is stored, never the text, and rows indexed before this measurement show as unmeasured. Grouping by category covers skills, plugin API, plugin, MCP, DSH and other tools. Command arguments, paths, outputs, prompts and secrets are never stored; compound or ambiguous shell commands are omitted.",
       "reach": [
         "click button \"Usage analytics\"",
         "click tab \"Tools & Jev\"",
-        "expect heading \"Jev requests\"",
-        "expect heading \"Tool executions\"",
-        "expect heading \"Time by command\"",
-        "expect heading \"Time by test runner\""
+        "expect text \"Tool calls over time\"",
+        "expect text \"Most-used tools\"",
+        "expect text \"Output by category\"",
+        "expect text \"Every tool\""
       ],
       "surfaces": ["client", "storage", "integration"],
       "configuration": [],
-      "states": ["empty", "loading", "populated", "filtered-range"],
+      "states": ["empty", "loading", "populated", "filtered-range", "measured-output", "unmeasured-output", "hourly-timeline", "daily-timeline"],
       "failureModes": [
         "Tool records with no result remain unknown or interrupted, not assumed successful.",
-        "Jev figures cover only calls Backlog and Memory record through recordJevUsage; calls made while Usage analytics is not loaded are not counted."
+        "A tool result with no text (an image, or a record written before returned tokens were measured) keeps the call but adds no tokens; the row shows the measured share.",
+        "An hourly timeline request over more than two days coarsens to daily buckets so the response stays bounded.",
+        "Jev figures cover only calls Backlog and Memory record through recordJevUsage; calls made while Usage analytics is not loaded are not counted.",
+        "Returned tokens are estimated from text characters, not provider-reported usage, so they approximate context cost rather than billing."
       ],
       "externalDependencies": [],
       "verification": [
@@ -279,6 +293,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "usage.tool-output-tokens",
+          "file": "plugins/@dshfiles/usage/src/activity.test.ts",
+          "testName": "reports returned text as token estimates per tool, category and bucket"
+        },
+        {
+          "kind": "unit-test",
           "id": "usage.activity-report-store",
           "file": "plugins/@dshfiles/usage/src/activity.test.ts",
           "testName": "reports tool executions and Jev outcomes without storing sensitive payloads"
@@ -286,8 +306,14 @@
       ],
       "telemetry": [
         {
-          "kind": "not-applicable",
-          "reason": "Client-only: Tool and Jev activity report renders browser state and starts no Host work of its own."
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "usage index",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "records a usage index span with the files and rows of one pass"
         }
       ]
     },
