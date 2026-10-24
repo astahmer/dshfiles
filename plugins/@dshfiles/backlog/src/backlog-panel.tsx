@@ -24,6 +24,7 @@ import {
   XIcon,
   InboxIcon,
   KanbanIcon,
+  LoaderCircleIcon,
   ListFilterIcon,
   MessagesSquareIcon,
   PlusIcon,
@@ -33,7 +34,7 @@ import {
   WandSparklesIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
@@ -61,7 +62,7 @@ import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
 import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
-import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { BACKLOG_TRIAGE_MUTATION_KEY, BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
 type OpenThread = (sessionId: string) => void
@@ -401,10 +402,12 @@ export const BacklogPanel = (props: {
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
+  const triagePending = useIsMutating({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY }) > 0
   const [backfillJob, setBackfillJob] = useState<BacklogBackfillResult | null>(null)
   const [backfillError, setBackfillError] = useState<string | null>(null)
   const backfillJobId = backfillJob?.jobId
   const backfillJobState = backfillJob?.state
+  const aiWorking = triagePending || backfillJobState === 'queued' || backfillJobState === 'running'
   useEffect(() => {
     if (backfillJobId === undefined || backfillJobId === null || backfillJobState === 'completed' || backfillJobState === 'failed') return
     let stopped = false
@@ -808,6 +811,17 @@ export const BacklogPanel = (props: {
           </button>
           {showSettings ? null : (
             <>
+              <span
+                role={aiWorking ? 'status' : undefined}
+                aria-label={aiWorking ? 'AI is working' : undefined}
+                aria-hidden={aiWorking ? undefined : true}
+                className={cn(
+                  'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground dshx:transition-opacity',
+                  aiWorking ? 'dshx:opacity-70' : 'dshx:opacity-0',
+                )}
+              >
+                <LoaderCircleIcon aria-hidden className={cn('dshx:size-3.5', aiWorking && 'dshx:animate-spin')} />
+              </span>
               <button
                 type="button"
                 aria-label="Backfill triage"
