@@ -147,9 +147,10 @@ Work lands on `main`; never `jj git push` without asking.
   workspace created by `@dshfiles/jj-integration` (see its
   [README](plugins/@dshfiles/jj-integration/README.md); **Rebase** moves it
   onto `main`).
-- One described revision per logical change: Conventional Commit title, a body
-  that says why, and the `Co-Authored-By` trailer. `jj describe -m …`, then
-  `jj new` before the next change.
+- One described revision per logical change: Conventional Commit title and a
+  body that says why. Do not add `Co-Authored-By` trailers or local DSH agent
+  handles to commit metadata; they are not GitHub collaborators. `jj describe
+  -m …`, then `jj new` before the next change.
 - Never rewrite a revision another workspace holds as its `@` (describe,
   squash, rebase, abandon): it leaves a divergent copy of the change. Touch
   only revisions you created, and not ones another workspace is built on:
