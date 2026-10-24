@@ -1019,10 +1019,12 @@ const PeekBody = (props: {
               className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-xl dshx:border dshx:border-info/30 dshx:bg-info/5 dshx:p-3"
             >
               {running.map(thread => (
-                <div key={thread.id} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                  <span aria-hidden className="dshx:size-1.5 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
-                  <span className="dshx:text-muted-foreground">Running in</span>
-                  <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{thread.title}</span>
+                <div key={thread.id} className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-xs">
+                  <span aria-hidden className="dshx:mt-1 dshx:size-1.5 dshx:shrink-0 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+                  <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+                    <span className="dshx:text-muted-foreground">Running in</span>
+                    <span className="dshx:truncate dshx:font-medium">{thread.title}</span>
+                  </span>
                   <Button size="xs" variant="ghost" className="dshx:ml-auto" onClick={() => props.openThread(thread.id)}>
                     Open thread
                   </Button>
