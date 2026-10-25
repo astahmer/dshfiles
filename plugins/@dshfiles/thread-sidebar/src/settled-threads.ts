@@ -93,8 +93,17 @@ const dueArchiveSessionIds = (input: {
   return due
 }
 
+const unpinSettledThreads = async (input: {
+  readonly sessionIds: readonly string[]
+  readonly pinnedSessionIds: ReadonlySet<string>
+  readonly unpin: (sessionId: string) => Promise<void>
+}): Promise<void> => {
+  await Promise.all(input.sessionIds.filter(sessionId => input.pinnedSessionIds.has(sessionId)).map(input.unpin))
+}
+
 export class SettledThreadsModel {
   static readonly settle = settle
+  static readonly unpinSettledThreads = unpinSettledThreads
   static readonly settleAndUnpark = settleAndUnpark
   static readonly unsettle = unsettle
   static readonly archiveTime = archiveTime

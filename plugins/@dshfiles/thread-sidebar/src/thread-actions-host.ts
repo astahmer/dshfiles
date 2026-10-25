@@ -11,6 +11,7 @@ import { continuationApi } from '@dshfiles/session-controller/continuation-api'
 import { createThreadActions, type ThreadActionDeps } from './thread-actions.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { setSessionSettled, settledSessionIdsFromHost } from './settings.js'
+import { SettledThreadsModel } from './settled-threads.js'
 
 let hostContext: Context | undefined
 
@@ -70,7 +71,19 @@ const dependencies: ThreadActionDeps = {
   archivedSessionIds: () => [...requireContext().workspaceRegistry.archivedSessionIds],
   pinnedSessionIds: () => [...requireContext().workspaceRegistry.pinnedSessionIds],
   settledSessionIds: () => settledSessionIdsFromHost(),
-  setSettled: (sessionId, settled) => setSessionSettled(sessionId, settled),
+  setSettled: async (sessionId, settled) => {
+    const ctx = requireContext()
+    if (settled) {
+      await SettledThreadsModel.unpinSettledThreads({
+        sessionIds: [sessionId],
+        pinnedSessionIds: new Set(ctx.workspaceRegistry.pinnedSessionIds),
+        unpin: async targetId => {
+          await ctx.workspaceController.unpinSession({ sessionId: SessionId(targetId) })
+        },
+      })
+    }
+    return setSessionSettled(sessionId, settled)
+  },
   archive: async (sessionId, stopActivity) => {
     const value = await requireContext().workspaceController.archiveSession({ sessionId: SessionId(sessionId), stopActivity })
     return value.archivedSessionIds

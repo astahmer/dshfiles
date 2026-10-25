@@ -159,7 +159,7 @@ import {
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
-import { SettledThreadsModel, type SettledPreferences, type SettledSessionState } from './settled-threads.js'
+import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
 import { answerSettleRequests } from './settle-request.js'
 import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.js'
 import { useAutoArchive, type AutoArchiveClient } from './auto-archive-machine.js'
@@ -1438,7 +1438,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const continued = await props.continueInProject(sessionId, projectId)
       // The Host settle is what blocks further steps; a sidebar on browser-local preferences keeps its own copy, so it
       // settles the original itself, and never the continuation that is now its child thread.
-      changePreferences(settlePreferences([sessionId]))
+      settleThreads([sessionId])
       setNotice(
         continued.settled
           ? { tone: 'success', message: props.tSidebar('threadSidebarContinuedIn') }
@@ -2336,14 +2336,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
 
-  /** Settling also clears the parked mark, so one write carries both fields. */
-  const settlePreferences = (sessionIds: readonly string[]): SettledPreferences =>
-    SettledThreadsModel.settleAndUnpark({
-      status: { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt },
-      parkedSessionIds: preferences.parkedSessionIds,
+  /** Settling also clears parked state and unpins threads, so a settled thread leaves the Pinned section. */
+  const settleThreads = (sessionIds: readonly string[]): void => {
+    changePreferences(
+      SettledThreadsModel.settleAndUnpark({
+        status: { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt },
+        parkedSessionIds: preferences.parkedSessionIds,
+        sessionIds,
+        now: Date.now(),
+      }),
+    )
+    void SettledThreadsModel.unpinSettledThreads({
       sessionIds,
-      now: Date.now(),
-    })
+      pinnedSessionIds,
+      unpin: sessionId => props.unpinSession(SessionId(sessionId)),
+    }).catch(() => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }))
+  }
 
   const batchSetSettled = (settle: boolean): void => {
     const targetIds = batchTargetIds()
@@ -2364,7 +2372,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
       return
     }
-    changePreferences(settlePreferences(unsettledTargets))
+    settleThreads(unsettledTargets)
     setNotice({ tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') })
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
@@ -2523,7 +2531,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   /** One Settings write per scan rather than one per thread; the status is ours, not a Host verb. */
   const settleSessions = (sessionIds: readonly string[]): void => {
     if (sessionIds.length === 0) return
-    changePreferences(settlePreferences(sessionIds))
+    settleThreads(sessionIds)
   }
 
   const applySettled = (sessionId: SessionSummary['id'], shouldSettle: boolean): void => {
@@ -2537,7 +2545,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       cascadeToChildren: preferences.applyActionsToChildThreads,
     })
     const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
-    changePreferences(shouldSettle ? settlePreferences(targets) : SettledThreadsModel.unsettle(status, targets))
+    if (shouldSettle) settleThreads(targets)
+    else changePreferences(SettledThreadsModel.unsettle(status, targets))
     setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
   }
 

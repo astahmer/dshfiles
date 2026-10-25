@@ -52,6 +52,20 @@ describe('SettledThreadsModel.settleAndUnpark', () => {
   })
 })
 
+describe('SettledThreadsModel.unpinSettledThreads', () => {
+  it('unpins only settled threads that are currently pinned', async () => {
+    const unpinned: string[] = []
+    await SettledThreadsModel.unpinSettledThreads({
+      sessionIds: ['session-a', 'session-b'],
+      pinnedSessionIds: new Set(['session-a', 'session-c']),
+      unpin: async sessionId => {
+        unpinned.push(sessionId)
+      },
+    })
+    expect(unpinned).toEqual(['session-a'])
+  })
+})
+
 describe('SettledThreadsModel.archiveTime', () => {
   it('adds the delay to the settle instant and stays undefined without either', () => {
     expect(SettledThreadsModel.archiveTime({ settledAt: 1_000, delayMs: 60_000 })).toBe(61_000)
