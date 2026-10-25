@@ -84,6 +84,12 @@
           "source": "api-dispatch"
         },
         {
+          "kind": "custom",
+          "span": "worktree-memory list sessions",
+          "file": "plugins/@dshfiles/worktree-memory/src/session-metadata-cache.test.ts",
+          "testName": "returns the current value without waiting and coalesces a refresh"
+        },
+        {
           "kind": "automatic",
           "source": "agent-tool"
         }

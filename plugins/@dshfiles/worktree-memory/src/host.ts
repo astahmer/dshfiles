@@ -12,6 +12,7 @@ import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { worktreeMemoryApi } from './api.js'
 import { ProcessTable, type KnownSession, type ProcessRow } from './process-table.js'
+import { createSessionMetadataCache, type SessionMetadataCache } from './session-metadata-cache.js'
 import { emptyCategoryBytes, type MemoryPressure, type MemorySnapshot, type ProcessTree, type StopResult, type StopTarget } from './types.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
 
@@ -36,6 +37,7 @@ interface Probe {
 interface MemoryRuntime {
   readonly context: Context
   readonly jobs: Map<string, JobView>
+  readonly sessionMetadata: SessionMetadataCache
   registry: JobRegistry | null
   cached: { readonly at: number; readonly probe: Promise<Probe> } | null
 }
@@ -132,11 +134,12 @@ const readPressure = async (context: Context): Promise<MemoryPressure> => {
 const listedTitleSchema = z.string().min(1)
 const listedCreationSchema = z.object({ createdAt: z.number().optional() })
 
-const readSessions = async (context: Context): Promise<KnownSession[]> => {
+const readSessions = async (context: Context): Promise<readonly KnownSession[] | undefined> => {
   const controller = context.get('sessionController')
-  if (controller === undefined) return []
+  if (controller === undefined) return undefined
   const listed = await controller.list({}, AbortSignal.timeout(SESSIONS_TIMEOUT_MS)).catch(() => undefined)
-  return (listed?.items ?? []).map(summary => ({
+  if (listed === undefined) return undefined
+  return listed.items.map(summary => ({
     sessionId: summary.sessionId,
     cwd: summary.cwd ?? null,
     createdAt: listedCreationSchema.safeParse(summary).data?.createdAt ?? null,
@@ -147,11 +150,12 @@ const readSessions = async (context: Context): Promise<KnownSession[]> => {
   }))
 }
 
-const probe = async (active: MemoryRuntime): Promise<Probe> => {
+const probe = async (active: MemoryRuntime, includeSessions: boolean): Promise<Probe> => {
   const now = Date.now()
   if (process.platform !== 'darwin' && process.platform !== 'linux') return { snapshot: unsupported(now), rows: [] }
   const context = active.context
-  const [rows, pressure, sessions] = await Promise.all([readProcessTable(context), readPressure(context), readSessions(context)])
+  const sessions = includeSessions ? active.sessionMetadata.read(() => readSessions(context)) : []
+  const [rows, pressure] = await Promise.all([readProcessTable(context), readPressure(context)])
   const candidates = ProcessTable.candidates({ rows, hostPid: process.pid })
   const cwds = await readCwds(context, [...candidates.hostChildren, ...candidates.orphans])
   const registry = context.get('workspaceRegistry')
@@ -175,10 +179,10 @@ const probe = async (active: MemoryRuntime): Promise<Probe> => {
 }
 
 /** One probe serves every caller within the TTL, so a polling panel in several tabs costs one `ps`. */
-const currentProbe = (active: MemoryRuntime, fresh: boolean): Promise<Probe> => {
+const currentProbe = (active: MemoryRuntime, fresh: boolean, includeSessions = true): Promise<Probe> => {
   const now = Date.now()
   if (!fresh && active.cached !== null && now - active.cached.at < SNAPSHOT_TTL_MS) return active.cached.probe
-  const next = probe(active)
+  const next = probe(active, includeSessions)
   active.cached = { at: now, probe: next }
   next.catch(() => {
     if (active.cached?.probe === next) active.cached = null
@@ -196,7 +200,7 @@ const signal = (pid: number, name: NodeJS.Signals): boolean => {
 }
 
 const stop = async (active: MemoryRuntime, targets: readonly StopTarget[]): Promise<StopResult> => {
-  const { snapshot, rows } = await currentProbe(active, true)
+  const { snapshot, rows } = await currentProbe(active, true, false)
   const trees = new Map<number, ProcessTree>(snapshot.groups.flatMap(group => group.trees.map(tree => [tree.pid, tree] as const)))
   const byPid = new Map(rows.map(row => [row.pid, row]))
   const result = { stopped: 0, viaJob: 0, missing: 0, refused: 0 }
@@ -253,7 +257,13 @@ const applyJobEvent = (jobs: Map<string, JobView>, event: JobEvent): void => {
 }
 
 const setupHost = (context: Context): Effect<void> => {
-  const active: MemoryRuntime = { context, jobs: new Map(), registry: null, cached: null }
+  const active: MemoryRuntime = {
+    context,
+    jobs: new Map(),
+    sessionMetadata: createSessionMetadataCache(),
+    registry: null,
+    cached: null,
+  }
   runtime = active
   context.inject(['jobs'], scoped => {
     const registry = scoped.get('jobs')

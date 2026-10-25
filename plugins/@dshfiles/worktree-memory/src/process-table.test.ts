@@ -72,6 +72,23 @@ describe('ProcessTable', () => {
     expect(snapshot.categoryBytes.tests).toBe(504_000 * 1024)
   })
 
+  it('keeps process stop identities when session metadata is unavailable', () => {
+    const input = baseInput({
+      rows: [row(HOST, 1, 1, 'dsh'), row(650, HOST, 2_000, 'bash -c pnpm lint')],
+      cwds: new Map([[650, '/dev/app']]),
+      jobs: [{ id: 'bash-1', label: 'pnpm lint', owner: 'session-a', startedAt: T0 + 500 }],
+      sessions: [{ sessionId: 'session-a', cwd: '/dev/app', running: true, updatedAt: T0, title: 'Lint pass' }],
+    })
+    const withSessionMetadata = ProcessTable.snapshot(input)
+    const withoutSessionMetadata = ProcessTable.snapshot({ ...input, sessions: [] })
+    const stopIdentities = (snapshot: typeof withSessionMetadata) =>
+      snapshot.groups.flatMap(group =>
+        group.trees.map(({ pid, startedAt, jobId, sessionId }) => ({ pid, startedAt, jobId, sessionId })),
+      )
+
+    expect(stopIdentities(withoutSessionMetadata)).toEqual(stopIdentities(withSessionMetadata))
+  })
+
   it('marks a job tree whose thread finished its turn as safe for a bulk stop', () => {
     const snapshot = ProcessTable.snapshot(
       baseInput({
