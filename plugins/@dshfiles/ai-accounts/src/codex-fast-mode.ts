@@ -130,7 +130,7 @@ export class FastModeService {
         const transformed = options?.onPayload === undefined ? payload : ((await options.onPayload(payload, payloadModel)) ?? payload)
         const body = fastModeRequestBodySchema.safeParse(transformed)
         if (!body.success) throw new Error('ai-accounts: Fast mode request payload must be a JSON object.')
-        return { ...body.data, service_tier: 'fast' }
+        return { ...body.data, service_tier: 'priority' }
       },
       onProviderStreamEvent: async (event, eventModel) => {
         await options?.onProviderStreamEvent?.(event, eventModel)

@@ -119,9 +119,9 @@ describe('Codex Fast mode', () => {
     expect(fastMode.status({ ...route, sessionId: 'session-a' })).toEqual({ available: true, enabled: false })
   })
 
-  it('adds service_tier fast to the actual Codex request only while enabled', async () => {
+  it('uses the legacy priority tier on Codex requests only while Fast mode is enabled', async () => {
     const fast = await runRequest({ enabled: true })
-    expect(fast.body).toMatchObject({ service_tier: 'fast' })
+    expect(fast.body).toMatchObject({ service_tier: 'priority' })
     expect(fast.payloadCallbackCalls).toBe(1)
 
     const defaultTier = await runRequest({ enabled: false })

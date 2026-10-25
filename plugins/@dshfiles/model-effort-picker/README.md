@@ -12,7 +12,7 @@ When another provider route offers the selected model — a second Codex or Clau
 
 ## Fast mode
 
-The picker shows a Fast mode switch only for explicitly supported AI Accounts Codex models. AI Accounts stores the selection per Session in Host memory and uses pi-ai's supported request-payload hook to send `service_tier: "fast"`; native DSH provider routes and unsupported models are unchanged. Fast mode resets when the Host restarts and may cost more ([OpenAI Fast mode](https://developers.openai.com/api/docs/guides/fast-mode.md)).
+The picker shows a Fast mode switch only for explicitly supported AI Accounts Codex models. AI Accounts stores the selection per Session in Host memory and uses pi-ai's supported request-payload hook to send `service_tier: "priority"`, the legacy alias accepted by the Codex backend; native DSH provider routes and unsupported models are unchanged. Fast mode resets when the Host restarts and may cost more ([OpenAI Fast mode](https://developers.openai.com/api/docs/guides/fast-mode.md)).
 
 ## Development
 
