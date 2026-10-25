@@ -11,6 +11,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type CleanupKindView, type CleanupResult } from '@dshfiles/jj-integration/api'
 import { useState } from 'react'
 import { CleanupJobTrailModel, cleanupJobsKey, requestWorkspaceCleanup, useCleanupJobs } from './cleanup-jobs-queries.js'
+import { cleanupPreviewLoadingLabel } from './workspace-cleanup-preview.js'
 import { WorkspaceCleanupSummary } from './workspace-cleanup-summary.js'
 
 const AGE_CHOICES = [
@@ -90,6 +91,7 @@ export const WorkspaceCleanupDialog = (props: {
   const toggleKind = (kind: CleanupKindView, checked: boolean): void =>
     setKinds(current => (checked ? [...new Set([...current, kind])] : current.filter(existing => existing !== kind)))
   const shown = olderThanHours === undefined ? undefined : preview.data
+  const previewLoadingLabel = cleanupPreviewLoadingLabel({ isFetching: preview.isFetching, hasData: shown !== undefined })
   const candidates = shown === undefined ? [] : cleanupRows(shown)
   const removable = shown === undefined ? 0 : shown.workspaces.length + shown.untracked.length
   const emptyRevisionCount = shown?.emptyRevisions.length ?? 0
@@ -168,11 +170,17 @@ export const WorkspaceCleanupDialog = (props: {
                 </Tooltip>
               ))}
             </div>
+            {previewLoadingLabel === undefined ? null : (
+              <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground" role="status">
+                <Spinner aria-hidden="true" className="dshx:size-3" />
+                {previewLoadingLabel}
+              </p>
+            )}
             <div
+              aria-busy={preview.isFetching}
               aria-live="polite"
               className="dshx:flex dshx:max-h-60 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2"
             >
-              {preview.isFetching && shown === undefined && <Spinner className="dshx:size-3" />}
               {preview.isError && <p className="dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>}
               {shown !== undefined && candidates.length === 0 && <p className="dshx:text-muted-foreground">No workspace qualifies.</p>}
               {candidates.map(row => (
