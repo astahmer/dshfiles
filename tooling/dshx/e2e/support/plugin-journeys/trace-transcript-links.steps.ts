@@ -41,11 +41,15 @@ When('a new thread asks the fake model to run a bash command', async ({ page }: 
 
 When("the turn footer's Trace button is clicked", async ({ page }: { page: Page }) => {
   const footer = page.locator('[data-dshfiles-turn-trace]').last()
-  await recordAssertion(page, 'traces-turn-footer-trace-button', () =>
-    expect(footer.getByRole('button', { name: /^Open the trace of turn \d+$/ })).toBeVisible(),
-  )
-  turnOf.set(page, Number(await footer.getAttribute('data-dshfiles-turn-trace')))
-  await footer.getByRole('button').click()
+  const turn = Number(await footer.getAttribute('data-dshfiles-turn-trace'))
+  const turnSummary = page.locator(`[data-turn-tail="${String(turn)}"]`)
+  const traceButtons = turnSummary.getByRole('button', { name: `Open the trace of turn ${String(turn)}`, exact: true })
+  await recordAssertion(page, 'traces-turn-footer-trace-button', async () => {
+    await expect(traceButtons).toHaveCount(1)
+    await expect(turnSummary.locator('[data-clock="end"] [data-dshfiles-turn-trace]')).toHaveCount(1)
+  })
+  turnOf.set(page, turn)
+  await traceButtons.click()
 })
 
 Then("the thread Traces tab opens the waterfall of that turn's trace", async ({ page }: { page: Page }) => {

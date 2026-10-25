@@ -2,12 +2,12 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
-import type { ConvViewOwnerProps, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ConvViewOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import type { ChatTurnTailExtras } from '@dshfiles/chat/chat-focus'
+import type { ChatTurnActionExtras } from '@dshfiles/chat/chat-focus'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AlertNotifier } from './alerts/alert-notifier.js'
@@ -91,11 +91,11 @@ export default defineClient({
         )),
       ),
     )
-    // Under each Turn, after the other footer notes: jump to the thread's Traces tab on that turn's trace.
-    ctx.slots.inject('conversation.chat.turnTail', () =>
+    // Join the completed Turn's action row beside copy, branch and usage controls.
+    ctx.slots.inject('conversation.chat.assistant-actions', () =>
       ctx.slots.register(
-        { name: 'conversation.chat.turnTail', id: 'dshfiles-traces-turn-trace', order: 90, locale: TRACES_LOCALE_NAMESPACE },
-        (props: { readonly turn: TurnLocation } & ChatTurnTailExtras) => <TurnTraceButton turn={props.turn.turn} openView={props.openView} t={translate} />,
+        { name: 'conversation.chat.assistant-actions', id: 'dshfiles-traces-turn-trace', order: 90, locale: TRACES_LOCALE_NAMESPACE },
+        (props: ChatTurnActionExtras) => (props.turn === undefined ? null : <TurnTraceButton turn={props.turn.turn} openView={props.openView} t={translate} />),
       ),
     )
     ctx.slots.inject('main', () =>

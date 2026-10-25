@@ -55,7 +55,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
   const messageId = closing.finalNode.messageId
   const assistantActions = messageId === undefined
     ? null
-    : renderSlot('conversation.chat.assistant-actions', { messageId })
+    : renderSlot('conversation.chat.assistant-actions', { messageId, turn, openView })
   return (
     <div
       className={css.root}

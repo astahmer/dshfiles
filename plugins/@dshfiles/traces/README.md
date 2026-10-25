@@ -147,7 +147,7 @@ Replaces session replay: the transcript is the replay, and each side links to th
   opens the thread's Chat scrolled to and outlining what the span belongs to: the nearest span at or above it carrying
   `dsh.turn` names the turn, its `dsh.step` the step and, on a tool span, `gen_ai.tool.call.id` the tool call. A plugin
   span nested under a tool call therefore lands on that tool call; a subagent's span opens the subagent's thread.
-- **Turn → trace.** Every Turn footer (`conversation.chat.turnTail`) gets a **Trace** button that opens the thread's
+- **Turn → trace.** Every completed Turn's action row (`conversation.chat.assistant-actions`) gets a **Trace** button that opens the thread's
   Traces tab on that turn's trace (`traces_search` with `sessionId` and `turn`). A turn exported a moment after it
   ended is retried for 20 s before the tab says no trace was recorded for it.
 
@@ -155,7 +155,7 @@ Both directions use DSH's own Conversation View focus request — every `convers
 `openView(view, focus)` and the `viewRequest` addressed to it — plus the owned Chat fork's
 [`@dshfiles/chat/chat-focus`](../chat/README.md#focus-a-turn-step-or-tool-call-from-another-plugin) contract: the
 focus encoding, the pending request a panel leaves before it opens a thread, and the View opener Chat hands its Turn
-footers. With the stock Chat row the Trace button does not render and Open thread opens the thread unfocused.
+action rows. With the stock Chat row the Trace button does not render and Open thread opens the thread unfocused.
 
 ## List-price cost
 

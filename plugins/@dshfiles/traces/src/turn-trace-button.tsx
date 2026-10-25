@@ -1,16 +1,16 @@
-import type { ChatTurnTailExtras } from '@dshfiles/chat/chat-focus'
+import type { ChatTurnActionExtras } from '@dshfiles/chat/chat-focus'
 import { ActivityIcon } from '@dshfiles/plugin-ui/icons'
 import type { TracesTranslate } from './locales.js'
 import { ThreadLinks } from './thread-links.js'
 
 /**
- * A Turn footer entry (`conversation.chat.turnTail`): opens the thread's Traces tab on this turn's trace through the
- * native View opener the Chat fork hands its Turn-tail seats. Without that opener (a detached transcript, the stock
- * Chat row) it renders nothing.
+ * A completed-Turn action (`conversation.chat.assistant-actions`): opens the thread's Traces tab on this turn's trace through the
+ * native View opener the Chat fork hands its action row. Without that opener (a detached transcript, the stock Chat
+ * row) it renders nothing.
  */
 export const TurnTraceButton = (props: {
   readonly turn: number
-  readonly openView: ChatTurnTailExtras['openView']
+  readonly openView: ChatTurnActionExtras['openView']
   readonly t: TracesTranslate
 }): JSX.Element | null => {
   const openView = props.openView

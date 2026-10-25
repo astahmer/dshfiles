@@ -13,6 +13,7 @@
  * The pending requests live on `globalThis` because every client bundle that imports this module gets its own copy.
  */
 import { z } from 'zod/mini'
+import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 const CHAT_VIEW_ID = 'chat'
 const CHAT_FOCUS_EVENT = 'dshfiles-chat:focus'
@@ -90,4 +91,9 @@ export class ChatFocusModel {
  */
 export interface ChatTurnTailExtras {
   readonly openView?: ((view: string, focus: string) => void) | undefined
+}
+
+/** Turn identity and view opener shared by controls in the completed-Turn action row. */
+export interface ChatTurnActionExtras extends ChatTurnTailExtras {
+  readonly turn?: TurnLocation | undefined
 }
