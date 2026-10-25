@@ -23,6 +23,7 @@
     "@dshfiles/frame-layout": "link:../../plugins/@dshfiles/frame-layout",
     "@dshfiles/hmr-gate": "link:../../plugins/@dshfiles/hmr-gate",
     "@dshfiles/goal-stall-guard": "link:../../plugins/@dshfiles/goal-stall-guard",
+    "@dshfiles/goal-tool": "link:../../plugins/@dshfiles/goal-tool",
     "@dshfiles/home": "link:../../plugins/@dshfiles/home",
     "@dshfiles/input-trigger": "link:../../plugins/@dshfiles/input-trigger",
     "@dshfiles/jj-integration": "link:../../plugins/@dshfiles/jj-integration",

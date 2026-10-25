@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "continued-form-goal-authority",
+      "title": "Accept admitted continued-form answers as direct goal authority",
+      "summary": "The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["root-turn", "continued-question-settled", "goal-update-authorized", "rejected"],
+      "failureModes": [
+        "Skipped, failed, queued, stale, unmatched, or malformed question replies do not grant authority.",
+        "Subagents, closed turns, and missing user-question projection state remain unauthorized."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "goal-tool.accepted-question-reply-matches-settled-call",
+          "file": "plugins/@dshfiles/goal-tool/src/authority.test.ts",
+          "testName": "accepts only an answered reply matched to a settled call"
+        },
+        {
+          "kind": "gherkin",
+          "id": "goal-tool.replacement-goal-lifecycle",
+          "featureFile": "tooling/dshx/e2e/features/goal-tool.feature"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "goal-tool.no-browser-surface",
+          "reason": "The fork replaces a Host Loader row and renders no UI; the scratch Host boot check verifies the replacement bundle loads."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+- id: tool-goal
+  disabled: true
+- insert:
+    - id: dshfiles-goal-tool
+      name: '@dshfiles/goal-tool'
+      config: {}
