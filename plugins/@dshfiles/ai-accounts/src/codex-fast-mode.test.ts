@@ -10,7 +10,7 @@ const providerId = 'codex-primary'
 const sessionId = 'session-fast-mode'
 const modelId = 'gpt-6-luna'
 
-const createFastMode = (provider = openaiCodexProvider()) => {
+const createFastMode = (provider = openaiCodexProvider(), defaultEnabled = false) => {
   const supportedModelIds = new Set(
     provider
       .getModels()
@@ -20,13 +20,14 @@ const createFastMode = (provider = openaiCodexProvider()) => {
   return new FastModeService({
     isAvailable: route => route.provider === providerId && supportedModelIds.has(route.model),
     isLiveSession: session => session === sessionId,
+    isEnabledByDefault: () => defaultEnabled,
   })
 }
 
-const runRequest = async (input: { enabled: boolean }): Promise<{ body: unknown; payloadCallbackCalls: number }> => {
+const runRequest = async (input: { enabled?: boolean; defaultEnabled?: boolean }): Promise<{ body: unknown; payloadCallbackCalls: number }> => {
   const upstream = openaiCodexProvider()
-  const fastMode = createFastMode(upstream)
-  fastMode.set({ sessionId, provider: providerId, model: modelId, enabled: input.enabled })
+  const fastMode = createFastMode(upstream, input.defaultEnabled)
+  if (input.enabled !== undefined) fastMode.set({ sessionId, provider: providerId, model: modelId, enabled: input.enabled })
   const provider = withCodexFastMode({ upstream, fastMode })
   const catalogModel = provider.getModels().find(model => model.id === modelId)
   if (catalogModel === undefined) throw new Error(`The installed Codex catalog does not include ${modelId}.`)
@@ -97,6 +98,17 @@ describe('Codex Fast mode', () => {
     expect(fastMode.status({ sessionId, provider: providerId, model: 'gpt-6-sol' })).toEqual({ available: true, enabled: true })
   })
 
+  it('applies the configured default while preserving per-session route overrides', () => {
+    const fastMode = createFastMode(openaiCodexProvider(), true)
+    const route = { sessionId, provider: providerId, model: modelId }
+
+    expect(fastMode.status(route)).toEqual({ available: true, enabled: true })
+    fastMode.set({ ...route, enabled: false })
+    expect(fastMode.status(route)).toEqual({ available: true, enabled: false })
+    fastMode.delete(sessionId)
+    expect(fastMode.status(route)).toEqual({ available: true, enabled: true })
+  })
+
   it('isolates Fast mode preferences by live Session and clears disposed state', () => {
     const provider = openaiCodexProvider()
     const supportedModelIds = new Set(
@@ -108,6 +120,7 @@ describe('Codex Fast mode', () => {
     const fastMode = new FastModeService({
       isAvailable: route => route.provider === providerId && supportedModelIds.has(route.model),
       isLiveSession: () => true,
+      isEnabledByDefault: () => false,
     })
     const route = { provider: providerId, model: modelId }
 
@@ -119,12 +132,15 @@ describe('Codex Fast mode', () => {
     expect(fastMode.status({ ...route, sessionId: 'session-a' })).toEqual({ available: true, enabled: false })
   })
 
-  it('uses the legacy priority tier on Codex requests only while Fast mode is enabled', async () => {
+  it('uses the legacy priority tier when Fast mode is enabled per thread or by default', async () => {
     const fast = await runRequest({ enabled: true })
     expect(fast.body).toMatchObject({ service_tier: 'priority' })
     expect(fast.payloadCallbackCalls).toBe(1)
 
-    const defaultTier = await runRequest({ enabled: false })
+    const fastByDefault = await runRequest({ defaultEnabled: true })
+    expect(fastByDefault.body).toMatchObject({ service_tier: 'priority' })
+
+    const defaultTier = await runRequest({ enabled: false, defaultEnabled: true })
     expect(defaultTier.body).not.toHaveProperty('service_tier')
     expect(defaultTier.payloadCallbackCalls).toBe(1)
   })
@@ -138,6 +154,7 @@ describe('Codex Fast mode', () => {
     const fastMode = new FastModeService({
       isAvailable: route => route.provider === providerId && isCodexFastModeModel(model),
       isLiveSession: session => session === sessionId,
+      isEnabledByDefault: () => false,
       recordUsage: async observation => {
         recorded.push(observation)
       },

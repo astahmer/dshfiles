@@ -78,6 +78,13 @@
           "constraints": "Boolean; show account routing controls on the models page.",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.model-curation"]
+        },
+        {
+          "key": "fastModeDefault",
+          "defaultValue": "false",
+          "constraints": "Boolean; enable Fast mode for supported Codex models unless the thread overrides that model route.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.fast-mode-default"]
         }
       ],
       "states": ["available", "cooling-down", "rebound", "no-eligible-account", "priority-order", "fallback-serving", "fallback-returned"],
@@ -142,6 +149,12 @@
           "kind": "gherkin",
           "id": "ai-accounts.github-copilot",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts-copilot.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.fast-mode-default",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-fast-mode.test.ts",
+          "testName": "applies the configured default while preserving per-session route overrides"
         }
       ],
       "telemetry": [

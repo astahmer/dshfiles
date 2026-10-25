@@ -51,12 +51,13 @@ interface FastModeCall {
 interface FastModeDependencies {
   isAvailable: (route: Omit<FastModeRoute, 'sessionId'>) => boolean
   isLiveSession: (sessionId: string) => boolean
+  isEnabledByDefault: () => boolean
   recordUsage?: (observation: FastModeUsageObservation) => Promise<void>
   onUsageError?: (error: unknown) => void
 }
 
 export class FastModeService {
-  private readonly selections = new Map<string, Set<string>>()
+  private readonly selections = new Map<string, Map<string, boolean>>()
   private readonly requestContext = new AsyncLocalStorage<FastModeRequest>()
 
   constructor(private readonly dependencies: FastModeDependencies) {}
@@ -67,7 +68,7 @@ export class FastModeService {
 
     return {
       available: true,
-      enabled: this.selections.get(route.sessionId)?.has(routeKeyOf(route)) ?? false,
+      enabled: this.selections.get(route.sessionId)?.get(routeKeyOf(route)) ?? this.dependencies.isEnabledByDefault(),
     }
   }
 
@@ -78,16 +79,9 @@ export class FastModeService {
       return { available: false, enabled: false }
     }
 
-    const enabledRoutes = this.selections.get(route.sessionId) ?? new Set<string>()
-    const routeKey = routeKeyOf(route)
-    if (route.enabled) enabledRoutes.add(routeKey)
-    if (!route.enabled) enabledRoutes.delete(routeKey)
-    if (enabledRoutes.size === 0) {
-      this.selections.delete(route.sessionId)
-      return this.status(route)
-    }
-
-    this.selections.set(route.sessionId, enabledRoutes)
+    const routeOverrides = this.selections.get(route.sessionId) ?? new Map<string, boolean>()
+    routeOverrides.set(routeKeyOf(route), route.enabled)
+    this.selections.set(route.sessionId, routeOverrides)
     return this.status(route)
   }
 
@@ -103,7 +97,9 @@ export class FastModeService {
     if (call.sessionId === undefined) return stream
 
     if (
-      this.selections.get(call.sessionId)?.has(routeKeyOf({ provider: call.selectedProvider, model: call.model })) !== true ||
+      !(
+        this.selections.get(call.sessionId)?.get(routeKeyOf({ provider: call.selectedProvider, model: call.model })) ?? this.dependencies.isEnabledByDefault()
+      ) ||
       !this.dependencies.isAvailable({ provider: call.wireProvider, model: call.model })
     ) {
       return stream

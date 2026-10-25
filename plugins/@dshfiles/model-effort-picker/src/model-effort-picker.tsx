@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-import { useSettings } from '@dshfiles/dshx/client'
+import { useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -9,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { Slider } from '@dshfiles/plugin-ui/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftRightIcon, CheckIcon, ChevronDownIcon, LoaderCircleIcon, RotateCcwIcon, SearchIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftRightIcon, CheckIcon, ChevronDownIcon, LoaderCircleIcon, RotateCcwIcon, SearchIcon, SparklesIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { FastModeSection } from './fast-mode-section.js'
 import { FallbacksSection } from './fallbacks-section.js'
@@ -18,10 +19,23 @@ import { modelEffortPickerSettings } from './settings.js'
 
 type Props = ModelSelectInjected & { readonly locked: boolean; readonly sessionId: string }
 
+type FastModeRoute = { readonly sessionId: string; readonly provider: string; readonly model: string }
+type FastModeIndicatorProps = FastModeRoute & { readonly enabledOverride: boolean | undefined }
+
+const fastModeRouteKey = ({ sessionId, provider, model }: FastModeRoute): string => JSON.stringify([sessionId, provider, model])
+
+const FastModeIndicator = ({ sessionId, provider, model, enabledOverride }: FastModeIndicatorProps): JSX.Element => {
+  const state = useApiQuery(aiAccountsFastModeApi, 'status', { input: { sessionId, provider, model } })
+  if (enabledOverride ?? state.data?.enabled ?? false)
+    return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" data-model-fast-mode-enabled />
+  return <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+}
+
 export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId }: Props) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectionError, setSelectionError] = useState<string | null>(null)
+  const [fastModeOverride, setFastModeOverride] = useState<{ readonly routeKey: string; readonly enabled: boolean } | null>(null)
   const modelListRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const state = useSyncExternalStore(
@@ -30,6 +44,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   )
   const filteredGroups = useMemo(() => ModelPickerModel.filterGroups(state.groups, query), [state.groups, query])
   const current = state.current
+  const currentFastModeRouteKey = current === null ? null : fastModeRouteKey({ sessionId, provider: current.provider, model: current.model })
   const selectedGroup = current === null ? undefined : state.groups.find(group => group.id === current.provider)
   const selectedModel = selectedGroup?.models.find(model => model.id === current?.model)
   const efforts = selectedModel?.reasoning?.efforts ?? []
@@ -100,8 +115,15 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           >
             {busy ? (
               <LoaderCircleIcon aria-hidden="true" className="dshx:size-4 dshx:animate-spin dshx:text-muted-foreground" />
-            ) : (
+            ) : current === null ? (
               <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+            ) : (
+              <FastModeIndicator
+                enabledOverride={fastModeOverride?.routeKey === currentFastModeRouteKey ? fastModeOverride.enabled : undefined}
+                model={current.model}
+                provider={current.provider}
+                sessionId={sessionId}
+              />
             )}
             <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none">
               {shortLabel?.providerTag === undefined ? null : (
@@ -326,6 +348,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             <FastModeSection
               disabled={busy}
               key={`${sessionId}:${current.provider}:${current.model}`}
+              onEnabledChange={enabled =>
+                setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ sessionId, provider: current.provider, model: current.model }) })
+              }
               model={current.model}
               provider={current.provider}
               sessionId={sessionId}

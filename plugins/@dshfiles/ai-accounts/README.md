@@ -196,6 +196,10 @@ Sessions. Switch back from the picker once the failed account recovers. Each
 step shows as a retry row in the turn. Large
 tool outputs are never trimmed.
 
+### Fast mode
+
+The composer model picker offers Fast mode for supported Codex models. Use **Fast mode by default** in AI Accounts settings to enable it across eligible routes; each thread can still override its own route. The picker shows a lightning bolt while Fast mode is enabled and sparkles otherwise. Fast mode requests may cost more.
+
 ### Model fallback chain
 
 Under Priority, a thread can carry an ordered fallback chain: provider route

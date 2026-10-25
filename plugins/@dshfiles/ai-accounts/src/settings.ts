@@ -54,6 +54,8 @@ export const aiAccountsSettings = defineSettings({
     edgeWidget: Schema.boolean().default(false),
     /** Show the accounts block on Settings › Models. */
     modelsPageAccounts: Schema.boolean().default(true),
+    /** Enable Codex Fast mode for supported model routes unless a Session changes that route. */
+    fastModeDefault: Schema.boolean().default(false),
     /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
     codexLunaReserve: Schema.boolean().default(true),
     /** Default for resuming a quota-blocked turn one minute after its known reset. */
@@ -145,6 +147,13 @@ const readLiveSettings = (): object => {
 /** Live pricing preferences; defaults when the namespace is not registered on this Host. */
 const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
 
+/** Live Fast mode preference; off when the namespace is not registered on this Host. */
+const readFastModeDefault = (): boolean =>
+  z
+    .object({ fastModeDefault: z.boolean().catch(false) })
+    .catch({ fastModeDefault: false })
+    .parse(readLiveSettings()).fastModeDefault
+
 /** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
 const readLunaReserveRouting = (): boolean =>
   z
@@ -183,6 +192,7 @@ const readQuotaRetrySettings = (): {
 }
 
 export class AccountSettingsModel {
+  static readonly readFastModeDefault = readFastModeDefault
   static readonly readPricingSettings = readPricingSettings
   static readonly readLunaReserveRouting = readLunaReserveRouting
   static readonly readRecoverySettings = readRecoverySettings

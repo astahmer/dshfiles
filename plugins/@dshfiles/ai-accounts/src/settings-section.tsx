@@ -276,6 +276,19 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
           </Row>
         )}
         <Row
+          hint="Use Fast mode on supported Codex models unless changed in the thread's model picker. The provider may charge more."
+          label="Fast mode by default"
+        >
+          {id => (
+            <Switch
+              checked={preferences.fastModeDefault}
+              disabled={readOnly}
+              id={id}
+              onCheckedChange={value => write(settings.set('fastModeDefault', value))}
+            />
+          )}
+        </Row>
+        <Row
           hint="Once a Codex account's weekly limit is spent, send its requests to Luna Reserve (gpt-reserve) while the reserve lasts, like the Codex app's “Continue with Luna Reserve”."
           label="Codex Luna Reserve"
         >

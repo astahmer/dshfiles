@@ -12,7 +12,7 @@ const modelsFor = (profile: ReturnType<typeof buildProfile>) => {
   return profile.piProvider.getModels()
 }
 
-const disabledFastMode = new FastModeService({ isAvailable: () => false, isLiveSession: () => true })
+const disabledFastMode = new FastModeService({ isAvailable: () => false, isLiveSession: () => true, isEnabledByDefault: () => false })
 
 describe('account provider profiles', () => {
   it.each(['gpt-6.1-sol', 'gpt-6.1-luna', 'gpt-6.1'])('inherits matching GPT family capabilities for %s instead of Spark', async modelId => {

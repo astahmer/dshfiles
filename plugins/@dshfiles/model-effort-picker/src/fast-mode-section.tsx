@@ -9,9 +9,10 @@ type Props = {
   readonly provider: string
   readonly model: string
   readonly disabled: boolean
+  readonly onEnabledChange: (enabled: boolean) => void
 }
 
-export const FastModeSection = ({ sessionId, provider, model, disabled }: Props) => {
+export const FastModeSection = ({ sessionId, provider, model, disabled, onEnabledChange }: Props) => {
   const input = { sessionId, provider, model }
   const api = useApi(aiAccountsFastModeApi)
   const state = useApiQuery(aiAccountsFastModeApi, 'status', { input })
@@ -24,7 +25,8 @@ export const FastModeSection = ({ sessionId, provider, model, disabled }: Props)
     setPending(true)
     setError(null)
     try {
-      await api.setFast({ ...input, enabled })
+      const updated = await api.setFast({ ...input, enabled })
+      onEnabledChange(updated.enabled)
       await state.refetch()
     } catch (cause) {
       setError(errorMessage(cause, 'Fast mode could not be updated.'))

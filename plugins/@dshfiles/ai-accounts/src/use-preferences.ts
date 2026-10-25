@@ -35,6 +35,7 @@ export const usePreferences = () => {
     usageShortNameOverrides: value?.usageShortNameOverrides ?? {},
     usagePopoverSize: { width: value?.usagePopoverWidth ?? 0, height: value?.usagePopoverHeight ?? 0 },
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
+    fastModeDefault: value?.fastModeDefault ?? false,
     codexLunaReserve: value?.codexLunaReserve ?? true,
     autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? true,
     showQuotaRetryChoice: value?.showQuotaRetryChoice ?? true,

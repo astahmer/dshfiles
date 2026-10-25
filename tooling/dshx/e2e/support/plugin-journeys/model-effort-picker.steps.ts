@@ -195,6 +195,10 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
     await expect(fastMode).toBeEnabled()
     await fastMode.click()
     await expect(fastMode).toBeChecked()
+    await expect(page.locator('[data-model-fast-mode-enabled]')).toBeVisible()
+    await fastMode.click()
+    await expect(fastMode).not.toBeChecked()
+    await expect(page.locator('[data-model-fast-mode-enabled]')).toHaveCount(0)
 
     if (!(await dialog.isVisible())) await trigger.click()
     await expect(dialog).toBeVisible()
@@ -207,6 +211,7 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
     await spark.click()
     if ((await dialog.count()) === 0) await trigger.click()
     await expect(dialog.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })).toHaveCount(0)
+    await expect(page.locator('[data-model-fast-mode-enabled]')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

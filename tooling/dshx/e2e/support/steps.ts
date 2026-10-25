@@ -288,7 +288,7 @@ Given('the isolated AI Accounts and owned Chat plugin profile is booted', async 
 
 Given('the isolated AI Accounts and model effort picker plugin profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/model-effort-picker'],
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/model-effort-picker', '@dshfiles/multi-host'],
     profileLabel: 'ai-accounts-model-fallback',
   })
   await visitIsolatedPluginProfile(page, profile)

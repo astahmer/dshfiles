@@ -168,6 +168,7 @@ export default definePlugin({
     let routes = ProviderRoutes.buildRoutes(config).routes
     let profiles = new Map<string, ResolvedPiAiProviderProfile>()
     const fastMode = new FastModeService({
+      isEnabledByDefault: AccountSettingsModel.readFastModeDefault,
       isAvailable: route => {
         if (routes.get(route.provider)?.kind !== CODEX_KIND) return false
         const model = profiles
@@ -672,7 +673,8 @@ export default definePlugin({
           // Credited only after the upstream answers, so a failed attempt is never "used",
           // and to the account a fail-over put on the wire rather than the chosen route.
           if (!routes.has(options.provider)) return next()
-          return explainSilentRejections(creditServedAttempt(next(), {
+          return explainSilentRejections(
+            creditServedAttempt(next(), {
               pool: {
                 noteServed: accountId => {
                   pool.noteServed(accountId)
@@ -680,7 +682,9 @@ export default definePlugin({
                 },
               },
               accountId: accountForRequest(options),
-            }), options)
+            }),
+            options,
+          )
         }),
       )
 
