@@ -113,6 +113,11 @@
           "id": "annotations.source-no-guess",
           "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
           "testName": "returns no match rather than guessing"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "annotations.source-resolution-browser-gap",
+          "reason": "Resolution runs behind the annotations API and agent tool: the picker shows the resolved file only after the Host answers, so a browser journey would re-test the picker instead of the map matching it already traverses. The unit and real-bundle specs assert the matching itself."
         }
       ],
       "telemetry": [
@@ -352,8 +357,26 @@
           "span": "annotations launch chrome",
           "file": "plugins/@dshfiles/annotations/tests/chrome-launch.spec.ts",
           "testName": "records the launch span and fails fast when no port opens"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations open cdp",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp.spec.ts",
+          "testName": "records the cdp open span when the socket is refused"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations list cdp pages",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp.spec.ts",
+          "testName": "records the cdp list span when the endpoint is refused"
         }
       ]
+    }
+  ],
+  "ioDelegation": [
+    {
+      "file": "src/host.ts",
+      "reason": "chromeState probes the loopback /json/version endpoint only from the chromeStatus, chromeLaunch, chromeStop and chromePick API methods, so every request runs inside that call's automatic api-dispatch span."
     }
   ]
 }
