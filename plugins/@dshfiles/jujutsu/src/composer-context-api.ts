@@ -9,6 +9,7 @@ export const composerBaseSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('parent') }),
   z.object({ kind: z.literal('trunk') }),
   z.object({ kind: z.literal('bookmark'), name: bookmarkNameSchema }),
+  z.object({ kind: z.literal('remoteBookmark'), name: bookmarkNameSchema, remote: bookmarkNameSchema }),
 ])
 
 const cwdSchema = z.string().min(1).max(2048)
@@ -32,6 +33,10 @@ const repositorySchema = z.object({
   files: z.array(z.object({ path: z.string().max(2048), status: fileStatusSchema })).max(500),
   filesTruncated: z.boolean(),
   localBookmarks: z.array(z.string().max(256)).max(200),
+  remoteBookmarks: z
+    .array(z.object({ name: z.string().max(256), remote: z.string().max(256) }))
+    .max(200)
+    .optional(),
 })
 
 export const composerContextApi = defineApi({

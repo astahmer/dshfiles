@@ -24,7 +24,7 @@ const preferencesSchema = z.object({
   headerToggle: z.boolean().catch(false),
   chatReferenceLinks: z.boolean().catch(true),
   chatReferenceClickBehavior: z.enum(['focus', 'path']).catch('focus'),
-  composerBarBase: z.string().max(256).catch('main'),
+  composerBarBase: z.string().max(512).catch('main'),
 })
 
 export type JujutsuPreferences = z.infer<typeof preferencesSchema>

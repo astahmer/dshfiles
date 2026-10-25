@@ -59,7 +59,7 @@ const ABOVE_STYLE: CSSProperties = {
 }
 
 const noStoredBases: Readonly<Record<string, string>> = {}
-const storedBases = createStoredValue({ key: 'dshfiles.jujutsu.composer-base.v1', schema: z.record(z.string(), z.string().max(256)), fallback: noStoredBases })
+const storedBases = createStoredValue({ key: 'dshfiles.jujutsu.composer-base.v1', schema: z.record(z.string(), z.string().max(512)), fallback: noStoredBases })
 
 const noCwd = (): null => null
 
@@ -140,11 +140,15 @@ const STATUS_CLASS: Record<string, string> = {
 const BasePicker = (props: { readonly repository: ComposerRepository; readonly base: ComposerBase; readonly onChoose: (base: ComposerBase) => void }) => {
   const [filter, setFilter] = useState('')
   const bookmarks = props.repository.localBookmarks.filter(name => name.toLowerCase().includes(filter.toLowerCase())).slice(0, 40)
+  const availableRemoteBookmarks = props.repository.remoteBookmarks ?? []
+  const remoteBookmarks = availableRemoteBookmarks
+    .filter(bookmark => (bookmark.name + '@' + bookmark.remote).toLowerCase().includes(filter.toLowerCase()))
+    .slice(0, 40)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button className="dshx:ml-auto dshx:max-w-[45%] dshx:text-muted-foreground" size="xs" type="button" variant="ghost">
-          <span>Base</span>
+          <span>Compare with</span>
           <span className={cn('dshx:truncate dshx:font-mono! dshx:text-foreground', !props.repository.base.found && 'dshx:text-warning')}>
             {props.repository.base.label}
           </span>
@@ -152,12 +156,12 @@ const BasePicker = (props: { readonly repository: ComposerRepository; readonly b
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx:max-h-80 dshx:w-64 dshx:overflow-y-auto">
-        <DropdownMenuLabel className="dshx:text-xs">Compare the working copy against</DropdownMenuLabel>
+        <DropdownMenuLabel className="dshx:text-xs">Diff and revision comparison base</DropdownMenuLabel>
         <DropdownMenuRadioGroup onValueChange={value => props.onChoose(composerBaseFromSetting(value))} value={composerBaseSetting(props.base)}>
           <DropdownMenuRadioItem value="parent">Parent (@-)</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="trunk">Trunk (trunk())</DropdownMenuRadioItem>
-          {props.repository.localBookmarks.length > 0 && <DropdownMenuSeparator />}
-          {props.repository.localBookmarks.length > 8 && (
+          {(props.repository.localBookmarks.length > 0 || availableRemoteBookmarks.length > 0) && <DropdownMenuSeparator />}
+          {(props.repository.localBookmarks.length > 8 || availableRemoteBookmarks.length > 8) && (
             <input
               aria-label="Filter bookmarks"
               className="dshx:mx-1 dshx:mb-1 dshx:w-[calc(100%-0.5rem)] dshx:rounded-sm dshx:border dshx:bg-background dshx:px-2 dshx:py-1 dshx:font-mono! dshx:text-xs"
@@ -167,9 +171,20 @@ const BasePicker = (props: { readonly repository: ComposerRepository; readonly b
               value={filter}
             />
           )}
+          {bookmarks.length > 0 && <DropdownMenuLabel className="dshx:text-xs">Local bookmarks</DropdownMenuLabel>}
           {bookmarks.map(name => (
             <DropdownMenuRadioItem className="dshx:font-mono! dshx:text-xs" key={name} value={name}>
               {name}
+            </DropdownMenuRadioItem>
+          ))}
+          {remoteBookmarks.length > 0 && <DropdownMenuLabel className="dshx:text-xs">Remote bookmarks</DropdownMenuLabel>}
+          {remoteBookmarks.map(bookmark => (
+            <DropdownMenuRadioItem
+              className="dshx:font-mono! dshx:text-xs"
+              key={bookmark.name + '@' + bookmark.remote}
+              value={composerBaseSetting({ kind: 'remoteBookmark', name: bookmark.name, remote: bookmark.remote })}
+            >
+              {bookmark.name}@{bookmark.remote}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -195,7 +210,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
   if (repository === null) return null
 
   const fileCount = repository.totals?.files ?? repository.files.length
-  const heading = context.base.kind === 'parent' ? 'Uncommitted' : 'Since ' + repository.base.label
+  const heading = context.base.kind === 'parent' ? 'Working copy' : 'Since fork point with ' + repository.base.label
   const revisionSummary = ComposerContextModel.revisionSummary({
     baseLabel: repository.base.label,
     baseFound: repository.base.found,
@@ -220,7 +235,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
           <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
           <span>·</span>
           {fileCount === 0 ? (
-            <span>no working copy changes</span>
+            <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no diff from fork point'}</span>
           ) : (
             <>
               <span>

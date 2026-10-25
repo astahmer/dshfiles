@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,6 +11,7 @@ import {
   COMPOSER_FILE_TEMPLATE,
   COMPOSER_HEAD_TEMPLATE,
   COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE,
+  COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE,
   COMPOSER_WORKSPACE_TEMPLATE,
   ComposerContextModel,
 } from './composer-context-core.ts'
@@ -33,14 +34,23 @@ const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
 test('composer templates and ranges read head, bookmarks, totals and files from a real repository', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-composer-'))
   const repo = join(home, 'repo')
+  const remote = join(home, 'remote')
   onTestFinished(() => rm(home, { recursive: true, force: true }))
   runJj(home, home, ['git', 'init', '--no-colocate', repo])
+  execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' })
   runJj(repo, home, ['config', 'set', '--repo', 'user.name', 'Composer Test'])
   runJj(repo, home, ['config', 'set', '--repo', 'user.email', 'composer@example.invalid'])
 
   await writeFile(join(repo, 'base.txt'), 'one\ntwo\n')
   runJj(repo, home, ['commit', '-m', 'base'])
   runJj(repo, home, ['bookmark', 'create', 'main', '-r', '@-'])
+  runJj(repo, home, ['git', 'remote', 'add', 'origin', remote])
+  runJj(repo, home, ['bookmark', 'track', 'main@origin'])
+  runJj(repo, home, ['git', 'export'])
+  execFileSync('git', ['--git-dir', join(repo, '.jj', 'repo', 'store', 'git'), 'push', remote, 'refs/heads/main:refs/heads/main'], {
+    stdio: 'ignore',
+  })
+  runJj(repo, home, ['git', 'fetch', '--remote', 'origin'])
   await writeFile(join(repo, 'feature.txt'), 'feature\n')
   runJj(repo, home, ['commit', '-m', 'feature'])
   await writeFile(join(repo, 'base.txt'), 'one\nthree\n')
@@ -63,6 +73,21 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   ])
   expect(nearest.trim()).toBe('["main"]')
   expect(runJj(repo, home, ['--ignore-working-copy', 'bookmark', 'list', '-T', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE]).trim()).toBe('"main"')
+  expect(
+    runJj(repo, home, [
+      '--ignore-working-copy',
+      'log',
+      '--no-graph',
+      '-r',
+      'remote_bookmarks(remote="origin")',
+      '-T',
+      COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE,
+    ]).trim(),
+  ).toContain('main@origin')
+  const remoteMain = ComposerContextModel.composerBaseTarget({ kind: 'remoteBookmark', name: 'main', remote: 'origin' })
+  expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', remoteMain, '-T', 'commit_id']).trim()).toBe(
+    runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id']).trim(),
+  )
   const baseCommitId = runJj(repo, home, [
     '--ignore-working-copy',
     'log',

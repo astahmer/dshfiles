@@ -56,7 +56,7 @@ export const jujutsuSettings = defineSettings({
     composerBarBase: Schema.string()
       .default('main')
       .description(
-        'Default base of the composer bar: `main` (since the fork point with main), `parent` (working copy vs @-), `trunk` (since trunk()), or a local bookmark name.',
+        'Default base of the composer bar: `main` (since the fork point with main), `parent` (working copy vs @-), `trunk` (since trunk()), a local bookmark, or a selected remote bookmark.',
       ),
   }),
   applies: 'live',

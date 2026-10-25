@@ -13,6 +13,9 @@ describe('composer base setting', () => {
     expect(composerBaseFromSetting('trunk')).toEqual({ kind: 'trunk' })
     expect(composerBaseFromSetting('feat/x')).toEqual({ kind: 'bookmark', name: 'feat/x' })
     expect(ComposerContextModel.composerBaseSetting({ kind: 'bookmark', name: 'feat/x' })).toBe('feat/x')
+    const remoteBaseSetting = ComposerContextModel.composerBaseSetting({ kind: 'remoteBookmark', name: 'main', remote: 'origin' })
+    expect(composerBaseFromSetting(remoteBaseSetting)).toEqual({ kind: 'remoteBookmark', name: 'main', remote: 'origin' })
+    expect(composerBaseFromSetting('remote-base:%ZZ')).toEqual({ kind: 'bookmark', name: 'main' })
   })
 
   it('defaults to main for empty, missing or revset-injecting values', () => {
@@ -30,6 +33,15 @@ describe('composer base setting', () => {
       '--to',
       '@',
     ])
+    expect(ComposerContextModel.composerDiffRange({ kind: 'remoteBookmark', name: 'main', remote: 'origin' })).toEqual([
+      '--from',
+      'fork_point(remote_bookmarks(exact:"main", remote=exact:"origin") | @)',
+      '--to',
+      '@',
+    ])
+    expect(ComposerContextModel.composerBaseTarget({ kind: 'remoteBookmark', name: 'main', remote: 'origin' })).toBe(
+      'remote_bookmarks(exact:"main", remote=exact:"origin")',
+    )
   })
 
   it('counts exact revisions on either side of a selected base', () => {
@@ -38,13 +50,13 @@ describe('composer base setting', () => {
     expect(ComposerContextModel.parseRevisionCount('', false)).toBe(0)
     expect(ComposerContextModel.parseRevisionCount('xx', true)).toBeNull()
     expect(ComposerContextModel.parseRevisionCount('x?x', false)).toBeNull()
-    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 0, behind: 0 } })).toBe('Up to date with main')
-    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 1, behind: 0 } })).toBe('1 revision ahead of main')
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 0, behind: 0 } })).toBe('@ matches main')
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 1, behind: 0 } })).toBe('@ vs main: 1 only on @')
     expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: { ahead: 2, behind: 1 } })).toBe(
-      '2 revisions ahead of main · 1 revision behind main',
+      '@ vs main: 2 only on @ · 1 only on main',
     )
     expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: false, counts: null })).toBe('main unavailable')
-    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: null })).toBe('Revision count unavailable')
+    expect(ComposerContextModel.revisionSummary({ baseLabel: 'main', baseFound: true, counts: null })).toBe('@ vs main: revision count unavailable')
   })
 })
 

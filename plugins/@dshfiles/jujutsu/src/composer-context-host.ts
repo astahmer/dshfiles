@@ -10,6 +10,7 @@ import {
   COMPOSER_FILE_TEMPLATE,
   COMPOSER_HEAD_TEMPLATE,
   COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE,
+  COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE,
   COMPOSER_WORKSPACE_TEMPLATE,
   ComposerContextModel,
 } from './composer-context-core.js'
@@ -36,6 +37,8 @@ const fileRowSchema = z.object({ path: z.string().max(2048), status: z.string().
 const baseRevisionIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
 const baseRevisionIdsSchema = z.array(baseRevisionIdSchema).max(2)
 const nameListSchema = z.array(z.string().max(256)).max(64)
+const remoteBookmarkListSchema = z.array(z.object({ name: z.string().max(256), remote: z.string().max(256) })).max(200)
+const remoteBookmarkRowSchema = z.string().max(513)
 const MAX_FILES = 500
 
 /** A Session's cwd keeps its workspace root, so the composer resolves it once instead of spawning jj on every read. */
@@ -73,6 +76,7 @@ const workspaceRoot = async (ctx: Context, run: RunJj, cwd: string, signal: Abor
 
 const baseLabel = (base: ComposerBase, targetBookmarks: readonly string[]): string => {
   if (base.kind === 'bookmark') return base.name
+  if (base.kind === 'remoteBookmark') return base.name + '@' + base.remote
   if (base.kind === 'trunk') return targetBookmarks[0] ?? 'trunk()'
   return '@-'
 }
@@ -132,7 +136,7 @@ export const composerContextHost = (directRun: RunJj) => {
       if (head === undefined) return { repository: null }
       const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
       const range = ComposerContextModel.composerDiffRange(input.base)
-      const [nearest, baseTarget, baseRevision, stat, files, localBookmarks, workspaces] = await Promise.all([
+      const [nearest, baseTarget, baseRevision, stat, files, localBookmarks, remoteBookmarks, workspaces] = await Promise.all([
         read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
         read(
           ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE],
@@ -145,6 +149,7 @@ export const composerContextHost = (directRun: RunJj) => {
         read(['diff', ...range, '--stat'], 256_000).catch(() => null),
         read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
         read(['bookmark', 'list', '--template', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
+        read(['log', '--no-graph', '--revisions', 'remote_bookmarks()', '--template', COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
         read(['workspace', 'list', '--template', COMPOSER_WORKSPACE_TEMPLATE], 16_000).catch(() => null),
       ])
       const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
@@ -175,6 +180,13 @@ export const composerContextHost = (directRun: RunJj) => {
       const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
       const bookmarkNames =
         localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
+      const remoteBookmarkRows =
+        remoteBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(remoteBookmarks), value => remoteBookmarkRowSchema.parse(value))
+      const remoteBookmarkNames = remoteBookmarkRows.flatMap(value => {
+        const separator = value.lastIndexOf('@')
+        if (separator < 1 || separator === value.length - 1) return []
+        return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
+      })
       const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
       return {
         repository: {
@@ -194,6 +206,9 @@ export const composerContextHost = (directRun: RunJj) => {
           files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
           filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
           localBookmarks: bookmarkNames.slice(0, 200),
+          remoteBookmarks: remoteBookmarkListSchema.parse(
+            [...new Map(remoteBookmarkNames.map(bookmark => [bookmark.name + '@' + bookmark.remote, bookmark])).values()].slice(0, 200),
+          ),
         },
       }
     },

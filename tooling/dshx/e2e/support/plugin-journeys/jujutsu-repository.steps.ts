@@ -473,7 +473,7 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
 })
 
 Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
-  const summary = page.getByRole('button', { name: /^Review workspace changes: 1 revision ahead of main$/u })
+  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
   const review = page.locator('[data-review-surface][data-review-source="workspace"]')
