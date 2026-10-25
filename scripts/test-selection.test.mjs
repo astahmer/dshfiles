@@ -28,20 +28,18 @@ test('auto build skips source-only related runs and builds dist loaders and full
   assert.match(distLoader.build.reason, /loads dist/)
   const dependent = dryRunAutoBuild('plugins/@dshfiles/usage/src/command-identifiers.ts')
   assert.equal(dependent.build.required, true)
-  assert.match(dependent.build.reason, /full suite/)
+  assert.match(dependent.build.reason, /built packages|full suite/)
 })
 
-test('consumer narrowing selects fewer dependent tests and keeps full suites for dynamic packages', () => {
+test('consumer narrowing drops unrelated dependents and keeps bundle-boot tests', () => {
   const narrowed = JSON.parse(
-    execFileSync(process.execPath, [selectionScript, 'related', 'plugins/@dshfiles/usage/src/session-log.ts', '--dry-run', '--consumers=related'], {
-      encoding: 'utf8',
-    }),
+    execFileSync(process.execPath, [selectionScript, 'related', 'plugins/@dshfiles/usage/src/session-log.ts', '--dry-run'], { encoding: 'utf8' }),
   )
   assert.equal(narrowed.build.required, true)
-  assert.ok(narrowed.consumers.length > 0)
-  assert.ok(narrowed.consumers.every(consumer => consumer.tests < 5))
-  const fullSuites = narrowed.packages.filter(packageInfo => packageInfo.mode === 'full').map(packageInfo => packageInfo.name)
-  assert.ok(fullSuites.includes('@dshfiles/jj-integration'))
+  const consumers = new Map(narrowed.consumers.map(consumer => [consumer.name, consumer.tests]))
+  assert.equal(consumers.get('@dshfiles/jj-integration'), 0)
+  assert.ok(consumers.get('@dshfiles/thread-sidebar') >= 1)
+  assert.ok([...consumers.values()].reduce((sum, count) => sum + count, 0) <= 20)
 })
 
 test('CLI rejects an unknown build mode', () => {

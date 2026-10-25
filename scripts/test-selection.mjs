@@ -153,14 +153,25 @@ const reachesChangedPackage = (startFile, changedPackages) => {
   return false
 }
 
+const bootsBuiltBundle = path => {
+  const content = readFileSync(path, 'utf8')
+  return (
+    /['"`][^'"`\n]*\/dist\//.test(content) ||
+    /(spawnSync|spawn|execFileSync)\(\s*['"](dsh|node)['"]/.test(content) ||
+    /(spawnSync|spawn|execFileSync)\(\s*process\.execPath/.test(content)
+  )
+}
+
 const narrowDependentTests = ({ packages, changedPackages }) => {
   const narrowed = new Map()
   for (const packageInfo of packages) {
-    if (packageInfo.mode !== 'full' || changedPackages.has(packageInfo.name) || fullSuitePackages.has(packageInfo.name)) continue
-    const tests = testFilesOf(join(repositoryRoot, packageInfo.directory))
+    if (packageInfo.mode !== 'full' || changedPackages.has(packageInfo.name) || !/^vitest run(?: |$)/.test(packageInfo.test ?? '')) continue
+    const packageDirectory = join(repositoryRoot, packageInfo.directory)
+    const tests = testFilesOf(packageDirectory)
+    // A test that boots a built bundle can exercise code without importing it, so it always runs.
     const selected = tests
-      .filter(testFile => reachesChangedPackage(testFile, changedPackages))
-      .map(testFile => relative(join(repositoryRoot, packageInfo.directory), testFile))
+      .filter(testFile => reachesChangedPackage(testFile, changedPackages) || bootsBuiltBundle(testFile))
+      .map(testFile => relative(packageDirectory, testFile))
     narrowed.set(packageInfo.name, selected)
   }
   return narrowed
@@ -198,7 +209,7 @@ const main = () => {
       'dry-run': { type: 'boolean', default: false },
       since: { type: 'string' },
       build: { type: 'string', default: 'auto' },
-      consumers: { type: 'string', default: 'full' },
+      consumers: { type: 'string', default: 'related' },
     },
     allowPositionals: true,
   })
@@ -278,7 +289,9 @@ const main = () => {
       console.log(`test selection: skipped full suite of ${packageName} (no test reaches the changed packages)`)
       continue
     }
-    run({ args: ['exec', 'vitest', 'run', ...tests, '--passWithNoTests'], cwd: join(repositoryRoot, packageInfo.directory) })
+    const commandMatch = /^vitest run(?: (.*))?$/.exec(packageInfo.test)
+    const commandFlags = commandMatch === null ? [] : (commandMatch[1] ?? '').split(' ').filter(Boolean)
+    run({ args: ['exec', 'vitest', 'run', ...tests, ...commandFlags, '--passWithNoTests'], cwd: join(repositoryRoot, packageInfo.directory) })
   }
   for (const packageInfo of selection.filter(packageInfo => packageInfo.mode === 'related')) {
     const match = /^vitest run(?: (.*))?$/.exec(packageInfo.test)
