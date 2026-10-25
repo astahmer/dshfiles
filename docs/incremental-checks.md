@@ -1,5 +1,29 @@
 # Incremental development checks
 
+## What changed, measured
+
+Steady state on this checkout, one source edit per measurement. "Before" is `main` without the selection work.
+
+| Lane                                    | Before                                | After                           |
+| --------------------------------------- | ------------------------------------- | ------------------------------- |
+| Leaf plugin edit, `test:related` (warm) | 4.9-5.8s                              | **0.76-0.82s**                  |
+| Same edit, cold or contended cache      | 12-22s                                | 1-2s                            |
+| Shared package edit (`usage`)           | 95-273s                               | **10s**                         |
+| Test-only or screenshot edit            | sheet rebuild 1.5-2.6s (11.5s loaded) | **264ms**, all 52 builds replay |
+| Dependent tests for a `usage` change    | 276 + 148 dynamic                     | **10**                          |
+| `credential-port` change                | 365                                   | **26**                          |
+| `backlog` change                        | 17                                    | **0**                           |
+| Full plugin suite / `pnpm test`         | ~291s forced                          | unchanged                       |
+
+Decisions behind it:
+
+- **Defaults:** `--build=auto` and `--consumers=related`; `--build=always` and `--consumers=full` are the escapes. A dependent full suite becomes the tests whose imports reach a changed package plus every test that boots a built bundle; non-Vitest dependents and the changed package itself keep full suites.
+- **Jev is not used for selection.** Ranking 56 backlog tests took 56 calls and 9.6s and missed the true test (p=0.12); `vitest related` found it in 2.35s. The per-change gate scored 74% against a 57% majority baseline, with two missed regressions.
+- **The coverage index is not wired.** It pays only for the real-JJ suites (index 154s, then 7.8s per change against 206-262s); ordinary packages cost 2-29x their suite to index.
+- **Shared stylesheet inputs exclude test and screenshot files**, because neither can contribute production classes. Source edits still rebuild it (verified: `ui-styles#build` misses, 1.9s).
+- **JJ suites stay `cache: false`** (real jj state) and are skipped when no test reaches the change. Turbo concurrency stays at 4: P4 and P8 both took 27s on six suites.
+- **Evidence:** 49 mutations (23 fault-revealing) with zero missed failures, a 267-test complement with zero misses, a cold-workspace rebuild and a real `test:changed` run. Full `pnpm test` and the browser journeys are unchanged by this work.
+
 ## One development workspace
 
 The root pnpm workspace includes plugins, SDK packages, workspace check packages and desktop. Run `pnpm install --frozen-lockfile` once. Plugin SDK dependencies use `workspace:*`; external installed DSH profiles retain `link:` because they live outside this workspace. The checked-in web profile seed remains a standalone deployment manifest. Scratch installation retains its separate [pnpm policy](../tooling/dshx/scratch-pnpm-policy.yaml) so a disposable profile never inherits development workspace discovery.
