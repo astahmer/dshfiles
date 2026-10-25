@@ -433,6 +433,23 @@ test('correction themes are lexical matches a caller must still read in context'
   assert.deepEqual(SessionMiner.correctionThemes('please add a test'), [])
 })
 
+test('a follow-up request is not pushback, while a real "still broken" report is', () => {
+  // Sampled from the 2026-10-25 review: the loudest "incomplete-or-unfixed" hit was this.
+  assert.equal(SessionMiner.correctionThemes('investigate again & confirm everything. ensure this makes sense. then work on the solution.').length, 0)
+  assert.equal(SessionMiner.correctionThemes('please run the tests again and then commit').length, 0)
+  assert.equal(SessionMiner.correctionThemes('then use a subagent and add the missing field').length, 0)
+  assert.ok(SessionMiner.correctionThemes('still broken after the fix').includes('incomplete-or-unfixed'))
+  assert.ok(SessionMiner.correctionThemes('you forgot the regression test').includes('incomplete-or-unfixed'))
+  assert.ok(SessionMiner.correctionThemes('it fails again with the same error').includes('incomplete-or-unfixed'))
+})
+
+test('only the opening of a long brief is scored, so a multi-part plan is not pushback', () => {
+  const brief = `1. use a subagent to investigate every competitor then give me an exhaustive list
+2. build it again with the missing pieces
+3. make sure it still works after the refactor`
+  assert.equal(SessionMiner.correctionThemes(brief).length, 0)
+})
+
 test('stored excerpts are redacted and capped', () => {
   const secret = 'sk-abcdefghijklmnopqrstuvwxyz012345'
   assert.equal(SessionMiner.redact(`token ${secret}`).includes(secret), false)
@@ -488,6 +505,34 @@ test('the ledger drops a stored entry that carries no evidence', async () => {
   assert.equal(outcome.kind, 'added')
   await ImprovementLedger.write(path, [outcome.entry])
   assert.deepEqual(await ImprovementLedger.read(path), [])
+})
+
+test('a link inside a code fence is an example, not a dead link', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'self-improve-fence-'))
+  write(
+    join(root, '.agents/skills/template/SKILL.md'),
+    [
+      '---',
+      'name: template',
+      'description: Shows a skill layout. Use when writing one.',
+      '---',
+      '',
+      '```text',
+      'my-skill/',
+      '├── SKILL.md',
+      '├── REFERENCE.md       # detailed docs (if needed)',
+      '```',
+      '',
+      'Then link a real file: [missing](scripts/absent.mjs).',
+      '',
+    ].join('\n'),
+  )
+  const report = await HarnessAudit.validate({ root, skillRoots: [join(root, '.agents/skills')], alwaysOnPaths: [] })
+  const links = report.findings.filter(finding => finding.code === 'skill.link-missing')
+  assert.deepEqual(
+    links.map(finding => finding.message),
+    ['relative link target `scripts/absent.mjs` does not exist'],
+  )
 })
 
 test('frontmatter parsing reads the flat skill header DSH accepts', () => {

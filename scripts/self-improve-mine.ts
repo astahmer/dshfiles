@@ -17,7 +17,7 @@ import { SessionLogs, type SessionLogRef } from './self-improve-log.ts'
  */
 
 /** Bump when extraction changes so a cached extraction is not reused. */
-const EXTRACTOR_VERSION = 3
+const EXTRACTOR_VERSION = 4
 
 const MAX_EXCERPT = 240
 const MAX_SAMPLES_PER_SIGNAL = 3
@@ -277,14 +277,12 @@ const CORRECTION_THEMES: ReadonlyArray<{ readonly theme: string; readonly patter
   {
     theme: 'incomplete-or-unfixed',
     patterns: [
-      /\bstill\b/i,
-      /\bagain\b/i,
-      /\bmissing\b/i,
-      /\bforgot\b/i,
-      /\byou didn'?t\b/i,
+      /\bstill (broken|failing|fails|not|doesn'?t|does not|isn'?t|no|wrong|same|shows|missing)\b/i,
+      /\bagain\b.{0,60}\b(fail|failed|broke|broken|error|same|not fixed)\b/i,
+      /\b(you )?(forgot|missed|skipped)\b/i,
+      /\b(you )?didn'?t (fix|do|add|change|implement|remove|update|work)\b/i,
       /\bnot fixed\b/i,
-      /\bdoesn'?t work\b/i,
-      /\bdon'?t work\b/i,
+      /\b(doesn'?t|does not|don'?t|do not) work\b/i,
       /\bstill broken\b/i,
     ],
   },
@@ -302,8 +300,19 @@ const CORRECTION_THEMES: ReadonlyArray<{ readonly theme: string; readonly patter
   },
 ]
 
-const correctionThemes = (text: string): readonly string[] =>
-  CORRECTION_THEMES.filter(entry => entry.patterns.some(pattern => pattern.test(text))).map(entry => entry.theme)
+/**
+ * Only the opening of a message is scored: pushback lives in the first sentence,
+ * while a long multi-part brief routinely contains "again", "missing" or "still"
+ * as ordinary instructions. Matching the whole brief is what made
+ * `incomplete-or-unfixed` the loudest signal of the week while its sampled hits
+ * were follow-up requests ("investigate again, then work on the solution").
+ */
+const CORRECTION_HEAD_CHARS = 400
+
+const correctionThemes = (text: string): readonly string[] => {
+  const head = collapse(text).slice(0, CORRECTION_HEAD_CHARS)
+  return CORRECTION_THEMES.filter(entry => entry.patterns.some(pattern => pattern.test(head))).map(entry => entry.theme)
+}
 
 const SEARCH_TOOLS: ReadonlySet<string> = new Set([
   'find_threads',

@@ -90,9 +90,16 @@ const discoverSkillFiles = async (root: string): Promise<SkillFile[]> => {
 const LINK = /\[[^\]]*\]\(<?([^)\s>]+)>?\)/g
 
 /** Relative markdown link targets that do not exist on disk. */
+/**
+ * A link inside a fenced block is documentation — a template, a directory tree —
+ * not a navigable target. Scanning it flagged `write-a-skill`, whose example tree
+ * lists REFERENCE.md as an *example* of what a skill may contain.
+ */
+const withoutCodeFences = (body: string): string => body.replace(/```[\s\S]*?```/g, '')
+
 const missingLinks = async (filePath: string, body: string): Promise<string[]> => {
   const missing: string[] = []
-  for (const match of body.matchAll(LINK)) {
+  for (const match of withoutCodeFences(body).matchAll(LINK)) {
     const target = match[1] ?? ''
     if (target.startsWith('http') || target.startsWith('#') || target.startsWith('mailto:') || target.includes('{{')) continue
     const path = target.split('#')[0] ?? ''

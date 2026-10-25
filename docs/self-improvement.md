@@ -258,6 +258,32 @@ file that exists in no checkout. That instruction lives in the nixfiles-managed
 `~/.dsh/AGENTS.md`, so the fix is a nixfiles change; it is recorded in the ledger
 rather than silently patched here.
 
+## The second correction defect (2026-10-25)
+
+`incomplete-or-unfixed` was the loudest behavioural signal of the 2026-10-25
+review — 252 hits across 120 Sessions, up 81 % — and reading eight sampled hits
+killed it: they were follow-up requests. "Investigate again & confirm everything,
+then work on the solution" scored because `again` matched anywhere in the
+message; a long multi-part brief scored because a bullet said "missing field".
+
+Two changes, both in the extractor:
+
+1. **A defect anchor is required.** `still` and `again` now count only next to a
+   defect (`still broken`, `again … fails … same`), and the other patterns name
+   the accusation (`you forgot`, `didn't fix`, `doesn't work`) instead of one
+   ambiguous word.
+2. **Only the opening 400 characters are scored.** Pushback lives in the first
+   sentence; a brief is a plan, not a complaint.
+
+| Signal                             | Before                  | After                |
+| ---------------------------------- | ----------------------- | -------------------- |
+| `correction:incomplete-or-unfixed` | 252 hits / 120 Sessions | 11 hits / 9 Sessions |
+| `coverage.totalCorrections`        | 263                     | 27                   |
+
+Same corpus and window (7 days ending 2026-10-25, ~1 000 Sessions); the window
+moved by about an hour while the runs were going, which is the only drift. The
+surviving hits were read and are real pushback.
+
 ## What this deliberately does not do
 
 No new index, database or event store: mining reads the logs DSH already writes,
