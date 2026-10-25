@@ -132,6 +132,20 @@ fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/agent-communicati
 fnm exec --using 22.23.3 pnpm --dir tooling/dshx --filter @dshfiles/dshx exec vitest run tests/communication-service.spec.ts
 ```
 
+## Isolated E2E workspace seeds
+
+Use `registerScratchWorkspace(home, canonicalProjectPath)` before Host startup
+for a fresh disposable home. It writes the released workspace-v2 store with
+private permissions and refuses to overwrite an existing store. `dshx dev up`
+and the AI Accounts E2E recipes share this writer; the Accounts recipes create
+and resolve their own project folder inside each prepared home, so the native
+composer has a selected workspace without a folder picker.
+
+`bootComposedPluginProfile` accepts `seedHome` and an optional non-empty
+`seedKey`. Only give a key to a deterministic recipe: prewarming invokes that
+recipe again in a new home, never shares its folder or workspace ID. Change the
+key when the recipe changes. Custom seeds without a key remain uncacheable.
+
 ## Raw Cordis extension
 
 Use the typed DSHX API when it expresses the operation. When the installed Host

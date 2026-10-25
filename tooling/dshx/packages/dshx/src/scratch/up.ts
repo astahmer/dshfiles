@@ -1,11 +1,11 @@
-import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, delimiter, join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
+import { registerScratchWorkspace } from '../project/scratch-workspace.js'
 import { ScratchReaperRuntime, type ReapedScratch, type WarnedScratch } from './reaper.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
@@ -34,23 +34,6 @@ const browserHostScript = fileURLToPath(new URL('./browser-host.js', import.meta
 const watchdogScript = fileURLToPath(new URL('./watchdog.js', import.meta.url))
 
 const sleep = (ms: number): Promise<void> => new Promise(resolveSleep => setTimeout(resolveSleep, ms))
-
-/**
- * Register the project the way DSH stores an opened folder, before the Host starts. The native "Open folder" picker
- * would put an osascript dialog on the user's screen.
- */
-const registerProject = async (home: string, project: string): Promise<string> => {
-  const workspaceId = randomUUID()
-  const now = new Date().toISOString()
-  const storage = {
-    unit: { name: 'workspace', version: 2 },
-    global: { initialized: true, defaultWorkspaceId: workspaceId, workspaceIds: [workspaceId], archivedSessionIds: [], pinnedSessionIds: [] },
-    tables: { workspaces: { [workspaceId]: { path: project, title: basename(project), sessionIds: [], createdAt: now, updatedAt: now } } },
-  }
-  await mkdir(join(home, 'storages'), { recursive: true })
-  await writeFile(join(home, 'storages', 'workspace.json'), `${JSON.stringify(storage, null, 2)}\n`, { mode: 0o600 })
-  return workspaceId
-}
 
 const waitFor = async <Value>(read: () => Promise<Value | undefined>, timeoutMs: number, failure: () => Promise<Error>): Promise<Value> => {
   const deadline = Date.now() + timeoutMs
@@ -170,7 +153,7 @@ export const scratchUp = async (
 
     // DSH compares a Session's resolved cwd with the stored path, and macOS temp dirs live behind the /var -> /private/var link.
     const project = await realpath(options.project === undefined ? await ScratchSeedRuntime.sampleProject(home) : resolve(options.project))
-    const workspaceId = await registerProject(home, project)
+    const workspaceId = await registerScratchWorkspace(home, project)
     const fakeSecretCli = options.fakeSecretCli ? await ScratchSeedRuntime.installFakeSecretCli({ home, project }) : undefined
     const hostSource = fakeSecretCli === undefined ? process.env : { ...process.env, PATH: `${fakeSecretCli}${delimiter}${process.env.PATH ?? ''}` }
 
