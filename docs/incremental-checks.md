@@ -146,6 +146,8 @@ With a compiling `usage` mutation (`session-log.ts`: `lastIndexOf` became `index
 
 Residual risk: a dynamic dependent test that exercises the changed package neither through a static import nor a bundle boot would be skipped. `--consumers=full` covers that case.
 
+Sweep before enabling the defaults: 26 further one-line mutations across six more packages (`main-tabs`, `settings-shell`, `traces`, `secret-catalog`, `agent-communication`, `optmem-core`) gave 10 fault-revealing cases and zero missed failures, on top of the earlier 23 mutations and 13 faults. Two `usage` mutations were checked from the consumer side: the `session-log` mutation failed one narrowed test and **zero** of the 267 non-selected dependent tests, and a `jev-usage` constant change failed neither side. A real working-copy edit through `test:changed` skipped the build and ran the right two tests in 6s. With the `dshx` dist removed, the cold check reported `unbuilt workspace dependency @dshfiles/dshx`, rebuilt in 14s and passed. Turbo's test cache was verified to stay fresh: after a `usage` dist change, `background-jobs` re-executed and failed instead of replaying its cached pass.
+
 ### Can Jev pick the tests inside one plugin?
 
 A known fault-revealing one-line mutation in `backlog` (`activity-description.tsx`, one test covers the line). Jev (`jev-latest`) ranked all 56 backlog test files with the diff plus each test's first 2,400 characters:
