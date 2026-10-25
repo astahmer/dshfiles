@@ -2,18 +2,21 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { PluginScreenshots } from './plugin-screenshots-core.mjs'
 
-const feature = (id, surfaces = ['client'], reach) => ({
-  id,
-  title: id,
-  summary: id,
-  surfaces,
-  configuration: [],
-  states: ['one'],
-  failureModes: ['none'],
-  externalDependencies: [],
-  verification: [{ kind: 'gherkin', id: `x.${id}`, featureFile: 'tooling/dshx/e2e/features/x.feature' }],
-  ...(reach === undefined ? {} : { reach }),
-})
+const feature = (id, surfaces = ['client'], reach) => {
+  const feature = {
+    id,
+    title: id,
+    summary: id,
+    surfaces,
+    configuration: [],
+    states: ['one'],
+    failureModes: ['none'],
+    externalDependencies: [],
+    verification: [{ kind: 'gherkin', id: `x.${id}`, featureFile: 'tooling/dshx/e2e/features/x.feature' }],
+  }
+  if (reach !== undefined) feature.reach = reach
+  return feature
+}
 
 const catalog = (kind, features) => ({ schemaVersion: 1, kind, features })
 const walk = ['click button "Settings"']

@@ -1,14 +1,41 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
+import { decodeJson } from './json.ts'
 
 const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts', 'apps/desktop/src']
 
-// Deliberate public re-export boundaries, exempt from the ast-grep forwarding rules.
+// Files whose forwarding is the point: each is the target of its package's export map (the public
+// surface of that package), a deliberate vendor shim, or the single JSON decode boundary that turns
+// text into a value. Everything else imports the defining module directly.
 const astGrepBoundaries = [
-  'tooling/dshx/packages/dshx/client/index.d.ts',
+  'scripts/json.ts',
+  'plugins/@dshfiles/agents/src/contract.ts',
+  'plugins/@dshfiles/credential-port/src/index.ts',
+  'plugins/@dshfiles/multi-host/src/destination/index.ts',
+  'plugins/@dshfiles/optmem-core/src/index.ts',
+  'plugins/@dshfiles/plugin-ui/src/machine.ts',
+  'plugins/@dshfiles/plugin-ui/src/shiki-slim.ts',
+  'plugins/@dshfiles/plugin-ui/src/virtual.ts',
   'plugins/@dshfiles/plugin-ui/src/icons.ts',
+  'plugins/@dshfiles/project-folder-picker/src/index.ts',
+  'plugins/@dshfiles/usage/src/api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
+  'tooling/dshx/packages/create-dshx/src/capabilities.ts',
+  'tooling/dshx/packages/create-dshx/src/index.ts',
+  'tooling/dshx/packages/dshx/client/index.d.ts',
+  'tooling/dshx/packages/dshx/src/api/index.ts',
+  'tooling/dshx/packages/dshx/src/client/index.ts',
+  'tooling/dshx/packages/dshx/src/communication/index.ts',
+  'tooling/dshx/packages/dshx/src/config/index.ts',
+  'tooling/dshx/packages/dshx/src/conversation/index.ts',
+  'tooling/dshx/packages/dshx/src/host/index.ts',
+  'tooling/dshx/packages/dshx/src/index.ts',
+  'tooling/dshx/packages/dshx/src/platform/index.ts',
+  'tooling/dshx/packages/dshx/src/platform/host-api.ts',
+  'tooling/dshx/packages/dshx/src/settings/index.ts',
+  'tooling/dshx/packages/dshx/src/tooling/index.ts',
+  'tooling/dshx/packages/dshx/src/tracing/index.ts',
 ]
 
 // Vendored upstream source: kept byte-comparable to its pinned revision, so this repository's rules do not apply.
@@ -50,8 +77,6 @@ const astGrepMatchSchema = z.object({
   file: z.string(),
   range: z.object({ start: z.object({ line: z.number(), column: z.number() }) }),
 })
-
-const decodeJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
 
 type Finding = { readonly rule: string; readonly message: string; readonly location: string }
 

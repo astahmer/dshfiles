@@ -233,8 +233,7 @@ const freePort = async () => {
     const server = createServer()
     server.on('error', reject)
     server.listen(0, '127.0.0.1', () => {
-      const address = server.address()
-      const port = typeof address === 'object' && address !== null ? address.port : 0
+      const port = server.address()?.port ?? 0
       server.close(() => resolvePort(port))
     })
   })
@@ -455,10 +454,12 @@ const healthCheck = async (root, { keepState = false, turn } = {}) => {
    * sessions API is refused rather than promoted.
    */
   const rpc = async (namespace, method, args) => {
+    const headers = { 'content-type': 'application/json' }
+    if (cookie !== undefined) headers.cookie = cookie
     const response = await fetch(`${origin}/api/${namespace}/${method}`, {
       method: 'POST',
       redirect: 'error',
-      headers: { 'content-type': 'application/json', ...(cookie === undefined ? {} : { cookie }) },
+      headers,
       body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: `${namespace}/${method}`, payload: { args } }),
     })
     return { status: response.status, body: await response.text() }

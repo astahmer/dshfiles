@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { z } from 'zod'
+import { decodeJson, decodeJsonSafe } from '../../scripts/json.ts'
 
 /**
  * `pnpm -r run <script>` silently skips a package without that script, so a
@@ -65,7 +66,7 @@ const workspaceProjects = (): readonly WorkspaceProject[] => {
     .split('\n')
     .filter(path => path.length > 0)
     .map(packagePath => {
-      const manifest = projectManifestSchema.parse(JSON.parse(readFileSync(join(packagePath, 'package.json'), 'utf8')))
+      const manifest = decodeJson(projectManifestSchema, readFileSync(join(packagePath, 'package.json'), 'utf8'))
       return { directory: relative(repositoryRoot, packagePath) || '.', name: manifest.name, manifest }
     })
 }
@@ -137,15 +138,15 @@ const cycleProblems = (projects: readonly WorkspaceProject[]): string[] => {
 const problemsFor = (name: string): string[] => {
   const directory = join(packagesRoot, name)
   const isBundle = existsSync(join(directory, 'cordis.patch.yml'))
-  const manifest = (isBundle ? bundleManifestSchema : libraryManifestSchema).safeParse(JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')))
-  const tsconfig = tsconfigSchema(tsconfigBaseExceptions.get(name) ?? clientBase).safeParse(JSON.parse(readFileSync(join(directory, 'tsconfig.json'), 'utf8')))
+  const manifest = decodeJsonSafe(isBundle ? bundleManifestSchema : libraryManifestSchema, readFileSync(join(directory, 'package.json'), 'utf8'))
+  const tsconfig = decodeJsonSafe(tsconfigSchema(tsconfigBaseExceptions.get(name) ?? clientBase), readFileSync(join(directory, 'tsconfig.json'), 'utf8'))
   return [
     ...(manifest.success ? [] : manifest.error.issues.map(issue => `package.json ${issue.path.join('.')}: ${issue.message}`)),
     ...(tsconfig.success ? [] : tsconfig.error.issues.map(issue => `tsconfig.json ${issue.path.join('.')}: ${issue.message}`)),
   ].map(problem => `@dshfiles/${name} ${problem}`)
 }
 
-const baseTsconfig = baseTsconfigSchema.safeParse(JSON.parse(readFileSync(join(workspaceRoot, '..', 'tsconfig.base.client.json'), 'utf8')))
+const baseTsconfig = decodeJsonSafe(baseTsconfigSchema, readFileSync(join(workspaceRoot, '..', 'tsconfig.base.client.json'), 'utf8'))
 const projects = workspaceProjects()
 
 const problems = [
