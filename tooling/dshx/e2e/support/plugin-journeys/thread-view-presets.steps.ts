@@ -28,6 +28,8 @@ const selectViewStatuses = async (page: Page, labels: readonly string[]): Promis
 }
 
 When('saved thread views are created, edited, reordered, disabled, and removed', async ({ page }: { page: Page }) => {
+  // Match plain HTTP LAN access: getRandomValues is available, randomUUID is not.
+  await page.evaluate(() => Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true }))
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
   const dialog = viewManager(page)

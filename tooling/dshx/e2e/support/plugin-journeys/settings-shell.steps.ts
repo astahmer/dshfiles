@@ -1,7 +1,9 @@
-import { expect, type Page, type Request, type Response, type Route } from '@playwright/test'
+import { expect, test, type Page, type Request, type Response, type Route } from '@playwright/test'
+import { realpath } from 'node:fs/promises'
 import { Then, When } from '../bdd.js'
 import { z } from 'zod'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
+import { registerWorkspaceFolder } from '../threads.js'
 
 const settingsView = (page: Page) => page.locator('[data-settings-view]')
 const searchField = (page: Page) => page.getByRole('searchbox', { name: 'Search settings', exact: true })
@@ -15,6 +17,38 @@ const openSettings = async (page: Page): Promise<void> => {
 
 When('Settings is opened from the sidebar', async ({ page }: { page: Page }) => {
   await openSettings(page)
+})
+
+Then('Settings remain usable at narrow and wide widths', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-compact-navigation', async () => {
+    const sections = page.getByRole('combobox', { name: 'Sections', exact: true })
+    const navigation = page.getByRole('navigation', { name: 'Settings', exact: true })
+    for (const width of [360, 480, 768, 1024]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(settingsView(page)).toBeVisible()
+      expect(await settingsView(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+      expect(await searchField(page).evaluate(element => element.clientWidth)).toBeGreaterThan(60)
+      await expect(page.getByRole('button', { name: 'Open configuration file', exact: true })).toBeVisible()
+      if (width <= 480) {
+        await expect(navigation).toBeHidden()
+        await expect(sections).toBeVisible()
+        await sections.click()
+        await page.getByRole('option', { name: 'Models', exact: true }).click()
+        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
+        await expect(sections).toHaveText('Models')
+        await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeHidden()
+        await sections.click()
+        await page.getByRole('option', { name: 'General', exact: true }).click()
+        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
+        await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
+      } else {
+        await expect(navigation).toBeVisible()
+        await expect(sections).toBeHidden()
+      }
+      if (width === 360) await page.screenshot({ path: test.info().outputPath('settings-shell-compact-navigation.png') })
+    }
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the DSH release status and manual check action are available', async ({ page }: { page: Page }) => {
@@ -276,7 +310,9 @@ const sidePanelSettings = (page: Page) => page.locator('[data-settings-view="sid
 
 When('the side panel opens Settings', async ({ page }: { page: Page }) => {
   const openPanel = page.getByRole('button', { name: 'Open right sidebar', exact: true })
-  if (!(await openPanel.isVisible())) await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  // The empty isolated profile has no selected project, so New session alone cannot expose the thread's side panel.
+  if (!(await openPanel.isVisible())) await registerWorkspaceFolder(page, await realpath(profileFor(page).homeRoot))
+  await expect(openPanel).toBeVisible()
   await openPanel.click()
   await page.getByText('Edit Settings in this panel.', { exact: true }).click()
   await expect(sidePanelSettings(page)).toBeVisible()

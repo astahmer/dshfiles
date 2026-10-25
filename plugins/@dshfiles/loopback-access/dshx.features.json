@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "localhost-with-lan",
+      "title": "Keep localhost available when LAN access is enabled",
+      "summary": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Print the actual localhost launch URL first and the available LAN/advertised addresses after startup settles. Native loopback-only binds remain unchanged.",
+      "surfaces": ["host", "integration", "api", "tool"],
+      "configuration": [],
+      "states": ["starting", "native-loopback", "forwarding", "disabled", "stopped", "failed"],
+      "failureModes": [
+        "An occupied loopback port rejects startup and rolls back listeners instead of taking over another application.",
+        "Unavailable IPv6 leaves the IPv4 loopback listener available; other listener failures are not hidden.",
+        "HTTPS is forwarded as TLS, so the supplied certificate must also cover localhost.",
+        "Localhost needs its own native launch-token login because authentication cookies are authority-bound."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "loopback listen",
+          "file": "plugins/@dshfiles/loopback-access/src/forwarder.test.ts",
+          "testName": "records bounded listen and connect spans without forwarded bytes or addresses"
+        },
+        {
+          "kind": "custom",
+          "span": "loopback connect",
+          "file": "plugins/@dshfiles/loopback-access/src/forwarder.test.ts",
+          "testName": "records bounded listen and connect spans without forwarded bytes or addresses"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "loopback-access.startup-address-order",
+          "file": "plugins/@dshfiles/loopback-access/src/terminal-output.test.ts",
+          "testName": "prints the native-compatible localhost line first and LAN as an additional address"
+        },
+        { "kind": "gherkin", "id": "loopback-access.authenticated-lan-and-localhost", "featureFile": "tooling/dshx/e2e/features/loopback-access.feature" },
+        {
+          "kind": "unit-test",
+          "id": "loopback-access.native-loopback-policy",
+          "file": "plugins/@dshfiles/loopback-access/src/access.test.ts",
+          "testName": "leaves a native loopback bind unchanged: %s"
+        }
+      ]
+    },
+    {
+      "id": "network-access-settings",
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ],
+      "title": "Choose how DSH is reachable",
+      "summary": "Choose LAN access and a concrete interface address, retain or disable localhost, and set an advanced port. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Network access\"", "expect switch \"LAN access\""],
+      "surfaces": ["client", "host", "settings"],
+      "configuration": [
+        {
+          "key": "lanEnabled",
+          "defaultValue": "null (inherit profile)",
+          "constraints": "Boolean desired access mode; null preserves the native profile fallback.",
+          "coveredBy": ["loopback-access.network-access-settings"]
+        },
+        {
+          "key": "bindAddress",
+          "defaultValue": "null",
+          "constraints": "A current concrete non-loopback address is required when enabling LAN access.",
+          "coveredBy": ["loopback-access.network-access-settings"]
+        },
+        {
+          "key": "localhostEnabled",
+          "defaultValue": "true",
+          "constraints": "LAN-only is allowed; disabling both LAN and localhost is refused by the save API.",
+          "coveredBy": ["loopback-access.network-access-settings"]
+        },
+        {
+          "key": "port",
+          "defaultValue": "null (inherit profile)",
+          "constraints": "0 chooses an available port; explicit ports are whole numbers 1–65535. CLI flags keep priority.",
+          "coveredBy": ["loopback-access.network-access-settings"]
+        }
+      ],
+      "states": [
+        "loading",
+        "local-only",
+        "lan-and-localhost",
+        "lan-only",
+        "pending-restart",
+        "cli-overridden",
+        "read-only",
+        "missing-address",
+        "old-host-unavailable",
+        "save-error"
+      ],
+      "failureModes": [
+        "Concurrent or invalid settings writes are rejected without replacing the user's desired configuration.",
+        "A saved address that disappears remains visible instead of silently exposing a different interface.",
+        "Custom native binding overrides stay read-only until the startup integration is installed; Save never live-migrates the native listener.",
+        "An old Host without the matching API displays an unavailable section rather than editable controls."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "loopback-access.network-access-settings", "featureFile": "tooling/dshx/e2e/features/loopback-access.feature" },
+        {
+          "kind": "unit-test",
+          "id": "loopback-access.network-form",
+          "file": "plugins/@dshfiles/loopback-access/src/network-section.client.test.tsx",
+          "testName": "requires an explicit interface choice instead of exposing the first available network"
+        },
+        {
+          "kind": "unit-test",
+          "id": "loopback-access.staged-startup",
+          "file": "plugins/@dshfiles/loopback-access/src/startup.test.ts",
+          "testName": "commits desired volatile changes without reactivating or changing the boot service"
+        }
+      ]
+    }
+  ]
+}

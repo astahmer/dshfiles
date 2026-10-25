@@ -10,6 +10,7 @@ import {
   Tooltip,
   useModalLayer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import {
   AppWindowIcon,
@@ -183,23 +184,24 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
   const activeLabel = activePage?.title ?? props.rows.find(row => row.id === props.activeId)?.label ?? ''
   return (
-    <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', sidebar && 'dshx:@container')}>
+    <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
       <div
         className={cn(
           'dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4',
           sidebar && 'dshx:h-11 dshx:gap-2 dshx:px-3',
+          !sidebar && 'dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3',
         )}
       >
         <div
           className={cn(
             'dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]',
-            sidebar && 'dshx:hidden dshx:@pane-compact:block',
+            sidebar ? 'dshx:hidden dshx:@pane-compact:block' : 'dshx:@max-pane-compact:sr-only',
           )}
           id={props.titleId}
         >
           {props.renderSlot('settings.header', {})}
         </div>
-        <InputGroup className="dshx:h-8 dshx:max-w-[560px] dshx:flex-1">
+        <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
           <InputGroupAddon>
             <SearchIcon />
           </InputGroupAddon>
@@ -233,11 +235,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         </InputGroup>
         {searching && (
-          <span
-            aria-live="polite"
-            className={cn('dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground', sidebar && 'dshx:@max-pane-narrow:hidden')}
-            role="status"
-          >
+          <span aria-live="polite" className="dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
             {foundText}
           </span>
         )}
@@ -272,12 +270,32 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         </div>
       </div>
-      <div className="dshx:flex dshx:min-h-0 dshx:flex-1">
+      {!sidebar && (
+        <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
+          <Combobox
+            label={t('search.sections')}
+            value={active ?? ''}
+            options={[
+              ...props.rows.map(row => ({ value: row.id, label: row.label, group: t('search.sections') })),
+              ...props.pluginPages.map(page => ({
+                value: page.pageId,
+                label: page.title,
+                keywords: [page.ns],
+                group: t(page.group === 'plugins' ? 'nav.plugins' : 'nav.more'),
+              })),
+            ]}
+            onValueChange={select}
+            matchTriggerWidth
+          />
+        </div>
+      )}
+      <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
         <nav
           aria-label={t('title')}
           className={cn(
             'dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4',
             sidebar && 'dshx:w-full dshx:@pane-compact:w-[208px]',
+            !sidebar && 'dshx:@max-pane-compact:hidden',
             drilled && 'dshx:hidden dshx:@pane-compact:flex',
           )}
         >
@@ -343,6 +361,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           className={cn(
             'dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6',
             sidebar && 'dshx:px-3 dshx:pt-3 dshx:@pane-compact:px-6 dshx:@pane-compact:pt-5',
+            !sidebar && 'dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3',
             sidebar && !drilled && 'dshx:hidden dshx:@pane-compact:block',
           )}
           ref={content}

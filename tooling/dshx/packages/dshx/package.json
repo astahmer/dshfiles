@@ -152,6 +152,7 @@
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tool-cordis": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
+    "@deepseek-ai/dsh-web-app": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
