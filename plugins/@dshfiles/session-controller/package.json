@@ -69,6 +69,7 @@
     "@deepseek-ai/dsh-scope": "0.2.1-rc.2",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-persistence": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-rc.2",
     "@deepseek-ai/dsh-session-projection": "catalog:",
     "@deepseek-ai/dsh-session-projection-cache": "0.2.1-rc.2",
     "@deepseek-ai/dsh-session-query": "catalog:",
@@ -89,11 +90,9 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/session-source-port": "workspace:*",
     "@types/node": "catalog:",
-    "mime-types": "3.0.2",
     "react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "zod": "4.4.3"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

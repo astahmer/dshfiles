@@ -65,6 +65,7 @@
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-modules": "catalog:",
+    "@deepseek-ai/dsh-client-resources": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-shortcuts": "catalog:",
     "@deepseek-ai/dsh-client-store": "catalog:",
     "@deepseek-ai/dsh-client-ui-chat": "catalog:",

@@ -148,7 +148,9 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   const divergedRevsets = ComposerContextModel.revisionCountRevsets(siblingCommitId)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', divergedRevsets.ahead, '-T', '"x"']).length).toBe(1)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', divergedRevsets.behind, '-T', '"x"']).length).toBe(1)
-}, 15_000)
+  // This builds a real repository through dozens of jj and git subprocesses; the suite runs files in parallel,
+  // where the 15s bound was a coin flip.
+}, 60_000)
 
 test('composer reads spawn jj again for view reads only after an operation lands', async () => {
   const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-composer-reads-'))
