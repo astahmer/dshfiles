@@ -73,6 +73,15 @@ Then('the decoy is listed as a detached tree of its workspace', async ({ page }:
   })
 })
 
+Then('the RAM process list is independently scrollable', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'worktree-memory-process-list-scrolls-within-its-panel', async () => {
+    const scrollRegion = page.locator('[data-memory-scroll-region]')
+    await expect(scrollRegion).toBeVisible()
+    await expect(scrollRegion).toHaveCSS('overflow-y', 'auto')
+    await expect(scrollRegion).toHaveCSS('min-height', '0px')
+  })
+})
+
 Then('the RAM sidebar entry shows the detached memory', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'worktree-memory-sidebar-badge-shows-detached-memory', async () => {
     const badge = ramEntry(page).locator('[data-memory-badge-detached-bytes]')

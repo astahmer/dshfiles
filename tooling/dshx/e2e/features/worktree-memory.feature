@@ -11,6 +11,7 @@ Feature: Worktree memory (RAM panel)
     And the RAM panel is opened
     Then the decoy is listed as a detached tree of its workspace
     And the RAM sidebar entry shows the detached memory
+    And the RAM process list is independently scrollable
     And stopping the decoy from the panel ends the process
 
   @scenario:worktree-memory.stop-section

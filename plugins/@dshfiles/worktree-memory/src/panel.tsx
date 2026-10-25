@@ -452,8 +452,11 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
   const pressure = PRESSURE[value?.pressure ?? 'unknown']
 
   return (
-    <div className="dshx-root dshx:@container dshx:flex dshx:min-h-full dshx:flex-col">
-      <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:p-5 dshx:@max-pane-narrow:p-3">
+    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden">
+      <div
+        className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3"
+        data-memory-scroll-region
+      >
         <header className="dshx:flex dshx:flex-col dshx:gap-2">
           <div className="dshx:flex dshx:items-center dshx:gap-2">
             <MemoryStickIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
@@ -563,7 +566,7 @@ export function WorktreeMemoryPanel(props: WorktreeMemoryPanelProps): JSX.Elemen
       </div>
 
       {value === undefined || listedTrees.length === 0 ? null : (
-        <footer className="dshx:sticky dshx:bottom-0 dshx:flex dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:px-5 dshx:py-2 dshx:@max-pane-narrow:px-3">
+        <footer className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:px-5 dshx:py-2 dshx:@max-pane-narrow:px-3">
           <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:text-muted-foreground">
             {count(listedTrees.length, 'process', 'processes', t)} · <span className="dshx:tabular-nums">{formatBytes(value.trackedBytes)}</span>
             {value.detachedCount === 0 ? '' : ` · ${String(value.detachedCount)} ${t('detachedTotal')}`}
