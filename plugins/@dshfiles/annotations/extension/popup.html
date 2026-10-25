@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DSH annotations</title>
+    <style>
+      body {
+        width: 290px;
+        margin: 0;
+        padding: 12px;
+        font:
+          12px/1.5 system-ui,
+          sans-serif;
+        color: #0f172a;
+        background: #fff;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 13px;
+      }
+      label {
+        display: block;
+        margin-top: 8px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 2px;
+        padding: 5px 6px;
+        font: inherit;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+      }
+      button {
+        margin-top: 10px;
+        width: 100%;
+        padding: 7px;
+        font: inherit;
+        font-weight: 600;
+        border: 0;
+        border-radius: 6px;
+        background: #4f46e5;
+        color: #fff;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      p.status {
+        margin: 8px 0 0;
+        min-height: 2.4em;
+        color: #475569;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          color: #e2e8f0;
+          background: #0f172a;
+        }
+        input {
+          color: inherit;
+          background: #1e293b;
+          border-color: #334155;
+        }
+        button.secondary {
+          background: #334155;
+          color: #e2e8f0;
+        }
+        p.status {
+          color: #94a3b8;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Annotate for DSH</h1>
+    <label for="endpoint">DSH URL</label>
+    <input id="endpoint" spellcheck="false" />
+    <button id="pair">Pair with DSH</button>
+    <button id="pick" class="secondary">Annotate this tab</button>
+    <details>
+      <summary>Paste a token instead</summary>
+      <label for="token">Token</label>
+      <input id="token" type="password" spellcheck="false" />
+      <button id="save" class="secondary">Save token</button>
+    </details>
+    <p id="status" class="status"></p>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

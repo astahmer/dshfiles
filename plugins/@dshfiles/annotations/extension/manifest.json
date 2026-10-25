@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "DSH annotations",
+  "version": "0.1.0",
+  "description": "Annotate any page and send it to DeepSeek Harness with a loopback token.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_title": "Annotate this page for DSH",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApQG7TkCLPHMje1cjMdSlOjaQb4it9DqJikNHveQy6llLIX6yFXD+gXzH+CgDwA+VEhzMmNDEePPVkJJzptWyOEJujRbrqvGxh2JJ0WGmLCi4TGJEJNJwGE7feIa+8BB1afeZgW4CgDR7Xgr+f0miI+3yogNy8t9tqW5nNhadQ5qoxBGLlLdaCGhEwK6d3WkG4wP4UHoFBohtQdnpKkxdSn2e6sbWrp3SPeAnBjUzlitn50ytV9HtIA1NOc0HVlOCr+Rt1J25ZwuiRDULRMjRusG5/Db6hlp1+432C395GbHZL+snFBhdSChmgCk03aMWwxaKWL3zev+6Lg/QOYz+fwIDAQAB"
+}

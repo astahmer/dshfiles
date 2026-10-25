@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-annotations
+      name: '@dshfiles/annotations'

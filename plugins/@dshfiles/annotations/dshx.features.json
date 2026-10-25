@@ -1,0 +1,359 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "pick-element",
+      "title": "Pick an element and add it to the draft",
+      "summary": "Pick an element in DSH, write a bounded note, and insert a source-linked block into the composer draft without sending it.",
+      "surfaces": ["client", "host", "api", "tool"],
+      "configuration": [],
+      "states": ["idle", "picking", "commenting", "saved", "stale", "resolved", "dismissed"],
+      "failureModes": [
+        "No Session is open, so the composer action refuses to start a pick.",
+        "The picker cannot read the element because it sits under a private or form field, so it refuses that pick.",
+        "The Host store is unavailable, so saving reports an error and the draft is untouched.",
+        "The source map for a bundle is missing, so the annotation keeps its selector and reports no source."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "click button \"Annotate an element\"",
+        "click button \"Pick element\"",
+        "expect text \"Click an element*\"",
+        "click button \"Annotate an element\"",
+        "expect textbox \"What is wrong or what should change?\"",
+        "fill textbox \"What is wrong or what should change?\" \"the tab strip overlaps the sidebar\"",
+        "click button \"Add\"",
+        "click button \"Annotate an element\"",
+        "expect text \"plugins/@dshfiles/annotations/src*\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "annotations.pick-and-insert",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.store-lifecycle",
+          "file": "plugins/@dshfiles/annotations/tests/store.spec.ts",
+          "testName": "creates a pending annotation with a stable id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.store-revision",
+          "file": "plugins/@dshfiles/annotations/tests/store.spec.ts",
+          "testName": "refuses to resolve a stale revision"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.descriptor-bounded",
+          "file": "plugins/@dshfiles/annotations/tests/descriptor.spec.ts",
+          "testName": "captures a bounded descriptor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.descriptor-refusals",
+          "file": "plugins/@dshfiles/annotations/tests/descriptor.spec.ts",
+          "testName": "refuses an input value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.draft-block",
+          "file": "plugins/@dshfiles/annotations/tests/draft.spec.ts",
+          "testName": "prints selector, page, source and note"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations resolve source",
+          "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
+          "testName": "records the resolve span"
+        }
+      ]
+    },
+    {
+      "id": "source-resolution",
+      "title": "Resolve an element to its source",
+      "summary": "Map a captured CSS class or exact visible text to a file and line inside an owned plugin bundle through its client source map.",
+      "surfaces": ["host", "api", "tool"],
+      "configuration": [],
+      "states": ["resolved", "unresolved"],
+      "failureModes": [
+        "The bundle was built without a source map, so the match is absent and the annotation keeps its selector only.",
+        "The map is larger than the parse cap, so it is skipped rather than blocking the Host.",
+        "The class hash appears in no built bundle, so no match is returned instead of guessing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "annotations.source-class-map",
+          "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
+          "testName": "maps a class hash to its module source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.source-text-fallback",
+          "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
+          "testName": "falls back to text in the original source"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.source-no-guess",
+          "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
+          "testName": "returns no match rather than guessing"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations resolve source",
+          "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
+          "testName": "records the resolve span"
+        }
+      ]
+    },
+    {
+      "id": "extension-intake",
+      "title": "Intake annotations from the browser extension",
+      "summary": "Pair a pinned-origin browser extension through a two-minute single-use window, then accept its annotations over a token-authenticated loopback route and keep them unassigned until the user picks a thread.",
+      "surfaces": ["host", "api"],
+      "configuration": [],
+      "states": ["unpaired", "pairing", "paired", "accepted", "rejected", "attached"],
+      "failureModes": [
+        "Pairing is refused when the window is closed, has expired, or the origin is not the pinned extension origin.",
+        "A wrong token, a non-extension origin or a non-loopback peer is refused before any parse.",
+        "A body over the size cap is refused with 413.",
+        "An unassigned annotation is never attached to a Session without the user choosing one."
+      ],
+      "externalDependencies": [
+        {
+          "id": "chrome-mv3-extension",
+          "boundary": "Only the page's own script can capture an element on a site DSH does not own, so the extension is the only capture path for those pages.",
+          "deterministicFake": "The Host ingest route is exercised directly over loopback HTTP with a valid token, a wrong token, a foreign origin and an oversize body, without loading the extension."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "annotations.extension-intake",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.intake-accepts",
+          "file": "plugins/@dshfiles/annotations/tests/ingest.spec.ts",
+          "testName": "accepts a valid annotation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.intake-token",
+          "file": "plugins/@dshfiles/annotations/tests/ingest.spec.ts",
+          "testName": "rejects a wrong token"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.intake-origin",
+          "file": "plugins/@dshfiles/annotations/tests/ingest.spec.ts",
+          "testName": "rejects a non-extension origin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.intake-attach",
+          "file": "plugins/@dshfiles/annotations/tests/store.spec.ts",
+          "testName": "ingests unattached extension feedback and attaches it to a chosen Session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.extension-identity",
+          "file": "plugins/@dshfiles/annotations/tests/extension.spec.ts",
+          "testName": "derives the pinned id from the committed manifest key"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.pair-armed",
+          "file": "plugins/@dshfiles/annotations/tests/pairing.spec.ts",
+          "testName": "refuses before the window is armed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.pair-once",
+          "file": "plugins/@dshfiles/annotations/tests/pairing.spec.ts",
+          "testName": "hands the token over once while the window is open"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.pair-cors",
+          "file": "plugins/@dshfiles/annotations/tests/pairing.spec.ts",
+          "testName": "answers the extension preflight with CORS headers"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "preview-file",
+      "title": "Annotate an HTML preview",
+      "summary": "Open a workspace HTML file in a sandboxed, instrumented preview and annotate an element inside it with the file as its source.",
+      "surfaces": ["client", "host", "api"],
+      "configuration": [],
+      "states": ["closed", "loading", "rendered", "picked", "saved"],
+      "failureModes": [
+        "A path outside the working directory, a non-HTML file, a missing file or one over 2 MB is refused with the reason.",
+        "The preview's own scripts are stripped and the frame is sandboxed without allow-same-origin, so page code cannot reach DSH.",
+        "The inspector never reports an element for a private subtree or a form control."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "annotations.preview-element",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.preview-sanitizes",
+          "file": "plugins/@dshfiles/annotations/tests/preview-document.spec.ts",
+          "testName": "removes the page scripts and inline handlers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.preview-bounded",
+          "file": "plugins/@dshfiles/annotations/tests/preview.spec.ts",
+          "testName": "refuses a path outside the root"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations read preview",
+          "file": "plugins/@dshfiles/annotations/tests/preview.spec.ts",
+          "testName": "records the preview read span"
+        }
+      ]
+    },
+    {
+      "id": "chrome-picker",
+      "title": "Pick on any page in a DSH-owned Chrome",
+      "summary": "Launch a Chrome profile with a loopback debugging port, open a configured start URL, and inject the same bounded picker over the DevTools protocol \u2014 on the focused tab by default, or on a listed tab.",
+      "surfaces": ["client", "host", "api"],
+      "configuration": [
+        {
+          "key": "chromePath",
+          "defaultValue": "",
+          "constraints": "Absolute path to a Chrome or Chromium executable; empty auto-detects the platform install.",
+          "coveredBy": ["annotations.chrome-detect"]
+        },
+        {
+          "key": "cdpPort",
+          "defaultValue": "9222",
+          "constraints": "Loopback port between 1024 and 65535.",
+          "coveredBy": ["annotations.chrome-pick"]
+        },
+        {
+          "key": "pickActiveTab",
+          "defaultValue": "true",
+          "constraints": "Pick on the focused tab instead of listing tabs; false restores the per-tab list.",
+          "choices": ["true", "false"],
+          "coveredBy": ["annotations.chrome-choose-page"]
+        },
+        {
+          "key": "startUrl",
+          "defaultValue": "",
+          "constraints": "Page the launched browser opens; empty opens a blank tab.",
+          "coveredBy": ["annotations.chrome-start-url"]
+        }
+      ],
+      "states": ["idle", "launching", "running", "picking", "picked", "unavailable"],
+      "failureModes": [
+        "No Chrome or Chromium is found, so the panel says so and points at the setting instead of guessing.",
+        "Chrome never opens its debugging port in time, so the launch fails with that reason.",
+        "A pick that is never answered times out and arms nothing afterwards.",
+        "A tab that disappeared between listing and picking is reported, not silently retried."
+      ],
+      "externalDependencies": [
+        {
+          "id": "chrome-devtools-protocol",
+          "boundary": "The picker runs inside a real Chrome; the protocol is unauthenticated loopback, so only the DSH-owned profile is launched.",
+          "deterministicFake": "The integration test launches headless Chrome, serves a fixture page and dispatches a real click, then asserts the picked selector and text."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "annotations.chrome-tab",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.chrome-pick",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp.integration.spec.ts",
+          "testName": "lists the page and returns the clicked element"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.chrome-detect",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-launch.spec.ts",
+          "testName": "honours a configured path that exists"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.chrome-profiles",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-launch.spec.ts",
+          "testName": "uses the DSH home when it is set"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.chrome-choose-page",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp.integration.spec.ts",
+          "testName": "prefers the focused tab"
+        },
+        {
+          "kind": "unit-test",
+          "id": "annotations.chrome-start-url",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-launch.spec.ts",
+          "testName": "opens the configured start page"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations launch chrome",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-launch.spec.ts",
+          "testName": "records the launch span and fails fast when no port opens"
+        }
+      ]
+    }
+  ]
+}

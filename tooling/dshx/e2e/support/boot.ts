@@ -108,6 +108,7 @@ export const startScratchProfile = async (
   expectedClientEntries: readonly string[],
   timeoutMs: number,
   pathPrefix?: string,
+  hostEnv: Readonly<Record<string, string>> = {},
 ): Promise<BootedProfile> => {
   const validatedAt = Date.now()
   const compositionKey = await compositionKeyFor(prepared)
@@ -129,7 +130,7 @@ export const startScratchProfile = async (
       cwd: DSHFILES_ROOT,
       // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
       // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
-      env: { ...hostEnvironment, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
+      env: { ...hostEnvironment, ...hostEnv, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     let output = ''
@@ -221,6 +222,8 @@ interface ComposedBootRequest {
   readonly additionalBundleIds: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
   readonly cordisPatch?: string
+  /** Extra environment for the Host process, e.g. a plugin's verification switch. */
+  readonly hostEnv?: Readonly<Record<string, string>>
 }
 
 /**
@@ -253,7 +256,11 @@ process.once('exit', killPrewarmedHostsOnExit)
 const compositionKeyOf = (request: ComposedBootRequest): string | undefined => {
   if (request.seedHome !== undefined) return undefined
   const hash = createHash('sha256')
-  hash.update(`${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}`)
+  const env = Object.entries(request.hostEnv ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('&')
+  hash.update(`${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}\0${env}`)
   return hash.digest('hex')
 }
 
@@ -307,7 +314,7 @@ const bootComposedProfile = async (request: ComposedBootRequest): Promise<Booted
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     const seededHome = await request.seedHome?.(prepared.homeRoot)
-    return await startScratchProfile(prepared, request.profileLabel, expectedClientEntries, request.timeoutMs, seededHome?.hostPathPrefix)
+    return await startScratchProfile(prepared, request.profileLabel, expectedClientEntries, request.timeoutMs, seededHome?.hostPathPrefix, request.hostEnv)
   } catch (error) {
     await prepared.dispose()
     throw error
@@ -321,6 +328,8 @@ export const bootComposedPluginProfile = async (request: {
   readonly additionalBundleIds?: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
   readonly cordisPatch?: string
+  /** Extra environment for the Host process, e.g. a plugin's verification switch. */
+  readonly hostEnv?: Readonly<Record<string, string>>
 }): Promise<BootedProfile> => {
   const composed: ComposedBootRequest = {
     packageIds: request.packageIds,
@@ -330,6 +339,7 @@ export const bootComposedPluginProfile = async (request: {
   }
   if (request.seedHome !== undefined) composed.seedHome = request.seedHome
   if (request.cordisPatch !== undefined) composed.cordisPatch = request.cordisPatch
+  if (request.hostEnv !== undefined) composed.hostEnv = request.hostEnv
   const compositionKey = compositionKeyOf(composed)
   if (compositionKey !== undefined) {
     const slot = prewarmSlots.get(compositionKey)
