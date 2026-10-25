@@ -2,11 +2,12 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
-import { useQueries, useQuery } from '@dshfiles/plugin-ui/query'
+import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
 import { hostDestination, openHostsPage, setHostDestination } from './state.js'
 
@@ -35,15 +36,18 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
       return hosts.find(host => host.id === runtime.hostId)?.hidden !== true
     })
     .sort((left, right) => (hostOrder.get(left.hostId) ?? 0) - (hostOrder.get(right.hostId) ?? 0))
-  // Opening the menu connects each host once, so its status is live rather than whatever the last call left behind.
+  // Reuse a recent ping for quick menu toggles, and stop probing an unavailable runtime every ten seconds.
   const pings = useQueries({
-    queries: pickable.map(runtime => ({
-      queryKey: ['multi-host', 'ping', runtime.id],
-      queryFn: ({ signal }: { readonly signal: AbortSignal }) => api.runtimePing({ runtimeId: runtime.id }, { signal }),
-      enabled: open || (destination.kind === 'runtime' && destination.runtimeId === runtime.id),
-      refetchInterval: open ? 10_000 : 60_000,
-      retry: false,
-    })),
+    queries: pickable.map(runtime =>
+      queryOptions({
+        queryKey: ['multi-host', 'ping', runtime.id],
+        queryFn: ({ signal }) => api.runtimePing({ runtimeId: runtime.id }, { signal }),
+        enabled: open || (destination.kind === 'runtime' && destination.runtimeId === runtime.id),
+        staleTime: 15_000,
+        refetchInterval: query => runtimePingRefetchInterval({ menuOpen: open, available: query.state.data?.ok }),
+        retry: false,
+      }),
+    ),
   })
   const liveState = (runtime: RuntimeSummary | undefined) => {
     const ping = pings[pickable.findIndex(item => item.id === runtime?.id)]?.data
