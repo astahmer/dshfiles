@@ -67,6 +67,8 @@ the preparation is still running, the send waits for the same work rather than
 starting it twice. The view follows the created thread only while this New thread
 screen is still the one on screen (its own blank Session, no main panel, not the
 Start page); after another thread or tab the thread is offered in a toast instead.
+When it follows, the main-tabs strip replaces the source blank Session tab with the
+isolated Session tab, so the submitted conversation stays in the tab the user sent from.
 Each first send runs on its own, so opening another New thread right after Send,
 or sending two threads back to back, keeps every prompt in its own workspace.
 Typing never waits on jj, and a New thread whose draft never sends leaves one

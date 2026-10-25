@@ -41,15 +41,16 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.new-thread-from-thread-workspace-isolation-browser-journey
   Scenario: An inherited thread workspace is replaced only on the first send
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
     And new threads start in their own jj workspace by default
-    And New thread is clicked in the sidebar
+    And New thread is opened from the main-tabs plus page
     Then the blank new thread keeps the previous workspace until it sends
     When the blank new thread sends its first message
     Then the new thread provisioned its own jj workspace instead of the previous one
+    And the submitted thread replaces the blank main tab
 
   @scenario:jj-integration.failed-destination-retry-browser-journey
   Scenario: A failed destination lookup keeps the first message unsent and offers retry

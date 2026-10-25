@@ -92,6 +92,8 @@ const usePlacementCheck = (host: HTMLElement | null, rendered: boolean): void =>
  */
 const OPEN_THREAD_EVENT = 'dshfiles:open-thread'
 const openThreadRequestSchema = z.object({ sessionId: z.string().min(1), newTab: z.boolean() })
+const REPLACE_THREAD_TAB_EVENT = 'dshfiles:replace-thread-tab'
+const replaceThreadTabRequestSchema = z.object({ sourceSessionId: z.string().min(1), sessionId: z.string().min(1) }).strict()
 
 export default defineClient({
   name: '@dshfiles/main-tabs',
@@ -143,8 +145,22 @@ export default defineClient({
         event.preventDefault()
         actor.send({ type: 'tab.open', target: { kind: 'thread', sessionId: request.data.sessionId }, newTab: request.data.newTab })
       }
+      const onReplaceThreadTab = (event: Event): void => {
+        const request = event instanceof CustomEvent ? replaceThreadTabRequestSchema.safeParse(event.detail) : undefined
+        if (request?.success !== true || !actor.getSnapshot().matches('on')) return
+        const snapshot = actor.getSnapshot()
+        const set = snapshot.context.sets[snapshot.context.scopeKey]
+        const sourceId = tabIdOf({ kind: 'thread', sessionId: request.data.sourceSessionId })
+        if (!set?.tabs.some(tab => tab.id === sourceId) || !ctx.sessions.list.getSnapshot().ids.some(id => id === request.data.sessionId)) return
+        event.preventDefault()
+        actor.send({ type: 'thread.replace', sourceSessionId: request.data.sourceSessionId, sessionId: request.data.sessionId })
+      }
       window.addEventListener(OPEN_THREAD_EVENT, onOpenThread)
-      return () => window.removeEventListener(OPEN_THREAD_EVENT, onOpenThread)
+      window.addEventListener(REPLACE_THREAD_TAB_EVENT, onReplaceThreadTab)
+      return () => {
+        window.removeEventListener(OPEN_THREAD_EVENT, onOpenThread)
+        window.removeEventListener(REPLACE_THREAD_TAB_EVENT, onReplaceThreadTab)
+      }
     }, 'main-tabs: open a thread for another plugin')
 
     ctx.effect(() => {

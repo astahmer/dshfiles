@@ -31,6 +31,7 @@ const rememberedBlankThreads = new WeakMap<Page, string>()
 /** The thread workspaces that existed just before the draft was sent; its send must add none. */
 const beforeSendNames = new WeakMap<Page, string>()
 const heldDestinationLookups = new WeakMap<Page, HeldDestinationLookup>()
+const firstSendMainTabTransitions = new WeakMap<Page, { readonly sourceSessionId: string; readonly destinationSessionId: string }>()
 const heldDestinationLookupFor = (page: Page): HeldDestinationLookup => {
   const lookup = heldDestinationLookups.get(page)
   if (lookup === undefined) throw new Error('No held New thread destination lookup exists for this page.')
@@ -478,6 +479,14 @@ When('New thread is clicked in the sidebar', async ({ page }: { page: Page }) =>
   await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
 })
 
+When('New thread is opened from the main-tabs plus page', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New tab', exact: true }).click()
+  const startPage = page.getByRole('listbox', { name: 'Open in this tab', exact: true })
+  await expect(startPage).toBeVisible()
+  await startPage.getByRole('option', { name: 'New thread', exact: true }).click()
+  await expect(newThreadComposer(page)).toBeVisible()
+})
+
 Then('the New thread composer opens before its workspace exists', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-new-thread-composer-opens-at-once', async () => {
     await expect(page.getByRole('textbox', { name: newThreadComposerName, exact: true })).toBeVisible({ timeout: 1_000 })
@@ -671,10 +680,28 @@ Then('the blank new thread keeps the previous workspace until it sends', async (
 })
 
 When('the blank new thread sends its first message', async ({ page }: { page: Page }) => {
+  const sourceSessionId = new URL(page.url()).searchParams.get('thread')
+  if (sourceSessionId === null) throw new Error('The blank New thread has no Session ID in the URL.')
   const composer = newThreadComposer(page)
   await composer.fill('first message from the inherited workspace')
   await composer.press('Enter')
   await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
+  const destinationSessionId = (): string | null => new URL(page.url()).searchParams.get('thread')
+  await expect.poll(destinationSessionId, { timeout: 15_000 }).not.toBe(sourceSessionId)
+  const destination = destinationSessionId()
+  if (destination === null) throw new Error('The submitted thread has no Session ID in the URL.')
+  firstSendMainTabTransitions.set(page, { sourceSessionId, destinationSessionId: destination })
+})
+
+Then('the submitted thread replaces the blank main tab', async ({ page }: { page: Page }) => {
+  const transition = firstSendMainTabTransitions.get(page)
+  if (transition === undefined) throw new Error('No first-send main-tab transition was recorded.')
+  const tabs = page.getByRole('tablist', { name: 'Open views', exact: true })
+  await recordAssertion(page, 'jj-integration-first-send-replaces-blank-main-tab', async () => {
+    expect(transition.destinationSessionId).not.toBe(transition.sourceSessionId)
+    await expect(tabs.locator(`[data-tab-id="thread:${transition.sourceSessionId}"]`)).toHaveCount(0)
+    await expect(tabs.locator(`[data-tab-id="thread:${transition.destinationSessionId}"]`)).toHaveAttribute('aria-selected', 'true')
+  })
 })
 
 Then('the new thread provisioned its own jj workspace instead of the previous one', async ({ page }: { page: Page }) => {
@@ -986,10 +1013,7 @@ const undoQueuedIntegrationButton = (page: Page) => workspaceMenu(page).getByRol
 
 When('the New thread screen is reopened', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page
-    .getByRole('button', { name: /^(?:New session|New thread)$/ })
-    .first()
-    .click()
+  await page.getByRole('button', { name: /^(?:New session|New thread)$/ }).first().click()
   await expect(newThreadComposer(page)).toBeVisible()
 })
 

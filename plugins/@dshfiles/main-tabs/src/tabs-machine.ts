@@ -72,6 +72,7 @@ export type TabsEvent =
   | { readonly type: 'tab.togglePin'; readonly tabId: string }
   | { readonly type: 'tab.keep'; readonly tabId: string }
   | { readonly type: 'thread.keep'; readonly sessionId: string }
+  | { readonly type: 'thread.replace'; readonly sourceSessionId: string; readonly sessionId: string }
   | { readonly type: 'tab.move'; readonly tabId: string; readonly toIndex: number }
   | { readonly type: 'tab.activateIndex'; readonly index: number }
   | { readonly type: 'tab.cycle'; readonly direction: 1 | -1 }
@@ -202,6 +203,28 @@ const replaceStart = (set: TabSet, target: HostTarget, usedAt: number, title?: s
   const candidate: Tab = { id, target, pinned: false, preview: false, usedAt }
   const opened: Tab = title === undefined ? candidate : { ...candidate, title }
   return { tabs: set.tabs.map(tab => (tab.id === START_TAB_ID ? opened : tab)), activeTabId: id }
+}
+
+/** A first-send workspace move turns its source blank tab into the destination Session's tab. */
+const replaceThread = (set: TabSet, sourceSessionId: string, sessionId: string, usedAt: number): TabSet => {
+  const sourceId = tabIdOf({ kind: 'thread', sessionId: sourceSessionId })
+  const target: HostTarget = { kind: 'thread', sessionId }
+  const targetId = tabIdOf(target)
+  const source = set.tabs.find(tab => tab.id === sourceId)
+  if (source === undefined || sourceId === targetId) return set
+  const existing = set.tabs.find(tab => tab.id === targetId)
+  if (existing !== undefined) {
+    return {
+      tabs: pinnedFirst(
+        set.tabs
+          .filter(tab => tab.id !== sourceId)
+          .map(tab => (tab.id === targetId ? { ...tab, pinned: tab.pinned || source.pinned, preview: false, usedAt } : tab)),
+      ),
+      activeTabId: targetId,
+    }
+  }
+  const replacement: Tab = { ...source, id: targetId, target, preview: false, usedAt }
+  return { tabs: set.tabs.map(tab => (tab.id === sourceId ? replacement : tab)), activeTabId: targetId }
 }
 
 /** Open the new-tab page at the end of the strip, or focus it when it is already open. */
@@ -553,6 +576,18 @@ export const tabsMachine = setup({
               if (!set.tabs.some(tab => tab.id === threadId)) return { pendingKeptSessionId: event.sessionId }
               return { pendingKeptSessionId: null, ...withSet(context, keepThreadTab(set, event.sessionId)) }
             }),
+            'persist',
+          ],
+        },
+        'thread.replace': {
+          target: '.navigating',
+          actions: [
+            assign(({ context, event }) => {
+              const clock = context.clock + 1
+              const set = replaceThread(currentSet(context), event.sourceSessionId, event.sessionId, clock)
+              return set === currentSet(context) ? {} : { clock, ...withSet(context, set) }
+            }),
+            'navigateToActive',
             'persist',
           ],
         },

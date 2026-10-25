@@ -44,6 +44,7 @@ import { deferWorkspaceSubmit, deliverFirstSend } from './workspace-submit.js'
 import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, type DeferredMove, type ToggleRequest } from './workspace-toggle-machine.js'
 import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSettings } from './settings.js'
 import { requestThreadSettle } from './settle-request.js'
+import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefresh } from './turn-end-status-refresh.js'
 
 const PANEL_ID = 'jj-integration'
@@ -923,7 +924,7 @@ export default defineClient({
             }),
           show: targetSessionId => {
             followed = true
-            ctx.uiWorkspace.openSession(targetSessionId)
+            if (!requestReplaceThreadTab(sessionId, targetSessionId)) ctx.uiWorkspace.openSession(targetSessionId)
           },
           blocks: ctx.conversation.blocks,
           reason: translate('preparingWorkspace', { name: move.name }),

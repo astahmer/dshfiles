@@ -351,6 +351,36 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
   })
 
+  it('replaces the source thread tab with a first-send destination thread', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('source'))
+    tabs.actor.send({ type: 'tab.open', target: panel('jujutsu'), newTab: true })
+    tabs.actor.send({ type: 'tab.select', tabId: 'thread:source' })
+    tabs.host(thread('source'))
+
+    tabs.actor.send({ type: 'thread.replace', sourceSessionId: 'source', sessionId: 'destination' })
+
+    expect(tabs.ids()).toEqual(['thread:destination', 'panel:jujutsu'])
+    expect(tabs.set().activeTabId).toBe('thread:destination')
+    expect(tabs.navigated.at(-1)).toEqual(thread('destination'))
+  })
+
+  it('removes the source thread when its destination already has a tab', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('source'))
+    tabs.actor.send({ type: 'tab.open', target: thread('destination'), newTab: true })
+    tabs.actor.send({ type: 'tab.select', tabId: 'thread:source' })
+    tabs.host(thread('source'))
+
+    tabs.actor.send({ type: 'thread.replace', sourceSessionId: 'source', sessionId: 'destination' })
+
+    expect(tabs.ids()).toEqual(['thread:destination'])
+    expect(tabs.set().activeTabId).toBe('thread:destination')
+    expect(tabs.navigated.at(-1)).toEqual(thread('destination'))
+  })
+
   it('opens the new-tab page at the end of the strip without navigating, and focuses it when opened again', () => {
     const tabs = start({ preferences: { openMode: 'new' } })
     tabs.enable()
