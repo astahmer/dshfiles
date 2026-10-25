@@ -2,10 +2,10 @@ import { ReferenceChip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
 import { jujutsuApi } from './api.js'
-import { ChatReferenceModel } from './chat-reference.js'
+import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
 import {
   chatReferencePreviewDismissEvent,
@@ -31,6 +31,7 @@ const titleRequestKey = (request: ChatReferenceTitleRequest): string =>
 export const ChatReferenceOverlay = (): JSX.Element => {
   const api = useApi(jujutsuApi)
   const jjIntegration = useApi(jjIntegrationApi)
+  const queryClient = useQueryClient()
   const [request, setRequest] = useState<ChatReferencePreviewRequest | null>(null)
   const [titleRequests, setTitleRequests] = useState<ChatReferenceTitleRequest[]>([])
   const closeTimer = useRef<number | undefined>(undefined)
@@ -87,7 +88,11 @@ export const ChatReferenceOverlay = (): JSX.Element => {
   const resolveReference = async (cwd: string, reference: string, signal: AbortSignal) => {
     const read = async (path: string) => {
       try {
-        const repository = await api.registerRepository({ path }, { signal })
+        const repository = await queryClient.fetchQuery({
+          queryKey: chatReferenceQueryKeys.repository(path),
+          queryFn: ({ signal: querySignal }) => api.registerRepository({ path }, { signal: querySignal }),
+          staleTime: 30_000,
+        })
         const graph = await api.referenceGraph({ repoId: repository.repoId, reference }, { signal })
         return 'graph' in graph ? { repository, graph } : undefined
       } catch {
@@ -96,12 +101,23 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     }
     const local = await read(cwd)
     if (local !== undefined) return [local]
-    const projects = await jjIntegration.projects({}, { signal })
+    const projects = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.projects,
+      queryFn: ({ signal: querySignal }) => jjIntegration.projects({}, { signal: querySignal }),
+      staleTime: 30_000,
+    })
     const paths = [...projects.projects, ...(projects.workspaces ?? [])].map(project => project.path)
     const repositories = await Promise.all(
       [...new Set(paths)].slice(0, 31).map(async path => {
         try {
-          return { path, repository: await api.registerRepository({ path }, { signal }) }
+          return {
+            path,
+            repository: await queryClient.fetchQuery({
+              queryKey: chatReferenceQueryKeys.repository(path),
+              queryFn: ({ signal: querySignal }) => api.registerRepository({ path }, { signal: querySignal }),
+              staleTime: 30_000,
+            }),
+          }
         } catch {
           return undefined
         }
@@ -126,14 +142,14 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     return matches.filter(match => match !== undefined)
   }
   const graph = useQuery({
-    queryKey: ['jujutsu', 'reference-preview', request?.cwd, referenced],
+    queryKey: chatReferenceQueryKeys.search(request?.cwd ?? '', referenced ?? ''),
     enabled: request !== null && referenced !== undefined,
     retry: false,
     staleTime: 30_000,
     queryFn: ({ signal }) => resolveReference(request?.cwd ?? '', referenced ?? '', signal),
   })
   const titleGraph = useQuery({
-    queryKey: ['jujutsu', 'reference-title', titleRequest?.cwd, titleReference],
+    queryKey: chatReferenceQueryKeys.search(titleRequest?.cwd ?? '', titleReference ?? ''),
     enabled: titleRequest !== null && titleReference !== undefined,
     retry: false,
     staleTime: 30_000,

@@ -213,11 +213,11 @@ No product optimization or isolation change was made.
 The controlled local fixture (`pnpm --dir tooling/dshx run benchmark:browser-cache`)
 loads 12 cacheable scripts three times in each fresh context:
 
-| Context | First load asset hits / transfer bytes | Repeated load asset hits / transfer bytes |
-| --- | --- | --- |
-| Route-free controlled fixture | 12 / 101,904 | 0 / 0 |
-| Exact-origin route guard | 12 / 101,904 | 12 / 101,904 |
-| Unrelated API route | 12 / 101,904 | 12 / 101,904 |
+| Context                       | First load asset hits / transfer bytes | Repeated load asset hits / transfer bytes |
+| ----------------------------- | -------------------------------------- | ----------------------------------------- |
+| Route-free controlled fixture | 12 / 101,904                           | 0 / 0                                     |
+| Exact-origin route guard      | 12 / 101,904                           | 12 / 101,904                              |
+| Unrelated API route           | 12 / 101,904                           | 12 / 101,904                              |
 
 A separate scratch sample booted `home` + `multi-host` using `dshx dev up
 --plugin @dshfiles/home --plugin @dshfiles/multi-host --skip-build`, with its own
@@ -269,6 +269,64 @@ took 210 ms to the transcript paint; its four dshx calls (`jujutsu-composer/cont
 by the switch (`dshx.api.outcome=aborted`). The `threadAt` and `destination` Host spans took 19–25 ms, so most of
 their browser time was waiting (the "client span ≫ server child" row); `context` was Host work (660 ms, 459 ms of it in
 `jj log`). Worth measuring on :3080 before reading more into it.
+
+## JJ reference lookup request storm (2026-10-25)
+
+The user-provided live DevTools captures show **63 requests** with `registerRepository` pending, followed by captures with
+many `referenceGraph` calls (roughly 9.8 kB each). The source confirms an N×M request pattern in
+[`chat-reference-overlay.tsx`](../plugins/@dshfiles/jujutsu/src/chat-reference-overlay.tsx): both inline-title lookups
+and hover previews independently register the Session repository, fetch project/workspace paths, register up to 31
+candidates in parallel, then request one graph per candidate. They used different query keys, so the same reference
+could run that full search twice. Inline titles are requested as references enter the viewport, not just on hover.
+This is a confirmed source-level cause consistent with the captures; the live receiver could not accept new traces
+(`traces_status`: port 4318 already in use), so there is no server-span attribution for those exact captures.
+
+The first fix shares the preview/title query identity and caches project discovery and repository registrations for 30 s.
+That removes duplicate same-reference scans and repeated registration bursts across nearby references. It does **not**
+remove the first miss's cross-repository graph fan-out; the screenshots have no matched before/after interaction, so the
+savings are not yet measured. The plugin test covers query identity and TanStack Query's in-flight/fresh-cache behavior.
+Both chat-reference browser journeys pass after updating their graph assertion to the current semantic `<ol>` preview;
+the old assertions expected a `<pre>` that the existing structured graph component no longer renders. A broader Jujutsu
+run before that selector correction passed 10/14 and also exposed a duplicate-button strict-mode failure in stale-repo
+recovery and a workspace-cleanup timeout; those two were not rerun because they are outside this fix.
+
+A live read-only probe on :3080 also measured three unrelated sidebar switches at **66, 66, and 22 requests**, versus
+9–14 in the older table above. The first two took about 31 s to visible history and had ~7.5k DOM nodes; the third took
+9.6 s. Long tasks were 1,021 / 250 / 151 ms total. Host lag over 20 s was p50 4 ms, p90 15 ms, p99 112 ms, max 1,583 ms
+(one stall); machine load was 9–16. The switch request lists included `repositories` (up to 17.0 s), `session/page`
+(up to 12.4 s), `active` (up to 9.1 s), `session/create` (9.4 s), and several repeated `available`, `pending`, credential,
+and model-catalog reads. These are browser request durations, not isolated server times, and the sample is not the
+reference-preview reproduction. The first two switches also spent ~31 s in the probe's composer/history readiness
+waits, so their totals include requests accumulated during those timeouts and are not a like-for-like rate comparison
+to earlier successful, shorter switches. The Host profile sampled 14.4 s busy of 60 s, led by Cordis apply (4.3 s), subprocess
+spawning (3.6 s), usage tool-source sync (2.9 s), and JJ process work (1.9 s); that indicates additional Host load, but
+sampling under concurrent activity does not assign those costs to the clicks.
+
+### Options to reduce plugin requests beyond this first fix
+
+1. **Demand-drive queries (best next low-risk pass):** only poll what the selected tab actually renders, stop hidden-tab
+   polling for historical charts, and avoid unconditional mount refetches when event invalidation or a short freshness
+   window suffices. Confirmed source candidates: Traces keeps status/list/stats polling while its non-trace tabs are
+   active ([`panel.tsx`](../plugins/@dshfiles/traces/src/panel.tsx), [`queries.ts`](../plugins/@dshfiles/traces/src/queries.ts));
+   Usage charts poll every minute in the background ([`charts.tsx`](../plugins/@dshfiles/usage/src/charts.tsx)); AI Accounts
+   forces quota-continuation reads on every mount ([`quota-continuations-query.ts`](../plugins/@dshfiles/ai-accounts/src/quota-continuations-query.ts)).
+   These are source-confirmed opportunities, not yet measured against the live clicks.
+2. **Batch at the owning Host API boundary:** replace the JJ client’s per-repository RPC fan-out with one owned-plugin
+   lookup method that resolves a reference across registered projects inside the Host. Preserve ambiguity behavior, cap
+   concurrent JJ subprocesses, forward cancellation, and trace one work unit. This removes HTTP queueing; it still needs
+   a live measure because JJ subprocess work remains. Do not patch DSH core for this.
+3. **Add request budgets and ownership tests:** per representative interaction, assert endpoint counts, polling cadence,
+   visibility gating, cancellation, and stale-data behavior. A source audit can flag `refetchIntervalInBackground`,
+   `refetchOnMount: 'always'`, raw timers, and large `Promise.all` API fan-outs for review, but should not auto-rewrite them.
+4. **Share reads narrowly, not with one global cache:** Query clients are intentionally per plugin bundle; a global cache
+   risks mixing owners, contexts, and invalidation lifetimes. Share a query module/client only when multiple surfaces
+   truly consume the same contract and have the same freshness and authorization scope. Prefer one Host read-model API
+   where aggregation/batching is the actual shared behavior.
+
+Prioritize by measured request count × cadence × Host cost, then re-run the same live probes. The current switch sample
+shows a broader regression against the previous baseline, but it does not identify a single owner for those slow calls;
+keep it separate from the JJ reference fix until per-request server timings and the exact thread-switch journey are
+captured again.
 
 ## Still open
 

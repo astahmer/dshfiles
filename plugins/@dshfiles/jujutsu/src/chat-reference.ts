@@ -22,6 +22,12 @@ const BOOKMARK = /^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/u
 
 export const CHAT_REFERENCE_PREFIX = 'jj:'
 
+export const chatReferenceQueryKeys = {
+  search: (cwd: string, reference: string) => ['jujutsu', 'reference-search', cwd, reference] as const,
+  projects: ['jujutsu', 'reference-projects'] as const,
+  repository: (path: string) => ['jujutsu', 'reference-repository', path] as const,
+}
+
 const referenceOf = (token: string): ChatReference | undefined => {
   if (COMMIT_ID.test(token) || CHANGE_ID.test(token)) return { value: token, kind: 'revision' }
   return BOOKMARK.test(token) ? { value: token, kind: 'bookmark' } : undefined
