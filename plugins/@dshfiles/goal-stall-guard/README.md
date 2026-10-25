@@ -59,6 +59,14 @@ tools cover only the two narrow cases above; they do not remove the native round
 ceiling. Goals cannot yet be guaranteed to continue until their objective is
 realized. That requires a supported native lifecycle contract; see [Host gap 86](../../../plans/dsh-host-gaps.md).
 
+A decision submitted through a continued user-question form currently does not
+count as a direct human turn for native goal actions. If `update_goal` rejects a
+resume/edit/complete after a form reply, do not retry it or claim the goal
+changed; ask the user for a plain chat message authorizing the needed goal
+transition. This plugin cannot safely replace the native guard because no
+supported API provides trusted form-answer provenance scoped to the goal. See
+[Host gap 88](../../../plans/dsh-host-gaps.md).
+
 ## Configuration
 
 ```yaml
