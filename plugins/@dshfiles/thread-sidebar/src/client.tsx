@@ -146,6 +146,7 @@ import { restartRecoveryRefetchInterval } from './restart-recovery-poll.js'
 import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from './usage-limit-rows.js'
+import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
@@ -1340,7 +1341,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const usageLimitQuery = useQuery({
     queryKey: usageLimitQueryKey,
     queryFn: ({ signal }) => accountsApi.quotaContinuations(undefined, { signal }),
-    refetchInterval: query => (isPrimarySurface && !isApiOwnerMissing(query.state.error) ? 15_000 : false),
+    refetchInterval: query =>
+      usageLimitRefetchInterval({
+        primarySurface: isPrimarySurface,
+        ownerMissing: isApiOwnerMissing(query.state.error),
+        errored: query.state.status === 'error',
+      }),
     retry: false,
   })
   useEffect(() => {
