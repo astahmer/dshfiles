@@ -92,6 +92,8 @@ const formatAge = (since: number, now: number, t: WorktreeMemoryTranslate): stri
 }
 
 // One decimal of GB keeps the pill as narrow as the icon it sits on.
+const formatDate = (at: number): string => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(at))
+
 const compactGigabytes = (bytes: number): string => `${Math.max(0.1, bytes / 1024 ** 3).toFixed(1)}G`
 
 /**
@@ -267,6 +269,7 @@ const GroupCard = (props: {
   const { group, t } = props
   const Chevron = props.open ? ChevronDownIcon : ChevronRightIcon
   const running = group.threads.filter(thread => thread.running).length
+  const latestThread = group.threads[0]
   const title = group.kind === 'elsewhere' ? t('elsewhere') : group.title
   const stoppable = bulkStoppable(group.trees)
   return (
@@ -302,6 +305,13 @@ const GroupCard = (props: {
                 .filter(part => part !== null)
                 .join(' · ')}
             </span>
+            {latestThread === undefined ? null : (
+              <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                {latestThread.title ?? props.threadLabel(latestThread.sessionId)}
+                {latestThread.createdAt == null ? '' : ` · ${t('created')} ${formatDate(latestThread.createdAt)}`}
+                {latestThread.updatedAt === null ? '' : ` · ${t('updated')} ${formatAge(latestThread.updatedAt, props.now, t)} ${t('ago')}`}
+              </span>
+            )}
             <CategoryBar bytes={groupCategoryBytes(group)} total={group.bytes} className="dshx:max-w-80" />
           </div>
           <Chevron aria-hidden className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
@@ -323,24 +333,38 @@ const GroupCard = (props: {
           {group.threads.length === 0 ? null : (
             <ul className="dshx:flex dshx:flex-col dshx:gap-0.5">
               {group.threads.map(thread => (
-                <li key={thread.sessionId} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                  <button
-                    type="button"
-                    className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:hover:underline"
-                    title={t('openThread')}
-                    onClick={() => props.onOpenThread(thread.sessionId)}
-                  >
-                    {thread.title ?? props.threadLabel(thread.sessionId)}
-                  </button>
-                  <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-muted-foreground">
-                    {thread.running ? (
-                      <>
-                        <Spinner aria-hidden className="dshx:size-3" /> {t('running')}
-                      </>
-                    ) : thread.updatedAt === null ? null : (
-                      `${t('idle')} ${formatAge(thread.updatedAt, props.now, t)}`
-                    )}
-                  </span>
+                <li key={thread.sessionId} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:text-xs">
+                  <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                    <button
+                      type="button"
+                      className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:hover:underline"
+                      title={t('openThread')}
+                      onClick={() => props.onOpenThread(thread.sessionId)}
+                    >
+                      {thread.title ?? props.threadLabel(thread.sessionId)}
+                    </button>
+                    <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-muted-foreground">
+                      {thread.running ? (
+                        <>
+                          <Spinner aria-hidden className="dshx:size-3" /> {t('running')}
+                        </>
+                      ) : null}
+                    </span>
+                  </div>
+                  {thread.createdAt == null && thread.updatedAt === null ? null : (
+                    <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-[11px] dshx:text-muted-foreground">
+                      {thread.createdAt == null ? null : (
+                        <time dateTime={new Date(thread.createdAt).toISOString()}>
+                          {t('created')} {formatDate(thread.createdAt)}
+                        </time>
+                      )}
+                      {thread.updatedAt === null ? null : (
+                        <time dateTime={new Date(thread.updatedAt).toISOString()}>
+                          {t('updated')} {formatAge(thread.updatedAt, props.now, t)} {t('ago')}
+                        </time>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

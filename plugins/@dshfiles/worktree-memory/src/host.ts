@@ -130,6 +130,7 @@ const readPressure = async (context: Context): Promise<MemoryPressure> => {
 }
 
 const listedTitleSchema = z.string().min(1)
+const listedCreationSchema = z.object({ createdAt: z.number().optional() })
 
 const readSessions = async (context: Context): Promise<KnownSession[]> => {
   const controller = context.get('sessionController')
@@ -138,6 +139,7 @@ const readSessions = async (context: Context): Promise<KnownSession[]> => {
   return (listed?.items ?? []).map(summary => ({
     sessionId: summary.sessionId,
     cwd: summary.cwd ?? null,
+    createdAt: listedCreationSchema.safeParse(summary).data?.createdAt ?? null,
     running: summary.running,
     updatedAt: summary.updatedAt ?? null,
     // The list serves each title from its cached projections; the per-Session title read decoded whole logs.

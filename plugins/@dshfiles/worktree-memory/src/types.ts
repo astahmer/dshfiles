@@ -36,6 +36,7 @@ export type ProcessTree = z.infer<typeof processTreeSchema>
 export const workspaceThreadSchema = z.object({
   sessionId: z.string().max(128),
   title: z.string().max(300).nullable(),
+  createdAt: z.number().nullable().optional(),
   running: z.boolean(),
   updatedAt: z.number().nullable(),
 })

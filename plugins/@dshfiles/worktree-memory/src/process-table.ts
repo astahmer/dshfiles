@@ -24,6 +24,7 @@ export interface KnownWorkspace {
 export interface KnownSession {
   readonly sessionId: string
   readonly cwd: string | null
+  readonly createdAt?: number | null
   readonly running: boolean
   readonly updatedAt: number | null
   readonly title: string | null
@@ -192,7 +193,13 @@ export class ProcessTable {
       const resolved = ProcessTable.resolveGroup(session.cwd, input.workspaces)
       if (resolved === undefined || !groups.has(resolved.key)) continue
       const list = threadsByGroup.get(resolved.key) ?? []
-      list.push({ sessionId: session.sessionId, title: session.title, running: session.running, updatedAt: session.updatedAt })
+      list.push({
+        sessionId: session.sessionId,
+        title: session.title,
+        createdAt: session.createdAt ?? null,
+        running: session.running,
+        updatedAt: session.updatedAt,
+      })
       threadsByGroup.set(resolved.key, list)
     }
 

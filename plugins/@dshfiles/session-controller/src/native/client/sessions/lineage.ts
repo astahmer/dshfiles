@@ -17,6 +17,7 @@ export interface TitledSessionSummary extends SessionSummary {
 export interface SessionListEntry {
   sessionId: SessionId
   title?: string
+  createdAt?: number
   updatedAt: number
   running: boolean
   /**

@@ -70,6 +70,7 @@ it('a selector returns only the named projections', async () => {
   expect(reads).toEqual([['title'], ['sessionListMetadata']])
   expect(items[0]?.projections?.values).toEqual({ title: fixtureValues.title })
   expect(items[0]?.blank).toBe(false)
+  expect(items[0]?.createdAt).toBe(100)
   expect(items[0]?.updatedAt).toBe(200)
 })
 
@@ -86,6 +87,7 @@ it('an empty selector returns no projection columns but keeps the row metadata',
   expect(reads).toEqual([['sessionListMetadata']])
   expect(items[0]?.projections).toBeUndefined()
   expect(items[0]?.blank).toBe(false)
+  expect(items[0]?.createdAt).toBe(100)
   expect(items[0]?.updatedAt).toBe(200)
 })
 

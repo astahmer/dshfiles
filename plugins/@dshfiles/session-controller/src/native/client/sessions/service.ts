@@ -30,6 +30,7 @@ export interface SessionSummary {
   title?: string
   /** Human-facing label: durable title, project basename, then session id. */
   displayTitle: string
+  createdAt?: number
   cwd?: string
   parentId?: SessionId
   /** Coarse durable origin for navigation filtering; not a continuation capability. */
@@ -661,6 +662,7 @@ export class ClientSessions implements ISessions {
         retainedBy: this.retentionSnapshot(entry.sessionId).retainedBy,
         blank: entry.blank,
         updatedAt: entry.updatedAt,
+        ...(entry.createdAt === undefined ? {} : { createdAt: entry.createdAt }),
         formatStatus: entry.formatStatus,
         ...(entry.projectionValues === undefined
           ? {}

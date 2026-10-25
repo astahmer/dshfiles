@@ -516,11 +516,13 @@ function updatedAt(header: SessionHeader, metadata: SessionListMetadata | undefi
 }
 
 function listFields(header: SessionHeader): {
+  readonly createdAt: number
   readonly parentSessionId?: SessionId
   readonly origin?: 'subagent'
   readonly cwd?: string
 } {
   return {
+    createdAt: header.createdAt,
     ...(header.parentSession === undefined ? {} : { parentSessionId: header.parentSession }),
     ...(header.origin === undefined ? {} : { origin: header.origin }),
     ...(header.cwd === undefined ? {} : { cwd: header.cwd }),

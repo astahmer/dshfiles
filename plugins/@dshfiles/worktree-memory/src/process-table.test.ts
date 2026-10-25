@@ -49,13 +49,14 @@ describe('ProcessTable', () => {
         ],
         cwds: new Map([[600, '/dev/app-threads/thread-a/packages/web']]),
         jobs: [{ id: 'bash-1', label: 'pnpm vitest run src/a.test.ts', owner: 'session-a', startedAt: T0 + 400 }],
-        sessions: [{ sessionId: 'session-a', cwd: '/dev/app-threads/thread-a', running: true, updatedAt: T0, title: 'Fix login' }],
+        sessions: [{ sessionId: 'session-a', cwd: '/dev/app-threads/thread-a', createdAt: T0 - 86_400_000, running: true, updatedAt: T0, title: 'Fix login' }],
       }),
     )
     expect(snapshot.hostBytes).toBe(300_000 * 1024)
     expect(snapshot.groups).toHaveLength(1)
     const group = snapshot.groups[0]
     expect(group).toMatchObject({ key: '/dev/app-threads/thread-a', kind: 'workspace', project: 'app', bytes: 504_000 * 1024, threadCount: 1 })
+    expect(group?.threads).toMatchObject([{ sessionId: 'session-a', title: 'Fix login', createdAt: T0 - 86_400_000, updatedAt: T0 }])
     expect(group?.trees[0]).toMatchObject({
       pid: 600,
       origin: 'job',

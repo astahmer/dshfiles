@@ -181,6 +181,7 @@ export interface SessionSummary {
   /** Current for attached Sessions; otherwise the persistence format status when reported. */
   readonly formatStatus?: 'current' | 'migration-required'
   readonly sessionId: SessionId
+  readonly createdAt?: number
   readonly updatedAt: number
   readonly running: boolean
   readonly blank: boolean
