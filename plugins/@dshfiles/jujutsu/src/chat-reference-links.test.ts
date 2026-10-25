@@ -169,7 +169,9 @@ describe('chat reference links', () => {
 
     link?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
     await settlePreview()
-    expect(requests).toEqual([{ cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, anchor: { left: 0, top: 0, width: 0, height: 0 } }])
+    expect(requests).toEqual([
+      { sessionId: 'session-1', cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, anchor: { left: 0, top: 0, width: 0, height: 0 } },
+    ])
     expect(onOpen).not.toHaveBeenCalled()
 
     link?.dispatchEvent(new MouseEvent('pointerout', { bubbles: true }))

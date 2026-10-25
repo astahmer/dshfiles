@@ -5,36 +5,45 @@ import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 describe('chat reference tokens', () => {
   const read = (value: string, bookmarks: readonly string[] = ['main', 'feature/topic-1']) => ChatReferenceModel.fromCode({ value, bookmarks })
 
-  it('uses one query identity for preview and inline-title lookups of the same reference', () => {
+  it('keeps local-title and full-preview query identities separate', () => {
     const preview = { cwd: '/repo', reference: { value: 'main' }, anchor: { left: 0, top: 0, width: 1, height: 1 } }
     const title = { sessionId: 'session-a', cwd: '/repo', reference: { value: 'main' } }
 
-    expect(chatReferenceQueryKeys.search(preview.cwd, preview.reference.value)).toEqual(chatReferenceQueryKeys.search(title.cwd, title.reference.value))
-    expect(chatReferenceQueryKeys.search('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.search('/other', 'main'))
-    expect(chatReferenceQueryKeys.search('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.search('/repo', 'release'))
+    expect(chatReferenceQueryKeys.localTitle(preview.cwd, preview.reference.value)).toEqual(chatReferenceQueryKeys.localTitle(title.cwd, title.reference.value))
+    expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.search('/repo', 'main'))
+    expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.localTitle('/other', 'main'))
+    expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.localTitle('/repo', 'release'))
   })
 
-  it('coalesces preview and title reads and caches repository registration', async () => {
+  it('deduplicates local-title reads and caches repository registration', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    let localTitleCalls = 0
     let searchCalls = 0
     let registrationCalls = 0
-    const preview = queryClient.fetchQuery({
-      queryKey: chatReferenceQueryKeys.search('/repo', 'main'),
+    const title = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.localTitle('/repo', 'main'),
       queryFn: async () => {
-        searchCalls += 1
+        localTitleCalls += 1
         return 'graph'
       },
       staleTime: 30_000,
     })
-    const title = queryClient.fetchQuery({
-      queryKey: chatReferenceQueryKeys.search('/repo', 'main'),
+    const repeatedTitle = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.localTitle('/repo', 'main'),
       queryFn: async () => {
-        searchCalls += 1
+        localTitleCalls += 1
         return 'graph'
       },
       staleTime: 30_000,
     })
-    await Promise.all([preview, title])
+    await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.search('/repo', 'main'),
+      queryFn: async () => {
+        searchCalls += 1
+        return [title]
+      },
+      staleTime: 30_000,
+    })
     await queryClient.fetchQuery({
       queryKey: chatReferenceQueryKeys.repository('/repo'),
       queryFn: async () => {
@@ -52,6 +61,8 @@ describe('chat reference tokens', () => {
       staleTime: 30_000,
     })
 
+    expect(repeatedTitle).toBe(title)
+    expect(localTitleCalls).toBe(1)
     expect(searchCalls).toBe(1)
     expect(registrationCalls).toBe(1)
     queryClient.clear()

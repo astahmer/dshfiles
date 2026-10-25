@@ -420,7 +420,7 @@ When("both repositories are registered and the first repository's thread answers
 
 const foreignReferenceLink = (page: Page) => {
   const foreign = foreignRepositoryFor(page)
-  return page.getByRole('link', { name: `Jujutsu bookmark: ${foreign.description} (${foreign.bookmark})`, exact: true })
+  return page.getByRole('link', { name: new RegExp(`\\(${foreign.bookmark}\\)$`, 'u') })
 }
 
 Then('hovering the foreign reference previews its revision graph from the other repository', async ({ page }: { page: Page }) => {

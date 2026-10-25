@@ -84,23 +84,26 @@ export const ChatReferenceOverlay = (): JSX.Element => {
 
   const titleRequest = titleRequests.at(0) ?? null
   const referenced = request?.reference.value
-  const titleReference = titleRequest?.reference.value
-  const resolveReference = async (cwd: string, reference: string, signal: AbortSignal) => {
-    const read = async (path: string) => {
-      try {
-        const repository = await queryClient.fetchQuery({
-          queryKey: chatReferenceQueryKeys.repository(path),
-          queryFn: ({ signal: querySignal }) => api.registerRepository({ path }, { signal: querySignal }),
-          staleTime: 30_000,
-        })
-        const graph = await api.referenceGraph({ repoId: repository.repoId, reference }, { signal })
-        return 'graph' in graph ? { repository, graph } : undefined
-      } catch {
-        return undefined
-      }
+  const readLocalReference = async (cwd: string, reference: string, signal: AbortSignal) => {
+    try {
+      const repository = await queryClient.fetchQuery({
+        queryKey: chatReferenceQueryKeys.repository(cwd),
+        queryFn: ({ signal: querySignal }) => api.registerRepository({ path: cwd }, { signal: querySignal }),
+        staleTime: 30_000,
+      })
+      const graph = await api.referenceGraph({ repoId: repository.repoId, reference }, { signal })
+      return 'graph' in graph ? { repository, graph } : null
+    } catch {
+      return null
     }
-    const local = await read(cwd)
-    if (local !== undefined) return [local]
+  }
+  const resolveReference = async (cwd: string, reference: string, signal: AbortSignal) => {
+    const local = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.localTitle(cwd, reference),
+      queryFn: ({ signal: querySignal }) => readLocalReference(cwd, reference, querySignal),
+      staleTime: 30_000,
+    })
+    if (local !== null) return [local]
     const projects = await queryClient.fetchQuery({
       queryKey: chatReferenceQueryKeys.projects,
       queryFn: ({ signal: querySignal }) => jjIntegration.projects({}, { signal: querySignal }),
@@ -149,17 +152,16 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     queryFn: ({ signal }) => resolveReference(request?.cwd ?? '', referenced ?? '', signal),
   })
   const titleGraph = useQuery({
-    queryKey: chatReferenceQueryKeys.search(titleRequest?.cwd ?? '', titleReference ?? ''),
-    enabled: titleRequest !== null && titleReference !== undefined,
+    queryKey: chatReferenceQueryKeys.localTitle(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? ''),
+    enabled: titleRequest !== null,
     retry: false,
     staleTime: 30_000,
-    queryFn: ({ signal }) => resolveReference(titleRequest?.cwd ?? '', titleReference ?? '', signal),
+    queryFn: ({ signal }) => readLocalReference(titleRequest?.cwd ?? '', titleRequest?.reference.value ?? '', signal),
   })
 
   useEffect(() => {
     if (titleRequest === null || titleGraph.isFetching || (!titleGraph.isSuccess && !titleGraph.isError)) return
-    const matches = titleGraph.data ?? []
-    const match = ChatReferenceModel.uniqueMatch(matches)
+    const match = titleGraph.data ?? null
     window.dispatchEvent(
       new CustomEvent(chatReferenceTitleResolvedEvent, {
         detail: {
@@ -172,6 +174,23 @@ export const ChatReferenceOverlay = (): JSX.Element => {
     const completedKey = titleRequestKey(titleRequest)
     setTitleRequests(current => (current[0] !== undefined && titleRequestKey(current[0]) === completedKey ? current.slice(1) : current))
   }, [titleGraph.data, titleGraph.isError, titleGraph.isFetching, titleGraph.isSuccess, titleRequest])
+
+  useEffect(() => {
+    if (request === null || graph.isFetching || !graph.isSuccess) return
+    const match = ChatReferenceModel.uniqueMatch(graph.data ?? [])
+    if (match === undefined) return
+    window.dispatchEvent(
+      new CustomEvent(chatReferenceTitleResolvedEvent, {
+        detail: {
+          sessionId: request.sessionId,
+          cwd: request.cwd,
+          reference: request.reference,
+          title: match.graph.description?.trim() || request.reference.value,
+          targetPath: match.repository.root,
+        },
+      }),
+    )
+  }, [graph.data, graph.isFetching, graph.isSuccess, request])
 
   const matches = graph.data ?? []
   const referenceGraph = ChatReferenceModel.uniqueMatch(matches)?.graph
