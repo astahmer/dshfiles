@@ -92,7 +92,8 @@
       "env": ["CI", "JJ_TEST_EXECUTABLE", "JJ_CONFIG"]
     },
     "dshx-workspace#test:evidence": {
-      "inputs": ["e2e/support/evidence*.ts", "package.json", "$TURBO_ROOT$/pnpm-lock.yaml"],
+      "dependsOn": ["@dshfiles/dshx#build"],
+      "inputs": ["e2e/support/**", "e2e/vitest.*.config.ts", "playwright.e2e.config.ts", "package.json", "$TURBO_ROOT$/pnpm-lock.yaml"],
       "outputs": [],
       "passThroughEnv": ["HOME", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH"]
     },
