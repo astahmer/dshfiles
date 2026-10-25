@@ -100,6 +100,7 @@
         "@dshfiles/plugin-marketplace",
         "@dshfiles/privacy-controls",
         "@dshfiles/goal-stall-guard",
+        "@dshfiles/goal-tool",
         "@dshfiles/multi-host",
         "@dshfiles/agent-questions",
         "@dshfiles/diff-viewed",
