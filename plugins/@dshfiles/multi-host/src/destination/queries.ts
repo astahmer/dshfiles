@@ -30,11 +30,15 @@ export const multiHostQueries = {
     queryOptions({
       queryKey: multiHostKeys.status(runtimeId),
       queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 40_000, request: hostSignal => api.runtimeStatus({ runtimeId }, { signal: hostSignal }) }),
-      refetchInterval: query =>
-        runtimeStatusRefreshRefetchInterval({
+      staleTime: 15_000,
+      refetchInterval: query => {
+        const status = query.state.data
+        return runtimeStatusRefreshRefetchInterval({
           intervalMs: isApiOwnerMissing(query.state.error) ? false : refetchInterval,
-          refreshing: query.state.data?.refreshing === true,
-        }),
+          refreshing: status?.refreshing === true,
+          available: status === undefined ? undefined : status.ok === false && status.refreshing !== true ? false : true,
+        })
+      },
       retry: false,
     }),
   models: (api: MultiHostClient, runtimeId: string) =>
