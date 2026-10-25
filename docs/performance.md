@@ -281,14 +281,20 @@ could run that full search twice. Inline titles are requested as references ente
 This is a confirmed source-level cause consistent with the captures; the live receiver could not accept new traces
 (`traces_status`: port 4318 already in use), so there is no server-span attribution for those exact captures.
 
-The first fix shares the preview/title query identity and caches project discovery and repository registrations for 30 s.
-That removes duplicate same-reference scans and repeated registration bursts across nearby references. It does **not**
-remove the first miss's cross-repository graph fan-out; the screenshots have no matched before/after interaction, so the
-savings are not yet measured. The plugin test covers query identity and TanStack Query's in-flight/fresh-cache behavior.
-Both chat-reference browser journeys pass after updating their graph assertion to the current semantic `<ol>` preview;
-the old assertions expected a `<pre>` that the existing structured graph component no longer renders. A broader Jujutsu
-run before that selector correction passed 10/14 and also exposed a duplicate-button strict-mode failure in stale-repo
-recovery and a workspace-cleanup timeout; those two were not rerun because they are outside this fix.
+The first fix shared preview/title query identity and cached project discovery and repository registrations for 30 s. A
+follow-up now gives inline titles a separate local-title query key and checks only the Session repository. On a local miss,
+the chip keeps its literal token; it does not fetch project/workspace paths or search other repositories during a thread
+switch. Hover still performs the full cross-repository lookup and carries the Session id so that explicit preview can
+update the chip. This removes cross-repository N×M fan-out from thread switches. A local title still needs one graph read
+per distinct reference (repository registration is cached); a cold foreign-reference hover can still fan out to 31
+candidates. Tests cover local-key isolation and caching, repository-registration caching, and Session id on preview events.
+No matched live before/after interaction exists, so savings remain unmeasured.
+
+The two scoped chat-reference scratch journeys now pass after the local-only title refinement (2/2, 69 s); foreign references keep
+their literal token until hover, then the preview resolves and updates the chip. The full Jujutsu browser run before this
+refinement passed 9/14; its two chat-reference failures are resolved by the scoped rerun. Three unrelated failures remain:
+a duplicate-button strict-mode failure in stale-repository recovery, a missing composer review surface, and a
+workspace-cleanup menu-item timeout.
 
 A live read-only probe on :3080 also measured three unrelated sidebar switches at **66, 66, and 22 requests**, versus
 9–14 in the older table above. The first two took about 31 s to visible history and had ~7.5k DOM nodes; the third took
@@ -302,7 +308,7 @@ to earlier successful, shorter switches. The Host profile sampled 14.4 s busy of
 spawning (3.6 s), usage tool-source sync (2.9 s), and JJ process work (1.9 s); that indicates additional Host load, but
 sampling under concurrent activity does not assign those costs to the clicks.
 
-### Options to reduce plugin requests beyond this first fix
+### Options to reduce plugin requests after this scoped fix
 
 1. **Demand-drive queries (best next low-risk pass):** only poll what the selected tab actually renders, stop hidden-tab
    polling for historical charts, and avoid unconditional mount refetches when event invalidation or a short freshness
@@ -311,10 +317,11 @@ sampling under concurrent activity does not assign those costs to the clicks.
    Usage charts poll every minute in the background ([`charts.tsx`](../plugins/@dshfiles/usage/src/charts.tsx)); AI Accounts
    forces quota-continuation reads on every mount ([`quota-continuations-query.ts`](../plugins/@dshfiles/ai-accounts/src/quota-continuations-query.ts)).
    These are source-confirmed opportunities, not yet measured against the live clicks.
-2. **Batch at the owning Host API boundary:** replace the JJ client’s per-repository RPC fan-out with one owned-plugin
-   lookup method that resolves a reference across registered projects inside the Host. Preserve ambiguity behavior, cap
-   concurrent JJ subprocesses, forward cancellation, and trace one work unit. This removes HTTP queueing; it still needs
-   a live measure because JJ subprocess work remains. Do not patch DSH core for this.
+2. **Batch cold-hover lookup only if it still misses budget:** replace the JJ client's per-repository hover fan-out with
+   one owned-plugin lookup method that resolves a reference across registered projects inside the Host. Preserve
+   ambiguity behavior, cap concurrent JJ subprocesses, forward cancellation, and trace one work unit. This could remove
+   HTTP queueing, but it still needs a live measure because JJ subprocess work remains. It is no longer needed for thread
+   switches after title queries were removed. Do not patch DSH core for this.
 3. **Add request budgets and ownership tests:** per representative interaction, assert endpoint counts, polling cadence,
    visibility gating, cancellation, and stale-data behavior. A source audit can flag `refetchIntervalInBackground`,
    `refetchOnMount: 'always'`, raw timers, and large `Promise.all` API fan-outs for review, but should not auto-rewrite them.
@@ -343,6 +350,7 @@ The unavailable-status failure backoff and map-level usage-registry snapshot opt
 | Follow-up                      | Change                                                                                                                                                                                                                                                                                                                       | Proof and remaining limit                                                                                                                     |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | JJ repository inventory        | [`repository-views-cache.ts`](../plugins/@dshfiles/jj-integration/src/repository-views-cache.ts) serves last-good inventory immediately, coalesces background refreshes, and preserves explicit fresh scans for cleanup. One pre-change trace spent 10.1 s in 68 `jj log` calls.                                             | 10 focused cache/API tests pass. Live Host still runs the old bundle; no after number yet.                                                    |
+| Worktree snapshot              | [`host.ts`](../plugins/@dshfiles/worktree-memory/src/host.ts) now decouples process inventory and stop from Session metadata; cached labels refresh in the background. The pre-change snapshot waited 8.073 s on metadata. | 15 worktree-memory tests, typecheck/build/Host import passed. Live after-measurement is unavailable; one old cold SSH probe took 1.207 s, so this path can still exceed 300 ms; PID/startedAt identity validation remains unchanged. |
 | Remote runtime status          | [`runtime-status-snapshot-cache.ts`](../plugins/@dshfiles/multi-host/src/runtime-status-snapshot-cache.ts) adds last-good/pending responses and coalesced background refresh; its 45 s failure TTL matches the candidate policy instead of adding a longer cooldown. The query polls every 5 s only while refresh is active. | Snapshot/API tests pass. Explicit reconnect still performs network work synchronously; live requests are not remeasured.                      |
 | Cold history tail              | [`tail-log.ts`](../plugins/@dshfiles/session-controller/src/tail-log.ts) adds bounded fallback reasons and stat/lookup/identity/read/scan/decode durations to the existing span; prior reads reached 6.33–7.33 s for a 1.24 MB/254-frame log.                                                                                | The tail persistence test asserts these fields and cached-open behavior. No algorithmic change yet: use live phase data to choose one safely. |
 | Partial usage-registry changes | [`store.ts`](../plugins/@dshfiles/usage/src/store.ts) updates only tool rows whose category or owner differs, complementing the candidate's whole-snapshot no-op guard and retaining the skill-row exclusion.                                                                                                                | Trigger-based regression test proves unchanged rows do not update and changed metadata still applies; live CPU savings are unmeasured.        |
@@ -372,4 +380,6 @@ The live Host was restarted at 21:33, but the multi-host bundle it loaded had be
   longer in the web profile.
 - Native per-switch catalogs (`skills/list`, `commands/list`, `schedule/list`, `agentPresets/list`, `session/modelCatalog`)
   answer under 250 ms on a warm Host but still run on every switch: Host gap 69.
+- `session/page` reached 4.9–12.4 s in noisy browser switch probes without matching server spans. That is not isolated
+  Host time, so leave ownership unresolved pending a clean capture rather than declaring a core gap.
 - Main-thread work on open is ~0.6 s spread over many small tasks; no single leaf above 80 ms.
