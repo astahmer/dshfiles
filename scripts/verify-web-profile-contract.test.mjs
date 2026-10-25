@@ -46,6 +46,31 @@ test('requires web profile bundles to link their local source packages', () => {
   )
 })
 
+test('reports an owned plugin dependency missing from the web profile', () => {
+  const dependent = { ...consumer, dependencies: { '@dshfiles/review-provider': 'workspace:*' } }
+  const reviewProvider = { name: '@dshfiles/review-provider', dsh: { bundle: { patch: './cordis.patch.yml' } } }
+
+  assert.deepEqual(webProfileContractErrors(profile, [provider, dependent, reviewProvider]), [
+    '@dshfiles/review-provider: owned DSH bundle is neither included in profiles/web nor marked opt-in.',
+    '@dshfiles/settings-shell: owned plugin dependency @dshfiles/review-provider is missing from profiles/web dependencies.',
+    '@dshfiles/settings-shell: owned plugin dependency @dshfiles/review-provider is missing from dsh.profile.bundles.',
+  ])
+})
+
+test('reports an owned plugin omitted from both web-profile lists', () => {
+  const omittedBundle = { name: '@dshfiles/omitted-plugin', dsh: { bundle: { patch: './cordis.patch.yml' } } }
+
+  assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, omittedBundle]), [
+    '@dshfiles/omitted-plugin: owned DSH bundle is neither included in profiles/web nor marked opt-in.',
+  ])
+})
+
+test('accepts a declared opt-in bundle omitted from the web profile', () => {
+  const optInBundle = { name: '@dshfiles/tool-search', dsh: { bundle: { patch: './cordis.patch.yml' } } }
+
+  assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, optInBundle]), [])
+})
+
 const disableInsideRegion = `# BEGIN NIX-MANAGED DSH PLUGINS
 - id: session-query-sqlite
   disabled: true

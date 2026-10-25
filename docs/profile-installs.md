@@ -43,6 +43,12 @@ it. No nixfiles change and no `nixapply` is needed. A run:
   manifest differs from the last one it installed or `node_modules` is missing.
   An unchanged profile costs a few milliseconds.
 
+`pnpm verify:web-profile-contract` (included in `pnpm check:green`) checks that
+profile bundles link their source packages, every external and direct owned-plugin
+dependency is included in both the profile dependencies and bundle list, and
+there are no one-sided bundle registrations. `pnpm test:web-profile-contract`
+keeps the missing-provider cases covered.
+
 It writes under DSH's own `package.json.lock` and replaces files atomically. Its
 record of managed entries is `.dshfiles-profile-sync.json` in the profile; it
 reads the older `.nixfiles-managed-plugins.json` once and removes it. When a
@@ -62,7 +68,7 @@ option. Restart DSH once afterwards; from then on Restart is enough.
 
 ## `pnpm add <path>` is blocked; `pnpm install` is not
 
-This pnpm resolves a local path spec through *registry name resolution*, so
+This pnpm resolves a local path spec through _registry name resolution_, so
 `pnpm add /abs/path` fails with `should have a @scope` or
 `ERR_PNPM_INVALID_DEPENDENCY_NAME` for essentially every layout, including a
 directory named exactly `@scope/name`. `trustPolicy` (values `off`,

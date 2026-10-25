@@ -15,8 +15,11 @@ const profileManifestSchema = z
 const bundleManifestSchema = z
   .object({
     name: z.string(),
+    dependencies: z.record(z.string(), z.string()).default({}),
+    peerDependencies: z.record(z.string(), z.string()).default({}),
     dsh: z
       .object({
+        bundle: z.unknown().optional(),
         client: z.object({ external: z.array(z.string()).default([]) }).optional(),
       })
       .passthrough()
@@ -27,6 +30,7 @@ const bundleManifestSchema = z
 const readJson = async (path, schema) => schema.parse(JSON.parse(await readFile(path, 'utf8')))
 const isOwnedPackage = packageId => /^@dshfiles\/[^/]+$/.test(packageId)
 const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0]
+const optInWebBundles = new Set(['@dshfiles/tool-search'])
 
 /** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */
 const managedRegion = patch => {
@@ -59,6 +63,11 @@ export const webProfileContractErrors = (profile, bundleManifests) => {
   const sourceBundles = new Map(bundleManifests.map(manifest => [manifest.name, manifest]))
   const errors = []
 
+  for (const manifest of bundleManifests) {
+    if (manifest.dsh?.bundle === undefined || profileBundles.has(manifest.name) || optInWebBundles.has(manifest.name)) continue
+    errors.push(`${manifest.name}: owned DSH bundle is neither included in profiles/web nor marked opt-in.`)
+  }
+
   for (const packageId of profileBundles) {
     if (!isOwnedPackage(packageId)) continue
 
@@ -74,6 +83,17 @@ export const webProfileContractErrors = (profile, bundleManifests) => {
 
     if (manifest.name !== packageId) errors.push(`${packageId}: source package declares name ${manifest.name}.`)
     if (profile.dependencies[packageId] === undefined) errors.push(`${packageId}: profile bundle has no dependency entry.`)
+
+    for (const dependency of [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})]) {
+      const provider = packageIdFromExternal(dependency)
+      if (provider === undefined || provider === packageId || sourceBundles.get(provider)?.dsh?.bundle === undefined) continue
+      if (profile.dependencies[provider] === undefined) {
+        errors.push(`${packageId}: owned plugin dependency ${provider} is missing from profiles/web dependencies.`)
+      }
+      if (!profileBundles.has(provider)) {
+        errors.push(`${packageId}: owned plugin dependency ${provider} is missing from dsh.profile.bundles.`)
+      }
+    }
 
     for (const external of manifest.dsh.client?.external ?? []) {
       const provider = packageIdFromExternal(external)
@@ -126,10 +146,10 @@ const verifyWebProfileContract = async () => {
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const errors = await verifyWebProfileContract()
   if (errors.length > 0) {
-    console.error('Web profile external-provider contract failed:')
+    console.error('Web profile bundle contract failed:')
     for (const error of errors) console.error(`  - ${error}`)
     process.exitCode = 1
   } else {
-    console.log('Web profile bundle dependencies cover every local external provider.')
+    console.log('Web profile bundle inclusion and dependency contracts pass.')
   }
 }
