@@ -163,6 +163,7 @@ describe('trace store', () => {
   test('drops whole traces past the age and span limits, and clears everything', () => {
     const clock = { now: NOW }
     const store = openStore(clock)
+    expect(store.prune(retention)).toBe(0)
     store.ingest(
       [makeSpan({ traceId: traceId(1), spanId: spanId(1) }), makeSpan({ traceId: traceId(1), spanId: spanId(2), parentSpanId: spanId(1) })],
       retention,

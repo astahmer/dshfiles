@@ -65,6 +65,8 @@ const runtimeStatusSchema = z.discriminatedUnion('ok', [
     runtime: runtimeSummarySchema,
     workspaces: z.array(workspaceSchema),
     sessions: z.array(sessionSchema),
+    stale: z.literal(true).optional(),
+    refreshing: z.boolean().optional(),
   }),
   z.object({
     ok: z.literal(false),
@@ -73,6 +75,7 @@ const runtimeStatusSchema = z.discriminatedUnion('ok', [
     code: z.string(),
     message: z.string(),
     stale: z.literal(true),
+    refreshing: z.boolean().optional(),
     lastSeenAt: z.string().datetime().optional(),
   }),
 ])
@@ -404,7 +407,8 @@ export const multiHostApi = defineApi({
     runtimeStatus: method({
       input: z.object({ runtimeId: idSchema }).strict(),
       output: runtimeStatusSchema,
-      description: 'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. Read-only.',
+      description:
+        'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. A cold or stale result returns immediately while one coalesced background refresh runs. Read-only.',
       tool: { name: 'multi_host_status', readOnly: true, render: compactJson },
     }),
     /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */

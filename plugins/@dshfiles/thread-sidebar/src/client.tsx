@@ -1362,6 +1362,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // the same cached inventory but never owns the schedule.
   const jjInventoryPolling = isPrimarySurface && props.wide !== false
   const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {}, enabled: props.wide !== false || isBoard })
+  const jjInventoryRefreshInterval = jjRepositories.data?.refreshing === true ? 5_000 : INVENTORY_REFRESH_INTERVAL_MS
   const jjThreads = useApi(jjIntegrationApi)
   const refetchJjRepositories = jjRepositories.refetch
   const jjOwnerMissing = isApiOwnerMissing(jjRepositories.error)
@@ -1370,7 +1371,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     // API owner is missing, instead of polling a Host that no longer answers the integration API.
     const poll = createInventoryPoll({
       refresh: refetchJjRepositories,
-      intervalMs: INVENTORY_REFRESH_INTERVAL_MS,
+      intervalMs: jjInventoryRefreshInterval,
       isHidden: () => document.hidden,
       schedule: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
       cancel: (handle: number) => window.clearTimeout(handle),
@@ -1388,7 +1389,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       window.removeEventListener('dshfiles:jj-changed', onRepositoryChange)
       poll.stop()
     }
-  }, [jjInventoryPolling, jjOwnerMissing, refetchJjRepositories])
+  }, [jjInventoryPolling, jjInventoryRefreshInterval, jjOwnerMissing, refetchJjRepositories])
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [threadSelection, setThreadSelection] = useState<ThreadSelectionState>(EMPTY_THREAD_SELECTION)

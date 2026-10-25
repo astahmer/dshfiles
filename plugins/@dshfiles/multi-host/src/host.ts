@@ -12,6 +12,7 @@ import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import { knownSessionRuntime } from './session-runtime.js'
+import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
 import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
@@ -170,6 +171,7 @@ const viewLeases = new Map<string, ViewLease>()
 const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
 const connectionErrors = new Map<string, { readonly code: string; readonly message: string; readonly at: string }>()
+const runtimeStatusCache = createRuntimeStatusCache<RuntimeStatus>({ successTtlMs: 30_000, failureTtlMs: 45_000 })
 
 const connectRuntime = async ({
   host,
@@ -284,6 +286,8 @@ const pool = createGatewayPool({
       const identity = await verifyPinnedIdentity(gateway, runtime)
       await HostDirectoryStore.upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
       connectionErrors.delete(runtimeId)
+      const cachedStatus = runtimeStatusCache.read(runtimeId)
+      if (cachedStatus.status?.ok === false && !cachedStatus.refreshing) runtimeStatusCache.invalidate(runtimeId)
       return gateway
     } catch (error) {
       await gateway.dispose()
@@ -688,50 +692,74 @@ const multiHostHandlers = multiHostApi.host({
     const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
     if (runtime === undefined)
       return { ok: false, hostId: 'unknown', runtimeId: input.runtimeId, code: 'runtime-not-found', message: 'No recorded runtime has this id.', stale: true }
-    try {
-      return await withRuntime(
-        runtime.id,
-        async gateway => {
-          const [frames, sessionValue] = await Promise.all([gateway.follow('workspace/follow', {}, 10_000), gateway.run('session', 'list', { _request: {} })])
-          const sessions = sessionListSchema
-            .parse(sessionValue)
-            .items.slice(0, 500)
-            .map(item => {
-              const title = item.title ?? item.projections?.values?.title ?? undefined
-              const summary: SessionSummary = {
+    const cached = runtimeStatusCache.read(runtime.id)
+    if (cached.status !== undefined && !cached.stale) return cached.status
+
+    void runtimeStatusCache
+      .refresh(runtime.id, async () => {
+        try {
+          return await withRuntime(
+            runtime.id,
+            async gateway => {
+              const [frames, sessionValue] = await Promise.all([
+                gateway.follow('workspace/follow', {}, 10_000),
+                gateway.run('session', 'list', { _request: {} }),
+              ])
+              const sessions = sessionListSchema
+                .parse(sessionValue)
+                .items.slice(0, 500)
+                .map(item => {
+                  const title = item.title ?? item.projections?.values?.title ?? undefined
+                  const summary: SessionSummary = {
+                    runtimeId: runtime.id,
+                    sessionId: item.sessionId,
+                    running: item.running,
+                    blank: item.blank,
+                    updatedAt: item.updatedAt,
+                  }
+                  if (item.cwd !== undefined) summary.cwd = item.cwd
+                  if (title !== undefined && title !== '') summary.title = title
+                  return summary
+                })
+              const workspaces = collectWorkspaces(frames).map(item => ({
                 runtimeId: runtime.id,
-                sessionId: item.sessionId,
-                running: item.running,
-                blank: item.blank,
-                updatedAt: item.updatedAt,
-              }
-              if (item.cwd !== undefined) summary.cwd = item.cwd
-              if (title !== undefined && title !== '') summary.title = title
-              return summary
-            })
-          const workspaces = collectWorkspaces(frames).map(item => ({
+                workspaceId: item.workspaceId,
+                path: item.path,
+                title: item.title ?? item.path,
+                sessionIds: item.sessionIds ?? [],
+              }))
+              const refreshed = (await HostDirectoryStore.findRuntime(runtime.id)) ?? runtime
+              return { ok: true as const, runtime: runtimeSummary(refreshed), workspaces, sessions }
+            },
+            { mutation: false },
+          )
+        } catch (error) {
+          const failure = safeFailure(error)
+          return {
+            ok: false,
+            hostId: runtime.hostId,
             runtimeId: runtime.id,
-            workspaceId: item.workspaceId,
-            path: item.path,
-            title: item.title ?? item.path,
-            sessionIds: item.sessionIds ?? [],
-          }))
-          const refreshed = (await HostDirectoryStore.findRuntime(runtime.id)) ?? runtime
-          return { ok: true as const, runtime: runtimeSummary(refreshed), workspaces, sessions }
-        },
-        { mutation: false },
-      )
-    } catch (error) {
-      const failure = safeFailure(error)
-      return {
-        ok: false,
-        hostId: runtime.hostId,
-        runtimeId: runtime.id,
-        code: failure.code,
-        message: failure.message,
-        stale: true,
-        ...(runtime.lastSeenAt === undefined ? {} : { lastSeenAt: runtime.lastSeenAt }),
-      }
+            code: failure.code,
+            message: failure.message,
+            stale: true,
+            lastSeenAt: runtime.lastSeenAt,
+          }
+        }
+      })
+      .catch(error => {
+        connectionErrors.set(runtime.id, { ...safeFailure(error), at: new Date().toISOString() })
+      })
+
+    if (cached.status !== undefined) return { ...cached.status, stale: true, refreshing: true }
+    return {
+      ok: false,
+      hostId: runtime.hostId,
+      runtimeId: runtime.id,
+      code: 'runtime-status-refreshing',
+      message: 'A remote status refresh is running.',
+      stale: true,
+      refreshing: true,
+      lastSeenAt: runtime.lastSeenAt,
     }
   },
   runtimePing: async ({ input, signal }) => {
@@ -744,6 +772,7 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   runtimeReconnect: async ({ input }) => {
+    runtimeStatusCache.invalidate(input.runtimeId)
     await pool.close(input.runtimeId)
     connectionErrors.delete(input.runtimeId)
     try {

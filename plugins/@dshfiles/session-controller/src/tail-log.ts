@@ -42,6 +42,21 @@ interface FrameRange {
   readonly end: number
 }
 
+type TailReadPhase = 'stat_ms' | 'lookup_ms' | 'identity_ms' | 'read_ms' | 'scan_ms' | 'decode_ms'
+type TailReadMetrics = Partial<Record<TailReadPhase, number>> & {
+  cache_hit?: boolean
+  fallback_reason?: string
+}
+
+const measureTailPhase = async <Value>(metrics: TailReadMetrics, phase: TailReadPhase, work: () => Value | Promise<Value>): Promise<Value> => {
+  const startedAt = performance.now()
+  try {
+    return await work()
+  } finally {
+    metrics[phase] = Math.round(performance.now() - startedAt)
+  }
+}
+
 /**
  * The end of one cold Session log, decoded without reading the rest. The JSONL backend writes a header frame and then
  * one independently decodable Zstandard frame per durable append, so the frames nearest the end hold the newest
@@ -67,45 +82,88 @@ export class TailLog {
    */
   static open(input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal }): Promise<TailLog | undefined> {
     return withSpan('session tail read', { attributes: { 'dsh.session.id': input.sessionId } }, async span => {
-      const tail = await TailLog.openUntraced(input)
+      const metrics: TailReadMetrics = { cache_hit: false }
+      let tail: TailLog | undefined
+      try {
+        tail = await TailLog.openUntraced(input, metrics)
+      } catch (error) {
+        metrics.fallback_reason = input.signal.aborted ? 'aborted' : 'error'
+        span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { served: false, ...metrics } }))
+        throw error
+      }
       span.setAttributes(
-        pluginAttributes({ plugin: 'session-controller', attributes: { served: tail !== undefined, bytes: tail?.bytes.length, frames: tail?.frames.length } }),
+        pluginAttributes({
+          plugin: 'session-controller',
+          attributes: { served: tail !== undefined, bytes: tail?.bytes.length, frames: tail?.frames.length, ...metrics },
+        }),
       )
       return tail
     })
   }
 
-  private static async openUntraced(input: {
-    readonly ctx: Context
-    readonly sessionId: SessionId
-    readonly signal: AbortSignal
-  }): Promise<TailLog | undefined> {
+  private static async openUntraced(
+    input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal },
+    metrics: TailReadMetrics,
+  ): Promise<TailLog | undefined> {
     const kept = TailLog.kept.get(input.sessionId)
     if (kept !== undefined) {
-      // A file identity check instead of the backend's stat and log lookup (130–330 ms on a busy Host): an unchanged
-      // file is the same log, already scanned and partly decoded.
-      if ((await TailLog.identityOf(kept.path)) === kept.identity) {
+      // An unchanged file is the same log, already scanned and partly decoded.
+      const identity = await measureTailPhase(metrics, 'identity_ms', () => TailLog.identityOf(kept.path))
+      if (identity === kept.identity) {
+        metrics.cache_hit = true
         kept.timer.refresh()
         return kept.tail
       }
       TailLog.forget(input.sessionId)
     }
     const persistence = input.ctx.get('sessionPersistence')
-    if (persistence === undefined || !jsonlLogSchema.safeParse(persistence).success) return undefined
-    const stat = await persistence.stat(input.sessionId, { signal: input.signal })
-    if (stat === undefined || stat.formatStatus !== 'current' || (stat.sizeBytes ?? 0) < MIN_TAIL_BYTES) return undefined
+    if (persistence === undefined || !jsonlLogSchema.safeParse(persistence).success) {
+      metrics.fallback_reason = 'persistence-unavailable'
+      return undefined
+    }
+    const stat = await measureTailPhase(metrics, 'stat_ms', () => persistence.stat(input.sessionId, { signal: input.signal }))
+    if (stat === undefined) {
+      metrics.fallback_reason = 'stat-missing'
+      return undefined
+    }
+    if (stat.formatStatus !== 'current') {
+      metrics.fallback_reason = 'unsupported-format'
+      return undefined
+    }
+    if ((stat.sizeBytes ?? 0) < MIN_TAIL_BYTES) {
+      metrics.fallback_reason = 'below-tail-size-threshold'
+      return undefined
+    }
     const header = stat.header
-    if (header.cwd === undefined || header.isSeeded || header.origin === 'subagent') return undefined
+    if (header.cwd === undefined || header.isSeeded || header.origin === 'subagent') {
+      metrics.fallback_reason = 'ineligible-session'
+      return undefined
+    }
     // SAFETY: the schema above proved the JSONL backend's public resolveCurrentLog method is present.
     const lookup = persistence as unknown as JsonlLogLookup
-    const path = logPathSchema.safeParse(await lookup.resolveCurrentLog(input.sessionId, input.signal))
-    if (!path.success) return undefined
-    const identity = await TailLog.identityOf(path.data)
-    const bytes = await readFile(path.data, { signal: input.signal })
-    const frames = TailLog.scan(bytes)
-    if (identity === undefined || frames === undefined || frames.length < 2) return undefined
+    const currentPath = await measureTailPhase(metrics, 'lookup_ms', () => lookup.resolveCurrentLog(input.sessionId, input.signal))
+    const path = logPathSchema.safeParse(currentPath)
+    if (!path.success) {
+      metrics.fallback_reason = 'log-path-unavailable'
+      return undefined
+    }
+    const identity = await measureTailPhase(metrics, 'identity_ms', () => TailLog.identityOf(path.data))
+    if (identity === undefined) {
+      metrics.fallback_reason = 'log-identity-unavailable'
+      return undefined
+    }
+    const bytes = await measureTailPhase(metrics, 'read_ms', () => readFile(path.data, { signal: input.signal }))
+    const frames = await measureTailPhase(metrics, 'scan_ms', () => TailLog.scan(bytes))
+    if (frames === undefined || frames.length < 2) {
+      metrics.fallback_reason = 'invalid-zstd-frames'
+      return undefined
+    }
     const tail = new TailLog(header, bytes, frames)
-    if (!tail.textOf(frames.length - 1).endsWith('\n')) return undefined
+    const finalLineComplete = await measureTailPhase(metrics, 'decode_ms', () => tail.textOf(frames.length - 1).endsWith('\n'))
+    if (!finalLineComplete) {
+      metrics.fallback_reason = 'incomplete-final-line'
+      return undefined
+    }
     TailLog.keep(input.sessionId, { path: path.data, identity, tail })
     return tail
   }

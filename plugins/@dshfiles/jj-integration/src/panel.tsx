@@ -771,8 +771,16 @@ export const ThreadWorkspacesPanel = (props: {
     queryKey: threadQueryKeys.repositories,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => api.repositories({}, { signal: hostSignal }) }),
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    refetchInterval: query => (query.state.data?.refreshing === true ? 5_000 : 60_000),
   })
+  const refreshRepositoryViews = async (): Promise<void> => {
+    try {
+      await api.refreshRepositories({})
+    } catch {
+      // The Host may still expose only the cache-backed repositories query.
+    }
+    await repositories.refetch()
+  }
   const refreshAfterChange = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
     announceRepositoryChange()
@@ -1081,8 +1089,13 @@ export const ThreadWorkspacesPanel = (props: {
                 onChange={event => setSearch(event.currentTarget.value)}
               />
             </label>
-            <Button size="sm" variant="outline" onClick={() => void repositories.refetch()} disabled={repositories.isFetching}>
-              {repositories.isFetching ? <Spinner /> : <RefreshCwIcon />}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void refreshRepositoryViews()}
+              disabled={repositories.isFetching || repositories.data?.refreshing === true}
+            >
+              {repositories.isFetching || repositories.data?.refreshing === true ? <Spinner /> : <RefreshCwIcon />}
               {t('refresh')}
             </Button>
           </div>
@@ -1100,8 +1113,15 @@ export const ThreadWorkspacesPanel = (props: {
           <AlertDescription>{errorMessage(repositories.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       ) : null}
-      {repositories.isPending ? <PanelSkeleton /> : null}
-      {repositories.data?.repositories.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRepositories')}</p> : null}
+      {repositories.isPending || (repositories.data?.refreshing === true && repositories.data.repositories.length === 0) ? <PanelSkeleton /> : null}
+      {repositories.data?.refreshFailed === true ? (
+        <Alert variant="default">
+          <AlertDescription>{t('loadFailed')}</AlertDescription>
+        </Alert>
+      ) : null}
+      {repositories.data?.refreshing !== true && repositories.data?.refreshFailed !== true && repositories.data?.repositories.length === 0 ? (
+        <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRepositories')}</p>
+      ) : null}
       {repositories.data !== undefined && repositories.data.repositories.length > 0 && threads.length === 0 ? (
         <p className="dshx:text-sm dshx:text-muted-foreground">{t('noThreads')}</p>
       ) : null}

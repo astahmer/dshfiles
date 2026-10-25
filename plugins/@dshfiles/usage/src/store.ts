@@ -958,7 +958,13 @@ export const openUsageStore = (path: string) => {
   const syncToolSources = (sources: ReadonlyMap<string, { readonly category: RegistryToolSource; readonly owner: string | null }>): void => {
     transaction(() => {
       for (const [name, source] of sources)
-        prepare("UPDATE tools SET category = ?, owner = ? WHERE name = ? AND category != 'skill'").run(source.category, source.owner, name)
+        prepare("UPDATE tools SET category = ?, owner = ? WHERE name = ? AND category != 'skill' AND (category IS NOT ? OR owner IS NOT ?)").run(
+          source.category,
+          source.owner,
+          name,
+          source.category,
+          source.owner,
+        )
     })
   }
 

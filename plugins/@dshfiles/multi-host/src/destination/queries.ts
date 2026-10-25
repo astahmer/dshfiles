@@ -2,6 +2,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { queryOptions } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing, type ApiClient } from '@dshfiles/dshx/api'
 import { multiHostApi } from '../api.js'
+import { runtimeStatusRefreshRefetchInterval } from '../runtime-status-refresh-policy.js'
 
 export type MultiHostClient = ApiClient<(typeof multiHostApi)['methods']>
 
@@ -29,7 +30,11 @@ export const multiHostQueries = {
     queryOptions({
       queryKey: multiHostKeys.status(runtimeId),
       queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 40_000, request: hostSignal => api.runtimeStatus({ runtimeId }, { signal: hostSignal }) }),
-      refetchInterval,
+      refetchInterval: query =>
+        runtimeStatusRefreshRefetchInterval({
+          intervalMs: isApiOwnerMissing(query.state.error) ? false : refetchInterval,
+          refreshing: query.state.data?.refreshing === true,
+        }),
       retry: false,
     }),
   models: (api: MultiHostClient, runtimeId: string) =>

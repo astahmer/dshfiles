@@ -72,6 +72,31 @@ it('records a session tail read span with the thread, bytes and frames it read',
   using recorder = recordSpans()
   await TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal })
   const span = recorder.span('session tail read')
-  expect(span.attributes).toMatchObject({ 'dsh.session.id': 'session-tail-span', 'dshx.session-controller.served': true, 'dshx.session-controller.frames': 33 })
+  expect(span.attributes).toMatchObject({
+    'dsh.session.id': 'session-tail-span',
+    'dshx.session-controller.served': true,
+    'dshx.session-controller.frames': 33,
+    'dshx.session-controller.cache_hit': false,
+  })
   expect(span.attributes['dshx.session-controller.bytes']).toBeGreaterThan(1_000_000)
+  for (const phase of ['stat_ms', 'lookup_ms', 'identity_ms', 'read_ms', 'scan_ms', 'decode_ms']) {
+    expect(span.attributes[`dshx.session-controller.${phase}`]).toEqual(expect.any(Number))
+  }
+  await TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal })
+  const spans = recorder.named('session tail read')
+  expect(spans).toHaveLength(2)
+  expect(spans[1]?.attributes).toMatchObject({ 'dshx.session-controller.served': true, 'dshx.session-controller.cache_hit': true })
+  expect(spans[1]?.attributes['dshx.session-controller.read_ms']).toBeUndefined()
 }, 30_000)
+
+it('records why an unavailable persistence backend cannot serve the tail', async () => {
+  const ctx = new Context()
+  contexts.push(ctx)
+  using recorder = recordSpans()
+  const tail = await TailLog.open({ ctx, sessionId: SessionId('session-tail-missing-backend'), signal: new AbortController().signal })
+  expect(tail).toBeUndefined()
+  expect(recorder.span('session tail read').attributes).toMatchObject({
+    'dshx.session-controller.served': false,
+    'dshx.session-controller.fallback_reason': 'persistence-unavailable',
+  })
+})

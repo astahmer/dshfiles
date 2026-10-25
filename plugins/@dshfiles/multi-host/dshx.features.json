@@ -245,6 +245,12 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "multi-host runtime status refresh",
+          "file": "plugins/@dshfiles/multi-host/src/runtime-status-snapshot-cache.test.ts",
+          "testName": "coalesces refreshes, caches results, and traces the remote work unit"
         }
       ]
     },

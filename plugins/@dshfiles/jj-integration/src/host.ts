@@ -55,6 +55,7 @@ import {
   type ThreadSessionActivity,
 } from './thread-rebase-eligibility.js'
 import { createSessionActivityCache, readWorkspaceSessionActivity as readScopedWorkspaceSessionActivity } from './session-activity-cache.js'
+import { createRepositoryViewsCache } from './repository-views-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
 import { IntegrationAttribution } from './integration-attribution.js'
 import { IntegrationRecovery } from './integration-recovery.js'
@@ -402,18 +403,6 @@ type Cached<Value> = { readonly value: Value; readonly at: number }
 
 const locationCache = new Map<string, Cached<ThreadLocation | undefined>>()
 const threadStatusCache = new Map<string, Cached<readonly ThreadStatus[]>>()
-let repositoryViews: Cached<readonly RepositoryView[]> | undefined
-let repositoryScan: Promise<readonly RepositoryView[]> | undefined
-let repositoryGeneration = 0
-
-/** A mutation makes every cached jj-derived value stale, including the scan that is still running. */
-const invalidateRepositories = (): void => {
-  repositoryGeneration += 1
-  repositoryViews = undefined
-  repositoryScan = undefined
-  threadStatusCache.clear()
-  sessionActivity.reset()
-}
 
 /**
  * A registered workspace's location never moves, and most registered folders are not jj repositories at all: caching
@@ -482,26 +471,24 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   })
 }
 
-const listRepositories = async (): Promise<readonly RepositoryView[]> => {
-  // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot before the await: a concurrent scan replaces the cache rather than mutating it.
-  const cached = repositoryViews
-  if (cached !== undefined && Date.now() - cached.at < REPOSITORY_VIEW_TTL_MS) return cached.value
-  // oxlint-disable-next-line antislop/no-passthrough-variable -- Join exactly the scan that was in flight when this caller arrived.
-  const inFlight = repositoryScan
-  if (inFlight !== undefined) return inFlight
-  // oxlint-disable-next-line antislop/no-passthrough-variable -- The scan may publish only while the generation it started from is still current.
-  const generation = repositoryGeneration
-  const scan = scanRepositories().then(result => {
-    if (generation === repositoryGeneration) repositoryViews = { value: result, at: Date.now() }
-    return result
-  })
-  repositoryScan = scan
-  try {
-    return await scan
-  } finally {
-    if (repositoryScan === scan) repositoryScan = undefined
+const repositoryViewsCache = createRepositoryViewsCache({ read: scanRepositories, ttlMs: REPOSITORY_VIEW_TTL_MS })
+
+const invalidateRepositories = (): void => {
+  repositoryViewsCache.invalidate()
+  threadStatusCache.clear()
+  sessionActivity.reset()
+}
+
+const listRepositorySnapshot = () => {
+  const snapshot = repositoryViewsCache.read()
+  return {
+    repositories: [...(snapshot.value ?? [])],
+    refreshing: snapshot.refreshing,
+    refreshFailed: snapshot.refreshFailed,
   }
 }
+
+const listRepositories = (): Promise<readonly RepositoryView[]> => repositoryViewsCache.refreshAndRead()
 
 const findThread = async (input: {
   readonly location: ThreadLocation
@@ -834,7 +821,7 @@ const queueIntegration = async (input: { readonly path: string; readonly session
   if (location?.threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
   const entry = deferredIntegrations.queue({ path: location.workspaceRoot, sessionId: input.sessionId })
   // Queueing changes no jj state, only what the assembled repository views report.
-  repositoryViews = undefined
+  repositoryViewsCache.invalidate()
   emitActivity({
     type: 'workspace.integration_queued',
     level: 'routine',
@@ -849,7 +836,7 @@ const queueIntegration = async (input: { readonly path: string; readonly session
 const cancelQueuedIntegration = (path: string) => {
   const status = deferredIntegrations.cancel(path)
   if (status === 'cancelled') {
-    repositoryViews = undefined
+    repositoryViewsCache.invalidate()
     emitActivity({ type: 'workspace.integration_unqueued', level: 'routine', summary: `Cancelled the queued integration of ${basename(path)}`, path })
   }
   return { status }
@@ -1421,7 +1408,8 @@ const api = jjIntegrationApi.host({
     const existing = await registry.resolveByPath(directory)
     return { workspaceId: (existing ?? (await registry.create(directory, 'No folder'))).id }
   },
-  repositories: async () => ({ repositories: [...(await listRepositories())] }),
+  repositories: async () => listRepositorySnapshot(),
+  refreshRepositories: async () => ({ started: repositoryViewsCache.startRefresh() }),
   threadAt: async ({ input }) => {
     const location = await requireThreads()
       .locate(input.path)

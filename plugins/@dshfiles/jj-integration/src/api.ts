@@ -276,14 +276,14 @@ export const jjIntegrationApi = defineApi({
     noFolder: method({ input: z.object({}).strict(), output: z.object({ workspaceId: z.string() }).strict() }),
     repositories: method({
       input: z.object({}).strict(),
-      output: z.object({ repositories: z.array(repositorySchema) }).strict(),
+      output: z.object({ repositories: z.array(repositorySchema), refreshing: z.boolean().optional(), refreshFailed: z.boolean().optional() }).strict(),
       description:
-        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. Read-only.',
+        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
       tool: {
         name: 'jj_thread_repositories',
         readOnly: true,
-        render: output =>
-          output.repositories
+        render: output => {
+          const content = output.repositories
             .map(repository =>
               [
                 `${repository.title} (${repository.repoRoot})${repository.workspaceId === null ? '' : ` · project ${repository.workspaceId}`}`,
@@ -299,7 +299,31 @@ export const jjIntegrationApi = defineApi({
                 }),
               ].join('\n'),
             )
-            .join('\n') || 'No jj repositories with thread workspaces.',
+            .join('\n')
+          if (content.length > 0) {
+            const note =
+              output.refreshing === true
+                ? 'A repository scan is running; listed statuses may be stale.'
+                : output.refreshFailed === true
+                  ? 'The last repository scan failed; listed statuses may be stale.'
+                  : undefined
+            return note === undefined ? content : `${note}\n${content}`
+          }
+          if (output.refreshing === true) return 'Repository scan is running; no cached results are available yet.'
+          if (output.refreshFailed === true) return 'Repository scan failed; no cached results are available.'
+          return 'No jj repositories with thread workspaces.'
+        },
+      },
+    }),
+    refreshRepositories: method({
+      input: z.object({}).strict(),
+      output: z.object({ started: z.boolean() }).strict(),
+      description:
+        'Start a fresh jj repository and thread-status scan in the background. Returns immediately; read the repositories view for progress and results.',
+      tool: {
+        name: 'jj_thread_refresh_repositories',
+        readOnly: true,
+        render: output => (output.started ? 'Repository status scan started.' : 'A repository status scan is already running.'),
       },
     }),
     threadAt: method({

@@ -8,6 +8,7 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_destination',
       'jj_thread_projects',
       'jj_thread_repositories',
+      'jj_thread_refresh_repositories',
       'jj_thread_isolate',
       'jj_thread_status',
       'jj_thread_rebase',
@@ -27,6 +28,7 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_destination',
       'jj_thread_projects',
       'jj_thread_repositories',
+      'jj_thread_refresh_repositories',
       'jj_thread_status',
       'jj_thread_workspace_sync',
       'jj_thread_cleanup_jobs',
@@ -36,6 +38,18 @@ describe('jj-integration tool exposure', () => {
       expect(method.description ?? method.tool.description).toBeTruthy()
       expect(method.tool.render).toBeDefined()
     }
+  })
+
+  test('repository inventory accepts old Host output and reports background refresh state', async () => {
+    const output = jjIntegrationApi.methods.repositories.output
+    if (output === undefined) throw new Error('repositories must declare an output schema')
+    expect('issues' in (await output['~standard'].validate({ repositories: [] }))).toBe(false)
+    expect('issues' in (await output['~standard'].validate({ repositories: [], refreshing: true, refreshFailed: false }))).toBe(false)
+    expect('issues' in (await output['~standard'].validate({ repositories: [], refreshing: 'yes' }))).toBe(true)
+
+    const refreshOutput = jjIntegrationApi.methods.refreshRepositories.output
+    if (refreshOutput === undefined) throw new Error('refreshRepositories must declare an output schema')
+    expect('issues' in (await refreshOutput['~standard'].validate({ started: true }))).toBe(false)
   })
 
   test('removing a thread workspace never abandons work without an explicit force', async () => {

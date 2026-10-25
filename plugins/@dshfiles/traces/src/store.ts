@@ -373,7 +373,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
       .parse(prepare('SELECT trace_id FROM traces WHERE received_ms < ?').all(cutoff))
       .map(row => row.trace_id)
     let removed = expired.length
-    transaction(() => deleteTraces(expired))
+    if (expired.length > 0) transaction(() => deleteTraces(expired))
     let excess = spanCount() - retention.maxSpans
     if (excess > 0) {
       const oldest = z
