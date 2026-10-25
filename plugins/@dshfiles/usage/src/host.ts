@@ -9,6 +9,7 @@ import { localOtlpEndpoint } from '@dshfiles/dshx/tracing'
 import { z } from 'zod'
 import { resolveActivityQuery, resolveOtelMetricsRange, usageApi } from './api.js'
 import type { ToolSourceMetadata } from './fold.js'
+import { toolSourceSnapshotsEqual } from './tool-source-snapshots.js'
 import { createJevUsageRecorder, jevSourceOf } from './jev-usage-recorder.js'
 import { createUsageIndexService } from './indexer.js'
 import { readLogFrom } from './session-log.js'
@@ -38,6 +39,7 @@ interface UsageRuntime {
   readonly pricer: ReturnType<typeof createRatePricer>
   readonly root: string
   readonly readToolRegistry: () => Promise<ToolRegistrySnapshot | undefined>
+  syncedToolSources: ReadonlyMap<string, ToolSourceMetadata> | undefined
   pass: Promise<void> | null
   lastIndexedAt: number | null
   lastError: string | null
@@ -56,10 +58,12 @@ const runPass = (active: UsageRuntime): Promise<void> => {
     try {
       active.store.pruneTelemetry()
       const toolRegistry = await active.readToolRegistry()
-      if (toolRegistry !== undefined)
+      if (toolRegistry !== undefined && !toolSourceSnapshotsEqual({ previous: active.syncedToolSources, next: toolRegistry.toolSources })) {
         active.store.syncToolSources(
           new Map([...toolRegistry.toolSources].map(([name, source]) => [name, { category: source.source, owner: source.owner }] as const)),
         )
+        active.syncedToolSources = toolRegistry.toolSources
+      }
       await usageIndexService.indexSessionLogs({ store: active.store, root: active.root, ...toolRegistry })
       active.store.reconcileLiveCalls(Date.now())
       await active.pricer.update()
@@ -149,6 +153,7 @@ const setupHost = (context: Context): Effect<void> => {
     pricer: createRatePricer({ store, accountKinds }),
     root: sessionsRoot(context),
     readToolRegistry,
+    syncedToolSources: undefined,
     pass: null,
     lastIndexedAt: null,
     lastError: null,
