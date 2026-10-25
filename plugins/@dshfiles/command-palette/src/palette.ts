@@ -1,3 +1,4 @@
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PaletteThreadSection } from './palette-api.js'
 
 /** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
@@ -107,6 +108,9 @@ export interface ThreadIndex {
   readonly recent: readonly ThreadCandidate[]
   readonly entries: readonly IndexedThread[]
 }
+
+const isTopLevelThread = (session: Pick<SessionSummary, 'origin' | 'parentId'>): boolean =>
+  session.origin !== 'subagent' && session.parentId === undefined
 
 const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex => ({
   recent: [...threads].sort((left, right) => right.updatedAt - left.updatedAt),
@@ -218,6 +222,7 @@ export class PaletteRules {
   static readonly parseLineNumber = parseLineNumber
   static readonly fuzzyScore = fuzzyScore
   static readonly indexThreads = indexThreads
+  static readonly isTopLevelThread = isTopLevelThread
   static readonly rankThreads = rankThreads
   static readonly indexFiles = indexFiles
   static readonly rankFiles = rankFiles

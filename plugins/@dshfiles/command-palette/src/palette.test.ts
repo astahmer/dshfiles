@@ -1,3 +1,4 @@
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { PaletteRules, type ThreadCandidate } from './palette.js'
@@ -16,6 +17,12 @@ test('fuzzy matching prefers substrings and word starts', () => {
   const scattered = PaletteRules.fuzzyScore('sbft', 'sidebar footer') ?? 0
   assert.ok(substring > scattered)
   assert.ok((PaletteRules.fuzzyScore('sf', 'sidebar footer') ?? 0) > (PaletteRules.fuzzyScore('sf', 'stuff') ?? 0))
+})
+
+test('thread search excludes children and subagents but keeps top-level sessions', () => {
+  assert.equal(PaletteRules.isTopLevelThread({}), true)
+  assert.equal(PaletteRules.isTopLevelThread({ parentId: SessionId('parent') }), false)
+  assert.equal(PaletteRules.isTopLevelThread({ origin: 'subagent' }), false)
 })
 
 test('empty thread search returns the most recent candidates', () => {

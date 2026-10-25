@@ -11,6 +11,7 @@ import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-cl
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { PaletteRules } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
 import { createThreadContentSearch } from './thread-content-source.js'
@@ -62,6 +63,7 @@ const samePaletteSession = (left: SessionSummary, right: SessionSummary): boolea
   left.displayTitle === right.displayTitle &&
   left.cwd === right.cwd &&
   left.parentId === right.parentId &&
+  left.origin === right.origin &&
   left.blank === right.blank &&
   left.updatedAt === right.updatedAt &&
   (left.retainedBy.mainView ?? 0) === (right.retainedBy.mainView ?? 0)
@@ -155,7 +157,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
   const threadEntries = useMemo(
     () =>
       sessions.flatMap(session => {
-        if (session.blank || archivedSessionIds.has(session.id)) return []
+        if (!PaletteRules.isTopLevelThread(session) || session.blank || archivedSessionIds.has(session.id)) return []
         const workspaceId = workspaceForSession(session, sessionsById, workspaceBySession)
         const project = workspaceId === undefined ? '' : (workspaceTitleById.get(workspaceId) ?? '')
         const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)

@@ -4,7 +4,7 @@
     {
       "id": "palette-search",
       "title": "Search threads and workspace files",
-      "summary": "Search threads by title, project, and id prefix; filter by sidebar group and show each result’s update date. Archived threads are hidden. Rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads unless threadsScope is all.",
+      "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Filter by sidebar group and show each result’s update date. Archived threads are hidden. Rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads unless threadsScope is all.",
       "surfaces": ["client"],
       "reach": ["press Meta+k", "click tab \"Threads\"", "expect tab \"Pinned\""],
       "configuration": [
@@ -21,6 +21,7 @@
         "A thread title or project match is omitted from results.",
         "A thread result omits its sidebar group or update date.",
         "An archived thread appears in search results.",
+        "A child session or subagent appears in the Threads list.",
         "A file basename match is buried below unrelated path matches.",
         "A persisted user message does not return from thread-content search."
       ],
@@ -52,6 +53,12 @@
           "id": "command-palette.palette-search-unit-thread-fields",
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
           "testName": "thread search matches title, project, and id prefix"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.palette-search-unit-top-level-threads",
+          "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
+          "testName": "thread search excludes children and subagents but keeps top-level sessions"
         },
         {
           "kind": "unit-test",
