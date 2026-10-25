@@ -108,8 +108,7 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
       const putReceipt = this.#database.prepare(
         'INSERT OR IGNORE INTO attempt_receipts (task_id, attempt_id, session_id, finished_at, payload) VALUES (?, ?, ?, ?, ?)',
       )
-      for (const saved of data.receipts) {
-        const receipt = saved
+      for (const receipt of data.receipts) {
         if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) continue
         const exists = this.#database.prepare('SELECT 1 AS found FROM tasks WHERE task_id = ?').get(receipt.taskId)
         if (exists === undefined) continue
@@ -205,18 +204,17 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
 
   async saveAttemptReceipt(receiptInput: StoredReceipt): Promise<void> {
     this.#assertOpen()
-    const receipt = receiptInput
-    if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) throw new Error('A durable attempt receipt needs both task identities.')
-    const taskId = receipt.taskId
-    const attemptId = receipt.taskAttemptId
+    if (receiptInput.taskId === undefined || receiptInput.taskAttemptId === undefined) throw new Error('A durable attempt receipt needs both task identities.')
+    const taskId = receiptInput.taskId
+    const attemptId = receiptInput.taskAttemptId
     await this.#transaction(() => {
       const task = this.get(taskId)
-      if (task === undefined || task.sessionId !== receipt.sessionId || !task.attempts.some(attempt => attempt.id === attemptId))
+      if (task === undefined || task.sessionId !== receiptInput.sessionId || !task.attempts.some(attempt => attempt.id === attemptId))
         throw new Error('A durable attempt receipt does not match a persisted task attempt.')
-      const payload = serializedReceipt(receipt)
+      const payload = serializedReceipt(receiptInput)
       this.#database
         .prepare('INSERT OR IGNORE INTO attempt_receipts (task_id, attempt_id, session_id, finished_at, payload) VALUES (?, ?, ?, ?, ?)')
-        .run(taskId, attemptId, receipt.sessionId, receipt.finishedAt, payload)
+        .run(taskId, attemptId, receiptInput.sessionId, receiptInput.finishedAt, payload)
       const existing = this.#database.prepare('SELECT payload FROM attempt_receipts WHERE task_id = ? AND attempt_id = ?').get(taskId, attemptId) as
         | { payload: string }
         | undefined

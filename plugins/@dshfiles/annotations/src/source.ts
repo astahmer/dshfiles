@@ -3,7 +3,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { MAX_BUNDLES, MAX_MAP_BYTES, MAX_TOTAL_MAP_BYTES } from './limits.js'
-import { findGeneratedPosition, originalPositionFor, sourceContentPosition, type RawSourceMap } from './sourcemap.js'
+import { type RawSourceMap, SourceMap } from './sourcemap.js'
 import type { SourceMatch } from './schema.js'
 
 interface FileFingerprint {
@@ -56,7 +56,7 @@ const rootFromModuleUrl = (moduleUrl: string | undefined): string[] => {
   }
 }
 
-export const discoverPluginRoots = async ({
+const discoverPluginRoots = async ({
   start,
   env,
   moduleUrl,
@@ -88,7 +88,7 @@ export const discoverPluginRoots = async ({
   return []
 }
 
-export const listBundles = async ({ root, limit = MAX_BUNDLES }: { readonly root: string; readonly limit?: number }): Promise<Bundle[]> => {
+const listBundles = async ({ root, limit = MAX_BUNDLES }: { readonly root: string; readonly limit?: number }): Promise<Bundle[]> => {
   let entries: string[]
   try {
     entries = await readdir(root)
@@ -110,13 +110,13 @@ export const listBundles = async ({ root, limit = MAX_BUNDLES }: { readonly root
  * ("cta", "row") appears in too many bundles to be evidence; a module name carries
  * its hash and an underscore.
  */
-export const classCandidates = (selector: string): string[] => {
+const classCandidates = (selector: string): string[] => {
   const matches = selector.match(/\.[^\s>]+/g) ?? []
   const names = matches.map(match => match.slice(1).replaceAll('\\', '')).filter(name => name.length >= 4 && name.includes('_'))
   return Array.from(new Set(names)).slice(0, 6)
 }
 
-export const createSourceResolver = ({
+const createSourceResolver = ({
   roots,
   maxBundles = MAX_BUNDLES,
   maxMapBytes = MAX_MAP_BYTES,
@@ -189,15 +189,15 @@ export const createSourceResolver = ({
   }): Promise<SourceMatch | undefined> => {
     const map = await mapOf(bundle)
     if (map === undefined) return undefined
-    let position = undefined as ReturnType<typeof originalPositionFor>
+    let position = undefined as ReturnType<typeof SourceMap.originalPositionFor>
     if (confidence === 'map') {
       const code = await codeOf(bundle)
       if (code === undefined) return undefined
-      const generated = findGeneratedPosition({ text: code, needle: name })
+      const generated = SourceMap.findGeneratedPosition({ text: code, needle: name })
       if (generated === undefined) return undefined
-      position = originalPositionFor({ map, position: generated })
+      position = SourceMap.originalPositionFor({ map, position: generated })
     } else {
-      position = sourceContentPosition({ map, needle: name })
+      position = SourceMap.sourceContentPosition({ map, needle: name })
     }
     if (position === undefined) return undefined
     const absolute = absoluteOf({ bundle, source: position.source })
@@ -237,4 +237,11 @@ export const createSourceResolver = ({
     resolveText: texts => withSpan('annotations resolve text', () => scan({ needles: texts, confidence: 'text' })),
     bundles,
   }
+}
+
+export const SourceCatalog = {
+  discoverPluginRoots,
+  listBundles,
+  classCandidates,
+  createSourceResolver,
 }

@@ -1,4 +1,4 @@
-import { matchesTarget } from './descriptor.js'
+import { Descriptor } from './descriptor.js'
 import type { Annotation, AnnotationStaleReason } from './schema.js'
 
 export interface StaleCheck {
@@ -40,7 +40,7 @@ export const staleAnnotations = ({
       checks.push({ id: annotation.id, revision: annotation.revision, reason: 'element-missing' })
       continue
     }
-    if (!matchesTarget({ element, target: annotation.target })) {
+    if (!Descriptor.matchesTarget({ element, target: annotation.target })) {
       checks.push({ id: annotation.id, revision: annotation.revision, reason: 'text-changed' })
     }
   }

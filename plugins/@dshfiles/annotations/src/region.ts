@@ -1,6 +1,6 @@
 import { annotationTargetSchema, type AnnotationSurface, type AnnotationTarget } from './schema.js'
-import { elementText, privateAncestor, redactUrl, safeAttributes, safeStyles, sensitiveField } from './redact.js'
-import { elementSelector } from './descriptor.js'
+import { Redact } from './redact.js'
+import { Descriptor } from './descriptor.js'
 
 export interface DragRect {
   readonly x: number
@@ -27,15 +27,15 @@ export const describeRegion = ({
   readonly url: string
   readonly rect: DragRect
 }): AnnotationTarget | null => {
-  if (privateAncestor(element) !== undefined) return null
-  if (sensitiveField(element)) return null
-  const attributes = safeAttributes(element)
-  const styles = safeStyles(element)
-  const text = elementText(element)
+  if (Redact.privateAncestor(element) !== undefined) return null
+  if (Redact.sensitiveField(element)) return null
+  const attributes = Redact.safeAttributes(element)
+  const styles = Redact.safeStyles(element)
+  const text = Redact.elementText(element)
   const parsed = annotationTargetSchema.safeParse({
     surface,
-    url: redactUrl(url),
-    selector: elementSelector(element),
+    url: Redact.redactUrl(url),
+    selector: Descriptor.elementSelector(element),
     tag: element.tagName.toLowerCase(),
     rect: normalize(rect),
     ...(text === undefined ? {} : { text }),

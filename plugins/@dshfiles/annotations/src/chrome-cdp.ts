@@ -32,7 +32,7 @@ export interface Cdp {
 }
 
 /** Node 22 ships a browser-shaped `WebSocket`, so CDP needs no dependency. */
-export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; readonly timeoutMs?: number }): Promise<Cdp> =>
+const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; readonly timeoutMs?: number }): Promise<Cdp> =>
   withSpan(
     'annotations open cdp',
     () =>
@@ -109,7 +109,7 @@ export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; 
       }),
   )
 
-export const listPages = ({ endpoint }: { readonly endpoint: string }): Promise<CdpPage[]> =>
+const listPages = ({ endpoint }: { readonly endpoint: string }): Promise<CdpPage[]> =>
   withSpan('annotations list cdp pages', async () => {
     const response = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(2_000) }).catch(() => undefined)
     if (response === undefined || !response.ok) return []
@@ -133,14 +133,14 @@ export const listPages = ({ endpoint }: { readonly endpoint: string }): Promise<
     return pages
   })
 
-export const endpointOf = ({ port }: { readonly port: number }): string => `http://127.0.0.1:${port}`
+const endpointOf = ({ port }: { readonly port: number }): string => `http://127.0.0.1:${port}`
 
 /**
  * `/json/list` has no "active" flag, so ask each tab whether it holds focus. A
  * browser window that is behind another app reports nothing focused, and then the
  * first page is the sensible default.
  */
-export const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPage[] }): Promise<string | undefined> => {
+const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPage[] }): Promise<string | undefined> => {
   for (const page of pages.slice(0, 20)) {
     const focused = await (async () => {
       let cdp: Cdp
@@ -166,7 +166,7 @@ export const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPag
   return undefined
 }
 
-export const choosePage = ({ pages, focusedId }: { readonly pages: readonly CdpPage[]; readonly focusedId?: string }): CdpPage | undefined => {
+const choosePage = ({ pages, focusedId }: { readonly pages: readonly CdpPage[]; readonly focusedId?: string }): CdpPage | undefined => {
   if (focusedId !== undefined) {
     const focused = pages.find(page => page.id === focusedId)
     if (focused !== undefined) return focused
@@ -198,7 +198,7 @@ const parsePick = (payload: unknown): PickOutcome => {
  * Arms the injected picker on one page and waits for the binding call. The page owns
  * the interaction, so this resolves only when the user clicks or cancels.
  */
-export const pickOnPage = async ({ page, timeoutMs }: { readonly page: CdpPage; readonly timeoutMs: number }): Promise<PickOutcome> => {
+const pickOnPage = async ({ page, timeoutMs }: { readonly page: CdpPage; readonly timeoutMs: number }): Promise<PickOutcome> => {
   let cdp: Cdp
   try {
     cdp = await openCdp({ wsUrl: page.wsUrl })
@@ -230,9 +230,19 @@ export const pickOnPage = async ({ page, timeoutMs }: { readonly page: CdpPage; 
   }
 }
 
-export const dispatchClick = async ({ cdp, x, y }: { readonly cdp: Cdp; readonly x: number; readonly y: number }): Promise<void> => {
+const dispatchClick = async ({ cdp, x, y }: { readonly cdp: Cdp; readonly x: number; readonly y: number }): Promise<void> => {
   const base = { x, y, button: 'left', clickCount: 1 }
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...base })
   await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...base })
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...base })
+}
+
+export const CdpTransport = {
+  openCdp,
+  listPages,
+  endpointOf,
+  focusedPageId,
+  choosePage,
+  pickOnPage,
+  dispatchClick,
 }

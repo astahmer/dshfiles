@@ -5,7 +5,7 @@ const VLQ_CONTINUATION = 32
 const VLQ_SHIFT = 5
 const VLQ_MASK = 31
 
-export const decodeVlq = (segment: string): number[] => {
+const decodeVlq = (segment: string): number[] => {
   const values: number[] = []
   let value = 0
   let shift = 0
@@ -45,7 +45,7 @@ export interface GeneratedPosition {
   readonly column: number
 }
 
-export const findGeneratedPosition = ({ text, needle }: { readonly text: string; readonly needle: string }): GeneratedPosition | undefined => {
+const findGeneratedPosition = ({ text, needle }: { readonly text: string; readonly needle: string }): GeneratedPosition | undefined => {
   const at = text.indexOf(needle)
   if (at < 0) return undefined
   let line = 1
@@ -59,7 +59,7 @@ export const findGeneratedPosition = ({ text, needle }: { readonly text: string;
   return { line, column: at - lineStart }
 }
 
-export const originalPositionFor = ({ map, position }: { readonly map: RawSourceMap; readonly position: GeneratedPosition }): OriginalPosition | undefined => {
+const originalPositionFor = ({ map, position }: { readonly map: RawSourceMap; readonly position: GeneratedPosition }): OriginalPosition | undefined => {
   const lines = map.mappings.split(';')
   const generatedLine = lines[position.line - 1]
   if (generatedLine === undefined || generatedLine.length === 0) return undefined
@@ -92,7 +92,7 @@ export const originalPositionFor = ({ map, position }: { readonly map: RawSource
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-export const sourceContentPosition = ({ map, needle }: { readonly map: RawSourceMap; readonly needle: string }): OriginalPosition | undefined => {
+const sourceContentPosition = ({ map, needle }: { readonly map: RawSourceMap; readonly needle: string }): OriginalPosition | undefined => {
   const contents = map.sourcesContent
   if (contents === undefined) return undefined
   const pattern = new RegExp(escapeRegExp(needle))
@@ -108,4 +108,11 @@ export const sourceContentPosition = ({ map, needle }: { readonly map: RawSource
     return { source, line, column: Math.max(0, column) }
   }
   return undefined
+}
+
+export const SourceMap = {
+  decodeVlq,
+  findGeneratedPosition,
+  originalPositionFor,
+  sourceContentPosition,
 }
