@@ -9,6 +9,9 @@ interface ResumeInterruptedProps {
   readonly seq: number
 }
 
+export const resumeAvailabilityRefetchInterval = (available: boolean | undefined): number | false =>
+  available === true ? 30_000 : false
+
 export const ResumeInterrupted = (props: ResumeInterruptedProps) => (
   <PluginQueryProvider>
     <ResumeAction key={`${props.sessionId}:${props.seq}`} {...props} />
@@ -29,7 +32,9 @@ export const ResumeInterruptedAction = (
   const available = useQuery({
     queryKey,
     queryFn: ({ signal }) => api.available({ sessionId: props.sessionId, seq: props.seq }, { signal }),
-    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 2000),
+    refetchInterval: query => (
+      isApiOwnerMissing(query.state.error) ? false : resumeAvailabilityRefetchInterval(query.state.data?.available)
+    ),
     retry: false,
   })
   const resume = useMutation({

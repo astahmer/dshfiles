@@ -2,9 +2,15 @@
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { ResumeInterruptedAction } from '../src/resume-interrupted.tsx'
+import { ResumeInterruptedAction, resumeAvailabilityRefetchInterval } from '../src/resume-interrupted.tsx'
 
 afterEach(cleanup)
+
+it('stops polling unavailable tasks and backs off checks for resumable tasks', () => {
+  expect(resumeAvailabilityRefetchInterval(undefined)).toBe(false)
+  expect(resumeAvailabilityRefetchInterval(false)).toBe(false)
+  expect(resumeAvailabilityRefetchInterval(true)).toBe(30_000)
+})
 
 it('hides unavailable stopped tasks', async () => {
   render(
