@@ -1,5 +1,8 @@
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { BotIcon, CodeIcon, CommandIcon, MousePointer2Icon, SparklesIcon, TerminalIcon } from '@dshfiles/plugin-ui/icons'
+import type { AccountProfile } from './api.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, type ReactNode } from 'react'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
@@ -18,18 +21,52 @@ export const LabelledControl = (props: { readonly label: string; readonly hint?:
   )
 }
 
-/** One numbered section, the shape the reference page numbers 01–05. */
+export const ActionHint = (props: { readonly label: string; readonly children: JSX.Element }): JSX.Element => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="dshx:inline-flex">{props.children}</span>
+    </TooltipTrigger>
+    <TooltipContent>{props.label}</TooltipContent>
+  </Tooltip>
+)
+
+const PROVIDER_GLYPHS = {
+  codex: CodeIcon,
+  claude: SparklesIcon,
+  'github-copilot': BotIcon,
+  'opencode-go': TerminalIcon,
+  commandcode: CommandIcon,
+  cursor: MousePointer2Icon,
+}
+
+/** Provider identity is distinct from the user's editable picker tag. */
+export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean }): JSX.Element => {
+  const Icon = PROVIDER_GLYPHS[props.kind]
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-xl dshx:border dshx:bg-muted dshx:text-foreground',
+        props.large ? 'dshx:size-12' : 'dshx:size-9',
+      )}
+    >
+      <Icon className={props.large ? 'dshx:size-6' : 'dshx:size-4'} />
+    </span>
+  )
+}
+
+/** A settings or usage section; numbering is optional for older callers. */
 export const NumberedSection = (props: {
-  readonly index: string
+  readonly index?: string
   readonly title: string
   readonly description?: string
   readonly actions?: ReactNode
   readonly children: ReactNode
 }): JSX.Element => (
   <section className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:py-3 dshx:last:border-b-0">
-    <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3">
-      <div className="dshx:flex dshx:items-center dshx:gap-2.5">
-        <span className="dshx:font-mono dshx:text-xs dshx:text-info">{props.index}</span>
+    <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2.5">
+        {props.index === undefined ? null : <span className="dshx:font-mono dshx:text-xs dshx:text-info">{props.index}</span>}
         <h3 className="dshx:text-sm dshx:font-semibold">{props.title}</h3>
       </div>
       <div className="dshx:flex dshx:items-center dshx:gap-2">

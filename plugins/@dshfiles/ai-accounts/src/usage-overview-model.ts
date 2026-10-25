@@ -3,8 +3,8 @@ import { AccountDraftModel } from './account-draft.js'
 import { KIND_GROUPS } from './account-labels.js'
 
 /**
- * What the usage strip and popover show: enabled accounts that report quota,
- * filtered by provider tab and arranged by the user, each with its windows in
+ * What the usage strip and popover show: enabled accounts, including those
+ * without quota data, filtered by provider tab and arranged by the user. Windows stay in
  * session → weekly → monthly order. Pure so the footer, the edge overlay and
  * the tests read it one way.
  */
@@ -36,6 +36,16 @@ export interface QuotaSummaryItem {
   readonly windows?: readonly UsageWindow[]
 }
 
+export interface UnavailableSummaryItem {
+  readonly instanceId: string
+  readonly displayName: string
+  readonly shortName: string
+  readonly kind: AccountKind
+  readonly unavailable: { readonly label: string; readonly reason: string }
+}
+
+export type AccountSummaryItem = QuotaSummaryItem | UnavailableSummaryItem
+
 export const SHORT_NAME_MAX_LENGTH = 6
 
 const windowRank = (label: string): number => {
@@ -46,8 +56,6 @@ const windowRank = (label: string): number => {
   if (lower.includes('month')) return 3
   return 4
 }
-
-const cardExhausted = (card: OverviewCard): boolean => card.usage.status === 'ok' && UsageOverviewModel.isCardLimited(card.usage.windows)
 
 const arrange = <Item extends { readonly instanceId: string }>(items: readonly Item[], order: readonly string[]): Item[] => {
   const rank = (id: string): number => {
@@ -85,7 +93,7 @@ export class UsageOverviewModel {
 
   /**
    * Enabled cards for the tab, split three ways: the ones with quota to show
-   * (spent ones below usable ones until the user orders them), the ones without
+   * (in canonical account priority), the ones without
    * quota data (signed out, failing), and the ones the user hid.
    */
   static overviewSections = (
@@ -95,14 +103,17 @@ export class UsageOverviewModel {
   ): { readonly cards: OverviewCard[]; readonly unavailable: OverviewCard[]; readonly hidden: OverviewCard[] } => {
     const enabled = (usage?.cards ?? []).filter(card => card.enabled && (tab === 'all' || card.kind === tab))
     const visible = enabled.filter(card => !layout.hidden.includes(card.instanceId))
-    const cards = visible
-      .filter(hasQuota)
-      .map(card => ({ ...card, usage: { ...card.usage, windows: UsageOverviewModel.sortWindows(card.usage.windows) } }))
-      .sort((left, right) => Number(cardExhausted(left)) - Number(cardExhausted(right)))
+    const cards = visible.filter(hasQuota).map(card => ({ ...card, usage: { ...card.usage, windows: UsageOverviewModel.sortWindows(card.usage.windows) } }))
     return {
       cards: arrange(cards, layout.order),
-      unavailable: visible.filter(card => !hasQuota(card)),
-      hidden: enabled.filter(card => layout.hidden.includes(card.instanceId)),
+      unavailable: arrange(
+        visible.filter(card => !hasQuota(card)),
+        layout.order,
+      ),
+      hidden: arrange(
+        enabled.filter(card => layout.hidden.includes(card.instanceId)),
+        layout.order,
+      ),
     }
   }
 
@@ -155,30 +166,42 @@ export class UsageOverviewModel {
     }
   }
 
-  /** The usage strip: each visible account's binding window, in the popover's order. */
-  static stripItems = (usage: AccountsUsage | null, layout: UsageLayout): QuotaSummaryItem[] =>
-    UsageOverviewModel.overviewSections(usage, 'all', layout).cards.flatMap(card => UsageOverviewModel.bindingWindow(card) ?? [])
+  /** Account visibility depends on enable/hide preferences, never the quota endpoint's availability. */
+  static visibleCards = (usage: AccountsUsage | null, tab: ProviderTab, layout: UsageLayout): OverviewCard[] =>
+    arrange(
+      (usage?.cards ?? []).filter(card => card.enabled && !layout.hidden.includes(card.instanceId) && (tab === 'all' || card.kind === tab)),
+      layout.order,
+    )
 
-  /** The one item a narrow surface shows: the lowest percent left, the sooner reset breaking a tie. */
-  static mostCritical = (items: readonly QuotaSummaryItem[]): QuotaSummaryItem | undefined =>
-    [...items].sort((left, right) => left.percentRemaining - right.percentRemaining || resetOrder(left.resetsAt) - resetOrder(right.resetsAt))[0]
+  static unavailableStatus = (card: OverviewCard): UnavailableSummaryItem['unavailable'] => ({
+    label: card.usage.status === 'unauthenticated' ? 'Sign in again' : 'Quota unavailable',
+    reason:
+      card.usage.message ??
+      (card.usage.status === 'ok'
+        ? card.usage.windows.length === 0
+          ? 'No quota windows reported.'
+          : 'No ordinary quota window reported.'
+        : 'Usage is not available.'),
+  })
 
-  /**
-   * Moves `id` to `toIndex` among the ids a surface shows, and keeps the
-   * remembered position of every id it does not show (hidden, signed out,
-   * another tab) after them.
-   */
-  static moveAccount = (input: {
-    readonly order: readonly string[]
-    readonly shownIds: readonly string[]
-    readonly id: string
-    readonly toIndex: number
-  }): string[] => {
-    const others = input.shownIds.filter(id => id !== input.id)
-    const index = Math.max(0, Math.min(others.length, input.toIndex))
-    const shown = [...others.slice(0, index), input.id, ...others.slice(index)]
-    return [...shown, ...input.order.filter(id => !shown.includes(id))]
-  }
+  /** Preserve every visible enabled account; absent quota must not invent a numeric meter. */
+  static stripItems = (usage: AccountsUsage | null, layout: UsageLayout): AccountSummaryItem[] =>
+    UsageOverviewModel.visibleCards(usage, 'all', layout).map(
+      card =>
+        UsageOverviewModel.bindingWindow(card) ?? {
+          instanceId: card.instanceId,
+          displayName: card.displayName,
+          shortName: AccountDraftModel.badgeFromName(card.displayName),
+          kind: card.kind,
+          unavailable: UsageOverviewModel.unavailableStatus(card),
+        },
+    )
+
+  /** Rank only actual quota measurements, never unavailable accounts as zero or full. */
+  static mostCritical = (items: readonly AccountSummaryItem[]): QuotaSummaryItem | undefined =>
+    items
+      .filter((item): item is QuotaSummaryItem => !('unavailable' in item))
+      .sort((left, right) => left.percentRemaining - right.percentRemaining || resetOrder(left.resetsAt) - resetOrder(right.resetsAt))[0]
 
   /** "4d 12h", "1h 11m", "9m", "now", or null without a known reset. */
   static formatResetShort = (resetsAt: number | null, now: number): string | null => {

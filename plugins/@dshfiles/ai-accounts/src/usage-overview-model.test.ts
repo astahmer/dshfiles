@@ -55,8 +55,10 @@ describe('usage overview', () => {
   })
 
   it('takes the tightest window across enabled accounts only', () => {
-    expect(UsageOverviewModel.stripItems(usage, noLayout).map(item => [item.instanceId, item.percentRemaining])).toEqual([['codex', 53]])
-    expect(UsageOverviewModel.stripItems(usage, noLayout)[0]?.windows?.map(window => [window.label, window.percentRemaining])).toEqual([
+    expect(UsageOverviewModel.stripItems(usage, noLayout).map(item => [item.instanceId, 'unavailable' in item ? null : item.percentRemaining])).toEqual([
+      ['codex', 53],
+    ])
+    expect(UsageOverviewModel.bindingWindow(usage.cards[0]!)?.windows?.map(window => [window.label, window.percentRemaining])).toEqual([
       ['Current session', 69],
       ['Weekly limit', 53],
     ])
@@ -97,7 +99,7 @@ const window = (label: string, percentRemaining: number, resetsAt: number | null
 
 const card = (
   instanceId: string,
-  windows: ReturnType<typeof window>[],
+  windows: AccountsUsage['cards'][number]['usage']['windows'],
   overrides: Partial<AccountsUsage['cards'][number]> = {},
 ): AccountsUsage['cards'][number] => ({
   instanceId,
@@ -141,17 +143,17 @@ describe('footer summary', () => {
       },
       noLayout,
     )
-    expect(items.map(item => item.instanceId)).toEqual(['roomy', 'low', 'spent'])
+    expect(items.map(item => item.instanceId)).toEqual(['roomy', 'spent', 'low'])
     expect(UsageOverviewModel.mostCritical(items)?.instanceId).toBe('spent')
   })
 
-  it('sinks accounts with a spent window below usable ones until the user orders them', () => {
+  it('never sinks an exhausted account below a lower-priority account', () => {
     const both: AccountsUsage = {
       readAt: 0,
       hostName: 'mac',
       cards: [card('spent', [window('Weekly limit', 0, HOUR)]), card('usable', [window('Weekly limit', 40, HOUR)])],
     }
-    expect(UsageOverviewModel.overviewSections(both, 'all', noLayout).cards.map(item => item.instanceId)).toEqual(['usable', 'spent'])
+    expect(UsageOverviewModel.overviewSections(both, 'all', noLayout).cards.map(item => item.instanceId)).toEqual(['spent', 'usable'])
     expect(UsageOverviewModel.overviewSections(both, 'all', { order: ['spent'], hidden: [] }).cards.map(item => item.instanceId)).toEqual(['spent', 'usable'])
   })
 })
@@ -170,18 +172,56 @@ describe('usage layout', () => {
     ],
   }
 
-  it('keeps accounts without quota data and hidden ones out of the cards and the strip', () => {
+  it('keeps accounts without quota visible while respecting explicit hiding', () => {
     const sections = UsageOverviewModel.overviewSections(mixed, 'all', { order: [], hidden: ['b', 'gone'] })
     expect(sections.cards.map(item => item.instanceId)).toEqual(['a', 'c'])
     expect(sections.unavailable.map(item => item.instanceId)).toEqual(['signed-out'])
     expect(sections.hidden.map(item => item.instanceId)).toEqual(['b'])
-    expect(UsageOverviewModel.stripItems(mixed, { order: ['c'], hidden: ['b'] }).map(item => item.instanceId)).toEqual(['c', 'a'])
+    expect(UsageOverviewModel.stripItems(mixed, { order: ['c'], hidden: ['b'] }).map(item => item.instanceId)).toEqual(['c', 'a', 'signed-out'])
   })
 
-  it('moves an account among the shown ones and keeps the remembered rest after them', () => {
-    expect(UsageOverviewModel.moveAccount({ order: ['x', 'a'], shownIds: ['a', 'b', 'c'], id: 'c', toIndex: 0 })).toEqual(['c', 'a', 'b', 'x'])
-    expect(UsageOverviewModel.moveAccount({ order: [], shownIds: ['a', 'b', 'c'], id: 'a', toIndex: 1 })).toEqual(['b', 'a', 'c'])
-    expect(UsageOverviewModel.moveAccount({ order: [], shownIds: ['a', 'b'], id: 'b', toIndex: 9 })).toEqual(['a', 'b'])
+  it('uses the canonical account order even when the quota sweep still has the earlier order', () => {
+    const layout = { order: ['c', 'signed-out', 'b', 'a'], hidden: ['b'] }
+    expect(UsageOverviewModel.overviewSections(mixed, 'all', layout).cards.map(item => item.instanceId)).toEqual(['c', 'a'])
+    expect(UsageOverviewModel.stripItems(mixed, layout).map(item => item.instanceId)).toEqual(['c', 'signed-out', 'a'])
+    expect(UsageOverviewModel.visibleCards(mixed, 'all', layout).map(item => item.instanceId)).toEqual(['c', 'signed-out', 'a'])
+    expect(UsageOverviewModel.overviewSections(mixed, 'all', layout).unavailable.map(item => item.instanceId)).toEqual(['signed-out'])
+  })
+})
+
+describe('unavailable quota identity', () => {
+  it.each(['unauthenticated', 'unsupported', 'error', 'rate-limited', 'ok'] as const)(
+    'preserves an enabled %s account without fabricating measurements',
+    status => {
+      const missing = card('Marwan', [], {
+        usage: { status, message: 'Provider quota unavailable.', identity: null, plan: null, windows: [], bankedResets: 0, bankedResetExpiries: [] },
+      })
+      const snapshot = { readAt: 0, hostName: 'test', cards: [missing] }
+      const items = UsageOverviewModel.stripItems(snapshot, noLayout)
+      expect(items).toEqual([
+        {
+          instanceId: 'Marwan',
+          displayName: 'Marwan',
+          shortName: 'M',
+          kind: 'codex',
+          unavailable: { label: status === 'unauthenticated' ? 'Sign in again' : 'Quota unavailable', reason: 'Provider quota unavailable.' },
+        },
+      ])
+      expect(UsageOverviewModel.mostCritical(items)).toBeUndefined()
+      expect(UsageOverviewModel.stripItems(snapshot, { order: [], hidden: ['Marwan'] })).toEqual([])
+    },
+  )
+
+  it('does not drop a reserve-only account without a binding measurement', () => {
+    const onlyReserve = card('reserve-only', [{ label: 'Luna Reserve', percentRemaining: 80, resetsAt: HOUR, reserve: true }])
+    const items = UsageOverviewModel.stripItems({ readAt: 0, hostName: 'test', cards: [onlyReserve] }, noLayout)
+    expect(items[0]).toHaveProperty('unavailable.reason', 'No ordinary quota window reported.')
+    expect(UsageOverviewModel.mostCritical(items)).toBeUndefined()
+    const withQuota = UsageOverviewModel.stripItems(
+      { readAt: 0, hostName: 'test', cards: [onlyReserve, card('low', [window('Weekly limit', 20, HOUR)]), card('high', [window('Weekly limit', 80, HOUR)])] },
+      noLayout,
+    )
+    expect(UsageOverviewModel.mostCritical(withQuota)?.instanceId).toBe('low')
   })
 })
 

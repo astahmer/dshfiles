@@ -12,6 +12,9 @@ import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { AccountsPanel } from './accounts-panel.js'
+import { createAccountSetupController } from './account-setup-controller.js'
+import { AccountSetupOverlay } from './account-setup-dialog.js'
+import { useServingAccount, type UseServingAccountSessions } from './use-serving-account.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { QuotaFooter, QuotaStrip } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
@@ -42,7 +45,7 @@ export default defineClientPlugin({
   id: 'llm-ai-accounts',
   name: '@dshfiles/ai-accounts',
   uses: ['ui'],
-  inject: ['layout', 'locale', 'remote', 'remote.credentials'],
+  inject: ['layout', 'locale', 'remote', 'remote.credentials', 'sessions'],
   locales: [aiAccountsLocale],
   // Declare the services used through the scoped context. The UI capability
   // supplies the native slot adapter and decorates each registered component.
@@ -66,6 +69,16 @@ export default defineClientPlugin({
               if (!result.ok) throw new Error('The key could not be stored in DSH credentials.')
             },
           }
+    const setupController = createAccountSetupController()
+    ctx.effect(() => () => setupController.close())
+    const openSetup = (onCreated?: (accountId: string) => void): void => setupController.open(onCreated === undefined ? {} : { onCreated })
+    const reconnect = (accountId: string): void => setupController.open({ accountId })
+    const SetupOverlayView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <AccountSetupOverlay controller={setupController} credentialSetup={credentialSetup} folderPicker={folderPicker} />
+      </PluginQueryProvider>
+    )
+    api.ui.register({ name: 'shell.overlay', id: 'ai-accounts-setup', order: 20, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SetupOverlayView)
     const translate = ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)
     const label = (): string => translate('aiAccountsPanel')
     const historyLabel = (): string => translate('aiAccountsUsageHistory')
@@ -78,7 +91,13 @@ export default defineClientPlugin({
     // and panels read one usage cache instead of polling side by side.
     const AccountsPanelView = (): JSX.Element => (
       <PluginQueryProvider>
-        <AccountsPanel credentialSetup={credentialSetup} folderPicker={folderPicker} onOpenUsageHistory={openUsageHistory} />
+        <AccountsPanel
+          credentialSetup={credentialSetup}
+          folderPicker={folderPicker}
+          onOpenUsageHistory={openUsageHistory}
+          onAddAccount={openSetup}
+          onConnectAccount={reconnect}
+        />
       </PluginQueryProvider>
     )
     const UsageHistoryPanelView = (): JSX.Element => (
@@ -93,22 +112,52 @@ export default defineClientPlugin({
     )
     const subscribeStripSeat = (listener: () => void): (() => void) => ctx.slots.subscribe('sidebar.footer.above', listener)
     const stripSeated = (): boolean => ctx.slots.entriesOfSlot('sidebar.footer.above').some(entry => entry.options.id === USAGE_STRIP_ID)
-    const QuotaFooterView = (props: { readonly wide: boolean }): JSX.Element => {
+    const ConnectedQuotaFooter = (props: {
+      readonly wide: boolean
+      readonly seated: boolean
+      readonly useSessions: UseServingAccountSessions
+    }): JSX.Element => {
+      const serving = useServingAccount(props.useSessions)
+      return (
+        <QuotaFooter
+          onOpenUsageHistory={openUsageHistory}
+          onAddAccount={() => openSetup()}
+          onConnectAccount={reconnect}
+          stripSeated={props.seated}
+          wide={props.wide}
+          activeAccountId={serving.activeAccountId}
+          activeAccountRunning={serving.running}
+        />
+      )
+    }
+    const ConnectedQuotaStrip = (props: { readonly useSessions: UseServingAccountSessions }): JSX.Element => {
+      const serving = useServingAccount(props.useSessions)
+      return (
+        <QuotaStrip
+          onOpenUsageHistory={openUsageHistory}
+          onAddAccount={() => openSetup()}
+          onConnectAccount={reconnect}
+          activeAccountId={serving.activeAccountId}
+          activeAccountRunning={serving.running}
+        />
+      )
+    }
+    const QuotaFooterView = (props: { readonly wide: boolean; readonly useSessions: UseServingAccountSessions }): JSX.Element => {
       const seated = useSyncExternalStore(subscribeStripSeat, stripSeated)
       return (
         <PluginQueryProvider>
-          <QuotaFooter onOpenUsageHistory={openUsageHistory} stripSeated={seated} wide={props.wide} />
+          <ConnectedQuotaFooter wide={props.wide} seated={seated} useSessions={props.useSessions} />
         </PluginQueryProvider>
       )
     }
-    const QuotaStripView = (): JSX.Element => (
+    const QuotaStripView = (props: { readonly useSessions: UseServingAccountSessions }): JSX.Element => (
       <PluginQueryProvider>
-        <QuotaStrip onOpenUsageHistory={openUsageHistory} />
+        <ConnectedQuotaStrip useSessions={props.useSessions} />
       </PluginQueryProvider>
     )
     const EdgeUsageHostView = (): JSX.Element => (
       <PluginQueryProvider>
-        <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} />
+        <EdgeUsageWidget onOpenUsageHistory={openUsageHistory} onConnectAccount={reconnect} />
       </PluginQueryProvider>
     )
     const ModelsPageAccountsView = (): JSX.Element => (

@@ -16,6 +16,10 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
+    "./account-login-api": {
+      "types": "./src/account-login-api.ts",
+      "default": "./dist/account-login-api.js"
+    },
     "./model-fallback-api": {
       "types": "./src/model-fallback-api.ts",
       "default": "./dist/model-fallback-api.js"
@@ -95,6 +99,7 @@
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
     "typescript": "5.9.3",
     "vitest": "catalog:"

@@ -5,11 +5,13 @@ import { PROVIDER_ICONS, accountDraftSchema, type AccountDraft, type AccountKind
 export const ROUTE_SLUG_HINT = 'Starts with a letter; letters, digits, dash and underscore. Appears as the provider in the model picker.'
 
 /** What the editor may submit: the wire draft, plus the slug rule the route registry enforces. */
+export const accountRouteSlugSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u, ROUTE_SLUG_HINT)
+
 const accountEditorSchema = accountDraftSchema.extend({
-  instanceId: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u, ROUTE_SLUG_HINT),
+  instanceId: accountRouteSlugSchema,
   displayName: z.string().trim().min(1, 'Give the account a display name.').max(120),
 })
 
@@ -38,6 +40,7 @@ export class AccountDraftModel {
     homePath: profile.homePath,
     shadowHomePath: profile.shadowHomePath,
     apiKeyEnv: profile.apiKeyEnv,
+    ...(profile.authSource === undefined ? {} : { authSource: profile.authSource }),
     apiBaseUrl: profile.apiBaseUrl,
     badge: profile.badge,
     accentColor: profile.accentColor,
@@ -65,6 +68,7 @@ export class AccountDraftModel {
     left.homePath === right.homePath &&
     left.shadowHomePath === right.shadowHomePath &&
     left.apiKeyEnv === right.apiKeyEnv &&
+    left.authSource === right.authSource &&
     left.apiBaseUrl === right.apiBaseUrl &&
     left.badge === right.badge &&
     left.accentColor === right.accentColor &&
@@ -86,12 +90,16 @@ export class AccountDraftModel {
     readonly selected: AccountProfile | null
     readonly selectedId: string | null
     readonly followedId: string | null
+    readonly previousSelected?: AccountProfile | null
   }): AccountDraft | null => {
     if (input.selected === null) {
       const renaming = input.selectedId !== null && input.current !== null && input.current.instanceId !== input.followedId
       return renaming ? input.current : null
     }
     if (input.current === null || AccountDraftModel.sameDraft(input.selected, input.current)) return AccountDraftModel.toDraft(input.selected)
+    // Clean editors follow external writes (for example compact setup enabling this account); only local edits need preserving.
+    if (input.previousSelected?.instanceId === input.selected.instanceId && AccountDraftModel.sameDraft(input.previousSelected, input.current))
+      return AccountDraftModel.toDraft(input.selected)
     if (input.followedId === input.selected.instanceId || input.current.instanceId === input.selected.instanceId) return input.current
     return AccountDraftModel.toDraft(input.selected)
   }
@@ -116,7 +124,7 @@ export class AccountDraftModel {
     return `${normalized.slice(0, 112)}_API_KEY`
   }
 
-  static newAccountDraft = (input: { readonly kind: AccountKind; readonly existing: readonly AccountProfile[] }): AccountDraft => {
+  static newAccountDraft = (input: { readonly kind: AccountKind; readonly existing: readonly AccountDraft[] }): AccountDraft => {
     const taken = new Set(input.existing.map(account => account.instanceId))
     let instanceId = `${input.kind}_work`
     for (let suffix = 2; taken.has(instanceId); suffix += 1) instanceId = `${input.kind}_work_${String(suffix)}`

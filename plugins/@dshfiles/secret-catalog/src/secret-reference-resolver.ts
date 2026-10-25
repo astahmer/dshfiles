@@ -24,13 +24,15 @@ const uniqueMatch = (rows: readonly SecretMetadata[], reference: SecretReference
  * resolve, so a settings field never picks up an unrelated project's secret.
  */
 export const createSecretCatalogValues = (input: { readonly operations: Pick<SecretCatalogOperations, 'list' | 'reveal'> }): SecretCatalogValues => ({
-  resolve: ({ reference, cwd }) =>
+  supportsExpectedScope: true,
+  resolve: ({ reference, cwd, expectedScope }) =>
     withSpan(
       'secret resolve',
       { attributes: { 'secret.alias': reference.alias, 'secret.environment': reference.environment, 'secret.project_scoped': cwd !== null } },
       async span => {
         const match = uniqueMatch(await input.operations.list(cwd), reference)
         const scope = secretScopeSchema.parse(match.scope)
+        if (expectedScope !== undefined && scope !== expectedScope) throw new Error('The selected secret scope changed. Select the alias again.')
         span.setAttribute('secret.scope', scope)
         return input.operations.reveal(reference.alias, scope, cwd, reference.environment)
       },

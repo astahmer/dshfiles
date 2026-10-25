@@ -1,7 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApiCaller } from '@dshfiles/dshx/api'
+import type { CopilotLoginState } from './api.js'
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
-import type { SecretCatalogCredentialBridge } from '@dshfiles/credential-port'
-import { accountRuntime } from './account-runtime.js'
+import type { SecretCatalogCredentialBridge, SecretCatalogValues } from '@dshfiles/credential-port'
+import { accountRuntime, AccountLoginIntentModel } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
 import {
@@ -77,6 +79,12 @@ const quotaContinuationServiceFor = (ctx: Context) => {
 
 const secretCatalogBridgeFor = (ctx: Context): SecretCatalogCredentialBridge | undefined => ctx.get('secretCatalogCredentials')
 
+const setupFor = (ctx: Context) => {
+  const service = accountRuntime(ctx)?.accountSetup
+  if (service === undefined) throw new Error('Account connection setup requires the updated Host. Restart when idle before connecting an account.')
+  return service
+}
+
 const copilotLoginFor = (ctx: Context) => {
   const service = accountRuntime(ctx)?.copilotLogin
   if (service === undefined) throw new Error('GitHub Copilot sign-in is unavailable.')
@@ -116,8 +124,44 @@ export const accountsHostApi = aiAccountsApi.host({
     accountRuntime(ctx)?.usageCache?.invalidate()
     return { imported: true, apiKeyEnv: account.apiKeyEnv }
   },
+  createSetupAccount: () => {
+    throw new Error('This account setup method is retired. Use prepareAccountConnection on an updated client; no account was saved.')
+  },
+  prepareAccountConnection: ({ input, ctx }) => setupFor(ctx).prepare(input),
+  getAccountConnection: ({ input, ctx }) => setupFor(ctx).get(input.operationId),
+  configureAccountConnection: ({ input, ctx }) => {
+    const { operationId, ...configuration } = input
+    return setupFor(ctx).configure(operationId, configuration)
+  },
+  stageAccountConnectionKey: ({ input, ctx, caller }) => {
+    if (caller.kind !== 'client') throw new Error('Raw credential entry is browser-only. Use Secret Catalog import instead.')
+    return setupFor(ctx).stageKey(input.operationId, input.value)
+  },
+  importAccountConnectionKey: async ({ input, ctx }) => {
+    const setup = setupFor(ctx)
+    setup.get(input.operationId)
+    const bridge = secretCatalogBridgeFor(ctx)
+    const values = AccountsHostApiModel.scopedCatalogValues(ctx.get('secretCatalogValues'))
+    if (bridge === undefined) throw new Error('Secret Catalog is not active.')
+    const cwd = input.scope === 'global' ? null : input.cwd
+    if (input.scope !== 'global' && cwd === null) throw new Error('Choose a folder for that credential scope.')
+    const rows = (await bridge.listKeys(cwd)).filter(row => row.alias === input.alias && row.environment === input.environment)
+    if (rows.length !== 1 || rows[0]?.scope !== input.scope) throw new Error('That Secret Catalog entry is unavailable or ambiguous.')
+    let value: string
+    try {
+      value = await values.resolve({ reference: { alias: input.alias, environment: input.environment }, cwd, expectedScope: input.scope })
+    } catch {
+      throw new Error('The selected Secret Catalog entry could not be read.')
+    }
+    return setup.stageKey(input.operationId, value)
+  },
+  completeAccountConnection: ({ input, ctx }) => setupFor(ctx).complete(input.operationId),
+  discardAccountConnection: async ({ input, ctx }) => {
+    await setupFor(ctx).discard(input.operationId)
+    return { discarded: true }
+  },
   save: async ({ input, ctx }) => {
-    await accountStoreService.upsertAccount(input.draft, input.previousInstanceId)
+    await accountStoreService.upsertAccount(input.draft, input.previousInstanceId, true)
     accountRuntime(ctx)?.usageCache?.invalidate()
     await refreshRoutes(ctx)
     return accountsFile(ctx)
@@ -133,19 +177,30 @@ export const accountsHostApi = aiAccountsApi.host({
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
+  reorderAccount: async ({ input, ctx }) => {
+    await accountStoreService.reorderAccount(input)
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
+  },
   setDistribution: async ({ input, ctx }) => {
     await accountStoreService.setDistribution(input.distribution)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
   identity: async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId),
-  beginCopilotLogin: async ({ input, ctx }) => copilotLoginFor(ctx).begin(input.instanceId),
-  copilotLoginStatus: async ({ input, ctx }) => copilotLoginFor(ctx).state(input.instanceId),
+  beginCopilotLogin: async ({ input, ctx, caller }) => {
+    if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new Error('This account sign-in intent is no longer active.')
+    return AccountsHostApiModel.copilotForCaller(await copilotLoginFor(ctx).begin(input.instanceId), caller)
+  },
+  copilotLoginStatus: async ({ input, ctx, caller }) => AccountsHostApiModel.copilotForCaller(copilotLoginFor(ctx).state(input.instanceId), caller),
   cancelCopilotLogin: async ({ input, ctx }) => {
-    copilotLoginFor(ctx).cancel(input.instanceId)
+    if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId, true)) return { cancelled: true }
+    if (input.operationId !== undefined) await setupFor(ctx).discard(input.operationId)
+    else copilotLoginFor(ctx).cancel(input.instanceId)
     return { cancelled: true }
   },
   signOutCopilot: async ({ input, ctx }) => {
+    if (!AccountLoginIntentModel.owns(ctx, input.instanceId)) throw new Error('Close the active account connection before signing this account out.')
     await copilotLoginFor(ctx).signOut(input.instanceId)
     accountRuntime(ctx)?.usageCache?.invalidate()
     return { signedOut: true }
@@ -307,6 +362,16 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
 }
 
 export class AccountsHostApiModel {
+  static scopedCatalogValues(values: SecretCatalogValues | undefined): SecretCatalogValues {
+    if (values?.supportsExpectedScope !== true)
+      throw new Error('Pending credential import requires an updated Secret Catalog Host with exact-scope resolution.')
+    return values
+  }
+
+  static copilotForCaller(state: CopilotLoginState, caller: ApiCaller): CopilotLoginState {
+    return caller.kind === 'client' ? state : { ...state, userCode: null, verificationUri: null }
+  }
+
   static readonly accountsFile = accountsFile
   static readonly readAccountsUsage = readAccountsUsage
   static readonly readQuotaResetAt = readQuotaResetAt

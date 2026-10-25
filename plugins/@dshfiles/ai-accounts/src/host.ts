@@ -1,15 +1,19 @@
 import { activateAccountRuntime } from './account-runtime.js'
+import { createServingAccountService, ServingAccountModel } from './serving-account.js'
+import { servingAccountHostApi } from './serving-account-host.js'
 import { configFromAccountsFile } from './account-config.js'
 export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
+import { AccountLoginHostModel, accountLoginHostApi, installAccountLogin } from './account-login-host.js'
 import { closeModelFallbacks, modelFallbackHostApi, modelFallbacksFor } from './model-fallback-host.js'
 import { createModelFallbackRouter } from './model-fallback-router.js'
 import { ModelFallbackModel } from './model-fallback.js'
 import type { ModelFallbackStore } from './model-fallback-store.js'
 import type { FallbackRoute } from './model-fallback-api.js'
-import { createUsageCache } from './account-usage.js'
+import { createUsageCache, readAccountUsage } from './account-usage.js'
+import { readCodexUsage } from './usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { CLAUDE_CLI_TOKEN, ClaudeCliSessions } from './claude-cli.js'
@@ -21,7 +25,11 @@ import { createFastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import { modelFastModeHostApi } from './model-fast-mode-host.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
-import { accountStoreService, type AccountStoreFile } from './account-store.js'
+import { AccountStoreModel, accountStoreService, type AccountStoreFile } from './account-store.js'
+import { createAccountSetupService } from './account-setup-service.js'
+import { verifyAccountConnection } from './account-connection-verification.js'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import { lstatSync, realpathSync, rmSync } from 'node:fs'
 import { aiAccountsTool } from './accounts-tool.js'
 import { createUsageHistoryService } from './usage-recorder.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
@@ -92,13 +100,94 @@ const PRICING_CHECK_MS = 30 * 60_000
 export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials', 'agents'],
-  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi],
+  apis: [accountsHostApi, modelFallbackHostApi, modelFastModeHostApi, servingAccountHostApi, accountLoginHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],
   setup: api => {
     const ctx = api.raw.ctx
     const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
+    const servingAccount = createServingAccountService(ctx)
+    runtime.servingAccount = servingAccount
+    ctx.effect(() => () => {
+      if (runtime.servingAccount === servingAccount) delete runtime.servingAccount
+      void servingAccount.close().catch(() => ctx.logger.warn('ai-accounts: serving account storage could not close cleanly'))
+    })
+    const copilotCredentialReader = createCopilotCredentialsService(ctx.get('credentials')).read
+    runtime.accountSetup = createAccountSetupService({
+      store: accountStoreService,
+      resolveCredential,
+      observeExisting: async draft => {
+        const file = await accountStoreService.readAccountFile()
+        return (
+          await accountStoreService.buildAccountsFile(
+            { ...file, accounts: [draft] },
+            [],
+            resolveCredential,
+            async id => (await copilotCredentialReader(id)) !== undefined,
+          )
+        ).accounts[0]
+      },
+      verify: request => {
+        const pendingHome = request.method === 'device' ? runtime.accountLogin?.pendingHome(request.account.instanceId) : undefined
+        return verifyAccountConnection({
+          ...request,
+          readCopilotCredential: async id => runtime.copilotLogin?.readPending(id) ?? copilotCredentialReader(id),
+          ...(pendingHome === undefined
+            ? {}
+            : {
+                readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
+                  probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
+              }),
+        })
+      },
+      saveKey: async (reference, _owner, value, accepted) => {
+        if (!accepted()) throw new Error('Account connection cancelled.')
+        // This private reference was never published before verification. Native ownership keeps all later edits/metadata in parity.
+        const ref = credentialRef(reference)
+        const information = await ctx.credentials.describe(ref)
+        if (information.configured || !information.writable) throw new Error('The private connection reference is already owned or is not writable.')
+        await ctx.credentials.set(ref, value)
+      },
+      adoptCredential: async id => {
+        await runtime.accountLogin?.commitPending(id)
+        await runtime.copilotLogin?.commitPending(id)
+      },
+      cancelLogin: id => {
+        runtime.accountLogin?.cancel(id)
+        runtime.copilotLogin?.cancel(id)
+      },
+      settleLogin: async id => {
+        await runtime.accountLogin?.settledAccount(id)
+      },
+      cleanupCandidate: async draft => {
+        await runtime.accountLogin?.settledAccount(draft.instanceId)
+        const file = await accountStoreService.readAccountFile()
+        if (
+          file.accounts.some(
+            account =>
+              AccountStoreModel.containsConfiguredHome(draft.homePath, account.homePath) ||
+              AccountStoreModel.containsConfiguredHome(draft.homePath, account.shadowHomePath),
+          )
+        )
+          return
+        if (draft.kind !== 'codex' && draft.kind !== 'claude') return
+        const path = draft.homePath
+        if (!AccountStoreModel.isManagedSetupHome(path, draft.kind)) return
+        try {
+          // Check exact trusted absolute target and all resolved ancestors before recursive removal.
+          if (realpathSync(path) !== path || !lstatSync(path).isDirectory()) throw new Error('Unsafe pending account home')
+          rmSync(path, { recursive: true, force: true })
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
+        }
+      },
+      onCommit: async () => {
+        runtime.usageCache?.invalidate()
+        await runtime.refreshRoutes?.()
+      },
+    })
+    installAccountLogin(ctx)
     const usageHistory = createUsageHistoryService(ctx)
     const fastModeUsageHistory = createFastModeUsageHistoryService(ctx, {
       readRetentionDays: async () => (await usageHistory.readSettings()).retentionDays,
@@ -192,7 +281,10 @@ export default definePlugin({
     })
     const copilotLogin = createCopilotLoginService({
       credentials: ctx.credentials,
-      isCopilotAccount: instanceId => routes.get(instanceId)?.kind === GITHUB_COPILOT_KIND,
+      isCopilotAccount: instanceId =>
+        accountStoreService.readAccountFileSync().accounts.some(account => account.instanceId === instanceId && account.kind === 'github-copilot') ||
+        runtime.accountSetup?.candidate(instanceId)?.kind === 'github-copilot',
+      isPendingAccount: instanceId => runtime.accountSetup?.candidate(instanceId) !== undefined,
       onChange: () => runtime.usageCache?.invalidate(),
     })
     runtime.copilotLogin = copilotLogin
@@ -228,9 +320,19 @@ export default definePlugin({
     const sameKeyedRoute = (candidate: Route | undefined, expected: KeyedRoute): boolean => {
       if (candidate === undefined || !candidate.enabled) return false
       if (expected.kind === COMMANDCODE_KIND) {
-        return candidate.kind === COMMANDCODE_KIND && candidate.apiBaseUrl === expected.apiBaseUrl && candidate.apiKeyEnv === expected.apiKeyEnv
+        return (
+          candidate.kind === COMMANDCODE_KIND &&
+          candidate.apiBaseUrl === expected.apiBaseUrl &&
+          candidate.apiKeyEnv === expected.apiKeyEnv &&
+          candidate.authSource === expected.authSource
+        )
       }
-      return candidate.kind === OPENCODE_KIND && candidate.apiBaseUrl === expected.apiBaseUrl && candidate.apiKeyEnv === expected.apiKeyEnv
+      return (
+        candidate.kind === OPENCODE_KIND &&
+        candidate.apiBaseUrl === expected.apiBaseUrl &&
+        candidate.apiKeyEnv === expected.apiKeyEnv &&
+        candidate.authSource === expected.authSource
+      )
     }
     // Each keyed provider is built with its own base and key variable, so two
     // Command Code accounts can point at different deployments.
@@ -239,8 +341,9 @@ export default definePlugin({
         ? createCommandCodeProvider({
             baseUrl: route.apiBaseUrl,
             keyEnv: route.apiKeyEnv,
+            authSource: route.authSource,
             resolveCredential,
-            readFallbackKey: () => readCommandCodeKey(route.apiKeyEnv, resolveCredential),
+            readFallbackKey: () => readCommandCodeKey(route.apiKeyEnv, resolveCredential, route.authSource),
           })
         : opencodeUpstream
     // Per-account, per-model default efforts, read from the same file as the
@@ -472,8 +575,9 @@ export default definePlugin({
           // Keyed providers read the variable their own account names, so several
           // subscriptions live in the vault without any value in the accounts file.
           const named = ProviderRoutes.keyEnvFor(route)
-          const namedKey = route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named, resolveCredential) : await resolveCredential(named)
-          const key = namedKey || config.opencodeApiKey.trim()
+          const namedKey =
+            route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named, resolveCredential, route.authSource) : await resolveCredential(named)
+          const key = route.authSource === undefined ? namedKey || config.opencodeApiKey.trim() : namedKey
           if (key.length === 0) {
             throw new LlmError(`No key for '${provider}'. Export ${named}, or set a shared key on the entry.`, 'MISSING_CREDENTIAL')
           }
@@ -550,7 +654,7 @@ export default definePlugin({
             ...CredentialModel.discoveryCatalogOptions(
               request,
               { apiBaseUrl: route.apiBaseUrl, keyEnv: ProviderRoutes.keyEnvFor(route) },
-              await readCommandCodeKey(route.apiKeyEnv, resolveCredential),
+              await readCommandCodeKey(route.apiKeyEnv, resolveCredential, route.authSource),
             ),
             signal,
           })
@@ -569,6 +673,9 @@ export default definePlugin({
 
     let registeredProviders: ReadonlySet<string> = new Set()
     const applyRouteSnapshot = (sourceFile: AccountStoreFile): void => {
+      runtime.accountLogin?.reconcile(
+        AccountLoginHostModel.accountsFromFile({ ...sourceFile, accounts: [...sourceFile.accounts, ...(runtime.accountSetup?.candidates() ?? [])] }),
+      )
       const nextConfig = configFromAccountsFile(sourceFile)
       const takenProviders = new Set(
         llm
@@ -673,15 +780,21 @@ export default definePlugin({
           // Credited only after the upstream answers, so a failed attempt is never "used",
           // and to the account a fail-over put on the wire rather than the chosen route.
           if (!routes.has(options.provider)) return next()
+          const accountId = accountForRequest(options)
+          const active = options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId)
+          const actualRoute = routes.get(accountId)
+          // Only a routed main Agent step can claim attribution. Side purposes and native requests never can.
+          const attempt = ServingAccountModel.startRequest(servingAccount, options, active, accountId, actualRoute?.kind)
+          const chunks = attempt === undefined ? next() : ServingAccountModel.observe(next(), servingAccount, attempt)
           return explainSilentRejections(
-            creditServedAttempt(next(), {
+            creditServedAttempt(chunks, {
               pool: {
                 noteServed: accountId => {
                   pool.noteServed(accountId)
                   recovery.noteServed(accountId)
                 },
               },
-              accountId: accountForRequest(options),
+              accountId,
             }),
             options,
           )
@@ -728,6 +841,7 @@ export default definePlugin({
                 }
                 if (!routes.has(request.provider)) {
                   activeAccountRoutes.delete(id)
+                  servingAccount.forget(id)
                   return request
                 }
                 const distribution = pool.distribution()
@@ -752,6 +866,7 @@ export default definePlugin({
             )
             const offTurnStopping = agent.ctx.on('agent/turn-stopping', () => {
               activeAccountRoutes.delete(id)
+              servingAccount.clear(id)
               const restored = fallbackRouter.turnEnded(id)
               if (restored === undefined) return
               void ctx
@@ -849,11 +964,13 @@ export default definePlugin({
             )
             agent.ctx.on('agent/disposed', () => {
               activeAccountRoutes.delete(id)
+              servingAccount.clear(id)
               recovery.forget(id)
               fallbackRouter.forget(id)
             })
             return () => {
               activeAccountRoutes.delete(id)
+              servingAccount.clear(id)
               offRequest()
               offTurnStopping()
               offRequestError()

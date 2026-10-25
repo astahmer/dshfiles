@@ -2,17 +2,60 @@
 
 ![Manage provider account drafts](docs/screenshots/account-lifecycle.png)
 
+![Unavailable quota stays visible in the sidebar](docs/screenshots/sidebar-unavailable-accounts.png)
+
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 OpenCode Go and Command Code accounts each become their own route in the model
 picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
+## Quick setup and account workspace
+
+Use **Add account** on the page, or the trailing **+** in the sidebar account preview. Both open the same setup without changing the active chat. Choosing a provider prepares a private, provisional connection—not an account-list entry. The Host saves and enables the account only after its selected sign-in check succeeds. Keyed/provider metadata checks are remote and read-only. Claude subscription checks are delegated to the official CLI's local authenticated-configuration status, not presented as remote token validation. Merely typing/storing a key or receiving an approval code does not add an account.
+
+The dialog presents only the common sign-in choices. Claude uses **Claude account** or **API key**; existing credential references and custom CLI homes live under **More options**. Token import is under **Import from Secret Catalog**. Click the pencil beside a new account's name to edit it before connecting. Enter saves the pending name; Escape or **Cancel name edit** discards only that name edit. Names are trimmed (1–120 characters) and do not change route slugs, credential references or login paths. Existing saved accounts are renamed in Settings.
+
+**Cancel**, the close button, Escape outside the name editor, failed verification and expiry add nothing. There is no **Finish later** account draft. Candidates never enter normal account reads, sidebar quota sweeps or model routes. Previously saved accounts are not automatically removed if their credentials later expire.
+
+- **Claude subscription:** choose **Claude account**; no API key is required. Keep a new private home, select **More options → Use default Claude Code login**, or apply a custom `CLAUDE_CONFIG_DIR`. Copy the exact shell-quoted sign-in command and run it on the Host if needed. The unmodified official CLI checks its login configuration with the selected directory and supported Host environment, including `CLAUDE_CODE_OAUTH_TOKEN`. This local status is not a remote validity check; quota is optional. DSH neither intercepts Claude.ai OAuth nor refreshes its credentials itself.
+- **Claude setup token or API key:** choose **API key**, import a Catalog entry, or select **More options → Use existing credential**. The token path does not require installing Claude Code. Verification sends a fixed synthetic request to Anthropic's official free, nongenerative token-count endpoint—never a paid inference request or another provider origin. Actual setup-token permission for that endpoint remains unverified; denial is not bypassed by switching identities. API keys retain separate API billing.
+- **Codex:** keep official browser/device sign-in or select **Existing login**. **Existing or custom CLI home** restores the shared-home and distinct authentication-overlay fields before saving. Linking verifies the selected existing overlay without copying/deleting user auth. Device sign-in explicitly stages a new login and adopts it only after accepted completion, with replacement consent. Custom equal shared/overlay paths remain rejected; the generated private pair retains its managed policy. DSH does not install the CLI.
+- **Command Code and Cursor:** choose a new key/token, an existing credential reference, or the existing `cmd login` / `cursor-agent login`. An explicit CLI choice remains pinned after saving and ordinary settings edits; it does not become a default environment-key fallback. Command Code base settings remain available in every mode. **Cursor** is still quota-only, never a DSH model route.
+- **OpenCode Go:** paste/import a key or reuse an existing named credential, including `OPENCODE_API_KEY`. OpenCode CLI OAuth is not a supported path in this integration.
+- **GitHub Copilot:** device OAuth remains provisional in Host memory until checked completion. Unlimited or nondisplayable quota no longer causes a valid authenticated connection to be rejected.
+
+Keys stay in memory until their selected check succeeds; the account file stores only credential references. Empty/malformed/unauthenticated provider responses are not proof. Authenticated exhausted, unlimited or unavailable numeric quota is not itself a login failure. Switching methods never silently falls back from a missing named key to another CLI or environment identity.
+
+The page has **Models**, **Settings**, and **Usage** tabs. Models keeps favorites, picker visibility, ordering and per-model reasoning defaults. Settings contains observed identity/plan, editable account settings and priority, with runtime paths under **Advanced**. Usage shows real provider quota/history—not invented costs, request counts or token-validity timestamps. Native providers remain separate from account profiles.
+
+![Shared quick account setup](docs/screenshots/quick-account-setup.png)
+
+[Verification commands, coverage and auth boundaries](docs/quick-setup-verification.md).
+
+### Sidebar priority and current chat
+
+The page and usage tiles share one Host-owned priority order. Drag a tile or use its move menu to update real same-provider priority; page moves update the preview too. The trailing **+** is never draggable. Hidden/disabled accounts are preserved. A move does not change cross-provider fallback chains or interrupt an in-flight request. Old cosmetic `usageOrder` preferences are ignored rather than silently promoted to priority. Failed/stale writes are shown and reconciled with the Host.
+
+Every enabled, non-hidden account stays in the sidebar even when quota cannot be read. Rejected credentials show **Sign in again**; other missing quota shows **Quota unavailable**, with the provider's explanation in the tooltip and visible usage card. Signed-out usage cards include **Reauthenticate**: it closes the popover and opens the existing account's sign-in setup without navigating away or starting provider login automatically. Saved Codex browser reconnects offer **Continue with Codex**, not another check of rejected local credentials; replacement occurs only after successful approval. A failed attempt offers **Start again** for the same account. Cancelling preserves that account. Missing data is never represented as 0% or 100%. Only accounts explicitly hidden by the user go behind **hidden by you**. Saved credentials on the accounts page indicate local availability, not provider-verified validity.
+
+The highlighted tile follows the foreground chat's **actual wire account**, including distribution and failover—not merely model selection. Running chats mark the current attempt; idle chats show **Last used by active chat** for the last successful account. A visible quota-unavailable active account keeps its status tile; an intentionally hidden active account gets a compact source chip. Unknown/old Hosts and native routes never get a guessed highlight. Only metadata is retained, for at most 2,000 chats and 90 days. Older chats remain unknown until a qualifying request succeeds; title/compaction traffic does not change attribution.
+
+These changes include Host APIs/storage. Applying them to an already running DSH requires a user-managed Host restart. The client tolerates an older Host without pretending new actions succeeded.
+
+### Sign-in and safety boundaries
+
+New Codex and Claude profiles use private homes under the active accounts store, not a copy of the Host user's global login. A managed Codex route slug identifies that home and is read-only in Advanced; change **Display name** to rename it. Existing manually configured overlay homes keep their original containment checks. Managed Codex login stages official CLI output in a private directory, checks permissions, links, current profile and previous-auth fingerprint, then atomically adopts a successful login. Failure, expiry and cancellation do not overwrite the previous credentials. Cancellation invalidates the provisional operation before asynchronous cleanup; late responses cannot publish it. A verified commit already accepted by the Host cannot be undone by closing the dialog. Native credential storage and account-file persistence are not one transaction: if the latter genuinely fails after a unique native key was written, an unreferenced private credential can remain, but no account entry is added. Cleanup never blindly deletes a potentially concurrent credential writer.
+
+Agent tools share the setup/save/order APIs. Starting or cancelling sign-in requires a user request; cancellation has an explicit opt-in. Device codes and approval URLs are returned only to the browser, never raw agent/plugin responses. There is no generic Claude.ai logout/OAuth or fabricated token-validity control.
+
+Automated verification uses fake CLI/device responses and a loopback provider. It does not approve real OpenAI/GitHub consent. Installed official CLI compatibility and real provider approval remain separate, human-dependent checks. The third-party Claude.ai OAuth boundary follows [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance.md); this plugin keeps the unmodified official CLI path separate.
+
 ## Providers
 
 | Kind           | Login                                                                                                                                                    | Model route | Quota                                                                                                                       |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Codex          | `CODEX_HOME=… codex login`, one shadow home per account                                                                                                  | yes         | 5-hour and weekly windows, banked resets                                                                                    |
+| Codex          | **Continue with Codex** in quick setup (official CLI device approval); existing CLI login remains supported                                              | yes         | 5-hour and weekly windows, banked resets                                                                                    |
 | Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet (`/api/oauth/usage`)                                                                     |
 | OpenCode Go    | key in DSH credentials or the Host environment                                                                                                           | yes         | rolling, weekly and monthly windows                                                                                         |
 | Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                           | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)                                                                  |
@@ -65,8 +108,8 @@ field or configure the environment reference yourself.
 
 **Copy accounts file path** in the page toolbar copies the active runtime JSON
 path for advanced editing. That file stores account settings and reference names,
-not secret values. The checked-in `profiles/web/ai-accounts.json` is only the
-seed for a new runtime profile.
+not secret values. Its location follows the active Host account-store settings;
+it is not a deployment-specific path.
 
 Entered keys go straight to DSH's write-only credential controller; managed
 credential-store changes are resolved for the next request without restarting
@@ -156,12 +199,13 @@ short name: the one set beside the account in Settings › AI Accounts (up to si
 characters), else its picker tag, else its initials. Settings › AI Accounts ›
 Short names in the strip, or the strip's right-click menu (Hide/Show short
 names), turns them off. Clicking a meter
-opens the popover, which filters by provider and lists one card per enabled
-account with quota, each showing its machine, session, weekly and monthly bars,
-reset times and snapshot age; accounts with a spent window carry a "Limit
-reached" badge and sink below the usable ones until you order them. Accounts
-without quota data (signed out, failing) fold into one "N hidden" line that
-expands. The grip in the popover's far corner resizes it both ways; wide
+opens the popover, which filters by provider and lists one card per enabled,
+non-hidden account in canonical priority order. Available quota shows its machine,
+session, weekly and monthly bars, reset times and snapshot age; accounts with a
+spent window carry a "Limit reached" badge without changing their priority.
+Accounts without quota data (signed out, failing) stay visible with a provider
+status and reason. Only accounts explicitly hidden by the user fold into
+**hidden by you**. The grip in the popover's far corner resizes it both ways; wide
 enough, the cards sit side by side in a grid, and the size is kept until you
 double-click the grip. Strip and popover share one order and one hidden list (Settings › AI
 Accounts): drag a meter or card onto another to reorder, or right-click it

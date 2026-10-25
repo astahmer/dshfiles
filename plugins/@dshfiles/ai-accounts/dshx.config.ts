@@ -6,6 +6,7 @@ export default defineConfig({
   profile: 'vanilla',
   host: { entry: 'src/host.ts' },
   modules: {
+    'account-login-api': 'src/account-login-api.ts',
     'model-fallback-api': 'src/model-fallback-api.ts',
     'model-fast-mode-api': 'src/model-fast-mode-api.ts',
   },

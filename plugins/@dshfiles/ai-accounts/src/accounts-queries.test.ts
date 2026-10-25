@@ -1,7 +1,8 @@
-import { QueryClient, type QueryKey } from '@dshfiles/plugin-ui/query'
+import { QueryClient, QueryObserver, type QueryKey } from '@dshfiles/plugin-ui/query'
 import { describe, expect, it } from 'vitest'
-import { aiAccountsQueries } from './accounts-queries.js'
-import type { NativeProviders } from './api.js'
+import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
+import type { AccountsFile, NativeProviders } from './api.js'
+import { AccountDraftModel } from './account-draft.js'
 
 /** What an older Host actually sends: JSON that the current schema types do not describe. */
 const overTheWire = (value: unknown) => JSON.parse(JSON.stringify(value))
@@ -21,7 +22,58 @@ const nativeProviders = (provider: { readonly enabled: boolean; readonly running
   providers: [{ entryId: 'llm-deepseek', label: 'DeepSeek', routes: [], lockedReason: null, ...provider }],
 })
 
+const fileFor = (ids: string[]): AccountsFile => ({
+  distribution: 'priority',
+  cooldownMs: 0,
+  shadowRoot: '',
+  accounts: ids.map(instanceId => ({
+    ...AccountDraftModel.newAccountDraft({ kind: 'github-copilot', existing: [] }),
+    instanceId,
+    mode: 'direct',
+    signedIn: false,
+    identity: null,
+    plan: null,
+    state: 'unconfigured',
+    loginHint: '',
+    detail: null,
+  })),
+})
+
 describe('ai-accounts queries', () => {
+  it('updates page and usage subscribers together, cancels stale reads and reconciles a concurrent Host change', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const initial = fileFor(['a', 'b', 'c'])
+    const committed = fileFor(['b', 'a', 'c'])
+    const concurrent = fileFor(['c', 'b', 'a'])
+    let read = async () => initial
+    const options = aiAccountsQueries.file({ read: () => read() })
+    await client.fetchQuery(options)
+    const page: string[][] = []
+    const usage: string[][] = []
+    const pageObserver = new QueryObserver(client, { ...options, staleTime: Infinity })
+    const usageObserver = new QueryObserver(client, { ...options, staleTime: Infinity })
+    const stopPage = pageObserver.subscribe(state => page.push(state.data?.accounts.map(account => account.instanceId) ?? []))
+    const stopUsage = usageObserver.subscribe(state => usage.push(state.data?.accounts.map(account => account.instanceId) ?? []))
+    let resolveStale: ((file: AccountsFile) => void) | undefined
+    read = () =>
+      new Promise(resolve => {
+        resolveStale = resolve
+      })
+    const obsolete = client.fetchQuery(options).catch(() => undefined)
+    read = async () => concurrent
+    await acceptAccountOrder(client, committed)
+    resolveStale?.(initial)
+    await obsolete
+    expect(page).toContainEqual(['b', 'a', 'c'])
+    expect(usage).toContainEqual(['b', 'a', 'c'])
+    expect(page.at(-1)).toEqual(['c', 'b', 'a'])
+    expect(usage.at(-1)).toEqual(['c', 'b', 'a'])
+    expect(client.getQueryData<AccountsFile>(aiAccountsKeys.file)?.accounts.map(account => account.instanceId)).toEqual(['c', 'b', 'a'])
+    stopPage()
+    stopUsage()
+    client.clear()
+  })
+
   it('keeps usage polling in the background and refreshes on focus', async () => {
     const options = aiAccountsQueries.usage({ usage: async () => overTheWire({ readAt: 1, hostName: 'mac', cards: [] }) }, 60_000)
     expect(options.refetchOnWindowFocus).toBe('always')

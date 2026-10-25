@@ -1,6 +1,15 @@
-import { expect, type Page } from '@playwright/test'
-import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { expect, test, type Page } from '@playwright/test'
+import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { z } from 'zod'
+import { accountDraftSchema } from '../../../../../plugins/@dshfiles/ai-accounts/src/api.js'
+import { tmpdir } from 'node:os'
+import { isAbsolute, join, relative } from 'node:path'
+import { After, Given, Then, When } from '../bdd.js'
+import { browserDiagnosticsFor, finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
+import { bootComposedPluginProfile } from '../boot.js'
+import { seedAiAccountsWorkspace } from '../ai-accounts-workspace.js'
+import { AccountDraftModel } from '../../../../../plugins/@dshfiles/ai-accounts/src/account-draft.js'
+import { seedInertCodexLogin } from '../../../../../plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.js'
 import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '../fake-command-code.js'
 
 const reasoningEffort = (page: Page) => page.getByRole('region', { name: 'Reasoning effort', exact: true })
@@ -107,24 +116,87 @@ Then('the picker reflects the adjusted reasoning effort', async ({ page }: { pag
   await finishJourneyAssertions(page)
 })
 
-When('a supported Codex model is selected in the composer picker', async ({ page }: { page: Page }) => {
+Given('the isolated model picker profile with a legacy inert Codex account is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/ai-accounts', '@dshfiles/model-effort-picker', '@dshfiles/multi-host'],
+    profileLabel: 'model-picker-legacy-codex',
+    seedHome: async homeRoot => {
+      await seedAiAccountsWorkspace(homeRoot)
+      const home = await realpath(homeRoot)
+      const underTemp = relative(await realpath(tmpdir()), home)
+      if (underTemp === '' || underTemp.startsWith('..') || isAbsolute(underTemp)) throw new Error('Legacy account fixture requires a private temporary home.')
+      const instanceId = 'codex_work_00000000000000000000000000000001'
+      const privateHome = join(home, 'plugins', 'ai-accounts', 'homes', instanceId)
+      const draft = {
+        ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
+        instanceId,
+        displayName: 'Codex 1',
+        enabled: false,
+        homePath: privateHome,
+        shadowHomePath: privateHome,
+      }
+      const store = join(home, 'plugins', 'ai-accounts')
+      await mkdir(store, { recursive: true, mode: 0o700 })
+      await writeFile(
+        join(store, 'accounts.json'),
+        JSON.stringify({ distribution: 'sticky', cooldownMs: 300_000, shadowRoot: join(store, 'homes'), accounts: [draft] }),
+        { flag: 'wx', mode: 0o600 },
+      )
+      // Explicit legacy fixture for model catalogs only. Missing account_id prevents quota networking; this is NOT connection proof.
+      await seedInertCodexLogin(home, 'Codex 1')
+    },
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
+When('a supported legacy Codex model is selected without validating a new connection', async ({ page }: { page: Page }) => {
   const providerAccounts = page.getByRole('complementary', { name: 'Provider accounts', exact: true })
   await page.getByRole('button', { name: 'AI Accounts', exact: true }).click()
   await expect(providerAccounts).toBeVisible()
-  await providerAccounts.getByRole('button', { name: 'Add account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+  // This pre-existing fixture tests catalog controls only, never provider authentication or new-account admission.
+  const card = providerAccounts.getByRole('listitem').filter({ has: page.getByText('Codex 1', { exact: true }) })
+  await card.getByRole('switch').click()
+  await expect(card.getByRole('switch')).toBeChecked()
+  const home = profileFor(page).homeRoot
+  const readLegacy = async () =>
+    z.object({ accounts: z.array(accountDraftSchema) }).parse(JSON.parse(await readFile(join(home, 'plugins/ai-accounts/accounts.json'), 'utf8'))).accounts[0]
+  await expect.poll(async () => (await readLegacy())?.enabled).toBe(true)
+  const legacy = await readLegacy()
+  if (legacy === undefined) throw new Error('Legacy catalog fixture is not persisted')
+  expect(legacy.instanceId).toBe('codex_work_00000000000000000000000000000001')
+  expect(legacy.homePath).toBe(join(home, 'plugins/ai-accounts/homes', legacy.instanceId))
+  expect(legacy.shadowHomePath).toBe(legacy.homePath)
+  expect((await stat(join(legacy.homePath, 'auth.json'))).mode & 0o777).toBe(0o600)
+  await test.info().attach('legacy-account-enabled-proof', {
+    body: JSON.stringify({ enabled: legacy.enabled, privatePairedHome: true, authMode: '0600', connectionProof: false }),
+    contentType: 'application/json',
+  })
   await page.getByRole('treeitem', { name: /Open a scratch Session for/i }).click()
   await expect(providerAccounts).toBeHidden()
 
   const trigger = page.locator('[data-model-picker-text]')
+  if ((await trigger.count()) === 0) {
+    await page.getByRole('button', { name: 'Select model', exact: true }).click()
+    const menu = page.getByRole('menu').last()
+    await expect(menu).toBeVisible()
+    await test.info().attach('legacy-picker-diagnostics', {
+      body: JSON.stringify({
+        nativePickerText: (await menu.innerText()).slice(0, 4000),
+        browserErrors: browserDiagnosticsFor(page).map(message => message.replace(/https?:\/\/\S+/gu, '[redacted URL]')),
+      }),
+      contentType: 'application/json',
+    })
+    await page.screenshot({ path: test.info().outputPath('enabled-legacy-native-picker.png') })
+    throw new Error('The private legacy account is persisted enabled with 0600 auth, but the owned model picker is absent; see attached catalog diagnostics.')
+  }
   await trigger.click()
   const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
   const codexGroup = modelList.getByRole('region', { name: 'Codex 1', exact: true })
   const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
   const modelOptions = modelList.locator('[data-model-picker-option]')
   await search.fill('gpt-')
-  expect(await modelOptions.count()).toBeGreaterThan(1)
+  await expect.poll(() => modelOptions.count()).toBeGreaterThan(1)
   await search.press('ArrowDown')
   await expect(modelOptions.first()).toBeFocused()
   await modelOptions.first().press('ArrowDown')
@@ -226,18 +298,21 @@ When('two Command Code accounts offer the same model in a new thread', async ({ 
     ['Command Code 1', 'e2e-fake-key-ALPHA1'],
     ['Command Code 2', 'e2e-fake-key-BRAVO2'],
   ]) {
-    await panel.getByRole('button', { name: 'Add account', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click()
-    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-    const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
-    await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
-    await baseUrl.blur()
-    await expect(page.getByRole('status').filter({ hasText: /^(Saved|Changes save automatically)$/ })).toBeVisible()
-    await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
+    await page.getByRole('button', { name: 'Add account', exact: true }).first().click()
+    await page.getByRole('dialog', { name: 'Add account', exact: true }).getByRole('button', { name: 'Command Code account', exact: true }).click()
     const keyDialog = page.getByRole('dialog', { name: `Configure ${name} key`, exact: true })
+    const connection = keyDialog.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Connection settings$/ }) })
+    await connection.locator('summary').click()
+    // Admission verifies the connection: point it at loopback before submitting even a synthetic key.
+    await keyDialog.getByRole('textbox', { name: 'API base URL', exact: true }).fill(fakeCommandCodeFor(page).baseUrl)
+    await keyDialog.getByRole('button', { name: 'Apply connection settings', exact: true }).click()
+    await expect(connection).not.toHaveAttribute('open', '')
     await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(key)
-    await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click()
+    await keyDialog.getByRole('button', { name: 'Verify and add account', exact: true }).click()
     await expect(keyDialog).toBeHidden()
+    const detail = page.getByRole('region', { name: 'Selected account', exact: true })
+    await expect(detail.getByRole('heading', { name, exact: true })).toBeVisible()
+    await expect(detail.getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
   }
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   const picker = page.getByRole('button', { name: /, reasoning / })

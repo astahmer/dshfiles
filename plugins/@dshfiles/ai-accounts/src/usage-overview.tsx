@@ -44,7 +44,13 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
   )
 }
 
-const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostName: string; readonly readAt: number; readonly now: number }): JSX.Element => {
+const AccountUsageCard = (props: {
+  readonly card: OverviewCard
+  readonly hostName: string
+  readonly readAt: number
+  readonly now: number
+  readonly onConnectAccount: (accountId: string) => void
+}): JSX.Element => {
   const usage = props.card.usage
   const limited = usage.status === 'ok' && UsageOverviewModel.isCardLimited(usage.windows)
   const onReserve = usage.status === 'ok' && UsageOverviewModel.reserveInUse(usage.windows) !== undefined
@@ -76,7 +82,18 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
           {props.hostName}
         </span>
       </header>
-      {usage.windows.map(window => {
+      {UsageOverviewModel.bindingWindow(props.card) === undefined ? (
+        <div className="dshx:text-xs dshx:text-muted-foreground">
+          <p className="dshx:font-semibold">{UsageOverviewModel.unavailableStatus(props.card).label}</p>
+          <p>{UsageOverviewModel.unavailableStatus(props.card).reason}</p>
+        </div>
+      ) : null}
+      {usage.status === 'unauthenticated' ? (
+        <Button className="dshx:self-start" onClick={() => props.onConnectAccount(props.card.instanceId)} size="xs" type="button" variant="outline">
+          Reauthenticate
+        </Button>
+      ) : null}
+      {(usage.status === 'ok' ? UsageOverviewModel.sortWindows(usage.windows) : []).map(window => {
         const tone = quotaTone(window.percentRemaining)
         const spent = UsageOverviewModel.isExhausted(window.percentRemaining)
         const resetLabel = window.reserve === true ? 'Reserve refills' : null
@@ -115,41 +132,18 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
   )
 }
 
-const unavailableReason = (card: OverviewCard): string =>
-  card.usage.message ??
-  (card.usage.status === 'unauthenticated' ? 'Not signed in.' : card.usage.status === 'ok' ? 'No quota windows reported.' : 'Usage is not available.')
-
-/** One collapsed line for accounts the popover leaves out: no quota data, or hidden by the user. */
-const HiddenAccounts = (props: {
-  readonly unavailable: readonly OverviewCard[]
-  readonly hidden: readonly OverviewCard[]
-  readonly arrangement: UsageArrangement
-}): JSX.Element | null => {
-  const count = props.unavailable.length + props.hidden.length
+/** Only accounts explicitly hidden by the user belong behind this disclosure. */
+const HiddenAccounts = (props: { readonly hidden: readonly OverviewCard[]; readonly arrangement: UsageArrangement }): JSX.Element | null => {
+  const count = props.hidden.length
   if (count === 0) return null
-  const reasons = [
-    props.unavailable.length > 0 ? `${String(props.unavailable.length)} without quota data` : null,
-    props.hidden.length > 0 ? `${String(props.hidden.length)} hidden by you` : null,
-  ].filter(reason => reason !== null)
   return (
     <Collapsible className="dshx:shrink-0 dshx:border-t dshx:px-3 dshx:py-1.5">
       <CollapsibleTrigger className="dshx:group dshx:flex dshx:w-full dshx:items-center dshx:gap-1 dshx:text-left dshx:text-[11px] dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:underline">
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-          {String(count)} hidden ({reasons.join(', ')})
-        </span>
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{String(count)} hidden by you</span>
         <ChevronDownIcon className="dshx:size-3 dshx:shrink-0 dshx:transition-transform dshx:group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="dshx:mt-1.5 dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto">
-          {props.unavailable.map(card => (
-            <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" key={card.instanceId}>
-              <ProviderGlyph className="dshx:size-3.5" kind={card.kind} />
-              <span className="dshx:shrink-0 dshx:font-medium">{card.displayName}</span>
-              <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground" title={unavailableReason(card)}>
-                {unavailableReason(card)}
-              </span>
-            </li>
-          ))}
           {props.hidden.map(card => (
             <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" key={card.instanceId}>
               <ProviderGlyph className="dshx:size-3.5" kind={card.kind} />
@@ -273,6 +267,7 @@ export const UsageOverview = (props: {
   readonly refreshing: boolean
   readonly onRefresh: () => void
   readonly onOpenHistory: () => void
+  readonly onConnectAccount: (accountId: string) => void
 }): JSX.Element => {
   const [tab, setTab] = useState<ProviderTab>('all')
   const now = useQuotaClock({ resetsAt: [], precision: 'second' })
@@ -280,7 +275,8 @@ export const UsageOverview = (props: {
   const activeTab = tab !== 'all' && !providers.includes(tab) ? 'all' : tab
   const arrangement = useUsageLayout()
   const sections = UsageOverviewModel.overviewSections(props.usage, activeTab, arrangement.layout)
-  const shownIds = sections.cards.map(card => card.instanceId)
+  const visibleCards = UsageOverviewModel.visibleCards(props.usage, activeTab, arrangement.layout)
+  const shownIds = visibleCards.map(card => card.instanceId)
   const { settings, usagePopoverSize } = usePreferences()
   const [draggedSize, setDraggedSize] = useState<{ readonly width: number; readonly height: number } | null>(null)
   const size = draggedSize ?? usagePopoverSize
@@ -350,12 +346,12 @@ export const UsageOverview = (props: {
           <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
             {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
           </p>
-        ) : sections.cards.length === 0 ? (
+        ) : visibleCards.length === 0 ? (
           <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
             {sections.unavailable.length + sections.hidden.length === 0 ? 'No enabled account for this provider.' : 'No account with quota to show.'}
           </p>
         ) : (
-          sections.cards.map(card => (
+          visibleCards.map(card => (
             <ArrangeableAccount
               arrangement={arrangement}
               className="dshx:rounded-lg dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
@@ -366,12 +362,18 @@ export const UsageOverview = (props: {
               name={card.displayName}
               shownIds={shownIds}
             >
-              <AccountUsageCard card={card} hostName={props.usage?.hostName ?? ''} now={now} readAt={props.usage?.readAt ?? now} />
+              <AccountUsageCard
+                card={card}
+                hostName={props.usage?.hostName ?? ''}
+                now={now}
+                readAt={props.usage?.readAt ?? now}
+                onConnectAccount={props.onConnectAccount}
+              />
             </ArrangeableAccount>
           ))
         )}
       </div>
-      {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} unavailable={sections.unavailable} />}
+      {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} />}
     </section>
   )
 }

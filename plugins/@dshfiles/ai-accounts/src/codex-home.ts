@@ -152,7 +152,7 @@ export const materializeCodexShadowHome = async (layout: CodexHomeLayout): Promi
 }
 
 /** The command that writes the next login for this instance. */
-const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME="${layout.effectiveHomePath}" codex login`
+const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME='${layout.effectiveHomePath.replaceAll("'", "'\\''")}' codex login`
 
 const authJsonPath = (layout: CodexHomeLayout): string => join(layout.effectiveHomePath, 'auth.json')
 

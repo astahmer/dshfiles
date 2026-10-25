@@ -79,6 +79,42 @@ describe('fetchCommandCodeCatalog', () => {
 })
 
 describe('createCommandCodeProvider', () => {
+  it('pins explicit CLI auth even when both a stored credential and default environment key exist', async () => {
+    let envReads = 0
+    const provider = createCommandCodeProvider({ authSource: 'cli', readFallbackKey: async () => 'cli-owned-fixture' })
+    const resolved = await provider.auth.apiKey?.resolve({
+      signal: new AbortController().signal,
+      credential: { type: 'api_key', key: 'other-stored-fixture' },
+      ctx: {
+        env: async () => {
+          envReads += 1
+          return 'other-env-fixture'
+        },
+        fileExists: async () => false,
+      },
+    })
+    expect(resolved).toEqual({ auth: { apiKey: 'cli-owned-fixture' }, source: 'Command Code CLI login' })
+    expect(envReads).toBe(0)
+  })
+
+  it('never falls back to CLI when an explicit named reference is missing', async () => {
+    let cliReads = 0
+    const provider = createCommandCodeProvider({
+      authSource: 'reference',
+      keyEnv: 'NAMED_API_KEY',
+      readFallbackKey: async () => {
+        cliReads += 1
+        return 'unrelated-cli-fixture'
+      },
+    })
+    const resolved = await provider.auth.apiKey?.resolve({
+      signal: new AbortController().signal,
+      ctx: { env: async () => undefined, fileExists: async () => false },
+    })
+    expect(resolved).toBeUndefined()
+    expect(cliReads).toBe(0)
+  })
+
   it('refuses a key variable not named as an API key', () => {
     expect(() => createCommandCodeProvider({ keyEnv: 'AWS_SECRET_ACCESS_KEY' })).toThrow(CommandCodeConfigError)
   })

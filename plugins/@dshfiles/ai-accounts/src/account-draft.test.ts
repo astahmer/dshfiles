@@ -36,6 +36,14 @@ describe('the editor draft following the selection', () => {
   const original = AccountDraftModel.newAccountDraft({ kind: 'commandcode', existing: [] })
   const renamed = { ...original, instanceId: 'fake_route', apiKeyEnv: 'FAKE_ROUTE_API_KEY', apiBaseUrl: 'http://127.0.0.1:4000' }
 
+  it.each(['cli', 'reference'] as const)('preserves %s credential ownership across normal draft edit/save round trips', authSource => {
+    const profile = stored({ ...original, authSource })
+    const draft = AccountDraftModel.toDraft(profile)
+    expect(draft.authSource).toBe(authSource)
+    expect(AccountDraftModel.sameDraft(draft, { ...draft, authSource: authSource === 'cli' ? 'reference' : 'cli' })).toBe(false)
+    expect(AccountDraftModel.toDraft(stored({ ...draft, enabled: false, hiddenModelIds: ['model'] })).authSource).toBe(authSource)
+  })
+
   it('keeps fields typed while a rename lands, through the moment the selection names no stored account', () => {
     const missing = AccountDraftModel.followSelection({ current: renamed, selected: null, selectedId: 'fake_route', followedId: original.instanceId })
     expect(missing).toBe(renamed)
@@ -46,6 +54,30 @@ describe('the editor draft following the selection', () => {
       followedId: original.instanceId,
     })
     expect(landed).toBe(renamed)
+  })
+
+  it('follows external availability changes when the editor has no unsaved edits', () => {
+    const disabled = { ...original, enabled: false }
+    const enabled = stored({ ...original, enabled: true })
+    expect(
+      AccountDraftModel.followSelection({
+        current: disabled,
+        previousSelected: stored(disabled),
+        selected: enabled,
+        selectedId: original.instanceId,
+        followedId: original.instanceId,
+      }),
+    ).toEqual(AccountDraftModel.toDraft(enabled))
+    const typing = { ...disabled, displayName: 'Still typing' }
+    expect(
+      AccountDraftModel.followSelection({
+        current: typing,
+        previousSelected: stored(disabled),
+        selected: enabled,
+        selectedId: original.instanceId,
+        followedId: original.instanceId,
+      }),
+    ).toBe(typing)
   })
 
   it('keeps a half-typed slug when the store is read again for the same account', () => {

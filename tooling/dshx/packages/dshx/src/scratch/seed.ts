@@ -13,7 +13,6 @@ import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const AI_ACCOUNTS_BUTTON_NAME = 'AI Accounts'
 const FAKE_PROVIDER_ROUTE_SLUG = 'dshx_fake_commandcode'
-const FAKE_PROVIDER_KEY_REF = 'DSHX_FAKE_COMMANDCODE_API_KEY'
 export const NEW_THREAD_START_BUTTON_NAME = /^(?:New thread|New session)$/i
 const fakeProviderScript = fileURLToPath(new URL('./fake-provider-main.js', import.meta.url))
 
@@ -81,9 +80,7 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   // name and shows only the model id.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)
   const bareModelWord = new RegExp(`(?:^|[\\s/])${bareModelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
-  const routeOption = input.page
-    .getByRole('menuitemradio', { name: modelId, exact: true })
-    .or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
+  const routeOption = input.page.getByRole('menuitemradio', { name: modelId, exact: true }).or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
   await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
   await routeOption.first().click({ timeout: input.timeoutMs })
 
@@ -231,7 +228,7 @@ const restorePendingRestart = async (state: ScratchState, dryRun: boolean): Prom
 }
 
 const FAKE_PROVIDER_ACCOUNTS_FILE = z.object({
-  accounts: z.array(z.object({ instanceId: z.string(), displayName: z.string(), apiKeyEnv: z.string(), apiBaseUrl: z.string() })),
+  accounts: z.array(z.object({ instanceId: z.string(), displayName: z.string(), apiKeyEnv: z.string(), apiBaseUrl: z.string(), enabled: z.boolean() })),
 })
 
 type FakeProviderAccount = z.infer<typeof FAKE_PROVIDER_ACCOUNTS_FILE>['accounts'][number]
@@ -301,12 +298,26 @@ const startFakeProvider = async (
   throw new ScratchError('seed-failed', 'The fake model provider did not start.', `Read ${join(state.stateDir, 'fake-provider.log')}.`)
 }
 
+const openAccountAdvanced = async (page: Page, timeoutMs: number): Promise<void> => {
+  const account = page.getByRole('region', { name: 'Selected account', exact: true })
+  await account.getByRole('tab', { name: 'Settings', exact: true }).click({ timeout: timeoutMs })
+  const advanced = account.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Advanced$/u }) })
+  if ((await advanced.getAttribute('open')) === null) await advanced.locator('summary').click({ timeout: timeoutMs })
+  await account.getByRole('heading', { name: 'Runtime paths', exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
+}
+
 /**
  * Open the fake route's account in the editor, adding it on the first run. A rename saves on blur and another field's
  * blur saves the whole draft at once, so the slug must land before any other field is touched: two overlapping saves
  * let the stale one win, leaving the account on the default key name and an empty base URL.
  */
-const openFakeProviderAccount = async (input: { readonly state: ScratchState; readonly page: Page; readonly timeoutMs: number }): Promise<string> => {
+const openFakeProviderAccount = async (input: {
+  readonly state: ScratchState
+  readonly page: Page
+  readonly timeoutMs: number
+  readonly baseUrl: string
+  readonly apiKey: string
+}): Promise<string> => {
   const { page, timeoutMs } = input
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   const existing = await readFakeProviderAccount(input.state.home)
@@ -318,13 +329,28 @@ const openFakeProviderAccount = async (input: { readonly state: ScratchState; re
       .first()
       .click({ timeout: timeoutMs })
     await page.getByRole('heading', { name: existing.displayName, exact: true }).last().waitFor({ state: 'visible', timeout: timeoutMs })
+    await openAccountAdvanced(page, timeoutMs)
     return existing.displayName
   }
-  await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
-  await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
-  const accountHeading = page.getByRole('heading', { name: /^Command Code \d+$/u }).last()
-  await accountHeading.waitFor({ state: 'visible', timeout: timeoutMs })
-  const accountName = (await accountHeading.innerText()).trim()
+  await page.getByRole('button', { name: 'Add account', exact: true }).first().click({ timeout: timeoutMs })
+  await page
+    .getByRole('dialog', { name: 'Add account', exact: true })
+    .getByRole('button', { name: 'Command Code account', exact: true })
+    .click({ timeout: timeoutMs })
+  // New accounts are provisional. Configure loopback before entering even a synthetic credential.
+  const initialKeyDialog = page.getByRole('dialog', { name: 'Connect Command Code', exact: true })
+  await initialKeyDialog.waitFor({ state: 'visible', timeout: timeoutMs })
+  const accountName = (await initialKeyDialog.getByText(/^Command Code \d+$/u, { exact: true }).innerText()).trim()
+  const connection = initialKeyDialog.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Connection settings$/u }) })
+  await connection.locator('summary').click({ timeout: timeoutMs })
+  await initialKeyDialog.getByRole('textbox', { name: 'API base URL', exact: true }).fill(input.baseUrl, { timeout: timeoutMs })
+  await initialKeyDialog.getByRole('button', { name: 'Apply connection settings', exact: true }).click({ timeout: timeoutMs })
+  await connection.locator('form').waitFor({ state: 'hidden', timeout: timeoutMs })
+  await initialKeyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.apiKey, { timeout: timeoutMs })
+  await initialKeyDialog.getByRole('button', { name: 'Verify and add account', exact: true }).click({ timeout: timeoutMs })
+  await initialKeyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
+  await page.getByRole('heading', { name: accountName, exact: true }).last().waitFor({ state: 'visible', timeout: timeoutMs })
+  await openAccountAdvanced(page, timeoutMs)
   const routeSlug = page.getByRole('textbox', { name: 'Route slug', exact: true }).last()
   await routeSlug.fill(FAKE_PROVIDER_ROUTE_SLUG, { timeout: timeoutMs })
   await routeSlug.blur()
@@ -334,6 +360,8 @@ const openFakeProviderAccount = async (input: { readonly state: ScratchState; re
     .filter({ hasText: `Renamed to ${FAKE_PROVIDER_ROUTE_SLUG}.` })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs })
+  // Renaming remounts the detail on Models. Runtime fields remain behind Settings > Advanced.
+  await openAccountAdvanced(page, timeoutMs)
   return accountName
 }
 
@@ -359,20 +387,21 @@ const configureFakeProviderThread = async (input: {
   }
   const fake = await startFakeProvider(state, timeoutMs)
   await openAIAccountsPanel(page, timeoutMs)
-  const accountName = await openFakeProviderAccount({ state, page, timeoutMs })
-  const keyVariable = page.getByRole('textbox', { name: 'API KEY reference name', exact: true }).last()
+  const accountName = await openFakeProviderAccount({ state, page, timeoutMs, baseUrl: fake.baseUrl, apiKey: input.apiKey ?? 'dshx-dev-fake-key' })
+  const current = await readFakeProviderAccount(state.home)
+  if (current === undefined || current.apiKeyEnv.trim() === '')
+    throw new ScratchError('seed-failed', 'The verified fake account has no credential reference.', 'Inspect the scratch account metadata.')
   const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true }).last()
   const deadline = Date.now() + timeoutMs
   // A re-read of the store can still replace the draft under the fields; the edit is typed again until it is saved.
   for (;;) {
-    await keyVariable.fill(FAKE_PROVIDER_KEY_REF, { timeout: timeoutMs })
     await baseUrl.fill(fake.baseUrl, { timeout: timeoutMs })
     await baseUrl.blur()
     const saved = await waitForFakeProviderAccount({
       home: state.home,
       timeoutMs: Math.min(5_000, Math.max(0, deadline - Date.now())),
-      expected: `key name ${FAKE_PROVIDER_KEY_REF} and base URL ${fake.baseUrl}`,
-      matches: account => account?.apiKeyEnv === FAKE_PROVIDER_KEY_REF && account.apiBaseUrl === fake.baseUrl,
+      expected: `verified key reference and base URL ${fake.baseUrl}`,
+      matches: account => account?.apiKeyEnv === current.apiKeyEnv && account.apiBaseUrl === fake.baseUrl,
     }).then(
       () => true,
       (error: unknown) => {
@@ -390,6 +419,11 @@ const configureFakeProviderThread = async (input: {
   await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.apiKey ?? 'dshx-dev-fake-key', { timeout: timeoutMs })
   await keyDialog.getByRole('button', { name: /^(?:Store key|Replace key)$/u }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
+  const enabled = page
+    .getByRole('region', { name: 'Selected account', exact: true })
+    .getByRole('switch', { name: /^(?:Enabled in model picker|Hidden from model picker)$/u })
+  if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click({ timeout: timeoutMs })
+  await waitForFakeProviderAccount({ home: state.home, timeoutMs, expected: 'an enabled loopback model route', matches: account => account?.enabled === true })
   await page.keyboard.press('Escape')
 
   await openSeedThreadComposer(page, timeoutMs)

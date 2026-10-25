@@ -14,6 +14,15 @@ const idTokenWith = (claims: Record<string, unknown>): string =>
 
 const authJsonWith = (claims: Record<string, unknown>): string => JSON.stringify({ tokens: { access_token: 'token', id_token: idTokenWith(claims) } })
 
+describe('Codex login command metadata', () => {
+  it('quotes shell metacharacters as literal path text without executing anything', () => {
+    const path = `/synthetic/account '$()\`quoted\` "+value`
+    expect(CodexHomeModel.loginHint({ mode: 'authOverlay', sharedHomePath: '/synthetic/shared', effectiveHomePath: path })).toBe(
+      "CODEX_HOME='/synthetic/account '\\''$()`quoted` \"+value' codex login",
+    )
+  })
+})
+
 describe('resolveCodexHomeLayout', () => {
   it('resolves homes inside the user home', () => {
     expect(CodexHomeModel.resolveLayout({ homePath: '~/.codex', shadowHomePath: '~/.codex-dshx/work' })).toEqual({

@@ -1,9 +1,9 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message } from '@earendil-works/pi-ai'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { ClaudeCliSessions } from './claude-cli.js'
 
 /**
@@ -68,6 +68,34 @@ const finished = async (stream: AssistantMessageEventStream): Promise<AssistantM
 }
 
 const textOf = (message: AssistantMessage): string => message.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')
+
+it('pins the selected default config directory and preserves native OAuth/cloud environment', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-env-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  const fake = FAKE_CLAUDE.replace(
+    "'echo ' + process.pid + ': ' + text",
+    'JSON.stringify({ config: process.env.CLAUDE_CONFIG_DIR, oauth: process.env.CLAUDE_CODE_OAUTH_TOKEN, cloud: process.env.CLAUDE_CODE_USE_VERTEX, key: process.env.ANTHROPIC_API_KEY, bearer: process.env.ANTHROPIC_AUTH_TOKEN })',
+  )
+  writeFileSync(executable, fake)
+  chmodSync(executable, 0o755)
+  vi.stubEnv('CLAUDE_CONFIG_DIR', '/synthetic/unrelated-config')
+  vi.stubEnv('CLAUDE_CODE_OAUTH_TOKEN', 'synthetic-oauth')
+  vi.stubEnv('CLAUDE_CODE_USE_VERTEX', 'synthetic-cloud')
+  vi.stubEnv('ANTHROPIC_API_KEY', 'synthetic-unrelated-key')
+  vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'synthetic-unrelated-bearer')
+  try {
+    const cli = new ClaudeCliSessions({ configDir: () => join(homedir(), '.claude'), executable })
+    sessions.push(cli)
+    const [model] = anthropicProvider().getModels()
+    if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+    const context = normalizeContext({ systemPrompt: 'Synthetic.', messages: [{ role: 'user', content: 'hello', timestamp: 1 }] })
+    const reply = await finished(cli.stream(model, context, { sessionId: 'synthetic-env' }))
+    expect(JSON.parse(textOf(reply))).toEqual({ config: join(homedir(), '.claude'), oauth: 'synthetic-oauth', cloud: 'synthetic-cloud' })
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
 
 it('holds a tool call until DSH answers it, then continues the same claude process', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'claude-cli-test-'))
