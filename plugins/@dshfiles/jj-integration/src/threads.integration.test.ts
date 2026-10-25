@@ -771,6 +771,36 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([])
   })
 
+  it('forgets safe workspaces together while retaining work-bearing workspaces', async () => {
+    const first = await threads.provision(repo)
+    const second = await threads.provision(repo)
+    const busy = await threads.provision(repo)
+    writeFileSync(join(busy.path, 'draft.txt'), 'draft\n')
+    const calls: string[][] = []
+    const measuredThreads = createThreads({
+      executor: async input => {
+        calls.push([...input.args])
+        return executor(input)
+      },
+      bookmark: () => 'main',
+      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
+    })
+
+    const result = await measuredThreads.discardMany({ repoRoot: repo, names: [first.name, second.name, busy.name], force: false })
+
+    expect(result.results).toEqual([
+      { name: busy.name, status: 'has-work', revisions: expect.any(Array), error: null },
+      { name: first.name, status: 'discarded', revisions: [], error: null },
+      { name: second.name, status: 'discarded', revisions: [], error: null },
+    ])
+    expect(calls.filter(args => args.includes('forget') && args.includes('workspace'))).toEqual([
+      ['--ignore-working-copy', 'workspace', 'forget', first.name, second.name],
+    ])
+    expect(existsSync(first.path)).toBe(false)
+    expect(existsSync(second.path)).toBe(false)
+    expect(existsSync(join(busy.path, 'draft.txt'))).toBe(true)
+  })
+
   it('dates every working copy and abandons only the empty revisions nothing builds on', async () => {
     const thread = await threads.provision(repo)
     const changedAt = await threads.workingCopyChangedAt(repo)

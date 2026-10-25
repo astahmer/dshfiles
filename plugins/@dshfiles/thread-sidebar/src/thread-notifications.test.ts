@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { test } from 'vitest'
-import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, threadNotificationCategoriesSchema } from './thread-notifications.js'
+import { z } from 'zod'
+import {
+  createThreadNotificationClaimer,
+  DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+  ThreadNotificationModel,
+  threadNotificationCategoriesSchema,
+} from './thread-notifications.js'
 
 test('a structured question becomes input-needed attention', () => {
   assert.deepEqual(
@@ -112,6 +119,33 @@ test('completed, stopped, and error endings each notify as their own category', 
   assert.equal(ThreadNotificationModel.categoryForFinishReason('aborted'), 'stopped')
   assert.equal(ThreadNotificationModel.categoryForFinishReason('blocked'), 'stopped')
   assert.equal(ThreadNotificationModel.categoryForFinishReason('max-tokens'), 'stopped')
+})
+
+test('system delivery proceeds when the browser refuses the deduplication ledger write', () => {
+  const storage = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('storage unavailable')
+    },
+    removeItem: () => undefined,
+  }
+  const ledger = createStoredValue({ key: 'notification-test', schema: z.array(z.string()), fallback: [], storage: () => storage })
+  const claim = createThreadNotificationClaimer(ledger)
+  const route = threadNotificationCategoriesSchema.parse({
+    ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+    'turn-finished': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'], delivery: 'system' },
+  })['turn-finished']
+  const browserPermission = 'granted'
+  const systemDeliveryReady = ThreadNotificationModel.notificationRouteHasSystem(route.delivery) && browserPermission === 'granted'
+  let createdSystemNotifications = 0
+  const deliver = (eventId: string): void => {
+    if (!systemDeliveryReady || !claim(eventId)) return
+    createdSystemNotifications += 1
+  }
+
+  deliver('finish:thread:1')
+  deliver('finish:thread:1')
+  assert.equal(createdSystemNotifications, 1)
 })
 
 test('event claims deduplicate ids and retain only the newest 5,000', () => {

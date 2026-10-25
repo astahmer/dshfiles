@@ -8,6 +8,18 @@ plugin APIs, document the concrete Host/core gap in `plans/dsh-host-gaps.md`
 and stop at that boundary. Work in a separate DSH source checkout only when the
 human explicitly redirects the task there.
 
+## Active goal cancellation
+
+A direct human request to stop, cancel, or hand off the current task also cancels
+its automatic goal continuation. In that same direct human turn, pause the active
+goal with `update_goal` before replying; do not merely stop edits while leaving
+the goal active. Pause the old goal before starting a replacement objective. A
+later `<goal_round>` is only a continuation of the old request and must never
+override a newer human stop or hand-off. If this Agent cannot update the owning
+goal, stop its own work and ask the goal-owning Agent to pause it; do not continue
+under the stale objective. Say the task is stopped only after its goal is paused
+or removed.
+
 ## Skills
 
 Load the matching skill from `.agents/skills/` before the work it covers:
@@ -116,6 +128,12 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
 
 ## References in chat
 
+- Whenever a referenced entity has a native link/reference form, use it in the
+  message so it renders as a link instead of leaving a bare identifier or label.
+  For example, use `b:<id>` for backlog items, `jj:<name>` for Jujutsu revisions
+  and bookmarks, and the native rich session reference for DSH conversations.
+  Keep these references unformatted in ordinary prose; don't wrap them in quotes
+  or code spans that can prevent the reference renderer from recognizing them.
 - Refer to DSH conversations with their native session reference (the rich
   thread/session reference), not a code-formatted or abbreviated `session-…`
   or `thread-…` identifier. Include the conversation title or a short purpose
@@ -124,6 +142,12 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
   `jj:main` or `jj:94526da8`. A `thread-<id>` workspace directory is not itself
   a revision or bookmark: call it a JJ workspace in prose, and link its actual
   revision with `jj:` when one is relevant. Never invent `jj:thread-<id>`.
+- Refer to a configured DSH Agent with the explicit `@{handle}` link reference
+  (for example, `@{luna}`) when linking to it in prose. Plain `@handle` remains
+  the dispatch mention syntax; do not use it as a substitute when a link is
+  intended.
+- Use Markdown links for ordinary URLs and repository files when the chat
+  renderer does not provide a native reference form.
 
 ## Version control
 
@@ -135,9 +159,10 @@ Work lands on `main`; never `jj git push` without asking.
   workspace created by `@dshfiles/jj-integration` (see its
   [README](plugins/@dshfiles/jj-integration/README.md); **Rebase** moves it
   onto `main`).
-- One described revision per logical change: Conventional Commit title, a body
-  that says why, and the `Co-Authored-By` trailer. `jj describe -m …`, then
-  `jj new` before the next change.
+- One described revision per logical change: Conventional Commit title and a
+  body that says why. Do not add `Co-Authored-By` trailers or local DSH agent
+  handles to commit metadata; they are not GitHub collaborators. `jj describe
+  -m …`, then `jj new` before the next change.
 - Never rewrite a revision another workspace holds as its `@` (describe,
   squash, rebase, abandon): it leaves a divergent copy of the change. Touch
   only revisions you created, and not ones another workspace is built on:
@@ -426,11 +451,20 @@ A plugin that installs is not a plugin that works.
 
 ### Repository checks
 
+When changing a plugin, do **not** run the full repository or plugin test suite
+by default. Use `pnpm test:related <changed-file>` for a focused source change or
+`pnpm test:changed --from <base>` for a set of changes; run only additional
+checks needed for the affected boundary (for example, the relevant E2E journey
+for a changed user flow). Docs-only changes need no tests. Widen to the plugin's
+full suite or repository-wide checks only when the change crosses broader
+contracts, a pre-landing/release gate requires it, or the focused checks expose
+a reason. See [docs/incremental-checks.md](docs/incremental-checks.md#test-selection)
+for selection behavior and its full-suite fallbacks.
+
 `node --run <script>` is faster than `pnpm run` and drops a bare argument
 silently, so pass it after `--` or through the check's own environment variable
-(`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The order, the
-`check:diff`/`check:green` split, the Turbo cache and `--force` rules, and the
-e2e scope rule live in
+(`DSHX_E2E_ONLY=<plugin> node --run check:e2e`). The `check:diff`/`check:green`
+split, the Turbo cache and `--force` rules, and the e2e scope rule live in
 [docs/repository-checks.md](docs/repository-checks.md).
 
 ### Rebuilt plugins reach the browser over HMR

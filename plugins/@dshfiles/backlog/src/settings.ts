@@ -29,7 +29,7 @@ export const backlogSettings = defineSettings({
     lifecycleSignals: Schema.boolean()
       .default(true)
       .description(
-        'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked, and its next finished turn clears that flag. Never overrides a status or attention you set by hand.',
+        'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked, and its next finished turn clears that flag; an answered question settles the request for input its own thread raised. Never overrides a status or attention you set by hand.',
       ),
     idleThreadNudgeDays: Schema.natural()
       .max(3_650)

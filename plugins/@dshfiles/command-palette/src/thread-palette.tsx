@@ -14,7 +14,7 @@ import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
 import { ProjectTone } from './project-tone.js'
 import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
-import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode } from './palette-api.js'
+import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteThreadSection } from './palette-api.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
 export interface ThreadPaletteCopy {
@@ -22,6 +22,10 @@ export interface ThreadPaletteCopy {
   readonly threadsPlaceholder: string
   readonly allPlaceholder: string
   readonly filesPlaceholder: string
+  readonly backlog: string
+  readonly backlogPlaceholder: string
+  readonly backlogOpen: string
+  readonly backlogUnavailable: string
   readonly recent: string
   readonly threads: string
   readonly destinations: string
@@ -73,6 +77,9 @@ export interface ThreadPaletteCopy {
   readonly askSend: string
   readonly askExit: string
   readonly askFailed: string
+  readonly threadSectionAll: string
+  readonly threadSectionLabels: Readonly<Record<'pinned' | 'active' | 'parked' | 'inactive' | 'settled', string>>
+  readonly threadDateLabel: string
 }
 
 type PaletteActionOption = Omit<PaletteAction, 'label'> & { readonly label: string }
@@ -82,6 +89,8 @@ interface ThreadPaletteProps {
   readonly threads: readonly ThreadCandidate[]
   /** The current project's threads; when set, the Threads tab lists only these, while a session ID still finds any thread. */
   readonly projectThreads?: readonly ThreadCandidate[]
+  readonly threadSections?: ReadonlyMap<string, PaletteThreadSection>
+  readonly archivedSessionIds?: ReadonlySet<string>
   readonly context: PaletteActionContext
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
@@ -91,6 +100,7 @@ interface ThreadPaletteProps {
   readonly onOpenThread: (sessionId: string) => void
   /** Send one Ask DSH question and open the thread it creates; a rejection keeps the palette open. */
   readonly onAsk: (question: string) => Promise<void>
+  readonly onBacklogCapture: (text: string) => boolean
   readonly onClose: () => void
 }
 
@@ -102,6 +112,7 @@ type PaletteRow =
   | { readonly kind: 'line'; readonly line: number }
   | { readonly kind: 'help'; readonly prefix: PalettePrefix | ''; readonly label: string }
   | { readonly kind: 'ask'; readonly question: string }
+  | { readonly kind: 'backlog'; readonly text: string }
 
 const RESULT_LIMIT = 50
 const COMMAND_LIMIT = 30
@@ -126,6 +137,7 @@ const rowValue = (row: PaletteRow): string => {
   if (row.kind === 'line') return `line:${row.line}`
   if (row.kind === 'help') return `help:${row.prefix}`
   if (row.kind === 'ask') return 'ask-dsh'
+  if (row.kind === 'backlog') return `backlog:${row.text}`
   return `destination:${row.destination.id}`
 }
 
@@ -133,6 +145,7 @@ type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help' | 'ask
 
 const VIEW_BY_PREFIX = {
   '>': 'commands',
+  '<': 'backlog',
   '#': 'content',
   ':': 'line',
   '?': 'help',
@@ -155,6 +168,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   useEffect(() => sendNavigation({ type: 'mode.sync', mode: props.mode }), [props.mode, sendNavigation])
   const emptyQuery = deferredQuery.trim().length === 0
   const [askPending, setAskPending] = useState(false)
+  const [threadSectionFilter, setThreadSectionFilter] = useState<'all' | 'pinned' | 'active' | 'parked' | 'inactive' | 'settled'>('all')
   const askInFlight = useRef(false)
   const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
   const latestOnClose = useRef(props.onClose)
@@ -237,6 +251,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         : [],
     [props.recentLimit, rankedThreadIndex, threadSearch.query, view],
   )
+  const filteredThreadRows = useMemo(
+    () =>
+      threadRows.filter(
+        thread =>
+          thread.section !== 'archived' &&
+          props.archivedSessionIds?.has(thread.id) !== true &&
+          (threadSectionFilter === 'all' || (thread.section ?? 'active') === threadSectionFilter),
+      ),
+    [props.archivedSessionIds, threadRows, threadSectionFilter],
+  )
   const exactSearchId = threadSearch.exactId?.toLocaleLowerCase()
   const missingSessionId =
     (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
@@ -249,14 +273,24 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       // A finder hit names its own thread, so content search still reaches a thread this client has not listed
       // (a thread from another project, or one whose workspace is gone).
       const known = threadsById.get(hit.sessionId)
+      const section = props.threadSections?.get(hit.sessionId)
       const thread =
         known ??
         (hit.title === undefined
           ? undefined
-          : { id: hit.sessionId, title: hit.title, project: hit.project ?? '', cwd: hit.cwd ?? '', updatedAt: hit.updatedAt ?? 0 })
-      return thread === undefined ? [] : [{ thread, snippet: hit.snippet }]
+          : {
+              id: hit.sessionId,
+              title: hit.title,
+              project: hit.project ?? '',
+              cwd: hit.cwd ?? '',
+              updatedAt: hit.updatedAt ?? 0,
+              ...(section === undefined ? {} : { section }),
+            })
+      if (thread === undefined || props.archivedSessionIds?.has(hit.sessionId) === true || section === 'archived' || thread.section === 'archived')
+        return []
+      return [{ thread, snippet: hit.snippet }]
     })
-  }, [content.hits, props.threads, view])
+  }, [content.hits, props.archivedSessionIds, props.threadSections, props.threads, view])
   const line = view === 'line' ? PaletteRules.parseLineNumber(deferredQuery) : null
   const helpRows = useMemo(
     () =>
@@ -265,17 +299,32 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             { prefix: 'thread:' as const, label: props.copy.helpThread },
             { prefix: 'session:' as const, label: props.copy.helpSession },
             { prefix: '>' as const, label: props.copy.helpCommands },
+            { prefix: '<' as const, label: props.copy.backlog },
             { prefix: '#' as const, label: props.copy.helpContent },
             { prefix: ':' as const, label: props.copy.helpLine },
             { prefix: '' as const, label: props.copy.helpNone },
           ]
         : [],
-    [props.copy.helpCommands, props.copy.helpContent, props.copy.helpLine, props.copy.helpNone, props.copy.helpSession, props.copy.helpThread, view],
+    [
+      props.copy.backlog,
+      props.copy.helpCommands,
+      props.copy.helpContent,
+      props.copy.helpLine,
+      props.copy.helpNone,
+      props.copy.helpSession,
+      props.copy.helpThread,
+      view,
+    ],
   )
 
   const askRows = useMemo<PaletteRow[]>(
     () => (view === 'ask' && deferredQuery.trim().length > 0 ? [{ kind: 'ask', question: deferredQuery.trim() }] : []),
     [deferredQuery, view],
+  )
+
+  const backlogRows = useMemo<PaletteRow[]>(
+    () => (view === 'backlog' ? [{ kind: 'backlog', text: (parsed.prefix === '<' ? parsed.text : query).trim() }] : []),
+    [parsed.prefix, parsed.text, query, view],
   )
 
   const goToFile: PaletteActionOption = useMemo(
@@ -316,15 +365,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const rows: PaletteRow[] = useMemo(
     () => [
       ...askRows,
+      ...backlogRows,
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
-      ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
+      ...filteredThreadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [askRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, filteredThreadRows, helpRows, line],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -334,6 +384,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     if (row.kind === 'ask') {
       // Enter can land before the deferred row catches up with the last keystroke; the live query wins.
       void submitAsk(query)
+      return
+    }
+    if (row.kind === 'backlog') {
+      if (!props.onBacklogCapture(row.text)) {
+        sendNavigation({ type: 'notice.show', message: props.copy.backlogUnavailable })
+        return
+      }
+      props.onClose()
       return
     }
     if (row.kind === 'help') {
@@ -420,6 +478,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
     files: { chip: props.copy.files, placeholder: props.copy.filesPlaceholder },
+    backlog: { chip: props.copy.backlog, placeholder: props.copy.backlogPlaceholder },
     commands: { chip: props.copy.viewCommands, placeholder: props.copy.commandsPlaceholder },
     content: { chip: props.copy.viewContent, placeholder: props.copy.contentPlaceholder },
     line: { chip: props.copy.viewLine, placeholder: props.copy.linePlaceholder },
@@ -523,7 +582,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               <Tabs
                 value={mode}
                 onValueChange={(value: string) => {
-                  if (value !== 'all' && value !== 'threads' && value !== 'files') return
+                  if (value !== 'all' && value !== 'threads' && value !== 'files' && value !== 'backlog') return
                   sendNavigation({ type: 'mode.change', mode: value })
                 }}
               >
@@ -531,12 +590,34 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   <TabsTrigger value="all">{props.copy.viewAll}</TabsTrigger>
                   <TabsTrigger value="threads">{props.copy.threads}</TabsTrigger>
                   <TabsTrigger value="files">{props.copy.files}</TabsTrigger>
+                  <TabsTrigger value="backlog">{props.copy.backlog}</TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
             <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
           </div>
+          {mode === 'threads' && !ask && !subview ? (
+            <Tabs
+              value={threadSectionFilter}
+              onValueChange={(value: string) => {
+                if (value === 'all' || value === 'pinned' || value === 'active' || value === 'parked' || value === 'inactive' || value === 'settled') {
+                  setThreadSectionFilter(value)
+                }
+              }}
+            >
+              <TabsList aria-label={props.copy.threads} className="dshx:mx-2 dshx:my-1 dshx:max-w-[calc(100%-1rem)] dshx:overflow-x-auto">
+                <TabsTrigger value="all" onClick={() => setThreadSectionFilter('all')}>
+                  {props.copy.threadSectionAll}
+                </TabsTrigger>
+                {(['pinned', 'active', 'parked', 'inactive', 'settled'] as const).map(section => (
+                  <TabsTrigger key={section} value={section} onClick={() => setThreadSectionFilter(section)}>
+                    {props.copy.threadSectionLabels[section]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          ) : null}
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
               {ask && emptyQuery
@@ -545,6 +626,19 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
                   : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
+            {backlogRows.length > 0 ? (
+              <CommandGroup heading={props.copy.backlog}>
+                {backlogRows.map(row => (
+                  <CommandItem key={rowValue(row)} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
+                    <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                    <span className="dshx:truncate dshx:text-sm">
+                      {row.kind === 'backlog' && row.text.length > 0 ? `${props.copy.backlogOpen}: ${row.text}` : props.copy.backlogOpen}
+                    </span>
+                    {shortcut(row)}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null}
             {askRows.length > 0 ? (
               <CommandGroup heading={props.copy.ask}>
                 {askRows.map(row => (
@@ -593,6 +687,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
                         <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{hit.snippet}</span>
+                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                          {hit.thread.section === undefined || hit.thread.section === 'archived'
+                            ? props.copy.threadSectionLabels.active
+                            : props.copy.threadSectionLabels[hit.thread.section]}
+                          {hit.thread.updatedAt > 0
+                            ? ` · ${props.copy.threadDateLabel}: ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(hit.thread.updatedAt))}`
+                            : ''}
+                        </span>
                       </span>
                       {shortcut(row)}
                     </CommandItem>
@@ -627,10 +729,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
-            {(destinationRows.length > 0 || commandRows.length > 0) && threadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
-            {threadRows.length > 0 ? (
+            {(destinationRows.length > 0 || commandRows.length > 0) && filteredThreadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
+            {filteredThreadRows.length > 0 ? (
               <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
-                {threadRows.map(thread => {
+                {filteredThreadRows.map(thread => {
                   const row: PaletteRow = { kind: 'thread', thread }
                   const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
                   return (
@@ -647,7 +749,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
                         <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                          {thread.section === undefined
+                            ? props.copy.threadSectionLabels.active
+                            : props.copy.threadSectionLabels[thread.section === 'archived' ? 'active' : thread.section]}
+                          {' · '}
                           {project}
+                          {' · '}
+                          {props.copy.threadDateLabel}: {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(thread.updatedAt))}
                           {thread.cwd.length > 0 ? (
                             <>
                               {' · '}

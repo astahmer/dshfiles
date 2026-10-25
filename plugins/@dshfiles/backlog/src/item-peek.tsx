@@ -41,6 +41,8 @@ import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { ActivityDescription } from './activity-description.js'
+import { ActorThreadLink } from './actor-thread-link.js'
+import { BacklogReferenceChip } from './backlog-reference-chip.js'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
@@ -395,8 +397,13 @@ const Conversation = (props: {
   readonly itemId: number
   readonly threadLabel: ThreadLabel
   readonly openThread: OpenThread
+  readonly agentReplying: boolean
 }): JSX.Element => {
   const attention = props.attention
+  const actions = useBacklogActions()
+  const [editingComment, setEditingComment] = useState<string | null>(null)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentFailure, setCommentFailure] = useState<string | null>(null)
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set())
   const threadIdsByEvent = new Map<BacklogEvent, string>()
@@ -412,24 +419,106 @@ const Conversation = (props: {
     else runs.push({ kind: 'changes', events: [event] })
   }
   return (
-    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
+    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-4">
       <span aria-hidden className="dshx:absolute dshx:inset-y-2 dshx:left-[9px] dshx:w-px dshx:bg-border" />
       {runs.map((run, index) => {
-        if (run.kind === 'comment')
+        if (run.kind === 'comment') {
+          const commentId = run.event.commentId
+          const canEdit = run.event.actor === 'user' && commentId !== undefined
+          const isEditing = commentId !== undefined && editingComment === commentId
           return (
-            <li key={`c:${String(index)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
+            <li key={`c:${commentId ?? String(index)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
               <ItemGlyphs.ActorAvatar actorId={run.event.actor} className="dshx:z-10 dshx:mt-0.5 dshx:size-5" />
               <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
                 <p className="dshx:text-xs dshx:text-muted-foreground">
                   <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
                 </p>
                 <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
-                  <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
-                  <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
+                  {isEditing ? (
+                    <>
+                      <textarea
+                        aria-label="Edit reply"
+                        autoFocus
+                        className="dshx:min-h-20 dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-sm dshx:focus-visible:outline-2 dshx:focus-visible:outline-ring"
+                        value={commentDraft}
+                        onChange={event => setCommentDraft(event.target.value)}
+                        onKeyDown={event => {
+                          if (event.key === 'Escape') setEditingComment(null)
+                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                            event.preventDefault()
+                            if (commentId !== undefined && commentDraft.trim() !== '') {
+                              void actions.editComment
+                                .mutateAsync({ id: props.itemId, commentId, text: commentDraft })
+                                .then(() => setEditingComment(null))
+                                .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be saved.')))
+                            }
+                          }
+                        }}
+                      />
+                      <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
+                        <Button
+                          size="sm"
+                          disabled={commentDraft.trim() === '' || actions.editComment.isPending}
+                          onClick={() => {
+                            if (commentId === undefined) return
+                            void actions.editComment
+                              .mutateAsync({ id: props.itemId, commentId, text: commentDraft })
+                              .then(() => setEditingComment(null))
+                              .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be saved.')))
+                          }}
+                        >
+                          Save reply
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingComment(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
+                      <AttachmentMedia itemId={props.itemId} attachments={run.event.attachments ?? []} />
+                      {canEdit ? (
+                        <div className="dshx:flex dshx:flex-wrap dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Edit your reply"
+                            onClick={() => {
+                              setCommentFailure(null)
+                              setCommentDraft(run.event.detail)
+                              setEditingComment(commentId ?? null)
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Delete your reply"
+                            onClick={() => {
+                              if (commentId === undefined || !window.confirm('Delete this reply? This cannot be undone.')) return
+                              void actions.deleteComment
+                                .mutateAsync({ id: props.itemId, commentId })
+                                .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be deleted.')))
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  {commentFailure === null ? null : (
+                    <p role="alert" className="dshx:text-xs dshx:text-destructive">
+                      {commentFailure}
+                    </p>
+                  )}
                 </div>
               </div>
             </li>
           )
+        }
         const first = run.events[0]
         if (first === undefined) return null
         const expanded = open.has(index) || run.events.length === 1
@@ -446,7 +535,7 @@ const Conversation = (props: {
                   return (
                     <div key={String(position)}>
                       <p>
-                        <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
+                        <ActorThreadLink actorId={event.actor} openThread={props.openThread} />{' '}
                         <ActivityDescription
                           description={ItemGlyphs.describeEvent(event, attention)}
                           threadId={threadId}
@@ -502,6 +591,21 @@ const Conversation = (props: {
           </li>
         )
       })}
+      {props.agentReplying ? (
+        <li
+          role="status"
+          aria-label="Agent is thinking"
+          className="dshx:relative dshx:flex dshx:items-center dshx:gap-2.5 dshx:text-xs dshx:text-muted-foreground"
+        >
+          <span
+            aria-hidden
+            className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background"
+          >
+            <span className="dshx:size-1.5 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+          </span>
+          <span className="dshx:animate-pulse">Thinking…</span>
+        </li>
+      ) : null}
     </ol>
   )
 }
@@ -514,44 +618,50 @@ const CommentBox = (props: {
   readonly smartThreadRouting: boolean
   readonly smartReplyAnswers: boolean
   readonly threadStartNotifications: 'off' | 'in-app' | 'system' | 'both'
+  readonly onAnswering: (answering: boolean) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
   const [pending, setPending] = useState(false)
+  const submitting = useRef(false)
   const [failed, setFailed] = useState<string | null>(null)
   const attachments = useComposerFiles({ onError: setFailed })
 
   /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
-  const submit = async (): Promise<void> => {
+  const submit = async (submittedText: string): Promise<void> => {
     const files = [...attachments.files]
-    if ((text.trim() === '' && files.length === 0) || pending) return
+    if ((submittedText.trim() === '' && files.length === 0) || submitting.current) return
+    submitting.current = true
     setPending(true)
     setFailed(null)
     try {
       await submitReply({
-        text,
+        text: submittedText,
         files,
         save: async saved => {
           const payload = saved.map(fileInput)
-          await actions.comment.mutateAsync(payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload })
+          await actions.comment.mutateAsync(
+            payload.length === 0 ? { id: props.item.id, text: submittedText } : { id: props.item.id, text: submittedText, files: payload },
+          )
         },
         dispatch:
           dispatch === null
             ? null
             : {
-                dispatch: () =>
+                dispatch: ({ text: replyText }) =>
                   dispatch.dispatch({
                     item: props.item,
-                    text,
+                    text: replyText,
                     files: files.map(fileInput),
                     open: props.openCreatedByDefault,
                     smartThreadRouting: props.smartThreadRouting,
                     notificationDelivery: props.threadStartNotifications,
                   }),
-                answerReply: () => dispatch.answerReply({ item: props.item, text }),
+                answerReply: ({ text: replyText }) => dispatch.answerReply({ item: props.item, text: replyText }),
                 smartReplyAnswers: props.smartReplyAnswers,
               },
+        onAnswering: props.onAnswering,
         view: {
           clear: () => {
             setText('')
@@ -565,6 +675,7 @@ const CommentBox = (props: {
         },
       })
     } finally {
+      submitting.current = false
       setPending(false)
     }
   }
@@ -582,7 +693,7 @@ const CommentBox = (props: {
         submitLabel="Reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
         pending={pending}
-        onSubmit={() => void submit()}
+        onSubmit={submittedText => void submit(submittedText)}
       />
       {failed === null ? null : (
         <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
@@ -626,14 +737,19 @@ const LinkRow = (props: {
   readonly thread: ComposerThread | undefined
   readonly threadLabel: string
   readonly openThread: OpenThread
-  readonly select: (id: number) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const api = useApi(backlogApi)
   const link = props.link
+  const linkedItem = useQuery({
+    queryKey: ['dshfiles-backlog', 'reference-title', link.target],
+    enabled: link.type === 'item',
+    staleTime: 30_000,
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: Number(link.target) }, { signal })),
+  })
   const Icon = linkIcons[link.type]
   const openAction = (): (() => void) | undefined => {
     if (link.type === 'thread') return () => props.openThread(link.target)
-    if (link.type === 'item') return () => props.select(Number(link.target))
     if (link.type === 'url') return () => void window.open(link.target, '_blank', 'noopener,noreferrer')
     return undefined
   }
@@ -641,7 +757,9 @@ const LinkRow = (props: {
   return (
     <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-      {open === undefined ? (
+      {link.type === 'item' ? (
+        <BacklogReferenceChip id={Number(link.target)} itemTitle={linkedItem.data?.ok === true ? linkedItem.data.value.item.title : null} />
+      ) : open === undefined ? (
         <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
       ) : (
         <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
@@ -757,6 +875,7 @@ const PeekBody = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const [agentReplying, setAgentReplying] = useState(false)
   const item = props.detail.item
   const scroller = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -901,10 +1020,12 @@ const PeekBody = (props: {
               className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-xl dshx:border dshx:border-info/30 dshx:bg-info/5 dshx:p-3"
             >
               {running.map(thread => (
-                <div key={thread.id} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                  <span aria-hidden className="dshx:size-1.5 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
-                  <span className="dshx:text-muted-foreground">Running in</span>
-                  <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{thread.title}</span>
+                <div key={thread.id} className="dshx:flex dshx:items-start dshx:gap-2 dshx:text-xs">
+                  <span aria-hidden className="dshx:mt-1 dshx:size-1.5 dshx:shrink-0 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+                  <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+                    <span className="dshx:text-muted-foreground">Running in</span>
+                    <span className="dshx:truncate dshx:font-medium">{thread.title}</span>
+                  </span>
                   <Button size="xs" variant="ghost" className="dshx:ml-auto" onClick={() => props.openThread(thread.id)}>
                     Open thread
                   </Button>
@@ -953,7 +1074,6 @@ const PeekBody = (props: {
                       thread={link.type === 'thread' ? threadsById.get(link.target) : undefined}
                       threadLabel={link.type === 'thread' ? threadLabel(link.target) : linkLabel(link)}
                       openThread={props.openThread}
-                      select={props.select}
                     />
                   ))}
                 </ul>
@@ -999,6 +1119,7 @@ const PeekBody = (props: {
               itemId={item.id}
               threadLabel={threadLabel}
               openThread={props.openThread}
+              agentReplying={agentReplying}
             />
             <CommentBox
               item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
@@ -1008,6 +1129,7 @@ const PeekBody = (props: {
               smartThreadRouting={props.smartThreadRouting}
               smartReplyAnswers={props.smartReplyAnswers}
               threadStartNotifications={props.threadStartNotifications}
+              onAnswering={setAgentReplying}
             />
           </Section>
         </div>

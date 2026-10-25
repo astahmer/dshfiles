@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { PaletteApi, type PaletteAction, type PaletteActionContext } from './palette-api.js'
+import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteThreadSection } from './palette-api.js'
 
 const context: PaletteActionContext = {
   thread: {
@@ -55,6 +55,15 @@ test('duplicate and un-namespaced action IDs are rejected', () => {
   registeredDisposers.push(dispose)
   expect(() => PaletteApi.registerAction(action)).toThrow(/already registered/u)
   expect(() => PaletteApi.registerAction({ ...action, id: 'open-panel' })).toThrow(/invalid definition/u)
+})
+
+test('sidebar section projections publish and dispose with their owner', () => {
+  const sections = new Map<string, PaletteThreadSection>([['session-1', 'parked']])
+  const dispose = PaletteApi.registerThreadSections(sections)
+  registeredDisposers.push(dispose)
+  expect(PaletteApi.getSnapshot().threadSections).toBe(sections)
+  dispose()
+  expect(PaletteApi.getSnapshot().threadSections.size).toBe(0)
 })
 
 test('palette mode and recent limit share the browser registry across API calls', () => {

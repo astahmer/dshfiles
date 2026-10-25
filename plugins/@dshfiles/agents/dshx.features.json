@@ -184,7 +184,7 @@
     {
       "id": "agent-mention-preview",
       "title": "Preview an agent from its mention",
-      "summary": "Every rendered @handle that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the mention with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the mention while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
+      "summary": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
       "surfaces": ["client"],
       "configuration": [],
       "states": ["known-agent", "disabled-agent", "removed-agent", "many-mentions", "thread-history"],
@@ -203,9 +203,15 @@
         },
         {
           "kind": "unit-test",
+          "id": "agents.explicit-reference-matches",
+          "file": "plugins/@dshfiles/agents/src/agent-reference.test.ts",
+          "testName": "recognizes brace-wrapped references alongside existing plain mentions"
+        },
+        {
+          "kind": "unit-test",
           "id": "agents.reference-leaves-text",
           "file": "plugins/@dshfiles/agents/src/agent-reference.test.ts",
-          "testName": "leaves an email address, a menu scope, an unknown handle and a longer slug alone"
+          "testName": "leaves an email address, a menu scope, unknown handles and longer slugs alone"
         },
         {
           "kind": "unit-test",
@@ -247,9 +253,9 @@
         "press Enter",
         "click text \"Preview the agent mention\"",
         "expect textbox \"Comment\"",
-        "fill textbox \"Comment\" \"Ping @luna about b:1\"",
+        "fill textbox \"Comment\" \"Ping @{luna} about b:1\"",
         "click button \"Reply\"",
-        "click text \"@luna\"",
+        "click text \"@{luna}\"",
         "expect button \"Open in Agents\""
       ]
     }

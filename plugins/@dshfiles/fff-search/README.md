@@ -40,6 +40,11 @@ their next start.
   to 100 paths plus the total.
 - Both respect `.gitignore` and include hidden files that are not ignored.
   Stock `grep` skips hidden files; stock `glob` includes ignored ones.
+- `path` expands `~`, and a path that does not exist is answered
+  `path does not exist: <path>` instead of creating an index. A root outside the
+  workspace that _contains_ it (`~/dev` from a thread workspace, `~`, `/`) is
+  refused for the same reason fff refuses a home root: one search would index
+  every checkout under it. Sibling checkouts and other outside roots still work.
 - Frecency and query history live in `$DSH_HOME/plugins/fff-search/<root hash>/`.
 
 ## Verify

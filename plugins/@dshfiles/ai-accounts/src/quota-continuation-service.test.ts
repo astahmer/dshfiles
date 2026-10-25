@@ -303,6 +303,59 @@ describe('quota continuation service', () => {
     }
   })
 
+  it('labels quota recoveries and omits archived Sessions', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-session-labels-'))
+    const visibleSessionId = SessionId('quota-visible-session')
+    const archivedSessionId = SessionId('quota-archived-session')
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({
+        context,
+        readResetAt: async () => null,
+        archivedSessionIds: () => [archivedSessionId],
+        sessionController: {
+          inspect: async () => ({ events: [] }),
+          prompt: async () => ({ accepted: true as const }),
+          list: async () => ({
+            items: [
+              {
+                sessionId: visibleSessionId,
+                updatedAt: 5_000,
+                running: false,
+                blank: false,
+                agentAvailable: false,
+                cwd: '/projects/visible',
+                projections: { kind: 'cached', asOfSeq: 0, values: { title: 'Visible Session' } },
+              },
+              {
+                sessionId: archivedSessionId,
+                updatedAt: 4_000,
+                running: false,
+                blank: false,
+                agentAvailable: false,
+                cwd: '/projects/archived',
+                projections: { kind: 'cached', asOfSeq: 0, values: { title: 'Archived Session' } },
+              },
+            ],
+          }),
+        },
+      })
+      await service.recordFailure(createFailureAgent(visibleSessionId), 'codex_work', false)
+      await service.recordFailure(createFailureAgent(archivedSessionId), 'codex_work', false)
+
+      await expect(service.list()).resolves.toMatchObject({
+        continuations: [{ sessionId: visibleSessionId, title: 'Visible Session', cwd: '/projects/visible' }],
+      })
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('uses the reset a provider message names when the usage card reports none', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-quota-message-reset-'))
     const now = () => 6_000_000

@@ -99,8 +99,8 @@ const setup = async () => {
 }
 
 const dispatchPort = (outcome: Promise<AgentDispatchOutcome>) => ({
-  dispatch: () => outcome,
-  answerReply: async (): Promise<{ readonly ok: true }> => ({ ok: true }),
+  dispatch: (_input: { readonly text: string }) => outcome,
+  answerReply: async (_input: { readonly text: string }): Promise<{ readonly ok: true }> => ({ ok: true }),
   smartReplyAnswers: false,
 })
 
@@ -117,7 +117,7 @@ describe('submitReply', () => {
       },
       dispatch: {
         ...dispatchPort(dispatched.promise),
-        dispatch: () => {
+        dispatch: (_input: { readonly text: string }) => {
           dispatchStarted = true
           return dispatched.promise
         },
@@ -141,6 +141,32 @@ describe('submitReply', () => {
     expect(context.view.text).toBe('')
   })
 
+  it('saves an attachment-only comment without dispatching an empty reply', async () => {
+    const context = await setup()
+    context.saveGate.resolve()
+    let dispatchStarted = false
+
+    await submitReply({
+      text: '',
+      files: [screenshot],
+      save: async files => {
+        await context.mutation.mutate({ id: context.id, text: '', files: files.map(fileInput) })
+      },
+      dispatch: {
+        ...dispatchPort(Promise.resolve({ kind: 'dispatched' })),
+        dispatch: async () => {
+          dispatchStarted = true
+          return { kind: 'dispatched' }
+        },
+      },
+      view: context.viewPort,
+    })
+
+    expect(context.storedComments()).toMatchObject([{ detail: '', attachments: [{ name: 'screenshot.png' }] }])
+    expect(dispatchStarted).toBe(false)
+    expect(context.view.failures).toEqual([])
+  })
+
   it('rolls the comment back and restores the text and files when the save fails', async () => {
     const context = await setup()
     let dispatchStarted = false
@@ -152,7 +178,7 @@ describe('submitReply', () => {
       },
       dispatch: {
         ...dispatchPort(Promise.resolve({ kind: 'dispatched' })),
-        dispatch: async () => {
+        dispatch: async (_input: { readonly text: string }) => {
           dispatchStarted = true
           return { kind: 'dispatched' }
         },
@@ -170,6 +196,67 @@ describe('submitReply', () => {
     expect(context.view.files).toEqual([screenshot])
     expect(context.view.failures).toEqual(['Host unreachable'])
     expect(dispatchStarted).toBe(false)
+  })
+
+  it('shows and clears the thinking state while generating an AI answer', async () => {
+    const context = await setup()
+    context.saveGate.resolve()
+    const answer = deferred<{ readonly ok: true }>()
+    const answering: boolean[] = []
+    const submitted = submitReply({
+      text: 'Could you explain this?',
+      files: [],
+      save: async () => {
+        await context.mutation.mutate({ id: context.id, text: 'Could you explain this?' })
+      },
+      dispatch: {
+        ...dispatchPort(Promise.resolve({ kind: 'skipped', reason: 'reply-only' })),
+        answerReply: (_input: { readonly text: string }) => answer.promise,
+        smartReplyAnswers: true,
+      },
+      view: context.viewPort,
+      onAnswering: value => answering.push(value),
+    })
+
+    await expect.poll(() => answering).toEqual([true])
+    answer.resolve({ ok: true })
+    await submitted
+
+    expect(answering).toEqual([true, false])
+    expect(context.view.failures).toEqual([])
+  })
+
+  it('passes the complete submitted text once to automatic answer generation', async () => {
+    const context = await setup()
+    context.saveGate.resolve()
+    const submittedText = 'I was typing @emi go while finishing this complete answer.'
+    const dispatchTexts: string[] = []
+    const answerTexts: string[] = []
+
+    await submitReply({
+      text: submittedText,
+      files: [],
+      save: async () => {
+        await context.mutation.mutate({ id: context.id, text: submittedText })
+      },
+      dispatch: {
+        ...dispatchPort(Promise.resolve({ kind: 'skipped', reason: 'reply-only' })),
+        dispatch: async ({ text }) => {
+          dispatchTexts.push(text)
+          return { kind: 'skipped', reason: 'reply-only' }
+        },
+        answerReply: async ({ text }) => {
+          answerTexts.push(text)
+          return { ok: true }
+        },
+        smartReplyAnswers: true,
+      },
+      view: context.viewPort,
+    })
+
+    expect(context.storedComments().map(event => event.detail)).toEqual([submittedText])
+    expect(dispatchTexts).toEqual([submittedText])
+    expect(answerTexts).toEqual([submittedText])
   })
 
   it('keeps the saved comment and reports a failed dispatch without restoring the input', async () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import {
@@ -17,6 +18,7 @@ import {
 import { z } from 'zod'
 import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
 import { BacklogSearch, type SearchMatch } from './search.js'
+import { ThreadLifecycle } from './thread-lifecycle.js'
 import { BacklogTriage } from './triage.js'
 
 export const backlogDomain = defineDomain({
@@ -116,6 +118,13 @@ export interface BacklogStore {
     readonly files?: readonly BacklogFileInput[] | undefined
     readonly actor: BacklogActor
   }): Promise<BacklogResult<BacklogDetail>>
+  editComment(input: {
+    readonly id: number
+    readonly commentId: string
+    readonly text: string
+    readonly actor: BacklogActor
+  }): Promise<BacklogResult<BacklogDetail>>
+  deleteComment(input: { readonly id: number; readonly commentId: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   /** The item and every other item, for a triage pass to read. */
   triageInput(id: number): { readonly item: BacklogItem; readonly others: readonly BacklogItem[] } | undefined
   /** What one backfill run should triage, oldest first, and how many eligible items it leaves for a later run. */
@@ -125,7 +134,7 @@ export interface BacklogStore {
   propose(input: { readonly id: number; readonly proposal: BacklogProposal }): Promise<BacklogResult<BacklogDetail>>
   /**
    * Applies a proposal. For `system` (automatic triage) fields the user set by hand are left alone; for a person or an
-   * agent accepting it, every field applies. A duplicate is linked and commented, never closed.
+   * agent accepting it, every field applies. Completing a confirmed duplicate also resolves its canonical item unless its status was set by hand.
    */
   applyProposal(input: {
     readonly id: number
@@ -152,6 +161,11 @@ export interface BacklogStore {
     readonly attention: 'blocked' | 'waiting' | 'none'
     readonly reason: string
   }): Promise<BacklogResult<BacklogDetail>>
+  /**
+   * A thread's question was answered, so the `needs-input` request that thread made is settled: the user decided. An
+   * attention set by hand, or raised by another thread, waits for its own owner.
+   */
+  settleAnsweredQuestion(input: { readonly id: number; readonly threadId: string; readonly reason: string }): Promise<BacklogResult<BacklogDetail>>
   /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
   acknowledge(input: { readonly ids: readonly number[] }): Promise<void>
   dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
@@ -288,7 +302,13 @@ const createBacklogStore = ({
   const backlinksOf = (id: number): BacklogSummary[] => referencing({ type: 'item', target: String(id) })
 
   const detailOf = (item: BacklogItem): BacklogDetail => ({
-    item: { ...item, freshness: BacklogItems.freshness(item, now(), dormantDays()) },
+    item: {
+      ...item,
+      events: item.events.map((event, index) =>
+        event.kind === 'commented' && event.commentId === undefined ? { ...event, commentId: `legacy-${String(event.at)}-${String(index)}` } : event,
+      ),
+      freshness: BacklogItems.freshness(item, now(), dormantDays()),
+    },
     backlinks: backlinksOf(item.id),
   })
 
@@ -302,7 +322,7 @@ const createBacklogStore = ({
   const touch = async (
     item: BacklogItem,
     actor: BacklogActor,
-    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments'>,
+    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>,
     change: Partial<BacklogItem>,
   ): Promise<BacklogDetail> => {
     const at = now()
@@ -331,6 +351,32 @@ const createBacklogStore = ({
   }
 
   const find = (id: number): BacklogItem | undefined => records.get(id)
+
+  const closeDuplicateTargets = async (source: BacklogItem): Promise<void> => {
+    for (const link of source.links) {
+      if (link.type !== 'item' || link.relation !== 'duplicates') continue
+      const targetId = Number(link.target)
+      if (!Number.isSafeInteger(targetId)) continue
+      const target = find(targetId)
+      if (target === undefined || target.status === 'done' || target.status === 'dropped' || target.humanFields.includes('status')) continue
+      const change = { status: 'done' as const, ...closedStateChange({ item: target, status: 'done' }) }
+      await touch(target, { kind: 'system' }, { kind: 'moved', detail: `${target.status} → done (duplicate b:${String(source.id)} resolved)` }, change)
+    }
+  }
+
+  const touchAndCloseDuplicates = async (
+    item: BacklogItem,
+    actor: BacklogActor,
+    event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'>,
+    change: Partial<BacklogItem>,
+  ): Promise<BacklogDetail> => {
+    const detail = await touch(item, actor, event, change)
+    if (change.status === 'done' && item.status !== 'done') {
+      const resolved = find(item.id)
+      if (resolved !== undefined) await closeDuplicateTargets(resolved)
+    }
+    return detail
+  }
 
   const attachmentOf = (file: BacklogFileInput, at: number): BacklogAttachment => {
     const attachment: BacklogAttachment = {
@@ -547,14 +593,14 @@ const createBacklogStore = ({
           ...(change.snoozedUntil === undefined ? [] : [change.snoozedUntil === null ? 'woke it' : 'snoozed it']),
           ...(clearedSuggestion ? ['cleared closed-item suggestion'] : []),
         ]
-        return { ok: true, value: await touch(item, actor, { kind: 'edited', detail: details.join('; ') }, change) }
+        return { ok: true, value: await touchAndCloseDuplicates(item, actor, { kind: 'edited', detail: details.join('; ') }, change) }
       }
       if (actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, ...userChanged])]
       const detail =
         change.status === undefined
           ? `${changed.join(', ')}`
           : `${item.status} → ${change.status}${changed.length > 1 ? `; ${changed.filter(field => field !== 'status').join(', ')}` : ''}`
-      return { ok: true, value: await touch(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail }, change) }
+      return { ok: true, value: await touchAndCloseDuplicates(item, actor, { kind: change.status === undefined ? 'edited' : 'moved', detail }, change) }
     },
     link: async ({ id, link, remove, actor }) => {
       const item = find(id)
@@ -576,8 +622,42 @@ const createBacklogStore = ({
       const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(text), ...callerLinks(actor)])
       const sourceThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? { threadId: actor.sessionId } : {}
       const event = { kind: 'commented' as const, detail: text.slice(0, BacklogItems.maxBodyChars), ...sourceThread }
-      if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, attachments }, { links }) }
-      return { ok: true, value: await touch(item, actor, event, { links }) }
+      if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, commentId: randomUUID(), attachments }, { links }) }
+      return { ok: true, value: await touch(item, actor, { ...event, commentId: randomUUID() }, { links }) }
+    },
+    editComment: async ({ id, commentId, text, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (actor.kind !== 'user') return { ok: false, reason: 'not-found' }
+      const commentIndex = item.events.findIndex(
+        (event, index) =>
+          event.kind === 'commented' &&
+          event.actor === 'user' &&
+          (event.commentId === commentId || (event.commentId === undefined && commentId === `legacy-${String(event.at)}-${String(index)}`)),
+      )
+      const comment = item.events[commentIndex]
+      if (comment === undefined) return { ok: false, reason: 'not-found' }
+      const events = item.events.map((event, index) =>
+        index === commentIndex ? { ...event, commentId, detail: text.slice(0, BacklogItems.maxBodyChars) } : event,
+      )
+      const edited: BacklogItem = { ...item, events }
+      return { ok: true, value: await touch(edited, actor, { kind: 'edited', detail: 'edited a reply' }, {}) }
+    },
+    deleteComment: async ({ id, commentId, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (actor.kind !== 'user') return { ok: false, reason: 'not-found' }
+      const commentIndex = item.events.findIndex(
+        (event, index) =>
+          event.kind === 'commented' &&
+          event.actor === 'user' &&
+          (event.commentId === commentId || (event.commentId === undefined && commentId === `legacy-${String(event.at)}-${String(index)}`)),
+      )
+      const comment = item.events[commentIndex]
+      if (comment === undefined) return { ok: false, reason: 'not-found' }
+      for (const attachment of comment.attachments ?? []) await files.delete(fileKey(id, attachment.id))
+      const events = item.events.filter((_event, index) => index !== commentIndex)
+      return { ok: true, value: await touch({ ...item, events }, actor, { kind: 'edited', detail: 'deleted a reply' }, {}) }
     },
     triageInput: id => {
       const item = find(id)
@@ -625,7 +705,9 @@ const createBacklogStore = ({
         applied.tags = chosen.tags
       }
       if (chosen.duplicateOf !== undefined && records.has(chosen.duplicateOf)) {
-        change.links = BacklogItems.uniqueLinks([...item.links, { type: 'item', target: String(chosen.duplicateOf) }])
+        const duplicateTarget = String(chosen.duplicateOf)
+        const existingLinks = item.links.filter(link => link.type !== 'item' || link.target !== duplicateTarget)
+        change.links = BacklogItems.uniqueLinks([...existingLinks, { type: 'item', target: duplicateTarget, relation: 'duplicates' }])
         applied.duplicateOf = chosen.duplicateOf
       }
       Object.assign(change, closedStateChange({ item, status: change.status ?? item.status }))
@@ -634,7 +716,10 @@ const createBacklogStore = ({
         const owned = (['kind', 'status', 'title', 'tags'] as const).filter(field => applied[field] !== undefined)
         change.humanFields = [...new Set([...item.humanFields, ...owned])]
       }
-      return { ok: true, value: await touch(item, actor, { kind: 'triaged', detail: `applied ${BacklogTriage.describe(applied) || 'nothing'}` }, change) }
+      return {
+        ok: true,
+        value: await touchAndCloseDuplicates(item, actor, { kind: 'triaged', detail: `applied ${BacklogTriage.describe(applied) || 'nothing'}` }, change),
+      }
     },
     applySignal: async ({ id, status, link, reason }) => {
       const item = find(id)
@@ -659,7 +744,7 @@ const createBacklogStore = ({
       if (moves) change.status = status
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
       const sourceThread = link.type === 'thread' ? { threadId: link.target } : {}
-      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail, ...sourceThread }, change) }
+      return { ok: true, value: await touchAndCloseDuplicates(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail, ...sourceThread }, change) }
     },
     applyThreadAttention: async ({ id, threadId, attention, reason }) => {
       const item = find(id)
@@ -704,6 +789,20 @@ const createBacklogStore = ({
       return {
         ok: true,
         value: await touch(item, { kind: 'system' }, { kind: 'edited', detail: `attention: none (${reason})`, threadId }, { attention: 'none' }),
+      }
+    },
+    settleAnsweredQuestion: async ({ id, threadId, reason }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (!ThreadLifecycle.answeredQuestionSettles({ item, threadId })) return { ok: true, value: detailOf(item) }
+      return {
+        ok: true,
+        value: await touch(
+          item,
+          { kind: 'agent', sessionId: threadId },
+          { kind: 'edited', detail: `attention: none (${reason})`, threadId },
+          { attention: 'none' },
+        ),
       }
     },
     acknowledge: async ({ ids }) => {

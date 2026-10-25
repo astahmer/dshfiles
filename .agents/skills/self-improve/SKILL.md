@@ -130,7 +130,8 @@ seeds' security-relevant rows, permissions, sandbox/approval policy, secrets,
 destructive operations, anything that changes what the agent is allowed to do.
 
 One described revision per logical change (Conventional Commit title, why in the
-body, `Co-Authored-By` trailer), then `jj new` before the next change.
+body), then `jj new` before the next change. Do not add `Co-Authored-By` trailers
+or local DSH agent handles to commit metadata; they are not GitHub collaborators.
 
 ## 5. Validate, compare, and be honest
 

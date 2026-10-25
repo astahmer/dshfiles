@@ -49,4 +49,8 @@ export const closeViewedMarks = async (): Promise<void> => {
 export const diffViewedApiHost = diffViewedApi.host({
   state: async ({ ctx }) => (await viewedMarksFor(ctx)).snapshot(),
   toggle: async ({ ctx, input }) => (await viewedMarksFor(ctx)).toggle(input),
+  mark: async ({ ctx, input }) => {
+    const { viewed, ...file } = input
+    return (await viewedMarksFor(ctx)).mark(file, viewed)
+  },
 })

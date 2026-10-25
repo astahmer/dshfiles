@@ -29,6 +29,8 @@ export const quotaContinuationSummarySchema = z
     continuationId: z.string().uuid(),
     sessionId: z.string().trim().min(1).max(256),
     accountId: z.string().trim().min(1).max(64),
+    title: z.string().trim().min(1).max(512).optional(),
+    cwd: z.string().trim().min(1).max(4096).optional(),
     failedProvider: z.string().min(1).max(200).optional(),
     failedModel: z.string().min(1).max(200).optional(),
     failedAt: z.number().int().safe().nonnegative(),

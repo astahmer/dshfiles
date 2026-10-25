@@ -18,6 +18,17 @@ const showFeed = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await expect(feed(page)).toBeVisible()
 }
+const countViewTransitions = async (page: Page): Promise<void> => {
+  await page.evaluate(() => {
+    document.documentElement.dataset['viewTransitionCount'] = '0'
+    const startViewTransition = document.startViewTransition.bind(document)
+    document.startViewTransition = callback => {
+      const count = Number(document.documentElement.dataset['viewTransitionCount'] ?? 0)
+      document.documentElement.dataset['viewTransitionCount'] = String(count + 1)
+      return startViewTransition(callback)
+    }
+  })
+}
 
 const contextTarget = async (page: Page, id: number, view: string): Promise<Locator> => {
   const itemName = `Item b:${String(id)}`
@@ -93,7 +104,7 @@ const menuItemTextPosition = async (item: Locator, label: string): Promise<numbe
   }, label)
 
 const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
-  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Status', 'Kind', 'Project', 'Pin item']
+  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Copy item as Markdown', 'Status', 'Kind', 'Project', 'Pin item']
   if (includeOpenItem) labels.push('Open item')
   const attention = menu.getByRole('menuitem', { name: 'Attention', exact: true })
   if ((await attention.locator('span[title]').count()) === 0) labels.push('Attention')
@@ -116,6 +127,7 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
   await expect(menu.getByRole('menuitem', { name: /^(Unpin item|Pin item)$/ })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Copy item ID', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Copy item link', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Copy item as Markdown', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toHaveCount(0)
   if (includeOpenItem) await expect(menu.getByRole('menuitem', { name: 'Open item', exact: true })).toBeVisible()
   await expectContextMenuLabelsAligned(menu, includeOpenItem)
@@ -156,9 +168,14 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
 
 When('two images are attached to the capture', async ({ page }: { page: Page }) => {
   const captureForm = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'Capture', exact: true }) })
+  const contentRegion = page.locator('[data-backlog-content-region]')
+  const contentHeight = await contentRegion.evaluate(element => element.getBoundingClientRect().height)
+  const composerHeight = await captureForm.evaluate(element => element.getBoundingClientRect().height)
   await captureForm.locator('input[type="file"]').setInputFiles([join(attachmentFixtures, 'red.png'), join(attachmentFixtures, 'blue.png')])
   await expect(captureForm.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
   await expect(captureForm.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
+  await expect.poll(() => contentRegion.evaluate(element => element.getBoundingClientRect().height)).toBe(contentHeight)
+  await expect.poll(() => captureForm.evaluate(element => element.getBoundingClientRect().height)).toBe(composerHeight)
 })
 
 When('{string} is captured', async ({ page }: { page: Page }, text: string) => {
@@ -267,17 +284,47 @@ Then('search results list both {string} and {string}', async ({ page }: { page: 
 
 When('item b:{int} is moved to In progress on the board', async ({ page }: { page: Page }, id: number) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
+  await countViewTransitions(page)
   await page
     .getByRole('article', { name: `Card b:${String(id)}` })
     .getByRole('button', { name: `Status of b:${String(id)}` })
     .click()
   await page.getByRole('menuitem', { name: 'In progress' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
+})
+
+When('the Inbox column is moved right and the Dropped column is hidden', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Configure board columns' }).click()
+  await page.getByRole('button', { name: 'Move Inbox right' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Dropped' }).click()
+  await page.keyboard.press('Escape')
+})
+
+Then('the board columns show the customized order without Dropped', async ({ page }: { page: Page }) => {
+  const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.map(column => column.getAttribute('data-backlog-column')))
+  expect(statuses).toEqual(['todo', 'inbox', 'doing', 'done'])
+})
+
+Then('the Backlog items remain available outside the customized board', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('table', { name: 'Backlog items' })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Backlog items' }).getByRole('row', { name: /^Item b:/ })).toHaveCount(1)
+  await expect(page.getByRole('table', { name: 'Backlog items' })).toContainText('Keep board preferences local')
 })
 
 Then('the board columns follow the status order through Dropped', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-board-status-order', async () => {
     const statuses = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.map(column => column.getAttribute('data-backlog-column')))
     expect(statuses).toEqual(['inbox', 'todo', 'doing', 'done', 'dropped'])
+  })
+})
+
+Then('the board columns do not scroll horizontally', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-board-no-horizontal-scroll', async () => {
+    const board = page.locator('[data-backlog-board]')
+    const boardOverflows = await board.evaluate(element => element.scrollWidth > element.clientWidth)
+    const columnsOverflow = await page.locator('[data-backlog-column]').evaluateAll(columns => columns.some(column => column.scrollWidth > column.clientWidth))
+    expect(boardOverflows).toBe(false)
+    expect(columnsOverflow).toBe(false)
   })
 })
 
@@ -295,6 +342,35 @@ When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: numb
     .getByText(`b:${String(id)}`, { exact: true })
     .click()
   await expect(peek(page)).toContainText(`b:${String(id)}`)
+})
+
+When('the project picker for item b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
+  await peek(page)
+    .getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })
+    .click()
+})
+
+Then('the project choices are visible', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('combobox', { name: 'Search projects', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'No project', exact: true })).toBeVisible()
+})
+
+When('item b:{int} is assigned to the registered project from its details', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('option', { name: /^default-workspace\b/ }).click()
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('default-workspace')
+})
+
+Then('item b:{int} shows its selected project', async ({ page }: { page: Page }, id: number) => {
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('default-workspace')
+})
+
+When('item b:{int} is unassigned from its details', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('option', { name: 'No project', exact: true }).click()
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('Project')
+})
+
+Then('item b:{int} has no project', async ({ page }: { page: Page }, id: number) => {
+  await expect(peek(page).getByRole('combobox', { name: `Project of b:${String(id)}`, exact: true })).toContainText('Project')
 })
 
 Then('it is referenced by {string}', async ({ page }: { page: Page }, title: string) => {
@@ -447,6 +523,18 @@ When('backlog item b:{int} copies its ID and link from the context menu', async 
   await contextMenu(page).getByRole('menuitem', { name: 'Copy item link', exact: true }).click()
   await recordAssertion(page, 'backlog-copy-item-link', async () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`b:${String(id)}`)
+  })
+})
+
+When('backlog item b:{int} copies its Markdown from the context menu', async ({ page }: { page: Page }, id: number) => {
+  const origin = new URL(page.url()).origin
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+  const target = await contextTarget(page, id, 'feed')
+
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Copy item as Markdown', exact: true }).click()
+  await recordAssertion(page, 'backlog-copy-item-markdown', async () => {
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`b:${String(id)}`)
   })
 })
 
@@ -700,10 +788,12 @@ When('the selected board cards are dragged to {string}', async ({ page }: { page
   const source = await card.boundingBox()
   const target = await page.locator(`[data-backlog-column="${status}"]`).boundingBox()
   if (source === null || target === null) throw new Error('Board drag bounds are unavailable')
+  await countViewTransitions(page)
   await page.mouse.move(source.x + 30, source.y + 20)
   await page.mouse.down()
   await page.mouse.move(target.x + 40, target.y + 60, { steps: 12 })
   await page.mouse.up()
+  await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
 })
 
 When('the selected board card context menu moves all selected items to {string}', async ({ page }: { page: Page }, status: string) => {
@@ -814,7 +904,7 @@ When('a message with the serialized backlog mention is sent', async ({ page }: {
 
 Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
   await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
-    const chip = page.getByRole('button', { name: `Backlog item ${reference} ${title}`, exact: true })
+    const chip = page.getByRole('button', { name: `Backlog item ${reference} · ${title}`, exact: true })
     await expect(chip).toBeVisible()
     // The serialized title and tool hint must not stay in the bubble.
     await expect(page.getByText('backlog_get has its details')).toHaveCount(0)
@@ -919,6 +1009,58 @@ When('a comment {string} is added', async ({ page }: { page: Page }, text: strin
 Then('the item activity shows the comment', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-rich-text-comment', async () => {
     await expect(peek(page).getByRole('list', { name: 'Activity' })).toContainText('Confirmed in the scratch profile')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a reply with an image is added', async ({ page }: { page: Page }) => {
+  const itemPeek = peek(page)
+  await itemPeek.locator('input[type="file"]').setInputFiles(join(attachmentFixtures, 'red.png'))
+  await expect(itemPeek.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  const comment = itemPeek.getByRole('textbox', { name: 'Comment', exact: true })
+  await comment.fill('Original reply')
+  await comment.press('Enter')
+  await expect(itemPeek.getByRole('list', { name: 'Activity' })).toContainText('Original reply')
+})
+
+When('the user reply is edited with keyboard navigation', async ({ page }: { page: Page }) => {
+  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  const edit = activity.getByRole('button', { name: 'Edit your reply', exact: true })
+  await edit.focus()
+  await page.keyboard.press('Enter')
+  const editor = activity.getByRole('textbox', { name: 'Edit reply', exact: true })
+  await expect(editor).toBeVisible()
+  await editor.fill('Edited reply')
+  await editor.focus()
+  await page.keyboard.press('Tab')
+  const save = activity.getByRole('button', { name: 'Save reply', exact: true })
+  await expect(save).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(activity).toContainText('Edited reply')
+})
+
+Then('the edited reply keeps its attachment', async ({ page }: { page: Page }) => {
+  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  await expect(activity).toContainText('Edited reply')
+  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+})
+
+When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {
+  const activity = peek(page).getByRole('list', { name: 'Activity' })
+  let confirmationMessage: string | undefined
+  page.once('dialog', dialog => {
+    confirmationMessage = dialog.message()
+    void dialog.accept()
+  })
+  await activity.getByRole('button', { name: 'Delete your reply', exact: true }).click()
+  expect(confirmationMessage).toBe('Delete this reply? This cannot be undone.')
+})
+
+Then('the reply and its attachment are removed from the activity', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-reply-delete-attachment', async () => {
+    const activity = peek(page).getByRole('list', { name: 'Activity' })
+    await expect(activity).not.toContainText('Edited reply')
+    await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

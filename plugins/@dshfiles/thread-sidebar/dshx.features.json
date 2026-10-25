@@ -4,14 +4,15 @@
     {
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
-      "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar) and keeps its own grouping, status/source filters and project scope; park and settle through sidebar preferences and pin/archive through Host APIs.",
+      "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar), keeps independent grouping, status/source filters, project scope, column order and visibility, and never changes the sidebar thread list; park and settle through sidebar preferences and pin/archive through Host APIs.",
       "reach": [
         "expect region \"Threads\"",
-        "expect button \"Group: Status\"",
+        "expect button \"Group: Date\"",
         "click button \"Thread board\"",
         "expect region \"Thread board\"",
         "expect region \"Active column\"",
-        "expect button \"Group: Status\""
+        "click button \"Board columns\"",
+        "expect menuitemcheckbox \"Archived\""
       ],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
@@ -1022,7 +1023,7 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds and grant system permission explicitly.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds, mute or unmute tones globally from the command palette, and grant system permission explicitly.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
@@ -1055,6 +1056,23 @@
           "kind": "gherkin",
           "id": "thread-sidebar.notifications-settings",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.notification-sound-palette",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-sound-palette-label-and-execution",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-sound-palette-action.test.ts",
+          "testName": "the palette action label reflects the current mute state"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-sound-palette-toggle-execution",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-sound-palette-action.test.ts",
+          "testName": "executing the palette action toggles shared mute state in both directions"
         },
         {
           "kind": "unit-test",
@@ -1245,7 +1263,7 @@
     {
       "id": "client-reload-banner",
       "title": "Offer a page reload when the running client bundles are behind",
-      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Reload to apply updates banner naming the plugins a reload would load, with the button that does it.",
+      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner immediately below the Restart DSH to apply updates banner, naming the plugins a reload would load, with the button that does it.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["current", "stale-rebuild", "other-release", "added-entry"],

@@ -121,7 +121,7 @@
     {
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
-      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
+      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
       "reach": [
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Feed item to close\"",
@@ -153,6 +153,18 @@
           "kind": "gherkin",
           "id": "backlog.status-filter",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.feed-unit-actor-thread",
+          "file": "plugins/@dshfiles/backlog/src/actor-thread-link.test.tsx",
+          "testName": "links an agent actor to the thread it worked in"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.feed-unit-activity-phrase",
+          "file": "plugins/@dshfiles/backlog/src/activity-phrase.test.ts",
+          "testName": "reads an attention signal with the reason it fired"
         },
         {
           "kind": "unit-test",
@@ -431,7 +443,7 @@
     {
       "id": "auto-triage",
       "title": "Triage new items automatically",
-      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
+      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge and proposes kind, title, tags and duplicates using the user's past corrections as examples. A duplicate is recorded as a directional relation to its canonical item; when completed, it resolves that canonical item too unless the user set the canonical status by hand. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
       "surfaces": ["client", "host", "settings", "tool"],
       "configuration": [],
       "states": ["off", "proposed", "applied", "dismissed"],
@@ -630,7 +642,7 @@
     {
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
-      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",
+      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",
       "surfaces": ["host", "settings", "integration"],
       "configuration": [],
       "states": ["linked", "started", "stalled", "suggested", "finished"],
@@ -717,6 +729,30 @@
           "id": "backlog.lifecycle-host-thread-agent",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "keeps a block an agent flagged itself when a later turn finishes"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-question-answered",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "settles a request for input once its own thread answered the question"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-question-owner",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "leaves a request for input another thread raised, or the user set, alone"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-question-answered",
+          "file": "plugins/@dshfiles/backlog/src/thread-lifecycle.test.ts",
+          "testName": "settles a request for input when the thread that asked reaches an answer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-question-reply",
+          "file": "plugins/@dshfiles/backlog/src/question-reply.test.ts",
+          "testName": "recognises the reply an answered question steers back into the Agent"
         },
         {
           "kind": "unit-test",
@@ -950,7 +986,7 @@
     {
       "id": "attention-inbox",
       "title": "Attention Inbox across items and threads",
-      "summary": "One row per open backlog item combines attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. Thread acknowledgement never resolves item attention or suggestions; done/dropped historical thread items stay excluded, and snoozed items return later.",
+      "summary": "One row per open backlog item combines attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. Thread acknowledgement never resolves item attention or suggestions; answering a thread's question does settle its own request for input; done/dropped historical thread items stay excluded, and snoozed items return later.",
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
@@ -1140,6 +1176,14 @@
         "click text \"Describe me with a screenshot\"",
         "expect complementary \"Item detail\"",
         "expect textbox \"Comment\"",
+        "fill textbox \"Comment\" \"A first reply\"",
+        "press Enter",
+        "expect text \"A first reply\"",
+        "click button \"Edit your reply\"",
+        "fill textbox \"Edit reply\" \"Updated reply\"",
+        "press Meta+Enter",
+        "expect text \"Updated reply\"",
+        "expect button \"Delete your reply\"",
         "expect button \"Add an image or file\"",
         "click button \"Edit description\"",
         "expect button \"Attach an image or file to this item\"",
@@ -1213,6 +1257,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "backlog.reply-edit-delete-keyboard",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "backlog.smart-reply-routing",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
@@ -1274,6 +1323,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.project-scope",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.project-detail-picker",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

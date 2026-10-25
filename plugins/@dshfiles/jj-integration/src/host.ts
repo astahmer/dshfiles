@@ -874,6 +874,24 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
 }
 
+const discardThreads = async (input: { readonly paths: readonly string[]; readonly force: boolean }) => {
+  const results: {
+    readonly path: string
+    readonly status: 'discarded' | 'has-work' | 'error'
+    readonly revisions: Awaited<ReturnType<typeof discardThread>>['revisions']
+    readonly error: string | null
+  }[] = []
+  for (const path of input.paths) {
+    try {
+      const result = await discardThread({ path, force: input.force })
+      results.push({ path, ...result, error: null })
+    } catch (error) {
+      results.push({ path, status: 'error', revisions: [], error: errorText(error) })
+    }
+  }
+  return { results }
+}
+
 const HOUR_MS = 60 * 60_000
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 400)
@@ -981,15 +999,39 @@ const applyCleanup = async (input: {
   const untracked: CleanupResult['untracked'] = []
   const emptyRevisions: CleanupResult['emptyRevisions'] = []
   report.beginPhase('removing')
+  const plannedByRepository = new Map<string, PlannedWorkspace[]>()
   for (const planned of scan.workspaces) {
-    report.beginItem(planned.name)
-    try {
-      const outcome = await discardThread({ path: planned.path, force: false })
-      const removed = outcome.status === 'discarded'
-      workspaces.push({ ...planned, outcome: removed ? 'removed' : 'has-work' })
-      report.settleItem(removed ? 'removed' : 'kept')
-    } catch (error) {
-      workspaces.push({ ...planned, outcome: 'failed', message: errorText(error) })
+    const group = plannedByRepository.get(planned.repoRoot) ?? []
+    group.push(planned)
+    plannedByRepository.set(planned.repoRoot, group)
+  }
+  for (const [repoRoot, plannedWorkspaces] of plannedByRepository) {
+    for (const planned of plannedWorkspaces) report.beginItem(planned.name)
+    const repository = (await listRepositories()).find(candidate => candidate.repoRoot === repoRoot)
+    const workspaceIds = new Map(repository?.threads.map(thread => [thread.name, thread.workspaceId]) ?? [])
+    const outcome = await active.discardMany({ repoRoot, names: plannedWorkspaces.map(planned => planned.name), force: false })
+    const resultByName = new Map(outcome.results.map(result => [result.name, result]))
+    for (const planned of plannedWorkspaces) {
+      const result = resultByName.get(planned.name)
+      if (result?.status === 'discarded') {
+        const workspaceId = workspaceIds.get(planned.name)
+        if (workspaceId !== null && workspaceId !== undefined) await registryOf().delete(WorkspaceId(workspaceId))
+        for (const [sessionId, workspace] of isolatedSessionWorkspaces) {
+          if (workspace.path === planned.path) isolatedSessionWorkspaces.delete(sessionId)
+        }
+        const correlationId = randomUUID()
+        emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${planned.name}`, path: planned.path, correlationId })
+        queueWorkspaceSync({ repoRoot, bookmark: readSettings().bookmark, correlationId })
+        workspaces.push({ ...planned, outcome: 'removed' })
+        report.settleItem('removed')
+        continue
+      }
+      if (result?.status === 'has-work') {
+        workspaces.push({ ...planned, outcome: 'has-work' })
+        report.settleItem('kept')
+        continue
+      }
+      workspaces.push({ ...planned, outcome: 'failed', message: result?.error ?? 'Workspace cleanup returned no result.' })
       report.settleItem('failed')
     }
   }
@@ -1342,6 +1384,7 @@ const api = jjIntegrationApi.host({
   },
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
+  discardMany: ({ input }) => discardThreads(input),
   cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
   startCleanup: ({ input }) => {
     const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })

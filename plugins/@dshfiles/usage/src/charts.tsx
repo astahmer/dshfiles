@@ -6,37 +6,17 @@ import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/qu
 import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, type ReactNode } from 'react'
 import { usageApi, type ChartQuery, type ChartView } from './api.js'
+import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
 import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 
-const HOUR_MS = 3_600_000
-const DAY_MS = 86_400_000
+const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
 const TOKEN_KINDS = ['Input', 'Cache read', 'Cache write', 'Output'] as const
 
-/** Every bucket start in the range, computed the way the Host groups requests, so empty buckets still show. */
-const bucketStarts = (input: { readonly from: number; readonly to: number; readonly bucket: 'hour' | 'day'; readonly offsetMs: number }): number[] => {
-  const size = input.bucket === 'hour' ? HOUR_MS : DAY_MS
-  const align = (at: number): number => Math.floor((at + input.offsetMs) / size) * size - input.offsetMs
-  const starts: number[] = []
-  for (let start = align(input.from); start < input.to && starts.length < 2_000; start += size) starts.push(start)
-  return starts
-}
-
-const bucketLabel = (start: number, bucket: 'hour' | 'day', spansDays: boolean): string => {
-  const date = new Date(start)
-  if (bucket === 'day') return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  const hour = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-  return spansDays ? `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${hour}` : hour
-}
-
-/** Label at most ~8 ticks on a band axis; the rest keep their tick but no text. */
-const sparseTickFormat = (labels: readonly string[]): ((value: string) => string) => {
-  const step = Math.max(1, Math.ceil(labels.length / 8))
-  const shown = new Set(labels.filter((_, index) => index % step === 0))
-  return value => (shown.has(value) ? value : '')
-}
+/** Purpose ids arrive as series keys; the legend and tooltips show their product names. */
+const purposeLabelsByKey = new Map(Object.entries(UsageFormattingModel.purposeLabels))
 
 const Panel = (props: { readonly title: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
   <ChartFrame title={props.title} description={props.description} className={cn('dshx:rounded-lg dshx:border dshx:p-3', props.className)}>
@@ -146,9 +126,10 @@ export const UsageCharts = (props: {
   const view = charts.data
 
   const series = useMemo(() => {
-    const starts = bucketStarts({ from: props.range.from, to: props.range.to, bucket: props.bucket, offsetMs: tzOffsetMinutes * 60_000 })
+    const keyOf = (key: string): string => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)
+    const starts = UsageBucketsModel.bucketStarts({ from: props.range.from, to: props.range.to, bucket: props.bucket, offsetMs: tzOffsetMinutes * 60_000 })
     const spansDays = props.range.to - props.range.from > DAY_MS
-    const labels = starts.map(start => bucketLabel(start, props.bucket, spansDays))
+    const labels = starts.map(start => UsageBucketsModel.bucketLabel(start, props.bucket, spansDays))
     const labelOf = new Map(starts.map((start, index) => [start, labels[index] ?? '']))
     const buckets = view?.buckets ?? []
     // Band scales take their domain from the rows, so every bucket gets a zero row and empty days keep their slot.
@@ -157,7 +138,7 @@ export const UsageCharts = (props: {
       const present = new Set(rows.map(row => row.label))
       return labels.filter(label => !present.has(label))
     }
-    const cost = buckets.filter(row => row.cost > 0).map(row => ({ label: labelOf.get(row.start) ?? '', key: row.key, cost: row.cost }))
+    const cost = buckets.filter(row => row.cost > 0).map(row => ({ label: labelOf.get(row.start) ?? '', key: keyOf(row.key), cost: row.cost }))
     cost.push(...missing(cost).map(label => ({ label, key: firstKey, cost: 0 })))
     const totals = new Map<number, { input: number; cacheRead: number; cacheWrite: number; output: number; requests: number; failed: number }>()
     for (const row of buckets) {
@@ -201,14 +182,20 @@ export const UsageCharts = (props: {
     const order = new Map(labels.map((label, index) => [label, index]))
     const byTime = (left: { readonly label: string }, right: { readonly label: string }): number => (order.get(left.label) ?? 0) - (order.get(right.label) ?? 0)
     return { labels, cost: cost.sort(byTime), tokens: tokens.sort(byTime), cache, requests: requests.sort(byTime), latency }
-  }, [view, props.range.from, props.range.to, props.bucket, tzOffsetMinutes])
+  }, [view, props.range.from, props.range.to, props.bucket, props.groupBy, tzOffsetMinutes])
 
   const xAxis = useMemo(
-    () => ({ scale: () => scaleBand<string>().domain(series.labels).padding(0.2), axis: { ticks: { format: sparseTickFormat(series.labels) } } }),
+    () => ({
+      scale: () => scaleBand<string>().domain(series.labels).padding(0.2),
+      axis: { ticks: { format: UsageBucketsModel.sparseTickFormat(series.labels) } },
+    }),
     [series.labels],
   )
   const pointAxis = useMemo(
-    () => ({ scale: () => scalePoint<string>().domain(series.labels).padding(0.5), axis: { ticks: { format: sparseTickFormat(series.labels) } } }),
+    () => ({
+      scale: () => scalePoint<string>().domain(series.labels).padding(0.5),
+      axis: { ticks: { format: UsageBucketsModel.sparseTickFormat(series.labels) } },
+    }),
     [series.labels],
   )
 
@@ -220,10 +207,13 @@ export const UsageCharts = (props: {
           x: xAxis,
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCost(Number(value)) } } },
         },
-        color: { domain: view?.keys ?? [], legend: colorLegend({ placement: 'bottom' }) },
+        color: {
+          domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
+          legend: colorLegend({ placement: 'bottom' }),
+        },
         tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.key}: ${UsageFormattingModel.formatCost(point.datum.cost)}` },
       }),
-    [series.cost, xAxis, view?.keys],
+    [series.cost, xAxis, view?.keys, props.groupBy],
   )
   const tokenChart = useMemo(
     () =>
@@ -277,10 +267,11 @@ export const UsageCharts = (props: {
   const summary = view.summary
   const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
   const days = Math.max(1, (Math.min(Date.now(), props.range.to) - props.range.from) / DAY_MS)
+  const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
-      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:md:grid-cols-3 dshx:xl:grid-cols-6">
+      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:md:grid-cols-3 dshx:xl:grid-cols-4">
         <Tile
           label="Cost (estimate)"
           value={UsageFormattingModel.formatCost(summary.cost)}
@@ -300,8 +291,22 @@ export const UsageCharts = (props: {
         <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={<Change current={tokens} previous={summary.previous.tokens} />} />
         <Tile
           label="Cache hit"
-          value={UsageFormattingModel.formatPercent(UsageFormattingModel.cacheHitRatio(summary))}
+          value={UsageFormattingModel.formatPercent(cacheHit)}
           detail={`${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
+        />
+        <Tile
+          label="Cache savings (estimate)"
+          value={UsageFormattingModel.formatCost(summary.cacheSavings)}
+          detail={
+            cacheHit === null
+              ? 'no prompt token read from cache'
+              : `${UsageFormattingModel.formatPercent(cacheHit)} of prompt tokens billed at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
+          }
+        />
+        <Tile
+          label="Cost per turn"
+          value={summary.turns === 0 ? '–' : UsageFormattingModel.formatCost(summary.cost / summary.turns)}
+          detail={summary.turns === 0 ? 'no turn recorded' : `${summary.turns.toLocaleString()} turns · ${summary.requests.toLocaleString()} requests`}
         />
       </div>
 
@@ -324,6 +329,7 @@ export const UsageCharts = (props: {
           <ToggleGroupItem value="model">Model</ToggleGroupItem>
           <ToggleGroupItem value="provider">Provider</ToggleGroupItem>
           <ToggleGroupItem value="project">Project</ToggleGroupItem>
+          <ToggleGroupItem value="purpose">Purpose</ToggleGroupItem>
         </ToggleGroup>
         <Chart
           ariaLabel="Cost over time"

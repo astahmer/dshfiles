@@ -9,8 +9,15 @@ const copy: ThreadPaletteCopy = {
   threadsPlaceholder: 'Search threads…',
   allPlaceholder: 'Search everything…',
   filesPlaceholder: 'Search files…',
+  backlog: 'Backlog',
+  backlogPlaceholder: 'Capture an item…',
+  backlogOpen: 'Open capture composer',
+  backlogUnavailable: 'Install Backlog to capture this draft.',
   recent: 'Recent',
   threads: 'Threads',
+  threadSectionAll: 'All',
+  threadSectionLabels: { pinned: 'Pinned', active: 'Active', parked: 'Parked', inactive: 'Inactive', settled: 'Settled' },
+  threadDateLabel: 'Updated',
   destinations: 'Destinations',
   commands: 'Commands',
   files: 'Files',
@@ -67,7 +74,7 @@ const context: PaletteActionContext = {
   themePreference: 'system',
 }
 
-const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {})) => {
+const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {}), onBacklogCapture: (text: string) => boolean = vi.fn(() => true)) => {
   const onClose = vi.fn()
   render(
     <ThreadPalette
@@ -80,6 +87,7 @@ const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {}
       copy={copy}
       searchContent={null}
       onAsk={onAsk}
+      onBacklogCapture={onBacklogCapture}
       onOpenThread={vi.fn()}
       onClose={onClose}
     />,
@@ -145,6 +153,40 @@ describe('ThreadPalette navigation', () => {
     await waitFor(() => expect(input.value).toBe('session-missing'))
     expect(screen.getByRole('tab', { name: 'Everything' }).getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(input)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('routes the < prefix to Backlog and carries capture text into its composer', async () => {
+    const capture = vi.fn(() => true)
+    const { onClose } = mount(
+      vi.fn(async () => {}),
+      capture,
+    )
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: '<bug: screenshot needs updating' } })
+
+    const row = await screen.findByRole('option', { name: /Open capture composer: bug: screenshot needs updating/ })
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(capture).toHaveBeenCalledWith('bug: screenshot needs updating')
+    expect(screen.queryByRole('tab', { name: 'Backlog' })).toBeNull()
+    expect(row).toBeTruthy()
+  })
+
+  it('keeps the draft open and explains the missing Backlog plugin', async () => {
+    const { onClose } = mount(
+      vi.fn(async () => {}),
+      () => false,
+    )
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: '<bug: keep this draft' } })
+    await screen.findByRole('option', { name: /Open capture composer: bug: keep this draft/ })
+
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+
+    expect(await screen.findByText('Install Backlog to capture this draft.')).toBeTruthy()
+    expect(input.value).toBe('<bug: keep this draft')
     expect(onClose).not.toHaveBeenCalled()
   })
 
@@ -276,14 +318,76 @@ describe('Ask DSH keyboard submit', () => {
 
 describe('Threads tab project scope', () => {
   const here = { id: 'session-here', title: 'Here work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 }
-  const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1 }
+  const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1, section: 'parked' as const }
+  const archived = { id: 'session-archived', title: 'Archived work', project: 'welii', cwd: '/dev/welii', updatedAt: 1, section: 'archived' as const }
+
+  it('shows sidebar section and update date on content-search results', async () => {
+    const searchContent = vi.fn(async () => [
+      {
+        sessionId: 'session-content',
+        title: 'Content result',
+        project: 'dshfiles',
+        cwd: '/dev/dshfiles',
+        updatedAt: 1_704_067_200_000,
+        snippet: 'needle in the thread body',
+      },
+    ])
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[]}
+        threadSections={new Map([['session-content', 'parked']])}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={searchContent}
+        onBacklogCapture={vi.fn(() => true)}
+        onAsk={vi.fn(async () => {})}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '#needle' } })
+    const result = await screen.findByRole('option', { name: /needle in the thread body/ })
+    expect(result.textContent).toContain('Parked')
+    expect(result.textContent).toContain('Updated:')
+    expect(searchContent).toHaveBeenCalledWith('needle', expect.any(AbortSignal))
+  })
+
+  it('filters threads by sidebar section and shows their update date', async () => {
+    render(
+      <ThreadPalette
+        mode="threads"
+        threads={[here, elsewhere, archived]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onBacklogCapture={vi.fn(() => true)}
+        onAsk={vi.fn(async () => {})}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    await screen.findByRole('option', { name: /Elsewhere work/ })
+    expect(screen.queryByRole('option', { name: /Archived work/ })).toBeNull()
+    expect(screen.getAllByRole('option', { name: /Updated:/ })).toHaveLength(2)
+    fireEvent.click(screen.getByRole('tab', { name: 'Parked' }))
+    await screen.findByRole('option', { name: /Elsewhere work/ })
+    await waitFor(() => expect(screen.queryByRole('option', { name: /Here work/ })).toBeNull())
+  })
 
   it('lists only the current project on Threads and every project on Everything', async () => {
     const view = (mode: 'all' | 'threads') =>
       render(
         <ThreadPalette
           mode={mode}
-          threads={[here, elsewhere]}
+          threads={[here, elsewhere, archived]}
           projectThreads={[here]}
           context={context}
           additionalActions={[]}
@@ -292,6 +396,7 @@ describe('Threads tab project scope', () => {
           copy={copy}
           searchContent={null}
           onAsk={vi.fn(async () => {})}
+          onBacklogCapture={vi.fn()}
           onOpenThread={vi.fn()}
           onClose={vi.fn()}
         />,

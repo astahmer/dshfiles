@@ -1,6 +1,16 @@
-import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { z } from 'zod'
 
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
@@ -9,12 +19,20 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
+import { BoardScrollAnchors, type BoardColumnScrollAnchor } from './board-scroll-anchor.js'
 import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
-import { itemTransitionName, withViewTransition } from './view-transition.js'
+import { itemTransitionName } from './view-transition.js'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
+const boardStatusSchema = z.enum(['inbox', 'todo', 'doing', 'done', 'dropped'])
+const defaultBoardColumns = { order: [...boardStatuses], hidden: [] satisfies BacklogStatus[] }
+const boardColumns = createStoredValue({
+  key: 'dshfiles.backlog.board-columns.v1',
+  schema: z.object({ order: z.array(boardStatusSchema), hidden: z.array(boardStatusSchema) }),
+  fallback: defaultBoardColumns,
+})
 /** Cards mounted per column before scrolling near the end reveals another batch. */
 const COLUMN_PAGE = 30
 
@@ -150,6 +168,7 @@ const BoardCard = (props: {
     >
       <article
         tabIndex={-1}
+        data-backlog-card-id={item.id}
         aria-label={`Card b:${String(item.id)}`}
         aria-selected={props.selected}
         onPointerDown={event => props.startDrag(event, item, rename.openSoon, event.shiftKey, event.metaKey || event.ctrlKey)}
@@ -187,6 +206,28 @@ export const BoardView = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const columnPreferences = boardColumns.useValue()
+  const orderedStatuses = useMemo(
+    () => [...boardStatuses].sort((left, right) => columnPreferences.order.indexOf(left) - columnPreferences.order.indexOf(right)),
+    [columnPreferences.order],
+  )
+  const visibleStatuses = useMemo(
+    () => orderedStatuses.filter(status => !columnPreferences.hidden.some(hidden => hidden === status)),
+    [orderedStatuses, columnPreferences.hidden],
+  )
+  const updateColumns = (patch: Partial<typeof columnPreferences>): void => {
+    boardColumns.set({ ...columnPreferences, ...patch })
+  }
+  const moveColumn = (status: BacklogStatus, direction: -1 | 1): void => {
+    const order = [...orderedStatuses]
+    const index = order.indexOf(status)
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= order.length) return
+    const [moved] = order.splice(index, 1)
+    if (moved === undefined) return
+    order.splice(nextIndex, 0, moved)
+    updateColumns({ order })
+  }
   const [drag, setDrag] = useState<Drag | null>(null)
   const [over, setOver] = useState<BacklogStatus | null>(null)
   const dragCleanup = useRef<(() => void) | null>(null)
@@ -194,15 +235,23 @@ export const BoardView = (props: {
   const [pages, setPages] = useState<Partial<Record<BacklogStatus, number>>>({})
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
   const selectionAnchor = useRef<number | null>(null)
+  const boardRoot = useRef<HTMLDivElement>(null)
+  const scrollAnchors = useRef<BoardColumnScrollAnchor[]>([])
+  useLayoutEffect(() => {
+    const root = boardRoot.current
+    if (root === null) return
+    BoardScrollAnchors.restore(root, scrollAnchors.current)
+    scrollAnchors.current = BoardScrollAnchors.capture(root)
+  }, [props.items])
   const orderedItems = useMemo(
     () =>
-      boardStatuses.flatMap(status =>
+      visibleStatuses.flatMap(status =>
         props.items
           .filter(item => item.status === status)
           .sort((left, right) => right.lastActivityAt - left.lastActivityAt)
           .slice(0, (pages[status] ?? 1) * COLUMN_PAGE),
       ),
-    [props.items, pages],
+    [props.items, pages, visibleStatuses],
   )
   const orderedIds = useMemo(() => orderedItems.map(item => item.id), [orderedItems])
   const selectedItems = useMemo(() => orderedItems.filter(item => selected.has(item.id)).map(startThreadItemOf), [orderedItems, selected])
@@ -235,7 +284,7 @@ export const BoardView = (props: {
   }
 
   const move = (id: number, status: BacklogStatus): void => {
-    withViewTransition(() => actions.patch({ id, status }))
+    actions.patch({ id, status })
     actions.update.mutate({ id, status })
   }
 
@@ -287,9 +336,7 @@ export const BoardView = (props: {
       const target = columnAt(upEvent.clientX, upEvent.clientY)
       if (target === null) return
       const moved = draggedItems.filter(candidate => candidate.status !== target)
-      withViewTransition(() => {
-        for (const candidate of moved) actions.patch({ id: candidate.id, status: target })
-      })
+      for (const candidate of moved) actions.patch({ id: candidate.id, status: target })
       for (const candidate of moved) actions.update.mutate({ id: candidate.id, status: target })
     }
     dragCleanup.current = cancel
@@ -299,73 +346,137 @@ export const BoardView = (props: {
   }
 
   return (
-    <div className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-auto dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}>
-      {boardStatuses.map(status => {
-        const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
-        const target = over === status && drag !== null && props.items.some(item => drag.ids.includes(item.id) && item.status !== status)
-        return (
-          <section
-            key={status}
-            data-backlog-column={status}
-            aria-label={`${ItemGlyphs.statusLabels[status]} column`}
-            className={cn(
-              'dshx:flex dshx:min-h-0 dshx:max-w-80 dshx:min-w-64 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
-              target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
-            )}
-          >
-            <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
-              <ItemGlyphs.StatusIcon status={status} />
-              <h3 className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">
-                {ItemGlyphs.statusLabels[status]}
-              </h3>
-              <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
-                {column.length}
-              </span>
-              <button
-                type="button"
-                aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}
-                onClick={() => props.captureInto(status)}
-                className="dshx:ml-auto dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-              >
-                <PlusIcon className="dshx:size-3.5" />
-              </button>
-            </header>
-            <div
-              className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5"
-              onScroll={event => {
-                const element = event.currentTarget
-                if (element.scrollHeight - element.scrollTop - element.clientHeight > 240) return
-                setPages(current => {
-                  const page = current[status] ?? 1
-                  if (column.length <= page * COLUMN_PAGE) return current
-                  return { ...current, [status]: page + 1 }
-                })
-              }}
+    <div
+      ref={boardRoot}
+      data-backlog-board
+      className={cn(
+        'dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-2 dshx:overflow-x-hidden dshx:px-4 dshx:py-3',
+        drag !== null && 'dshx:cursor-grabbing',
+      )}
+    >
+      <div className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Configure board columns"
+              className="dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
             >
-              {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
-              {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
-                <BoardCard
-                  key={item.id}
-                  item={item}
-                  openId={props.openId}
-                  cursor={item.id === props.cursorId}
-                  open={props.open}
-                  startDrag={startDrag}
-                  pickStatus={move}
-                  startThread={props.startThread}
-                  projectPaths={props.projectPaths}
-                  dragging={drag?.ids.includes(item.id) ?? false}
-                  triageOff={props.triageOff}
-                  selected={selected.has(item.id)}
-                  selectWithModifiers={selectWithModifiers}
-                  selection={selected.has(item.id) ? selectedItems : undefined}
-                  clearSelection={clearSelection}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })}
+              <Columns3Icon className="dshx:size-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="dshx:w-64">
+            <DropdownMenuLabel>Board columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {orderedStatuses.map((columnStatus, index) => (
+              <div key={columnStatus} className="dshx:flex dshx:items-center dshx:gap-1 dshx:pr-1">
+                <DropdownMenuCheckboxItem
+                  checked={!columnPreferences.hidden.some(hidden => hidden === columnStatus)}
+                  disabled={!columnPreferences.hidden.some(hidden => hidden === columnStatus) && columnPreferences.hidden.length === boardStatuses.length - 1}
+                  onSelect={event => event.preventDefault()}
+                  onCheckedChange={checked =>
+                    updateColumns({
+                      hidden: checked ? columnPreferences.hidden.filter(hidden => hidden !== columnStatus) : [...columnPreferences.hidden, columnStatus],
+                    })
+                  }
+                  className="dshx:min-w-0 dshx:flex-1"
+                >
+                  {ItemGlyphs.statusLabels[columnStatus]}
+                </DropdownMenuCheckboxItem>
+                <button
+                  type="button"
+                  aria-label={`Move ${ItemGlyphs.statusLabels[columnStatus]} left`}
+                  disabled={index === 0}
+                  onClick={() => moveColumn(columnStatus, -1)}
+                  className="dshx:rounded dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:disabled:opacity-40"
+                >
+                  <ArrowLeftIcon className="dshx:size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${ItemGlyphs.statusLabels[columnStatus]} right`}
+                  disabled={index === orderedStatuses.length - 1}
+                  onClick={() => moveColumn(columnStatus, 1)}
+                  className="dshx:rounded dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:disabled:opacity-40"
+                >
+                  <ArrowRightIcon className="dshx:size-3.5" />
+                </button>
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:gap-3 dshx:overflow-x-hidden">
+        {visibleStatuses.map(status => {
+          const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+          const target = over === status && drag !== null && props.items.some(item => drag.ids.includes(item.id) && item.status !== status)
+          return (
+            <section
+              key={status}
+              data-backlog-column={status}
+              aria-label={`${ItemGlyphs.statusLabels[status]} column`}
+              className={cn(
+                'dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
+                target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
+              )}
+            >
+              <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
+                <ItemGlyphs.StatusIcon status={status} />
+                <h3 className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">
+                  {ItemGlyphs.statusLabels[status]}
+                </h3>
+                <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
+                  {column.length}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}
+                  onClick={() => props.captureInto(status)}
+                  className="dshx:ml-auto dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+                >
+                  <PlusIcon className="dshx:size-3.5" />
+                </button>
+              </header>
+              <div
+                data-backlog-column-scroll
+                className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5"
+                onScroll={event => {
+                  const element = event.currentTarget
+                  const root = boardRoot.current
+                  if (root !== null) scrollAnchors.current = BoardScrollAnchors.capture(root)
+                  if (element.scrollHeight - element.scrollTop - element.clientHeight > 240) return
+                  setPages(current => {
+                    const page = current[status] ?? 1
+                    if (column.length <= page * COLUMN_PAGE) return current
+                    return { ...current, [status]: page + 1 }
+                  })
+                }}
+              >
+                {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
+                {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
+                  <BoardCard
+                    key={item.id}
+                    item={item}
+                    openId={props.openId}
+                    cursor={item.id === props.cursorId}
+                    open={props.open}
+                    startDrag={startDrag}
+                    pickStatus={move}
+                    startThread={props.startThread}
+                    projectPaths={props.projectPaths}
+                    dragging={drag?.ids.includes(item.id) ?? false}
+                    triageOff={props.triageOff}
+                    selected={selected.has(item.id)}
+                    selectWithModifiers={selectWithModifiers}
+                    selection={selected.has(item.id) ? selectedItems : undefined}
+                    clearSelection={clearSelection}
+                  />
+                ))}
+              </div>
+            </section>
+          )
+        })}
+      </div>
       {drag === null || dragged === undefined ? null : (
         <article
           aria-hidden

@@ -76,7 +76,7 @@ export const requestPageSchema = z.object({
 
 export type RequestPage = z.infer<typeof requestPageSchema>
 
-export const GROUP_DIMENSIONS = ['model', 'provider', 'project'] as const
+export const GROUP_DIMENSIONS = ['model', 'provider', 'project', 'purpose'] as const
 
 export const chartQuerySchema = z
   .object({
@@ -108,7 +108,17 @@ export const chartViewSchema = z.object({
     ...tokenTotals,
     /** Requests whose route has no catalog price, so `cost` is a lower bound. */
     unpriced: z.number().int(),
-    previous: z.object({ cost: z.number(), requests: z.number().int(), tokens: z.number() }),
+    /** USD the cache-read traffic would have cost at the uncached input rate, per list price. */
+    cacheSavings: z.number().default(0),
+    /** Distinct thread turns that made a request, for cost per turn. */
+    turns: z.number().int().nonnegative().default(0),
+    previous: z.object({
+      cost: z.number(),
+      requests: z.number().int(),
+      tokens: z.number(),
+      cacheSavings: z.number().default(0),
+      turns: z.number().int().nonnegative().default(0),
+    }),
   }),
   /** Grouped series keys in display order: the largest by cost, then `Other`. */
   keys: z.array(z.string()).max(8),
@@ -149,6 +159,8 @@ export const activityInputSchema = z
     category: toolCategorySchema.optional().describe('Optionally limit ranked tool rows to a source category.'),
     limit: z.number().int().min(1).max(100).optional().describe('Maximum ranked tool rows; defaults to 10.'),
     eventLimit: z.number().int().min(1).max(200).optional().describe('Maximum recent tool and Jev event rows; defaults to 50.'),
+    bucket: z.enum(['hour', 'day']).optional().describe('Optional timeline bucket; defaults to day, and an hourly request coarsens to day beyond two days.'),
+    tzOffsetMinutes: z.number().int().min(-900).max(900).optional().describe('Minutes east of UTC, so day buckets start at local midnight; defaults to 0.'),
   })
   .strict()
 
@@ -158,6 +170,8 @@ type ResolvedActivityQuery = {
   category?: z.infer<typeof toolCategorySchema>
   limit: number
   eventLimit?: number
+  bucket: 'hour' | 'day'
+  tzOffsetMinutes: number
 }
 
 export const resolveActivityQuery = (input: z.infer<typeof activityInputSchema>, now = Date.now()): ResolvedActivityQuery => {
@@ -165,7 +179,10 @@ export const resolveActivityQuery = (input: z.infer<typeof activityInputSchema>,
   if ((input.from === undefined) !== (input.to === undefined)) throw new Error('Provide both from and to, or neither.')
   const to = input.to ?? now
   if (to < (input.from ?? 0)) throw new Error('to must be at or after from.')
-  const query: ResolvedActivityQuery = { from: input.from ?? to - (input.days ?? 30) * DAY_MS, to, limit: input.limit ?? 10 }
+  const from = input.from ?? to - (input.days ?? 30) * DAY_MS
+  // An hourly timeline over a long window would return tens of thousands of rows; a day bucket stays bounded.
+  const bucket = input.bucket === 'hour' && to - from > 2 * DAY_MS ? 'day' : (input.bucket ?? 'day')
+  const query: ResolvedActivityQuery = { from, to, bucket, tzOffsetMinutes: input.tzOffsetMinutes ?? 0, limit: input.limit ?? 10 }
   if (input.category !== undefined) query.category = input.category
   if (input.eventLimit !== undefined) query.eventLimit = input.eventLimit
   return query
@@ -187,10 +204,40 @@ const activityOutcomeSchema = z.object({
 
 export const activityReportSchema = z.object({
   range: z.object({ from: z.number().int(), to: z.number().int() }).optional(),
+  timelineBucket: z.enum(['hour', 'day']).default('day'),
+  /** Tool calls, errors, wall time and returned tokens per bucket and category, oldest first. */
+  timeline: z
+    .array(
+      z.object({
+        start: z.number().int(),
+        category: toolCategorySchema,
+        calls: z.number().int(),
+        errors: z.number().int(),
+        durationMs: z.number().int().nonnegative(),
+        outputTokens: z.number().int().nonnegative(),
+      }),
+    )
+    .max(3000)
+    .default([]),
   categories: z
-    .array(z.object({ category: toolCategorySchema, calls: z.number().int() }))
+    .array(z.object({ category: toolCategorySchema, calls: z.number().int(), outputTokens: z.number().int().nonnegative().default(0) }))
     .max(6)
     .default([]),
+  /** Whole-range tool totals, independent of the ranked-row limit. */
+  totals: z
+    .object({
+      calls: z.number().int(),
+      successes: z.number().int(),
+      errors: z.number().int(),
+      interrupted: z.number().int(),
+      unknown: z.number().int(),
+      pending: z.number().int(),
+      durationMs: z.number().int().nonnegative(),
+      outputTokens: z.number().int().nonnegative(),
+      measuredCalls: z.number().int().nonnegative(),
+      successRate: z.number().min(0).max(1),
+    })
+    .optional(),
   categoryOutcomes: z
     .array(
       z.object({
@@ -203,6 +250,8 @@ export const activityReportSchema = z.object({
         pending: z.number().int(),
         successRate: z.number().min(0).max(1),
         durationMs: latencyStatsSchema,
+        outputTokens: z.number().int().nonnegative().default(0),
+        measuredCalls: z.number().int().nonnegative().default(0),
       }),
     )
     .max(6)
@@ -231,9 +280,35 @@ export const activityReportSchema = z.object({
           .optional(),
         durationMs: latencyStatsSchema.optional(),
         averageDurationMs: z.number().int().nullable(),
+        totalDurationMs: z.number().int().nonnegative().default(0),
+        /** Estimated tokens the tool returned (text characters / 4); 0 when no call was measured. */
+        outputTokens: z.number().int().nonnegative().default(0),
+        /** Calls whose result size was recorded; older rows and dispatches carry none. */
+        measuredCalls: z.number().int().nonnegative().default(0),
       }),
     )
     .max(100),
+  commandDurationTotalMs: z.number().int().nonnegative().default(0),
+  testRunDurationTotalMs: z.number().int().nonnegative().default(0),
+  commandDistribution: z
+    .array(z.object({ command: z.string().min(1).max(80), calls: z.number().int(), totalDurationMs: z.number().int().nonnegative() }))
+    .max(10)
+    .default([]),
+  testRunDistribution: z
+    .array(
+      z.object({
+        runner: z.string().min(1).max(80),
+        calls: z.number().int(),
+        totalDurationMs: z.number().int().nonnegative(),
+        successes: z.number().int(),
+        errors: z.number().int(),
+        interrupted: z.number().int(),
+        unknown: z.number().int(),
+        pending: z.number().int(),
+      }),
+    )
+    .max(10)
+    .default([]),
   events: z
     .array(
       z.discriminatedUnion('kind', [
@@ -338,7 +413,7 @@ export const usageApi = defineApi({
       input: chartQuerySchema,
       output: chartViewSchema,
       description:
-        'Cost, token, cache and latency totals between two Unix-ms timestamps, bucketed by hour or day, with breakdowns by model, provider and project and the costliest sessions. Costs are list-price estimates. Read-only.',
+        'Cost, token, cache and latency totals between two Unix-ms timestamps, bucketed by hour or day, with breakdowns by model, provider and project, the costliest sessions, estimated cache savings and turn count. Grouping by purpose shows where tokens went (agent, subagent, compaction, title, memory, other). Costs are list-price estimates. Read-only.',
       tool: { name: 'usage_report', readOnly: true, render: output => JSON.stringify(output) },
     }),
     status: method({
@@ -371,7 +446,7 @@ export const usageApi = defineApi({
       input: activityInputSchema,
       output: activityReportSchema,
       description:
-        'Read local tool-use statistics, Jev request totals by calling plugin (backlog, memory), and recent tool/Jev events. Omit inputs for the last 30 days, or specify days (1–365), or from/to Unix milliseconds. Ranked rows include individual skill names, MCP tools and plugin owners; category can filter rankings. Includes successes, errors, interruptions, unknowns, timestamps, durations and recent outcomes. Use this to answer “which skills or tools are used most?” or “what failed recently?”. No prompts, arguments, results or secrets are stored. Tool times are filtered by start time in the half-open [from, to) range; recent tool and Jev events are combined and capped by eventLimit.',
+        'Read local tool-use statistics: a per-bucket timeline of calls, errors, wall time and returned tokens, ranked tools and skills with outcomes and latency percentiles, estimated tokens each tool returned, normalized shell command and test-runner time distributions, Jev request totals by calling plugin (backlog, memory), and recent tool/Jev events. Omit inputs for the last 30 days, or specify days (1–365), or from/to Unix milliseconds. Token counts for tools are characters/4 estimates of returned text, never the text itself. Shell command arguments, paths, outputs, test case names and secrets are never stored; compound/ambiguous shell commands are omitted. Use this to answer “which tools or skills do I use most, and which return the most text?” or “what failed recently?”. Tool times are filtered by start time in the half-open [from, to) range; recent tool and Jev events are combined and capped by eventLimit.',
       tool: { name: 'usage_activity_report', readOnly: true, render: compactJson },
     }),
     otelMetrics: method({

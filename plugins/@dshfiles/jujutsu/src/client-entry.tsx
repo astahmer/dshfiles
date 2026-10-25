@@ -19,6 +19,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
+import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
@@ -80,14 +81,21 @@ export default defineClient({
         if (onScreen !== undefined) lastSession.current = onScreen
       }, [onScreen])
       const sessionId = onScreen ?? lastSession.current
-      const cwd = useSyncExternalStore(
+      const sessionsById = useSyncExternalStore(
         subscribeSessions,
-        () => (sessionId === undefined ? undefined : ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd),
-        noSession,
+        () => ctx.sessions.list.getSnapshot().byId,
+        () => ({}),
       )
+      const subscribeWorkspaces = useCallback((listener: () => void) => ctx.workspaces.list.subscribe(listener), [])
+      const workspaces = useSyncExternalStore(
+        subscribeWorkspaces,
+        () => ctx.workspaces.list.getSnapshot().items,
+        () => [],
+      )
+      const defaultPath = sessionId === undefined ? undefined : sessionProjectPath(sessionId, sessionsById, workspaces)
       return {
         scope: sessionId === undefined ? DEFAULT_PANEL_SCOPE : PanelScopes.thread(sessionId),
-        defaultPath: cwd === undefined || cwd.length === 0 ? null : cwd,
+        defaultPath: defaultPath === undefined || defaultPath.length === 0 ? null : defaultPath,
       }
     }
     const MainSurfacePanel = decorate(() => {

@@ -11,6 +11,7 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { z } from 'zod'
 
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
 import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
@@ -29,6 +30,7 @@ import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartT
 import './client.css'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
+const backlogCaptureEventSchema = z.object({ text: z.string().max(20_000) })
 
 export default defineClient({
   name: '@dshfiles/backlog',
@@ -37,6 +39,19 @@ export default defineClient({
     ctx.effect(() => installBacklogReferenceLinks(), 'backlog reference links')
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
     const api = createApiClient(ctx, backlogApi)
+    ctx.effect(() => {
+      const openCapture = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const parsed = backlogCaptureEventSchema.safeParse(event.detail)
+        if (!parsed.success) return
+        event.preventDefault()
+        BacklogFocusModel.requestCapture(parsed.data.text)
+        // SAFETY: this entry registers PANEL_ID as a main-slot key below.
+        ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+      }
+      window.addEventListener('dshfiles:backlog-capture', openCapture)
+      return () => window.removeEventListener('dshfiles:backlog-capture', openCapture)
+    }, 'backlog: command palette capture')
     const agents = createApiClient(ctx, agentsApi)
     const startOne = async (request: StartThreadRequest, report: boolean): Promise<StartThreadOutcome> => {
       const failed = (reason: string): StartThreadOutcome => {

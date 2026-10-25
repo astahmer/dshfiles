@@ -279,9 +279,9 @@
         },
         {
           "key": "composerBarBase",
-          "defaultValue": "parent",
-          "constraints": "One of parent, trunk, or bookmark; invalid revset input falls back to parent.",
-          "choices": ["parent", "trunk", "bookmark"],
+          "defaultValue": "main",
+          "constraints": "One of main, parent, trunk, or bookmark; invalid revset input falls back to main.",
+          "choices": ["main", "parent", "trunk", "bookmark"],
           "coveredBy": ["jujutsu.composer-context"]
         }
       ],

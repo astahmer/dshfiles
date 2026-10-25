@@ -24,8 +24,8 @@ where a thread starts.
   reads, because a preset and system prompt are fixed when the thread is created.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
-- **Every mention is a preview.** A rendered `@handle` that names a saved agent is a link: clicking it
-  (or pressing Enter) opens a card above the mention with its glyph, name, description, model route,
+- **Every mention is a preview.** A rendered `@{handle}` explicit reference (and legacy `@handle` mention)
+  that names a saved agent is a link: clicking it (or pressing Enter) opens a card above the reference with its glyph, name, description, model route,
   tool preset, memory scope, delegation, routine, instructions and recent threads, plus **Open in
   Agents**. Sent messages both ways are covered — the conversation's own `@handle` chip and the plain
   mention in Markdown, so a backlog item's comments work too. An unknown, misspelled or removed handle

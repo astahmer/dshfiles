@@ -3,8 +3,8 @@ import { errorMessage } from '@dshfiles/plugin-ui/query'
 import type { AgentDispatchOutcome } from './agent-dispatch.js'
 
 interface ReplyDispatch {
-  readonly dispatch: () => Promise<AgentDispatchOutcome>
-  readonly answerReply: () => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
+  readonly dispatch: (input: { readonly text: string }) => Promise<AgentDispatchOutcome>
+  readonly answerReply: (input: { readonly text: string }) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
   readonly smartReplyAnswers: boolean
 }
 
@@ -27,6 +27,7 @@ export const submitReply = async <File>(input: {
   readonly save: (files: readonly File[]) => Promise<void>
   readonly dispatch: ReplyDispatch | null
   readonly view: ReplyView<File>
+  readonly onAnswering?: (answering: boolean) => void
 }): Promise<void> => {
   input.view.clear()
   try {
@@ -39,7 +40,7 @@ export const submitReply = async <File>(input: {
   if (input.dispatch === null || input.text.trim() === '') return
   let outcome: AgentDispatchOutcome
   try {
-    outcome = await input.dispatch.dispatch()
+    outcome = await input.dispatch.dispatch({ text: input.text })
   } catch (error) {
     input.view.fail(`${SAVED}, but it was not sent to an agent: ${errorMessage(error, 'The dispatch failed.')}`)
     return
@@ -49,10 +50,13 @@ export const submitReply = async <File>(input: {
     return
   }
   if (outcome.kind !== 'skipped' || outcome.reason !== 'reply-only' || !input.dispatch.smartReplyAnswers || input.files.length > 0) return
+  input.onAnswering?.(true)
   try {
-    const answered = await input.dispatch.answerReply()
+    const answered = await input.dispatch.answerReply({ text: input.text })
     if (!answered.ok) input.view.fail(`${SAVED}, but an AI answer could not be generated: ${answered.reason}`)
   } catch (error) {
     input.view.fail(`${SAVED}, but an AI answer could not be generated: ${errorMessage(error, 'Generation failed.')}`)
+  } finally {
+    input.onAnswering?.(false)
   }
 }

@@ -14,11 +14,17 @@ call observations. Observation only.
   with counts, search by model, provider, project or thread title, a purpose
   filter (agent, subagent, compaction, title, memory summary, other side
   call) and a date range. A row opens its thread.
-- **Charts**: headline tiles against the previous period, cost over time
-  stacked by model, provider or project, cost per model, provider and project
-  (selecting one filters the log), tokens by kind, cache hit ratio, requests
-  and failures, TTFT and duration p50/p90, and the top threads by cost,
-  hourly or daily. Charts use TanStack Charts from `@dshfiles/plugin-ui`.
+- **Charts**: headline tiles against the previous period — cost, per day,
+  requests, failures, tokens, cache hit, estimated cache savings and cost per
+  turn — cost over time stacked by model, provider, project or purpose, cost
+  per model, provider and project (selecting one filters the log), tokens by
+  kind, cache hit ratio, requests and failures, TTFT and duration p50/p90, and
+  the top threads by cost, hourly or daily. Grouping by purpose shows where
+  tokens went: agent, subagent, compaction, title, memory summary or another
+  side call. Cache savings prices the cache-read tokens at the input rate they
+  avoided, per list price, and cost per turn divides the range cost by the
+  turns that made a request. Charts use TanStack Charts from
+  `@dshfiles/plugin-ui`.
 - **Jev API usage**: DSH-origin calls from Backlog and Memory, grouped by the
   configured secret reference (or the `TYPESAFE_API_KEY` environment-variable
   label), with provider-reported tokens, request counts and a TypeSafe
@@ -26,9 +32,17 @@ call observations. Observation only.
   are shown per label, with bars comparing input-token volume to the most-used
   label this month. These are DSH-local observations, not provider account billing, and
   exclude calls outside DSH; labels are not verified billing identities.
-- **Tools & Jev**: tool counts split into skill, plugin API, plugin, MCP, DSH
-  and other sources, with per-tool/plugin counts, outcome totals and latency
-  statistics, next to Jev request totals per calling plugin (Backlog, Memory).
+- **Tools & Jev**: tool charts over the selected range — calls over time
+  stacked by source category, the ten most-used tools ranked by calls, wall
+  time or returned tokens, a per-category share of returned tokens and success
+  rate, and tiles for calls, success rate, interruptions, wall time, returned
+  tokens and the busiest category. Below them sit the per-tool table (calls,
+  outcomes, latency, returned tokens, last use), normalized shell
+  executable/subcommands and recognized test runners ranked by summed
+  wall-clock duration, share, call count and recorded shell-call outcome (not
+  parsed test output; parallel calls can overlap, and compound or ambiguous
+  shell calls are omitted), Jev request totals per calling plugin (Backlog,
+  Memory) and recent tool/Jev events.
   The read-only `usage_activity_report` Agent tool defaults to the last 30 days
   and answers rankings such as most-used skills or MCP tools; optional `days`
   (not with explicit `from`/`to`), `category`, `limit` and `eventLimit` narrow
@@ -43,7 +57,8 @@ The Host walks `<sessions root>/<project>/<session>/session[.vN].jsonl.zstd`
 complete Zstandard frame and the fold state, in
 `$DSH_HOME/plugins/usage/usage.db` (node:sqlite). A pass every 30 s, or
 **Refresh**, decodes only the frames a log gained; a torn final frame waits for
-the writer.
+the writer. A fold-version bump — a change in how a log is read — clears the
+stored cursors and tool rows once, so the next pass re-reads every log.
 
 | Field       | Source                                                                                                                                                                                                                   |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -72,10 +87,20 @@ Tool executions are derived from durable `tool/call` + `tool/result` session
 records. Calls are paired in the resumable fold and persisted locally for up to
 365 days as event sequence and turn/step, sanitized tool name, source category,
 optional plugin owner, timestamps, duration and outcome (`success`, `error`,
-`interrupted`, `unknown` or `pending`). Categories come from the live dshx
-registry (`api`, `plugin`, `mcp`, `tool`); recognized skill-loader calls retain
-only a bounded skill ID parsed from the call's `name` field. Other arguments are
-never persisted. Error means the recorded result marks `isError`; the report
+`interrupted`, `unknown` or `pending`). Shell calls additionally retain a bounded
+normalized executable/subcommand and, when recognized, a test-runner identifier
+(e.g. `pnpm:test:e2e` or `vitest`) for aggregate time/call/outcome reports. Each finished call keeps
+the number of text characters the tool returned, so the report can estimate
+returned tokens (characters / 4) per tool, category and time bucket; the
+returned text itself, image parts and binary payloads are never stored, and a
+call indexed before this measurement, or with no text, reports as unmeasured.
+Compound or ambiguous shell commands have no command identifier. Categories come
+from the live dshx registry (`api`, `plugin`, `mcp`, `tool`); recognized
+skill-loader calls retain only a bounded skill ID parsed from the call's `name`
+field. Raw command arguments, file paths, outputs, prompts, credentials, and
+test-case names are never persisted. This covers recognized shell invocations in
+DSH session logs, not commands run in external terminals; complex or unsupported
+wrappers may be omitted rather than guessed. Error means the recorded result marks `isError`; the report
 does not infer a process exit code from tool output. Unfinished calls older than
 24 hours are finalized as `unknown`, so crashed sessions cannot leave permanent
 pending rows.

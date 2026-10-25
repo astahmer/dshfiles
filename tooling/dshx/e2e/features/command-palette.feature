@@ -50,11 +50,18 @@ Feature: Command palette
     When the command palette is opened
     Then command, content, line, and help prefixes open their matching views
 
+  @scenario:command-palette.backlog-capture
+  Scenario: The Backlog prefix hands its draft to the full capture composer
+    Given the isolated plugin composition of "@dshfiles/command-palette, @dshfiles/backlog" is booted
+    When the command palette is opened
+    When the palette query is "<bug: dshx-palette-capture-e2e"
+    Then the Backlog capture composer opens with "bug: dshx-palette-capture-e2e"
+
   @scenario:command-palette.thread-tabs-and-escape
   Scenario: Thread tabs, prefixes, and Escape navigation stay inside the palette
     Given the isolated plugin profile "@dshfiles/command-palette" is booted
     When the command palette is opened
-    Then Everything, Threads, and Files tabs are available
+    Then Everything, Threads, Files, and Backlog tabs are available
     When the Threads tab is selected
     Then the Threads tab is active
     When the palette query is "thread:session-e2e-missing"

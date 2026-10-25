@@ -1382,6 +1382,55 @@ export const createThreads = (options: {
     })
 
   /** When each workspace's working-copy commit last changed, in epoch milliseconds, keyed by workspace name. */
+  const discardMany = (input: { readonly repoRoot: string; readonly names: readonly string[]; readonly force: boolean }) =>
+    serialized(input.repoRoot, async () => {
+      const candidates: { readonly name: string; readonly workspaceRoot: string; readonly owned: readonly ThreadRevision[] }[] = []
+      const results: {
+        readonly name: string
+        readonly status: 'discarded' | 'has-work' | 'error'
+        readonly revisions: readonly ThreadRevision[]
+        readonly error: string | null
+      }[] = []
+      const seen = new Set<string>()
+      for (const name of input.names) {
+        if (seen.has(name)) continue
+        seen.add(name)
+        try {
+          if (name.includes('/') || name.startsWith('.')) throw new ThreadError('unsafe-path', `Refusing to discard workspace ${name}.`)
+          const workspaceRoot = join(options.threadsDirectory(input.repoRoot), name)
+          if (existsSync(join(workspaceRoot, '.jj'))) await jj(['status'], workspaceRoot)
+          const work = await revisions(unlandedRevset(name), input.repoRoot, true)
+          if (work.length > 0 && !input.force) {
+            results.push({ name, status: 'has-work', revisions: work, error: null })
+            continue
+          }
+          const owned = await revisions(`(::${name}@ ~ ::${options.bookmark()}) ~ ::(working_copies() ~ ${name}@)`, input.repoRoot, true)
+          candidates.push({ name, workspaceRoot, owned })
+        } catch (error) {
+          results.push({ name, status: 'error', revisions: [], error: error instanceof Error ? error.message : String(error) })
+        }
+      }
+      if (candidates.length === 0) return { results }
+      try {
+        await jj(['--ignore-working-copy', 'workspace', 'forget', ...candidates.map(candidate => candidate.name)], input.repoRoot)
+        const ownedCommitIds = new Set(candidates.flatMap(candidate => candidate.owned.map(revision => revision.commitId)))
+        if (ownedCommitIds.size > 0) await jj(['--ignore-working-copy', 'abandon', ...ownedCommitIds], input.repoRoot)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        results.push(...candidates.map(candidate => ({ name: candidate.name, status: 'error' as const, revisions: [], error: message })))
+        return { results }
+      }
+      for (const candidate of candidates) {
+        try {
+          await rm(candidate.workspaceRoot, { recursive: true, force: true })
+          results.push({ name: candidate.name, status: 'discarded', revisions: [], error: null })
+        } catch (error) {
+          results.push({ name: candidate.name, status: 'error', revisions: [], error: error instanceof Error ? error.message : String(error) })
+        }
+      }
+      return { results }
+    })
+
   const workingCopyChangedAt = async (repoRoot: string): Promise<ReadonlyMap<string, number>> => {
     const output = await jj(
       [
@@ -1533,6 +1582,7 @@ export const createThreads = (options: {
     landAt,
     landVerified,
     discard,
+    discardMany,
     workingCopyChangedAt,
     danglingEmptyRevisions,
     untrackedEntries,

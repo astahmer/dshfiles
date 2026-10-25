@@ -15,6 +15,8 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 import type { BacklogAttention, BacklogKind, BacklogStatus } from './item.js'
+import { activityPhrase } from './activity-phrase.js'
+import { actorName } from './actor-name.js'
 import { BacklogProjectPaths } from './project-paths.js'
 
 const statusLabels = { inbox: 'Inbox', todo: 'Todo', doing: 'In progress', done: 'Done', dropped: 'Dropped' } satisfies Record<BacklogStatus, string>
@@ -135,12 +137,6 @@ const ProjectLabel = (props: { readonly project: string; readonly className?: st
   </span>
 )
 
-const actorName = (id: string | undefined): string => {
-  if (id === undefined || id === 'user') return 'You'
-  if (id === 'system') return 'Automatic'
-  return `Agent ${id.replace(/^agent:(session-)?/, '').slice(0, 6)}`
-}
-
 /** An actor as a tiny avatar: the user's initial, a bot for an agent, a wand for automatic triage and signals. */
 const ActorAvatar = (props: { readonly actorId: string | undefined; readonly className?: string }): JSX.Element => {
   const agent = props.actorId?.startsWith('agent:') === true
@@ -175,28 +171,6 @@ const ActorStack = (props: { readonly actorIds: readonly string[]; readonly max?
   )
 }
 
-const attentionPhrases = {
-  none: 'cleared the request',
-  'needs-input': 'asked for your input',
-  blocked: 'flagged it blocked',
-  waiting: 'set it waiting',
-} satisfies Record<BacklogAttention, string>
-
-/**
- * One event as a short sentence after the actor's name. An attention change records only the field name, so the item's
- * current attention says what it was set to.
- */
-const describeEvent = (event: { readonly kind: string; readonly detail: string; readonly actor: string }, attention: BacklogAttention): string => {
-  if (event.kind === 'created') return 'captured it'
-  if (event.kind === 'moved') return `moved it ${event.detail}`
-  if (event.kind === 'commented') return 'commented'
-  if (event.kind === 'linked') return `linked ${event.detail}`
-  if (event.kind === 'unlinked') return `unlinked ${event.detail}`
-  if (event.kind === 'triaged') return event.actor === 'system' ? `triage ${event.detail}` : `${event.detail.split(' ')[0] ?? 'handled'} a suggestion`
-  if (event.detail === 'attention') return attentionPhrases[attention]
-  return `edited ${event.detail}`
-}
-
 const AGO_SUFFIX = { minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 const ago = (time: number, now = Date.now()): string => {
   const age = relativeTime(time, now)
@@ -218,5 +192,5 @@ export class ItemGlyphs {
   static readonly displayProjectPath = BacklogProjectPaths.displayPath
   static readonly actorName = actorName
   static readonly ago = ago
-  static readonly describeEvent = describeEvent
+  static readonly describeEvent = activityPhrase
 }

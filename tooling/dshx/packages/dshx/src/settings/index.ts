@@ -1,6 +1,7 @@
 import { SettingsDefinitionModel } from './define.js'
 
 export const defineSettings = SettingsDefinitionModel.define
+export { createSettingsClientRuntime, provideSettingsContext } from './client.js'
 export type { SettingsDefinition } from './define.js'
 export type {
   SettingsClientOptions,

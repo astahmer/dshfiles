@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
-import { ThreadSelectionModel } from './thread-selection.js'
+import { isThreadSelectionBackgroundClick, ThreadSelectionModel } from './thread-selection.js'
 
 const ids = ['a', 'b', 'c', 'd', 'e'] as const
 
@@ -54,6 +54,24 @@ describe('thread selection model', () => {
     expect(ThreadSelectionModel.selectAll(ids)).toEqual({ sessionIds: [...ids], anchorId: 'a' })
     expect(ThreadSelectionModel.selectAll(['a', 'a', 'b'])).toEqual({ sessionIds: ['a', 'b'], anchorId: 'a' })
     expect(ThreadSelectionModel.selectAll([])).toEqual({ sessionIds: [], anchorId: undefined })
+  })
+
+  it('clears selection for blank sidebar clicks but preserves it for rows and portalled overlays', () => {
+    const surface = document.createElement('section')
+    const background = document.createElement('div')
+    const row = document.createElement('button')
+    row.dataset.threadMainAction = ''
+    row.dataset.threadId = 'a'
+    surface.append(background, row)
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    const menuItem = document.createElement('button')
+    menuItem.setAttribute('role', 'menuitem')
+    menu.append(menuItem)
+
+    expect(isThreadSelectionBackgroundClick({ target: background, surface })).toBe(true)
+    expect(isThreadSelectionBackgroundClick({ target: row, surface })).toBe(false)
+    expect(isThreadSelectionBackgroundClick({ target: menuItem, surface })).toBe(false)
   })
 
   it('paints and unpaints only the rows currently selected', () => {

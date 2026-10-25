@@ -53,6 +53,17 @@ Feature: Backlog
     When the backlog search is submitted
     Then search results list only "composer chip on the board"
 
+  @scenario:backlog.board-columns-customization
+  Scenario: Reorder and hide columns on the Backlog board only
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Keep board preferences local" is captured
+    And the Board view is opened
+    And the Inbox column is moved right and the Dropped column is hidden
+    Then the board columns show the customized order without Dropped
+    When the Items view is opened
+    Then the Backlog items remain available outside the customized board
+
   @scenario:backlog.board-links
   Scenario: Move an item on the board and follow its backlinks
     Given the isolated plugin profile "@dshfiles/backlog" is booted
@@ -61,6 +72,7 @@ Feature: Backlog
     And "Child step, part of b:1" is captured
     When item b:2 is moved to In progress on the board
     Then the board columns follow the status order through Dropped
+    And the board columns do not scroll horizontally
     And the In progress column holds "Child step, part of b:1"
     When backlog item b:1 is opened
     Then it is referenced by "Child step, part of b:1"
@@ -103,6 +115,20 @@ Feature: Backlog
     Then the board edits b:1 inline without opening it
     When the inline title is replaced with "Renamed on the board"
     Then the board card for b:1 is titled "Renamed on the board"
+
+  @scenario:backlog.project-detail-picker
+  Scenario: Change an item's project from its details
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Change project from details" is captured
+    And backlog item b:1 is opened
+    When the project picker for item b:1 is opened
+    Then the project choices are visible
+    When item b:1 is assigned to the registered project from its details
+    Then item b:1 shows its selected project
+    When the project picker for item b:1 is opened
+    And item b:1 is unassigned from its details
+    Then item b:1 has no project
 
   @scenario:backlog.start-thread
   Scenario: Start a thread from a board card and stay in the backlog
@@ -222,6 +248,7 @@ Feature: Backlog
     When ArrowUp is pressed from the empty backlog composer
     Then backlog item b:2 receives composer keyboard focus
     When backlog item b:1 copies its ID and link from the context menu
+    And backlog item b:1 copies its Markdown from the context menu
     And backlog item b:1 is moved to "In progress" from its feed context menu
     Then backlog item b:1 exposes all context actions in the "feed" view
     And backlog item b:1 exposes all context actions in the "items" view
@@ -307,6 +334,18 @@ Feature: Backlog
     Then the item detail shows the saved Markdown description
     When a comment "Confirmed in the scratch profile" is added
     Then the item activity shows the comment
+
+  @scenario:backlog.reply-edit-delete-keyboard
+  Scenario: Edit and delete a user reply, using keyboard access
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Reply with an image" is captured
+    And backlog item b:1 is opened
+    And a reply with an image is added
+    When the user reply is edited with keyboard navigation
+    Then the edited reply keeps its attachment
+    When the user reply is deleted after confirmation
+    Then the reply and its attachment are removed from the activity
 
   @scenario:backlog.smart-reply-routing
   Scenario: Route a work reply to a linked thread with in-app and browser notices

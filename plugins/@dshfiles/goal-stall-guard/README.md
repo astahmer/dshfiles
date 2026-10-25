@@ -55,7 +55,9 @@ The plugin registers two additional Host tools through the public `goals` and
   not close other blocked states or excuse an unresolved human decision.
 
 The native `update_goal` guard remains authoritative for its own actions. These
-tools cover only the two narrow cases above.
+tools cover only the two narrow cases above; they do not remove the native round
+ceiling. Goals cannot yet be guaranteed to continue until their objective is
+realized. That requires a supported native lifecycle contract; see [Host gap 86](../../../plans/dsh-host-gaps.md).
 
 ## Configuration
 

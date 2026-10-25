@@ -60,7 +60,7 @@ Feature: Persistent agents
     When the Backlog panel is opened
     And "Preview the agent mention" is captured
     When backlog item b:1 is opened
-    And "Ping @luna about b:1" is commented on the open item
-    And the mention "@luna" is clicked in the open item
+    And "Ping @{luna} about b:1" is commented on the open item
+    And the mention "@{luna}" is clicked in the open item
     Then the agent preview shows "Luna" with instructions "Prefer small findings."
     And the preview opens "Luna" in the Agents panel

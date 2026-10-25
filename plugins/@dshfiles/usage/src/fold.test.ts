@@ -66,7 +66,12 @@ describe('foldRecords', () => {
 
   it('folds privacy-reduced tool executions and marks missing results by turn outcome', () => {
     const first = fold([
-      { type: 'tool/call', seq: 1, time: 100, data: { callId: 'private-call-id', name: 'shell.run', arguments: 'secret command', turn: 1, step: 2 } },
+      {
+        type: 'tool/call',
+        seq: 1,
+        time: 100,
+        data: { callId: 'private-call-id', name: 'shell.run', arguments: JSON.stringify({ command: 'pnpm test --token super-secret' }), turn: 1, step: 2 },
+      },
     ])
     expect(first.tools).toMatchObject([{ startedAt: 100, endedAt: null, outcome: 'pending' }])
     const finished = UsageFoldModel.foldRecords({
@@ -99,12 +104,15 @@ describe('foldRecords', () => {
         name: 'shell.run',
         category: 'other',
         owner: null,
+        normalizedCommand: 'pnpm test',
+        testRunner: 'pnpm:test',
         startedAt: 100,
         endedAt: 375,
         outcome: 'error',
+        resultChars: 14,
       },
     ])
-    expect(JSON.stringify(finished.tools)).not.toContain('secret command')
+    expect(JSON.stringify(finished.tools)).not.toContain('super-secret')
     expect(JSON.stringify(finished.tools)).not.toContain('private output')
     expect(pending.tools[0]?.outcome).toBe('interrupted')
     const ptc = fold([
@@ -128,9 +136,35 @@ describe('foldRecords', () => {
           content: [{ type: 'text', text: 'private result' }],
         },
       },
+      {
+        type: 'tool/ptc-dispatch-start',
+        seq: 8,
+        time: 590,
+        data: {
+          parentCallId: 'parent',
+          subCallId: 'test-run-id',
+          name: 'bash',
+          arguments: { command: 'vitest run /private/test.spec.ts --secret hidden', token: 'hidden' },
+        },
+      },
+      {
+        type: 'tool/ptc-dispatch',
+        seq: 9,
+        time: 690,
+        data: {
+          parentCallId: 'parent',
+          subCallId: 'test-run-id',
+          name: 'bash',
+          arguments: { command: 'vitest run /private/test.spec.ts --secret hidden', token: 'hidden' },
+          isError: false,
+        },
+      },
     ])
     expect(ptc.tools[0]).toMatchObject({ turn: 3, name: 'file.read', category: 'other', owner: null, startedAt: 520, endedAt: 580, outcome: 'success' })
+    expect(ptc.tools[1]).toMatchObject({ normalizedCommand: 'vitest run', testRunner: 'vitest', startedAt: 590, endedAt: 690 })
     expect(JSON.stringify(ptc.tools)).not.toContain('/private/path')
+    expect(JSON.stringify(ptc.tools)).not.toContain('/private/test.spec.ts')
+    expect(JSON.stringify(ptc.tools)).not.toContain('hidden')
     expect(JSON.stringify(ptc.tools)).not.toContain('private result')
   })
 

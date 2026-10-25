@@ -11,6 +11,7 @@ type ListData = { readonly revision: number; readonly total: number; readonly it
 type DetailData = { readonly ok: true; readonly value: BacklogDetailView } | { readonly ok: false; readonly reason: 'not-found' }
 
 const QUERY_KEY = 'dshfiles-backlog'
+export const BACKLOG_TRIAGE_MUTATION_KEY = [QUERY_KEY, 'triage'] as const
 
 /** A reply shows in the item's activity, files included, before the Host answers; a failed save puts the detail back. */
 export const commentMutation = <Result>(input: { readonly client: QueryClient; readonly send: (request: CommentInput) => Promise<Result> }) => ({
@@ -90,9 +91,11 @@ export const useBacklogActions = () => {
   const capture = useMutation({ mutationFn: (input: Parameters<typeof api.capture>[0]) => api.capture(input), onSuccess: invalidate })
   const link = useMutation({ mutationFn: (input: Parameters<typeof api.link>[0]) => api.link(input), onSuccess: invalidate })
   const comment = useMutation(commentMutation({ client, send: input => api.comment(input) }))
+  const editComment = useMutation({ mutationFn: (input: Parameters<typeof api.editComment>[0]) => api.editComment(input), onSuccess: invalidate })
+  const deleteComment = useMutation({ mutationFn: (input: Parameters<typeof api.deleteComment>[0]) => api.deleteComment(input), onSuccess: invalidate })
   const attachFile = useMutation({ mutationFn: (input: Parameters<typeof api.attachFile>[0]) => api.attachFile(input), onSuccess: invalidate })
   const removeFile = useMutation({ mutationFn: (input: Parameters<typeof api.removeFile>[0]) => api.removeFile(input), onSuccess: invalidate })
-  const triage = useMutation({ mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
+  const triage = useMutation({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY, mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
   const backfillTriage = useMutation({
     mutationFn: (request: { readonly retriage: boolean }) => api.backfillTriage(request),
   })
@@ -105,6 +108,8 @@ export const useBacklogActions = () => {
     capture,
     link,
     comment,
+    editComment,
+    deleteComment,
     attachFile,
     removeFile,
     triage,

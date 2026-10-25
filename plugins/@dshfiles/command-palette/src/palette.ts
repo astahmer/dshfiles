@@ -1,12 +1,14 @@
+import type { PaletteThreadSection } from './palette-api.js'
+
 /** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
 const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
 const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 
 /** Query prefixes route to threads, commands, thread content, editor lines, or the prefix list. */
-export type PalettePrefix = '>' | '#' | ':' | '?' | 'thread:' | 'session:'
+export type PalettePrefix = '>' | '<' | '#' | ':' | '?' | 'thread:' | 'session:'
 
-const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '#', ':', '?']
+const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '<', '#', ':', '?']
 
 const parsePaletteQuery = (query: string) => {
   const lowered = query.toLocaleLowerCase()
@@ -59,6 +61,7 @@ export interface ThreadCandidate {
   readonly project: string
   readonly cwd: string
   readonly updatedAt: number
+  readonly section?: PaletteThreadSection
 }
 
 const WORD_BOUNDARY = /[\s\-_/.·:]/

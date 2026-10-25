@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { PaletteApi, type PaletteAction, type PaletteThreadSection } from '@dshfiles/command-palette/api'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -64,6 +65,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Empty, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
@@ -121,12 +125,12 @@ import {
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
-import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
+import { workspaceName } from './workspace-paths.js'
 import {
   failedResumeNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
@@ -144,7 +148,13 @@ import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
-import { EMPTY_THREAD_SELECTION, THREAD_MAIN_BUTTON_SELECTOR, ThreadSelectionModel, type ThreadSelectionState } from './thread-selection.js'
+import {
+  EMPTY_THREAD_SELECTION,
+  THREAD_MAIN_BUTTON_SELECTOR,
+  isThreadSelectionBackgroundClick,
+  ThreadSelectionModel,
+  type ThreadSelectionState,
+} from './thread-selection.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -187,6 +197,7 @@ import {
   type ThreadFinishNotificationCategory,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
+import { createNotificationSoundPaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import {
@@ -488,6 +499,7 @@ interface ThreadRowProps {
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+  readonly workspaceName: string | undefined
   readonly machine: string | undefined
   readonly age: string
   /** Set only while the thread is muted or snoozed. */
@@ -607,7 +619,7 @@ const ChildThreadList = (props: {
           className={cn(
             lineClass,
             'dshx:data-[selected=true]:bg-accent',
-            'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
+            'dshx:group/selection dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
@@ -617,6 +629,13 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
+          <span
+            aria-hidden="true"
+            className="dshx:pointer-events-none dshx:absolute dshx:-left-1 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground dshx:opacity-0 dshx:group-data-[multi-selected=true]/selection:opacity-100"
+            data-thread-selection-indicator=""
+          >
+            ✓
+          </span>
           <StatusDot
             session={child}
             unread={props.unreadSessionIds.has(child.id)}
@@ -1067,7 +1086,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               type="button"
               draggable
               className={cn(
-                'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                'dshx:group/selection dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
@@ -1078,6 +1097,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               onClick={() => props.actions.open(session.id)}
               onDoubleClick={() => keepThreadTab(session.id)}
             >
+              <span
+                aria-hidden="true"
+                className="dshx:pointer-events-none dshx:absolute dshx:-left-1 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground dshx:opacity-0 dshx:group-data-[multi-selected=true]/selection:opacity-100"
+                data-thread-selection-indicator=""
+              >
+                ✓
+              </span>
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
                   {rowStyle.statusDot ? (
@@ -1153,6 +1179,11 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>
                   ) : null}
+                  {props.workspaceName === undefined ? null : (
+                    <span className="dshx:shrink-0 dshx:truncate" data-testid="thread-workspace-name">
+                      · {props.workspaceName}
+                    </span>
+                  )}
                   {props.parentTitle === undefined ? null : (
                     <span className="dshx:min-w-0 dshx:truncate">
                       {t('threadSidebarChildOf')} {props.parentTitle}
@@ -1347,6 +1378,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [threadSelection, setThreadSelection] = useState<ThreadSelectionState>(EMPTY_THREAD_SELECTION)
+  const [shiftPressed, setShiftPressed] = useState(false)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Shift') setShiftPressed(true)
+    }
+    const onKeyUp = (event: KeyboardEvent): void => {
+      if (event.key === 'Shift') setShiftPressed(false)
+    }
+    const onWindowBlur = (): void => setShiftPressed(false)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onWindowBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onWindowBlur)
+    }
+  }, [])
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null)
   const selectionRef = useRef(threadSelection)
   selectionRef.current = threadSelection
@@ -1475,6 +1524,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
+  const workspaceNameById = useMemo(
+    () => new Map<string, string | undefined>(workspaceState.items.map(workspace => [workspace.workspaceId, workspaceName(workspace.path)])),
+    [workspaceState.items],
+  )
   const integrationQueuedAtBySessionId = useMemo(
     () => indexQueuedIntegrationSessions((jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads)),
     [jjRepositories.data],
@@ -1598,6 +1651,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   })
   const continuedQuestionSessionIds = useMemo(() => new Set(activeQuestionsQuery.data?.sessionIds ?? []), [activeQuestionsQuery.data])
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
+  const paletteThreadSections = useMemo<ReadonlyMap<string, PaletteThreadSection>>(
+    () =>
+      new Map(
+        sessions.map(session => [
+          session.id,
+          SidebarOrganization.sectionForSession({
+            session: { id: session.id, running: session.running, updatedAt: session.updatedAt },
+            archivedSessionIds,
+            pinnedSessionIds,
+            parkedSessionIds,
+            settledSessionIds,
+            idleSectionOverrides: preferences.idleSectionOverrides,
+            now,
+            idleMinutes: preferences.idleMinutes,
+          }),
+        ]),
+      ),
+    [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, preferences.idleSectionOverrides, sessions, settledSessionIds],
+  )
+  useEffect(() => PaletteApi.registerThreadSections(paletteThreadSections), [paletteThreadSections])
   const mutedThreads = preferences.mutedThreads
   const mutedSessionIds = useMemo(
     () => new Set(Object.entries(mutedThreads).flatMap(([sessionId, mute]) => (isMuteActive(mute, now) ? [sessionId] : []))),
@@ -3516,6 +3589,40 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       now,
     })
   }, [attentionIds, displayWorkspaces, now, tSidebar, threadView.groupBy, visibleRemoteThreads, visibleThreadEntries])
+  const boardColumnOptions = useMemo(
+    () =>
+      threadView.groupBy === 'status'
+        ? SIDEBAR_SECTIONS.map(section => ({ key: section, label: tSidebar(sectionLabels[section]) }))
+        : groupedThreadEntries.map(group => ({ key: group.key, label: group.label || tSidebar('threadSidebarAllThreads') })),
+    [groupedThreadEntries, tSidebar, threadView.groupBy],
+  )
+  const orderedBoardColumns = useMemo(
+    () =>
+      ThreadBoardViewModel.orderColumns(
+        boardColumnOptions.map(column => column.key),
+        boardViewSettings.columnOrder,
+      ),
+    [boardColumnOptions, boardViewSettings.columnOrder],
+  )
+  const visibleBoardColumns = useMemo(
+    () => orderedBoardColumns.filter(column => !boardViewSettings.hiddenColumns.includes(column)),
+    [boardViewSettings.hiddenColumns, orderedBoardColumns],
+  )
+  const renderedGroupedThreadEntries = isBoard
+    ? visibleBoardColumns.map(column => groupedThreadEntries.find(group => group.key === column)).filter(group => group !== undefined)
+    : groupedThreadEntries
+  const updateBoardColumnOrder = (column: string, direction: -1 | 1): void => {
+    storedThreadBoardView.set(
+      ThreadBoardViewModel.update(boardViewSettings, { columnOrder: ThreadBoardViewModel.moveColumn(orderedBoardColumns, column, direction) }),
+    )
+  }
+  const toggleBoardColumn = (column: string, visible: boolean): void => {
+    storedThreadBoardView.set(
+      ThreadBoardViewModel.update(boardViewSettings, {
+        hiddenColumns: ThreadBoardViewModel.toggleColumn(boardViewSettings.hiddenColumns, column, visible),
+      }),
+    )
+  }
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -3702,6 +3809,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   useEffect(() => {
     if (!isPrimarySurface) return
     const actions: readonly PaletteAction[] = [
+      createNotificationSoundPaletteAction(latestRowActions.current.props.tSidebar),
       ...(asideOpener === null
         ? []
         : [
@@ -3887,15 +3995,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     const target = event.target
     if (!(target instanceof Element)) return
-    // Portalled menus and dialogs keep this React tree as their parent, so their clicks arrive here too.
-    if (target.closest('[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="dialog"]') !== null) return
-    const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
-    if (rowButton === null || !event.currentTarget.contains(rowButton)) {
+    if (isThreadSelectionBackgroundClick({ target, surface: event.currentTarget })) {
       if (!event.shiftKey && !event.metaKey && !event.ctrlKey && threadSelection.sessionIds.length > 0) {
         setThreadSelection(EMPTY_THREAD_SELECTION)
       }
       return
     }
+    const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+    if (rowButton === null || !event.currentTarget.contains(rowButton)) return
     const sessionId = rowButton.dataset.threadId
     if (sessionId === undefined) return
     if (event.shiftKey) {
@@ -3983,6 +4090,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       selectedSessionId: selectedSession?.id,
     })
     const rowAttentionLabel = attentionLabel ?? inlineAttentionLabels.get(session.id)
+    const realWorkspaceId = realWorkspaceBySession.get(session.id)
     return (
       <ThreadRow
         key={session.id}
@@ -4000,6 +4108,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+        workspaceName={realWorkspaceId === undefined || realWorkspaceId === workspaceId ? undefined : workspaceNameById.get(realWorkspaceId)}
         machine={machine}
         age={formatAge(session.updatedAt)}
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
@@ -4129,9 +4238,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   return (
     <TooltipProvider delayDuration={500}>
       <section
-        className="dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col"
+        className={cn('dshx-root dshx:relative dshx:flex dshx:h-full dshx:w-full dshx:min-h-0 dshx:min-w-0 dshx:flex-col', shiftPressed && 'dshx:select-none')}
         aria-label={props.tSidebar(isBoard ? 'threadSidebarBoardTitle' : 'threadSidebarTitle')}
         data-thread-surface={surface}
+        onClickCapture={handleSelectionClickCapture}
+        onContextMenuCapture={handleSelectionContextMenuCapture}
       >
         <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
           {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
@@ -4264,7 +4375,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               ))}
             </div>
           </div>
-          {showGroupControl || showFilterControl ? (
+          {showGroupControl || showFilterControl || isBoard ? (
             <div
               className={cn(
                 'dshx:grid dshx:gap-1',
@@ -4297,6 +4408,53 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         </DropdownMenuRadioItem>
                       ))}
                     </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              {isBoard ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="dshx:min-w-0 dshx:justify-start dshx:text-xs">
+                      {props.tSidebar('threadSidebarBoardColumns')}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="dshx-root dshx:min-w-56">
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarBoardColumns')}</DropdownMenuLabel>
+                    {orderedBoardColumns.map(column => {
+                      const option = boardColumnOptions.find(candidate => candidate.key === column)
+                      if (option === undefined) return null
+                      const visible = !boardViewSettings.hiddenColumns.includes(column)
+                      return (
+                        <DropdownMenuCheckboxItem
+                          checked={visible}
+                          disabled={visible && visibleBoardColumns.length <= 1}
+                          key={column}
+                          onCheckedChange={checked => toggleBoardColumn(column, checked === true)}
+                          onSelect={event => event.preventDefault()}
+                        >
+                          {option.label}
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{props.tSidebar('threadSidebarReorderColumns')}</DropdownMenuLabel>
+                    {orderedBoardColumns.map((column, index) => {
+                      const option = boardColumnOptions.find(candidate => candidate.key === column)
+                      if (option === undefined) return null
+                      return (
+                        <DropdownMenuSub key={column}>
+                          <DropdownMenuSubTrigger>{option.label}</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="dshx-root dshx:min-w-40">
+                            <DropdownMenuItem disabled={index === 0} onSelect={() => updateBoardColumnOrder(column, -1)}>
+                              {props.tSidebar('threadSidebarMoveLeft')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled={index === orderedBoardColumns.length - 1} onSelect={() => updateBoardColumnOrder(column, 1)}>
+                              {props.tSidebar('threadSidebarMoveRight')}
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}
@@ -4580,8 +4738,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           onKeyDown={event => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}
-          onClickCapture={handleSelectionClickCapture}
-          onContextMenuCapture={handleSelectionContextMenuCapture}
         >
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
@@ -4716,7 +4872,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
             {threadView.groupBy === 'status'
-              ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
+              ? (isBoard ? visibleBoardColumns.filter(isSidebarSection) : renderedSections).map((section, index) => {
                   if (section === 'remote') {
                     return !preferences.separateRemoteThreads || props.openRemoteThreads === undefined ? null : (
                       <RemoteThreadsSection
@@ -4903,7 +5059,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     </section>
                   )
                 })
-              : groupedThreadEntries.map(group => {
+              : renderedGroupedThreadEntries.map(group => {
                   // A flat list under a hoisted group (Usage limit, Interrupted…) gets its own header, so its rows do
                   // not read as part of the group above.
                   const showHeader = group.showHeader || (!isBoard && hasHoistedGroups)

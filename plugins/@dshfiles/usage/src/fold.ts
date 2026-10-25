@@ -1,6 +1,7 @@
 import type { RegistryToolSource } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import type { LogRecord } from './session-log.js'
+import { identifyCommand, shellToolArgumentsSchema, type ShellToolArguments } from './command-identifiers.js'
 
 /**
  * Turns one session log into model requests. Every request is keyed by the
@@ -78,13 +79,32 @@ export interface ToolExecutionRow {
   readonly name: string
   readonly category: ToolCategory
   readonly owner: string | null
+  readonly normalizedCommand?: string | null
+  readonly testRunner?: string | null
   readonly startedAt: number
   readonly endedAt: number | null
   readonly outcome: 'success' | 'error' | 'interrupted' | 'unknown' | 'pending'
+  /** Text characters the tool returned, so callers can estimate output tokens. Never the text itself. */
+  readonly resultChars?: number | null
 }
 
 const stepKey = (turn: number, step: number): string => `${String(turn)}:${String(step)}`
 const MAX_OPEN_TOOL_CALLS = 2_000
+
+const toolResultSchema = z.object({
+  message: z.object({
+    toolCallId: z.string().min(1).max(256),
+    isError: z.boolean().optional(),
+    content: z.array(z.object({ text: z.string().optional() })).optional(),
+  }),
+})
+
+/** Characters of text a tool returned. Image and binary parts carry no `text` and are not counted. */
+const resultCharsOf = (content: readonly { readonly text?: string | undefined }[] | undefined): number => {
+  let total = 0
+  for (const part of content ?? []) total += part.text?.length ?? 0
+  return total
+}
 
 const foldStateSchema = z.object({
   session: z
@@ -115,6 +135,8 @@ const foldStateSchema = z.object({
         name: z.string(),
         category: z.enum(['api', 'mcp', 'plugin', 'tool', 'skill', 'other']),
         owner: z.string().nullable(),
+        normalizedCommand: z.string().max(80).nullable(),
+        testRunner: z.string().max(80).nullable(),
         startedAt: z.number(),
       }),
     )
@@ -241,12 +263,17 @@ export class UsageFoldModel {
     const tools: ToolExecutionRow[] = []
     const sessionId = (): string => state.session?.id ?? input.sessionId
     const agentPurpose = (): RequestPurpose => (state.session?.subagent === true ? 'subagent' : 'agent')
-    const classifyTool = (name: string, args?: string): Pick<ToolExecutionRow, 'name' | 'category' | 'owner'> => {
+    const classifyTool = (
+      name: string,
+      args?: ShellToolArguments,
+    ): Pick<ToolExecutionRow, 'name' | 'category' | 'owner'> & { readonly normalizedCommand: string | null; readonly testRunner: string | null } => {
+      const identifiers = identifyCommand({ toolName: name, arguments: args })
       if (/^(?:functions\.)?(?:skill|load_skill|read_skill)$/.test(name)) {
-        if (args !== undefined && args.length <= 4_096) {
+        const skillArguments = z.string().max(4_096).safeParse(args)
+        if (skillArguments.success) {
           let parsedArguments: unknown
           try {
-            parsedArguments = JSON.parse(args)
+            parsedArguments = JSON.parse(skillArguments.data)
           } catch {
             parsedArguments = undefined
           }
@@ -254,9 +281,9 @@ export class UsageFoldModel {
             .object({ name: z.string().regex(/^[\w.-]{1,80}$/) })
             .strict()
             .safeParse(parsedArguments)
-          if (skill.success) return { name: skill.data.name, category: 'skill', owner: null }
+          if (skill.success) return { name: skill.data.name, category: 'skill', owner: null, ...identifiers }
         }
-        return { name: 'skill', category: 'skill', owner: null }
+        return { name: 'skill', category: 'skill', owner: null, ...identifiers }
       }
       const registered = input.toolSources?.get(name)
       const category = registered?.source ?? (name.startsWith('mcp__') ? 'mcp' : 'other')
@@ -264,6 +291,7 @@ export class UsageFoldModel {
         name: name.replace(/[^\w.-]/g, '_').slice(0, 120) || 'other',
         category,
         owner: registered?.owner ?? null,
+        ...identifiers,
       }
     }
     const trackOpenTool = (call: FoldState['openTools'][number]): void => {
@@ -280,6 +308,8 @@ export class UsageFoldModel {
             name: replaced.name,
             category: replaced.category,
             owner: replaced.owner,
+            normalizedCommand: replaced.normalizedCommand,
+            testRunner: replaced.testRunner,
             startedAt: replaced.startedAt,
             endedAt: null,
             outcome: 'unknown',
@@ -298,6 +328,8 @@ export class UsageFoldModel {
           name: dropped.name,
           category: dropped.category,
           owner: dropped.owner,
+          normalizedCommand: dropped.normalizedCommand,
+          testRunner: dropped.testRunner,
           startedAt: dropped.startedAt,
           endedAt: null,
           outcome: 'unknown',
@@ -330,7 +362,7 @@ export class UsageFoldModel {
           break
         }
         case 'tool/result': {
-          const parsed = z.object({ message: z.object({ toolCallId: z.string().min(1).max(256), isError: z.boolean().optional() }) }).safeParse(record.data)
+          const parsed = toolResultSchema.safeParse(record.data)
           if (!parsed.success || seq === null || time === null) break
           const index = state.openTools.findIndex(call => call.callId === parsed.data.message.toolCallId)
           if (index < 0) break
@@ -345,21 +377,27 @@ export class UsageFoldModel {
             name: call.name,
             category: call.category,
             owner: call.owner,
+            normalizedCommand: call.normalizedCommand,
+            testRunner: call.testRunner,
             startedAt: call.startedAt,
             endedAt: time,
             outcome: parsed.data.message.isError === true ? 'error' : parsed.data.message.isError === false ? 'success' : 'unknown',
+            resultChars: resultCharsOf(parsed.data.message.content),
           })
           break
         }
         case 'tool/ptc-dispatch-start': {
-          const parsed = z.object({ subCallId: z.string().min(1).max(256), name: z.string().min(1).max(256) }).safeParse(record.data)
+          const parsed = z
+            .object({ subCallId: z.string().min(1).max(256), name: z.string().min(1).max(256), arguments: z.unknown().optional() })
+            .safeParse(record.data)
           if (!parsed.success || seq === null || time === null) break
+          const commandArguments = shellToolArgumentsSchema.optional().safeParse(parsed.data.arguments)
           trackOpenTool({
             callId: parsed.data.subCallId,
             seq,
             turn: state.activeTurn,
             step: null,
-            ...classifyTool(parsed.data.name),
+            ...classifyTool(parsed.data.name, commandArguments.success ? commandArguments.data : undefined),
             startedAt: time,
           })
           break
@@ -380,6 +418,8 @@ export class UsageFoldModel {
             name: call.name,
             category: call.category,
             owner: call.owner,
+            normalizedCommand: call.normalizedCommand,
+            testRunner: call.testRunner,
             startedAt: call.startedAt,
             endedAt: time,
             outcome: parsed.data.isError === true ? 'error' : parsed.data.isError === false ? 'success' : 'unknown',
@@ -500,6 +540,8 @@ export class UsageFoldModel {
               name: tool.name,
               category: tool.category,
               owner: tool.owner,
+              normalizedCommand: tool.normalizedCommand,
+              testRunner: tool.testRunner,
               startedAt: tool.startedAt,
               endedAt: time,
               outcome: ABORTED_TURN_REASONS.has(reason ?? '') ? 'interrupted' : 'unknown',
@@ -606,6 +648,8 @@ export class UsageFoldModel {
         name: call.name,
         category: call.category,
         owner: call.owner,
+        normalizedCommand: call.normalizedCommand,
+        testRunner: call.testRunner,
         startedAt: call.startedAt,
         endedAt: null,
         outcome: 'pending',

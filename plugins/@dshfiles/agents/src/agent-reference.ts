@@ -3,10 +3,10 @@ import { z } from 'zod'
 import { AGENT_HANDLE_PATTERN } from './agent.js'
 
 /**
- * A mention is written as plain text (`@luna fix it`), so a rendered message decorates it after the fact. The leading
- * boundary keeps an email address out, and `(?!:)` keeps the `@agent:`/`@a:` menu scopes from matching a handle.
+ * Agent references use `@{luna}`; ordinary `@handle` mentions remain supported for existing messages. The leading
+ * boundary keeps email addresses out, and `(?!:)` keeps the `@agent:`/`@a:` menu scopes from matching a handle.
  */
-const mentionPattern = /(?<![\w@/])@([a-z][a-z0-9-]{0,31})\b(?!:)/gu
+const mentionPattern = /(?<![\w@/])@\{([a-z][a-z0-9-]{0,31})\}(?![\w-])|(?<![\w@/])@([a-z][a-z0-9-]{0,31})\b(?!:)/gu
 
 export interface AgentReferenceMatch {
   readonly handle: string
@@ -18,7 +18,7 @@ export interface AgentReferenceMatch {
 /** The `@handle` tokens naming one of `handles`; an unknown or disabled agent's mention stays plain text. */
 export const agentReferenceMatches = (text: string, handles: ReadonlySet<string>): readonly AgentReferenceMatch[] =>
   [...text.matchAll(mentionPattern)].flatMap(match => {
-    const handle = match[1]
+    const handle = match[1] ?? match[2]
     if (handle === undefined || !handles.has(handle)) return []
     const start = match.index ?? 0
     return [{ handle, start, end: start + match[0].length }]

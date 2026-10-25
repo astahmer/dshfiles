@@ -24,6 +24,7 @@ import {
   XIcon,
   InboxIcon,
   KanbanIcon,
+  LoaderCircleIcon,
   ListFilterIcon,
   MessagesSquareIcon,
   PlusIcon,
@@ -33,7 +34,7 @@ import {
   WandSparklesIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
@@ -61,7 +62,7 @@ import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
 import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadOutcome, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
-import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { BACKLOG_TRIAGE_MUTATION_KEY, BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
 type OpenThread = (sessionId: string) => void
@@ -401,6 +402,7 @@ export const BacklogPanel = (props: {
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
+  const triagePending = useIsMutating({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY }) > 0
   const [backfillJob, setBackfillJob] = useState<BacklogBackfillResult | null>(null)
   const [backfillError, setBackfillError] = useState<string | null>(null)
   const backfillJobId = backfillJob?.jobId
@@ -450,6 +452,7 @@ export const BacklogPanel = (props: {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
+  const [captureRequest, setCaptureRequest] = useState<{ readonly id: number; readonly text: string } | undefined>()
   const [startThreadItems, setStartThreadItems] = useState<readonly StartThreadItem[] | null>(null)
   const [backfillOpen, setBackfillOpen] = useState(false)
   const openStartThread = (items: readonly StartThreadItem[]): void => setStartThreadItems(items)
@@ -466,6 +469,14 @@ export const BacklogPanel = (props: {
     queryFn: ({ signal }) => api.revision(undefined, { signal }),
     refetchInterval: REFRESH_MS,
   })
+  const aiActivity = useQuery({
+    queryKey: [BacklogQueries.key, 'ai-activity'],
+    queryFn: ({ signal }) => api.aiActivity(undefined, { signal }),
+    retry: false,
+    refetchInterval: query => (query.state.error === null ? 1_000 : false),
+  })
+  const aiWorking =
+    triagePending || (aiActivity.error === null && aiActivity.data?.active === true) || backfillJobState === 'queued' || backfillJobState === 'running'
   const lastRevision = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (revision.data === undefined) return
@@ -474,6 +485,12 @@ export const BacklogPanel = (props: {
   }, [revision.data, queryClient])
   // A conversation reference asks for one item; selecting it here is what the sidebar row cannot know.
   const focus = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.read, () => null)
+  const pendingCapture = useSyncExternalStore(BacklogFocusModel.subscribe, BacklogFocusModel.readCapture, () => null)
+  useEffect(() => {
+    if (pendingCapture === null) return
+    setCaptureRequest(pendingCapture)
+    BacklogFocusModel.clearCapture()
+  }, [pendingCapture])
   useEffect(() => {
     if (focus === null) return
     setOpenId(focus)
@@ -808,6 +825,17 @@ export const BacklogPanel = (props: {
           </button>
           {showSettings ? null : (
             <>
+              <span
+                role={aiWorking ? 'status' : undefined}
+                aria-label={aiWorking ? 'AI is working' : undefined}
+                aria-hidden={aiWorking ? undefined : true}
+                className={cn(
+                  'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground dshx:transition-opacity',
+                  aiWorking ? 'dshx:opacity-70' : 'dshx:opacity-0',
+                )}
+              >
+                <LoaderCircleIcon aria-hidden className={cn('dshx:size-3.5', aiWorking && 'dshx:animate-spin')} />
+              </span>
               <button
                 type="button"
                 aria-label="Backfill triage"
@@ -833,7 +861,7 @@ export const BacklogPanel = (props: {
       {list.isError ? (
         <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(list.error, 'The backlog is unavailable.')}</p>
       ) : null}
-      <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
+      <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
         {showSettings ? <BacklogSettingsPanel /> : null}
         {showSettings ? null : showsResults ? (
           <>
@@ -895,6 +923,7 @@ export const BacklogPanel = (props: {
                   now={now}
                   projectPaths={projectPaths}
                   startThread={openStartThread}
+                  openThread={props.openThread}
                 />
               )}
               {view === 'items' && (
@@ -1010,6 +1039,7 @@ export const BacklogPanel = (props: {
               onClearStatus={() => setCaptureStatus(null)}
               inputRef={captureComposer}
               onNavigateUp={navigateToNearestItem}
+              {...(captureRequest === undefined ? {} : { captureRequest })}
             />
           </div>
         </div>

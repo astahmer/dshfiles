@@ -12,7 +12,6 @@ import '@deepseek-ai/dsh-working-directory'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import type { z } from 'zod'
 import { stat } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { FffSearch } from './fff-search.js'
 
@@ -74,7 +73,16 @@ export default defineHost({
         ensureWorker().postMessage({ ...request, id })
       })
 
-    const isFile = async (path: string): Promise<boolean> => (await stat(path).catch(() => undefined))?.isFile() ?? false
+    const resolveScope = async (options: { workingDirectory: string; path: string | undefined }) => {
+      const target = FffSearch.target({ workingDirectory: options.workingDirectory, path: options.path })
+      const found = options.path === undefined ? undefined : await stat(target).catch(() => undefined)
+      return FffSearch.scope({
+        workingDirectory: options.workingDirectory,
+        path: options.path,
+        target,
+        stats: found === undefined ? undefined : { isFile: found.isFile() },
+      })
+    }
 
     const grepTool = defineTool({
       name: 'grep',
@@ -115,8 +123,7 @@ export default defineHost({
       execute: async (args, exec) => {
         if (exec.agent === undefined) throw new Error('fff-search grep runs only on behalf of an Agent')
         const workingDirectory = await ctx.workingDirectory.ensure(exec.agent, exec.signal)
-        const target = args.path === undefined ? undefined : await isFile(resolve(workingDirectory, args.path))
-        const scope = FffSearch.scope({ workingDirectory, path: args.path, isFile: () => target === true })
+        const scope = await resolveScope({ workingDirectory, path: args.path })
         const reply = await ask({ kind: 'grep', scope, pattern: args.pattern, include: args.include, workingDirectory })
         if (!reply.ok) throw new Error(reply.error)
         return FffSearch.grepOutcome.parse(reply.value)
@@ -145,7 +152,7 @@ export default defineHost({
       execute: async (args, exec) => {
         if (exec.agent === undefined) throw new Error('fff-search glob runs only on behalf of an Agent')
         const workingDirectory = await ctx.workingDirectory.ensure(exec.agent, exec.signal)
-        const scope = FffSearch.scope({ workingDirectory, path: args.path, isFile: () => false })
+        const scope = await resolveScope({ workingDirectory, path: args.path })
         const reply = await ask({ kind: 'glob', scope, pattern: args.pattern, workingDirectory })
         if (!reply.ok) throw new Error(reply.error)
         return FffSearch.globOutcome.parse(reply.value)

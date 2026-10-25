@@ -280,14 +280,60 @@ describe('triage proposals', () => {
     const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'parent epic', actor: user })
     await store.capture({ text: 'paste drops chips', actor: user })
+    await store.link({ id: 2, link: { type: 'item', target: '1', provenance: 'extracted' }, actor: user })
     await store.propose({ id: 2, proposal: { kind: 'bug', duplicateOf: 1, confidence: 0.5, reason: 'Broken.', source: 'model', at: 9 } })
     expect(store.list({}).items.find(entry => entry.id === 2)?.proposal?.kind).toBe('bug')
 
     const accepted = await store.applyProposal({ id: 2, actor: user })
     expect(accepted.ok && accepted.value.item.kind).toBe('bug')
     expect(accepted.ok && accepted.value.item.humanFields).toEqual(['kind'])
-    expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: '1' }])
+    expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: '1', relation: 'duplicates' }])
     expect(accepted.ok && accepted.value.item.proposal).toBeNull()
+  })
+
+  it('resolves the canonical item when a confirmed duplicate is completed', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'canonical work', actor: user })
+    await store.capture({ text: 'duplicate work', actor: user })
+    await store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
+    await store.applyProposal({ id: 2, actor: user })
+    await store.propose({ id: 2, proposal: { status: 'done', confidence: 0.9, reason: 'Work completed.', source: 'jev', at: 9 } })
+
+    await store.applyProposal({ id: 2, actor: user })
+
+    const duplicate = store.get(2)
+    const canonical = store.get(1)
+    expect(duplicate.ok && duplicate.value.item.status).toBe('done')
+    expect(canonical.ok && canonical.value.item.status).toBe('done')
+    expect(canonical.ok && canonical.value.item.events.at(-1)?.detail).toBe('inbox → done (duplicate b:2 resolved)')
+  })
+
+  it('closes the canonical item when an agent marks its confirmed duplicate done', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'canonical work', actor: user })
+    await store.capture({ text: 'duplicate work', actor: user })
+    await store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
+    await store.applyProposal({ id: 2, actor: user })
+
+    await store.update({ id: 2, status: 'done', actor: agent })
+
+    const canonical = store.get(1)
+    expect(canonical.ok && canonical.value.item.status).toBe('done')
+  })
+
+  it('leaves a canonical item whose status the user chose untouched when its duplicate is completed', async () => {
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
+    await store.capture({ text: 'canonical work', actor: user })
+    await store.capture({ text: 'duplicate work', actor: user })
+    await store.update({ id: 1, status: 'doing', actor: user })
+    await store.propose({ id: 2, proposal: { duplicateOf: 1, confidence: 0.9, reason: 'Same work.', source: 'model', at: 9 } })
+    await store.applyProposal({ id: 2, actor: user })
+    await store.propose({ id: 2, proposal: { status: 'done', confidence: 0.9, reason: 'Work completed.', source: 'jev', at: 9 } })
+
+    await store.applyProposal({ id: 2, actor: user })
+
+    const canonical = store.get(1)
+    expect(canonical.ok && canonical.value.item.status).toBe('doing')
   })
 
   it('clears agent attention when a done suggestion is accepted', async () => {
@@ -426,6 +472,31 @@ describe('thread turn signals', () => {
     await store.update({ id: 1, attention: 'blocked', actor: agent })
     const cleared = await store.applyThreadAttention({ id: 1, threadId: 'session-abc123', attention: 'none', reason: 'the thread works again' })
     expect(cleared.ok && cleared.value.item.attention).toBe('blocked')
+  })
+
+  it('settles a request for input once its own thread answered the question', async () => {
+    const store = await workingItem()
+    await store.update({ id: 1, attention: 'needs-input', actor: agent })
+    expect(store.list({ inbox: true }).items.map(item => item.id)).toEqual([1])
+
+    const settled = await store.settleAnsweredQuestion({ id: 1, threadId: 'session-abc123', reason: 'the thread’s question was answered' })
+    expect(settled.ok && settled.value.item.attention).toBe('none')
+    expect(settled.ok && settled.value.item.events.at(-1)?.detail).toBe('attention: none (the thread’s question was answered)')
+    expect(settled.ok && settled.value.item.events.at(-1)?.threadId).toBe('session-abc123')
+    expect(settled.ok && settled.value.item.humanFields).toEqual([])
+    expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
+  it('leaves a request for input another thread raised, or the user set, alone', async () => {
+    const store = await workingItem()
+    await store.update({ id: 1, attention: 'needs-input', actor: agent })
+    const elsewhere = await store.settleAnsweredQuestion({ id: 1, threadId: 'session-other', reason: 'another thread answered' })
+    expect(elsewhere.ok && elsewhere.value.item.attention).toBe('needs-input')
+
+    await store.update({ id: 1, attention: 'none', actor: user })
+    await store.update({ id: 1, attention: 'needs-input', actor: user })
+    const handSet = await store.settleAnsweredQuestion({ id: 1, threadId: 'session-abc123', reason: 'the thread’s question was answered' })
+    expect(handSet.ok && handSet.value.item.attention).toBe('needs-input')
   })
 })
 
@@ -589,6 +660,58 @@ describe('attention and inbox', () => {
       ok: true,
       value: { dataUrl: 'data:image/png;base64,aGk=' },
     })
+  })
+
+  it('edits and deletes only the current user’s replies and removes deleted reply attachments', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1_000 })
+    await store.capture({ text: 'reply editing', actor: user })
+    const commented = await store.comment({
+      id: 1,
+      text: 'original reply',
+      files: [{ id: 'comment-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
+      actor: user,
+    })
+    expect(commented.ok).toBe(true)
+    if (!commented.ok) return
+    const commentId = commented.value.item.events.find(event => event.kind === 'commented')?.commentId
+    expect(commentId).toBeDefined()
+    if (commentId === undefined) return
+
+    const edited = await store.editComment({ id: 1, commentId, text: 'updated reply', actor: user })
+    expect(edited.ok && edited.value.item.events.some(event => event.commentId === commentId && event.detail === 'updated reply')).toBe(true)
+    expect(await store.editComment({ id: 1, commentId, text: 'not yours', actor: { kind: 'agent', sessionId: 'other-thread' } })).toEqual({
+      ok: false,
+      reason: 'not-found',
+    })
+
+    const deleted = await store.deleteComment({ id: 1, commentId, actor: user })
+    expect(deleted.ok && deleted.value.item.events.some(event => event.commentId === commentId)).toBe(false)
+    expect(await store.readFile({ id: 1, attachmentId: 'comment-image-1' })).toEqual({ ok: false, reason: 'not-found' })
+  })
+
+  it('keeps older user replies editable without stored comment ids', async () => {
+    const items = memoryTable<BacklogItem>()
+    const files = memoryFiles()
+    const store = BacklogModel.createStore({ items, files, now: () => 1_000 })
+    await store.capture({ text: 'legacy reply', actor: user })
+    const captured = items.rows.get('1')
+    expect(captured).toBeDefined()
+    if (captured === undefined) return
+    await items.put('1', {
+      ...captured,
+      events: [...captured.events, { at: 500, actor: 'user', kind: 'commented', detail: 'written before reply editing' }],
+    })
+
+    const reopened = BacklogModel.createStore({ items, files, now: () => 1_000 })
+    const detail = reopened.get(1)
+    expect(detail.ok).toBe(true)
+    if (!detail.ok) return
+    const reply = detail.value.item.events.find(event => event.kind === 'commented')
+    expect(reply?.commentId).toMatch(/^legacy-/)
+    if (reply?.commentId === undefined) return
+
+    const edited = await reopened.editComment({ id: 1, commentId: reply.commentId, text: 'edited legacy reply', actor: user })
+    expect(edited.ok && edited.value.item.events.some(event => event.commentId === reply.commentId && event.detail === 'edited legacy reply')).toBe(true)
   })
 
   it('takes the kind, status and project the composer set, and records them as the user owns them', async () => {

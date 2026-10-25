@@ -19,6 +19,12 @@ export interface ThreadNotificationCategoryPreferences {
 
 export type ThreadNotificationCategories = Readonly<Record<ThreadNotificationCategory, ThreadNotificationCategoryPreferences>>
 
+export const storedNotificationSoundsMuted = createStoredValue({
+  key: 'dshfiles.thread-sidebar.notification-sounds-muted.v1',
+  schema: z.boolean(),
+  fallback: false,
+})
+
 export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   'approval-needed': { delivery: 'off', sound: false, soundPreset: 'soft', volume: 0.5 },
   'input-needed': { delivery: 'off', sound: false, soundPreset: 'chime', volume: 0.5 },
@@ -99,11 +105,17 @@ const claimNotificationEvent = (knownIds: readonly string[], eventId: string) =>
 }
 
 /** Claim a bounded per-browser event id before delivery, so mounted tabs do not repeat it. */
-const claimThreadNotification = (eventId: string): boolean => {
-  const claim = claimNotificationEvent(deliveredNotificationIds.get() ?? [], eventId)
-  if (!claim.claimed) return false
-  return deliveredNotificationIds.set([...claim.notificationIds])
-}
+export const createThreadNotificationClaimer =
+  (ledger: { readonly get: () => string[]; readonly set: (next: string[]) => boolean }): ((eventId: string) => boolean) =>
+  (eventId: string): boolean => {
+    const claim = claimNotificationEvent(ledger.get(), eventId)
+    if (!claim.claimed) return false
+    // A failed persistence write still leaves this tab's in-memory claim in place; deliver the event anyway.
+    ledger.set([...claim.notificationIds])
+    return true
+  }
+
+const claimThreadNotification = createThreadNotificationClaimer(deliveredNotificationIds)
 
 export interface ThreadInteractionStatus {
   readonly pendingInteractionKey: string | undefined

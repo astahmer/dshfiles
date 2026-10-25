@@ -112,9 +112,16 @@ export class PanelScopes {
    * The repository a scope opens on: what it last showed, the thread's own project, then — only for the panel's own
    * default and the dock, which shared one pick before scopes existed — the last repository opened anywhere.
    */
-  static initialPath(input: { readonly scope: string; readonly defaultPath: string | null; readonly legacyPath: string }): string {
+  static initialPath(input: {
+    readonly scope: string
+    readonly defaultPath: string | null
+    readonly legacyPath: string
+    readonly registeredPaths?: readonly string[]
+  }): string {
     const ownPick = input.scope.startsWith(THREAD_SCOPE_PREFIX) || input.scope.startsWith(MAIN_TAB_SCOPE_PREFIX)
-    return PanelScopes.persisted(input.scope).path ?? input.defaultPath ?? (ownPick ? '' : input.legacyPath)
+    const rememberedPath = PanelScopes.persisted(input.scope).path
+    const rememberedPathIsRegistered = rememberedPath === undefined || input.registeredPaths === undefined || input.registeredPaths.includes(rememberedPath)
+    return (rememberedPathIsRegistered ? rememberedPath : undefined) ?? input.defaultPath ?? (ownPick ? '' : input.legacyPath)
   }
 
   /** "Jujutsu · dshfiles" names the repository a scoped tab shows; the bare name is the panel default. */

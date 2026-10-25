@@ -192,20 +192,19 @@ Then('selecting a model in the cost breakdown shows its requests in the log', as
 
 When('the Tools & Jev tab is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Tools & Jev', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Jev requests', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tool calls over time', exact: true })).toBeVisible()
 })
 
 Then('the tool execution report and Jev call report are visible', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'usage-tool-and-jev-report-visible', async () => {
-    await expect(page.getByRole('heading', { name: 'Tool executions', exact: true })).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Avg / p50 / p90 / max', exact: true })).toBeVisible()
-    await expect(page.locator('dl').getByText('Skills', { exact: true }).locator('..')).toContainText('1')
-    await expect(page.locator('dl').getByText('Plugin API tools', { exact: true }).locator('..')).toContainText('1')
-    await expect(page.locator('dl').getByText('MCP tools', { exact: true }).locator('..')).toContainText('1')
-    await expect(page.locator('dl').getByText('DSH tools', { exact: true }).locator('..')).toContainText('1')
-    await expect(page.getByRole('table').getByRole('row', { name: /DSH tools\s+—\s+bash\s+1\s+1\s+\(100%\)\s+0\s+0\s+0/u })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Most-used tools', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Output by category', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Every tool', exact: true })).toBeVisible()
+    await expect(page.locator('dl').getByText('Returned text', { exact: true }).locator('..')).toContainText('tokens')
+    await expect(page.getByRole('columnheader', { name: 'Output tokens', exact: true })).toBeVisible()
+    await expect(page.getByRole('table').getByRole('row', { name: /DSH tools\s+—\s+bash\s+1\s+1\s+\(100%\)\s+0/u })).toBeVisible()
     await expect(page.getByRole('table').getByRole('row', { name: /Skills\s+—\s+verify-dsh\s+1/u })).toBeVisible()
-    await expect(page.getByText(/Arguments, outputs, commands, paths, and raw errors are never copied/u)).toBeVisible()
+    await expect(page.getByText(/Arguments, outputs, commands, paths and raw errors are never copied/u)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

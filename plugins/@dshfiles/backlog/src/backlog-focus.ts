@@ -3,6 +3,8 @@
  * this module store: the card asks, the panel reads and selects, and the request is dropped once it lands.
  */
 let focus: number | null = null
+let capture: { readonly id: number; readonly text: string } | null = null
+let nextCaptureId = 0
 const listeners = new Set<() => void>()
 
 const notify = (): void => {
@@ -15,6 +17,19 @@ const requestBacklogFocus = (id: number): void => {
 }
 
 const readBacklogFocus = (): number | null => focus
+
+const requestBacklogCapture = (text: string): void => {
+  capture = { id: ++nextCaptureId, text }
+  notify()
+}
+
+const readBacklogCapture = (): { readonly id: number; readonly text: string } | null => capture
+
+const clearBacklogCapture = (): void => {
+  if (capture === null) return
+  capture = null
+  notify()
+}
 
 const clearBacklogFocus = (): void => {
   if (focus === null) return
@@ -30,6 +45,9 @@ const subscribeBacklogFocus = (listener: () => void): (() => void) => {
 export class BacklogFocusModel {
   static readonly request = requestBacklogFocus
   static readonly read = readBacklogFocus
+  static readonly requestCapture = requestBacklogCapture
+  static readonly readCapture = readBacklogCapture
+  static readonly clearCapture = clearBacklogCapture
   static readonly clear = clearBacklogFocus
   static readonly subscribe = subscribeBacklogFocus
 }

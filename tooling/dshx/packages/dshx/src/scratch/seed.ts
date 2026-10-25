@@ -81,9 +81,7 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   // name and shows only the model id.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)
   const bareModelWord = new RegExp(`(?:^|[\\s/])${bareModelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
-  const routeOption = input.page
-    .getByRole('menuitemradio', { name: modelId, exact: true })
-    .or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
+  const routeOption = input.page.getByRole('menuitemradio', { name: modelId, exact: true }).or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
   await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
   await routeOption.first().click({ timeout: input.timeoutMs })
 
@@ -99,6 +97,9 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
 
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
 const TOOL_CALL_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-call-thread', description: 'Wait three seconds' })}]]`
+/** A successful `write` call gives the turn a changed-files card, and with it a `changes-review` tab to open. */
+const FILE_CHANGE_DIRECTIVE = `[[call write ${JSON.stringify({ file_path: 'review-fixture.md', content: ['# Review fixture', '', ...Array.from({ length: 80 }, (_, index) => `- line ${String(index + 1)}`)].join('\n') })}]]`
+const FILE_CHANGE_NAME = 'review-fixture.md'
 const JEV_SETUP_CHAT_PROMPT = 'Can you help me set up Jev?'
 const REBASE_READY_THREAD_MESSAGE = 'Seeded thread to rebase'
 const PENDING_RESTART_MARKER = '\n// dshx dev seed: pending restart\n'
@@ -424,6 +425,17 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
   await sendFakeProviderTurn(page, TOOL_CALL_DIRECTIVE, timeoutMs)
   await page
     .getByText('Tool finished.', { exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: timeoutMs + 10_000 })
+  return process
+}
+
+/** A thread whose model writes one file, so the turn ends with a changed-files card a review can open. */
+const seedFileChangeThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  const process = await configureFakeProviderThread({ state, page, seed: 'file-change-thread', timeoutMs })
+  await sendFakeProviderTurn(page, FILE_CHANGE_DIRECTIVE, timeoutMs)
+  await page
+    .getByText(FILE_CHANGE_NAME, { exact: false })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs + 10_000 })
   return process
@@ -1104,6 +1116,7 @@ const applySeed = async (input: {
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'credential-recovery') return { fakeProvider: await seedCredentialRecovery(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
+  if (input.seed === 'file-change-thread') return { fakeProvider: await seedFileChangeThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'queue-preview-thread') return { fakeProvider: await seedQueuePreviewThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'jev-setup-chat-thread') return { fakeProvider: await seedJevSetupChatThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }

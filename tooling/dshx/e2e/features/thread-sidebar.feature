@@ -144,6 +144,13 @@ Feature: Thread sidebar journeys
     Then previewing a notification sound plays a tone through the browser audio context
     And the notification settings survive a browser reload
 
+  @scenario:thread-sidebar.notification-sound-palette
+  Scenario: Notification sound mute toggles from the command palette
+    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
+    When the command palette is opened
+    When the palette query is "Mute notification sounds"
+    Then the notification sound mute palette action toggles both ways
+
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

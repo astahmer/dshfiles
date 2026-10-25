@@ -414,6 +414,7 @@ export default defineClient({
         archived,
         landing,
         queued: thread.integrationQueuedAt !== undefined,
+        statusRefreshing: status.isFetching,
       })
       if (markers.length === 0 && !offered) return noticeToast.element
       return (

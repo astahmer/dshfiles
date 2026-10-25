@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { ComposerContextModel, composerBaseFromSetting } from './composer-context-core.js'
+import { decodePreferences } from './preferences.js'
 
 describe('composer base setting', () => {
+  it('defaults composer preferences to main while preserving configured bases', () => {
+    expect(decodePreferences({}).composerBarBase).toBe('main')
+    expect(decodePreferences({ composerBarBase: 'release' }).composerBarBase).toBe('release')
+  })
+
   it('maps the settings string to a base and back', () => {
     expect(composerBaseFromSetting('parent')).toEqual({ kind: 'parent' })
     expect(composerBaseFromSetting('trunk')).toEqual({ kind: 'trunk' })
@@ -9,10 +15,10 @@ describe('composer base setting', () => {
     expect(ComposerContextModel.composerBaseSetting({ kind: 'bookmark', name: 'feat/x' })).toBe('feat/x')
   })
 
-  it('falls back to the parent for empty, missing or revset-injecting values', () => {
-    expect(composerBaseFromSetting('')).toEqual({ kind: 'parent' })
-    expect(composerBaseFromSetting(undefined)).toEqual({ kind: 'parent' })
-    expect(composerBaseFromSetting('main") | all()')).toEqual({ kind: 'parent' })
+  it('defaults to main for empty, missing or revset-injecting values', () => {
+    expect(composerBaseFromSetting('')).toEqual({ kind: 'bookmark', name: 'main' })
+    expect(composerBaseFromSetting(undefined)).toEqual({ kind: 'bookmark', name: 'main' })
+    expect(composerBaseFromSetting('main") | all()')).toEqual({ kind: 'bookmark', name: 'main' })
   })
 
   it('compares the parent as the working-copy change and other bases from their fork point', () => {

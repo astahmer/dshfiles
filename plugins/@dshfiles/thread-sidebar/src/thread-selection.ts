@@ -1,6 +1,12 @@
 export const THREAD_MAIN_BUTTON_SELECTOR = 'button[data-thread-main-action][data-thread-id]'
 export const THREAD_SECTION_HEADER_SELECTOR = 'button[data-thread-section-header]'
 
+export const isThreadSelectionBackgroundClick = (input: { readonly target: Element; readonly surface: HTMLElement }): boolean => {
+  if (input.target.closest('[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="dialog"]') !== null) return false
+  const rowButton = input.target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+  return rowButton === null || !input.surface.contains(rowButton)
+}
+
 export interface ThreadSelectionState {
   /** Selected thread ids in the order they were selected; never duplicated. */
   readonly sessionIds: readonly string[]

@@ -1,4 +1,4 @@
-import type { ThreadNotificationSound } from './thread-notifications.js'
+import { storedNotificationSoundsMuted, type ThreadNotificationSound } from './thread-notifications.js'
 
 interface NotificationTone {
   readonly frequency: number
@@ -79,7 +79,9 @@ const scheduleTone = (context: AudioContext, sound: ThreadNotificationSound, vol
 
 /** Play a sound outside a gesture: resume first, then schedule, so a suspended context still rings. */
 const playThreadNotificationSound = (sound: ThreadNotificationSound, volume: number): void => {
+  if (storedNotificationSoundsMuted.get() === true) return
   void runningAudioContext().then(context => {
+    if (storedNotificationSoundsMuted.get() === true) return
     if (context === null) return
     try {
       scheduleTone(context, sound, volume)
