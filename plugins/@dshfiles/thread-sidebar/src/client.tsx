@@ -4327,55 +4327,83 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           >
             {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
               const compactLabel = threadViewPresetCompactLabel(view)
+              const matchingThreadIds = threadViewAttentionEntries
+                .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
+                .map(entry => entry.thread.id)
+              const clearViewUnread = (): void => {
+                for (const sessionId of matchingThreadIds) {
+                  const record = attention.records.get(sessionId)
+                  if (record !== undefined) attention.clearUnread(sessionId, record.version)
+                }
+              }
+              const markViewUnread = (): void => {
+                for (const sessionId of matchingThreadIds) {
+                  if (!attention.records.has(sessionId)) attention.markUnread(sessionId)
+                }
+              }
               const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
               const accessibleLabel =
                 attentionLabel === undefined && visibleCount === null
                   ? undefined
                   : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
               return (
-                <Button
-                  key={view.id}
-                  type="button"
-                  data-thread-list-view-button=""
-                  variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className={cn('dshx:flex-1', compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-20 dshx:shrink-0')}
-                  title={label}
-                  aria-label={accessibleLabel}
-                  aria-pressed={view.id === listThreadView.id}
-                  onClick={() => selectThreadViewPreset(view.id)}
-                >
-                  {compactViewTabs ? (
-                    <>
-                      <span className="dshx:sr-only">{label}</span>
-                      {compactLabel.kind === 'icon' ? (
-                        <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
+                <ContextMenu key={view.id}>
+                  <ContextMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      data-thread-list-view-button=""
+                      variant={view.id === listThreadView.id ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn('dshx:flex-1', compactViewTabs ? 'dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-1.5' : 'dshx:min-w-20 dshx:shrink-0')}
+                      title={label}
+                      aria-label={accessibleLabel}
+                      aria-pressed={view.id === listThreadView.id}
+                      onClick={() => selectThreadViewPreset(view.id)}
+                    >
+                      {compactViewTabs ? (
+                        <>
+                          <span className="dshx:sr-only">{label}</span>
+                          {compactLabel.kind === 'icon' ? (
+                            <compactLabel.icon aria-hidden="true" data-testid="thread-view-compact-icon" />
+                          ) : (
+                            <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
+                              {compactLabel.initial}
+                            </span>
+                          )}
+                        </>
                       ) : (
-                        <span aria-hidden="true" data-testid="thread-view-compact-initial" className="dshx:font-semibold">
-                          {compactLabel.initial}
-                        </span>
+                        <span className="dshx:truncate">{label}</span>
                       )}
-                    </>
-                  ) : (
-                    <span className="dshx:truncate">{label}</span>
-                  )}
-                  {attentionLabel === undefined ? null : (
-                    <span
-                      aria-hidden="true"
-                      data-testid="thread-view-attention-dot"
-                      className={cn(
-                        'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
-                        ThreadAttentionPresentationModel.attentionDotClass({
-                          attentionLabel,
-                          attentionColors: preferences.attentionColors,
-                          unread: false,
-                          running: false,
-                        }),
+                      {attentionLabel === undefined ? null : (
+                        <span
+                          aria-hidden="true"
+                          data-testid="thread-view-attention-dot"
+                          className={cn(
+                            'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
+                            ThreadAttentionPresentationModel.attentionDotClass({
+                              attentionLabel,
+                              attentionColors: preferences.attentionColors,
+                              unread: false,
+                              running: false,
+                            }),
+                          )}
+                        />
                       )}
-                    />
-                  )}
-                  {visibleCount === null ? null : <span className="dshx:shrink-0">{compactViewTabs ? visibleCount : `(${visibleCount})`}</span>}
-                </Button>
+                      {visibleCount === null ? null : <span className="dshx:shrink-0">{compactViewTabs ? visibleCount : `(${visibleCount})`}</span>}
+                    </Button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="dshx-root">
+                    <ContextMenuItem
+                      disabled={!attention.available || !matchingThreadIds.some(sessionId => attention.records.has(sessionId))}
+                      onSelect={clearViewUnread}
+                    >
+                      {props.tSidebar('threadSidebarMarkViewRead')}
+                    </ContextMenuItem>
+                    <ContextMenuItem disabled={!attention.available || matchingThreadIds.length === 0} onSelect={markViewUnread}>
+                      {props.tSidebar('threadSidebarMarkViewUnread')}
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               )
             })}
           </div>

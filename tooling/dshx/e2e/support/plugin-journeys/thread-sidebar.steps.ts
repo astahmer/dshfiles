@@ -1083,6 +1083,37 @@ Then('the policy settings survive a browser reload', async ({ page }: { page: Pa
   await finishJourneyAssertions(page)
 })
 
+const viewContextUnreadJourneys = new WeakMap<Page, string>()
+
+When('a view context menu marks a thread unread', async ({ page }: { page: Page }) => {
+  const threadId = await startBlankThread(page)
+  viewContextUnreadJourneys.set(page, threadId)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar view context unread e2e target')
+  await composer.press('Enter')
+  const row = threadRow(page, threadId)
+  const allThreadsTab = threadSidebar(page).locator('button[data-thread-list-view-button][title="All threads"]')
+
+  await expect(row).toHaveCount(1)
+  await allThreadsTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Mark all as unread', exact: true }).click()
+  await expect(row.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
+})
+
+Then('the same view context menu marks it read', async ({ page }: { page: Page }) => {
+  const threadId = viewContextUnreadJourneys.get(page)
+  if (threadId === undefined) throw new Error('view context menu journey did not create a thread')
+  const row = threadRow(page, threadId)
+  const allThreadsTab = threadSidebar(page).locator('button[data-thread-list-view-button][title="All threads"]')
+
+  await allThreadsTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Mark all as read', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-view-context-read-unread', async () => {
+    await expect(row.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('one thread is marked unread and another thread is opened', async ({ page }: { page: Page }) => {
   const targetThreadId = await startBlankThread(page)
   const targetPrompt = 'thread sidebar primary unread e2e target'

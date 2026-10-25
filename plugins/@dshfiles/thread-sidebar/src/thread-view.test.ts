@@ -214,6 +214,15 @@ describe('thread view unread counts', () => {
     ...overrides,
   })
 
+  it('matches every row in a view, including unread-filtered and storage-filtered rows', () => {
+    expect(ThreadViewModel.matchesAttentionView(entry(), { filters: [], sourceFilter: 'all' })).toBe(true)
+    expect(ThreadViewModel.matchesAttentionView(entry({ unread: true }), { filters: ['unread'], sourceFilter: 'all' })).toBe(true)
+    expect(ThreadViewModel.matchesAttentionView(entry(), { filters: ['unread'], sourceFilter: 'all' })).toBe(false)
+    expect(ThreadViewModel.matchesAttentionView(entry({ muted: true }), { filters: [], sourceFilter: 'all' })).toBe(false)
+    expect(ThreadViewModel.matchesAttentionView(entry({ muted: true }), { filters: ['muted'], sourceFilter: 'all' })).toBe(true)
+    expect(ThreadViewModel.matchesAttentionView(entry({ thread: { origin: 'subagent' } }), { filters: [], sourceFilter: 'main' })).toBe(false)
+  })
+
   it('counts only unread threads the view lists', () => {
     const entries = [
       entry({ unread: true }),

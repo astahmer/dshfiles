@@ -205,6 +205,24 @@ const attentionLabelForView = (input: {
 }
 
 /** How many threads the view lists that still hold an unacknowledged finish on the Host. */
+const matchesAttentionView = (
+  entry: ThreadViewAttentionEntry,
+  view: { readonly filters: ThreadStatusFilters; readonly sourceFilter: ThreadSourceFilter },
+): boolean => {
+  if (!matchesThreadSourceFilter(entry.thread, view.sourceFilter)) return false
+  if (entry.muted && !view.filters.includes('muted')) return false
+  return matchesThreadStatusFilter({
+    filters: view.filters,
+    running: entry.running,
+    inactive: entry.inactive === true,
+    labels: entry.attentionLabel === undefined ? [] : [entry.attentionLabel],
+    unread: entry.unread === true,
+    archived: entry.archived,
+    settled: entry.settled,
+    muted: entry.muted,
+  })
+}
+
 const unreadCountForView = (input: {
   readonly filters: ThreadStatusFilters
   readonly sourceFilter: ThreadSourceFilter
@@ -212,22 +230,7 @@ const unreadCountForView = (input: {
 }): number => {
   let count = 0
   for (const entry of input.entries) {
-    if (entry.unread !== true || !matchesThreadSourceFilter(entry.thread, input.sourceFilter)) continue
-    if (entry.muted && !input.filters.includes('muted')) continue
-    if (
-      !matchesThreadStatusFilter({
-        filters: input.filters,
-        running: entry.running,
-        inactive: entry.inactive === true,
-        labels: entry.attentionLabel === undefined ? [] : [entry.attentionLabel],
-        unread: entry.unread === true,
-        archived: entry.archived,
-        settled: entry.settled,
-        muted: entry.muted,
-      })
-    ) {
-      continue
-    }
+    if (entry.unread !== true || !matchesAttentionView(entry, input)) continue
     count += 1
   }
   return count
@@ -304,6 +307,7 @@ export class ThreadViewModel {
   static readonly matchesSourceFilter = matchesThreadSourceFilter
   static readonly matchesAttentionSourceFilter = matchesAttentionSourceFilter
   static readonly matchesStatusFilter = matchesThreadStatusFilter
+  static readonly matchesAttentionView = matchesAttentionView
   static readonly mostUrgentAttentionLabel = mostUrgentAttentionLabel
   static readonly attentionLabelForView = attentionLabelForView
   static readonly unreadCountForView = unreadCountForView

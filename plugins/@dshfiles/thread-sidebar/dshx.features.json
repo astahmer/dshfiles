@@ -399,6 +399,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "thread-sidebar.view-context-menu",
+          "featureFile": "tooling/dshx/e2e/features/thread-view-presets.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "thread-sidebar.shipped-view-filters",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
