@@ -19,7 +19,7 @@ export class InlineIntegrateOffer {
     readonly landing: boolean
     /** A queued integration already waits for the workspace to go idle; its notice offers Undo instead. */
     readonly queued: boolean
-    /** Do not show a cached offer while a status refresh may already know it was integrated. */
-    readonly statusRefreshing: boolean
-  }): boolean => input.category === 'ready' && input.isNewestTurn && !input.archived && !input.landing && !input.queued && !input.statusRefreshing
+    /** A completed Turn must not offer from the cached status that predates that Turn. */
+    readonly turnEndRefreshPending: boolean
+  }): boolean => input.category === 'ready' && input.isNewestTurn && !input.archived && !input.landing && !input.queued && !input.turnEndRefreshPending
 }

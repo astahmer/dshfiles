@@ -290,10 +290,13 @@ export default defineClient({
       const queryClient = useQueryClient()
       const statusRefresh = useRef<TurnEndStatusRefresh | null>(null)
       statusRefresh.current ??= new TurnEndStatusRefresh(props.turn.end?.time)
-      useEffect(() => {
+      const [statusRefreshBaseline, setStatusRefreshBaseline] = useState<number | null>(null)
+      useLayoutEffect(() => {
         if (!statusRefresh.current?.take({ newestTurnHasEnded, endedAt: props.turn.end?.time })) return
+        setStatusRefreshBaseline(status.dataUpdatedAt)
         void queryClient.invalidateQueries({ queryKey: statusQueryKey, exact: true })
-      }, [newestTurnHasEnded, props.turn.end?.time, queryClient, statusQueryKey])
+      }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey])
+      const turnEndRefreshPending = statusRefreshBaseline !== null && status.dataUpdatedAt <= statusRefreshBaseline
       const bookmark = useBookmark()
       const thread = status.data?.thread
       const threadPath = thread?.path ?? path
@@ -415,7 +418,7 @@ export default defineClient({
         archived,
         landing,
         queued: thread.integrationQueuedAt !== undefined,
-        statusRefreshing: status.isFetching,
+        turnEndRefreshPending,
       })
       if (markers.length === 0 && !offered) return noticeToast.element
       return (

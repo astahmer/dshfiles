@@ -1252,6 +1252,12 @@ const restoreMissingThreadWorkspace = async (path: string, sessionId: string): P
     const location = await cachedBestEffortLocation(activeThreads, workspace.path)
     if (location === undefined || location.repoRoot !== location.workspaceRoot) continue
     await activeThreads.restore(location.repoRoot, path)
+    const registry = registryOf()
+    const registered = await registry.resolveByPath(path)
+    if (registered === undefined) {
+      const project = await registry.resolveByPath(location.repoRoot)
+      await registry.create(path, `${project?.title ?? basename(location.repoRoot)} · ${basename(path)}`)
+    }
     locationCache.delete(path)
     invalidateRepositories()
     emitActivity({ type: 'workspace.restored', summary: `Restored deleted thread workspace ${basename(path)}`, path, sessionId })

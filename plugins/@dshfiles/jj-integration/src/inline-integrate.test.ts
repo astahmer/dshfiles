@@ -34,7 +34,7 @@ const offer = (input: {
   readonly archived?: boolean
   readonly landing?: boolean
   readonly queued?: boolean
-  readonly statusRefreshing?: boolean
+  readonly turnEndRefreshPending?: boolean
 }) =>
   InlineIntegrateOffer.isOffered({
     category: ThreadIntegrationModel.assess({
@@ -47,7 +47,7 @@ const offer = (input: {
     archived: input.archived ?? false,
     landing: input.landing ?? false,
     queued: input.queued ?? false,
-    statusRefreshing: input.statusRefreshing ?? false,
+    turnEndRefreshPending: input.turnEndRefreshPending ?? false,
   })
 
 describe('inline integration offer', () => {
@@ -70,11 +70,16 @@ describe('inline integration offer', () => {
     expect(offer({ thread: { unlanded: [], rebasedAt: 1, rebasedTipChangeId: 'tip' } })).toBe(false)
   })
 
-  it('keeps the offer on the newest turn only, and never on an archived, landing, queued, or refreshing thread', () => {
+  it('waits for the completed Turn status refresh before offering integration', () => {
+    expect(offer({ turnEndRefreshPending: true })).toBe(false)
+    expect(offer({})).toBe(true)
+    expect(offer({ thread: { unlanded: [] } })).toBe(false)
+  })
+
+  it('keeps the offer on the newest turn only, and never on an archived, landing, or queued thread', () => {
     expect(offer({ isNewestTurn: false })).toBe(false)
     expect(offer({ archived: true })).toBe(false)
     expect(offer({ landing: true })).toBe(false)
     expect(offer({ queued: true })).toBe(false)
-    expect(offer({ statusRefreshing: true })).toBe(false)
   })
 })
