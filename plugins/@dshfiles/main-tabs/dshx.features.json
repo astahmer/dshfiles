@@ -57,7 +57,8 @@
         "Dragging a panel tab over the right column asks its plugin through the cancelable `dshfiles:move-panel-aside` event. A panel whose plugin offers no side-panel view keeps its tab and the strip says so; a panel tab is only moved when its owner cancels the request.",
         "A thread dropped where the aside owner declined the request keeps its main tab and announces the unavailable side panel; dragging where the right sidebar is not mounted highlights nothing.",
         "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too.",
-        "A thread tab dropped outside the active composer leaves the strip alone; a drop on the composer inserts a mention chip and never the tab title as plain text."
+        "A thread tab dropped outside the active composer leaves the strip alone; a drop on the composer inserts a mention chip and never the tab title as plain text.",
+        "A same-origin thread link whose thread the strip cannot open (unlisted, archived, or main-tabs switched off) keeps the link's own navigation instead of opening a tab."
       ],
       "externalDependencies": [],
       "verification": [

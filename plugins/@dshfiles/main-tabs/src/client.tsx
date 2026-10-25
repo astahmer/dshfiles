@@ -21,6 +21,7 @@ import { mainTabsSettings } from './settings.js'
 import { PanelIcon, StartPage, type StartSection } from './start-page.js'
 import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-tabs.js'
 import { panelShortcut, recentThreads } from './start-suggestions.js'
+import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type HostTarget, type TabPreferences, type TabsEvent } from './tabs-machine.js'
 import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, mountStripHost, stripSitsAbovePanel } from './strip-mount.js'
@@ -138,12 +139,27 @@ export default defineClient({
       return () => actor.stop()
     }, 'main-tabs: tabs machine')
 
+    /** Open a listed thread in the strip; false means nothing took it and the caller keeps its own behavior. */
+    const requestThreadTab = (sessionId: string, newTab: boolean): boolean => {
+      if (!actor.getSnapshot().matches('on')) return false
+      const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === sessionId)
+      if (listed === undefined) return false
+      actor.send({ type: 'tab.open', target: { kind: 'thread', sessionId: listed }, newTab })
+      return true
+    }
+
+    // A same-origin thread link is a tab, not a document load: inside an installed PWA loading the app again looks
+    // like the current page reloading, which is what a clicked thread link used to do.
+    ctx.effect(
+      () => installThreadLinkClicks({ document, origin: window.location.origin, openThread: sessionId => requestThreadTab(sessionId, true) }),
+      'main-tabs: open a clicked thread link in a tab',
+    )
+
     ctx.effect(() => {
       const onOpenThread = (event: Event): void => {
         const request = event instanceof CustomEvent ? openThreadRequestSchema.safeParse(event.detail) : undefined
-        if (request?.success !== true || !actor.getSnapshot().matches('on')) return
+        if (request?.success !== true || !requestThreadTab(request.data.sessionId, request.data.newTab)) return
         event.preventDefault()
-        actor.send({ type: 'tab.open', target: { kind: 'thread', sessionId: request.data.sessionId }, newTab: request.data.newTab })
       }
       const onReplaceThreadTab = (event: Event): void => {
         const request = event instanceof CustomEvent ? replaceThreadTabRequestSchema.safeParse(event.detail) : undefined
