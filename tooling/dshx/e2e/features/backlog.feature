@@ -53,7 +53,7 @@ Feature: Backlog
     When the backlog search is submitted
     Then search results list only "composer chip on the board"
 
-  @scenario:backlog.board-columns-customization
+  @scenario:backlog.board-column-preferences
   Scenario: Reorder and hide columns on the Backlog board only
     Given the isolated plugin profile "@dshfiles/backlog" is booted
     When the Backlog panel is opened

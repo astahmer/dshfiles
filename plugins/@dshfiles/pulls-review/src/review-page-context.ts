@@ -1,8 +1,5 @@
-import type { ReviewSource } from './review-model.js'
-
 /** What the tab hands the main-area page when the user asks for the full page. */
 export interface PageReviewContext {
-  readonly turn?: Extract<ReviewSource, { kind: 'turn' }> | undefined
   readonly workspacePath?: string | undefined
   readonly sessionId?: string | undefined
 }
