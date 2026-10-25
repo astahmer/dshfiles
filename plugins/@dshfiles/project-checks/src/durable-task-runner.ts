@@ -1,9 +1,10 @@
-import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.js'
+import { setTimeout as delay } from 'node:timers/promises'
+import { DurableTaskModel, durableTaskSchema, type DurableTask } from './durable-tasks.ts'
+import type { DurableTaskExecutionStore } from './durable-task-store.ts'
 
 export type DurableTaskResult = { readonly status: 'succeeded' | 'failed' | 'cancelled' | 'timed-out' | 'unknown'; readonly exitCode: number | null }
 
-export type DurableTaskTable = KvTable<string, DurableTask>
+export type DurableTaskTable = DurableTaskExecutionStore
 
 export interface DurableTaskRunnerOptions {
   readonly table: DurableTaskTable
@@ -25,6 +26,7 @@ const MAX_DURABLE_TASKS = 1_000
 export class DurableTaskRunner {
   private readonly options: DurableTaskRunnerOptions
   private readonly active = new Map<string, AbortController>()
+  private readonly claimed = new Set<string>()
   private readonly workers = new Map<string, Promise<void>>()
   private readonly pending = new Set<string>()
   private stopping = false
@@ -35,48 +37,22 @@ export class DurableTaskRunner {
   }
 
   async recover(): Promise<void> {
-    const now = this.now()
     for (const [taskId, saved] of this.options.table.entries()) {
-      let task = durableTaskSchema.parse(saved)
+      const task = durableTaskSchema.parse(saved)
       if (task.id !== taskId) throw new Error('Durable Project Checks task key does not match its record identity.')
-      if (task.status === 'running' || task.status === 'cancel-requested') task = DurableTaskModel.unknown(task, now)
-      if (task.status === 'unknown') {
-        const attempt = task.attempts[task.attempts.length - 1]
-        const receipt = attempt === undefined ? null : await this.options.findReceipt(taskId, attempt.id)
-        if (attempt !== undefined && receipt !== null && receipt.status !== 'unknown') {
-          task = DurableTaskModel.reconcile(task, { attemptId: attempt.id, status: receipt.status, exitCode: receipt.exitCode, now })
-        }
-        await this.options.table.put(taskId, task)
-      }
-      if (task.status !== 'queued' && task.status !== 'unknown') continue
-      const validation = await this.options.validate(task)
-      if (!validation.runnable) {
-        await this.options.table.update(taskId, current => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now: this.now() }))
-        continue
-      }
-      if (task.status === 'unknown' && !validation.safeReplay) continue
-      if (task.status === 'unknown') {
-        task = DurableTaskModel.retry(task, this.now())
-        await this.options.table.put(taskId, task)
-      }
-      this.launch(taskId)
+      if (task.status === 'queued' || task.status === 'running' || task.status === 'cancel-requested' || task.status === 'unknown') this.launch(taskId)
     }
   }
 
   async enqueue(task: DurableTask): Promise<DurableTask> {
     return this.withAdmission(async () => {
       if (this.stopping) throw new Error('Durable Project Checks runner is stopping.')
-      const existing = this.options.table.get(task.id)
-      if (existing !== undefined) {
-        if (existing.sessionId !== task.sessionId || existing.actionId !== task.actionId || existing.actionFingerprint !== task.actionFingerprint) {
-          throw new Error('That idempotency key is already bound to a different Project Checks action.')
-        }
-        return existing
+      const stored = await this.options.table.createIfAbsent(task, MAX_DURABLE_TASKS)
+      if (stored.sessionId !== task.sessionId || stored.actionId !== task.actionId || stored.actionFingerprint !== task.actionFingerprint) {
+        throw new Error('That idempotency key is already bound to a different Project Checks action.')
       }
-      await this.pruneTerminalRows()
-      await this.options.table.put(task.id, task)
       this.launch(task.id)
-      return task
+      return stored
     })
   }
 
@@ -95,14 +71,8 @@ export class DurableTaskRunner {
 
   async cancel(taskId: string): Promise<DurableTask> {
     const task = await this.options.table.update(taskId, current => DurableTaskModel.cancel(current, this.now()))
-    if (task.status === 'cancel-requested') {
-      const controller = this.active.get(taskId)
-      if (controller === undefined) {
-        const unknown = await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, this.now()))
-        return unknown
-      }
-      controller.abort(new Error('Project Checks task cancellation requested.'))
-    }
+    if (task.status === 'cancel-requested' || task.status === 'cancelled')
+      this.active.get(taskId)?.abort(new Error('Project Checks task cancellation requested.'))
     return task
   }
 
@@ -131,7 +101,7 @@ export class DurableTaskRunner {
     this.pending.clear()
     const now = this.now()
     for (const [taskId, controller] of this.active) {
-      await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, now))
+      if (this.claimed.has(taskId)) await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, now))
       controller.abort(new Error('Project Checks Host is stopping.'))
     }
     await this.waitForIdle()
@@ -158,24 +128,75 @@ export class DurableTaskRunner {
   }
 
   private async runTask(taskId: string): Promise<void> {
-    const validation = await this.validateTask(taskId)
+    const controller = new AbortController()
+    this.active.set(taskId, controller)
+    try {
+      await this.options.table.withWorkerClaim(controller.signal, async () => {
+        this.claimed.add(taskId)
+        try {
+          await this.runClaimedTask(taskId, controller)
+        } finally {
+          this.claimed.delete(taskId)
+        }
+      })
+    } catch (error) {
+      if (!controller.signal.aborted) this.options.onFailure(error)
+    }
+  }
+
+  private async runClaimedTask(taskId: string, controller: AbortController): Promise<void> {
+    let task = this.options.table.get(taskId)
+    if (task === undefined || DurableTaskModel.isTerminal(task.status)) return
+    let cancellationWasRequested = task.status === 'cancel-requested'
+    if (task.status === 'running' || cancellationWasRequested) {
+      task = await this.options.table.update(taskId, current => {
+        if (current.status === 'cancel-requested') cancellationWasRequested = true
+        return DurableTaskModel.unknown(current, this.now())
+      })
+      const interruptedAttempt = task.attempts[task.attempts.length - 1]
+      const receipt = interruptedAttempt === undefined ? null : await this.options.findReceipt(taskId, interruptedAttempt.id)
+      const receiptStatus = receipt?.status
+      if (interruptedAttempt !== undefined && receipt !== null && receiptStatus !== undefined && receiptStatus !== 'unknown') {
+        task = await this.options.table.update(taskId, current =>
+          DurableTaskModel.reconcile(current, {
+            attemptId: interruptedAttempt.id,
+            status: receiptStatus,
+            exitCode: receipt.exitCode,
+            now: this.now(),
+          }),
+        )
+      }
+    }
+    if (task.status === 'unknown') {
+      const validation = await this.options.validate(task)
+      if (!validation.runnable) {
+        await this.options.table.update(taskId, current => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now: this.now() }))
+        return
+      }
+      if (!validation.safeReplay || cancellationWasRequested) return
+      task = await this.options.table.update(taskId, current => DurableTaskModel.retry(current, this.now()))
+    }
+    if (task.status !== 'queued') return
+    const validation = await this.options.validate(task)
     if (!validation.runnable) {
       await this.options.table.update(taskId, current => DurableTaskModel.block(current, { errorCode: 'handler-unavailable', now: this.now() }))
       return
     }
     const attemptId = this.options.newAttemptId()
-    const task = await this.options.table.update(taskId, current => DurableTaskModel.begin(current, { attemptId, now: this.now() }))
+    task = await this.options.table.update(taskId, current => DurableTaskModel.begin(current, { attemptId, now: this.now() }))
     if (task.status !== 'running') return
-    if (this.stopping) {
+    if (this.stopping || controller.signal.aborted) {
       await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, this.now()))
       return
     }
-    const controller = new AbortController()
-    this.active.set(taskId, controller)
-    if (this.options.table.get(taskId)?.status !== 'running') return
     const progress = async (value: DurableTask['attempts'][number]['progress']): Promise<void> => {
       await this.options.table.update(taskId, current => DurableTaskModel.progress(current, { attemptId, progress: value, now: this.now() }))
     }
+    const monitor = new AbortController()
+    const cancellationWatcher = this.watchCancellation(taskId, controller, monitor.signal).catch(error => {
+      this.options.onFailure(error)
+      controller.abort(new Error('Project Checks cancellation state became unavailable.'))
+    })
     try {
       const result = await this.options.run({ task, attemptId, signal: controller.signal, progress })
       await this.options.table.update(taskId, current =>
@@ -186,25 +207,21 @@ export class DurableTaskRunner {
     } catch (error) {
       await this.options.table.update(taskId, current => DurableTaskModel.unknown(current, this.now()))
       this.options.onFailure(error)
+    } finally {
+      monitor.abort()
+      await cancellationWatcher
     }
   }
 
-  private async pruneTerminalRows(): Promise<void> {
-    const entries = [...this.options.table.entries()].map(([id, task]) => ({ id, task: durableTaskSchema.parse(task) }))
-    const removable = entries
-      .filter(
-        entry => entry.task.status === 'succeeded' || entry.task.status === 'failed' || entry.task.status === 'cancelled' || entry.task.status === 'timed-out',
-      )
-      .sort((left, right) => left.task.updatedAt - right.task.updatedAt)
-    while (entries.length >= MAX_DURABLE_TASKS && removable.length > 0) {
-      const next = removable.shift()
-      if (next === undefined) break
-      await this.options.table.delete(next.id)
-      const index = entries.findIndex(entry => entry.id === next.id)
-      if (index >= 0) entries.splice(index, 1)
+  private async watchCancellation(taskId: string, controller: AbortController, signal: AbortSignal): Promise<void> {
+    while (!signal.aborted && !controller.signal.aborted) {
+      try {
+        await delay(200, undefined, { signal })
+      } catch {
+        return
+      }
+      if (this.options.table.get(taskId)?.status === 'cancel-requested') controller.abort(new Error('Project Checks task cancellation requested.'))
     }
-    if (entries.length >= MAX_DURABLE_TASKS)
-      throw new Error('Durable Project Checks task history is full; resolve pending/unknown work before dispatching more.')
   }
 
   private async validateTask(taskId: string): Promise<{ readonly runnable: boolean; readonly safeReplay: boolean }> {

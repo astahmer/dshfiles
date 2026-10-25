@@ -288,9 +288,45 @@
         },
         {
           "kind": "unit-test",
+          "id": "project-checks.durable-task-cross-process-dispatch",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-process.test.ts",
+          "testName": "admits the same idempotency key in two Node processes but runs its side effect once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-cross-process-recovery",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-process.test.ts",
+          "testName": "lets two independent recovering Hosts share one queued task claim"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-cross-process-cancel",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-process.test.ts",
+          "testName": "propagates cancellation from another Host to the process holding the worker claim"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-process-crash-recovery",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-process.test.ts",
+          "testName": "releases the process claim on hard exit and leaves an unreceipted side effect unknown without replay"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-crash-receipt-reconciliation",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-process.test.ts",
+          "testName": "reconciles a committed attempt receipt after its owner dies before the task terminal update"
+        },
+        {
+          "kind": "unit-test",
           "id": "project-checks.durable-task-restart-recovery",
           "file": "plugins/@dshfiles/project-checks/src/durable-task-storage.test.ts",
-          "testName": "recovers queued work and reconciles an interrupted attempt from its persisted receipt after Host reopen"
+          "testName": "imports JSON history, recovers queued work, and reconciles an attempt-specific receipt after reopening"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-cancelled-recovery-no-replay",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
+          "testName": "does not replay a crash-interrupted task after cancellation was requested"
         },
         {
           "kind": "unit-test",

@@ -20,8 +20,9 @@ import { ExecutionModel, LOCAL_ENDPOINT_KEY, type RemoteEndpointState } from './
 import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './receipt-activity.js'
 import { runManagedProcess, type ProcessResult } from './managed-process.js'
 import { PeerSnapshotModel, type PeerFailureCode, type StepResult } from './remote.js'
-import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, type StoredReceipt } from './store.js'
+import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, storedReceiptSchema, type StoredReceipt } from './store.js'
 import { DurableTaskRunner } from './durable-task-runner.js'
+import { DurableTaskStore } from './durable-task-store.js'
 import { durableTaskDomain } from './durable-task-domain.js'
 import { durableTaskSchema, type DurableTask } from './durable-tasks.js'
 
@@ -174,6 +175,7 @@ const openDurableTaskDomain = (ctx: Context) => {
 
 type DurableTaskDomain = Awaited<ReturnType<typeof openDurableTaskDomain>>
 const durableTaskDomains = new WeakMap<Context, Promise<DurableTaskDomain>>()
+const durableTaskStores = new WeakMap<Context, Promise<DurableTaskStore>>()
 const durableTaskRunners = new WeakMap<Context, Promise<DurableTaskRunner>>()
 
 const durableTaskDomainFor = (ctx: Context): Promise<DurableTaskDomain> => {
@@ -183,6 +185,30 @@ const durableTaskDomainFor = (ctx: Context): Promise<DurableTaskDomain> => {
   durableTaskDomains.set(ctx, opening)
   void opening.catch(() => {
     if (durableTaskDomains.get(ctx) === opening) durableTaskDomains.delete(ctx)
+  })
+  return opening
+}
+
+const durableTaskStoreFor = (ctx: Context): Promise<DurableTaskStore> => {
+  const existing = durableTaskStores.get(ctx)
+  if (existing !== undefined) return existing
+  const opening = Promise.resolve().then(async () => {
+    const store = await DurableTaskStore.open()
+    try {
+      const [domain, receipts] = await Promise.all([durableTaskDomainFor(ctx), storageFor(ctx)])
+      await store.importLegacy({
+        tasks: Array.from(domain.table('tasks').entries()).map(([, task]) => task),
+        receipts: Array.from(receipts.table('receipts').entries()).map(([, receipt]) => receipt),
+      })
+      return store
+    } catch (error) {
+      store.close()
+      throw error
+    }
+  })
+  durableTaskStores.set(ctx, opening)
+  void opening.catch(() => {
+    if (durableTaskStores.get(ctx) === opening) durableTaskStores.delete(ctx)
   })
   return opening
 }
@@ -218,9 +244,9 @@ const durableTaskRunnerFor = async (ctx: Context): Promise<DurableTaskRunner> =>
   const existing = durableTaskRunners.get(ctx)
   if (existing !== undefined) return existing
   const opening = Promise.resolve().then(async () => {
-    const domain = await durableTaskDomainFor(ctx)
+    const store = await durableTaskStoreFor(ctx)
     const runner = new DurableTaskRunner({
-      table: domain.table('tasks'),
+      table: store,
       newAttemptId: randomUUID,
       validate: async task => {
         const action = configFor(ctx).actions.find(candidate => candidate.id === task.actionId)
@@ -234,9 +260,11 @@ const durableTaskRunnerFor = async (ctx: Context): Promise<DurableTaskRunner> =>
         }
       },
       findReceipt: async (taskId, attemptId) => {
-        const receipts = Array.from((await storageFor(ctx)).table('receipts').entries()).map(([, receipt]) => receipt)
-        const receipt = receipts.find(candidate => candidate.taskId === taskId && candidate.taskAttemptId === attemptId)
-        if (receipt === undefined) return null
+        const saved = store.findAttemptReceipt(taskId, attemptId)
+        if (saved === undefined) return null
+        const receipt = storedReceiptSchema.parse(saved)
+        if (receipt.taskId !== taskId || receipt.taskAttemptId !== attemptId)
+          throw new Error('A stored receipt does not match the requested durable task attempt.')
         if (receipt.failure === 'process-group-failed') return { status: 'unknown', exitCode: receipt.exitCode }
         return {
           status: receipt.status === 'passed' ? 'succeeded' : receipt.status,
@@ -283,6 +311,14 @@ const closeDurableProjectChecksTasks = async (ctx: Context): Promise<void> => {
     )
     if (durableTaskRunners.get(ctx) === runnerOpening) durableTaskRunners.delete(ctx)
   }
+  const storeOpening = durableTaskStores.get(ctx)
+  if (storeOpening !== undefined) {
+    await storeOpening.then(
+      store => store.close(),
+      () => undefined,
+    )
+    if (durableTaskStores.get(ctx) === storeOpening) durableTaskStores.delete(ctx)
+  }
   const domainOpening = durableTaskDomains.get(ctx)
   if (domainOpening !== undefined) {
     await domainOpening.then(
@@ -294,21 +330,43 @@ const closeDurableProjectChecksTasks = async (ctx: Context): Promise<void> => {
 }
 
 const readStoredReceipts = async (ctx: Context, sessionId: string): Promise<StoredReceipt[]> => {
-  const domain = await storageFor(ctx)
-  return Array.from(domain.table('receipts').entries())
-    .map(([, receipt]) => receipt)
+  const [domain, taskStore] = await Promise.all([storageFor(ctx), durableTaskStoreFor(ctx)])
+  const receipts = new Map<string, StoredReceipt>()
+  for (const [, receipt] of domain.table('receipts').entries()) receipts.set(receipt.id, receipt)
+  for (const saved of taskStore.listAttemptReceipts({ sessionId, limit: MAX_RECEIPTS_PER_SESSION })) {
+    const receipt = storedReceiptSchema.parse(saved)
+    receipts.set(receipt.id, receipt)
+  }
+  return [...receipts.values()]
     .filter(receipt => receipt.sessionId === sessionId)
-    .sort((left, right) => right.finishedAt - left.finishedAt)
+    .sort((left, right) => right.finishedAt - left.finishedAt || right.id.localeCompare(left.id))
     .slice(0, MAX_RECEIPTS_PER_SESSION)
 }
 
-const readStoredReceiptsAfter = async (ctx: Context, since: number): Promise<readonly StoredReceipt[]> =>
-  ProjectChecksReceiptModel.after(Array.from((await storageFor(ctx)).table('receipts').entries()), since, MAX_RECEIPTS_TOTAL)
+const readStoredReceiptsAfter = async (ctx: Context, since: number): Promise<readonly StoredReceipt[]> => {
+  const [domain, taskStore] = await Promise.all([storageFor(ctx), durableTaskStoreFor(ctx)])
+  const receipts = new Map<string, StoredReceipt>()
+  for (const [, receipt] of domain.table('receipts').entries()) receipts.set(receipt.id, receipt)
+  for (const saved of taskStore.listAttemptReceipts({ since, limit: MAX_RECEIPTS_TOTAL })) {
+    const receipt = storedReceiptSchema.parse(saved)
+    receipts.set(receipt.id, receipt)
+  }
+  return ProjectChecksReceiptModel.after(
+    [...receipts].map(([key, receipt]) => [key, receipt]),
+    since,
+    MAX_RECEIPTS_TOTAL,
+  )
+}
 
 const emitReceiptActivity = (ctx: Context, receipt: StoredReceipt): void =>
   ProjectChecksActivityModel.emit(receipt, event => ctx.emit('dshfiles/activity/event', event))
 
 const persistReceipt = async (ctx: Context, receipt: StoredReceipt): Promise<void> => {
+  if (receipt.taskId !== undefined || receipt.taskAttemptId !== undefined) {
+    if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) throw new Error('A durable task receipt is missing its task identity.')
+    await (await durableTaskStoreFor(ctx)).saveAttemptReceipt(storedReceiptSchema.parse(receipt))
+    return
+  }
   const table = (await storageFor(ctx)).table('receipts')
   await table.put(ProjectChecksReceiptModel.key(receipt), receipt)
   const removals = ProjectChecksReceiptModel.trimRows(Array.from(table.entries()), receipt.sessionId, MAX_RECEIPTS_PER_SESSION, MAX_RECEIPTS_TOTAL)

@@ -8,15 +8,18 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { describe, expect, it } from 'vitest'
 import { durableTaskDomain } from './durable-task-domain.js'
 import { DurableTaskRunner } from './durable-task-runner.js'
+import { DurableTaskStore } from './durable-task-store.js'
 import { DurableTaskModel, durableTaskSchema } from './durable-tasks.js'
+import { storedReceiptSchema } from './store.js'
 
 const taskId = 'a'.repeat(64)
+const interruptedTaskId = 'c'.repeat(64)
 const attemptId = '00000000-0000-4000-8000-000000000002'
 
-const queuedTask = () =>
+const queuedTask = (id: string, idempotencyKey: string) =>
   durableTaskSchema.parse({
-    id: taskId,
-    idempotencyKey: '00000000-0000-4000-8000-000000000001',
+    id,
+    idempotencyKey,
     sessionId: 'session-storage-test',
     actionId: 'test',
     handlerVersion: 1,
@@ -29,7 +32,29 @@ const queuedTask = () =>
     errorCode: null,
   })
 
-const openTaskStorage = async (root: string) => {
+const interruptedTask = () => DurableTaskModel.begin(queuedTask(interruptedTaskId, '00000000-0000-4000-8000-000000000003'), { attemptId, now: 2 })
+
+const successfulReceipt = () =>
+  storedReceiptSchema.parse({
+    id: '00000000-0000-4000-8000-000000000004',
+    taskId: interruptedTaskId,
+    taskAttemptId: attemptId,
+    sessionId: 'session-storage-test',
+    actionId: 'test',
+    label: 'Test action',
+    status: 'passed',
+    failure: null,
+    startedAt: 2,
+    finishedAt: 3,
+    durationMs: 1,
+    exitCode: 0,
+    sourceRevision: null,
+    verificationTurn: null,
+    automatic: false,
+    attempt: 1,
+  })
+
+const openLegacyStorage = async (root: string) => {
   const context = new Context()
   await context.plugin(Storage)
   await context.plugin(StorageJson, { root })
@@ -38,27 +63,43 @@ const openTaskStorage = async (root: string) => {
   return { context, domain, table: domain.table('tasks') }
 }
 
-describe('durable Project Checks JSON storage', () => {
-  it('recovers queued work and reconciles an interrupted attempt from its persisted receipt after Host reopen', async () => {
+describe('durable Project Checks task SQLite storage', () => {
+  it('imports JSON history, recovers queued work, and reconciles an attempt-specific receipt after reopening', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-project-checks-tasks-'))
-    let first: Awaited<ReturnType<typeof openTaskStorage>> | undefined
-    let second: Awaited<ReturnType<typeof openTaskStorage>> | undefined
-    let third: Awaited<ReturnType<typeof openTaskStorage>> | undefined
+    let legacy: Awaited<ReturnType<typeof openLegacyStorage>> | undefined
+    let store: DurableTaskStore | undefined
+    let reopened: DurableTaskStore | undefined
 
     try {
-      first = await openTaskStorage(root)
-      await first.table.put(taskId, queuedTask())
-      await first.domain.close()
-      await first.context.fiber.dispose()
-      first = undefined
+      legacy = await openLegacyStorage(join(root, 'legacy-json'))
+      await legacy.table.put(taskId, queuedTask(taskId, '00000000-0000-4000-8000-000000000001'))
+      await legacy.table.put(interruptedTaskId, interruptedTask())
+      await legacy.domain.close()
+      await legacy.context.fiber.dispose()
+      legacy = undefined
 
-      second = await openTaskStorage(root)
+      store = await DurableTaskStore.open({ root: join(root, 'sqlite') })
+      await store.importLegacy({
+        tasks: [queuedTask(taskId, '00000000-0000-4000-8000-000000000001'), interruptedTask()],
+        receipts: [successfulReceipt()],
+      })
+      await expect(store.saveAttemptReceipt({ ...successfulReceipt(), taskAttemptId: '00000000-0000-4000-8000-000000000006' })).rejects.toThrow(
+        /does not match a persisted task attempt/u,
+      )
+      await expect(store.saveAttemptReceipt({ ...successfulReceipt(), sessionId: 'another-session' })).rejects.toThrow(
+        /does not match a persisted task attempt/u,
+      )
       let executions = 0
       const runner = new DurableTaskRunner({
-        table: second.table,
-        newAttemptId: () => attemptId,
+        table: store,
+        newAttemptId: () => '00000000-0000-4000-8000-000000000005',
         validate: async () => ({ runnable: true, safeReplay: false }),
-        findReceipt: async () => null,
+        findReceipt: async (recoveredTaskId, recoveredAttemptId) => {
+          const saved = store?.findAttemptReceipt(recoveredTaskId, recoveredAttemptId)
+          if (saved === undefined) return null
+          const receipt = storedReceiptSchema.parse(saved)
+          return { status: receipt.status === 'passed' ? 'succeeded' : receipt.status, exitCode: receipt.exitCode }
+        },
         run: async () => {
           executions += 1
           return { status: 'succeeded', exitCode: 0 }
@@ -69,40 +110,34 @@ describe('durable Project Checks JSON storage', () => {
       })
       await runner.recover()
       await runner.waitForIdle()
-      expect(runner.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ id: attemptId, status: 'succeeded' }] })
+
+      expect(runner.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ number: 1, status: 'succeeded' }] })
+      expect(runner.get(interruptedTaskId)).toMatchObject({ status: 'succeeded', attempts: [{ id: attemptId, status: 'succeeded' }] })
       expect(executions).toBe(1)
       await runner.close()
-      await second.domain.close()
-      await second.context.fiber.dispose()
-      second = undefined
+      store.close()
+      store = undefined
 
-      third = await openTaskStorage(root)
-      const interrupted = DurableTaskModel.unknown(DurableTaskModel.begin(queuedTask(), { attemptId, now: 2 }), 3)
-      await third.table.put(taskId, interrupted)
-      const recoveredRunner = new DurableTaskRunner({
-        table: third.table,
-        newAttemptId: () => '00000000-0000-4000-8000-000000000003',
-        validate: async () => ({ runnable: true, safeReplay: false }),
-        findReceipt: async (recoveredTaskId, recoveredAttemptId) =>
-          recoveredTaskId === taskId && recoveredAttemptId === attemptId ? { status: 'succeeded', exitCode: 0 } : null,
-        run: async () => {
-          throw new Error('receipt reconciliation must not replay completed work')
-        },
-        onFailure: error => {
-          throw error
-        },
+      reopened = await DurableTaskStore.open({ root: join(root, 'sqlite') })
+      expect(reopened.get(taskId)).toMatchObject({ status: 'succeeded' })
+      expect(storedReceiptSchema.parse(reopened.findAttemptReceipt(interruptedTaskId, attemptId))).toEqual(successfulReceipt())
+      expect(await reopened.createIfAbsent(queuedTask(taskId, '00000000-0000-4000-8000-000000000001'), 1_000)).toMatchObject({
+        id: taskId,
+        status: 'succeeded',
       })
-      await recoveredRunner.recover()
-      await recoveredRunner.waitForIdle()
-      expect(recoveredRunner.get(taskId)).toMatchObject({ status: 'succeeded', attempts: [{ id: attemptId, status: 'succeeded' }] })
-      await recoveredRunner.close()
+      await expect(
+        reopened.createIfAbsent({ ...queuedTask(taskId, '00000000-0000-4000-8000-000000000001'), actionFingerprint: 'f'.repeat(64) }, 1_000),
+      ).rejects.toThrow(/idempotency key.*different/u)
+      await reopened.createIfAbsent(queuedTask('d'.repeat(64), '00000000-0000-4000-8000-000000000006'), 1)
+      expect(reopened.get(taskId)).toBeUndefined()
+      await reopened.importLegacy({ tasks: [queuedTask(taskId, '00000000-0000-4000-8000-000000000001')], receipts: [successfulReceipt()] })
+      expect(reopened.get(taskId)).toBeUndefined()
+      await expect(reopened.createIfAbsent(queuedTask(taskId, '00000000-0000-4000-8000-000000000001'), 1_000)).rejects.toThrow(/history has expired/u)
     } finally {
-      await first?.domain.close()
-      await first?.context.fiber.dispose()
-      await second?.domain.close()
-      await second?.context.fiber.dispose()
-      await third?.domain.close()
-      await third?.context.fiber.dispose()
+      legacy?.domain.close()
+      legacy?.context.fiber.dispose()
+      store?.close()
+      reopened?.close()
       await rm(root, { recursive: true, force: true })
     }
   })

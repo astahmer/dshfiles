@@ -31,6 +31,13 @@ const makeTable = (): DurableTaskTable => {
     get size() {
       return rows.size
     },
+    createIfAbsent: async task => {
+      const existing = rows.get(task.id)
+      if (existing !== undefined) return existing
+      rows.set(task.id, task)
+      return task
+    },
+    withWorkerClaim: async (_signal, work) => work(),
     put: async (key, value) => {
       rows.set(key, value)
     },
@@ -111,6 +118,26 @@ describe('durable Project Checks task runner', () => {
     expect(runner.get(taskId)).toMatchObject({ status: 'unknown', attempts: [{ status: 'unknown' }] })
     expect(executions).toBe(0)
     expect(previousEffectCount).toBe(1)
+  })
+
+  it('does not replay a crash-interrupted task after cancellation was requested', async () => {
+    const table = makeTable()
+    await table.put(taskId, DurableTaskModel.cancel(interruptedTask(), 3))
+    let executions = 0
+    const runner = makeRunner({
+      table,
+      safeReplay: true,
+      run: async () => {
+        executions += 1
+        return { status: 'succeeded', exitCode: 0 }
+      },
+    })
+
+    await runner.recover()
+    await runner.waitForIdle()
+
+    expect(runner.get(taskId)).toMatchObject({ status: 'unknown', attempts: [{ status: 'unknown' }] })
+    expect(executions).toBe(0)
   })
 
   it('retries an interrupted action only when its profile policy declares read-only', async () => {
