@@ -140,6 +140,7 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
           groupBy: z.enum(THREAD_GROUP_BY_OPTIONS),
           statusFilters: z.array(z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))),
           sourceFilter: z.enum(THREAD_SOURCE_FILTER_OPTIONS),
+          showCount: z.boolean(),
         })
         .strict(),
     [existingNames, translate],
@@ -151,6 +152,7 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
       groupBy: props.view.groupBy,
       statusFilters: props.view.statusFilters,
       sourceFilter: props.view.sourceFilter,
+      showCount: props.view.showCount !== false,
     },
     validationLogic: revalidateLogic(),
     validators: { onDynamic: editorSchema },
@@ -226,6 +228,14 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
               label={props.t('threadSidebarViewSource')}
               options={THREAD_SOURCE_FILTER_OPTIONS.map(value => ({ value, label: props.t(sourceLabelKeys[value]) }))}
             />
+          )}
+        </form.AppField>
+        <form.AppField name="showCount">
+          {field => (
+            <Label className="dshx:font-normal">
+              <Checkbox checked={field.state.value} onCheckedChange={checked => field.handleChange(checked === true)} />
+              {props.t('threadSidebarShowTabCount')}
+            </Label>
           )}
         </form.AppField>
         <DialogFooter>

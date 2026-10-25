@@ -276,7 +276,7 @@
     {
       "id": "thread-list-views",
       "title": "Configure saved thread views",
-      "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; include durable Inactive and explicitly selected interrupted child rows in saved views, allow views to overlap, and show attention dots only for matching statuses.",
+      "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; include durable Inactive and explicitly selected interrupted child rows in saved views, allow views to overlap, show attention dots only for matching statuses, and independently show or hide each tab's count.",
       "reach": [
         "expect group \"Thread list view\"",
         "click button \"All threads\"",
@@ -288,7 +288,8 @@
         "expect checkbox \"Working\"",
         "expect checkbox \"Turn finished\"",
         "expect checkbox \"Inactive\"",
-        "expect checkbox \"Archived\""
+        "expect checkbox \"Archived\"",
+        "expect checkbox \"Show count on tab\""
       ],
       "surfaces": ["client", "storage"],
       "configuration": [
@@ -315,7 +316,7 @@
         {
           "key": "views",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
-          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
+          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
@@ -341,7 +342,7 @@
         {
           "key": "viewPresets",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
-          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
+          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
       ],

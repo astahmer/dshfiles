@@ -142,7 +142,7 @@ and keeps the rest for Back and Forward.
 
 **Saved views.** The view row above the thread list is backed by validated view
 presets (`src/thread-view-preferences.ts`): each preset carries a name, order,
-and the grouping/status/source filters it applies. The whole document is the
+its grouping/status/source filters, and whether its tab shows a count. The whole document is the
 Host-synced `threadViews` setting, so every browser offers the same views; the
 v1 browser copy this plugin wrote migrates into it once. Stored v1 view
 preferences migrate into that preset list once. **Customize views** opens
@@ -158,11 +158,11 @@ remain available. Legacy **Not working** decodes to **Not running**, retaining
 any other selected filters. Custom view IDs, order, grouping, source, enabled
 state and active selection survive migration; removed Inbox/Gone tabs are not
 restored. Earlier unedited built-in Working/Done filter sets upgrade without
-rewriting custom views. A preset that is not All threads shows `(N)`
-beside its name: Working shows the running-thread count, while every other
-view counts the unread threads it lists, showing how many listed threads
-still hold an unacknowledged finish on the Host (opening one clears it
-everywhere). The colored dot signals only attention labels matched by that
+rewriting custom views. A preset that is not All threads shows `(N)` beside its name by default:
+Working shows the running-thread count, while every other view counts unread
+threads it lists, showing how many listed threads still hold an unacknowledged
+finish on the Host (opening one clears it everywhere). Edit any view and uncheck
+**Show count on tab** to hide that tab's count without affecting other tabs. The colored dot signals only attention labels matched by that
 view's selected statuses; it is not itself an unread-finish count. When the
 sidebar is too narrow for every full tab (`src/thread-view-tabs.ts` measures the
 row), built-in views show their icon and custom views their initial beside the

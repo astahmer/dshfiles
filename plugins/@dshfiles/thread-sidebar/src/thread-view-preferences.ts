@@ -28,6 +28,7 @@ export interface ThreadViewPreset extends ThreadViewPreferences {
   readonly id: string
   readonly name: string | null
   readonly enabled: boolean
+  readonly showCount?: boolean | undefined
 }
 
 export interface ThreadViewSettings {
@@ -125,6 +126,7 @@ const threadViewPresetSchema = z
     groupBy: groupBySchema,
     statusFilters: statusFiltersSchema.readonly(),
     sourceFilter: sourceFilterSchema,
+    showCount: z.boolean().optional(),
   })
   .strict()
 

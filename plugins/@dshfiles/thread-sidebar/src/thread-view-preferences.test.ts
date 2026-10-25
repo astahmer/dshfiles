@@ -419,6 +419,18 @@ describe('thread view preferences', () => {
     expect(oneView.views).toEqual([attentionView])
   })
 
+  it('preserves per-view count visibility and defaults older views to showing counts', () => {
+    const viewWithoutCountPreference = ThreadViewPreferencesModel.decodeThreadViewSettings({
+      ...DEFAULT_THREAD_VIEW_SETTINGS,
+      views: DEFAULT_THREAD_VIEW_SETTINGS.views.map(view => ({ ...view, showCount: undefined })),
+    })
+    expect(viewWithoutCountPreference?.views.every(view => view.showCount !== false)).toBe(true)
+
+    const hiddenCount = { ...DEFAULT_THREAD_VIEW_PRESETS[2], showCount: false }
+    const saved = ThreadViewPreferencesModel.saveThreadView(DEFAULT_THREAD_VIEW_SETTINGS, hiddenCount)
+    expect(ThreadViewPreferencesModel.decodeThreadViewSettings(saved)?.views.find(view => view.id === DONE_VIEW_ID)?.showCount).toBe(false)
+  })
+
   it('updates an existing preset or adds a new preset without changing selection', () => {
     const renamed = { ...DEFAULT_THREAD_VIEW_PRESETS[0], name: 'Everything' }
     const updated = ThreadViewPreferencesModel.saveThreadView(DEFAULT_THREAD_VIEW_SETTINGS, renamed)

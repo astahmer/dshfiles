@@ -3113,7 +3113,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         view,
         label: threadViewPresetLabel(view, props.tSidebar),
         attentionLabel: attentionLabelByViewId.get(view.id),
-        visibleCount: workingCount ?? (unreadCount > 0 ? unreadCount : null),
+        visibleCount: view.showCount === false ? null : (workingCount ?? (unreadCount > 0 ? unreadCount : null)),
       }
     })
   const visibleThreadEntries = useMemo(
