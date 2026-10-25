@@ -142,6 +142,7 @@ import {
 } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
+import { restartRecoveryRefetchInterval } from './restart-recovery-poll.js'
 import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from './usage-limit-rows.js'
@@ -1306,7 +1307,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const recoveryQuery = useQuery({
     queryKey: restartRecoveryQueryKey,
     queryFn: ({ signal }) => recoveryApi.pending(undefined, { signal }),
-    refetchInterval: query => (isPrimarySurface && !isApiOwnerMissing(query.state.error) ? 5000 : false),
+    staleTime: 30_000,
+    refetchInterval: query => {
+      const pending = query.state.data?.entries ?? query.state.data?.sessionIds ?? []
+      return restartRecoveryRefetchInterval({
+        primarySurface: isPrimarySurface,
+        ownerMissing: isApiOwnerMissing(query.state.error),
+        hasData: query.state.data !== undefined,
+        hasPending: pending.length > 0,
+      })
+    },
     retry: false,
   })
   const resumeMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.resume(input) })
