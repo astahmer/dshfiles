@@ -219,7 +219,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
           <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
           <span>·</span>
           {fileCount === 0 ? (
-            <span>no changes</span>
+            <span>no working copy changes</span>
           ) : (
             <>
               <span>
