@@ -1,5 +1,6 @@
 import { defineApi, method, type ApiCaller } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { durableAttemptStatusSchema, durableTaskProgressSchema, durableTaskStatusSchema } from './durable-tasks.js'
 
 const sessionIdSchema = z.string().min(1).max(128)
 const actionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/)
@@ -55,6 +56,7 @@ export const actionViewSchema = z.object({
   description: z.string().max(240),
   timeoutMs: z.number().int().min(1_000).max(300_000),
   verifyBeforeComplete: z.boolean(),
+  replayPolicy: z.enum(['manual', 'read-only']).default('manual'),
   execution: z
     .object({
       target: z.enum(['local', 'remote', 'auto']),
@@ -66,6 +68,11 @@ export const actionViewSchema = z.object({
 
 export const receiptSchema = z.object({
   id: z.string().uuid(),
+  taskId: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
+  taskAttemptId: z.string().uuid().optional(),
   sessionId: sessionIdSchema,
   actionId: actionIdSchema,
   label: z.string().max(80),
@@ -98,6 +105,37 @@ export const receiptSchema = z.object({
   attempt: z.number().int().min(0).max(2),
   freshness: z.enum(['current', 'stale', 'unknown']),
 })
+
+export const durableTaskViewSchema = z
+  .object({
+    id: z.string().regex(/^[a-f0-9]{64}$/),
+    sessionId: sessionIdSchema,
+    actionId: actionIdSchema,
+    label: z.string().max(80),
+    status: durableTaskStatusSchema,
+    progress: durableTaskProgressSchema,
+    attemptCount: z.number().int().nonnegative(),
+    attempts: z
+      .array(
+        z
+          .object({
+            id: z.string().uuid(),
+            number: z.number().int().min(1).max(100),
+            status: durableAttemptStatusSchema,
+            progress: durableTaskProgressSchema,
+            startedAt: z.number().int().nonnegative(),
+            finishedAt: z.number().int().nonnegative().nullable(),
+            exitCode: z.number().int().nullable(),
+          })
+          .strict(),
+      )
+      .max(100),
+    createdAt: z.number().int().nonnegative(),
+    updatedAt: z.number().int().nonnegative(),
+    exitCode: z.number().int().nullable(),
+    errorCode: z.string().max(64).nullable(),
+  })
+  .strict()
 
 export const hookEventSchema = z.object({
   seq: z.number().int().nonnegative(),
@@ -148,6 +186,35 @@ export const projectChecksApi = defineApi({
         'Run one configured project action and return the receipt. The action may execute on a configured peer host; the receipt records the executor and any local fallback. It must be configured and visible for the thread directory. Defaults to the calling thread. Call only when the user asked to run that check.',
       tool: { name: 'project_checks_run', render: compactJson },
     }),
+    dispatch: method({
+      input: z.object({ sessionId: sessionIdSchema.optional(), actionId: actionIdSchema, idempotencyKey: z.string().uuid() }).strict(),
+      output: durableTaskViewSchema,
+      description:
+        'Durably dispatch one configured local project action and return its task record. This creates work and may execute a process; call only when the user asked. Reuse the same idempotencyKey to safely repeat dispatch after a lost response.',
+      tool: { name: 'project_checks_dispatch', render: compactJson },
+    }),
+    tasks: method({
+      input: z.object({ sessionId: sessionIdSchema.optional() }).strict(),
+      output: z.array(durableTaskViewSchema).max(100),
+      description: 'List durable project-check tasks for a thread, including interrupted/unknown work. Defaults to the calling thread. Read-only.',
+      tool: { name: 'project_checks_tasks', readOnly: true, render: compactJson },
+    }),
+    cancelTask: method({
+      input: z.object({ sessionId: sessionIdSchema.optional(), taskId: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
+      output: durableTaskViewSchema,
+      description:
+        'Cancel a queued/running durable project-check task. A running task remains cancellation-pending until its subprocess confirms termination. Call only when the user asked.',
+      tool: { name: 'project_checks_cancel', render: compactJson },
+    }),
+    retryTask: method({
+      input: z
+        .object({ sessionId: sessionIdSchema.optional(), taskId: z.string().regex(/^[a-f0-9]{64}$/), confirmPossibleDuplicate: z.literal(true) })
+        .strict(),
+      output: durableTaskViewSchema,
+      description:
+        'Retry a failed, cancelled, timed-out or unknown durable task. The required confirmation acknowledges that the previous attempt may have applied external effects. Call only when the user explicitly asks to retry.',
+      tool: { name: 'project_checks_retry', render: compactJson },
+    }),
     assertVerifiedCompletion: method({
       input: verifiedCompletionInputSchema,
       output: completionAuthorizationResultSchema,
@@ -166,6 +233,7 @@ export type CandidateVerificationResult = z.infer<typeof candidateVerificationRe
 export type ProjectActionView = z.infer<typeof actionViewSchema>
 export type ProjectCheckReceipt = z.infer<typeof receiptSchema>
 export type ProjectHookEvent = z.infer<typeof hookEventSchema>
+export type ProjectChecksTaskView = z.infer<typeof durableTaskViewSchema>
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {

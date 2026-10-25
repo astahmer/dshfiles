@@ -2,11 +2,15 @@
 
 Personal DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and
 plugins we own. The repository runs on stock DSH 0.2.1-rc.2; it carries no
-core patches. Never patch DSH core from this repository or recommend a core
-patch as a fallback. If a need cannot be expressed through supported dshx or
-plugin APIs, document the concrete Host/core gap in `plans/dsh-host-gaps.md`
-and stop at that boundary. Work in a separate DSH source checkout only when the
-human explicitly redirects the task there.
+core patches. Never patch DSH core from this repository. Prefer an adopted or
+forked official plugin when it fits; otherwise an owned plugin may implement a
+bounded capability using supported Host/dshx services, including plugin-owned
+versioned storage, lifecycle and execution. A missing native Host verb is not
+by itself a reason to stop: first test whether a Host plugin can own the full
+contract safely. Record a concrete residual Host/core gap and stop only when no
+supported plugin-owned implementation can meet the required guarantees; never
+fake a native method or durable state in the client. Work in a separate DSH
+source checkout only when the human explicitly redirects the task there.
 
 ## Active goal cancellation
 
@@ -92,9 +96,13 @@ Say which option you chose and why. Two rules keep the choice honest:
 - **Verify against the installed runtime, not the README.** Read a plugin's peer
   ranges against our DSH version, resolve the imports it uses, and read the
   Service contract it calls.
-- **Check the Host can do it before building UI.** If a Service has no such
-  method, a plugin cannot add one; record it in `plans/dsh-host-gaps.md` instead
-  of faking it client-side.
+- **Check the Host boundary before building UI.** A plugin cannot add a method
+  to a native Service, but it may expose its own Host API and own the needed
+  state/workflow when supported services (for example storage domains and
+  subprocesses) provide the required semantics. Prefer an adopted/forked
+  official plugin or a focused owned plugin. Record a gap only for guarantees
+  that remain unavailable after this plugin-owned feasibility check; never fake
+  a native method or durable state client-side.
 
 When dshx cannot express something a plugin needs, fix dshx rather than
 shipping a workaround: an `as unknown as`, a local `declare module`, or a
@@ -162,7 +170,7 @@ Work lands on `main`; never `jj git push` without asking.
 - One described revision per logical change: Conventional Commit title and a
   body that says why. Do not add `Co-Authored-By` trailers or local DSH agent
   handles to commit metadata; they are not GitHub collaborators. `jj describe
-  -m …`, then `jj new` before the next change.
+-m …`, then `jj new` before the next change.
 - Never rewrite a revision another workspace holds as its `@` (describe,
   squash, rebase, abandon): it leaves a divergent copy of the change. Touch
   only revisions you created, and not ones another workspace is built on:
@@ -299,9 +307,11 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
   destroy work. For each new user-visible state transition, include a way to see
   the resulting state and, where meaningful, reverse or reopen it; test both
   paths or state why the transition is intentionally irreversible.
-  Presentation-only state (tab layout, a lightbox, a draft) is not a tool. When no Host verb exists, record the gap in
-  [`plans/dsh-host-gaps.md`](plans/dsh-host-gaps.md) instead of faking the action
-  client-side. The per-owner audit and backlog live in
+  Presentation-only state (tab layout, a lightbox, a draft) is not a tool. When
+  no native Host verb exists, do not fake it client-side: first consider a
+  Host-side plugin API with plugin-owned state and supported services. Record a
+  gap in [`plans/dsh-host-gaps.md`](plans/dsh-host-gaps.md) only if that route
+  cannot satisfy the contract. The per-owner audit and backlog live in
   [`docs/agent-tool-parity.md`](docs/agent-tool-parity.md).
 - **Host work leaves a span, and the catalog says which.** Every feature in
   `dshx.features.json` lists `telemetry`: the `automatic` spans it already gets

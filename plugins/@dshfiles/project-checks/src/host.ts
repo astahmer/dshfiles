@@ -8,12 +8,12 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import { MessageId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { defineHost } from '@dshfiles/dshx/host'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectHookEvent } from './api.js'
+import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectChecksTaskView, type ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
 import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction, type RemoteHost } from './core.js'
 import { ExecutionModel, LOCAL_ENDPOINT_KEY, type RemoteEndpointState } from './execution.js'
@@ -21,6 +21,9 @@ import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './r
 import { runManagedProcess, type ProcessResult } from './managed-process.js'
 import { PeerSnapshotModel, type PeerFailureCode, type StepResult } from './remote.js'
 import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, type StoredReceipt } from './store.js'
+import { DurableTaskRunner } from './durable-task-runner.js'
+import { durableTaskDomain } from './durable-task-domain.js'
+import { durableTaskSchema, type DurableTask } from './durable-tasks.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -47,7 +50,8 @@ type ReceiptStage =
   | 'persist-receipt'
   | 'list-receipts'
   | 'materialize-receipts'
-type ApiDiagnosticOperation = 'manual-run' | 'verification-run' | 'list-receipts'
+  | 'recover-tasks'
+type ApiDiagnosticOperation = 'manual-run' | 'verification-run' | 'list-receipts' | 'durable-task'
 
 const safeErrorCode = (cause: unknown): string | null => {
   if (!(cause instanceof Error) || !('code' in cause)) return null
@@ -80,6 +84,9 @@ interface ReceiptOptions {
   readonly expectedRevision?: string
   readonly signal?: AbortSignal
   readonly requireRevision: boolean
+  readonly durableTaskId?: string
+  readonly durableTaskAttemptId?: string
+  readonly onProgress?: (progress: DurableTask['attempts'][number]['progress']) => Promise<void>
 }
 
 interface CompletionVerificationPermit {
@@ -159,6 +166,41 @@ const storageFor = (ctx: Context): Promise<ProjectChecksDomain> => {
   return opening
 }
 
+const openDurableTaskDomain = (ctx: Context) => {
+  const storage = ctx.get('storageDomain')
+  if (storage === undefined) throw new Error('Durable Project Checks storage is unavailable.')
+  return storage.open(durableTaskDomain)
+}
+
+type DurableTaskDomain = Awaited<ReturnType<typeof openDurableTaskDomain>>
+const durableTaskDomains = new WeakMap<Context, Promise<DurableTaskDomain>>()
+const durableTaskRunners = new WeakMap<Context, Promise<DurableTaskRunner>>()
+
+const durableTaskDomainFor = (ctx: Context): Promise<DurableTaskDomain> => {
+  const existing = durableTaskDomains.get(ctx)
+  if (existing !== undefined) return existing
+  const opening = Promise.resolve().then(() => openDurableTaskDomain(ctx))
+  durableTaskDomains.set(ctx, opening)
+  void opening.catch(() => {
+    if (durableTaskDomains.get(ctx) === opening) durableTaskDomains.delete(ctx)
+  })
+  return opening
+}
+
+const taskFingerprint = (action: ProjectAction): string =>
+  createHash('sha256')
+    .update(
+      JSON.stringify({
+        id: action.id,
+        command: action.command,
+        args: action.args,
+        root: action.root,
+        timeoutMs: action.timeoutMs,
+        replayPolicy: action.replayPolicy,
+      }),
+    )
+    .digest('hex')
+
 const closeProjectChecksDomain = async (ctx: Context): Promise<void> => {
   const opening = storageDomains.get(ctx)
   if (opening === undefined) return
@@ -169,6 +211,85 @@ const closeProjectChecksDomain = async (ctx: Context): Promise<void> => {
     )
   } finally {
     if (storageDomains.get(ctx) === opening) storageDomains.delete(ctx)
+  }
+}
+
+const durableTaskRunnerFor = async (ctx: Context): Promise<DurableTaskRunner> => {
+  const existing = durableTaskRunners.get(ctx)
+  if (existing !== undefined) return existing
+  const opening = Promise.resolve().then(async () => {
+    const domain = await durableTaskDomainFor(ctx)
+    const runner = new DurableTaskRunner({
+      table: domain.table('tasks'),
+      newAttemptId: randomUUID,
+      validate: async task => {
+        const action = configFor(ctx).actions.find(candidate => candidate.id === task.actionId)
+        if (action === undefined || action.execution.target !== 'local' || task.handlerVersion !== 1) return { runnable: false, safeReplay: false }
+        if (task.actionFingerprint !== taskFingerprint(action)) return { runnable: false, safeReplay: false }
+        try {
+          const paths = await sessionPaths(ctx, task.sessionId, action)
+          return { runnable: paths.cwd === task.cwd, safeReplay: action.replayPolicy === 'read-only' }
+        } catch {
+          return { runnable: false, safeReplay: false }
+        }
+      },
+      findReceipt: async (taskId, attemptId) => {
+        const receipts = Array.from((await storageFor(ctx)).table('receipts').entries()).map(([, receipt]) => receipt)
+        const receipt = receipts.find(candidate => candidate.taskId === taskId && candidate.taskAttemptId === attemptId)
+        if (receipt === undefined) return null
+        if (receipt.failure === 'process-group-failed') return { status: 'unknown', exitCode: receipt.exitCode }
+        return {
+          status: receipt.status === 'passed' ? 'succeeded' : receipt.status,
+          exitCode: receipt.exitCode,
+        }
+      },
+      run: async ({ task, attemptId, signal, progress }) => {
+        const action = configFor(ctx).actions.find(candidate => candidate.id === task.actionId)
+        if (action === undefined) return { status: 'unknown', exitCode: null }
+        const receipt = await runAction(ctx, task.sessionId, action, {
+          automatic: false,
+          attempt: task.attempts[task.attempts.length - 1]?.number ?? 1,
+          verificationTurn: null,
+          signal,
+          requireRevision: false,
+          durableTaskId: task.id,
+          durableTaskAttemptId: attemptId,
+          onProgress: progress,
+        })
+        if (receipt.failure === 'process-group-failed') return { status: 'unknown', exitCode: receipt.exitCode }
+        return {
+          status: receipt.status === 'passed' ? 'succeeded' : receipt.status,
+          exitCode: receipt.exitCode,
+        }
+      },
+      onFailure: error => reportApiFailure('durable-task', randomUUID(), 'run-command', error),
+    })
+    await runner.recover()
+    return runner
+  })
+  durableTaskRunners.set(ctx, opening)
+  void opening.catch(() => {
+    if (durableTaskRunners.get(ctx) === opening) durableTaskRunners.delete(ctx)
+  })
+  return opening
+}
+
+const closeDurableProjectChecksTasks = async (ctx: Context): Promise<void> => {
+  const runnerOpening = durableTaskRunners.get(ctx)
+  if (runnerOpening !== undefined) {
+    await runnerOpening.then(
+      runner => runner.close(),
+      () => undefined,
+    )
+    if (durableTaskRunners.get(ctx) === runnerOpening) durableTaskRunners.delete(ctx)
+  }
+  const domainOpening = durableTaskDomains.get(ctx)
+  if (domainOpening !== undefined) {
+    await domainOpening.then(
+      domain => domain.close(),
+      () => undefined,
+    )
+    if (durableTaskDomains.get(ctx) === domainOpening) durableTaskDomains.delete(ctx)
   }
 }
 
@@ -344,6 +465,7 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
   const diagnosticId = randomUUID()
   let stage: ReceiptStage = 'resolve-session-paths'
   try {
+    await options.onProgress?.('resolving-workspace')
     const paths = await sessionPaths(ctx, sessionId, action)
     const startedAt = Date.now()
     stage = 'capture-source-revision-before'
@@ -361,6 +483,7 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       failure = 'source-changed'
     } else {
       stage = 'run-command'
+      await options.onProgress?.('starting-process')
       const config = configFor(ctx)
       const choice = ExecutionModel.choose({
         policy: action.execution,
@@ -428,6 +551,7 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       }
     }
 
+    await options.onProgress?.('recording-result')
     const finishedAt = Date.now()
     const receipt: StoredReceipt = {
       id: diagnosticId,
@@ -447,6 +571,8 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       automatic: options.automatic,
       attempt: options.attempt,
     }
+    if (options.durableTaskId !== undefined) receipt.taskId = options.durableTaskId
+    if (options.durableTaskAttemptId !== undefined) receipt.taskAttemptId = options.durableTaskAttemptId
     if (executor !== undefined) receipt.executor = executor
     if (remoteFailure !== null) receipt.remoteFailure = remoteFailure
     if (options.verificationStage !== undefined) receipt.verificationStage = options.verificationStage
@@ -557,6 +683,7 @@ const apiActions = async (ctx: Context, sessionId: string) => {
     description: string
     timeoutMs: number
     verifyBeforeComplete: boolean
+    replayPolicy: 'manual' | 'read-only'
     execution: { target: 'local' | 'remote' | 'auto'; remoteId: string | null; onRemoteFailure: 'local' | 'fail' }
   }> = []
   for (const action of config.actions) {
@@ -568,6 +695,7 @@ const apiActions = async (ctx: Context, sessionId: string) => {
         description: action.description,
         timeoutMs: action.timeoutMs,
         verifyBeforeComplete: action.verifyBeforeComplete,
+        replayPolicy: action.replayPolicy,
         execution: {
           target: action.execution.target,
           remoteId: action.execution.remote ?? null,
@@ -662,6 +790,63 @@ const targetSessionId = (requested: string | undefined, caller: ApiCaller): stri
   throw new PluginApiError('Pass sessionId: this tool cannot tell which thread to check.', { code: 'checks-target-unknown' })
 }
 
+const durableTaskView = (task: DurableTask, action: ProjectAction | undefined): ProjectChecksTaskView => {
+  const attempt = task.attempts[task.attempts.length - 1]
+  return {
+    id: task.id,
+    sessionId: task.sessionId,
+    actionId: task.actionId,
+    label: action?.label ?? task.actionId,
+    status: task.status,
+    progress: attempt?.progress ?? 'queued',
+    attemptCount: task.attempts.length,
+    attempts: task.attempts.map(current => ({
+      id: current.id,
+      number: current.number,
+      status: current.status,
+      progress: current.progress,
+      startedAt: current.startedAt,
+      finishedAt: current.finishedAt,
+      exitCode: current.exitCode,
+    })),
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    exitCode: attempt?.exitCode ?? null,
+    errorCode: task.errorCode,
+  }
+}
+
+const actionForDurableTask = (ctx: Context, actionId: string): ProjectAction => {
+  const action = configFor(ctx).actions.find(candidate => candidate.id === actionId)
+  if (action === undefined || action.execution.target !== 'local') {
+    throw new Error('Durable Project Checks currently supports configured local actions only.')
+  }
+  return action
+}
+
+const dispatchDurableTask = async (ctx: Context, sessionId: string, actionId: string, idempotencyKey: string): Promise<ProjectChecksTaskView> => {
+  const action = actionForDurableTask(ctx, actionId)
+  const paths = await sessionPaths(ctx, sessionId, action)
+  const taskId = createHash('sha256').update(`${sessionId}\0${idempotencyKey}`).digest('hex')
+  const now = Date.now()
+  const task = durableTaskSchema.parse({
+    id: taskId,
+    idempotencyKey,
+    sessionId,
+    actionId,
+    handlerVersion: 1,
+    actionFingerprint: taskFingerprint(action),
+    cwd: paths.cwd,
+    status: 'queued',
+    attempts: [],
+    createdAt: now,
+    updatedAt: now,
+    errorCode: null,
+  })
+  const stored = await (await durableTaskRunnerFor(ctx)).enqueue(task)
+  return durableTaskView(stored, action)
+}
+
 const hostApi = projectChecksApi.host({
   actions: async ({ input, ctx, caller }) => apiActions(ctx, targetSessionId(input.sessionId, caller)),
   receipts: async ({ input, ctx, caller }) => apiReceipts(ctx, targetSessionId(input.sessionId, caller)),
@@ -692,6 +877,39 @@ const hostApi = projectChecksApi.host({
     )
     return { ...receipt, configurationFreshness: 'unknown' as const, freshness }
   },
+  dispatch: async ({ input, ctx, caller }) => dispatchDurableTask(ctx, targetSessionId(input.sessionId, caller), input.actionId, input.idempotencyKey),
+  tasks: async ({ input, ctx, caller }) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    const runner = await durableTaskRunnerFor(ctx)
+    return (await runner.list(sessionId)).map(task =>
+      durableTaskView(
+        task,
+        configFor(ctx).actions.find(action => action.id === task.actionId),
+      ),
+    )
+  },
+  cancelTask: async ({ input, ctx, caller }) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    const runner = await durableTaskRunnerFor(ctx)
+    const existing = runner.get(input.taskId)
+    if (existing === undefined || existing.sessionId !== sessionId) throw new Error('No durable task belongs to this session.')
+    const task = await runner.cancel(input.taskId)
+    return durableTaskView(
+      task,
+      configFor(ctx).actions.find(action => action.id === task.actionId),
+    )
+  },
+  retryTask: async ({ input, ctx, caller }) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    const runner = await durableTaskRunnerFor(ctx)
+    const existing = runner.get(input.taskId)
+    if (existing === undefined || existing.sessionId !== sessionId) throw new Error('No durable task belongs to this session.')
+    const task = await runner.retry(input.taskId, input.confirmPossibleDuplicate)
+    return durableTaskView(
+      task,
+      configFor(ctx).actions.find(action => action.id === task.actionId),
+    )
+  },
   assertVerifiedCompletion: async ({ input, ctx, signal, caller }) => {
     if (!mayVerifyCandidate(caller)) throw new Error('Only jj-integration may verify a completed turn.')
     return { status: hasVerifiedCompletion(ctx, input, signal) ? 'authorized' : 'unavailable' }
@@ -709,7 +927,16 @@ export default defineHost({
   apis: [hostApi],
   setup: ctx => {
     const config = configFor(ctx)
-    ctx.effect(() => async () => closeProjectChecksDomain(ctx), 'Project Checks receipt domain')
+    ctx.effect(() => {
+      void durableTaskRunnerFor(ctx).catch(error => reportApiFailure('durable-task', randomUUID(), 'recover-tasks', error))
+      return async () => {
+        try {
+          await closeDurableProjectChecksTasks(ctx)
+        } finally {
+          await closeProjectChecksDomain(ctx)
+        }
+      }
+    }, 'Project Checks durable task and receipt domains')
     ctx.on('dshfiles/activity/backfill', payload => {
       const parsed = z.object({ since: z.number().int().nonnegative().optional() }).strict().safeParse(payload)
       if (!parsed.success) return undefined

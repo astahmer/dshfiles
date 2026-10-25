@@ -1,4 +1,4 @@
-import type { SubprocessHandle, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
 import { runManagedProcess } from './managed-process.js'
@@ -20,6 +20,36 @@ const subprocessExiting = (exitCode: number): Pick<SubprocessRuntime, 'resolveEx
   return { resolveExecutable: async () => '/usr/local/bin/pnpm', spawn: () => handle }
 }
 
+const subprocessControlled = (processGroupExited: boolean) => {
+  let spawned = (): void => undefined
+  const spawnedProcess = new Promise<void>(resolve => {
+    spawned = resolve
+  })
+  let resolveDone: (value: SubprocessOutcome) => void = () => undefined
+  const handle: SubprocessHandle = {
+    stdin: undefined,
+    stdout: undefined,
+    stderr: undefined,
+    control: undefined,
+    collected: {},
+    done: new Promise(resolve => {
+      resolveDone = resolve
+    }),
+    terminate: () => undefined,
+    waitForExit: async () => processGroupExited,
+  }
+  const subprocess: Pick<SubprocessRuntime, 'resolveExecutable' | 'spawn'> = {
+    resolveExecutable: async () => '/usr/local/bin/pnpm',
+    spawn: request => {
+      spawned()
+      if (request.signal === undefined) throw new Error('Expected a managed abort signal.')
+      request.signal.addEventListener('abort', () => resolveDone({ exitCode: null, signal: 'SIGTERM' }), { once: true })
+      return handle
+    },
+  }
+  return { subprocess, spawnedProcess }
+}
+
 describe('managed project-check process', () => {
   it('records a project-checks run span with the executable, argument count and exit code, never argv', async () => {
     using recorder = recordSpans()
@@ -36,5 +66,25 @@ describe('managed project-check process', () => {
     expect(span.attributes).toMatchObject({ 'process.executable.name': 'pnpm', 'dshx.project-checks.argument_count': 2, 'process.exit.code': 2 })
     expect(span.status.code).toBe('error')
     expect(JSON.stringify(span.attributes)).not.toMatch(/synthetic-private-script|\/private\/tmp/)
+  })
+
+  it('reports cancellation only after process-group exit is confirmed', async () => {
+    const controller = new AbortController()
+    const { subprocess, spawnedProcess } = subprocessControlled(true)
+    const running = runManagedProcess({ subprocess, command: 'pnpm', args: [], cwd: '/private/tmp/project', timeoutMs: 5_000, signal: controller.signal })
+    await spawnedProcess
+    controller.abort()
+
+    expect(await running).toMatchObject({ failure: 'cancelled' })
+  })
+
+  it('keeps cancellation outcome unknown when process-group exit cannot be confirmed', async () => {
+    const controller = new AbortController()
+    const { subprocess, spawnedProcess } = subprocessControlled(false)
+    const running = runManagedProcess({ subprocess, command: 'pnpm', args: [], cwd: '/private/tmp/project', timeoutMs: 5_000, signal: controller.signal })
+    await spawnedProcess
+    controller.abort()
+
+    expect(await running).toMatchObject({ failure: 'process-group-failed' })
   })
 })

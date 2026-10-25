@@ -32,6 +32,7 @@ export const projectActionSchema = z
     root: z.string().trim().min(1).max(2048).refine(isAbsolute, 'Use an absolute trusted project root.'),
     timeoutMs: z.number().int().min(1_000).max(300_000).default(60_000),
     verifyBeforeComplete: z.boolean().default(false),
+    replayPolicy: z.enum(['manual', 'read-only']).default('manual'),
     execution: executionPolicySchema,
   })
   .strict()

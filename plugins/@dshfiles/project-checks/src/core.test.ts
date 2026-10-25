@@ -13,7 +13,7 @@ describe('trusted project actions', () => {
 
     expect(projectChecksConfigSchema.safeParse({ actions: [action, action] }).success).toBe(false)
     expect(projectChecksConfigSchema.safeParse({ actions: [{ ...action, root: 'project' }] }).success).toBe(false)
-    expect(projectChecksConfigSchema.parse({ actions: [action] }).actions[0]?.timeoutMs).toBe(60_000)
+    expect(projectChecksConfigSchema.parse({ actions: [action] }).actions[0]).toMatchObject({ timeoutMs: 60_000, replayPolicy: 'manual' })
     expect(projectChecksConfigSchema.parse(undefined).actions).toEqual([])
   })
 

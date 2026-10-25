@@ -4,10 +4,10 @@
     {
       "id": "trusted-actions",
       "title": "Run trusted project checks",
-      "summary": "Run configured fixed-argv actions only inside canonical trusted project roots and retain bounded receipts without exposing child output.",
+      "summary": "Run configured fixed-argv actions inside canonical trusted roots, retain receipts, and expose an opt-in durable local task lifecycle without exposing child output.",
       "surfaces": ["client", "host", "command", "settings", "integration"],
       "reach": [
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"/project-checks\"",
         "expect option \"Project checks*\"",
         "click option \"Project checks*\"",
@@ -62,6 +62,13 @@
           "constraints": "Boolean; enable turn-stopping verification before completion.",
           "choices": ["true", "false"],
           "coveredBy": ["project-checks.verify-retry"]
+        },
+        {
+          "key": "actions[].replayPolicy",
+          "defaultValue": "manual",
+          "constraints": "One of manual or read-only; read-only is an operator assertion that the fixed command is safe to replay after interruption.",
+          "choices": ["manual", "read-only"],
+          "coveredBy": ["project-checks.durable-task-safe-retry"]
         },
         {
           "key": "maxVerificationAttempts",
@@ -175,10 +182,25 @@
           "coveredBy": ["project-checks.trusted-root"]
         }
       ],
-      "states": ["ready", "running", "passed", "failed", "timed-out", "cancelled", "stale-revision"],
+      "states": [
+        "ready",
+        "queued",
+        "running",
+        "cancel-requested",
+        "passed",
+        "succeeded",
+        "failed",
+        "timed-out",
+        "cancelled",
+        "unknown",
+        "blocked",
+        "stale-revision"
+      ],
       "failureModes": [
         "A sibling or traversal path is rejected before spawn.",
         "Subprocess timeout, cancellation, or storage failure yields a bounded failure receipt.",
+        "An interrupted attempt without its attempt-specific receipt remains unknown unless the exact profile action is explicitly declared read-only.",
+        "Same-process duplicate dispatch is idempotent; multiple Host processes sharing one storage home are outside the guarantee.",
         "A peer that cannot publish, check out, install or run falls back to local execution unless the policy asks for failure.",
         "A peer revision that differs from the local working copy is reported, never trusted."
       ],
@@ -257,6 +279,54 @@
           "id": "project-checks.trusted-actions-unit-peer-install",
           "file": "plugins/@dshfiles/project-checks/src/remote.test.ts",
           "testName": "installs on the first run and whenever the tracked paths changed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-duplicate-dispatch",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
+          "testName": "deduplicates concurrent dispatches in the owning Host process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-unknown-outcome",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
+          "testName": "leaves an interrupted side effect unknown and does not replay it by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-safe-retry",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
+          "testName": "retries an interrupted action only when its profile policy declares read-only"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-explicit-retry",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
+          "testName": "requires explicit duplicate-effect acknowledgement and records a new attempt identity"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-cancel",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
+          "testName": "cancels a running process through its signal and records its confirmed result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-cancel-confirmed",
+          "file": "plugins/@dshfiles/project-checks/src/managed-process.test.ts",
+          "testName": "reports cancellation only after process-group exit is confirmed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-cancel-unknown",
+          "file": "plugins/@dshfiles/project-checks/src/managed-process.test.ts",
+          "testName": "keeps cancellation outcome unknown when process-group exit cannot be confirmed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.durable-task-api-tools",
+          "file": "plugins/@dshfiles/project-checks/src/api-tools.test.ts",
+          "testName": "retry requires an explicit acknowledgement that effects may repeat"
         }
       ],
       "telemetry": [

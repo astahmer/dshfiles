@@ -51,6 +51,13 @@ const runUntracedProcess = async ({ subprocess, command, args, cwd, timeoutMs, s
   signal?.addEventListener('abort', abortFromCaller, { once: true })
   if (signal?.aborted === true) abortFromCaller()
 
+  const stopAndConfirm = async (failure: 'cancelled' | 'timed-out'): Promise<ProcessResult> => {
+    if (handle === undefined) return { exitCode: null, stdout: '', stderr: '', failure }
+    handle.terminate()
+    managedExit = await waitForManagedExit({ handle, timeoutMs: 10_000 }).catch(() => false)
+    return managedExit ? { exitCode: null, stdout: '', stderr: '', failure } : { exitCode: null, stdout: '', stderr: '', failure: 'process-group-failed' }
+  }
+
   try {
     if (controller.signal.aborted) return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
     const executable = await subprocess.resolveExecutable(command, undefined, controller.signal)
@@ -68,11 +75,7 @@ const runUntracedProcess = async ({ subprocess, command, args, cwd, timeoutMs, s
       signal: controller.signal,
     })
     const outcome = await handle.done
-    if (controller.signal.aborted) {
-      handle.terminate()
-      if (timedOut) return { exitCode: null, stdout: '', stderr: '', failure: 'timed-out' }
-      return { exitCode: null, stdout: '', stderr: '', failure: 'cancelled' }
-    }
+    if (controller.signal.aborted) return stopAndConfirm(timedOut ? 'timed-out' : 'cancelled')
 
     managedExit = await waitForManagedExit({ handle, timeoutMs, signal: controller.signal })
     if (!managedExit) {
@@ -84,9 +87,7 @@ const runUntracedProcess = async ({ subprocess, command, args, cwd, timeoutMs, s
     const stderr = handle.collected.stderr?.readFrom(0)
     return { exitCode: outcome.exitCode, stdout: stdout?.text ?? '', stderr: stderr?.text ?? '', failure: null }
   } catch {
-    if (controller.signal.aborted) {
-      return { exitCode: null, stdout: '', stderr: '', failure: timedOut ? 'timed-out' : 'cancelled' }
-    }
+    if (controller.signal.aborted) return stopAndConfirm(timedOut ? 'timed-out' : 'cancelled')
     return { exitCode: null, stdout: '', stderr: '', failure: 'spawn-failed' }
   } finally {
     clearTimeout(timeout)
