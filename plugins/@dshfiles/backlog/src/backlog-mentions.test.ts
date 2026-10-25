@@ -57,7 +57,7 @@ describe('backlog @ mentions', () => {
         clipboardText: 'b:12 Composer drops chips',
       },
     })
-    expect(await source.codec?.serialize('{"id":12,"title":"Composer drops chips"}', new AbortController().signal)).toBe(
+    expect(await source.codec?.serialize('{"id":12,"title":"Composer drops chips"}', new AbortController().signal, 'b:12 Composer drops chips')).toBe(
       'b:12 "Composer drops chips" (backlog item; backlog_get has its details)',
     )
   })
