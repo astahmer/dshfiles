@@ -24,6 +24,7 @@ import type { ComposerKeyboard } from '../contract/draft-editor.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
+import { whileSessionRetained } from './retained-send.ts'
 import { reportMessageSubmission } from './submission-analytics.ts'
 import { readConversationDraft } from '../stores.ts'
 import { AgentWarmup } from '../../agent-warmup.ts'
@@ -234,15 +235,19 @@ export class InputHub implements SessionInputResolver {
    * exactly one path; a failed first prompt is an ordinary prompt failure
    * (banner via promptError, draft restored only while untouched).
    */
-  private sink(
+  private async sink(
     session: SessionFace,
     text: string,
     attachmentIds: readonly DraftAttachmentId[],
     mode: InputSubmitMode,
     signal: AbortSignal,
   ): Promise<SubmitOutcome> {
-    if (text === '' && attachmentIds.length === 0) return Promise.resolve({ kind: 'success' })
-    return this.conversation().sendSession(session, text, attachmentIds, mode, signal)
+    if (text === '' && attachmentIds.length === 0) return { kind: 'success' }
+    return whileSessionRetained({
+      sessions: this.sessions(),
+      session,
+      operation: () => this.conversation().sendSession(session, text, attachmentIds, mode, signal),
+    })
   }
 
   /**

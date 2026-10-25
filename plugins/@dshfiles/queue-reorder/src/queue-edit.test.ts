@@ -201,6 +201,11 @@ const rowsOf = (world: { readonly rows: readonly RawRow[] }) => QueueEditModel.d
 const textsOf = (world: { readonly rows: readonly RawRow[] }) =>
   world.rows.map(row => row.content.flatMap(block => (block.type === 'text' ? [block.text] : [`[${block.attachment.name}]`])).join(' '))
 
+test('the editor retains its session while loading before the edit record exists', () => {
+  assert.equal(QueueEditModel.retainsSession({ record: null, loading: true, notice: null }), true)
+  assert.equal(QueueEditModel.retainsSession({ record: null, loading: false, notice: null }), false)
+})
+
 test('Edit moves the text and attachments into the composer and keeps the user draft aside', async () => {
   const { world, enqueueRow, editor } = createWorld()
   enqueueRow([text('first')])

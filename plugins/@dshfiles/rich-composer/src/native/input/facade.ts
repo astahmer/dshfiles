@@ -597,20 +597,13 @@ export class SessionInputShell implements SessionInput {
   // ---- wiring-layer extras (not on the frozen SessionInput face) ----
 
   /**
-   * Teardown the shell and return every browser-owned attachment still retained by
-   * the draft or an unsettled default send.
-   * @returns attachment ids the scope disposer must release.
+   * Teardown the shell and return only attachments still owned by its editable draft.
+   * Submitted attachments belong to the retained send operation until settlement.
+   * @returns unsent attachment ids the scope disposer must release.
    */
   dispose(): readonly DraftAttachmentId[] {
     if (this.disposed) return []
     const retained = new Set(this.attachmentIds)
-    for (const record of this.detachedDrafts.values()) {
-      for (const attachmentId of record.attachmentIds) retained.add(attachmentId)
-    }
-    for (const flight of this.attachmentFlights.values()) {
-      for (const attachmentId of flight.attachmentIds) retained.add(attachmentId)
-      flight.controller.abort()
-    }
     this.disposed = true
     this.cancelCommandRestore()
     this.dispatchRun(({ type: 'release' }))

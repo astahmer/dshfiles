@@ -191,10 +191,13 @@ const promptPartsFor = <Attachment>(blocks: readonly QueuedBlock[], attachments:
   return parts
 }
 
+const retainsSession = (view: QueueEditView): boolean => view.loading || view.record !== null
+
 export class QueueEditModel {
   static readonly decodeQueuedRows = decodeQueuedRows
   static readonly restoredIndex = restoredIndex
   static readonly promptPartsFor = promptPartsFor
+  static readonly retainsSession = retainsSession
 }
 
 const textOf = (blocks: readonly QueuedBlock[]): string => blocks.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')

@@ -243,8 +243,8 @@ const createEditor = (input: {
 const editors = new Map<string, { readonly session: SessionFace; readonly editor: QueueEditor; readonly release: () => void }>()
 
 /**
- * The editor for one session, kept for the page's lifetime so an edit survives switching threads. While a record
- * is open the session stays retained, so its inbox and submissions keep flowing to the editor in the background.
+ * The editor for one session, kept for the page's lifetime so an edit survives switching threads. During attachment
+ * loading and while a record is open, the session stays retained so the async edit can finish against its owner.
  */
 const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): QueueEditor | undefined => {
   const binding = ctx.sessions.binding(sessionId)
@@ -259,7 +259,7 @@ const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): 
   const editor = createEditor({ sessionId, session: binding.session, composer: conversation.input.for(scoped), drafts: conversation })
   let reference: { release(): void } | undefined
   const retainWhileEditing = (): void => {
-    const editing = editor.getSnapshot().record !== null
+    const editing = QueueEditModel.retainsSession(editor.getSnapshot())
     if (editing && reference === undefined) reference = ctx.sessions.retain(sessionId, { source: 'controllerOperation' })
     if (!editing && reference !== undefined) {
       reference.release()
