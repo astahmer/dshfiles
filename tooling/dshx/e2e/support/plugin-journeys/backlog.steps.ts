@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { openActivity } from './activity-timeline.steps.js'
@@ -293,6 +293,18 @@ When('item b:{int} is moved to In progress on the board', async ({ page }: { pag
   await expect(page.locator('html')).toHaveAttribute('data-view-transition-count', '0')
 })
 
+When('the default board columns are restored', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Configure board columns' }).click()
+  for (const status of ['Inbox', 'Todo', 'In progress', 'Done', 'Dropped']) {
+    const checkbox = page.getByRole('menuitemcheckbox', { name: status, exact: true })
+    if ((await checkbox.getAttribute('aria-checked')) === 'false') await checkbox.click()
+  }
+  const moveLeft = page.getByRole('button', { name: 'Move Inbox left', exact: true })
+  while (await moveLeft.isEnabled()) await moveLeft.click()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('[data-backlog-column]')).toHaveCount(5)
+})
+
 When('the Inbox column is moved right and the Dropped column is hidden', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Configure board columns' }).click()
   await page.getByRole('button', { name: 'Move Inbox right' }).click()
@@ -438,7 +450,17 @@ When('the Items view is opened', async ({ page }: { page: Page }) => {
 
 When('the Board view is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Board', exact: true }).click()
-  await expect(page.locator('[data-backlog-column]')).toHaveCount(5)
+  await expect(page.locator('[data-backlog-column]')).not.toHaveCount(0)
+})
+
+When('the customized Board view is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
+  await expect(page.locator('[data-backlog-column]')).toHaveCount(4)
+})
+
+When('the scratch Host is restarted in the browser', async ({ page }: { page: Page }) => {
+  await restartScratchProfileInBrowser(page)
+  await expect(page.getByRole('button', { name: 'Backlog', exact: true })).toBeVisible()
 })
 
 Then('the Items view lists both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {

@@ -288,9 +288,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "project-checks.durable-task-unknown-outcome",
-          "file": "plugins/@dshfiles/project-checks/src/durable-task-runner.test.ts",
-          "testName": "leaves an interrupted side effect unknown and does not replay it by default"
+          "id": "project-checks.durable-task-restart-recovery",
+          "file": "plugins/@dshfiles/project-checks/src/durable-task-storage.test.ts",
+          "testName": "recovers queued work and reconciles an interrupted attempt from its persisted receipt after Host reopen"
         },
         {
           "kind": "unit-test",

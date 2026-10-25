@@ -289,6 +289,35 @@
       ]
     },
     {
+      "id": "board-column-preferences",
+      "title": "Customize Backlog board columns",
+      "summary": "Reorder or hide status columns on the board without changing item states; the preference stays in this browser across Host restarts, and the Items view still contains every item.",
+      "reach": ["click button \"Backlog\"", "click button \"Board\"", "click button \"Configure board columns\"", "expect button \"Configure board columns\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["default-order", "custom-order", "hidden-column"],
+      "failureModes": ["At least one board column remains visible; hiding columns does not change item status or remove items."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.board-columns-customization",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.board-columns-browser-persistence",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: board-column preferences update browser-local state and start no Host work."
+        }
+      ]
+    },
+    {
       "id": "multi-select-items",
       "title": "Select items in ranges and batch-edit them",
       "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",

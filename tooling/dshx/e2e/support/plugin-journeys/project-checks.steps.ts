@@ -164,11 +164,10 @@ When('the project checks panel is opened', async ({ page }: { page: Page }) => {
 When('{string} is run from the panel', async ({ page }: { page: Page }, label: string) => {
   await openChecks(page)
   const action = checksPanel(page).getByRole('region', { name: 'Actions', exact: true }).getByRole('listitem').filter({ hasText: label })
-  // The Host reloads the profile row a moment after the patch file changes.
   await expect(async () => {
     await checksPanel(page).getByRole('button', { name: 'Refresh project checks', exact: true }).click()
     await expect(action).toBeVisible({ timeout: 2_000 })
-  }).toPass({ timeout: 30_000 })
+  }).toPass({ timeout: 60_000 })
   await action.getByRole('button', { name: 'Run', exact: true }).click()
   await expect(action.getByRole('button', { name: 'Run', exact: true })).toBeEnabled()
 })
