@@ -5,7 +5,9 @@ export { CLIENT_CAPABILITY_INJECTIONS, HOST_CAPABILITY_INJECTIONS } from './runt
 export const DSH_PROTOCOL_2 = {
   generation: 'protocol-2',
   version: '0.2.0-rc.2',
-  range: '>=0.2.0-rc.1 <0.3.0-0',
+  // Package managers admit a prerelease only when a comparator names that exact patch, so each verified patch
+  // prerelease needs its own lower bound; keep this equal to the dshx compat registry's protocol-2 range.
+  range: '>=0.2.0-rc.1 <0.3.0-0 || >=0.2.1-rc.2 <0.3.0-0',
 } as const
 
 export const SDK_RUNTIME_DEPENDENCIES = { zod: '^4.6.5' } as const
