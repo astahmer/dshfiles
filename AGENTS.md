@@ -181,6 +181,9 @@ checkout sync` (`--dry-run` to preview). It rebases the `default` workspace
 - Always pass `-m` to `jj describe` and `jj squash` (or
   `--use-destination-message`); a bare command opens an editor and hangs.
 - Check `jj log -r 'conflicts()'` after a rebase.
+- For `jj_details`, pass the full 40- or 64-character hexadecimal commit hash;
+  short prefixes used in chat or accepted by the jj CLI fail its API schema.
+  Resolve the full hash from `jj log` or `jj_load` before calling it.
 - Long runs: keep a `plans/<topic>/README.md` progress table with a "Resume
   here" line and commit after each milestone. When a plan's last task is done
   and verified, run the `complete-plan` skill: its durable content moves into
