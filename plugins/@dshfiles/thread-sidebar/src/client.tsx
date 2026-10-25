@@ -631,7 +631,7 @@ const ChildThreadList = (props: {
           className={cn(
             lineClass,
             'dshx:data-[selected=true]:bg-accent',
-            'dshx:group/selection dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
+            'dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
@@ -641,13 +641,6 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
-          <span
-            aria-hidden="true"
-            className="dshx:pointer-events-none dshx:absolute dshx:-left-1 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground dshx:opacity-0 dshx:group-data-[multi-selected=true]/selection:opacity-100"
-            data-thread-selection-indicator=""
-          >
-            ✓
-          </span>
           <StatusDot
             session={child}
             unread={props.unreadSessionIds.has(child.id)}
@@ -1099,7 +1092,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               type="button"
               draggable
               className={cn(
-                'dshx:group/selection dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
@@ -1110,13 +1103,6 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               onClick={() => props.actions.open(session.id)}
               onDoubleClick={() => keepThreadTab(session.id)}
             >
-              <span
-                aria-hidden="true"
-                className="dshx:pointer-events-none dshx:absolute dshx:-left-1 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground dshx:opacity-0 dshx:group-data-[multi-selected=true]/selection:opacity-100"
-                data-thread-selection-indicator=""
-              >
-                ✓
-              </span>
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
                   {rowStyle.statusDot ? (
