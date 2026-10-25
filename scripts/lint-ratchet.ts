@@ -13,6 +13,8 @@ const astGrepBoundaries = [
 
 // Vendored upstream source: kept byte-comparable to its pinned revision, so this repository's rules do not apply.
 const astGrepVendored = [
+  'plugins/@dshfiles/model-selection/src/native/**',
+  'plugins/@dshfiles/agent-preset/src/native/**',
   'plugins/@dshfiles/rich-composer/src/native/**',
   'plugins/@dshfiles/chat/src/native/**',
   'plugins/@dshfiles/session-controller/src/native/**',

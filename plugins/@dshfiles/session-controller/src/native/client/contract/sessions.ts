@@ -26,7 +26,10 @@ export interface SessionReference extends Disposable {
   readonly sessionId: SessionId
   /** Shared binding; access fails after reference release or generation disposal. */
   readonly binding: SessionBinding
-  /** This reference's cancellable wait for the shared initial `Session.open()` attempt to settle. */
+  /**
+   * Cancellable initial history readiness. Local blank mainView/sidebarView references are
+   * synchronously binding-ready instead: their snapshot stays cold until Host creation settles.
+   */
   readonly ready: Promise<SessionBinding>
   /** Release once; the final reference starts local scope and history teardown. */
   release(): void
@@ -66,6 +69,8 @@ export interface ISessions {
   retain(target: SessionTarget, options: SessionRetainOptions): SessionReference
   /**
    * Hold one reference through callback settlement, including synchronous and asynchronous failures.
+   * Local drafts wait for Host creation before acquiring a reference, so speculative catalog warmup
+   * cannot pin an otherwise abandoned empty view. This wait respects caller and Controller cancellation.
    * @param target - Session to acquire.
    * @param options - source and acquisition cancellation.
    * @param operation - callback using the reference only until its returned value or Promise settles.

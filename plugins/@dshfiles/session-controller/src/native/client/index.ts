@@ -90,9 +90,11 @@ export type SessionReferenceSource = Extract<keyof SessionReferenceSourceMap, st
 /** Required Remote and Context projection services. */
 export const inject = [
   'connection',
+  'workspaces',
   'fileUpload',
   'typert',
   'remote',
+  'remote.agentPresets',
   'remote.commands',
   'remote.session',
   'remote.subagents',

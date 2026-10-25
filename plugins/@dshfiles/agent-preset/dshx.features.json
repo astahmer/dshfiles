@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "draft-preset-selection",
+      "title": "Choose an agent preset before typing",
+      "summary": "The native new-task preset chip changes a client-local draft's metadata without creating a Host Session or calling agentPresets.select for a nonexistent id. Settings defaults and both Creator routes use the same controller. Materialized blank Sessions retain the native Host selection path; started Sessions keep their recorded composition.",
+      "reach": ["click button \"New thread\"", "expect button \"Standard mode\"", "click button \"Standard mode\"", "expect menuitem \"Creator mode*\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["local-default", "local-selection", "creator-staged", "host-blank", "started"],
+      "failureModes": [
+        "A missing sessionDrafts service keeps this row pending instead of calling the Host for a local identity.",
+        "A refused Host selection keeps the native refusal toast and restores the recorded caption.",
+        "A Creator navigation cannot spend its staged preset on the previous local blank."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "The canonical draft-client service owns local identities, preset metadata and materialization through native SessionCreateRequest.agentPreset.",
+          "deterministicFake": "Focused controller tests supply the public SessionDrafts contract and assert local staging versus materialized Host selection."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only native row replacement; preset and Settings operations retain their existing native RPC instrumentation."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-preset.local-selection-unit",
+          "file": "plugins/@dshfiles/agent-preset/tests/draft-preset.test.ts",
+          "testName": "selects a local preset without a per-id Host RPC and keeps its caption on reload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-preset.creator-stage-unit",
+          "file": "plugins/@dshfiles/agent-preset/tests/draft-preset.test.ts",
+          "testName": "does not spend a Creator stage onto the previous local blank while navigation publishes the new identity"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agent-preset.pretyping-draft-choices",
+          "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"
+        }
+      ]
+    }
+  ]
+}

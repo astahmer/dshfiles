@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@dshfiles/input-trigger/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@dshfiles/session-controller/draft-client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -121,6 +122,7 @@ export default defineClient({
     'uiWorkspace',
     'workspaces',
     'sessions',
+    'sessionDrafts',
     'conversation',
     'sidebarRight',
     'sidebarRightTabs',
@@ -554,14 +556,15 @@ export default defineClient({
       const current = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
       return current === undefined ? undefined : ctx.workspaces.list.getSnapshot().items.find(item => item.sessionIds.includes(current))?.workspaceId
     }
+    // The composer opens at once; jj-integration's destination bar then moves the blank thread to its own jj
+    // workspace (or the project checkout) in the background, so New thread never waits on jj.
+    const startSession: SidebarRootInjected['startSession'] = workspaceId => {
+      const target = workspaceId ?? currentWorkspaceId()
+      if (target === undefined) return ctx.uiWorkspace.startSession()
+      ctx.uiWorkspace.startSession(target)
+    }
     const rootProps = (): SidebarRootInjected => ({
-      // The composer opens at once; jj-integration's destination bar then moves the blank thread to its own jj
-      // workspace (or the project checkout) in the background, so New thread never waits on jj.
-      startSession: workspaceId => {
-        const target = workspaceId ?? currentWorkspaceId()
-        if (target === undefined) return ctx.uiWorkspace.startSession()
-        ctx.uiWorkspace.startSession(target)
-      },
+      startSession,
       toggleSidebar: () => ctx.layout.toggleSidebar(),
       selectPanel: id => ctx.layout.selectPanel(id),
       hooks: {
@@ -805,6 +808,13 @@ export default defineClient({
       },
       renameSession,
       startFollowUp,
+      drafts: ctx.get('sessionDrafts')?.list,
+      startProjectSession: (projectId: string) => {
+        // Recheck at the click: deleted or remote projects must never fall back to the current project.
+        const project = SidebarOrganization.projectWorkspaces(ctx.workspaces.list.getSnapshot().items).find(item => item.workspaceId === projectId)
+        // Every New chat gets its own identity; unfinished drafts are reopened from their rows.
+        if (project !== undefined) ctx.uiWorkspace.startSession(project.workspaceId)
+      },
       continueInProject,
       open: openThread,
       openLinkedSession: (sessionId: SessionSummary['id']) => {

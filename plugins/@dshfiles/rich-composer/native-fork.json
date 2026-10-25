@@ -34,6 +34,7 @@
     "src/native/input/facade.ts",
     "src/native/input/machine.ts",
     "src/native/skeleton/ConversationSession.tsx",
+    "src/native/skeleton/ConversationContent.tsx",
     "src/native/skeleton/ConversationRoot.module.css",
     "src/native/queue/QueueDock.tsx",
     "src/native/service.ts"

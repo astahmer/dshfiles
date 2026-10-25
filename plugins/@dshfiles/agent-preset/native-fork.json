@@ -1,0 +1,17 @@
+{
+  "$comment": "Pinned whole native Loader-row fork; audit with scripts/native-fork-diff.mjs agent-preset.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-client-ui-agent-preset",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/client/ui-agent-preset"
+  },
+  "files": [
+    { "upstream": "src/client", "local": "src/native" },
+    { "upstream": "src/index.ts", "local": "src/host.ts" },
+    { "upstream": "src/css-modules.d.ts", "local": "src/css-modules.d.ts" },
+    { "upstream": "locale", "local": "locale" }
+  ],
+  "delta": ["src/native/index.ts", "src/native/seat-store.ts"]
+}

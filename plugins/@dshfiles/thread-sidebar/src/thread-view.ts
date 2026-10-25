@@ -106,6 +106,8 @@ export interface ThreadViewGroup<Thread> {
   readonly key: string
   readonly label: string
   readonly showHeader: boolean
+  /** Creation target only for a registered local project; never inferred from the label or group key. */
+  readonly projectId: string | undefined
   readonly threads: readonly Thread[]
 }
 
@@ -262,19 +264,22 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
   readonly groupBy: Exclude<ThreadGroupBy, 'status'>
   readonly entries: readonly ThreadViewEntry<Thread>[]
   readonly workspaceTitles: ReadonlyMap<string, string>
+  readonly localProjectIds: ReadonlySet<string>
   readonly unassignedTitle: string
   readonly dateTitles: Readonly<Record<ThreadDateGroup, string>>
   readonly now: number
 }): readonly ThreadViewGroup<Thread>[] => {
-  const groups = new Map<string, { label: string; showHeader: boolean; entries: { thread: Thread; activityAt: number }[] }>()
+  const groups = new Map<string, { label: string; showHeader: boolean; projectId: string | undefined; entries: { thread: Thread; activityAt: number }[] }>()
   for (const entry of options.entries) {
     let key = 'none'
     let label = ''
     let showHeader = false
+    let projectId: string | undefined
     if (options.groupBy === 'project') {
       key = `project:${entry.workspaceId ?? ''}`
       label = entry.workspaceId === undefined ? options.unassignedTitle : (options.workspaceTitles.get(entry.workspaceId) ?? entry.workspaceId)
       showHeader = true
+      if (entry.workspaceId !== undefined && options.localProjectIds.has(entry.workspaceId)) projectId = entry.workspaceId
     }
     if (options.groupBy === 'date') {
       const dateGroup = threadDateGroup(entry.activityAt ?? entry.thread.updatedAt, options.now)
@@ -282,7 +287,7 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
       label = options.dateTitles[dateGroup]
       showHeader = true
     }
-    const group = groups.get(key) ?? { label, showHeader, entries: [] }
+    const group = groups.get(key) ?? { label, showHeader, projectId, entries: [] }
     group.entries.push({ thread: entry.thread, activityAt: entry.activityAt ?? entry.thread.updatedAt })
     groups.set(key, group)
   }
@@ -298,6 +303,7 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
     key,
     label: group.label,
     showHeader: group.showHeader,
+    projectId: group.projectId,
     threads: group.entries.sort((left, right) => right.activityAt - left.activityAt).map(entry => entry.thread),
   }))
 }

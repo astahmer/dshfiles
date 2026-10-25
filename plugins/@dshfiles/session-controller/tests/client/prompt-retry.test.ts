@@ -4,15 +4,30 @@ import { describe, expect, it } from 'vitest'
 import { Session } from '../../src/native/client/sessions/session.js'
 import type { SessionRemotes } from '../../src/native/client/sessions/remotes.js'
 
-const sessionWithPrompt = (prompt: SessionRemotes['session']['prompt']): Session =>
-  new Session(
-    SessionId('session-retry-test'),
-    { session: { prompt } } as unknown as SessionRemotes,
-  )
+const sessionWithPrompt = (prompt: SessionRemotes['session']['prompt'], options: ConstructorParameters<typeof Session>[2] = {}): Session =>
+  new Session(SessionId('session-retry-test'), { session: { prompt } } as unknown as SessionRemotes, options)
 
 const text = [{ type: 'text', text: 'hello' }] as const
 
 describe('Session.prompt retry', () => {
+  it('never prompts after cancellation while the local draft is materializing', async () => {
+    let attempts = 0
+    const created = Promise.withResolvers<void>()
+    const controller = new AbortController()
+    const session = sessionWithPrompt(
+      async () => {
+        attempts += 1
+        return { ok: true, value: { accepted: true } }
+      },
+      { beforeRpc: () => created.promise },
+    )
+    const sending = session.prompt([...text], 'queue', controller.signal)
+    controller.abort(new Error('cancelled materialization'))
+    created.resolve()
+    await expect(sending).rejects.toThrow('cancelled materialization')
+    expect(attempts).toBe(0)
+  })
+
   it('retries a gateway failure once with the submission request ID', async () => {
     const requestIds: string[] = []
     const session = sessionWithPrompt(async request => {

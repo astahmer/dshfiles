@@ -1,0 +1,5 @@
+- id: ui-model-selection
+  disabled: true
+- insert:
+    - id: dshfiles-model-selection
+      name: '@dshfiles/model-selection'
