@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { buildRemoteSidebarThreads } from './remote-thread-inventory.js'
+import { buildRemoteSidebarThreads, runtimesWithStartedThreads } from './remote-thread-inventory.js'
 
 const status = {
   ok: true,
@@ -11,6 +11,13 @@ const status = {
     { runtimeId: 'runtime-a', sessionId: 'blank-thread', cwd: '/work/Atlas', running: false, blank: true, updatedAt: 500 },
   ],
 } satisfies Awaited<ReturnType<import('@dshfiles/multi-host/destination').MultiHostClient['runtimeStatus']>>
+
+test('only probes runtimes that own started-here threads', () => {
+  const runtimes = [{ id: 'runtime-a' }, { id: 'runtime-b' }, { id: 'runtime-c' }]
+  expect(runtimesWithStartedThreads(runtimes, [{ runtimeId: 'runtime-c' }, { runtimeId: 'runtime-a' }, { runtimeId: 'runtime-c' }]))
+    .toEqual([runtimes[0], runtimes[2]])
+  expect(runtimesWithStartedThreads(runtimes, [])).toEqual([])
+})
 
 test('remote inventory enriches started-here threads without adding host-only sessions', () => {
   const rows = buildRemoteSidebarThreads({

@@ -30,6 +30,14 @@ const folderName = (path: string | undefined): string | undefined => path?.split
 const validTimestamp = (timestamp: number): number => (Number.isFinite(timestamp) ? timestamp : 0)
 const createdTimestamp = (createdAt: string): number => validTimestamp(Date.parse(createdAt))
 
+export const runtimesWithStartedThreads = <Runtime extends { readonly id: string }>(
+  runtimes: readonly Runtime[],
+  threads: readonly Pick<RemoteThreadSummary, 'runtimeId'>[],
+): readonly Runtime[] => {
+  const runtimeIds = new Set(threads.map(thread => thread.runtimeId))
+  return runtimes.filter(runtime => runtimeIds.has(runtime.id))
+}
+
 /** Project started-here remote threads, enriching their rows with live runtime details when available. */
 export const buildRemoteSidebarThreads = (input: {
   readonly startedHere: readonly RemoteThreadSummary[]
@@ -96,7 +104,11 @@ export const useRemoteSidebarThreads = (enabled: boolean): readonly RemoteSideba
     enabled,
   })
   const directory = useQuery({ ...multiHostQueries.directory(api), enabled })
-  const runtimes = useMemo(() => (enabled ? (directory.data?.runtimes ?? []) : []), [directory.data?.runtimes, enabled])
+  const runtimes = useMemo(() => {
+    const threads = startedHere.data?.threads
+    if (!enabled || threads === undefined) return []
+    return runtimesWithStartedThreads(directory.data?.runtimes ?? [], threads)
+  }, [directory.data?.runtimes, enabled, startedHere.data?.threads])
   const statusQueries = useQueries({
     queries: runtimes.map(runtime => ({ ...multiHostQueries.status(api, runtime.id, 30_000), enabled })),
   })
