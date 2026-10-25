@@ -314,15 +314,17 @@ export class Session implements SessionFace {
       }, signal)
       return routed.ok ? { ok: true, value: { accepted: true } } : routed
     }
+    const isCancelled = (): boolean => Boolean(signal?.aborted)
+    const cancelledResult = (): RemoteResult<{ accepted: true }> => ({
+      ok: false,
+      error: new RemoteError('gateway/cancelled', 'prompt retry was cancelled', {}),
+    })
     let result = await send()
     if (!result.ok && result.error.code === 'gateway/internal') {
-      if (signal?.aborted === true) {
-        result = { ok: false, error: new RemoteError('gateway/cancelled', 'prompt retry was cancelled', {}) }
-      } else {
+      if (isCancelled()) result = cancelledResult()
+      else {
         await new Promise<void>(resolve => { setTimeout(resolve, 100) })
-        result = signal?.aborted === true
-          ? { ok: false, error: new RemoteError('gateway/cancelled', 'prompt retry was cancelled', {}) }
-          : await send()
+        result = isCancelled() ? cancelledResult() : await send()
       }
     }
     if (!result.ok) {

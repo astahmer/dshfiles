@@ -33,7 +33,7 @@ describe('Session.prompt retry', () => {
     let attempts = 0
     const session = sessionWithPrompt(async () => {
       attempts += 1
-      return { ok: false, error: new RemoteError('session/agent-busy', 'prompt rejected', {}) }
+      return { ok: false, error: new RemoteError('session/agent-busy', 'prompt rejected', { reason: 'BUSY' }) }
     })
 
     await expect(session.prompt([...text], 'queue')).resolves.toMatchObject({
