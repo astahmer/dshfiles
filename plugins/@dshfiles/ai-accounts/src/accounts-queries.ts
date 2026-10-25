@@ -106,7 +106,8 @@ export const aiAccountsQueries = {
       queryFn: async ({ signal, client }) =>
         keepLastGoodUsage(client.getQueryData<AccountsUsage | null>(aiAccountsKeys.usage), normalizeUsage(await accounts.usage(undefined, { signal }))),
       refetchInterval,
-      refetchOnWindowFocus: true,
+      refetchIntervalInBackground: true,
+      refetchOnWindowFocus: 'always',
     }),
 
   /** Bypasses the Host's shared sweep cache; an older Host without `refreshUsage` falls back to the cached read. */
