@@ -42,7 +42,7 @@ export class SubmitMachine {
     readonly attempt: SubmitAttempt
     readonly controller: AbortController
   } | undefined
-  /** Ordinary sends detached from the editor, retained for settlement validation and cancellation. */
+  /** Ordinary sends detached from the editor, retained for settlement validation until release. */
   private readonly detached = new Map<number, AbortController>()
 
   /** Read-only snapshot of the submit-plane state. */
@@ -221,7 +221,6 @@ export class SubmitMachine {
       this.inflight.controller.abort()
       this.inflight = undefined
     }
-    for (const controller of this.detached.values()) controller.abort()
     this.detached.clear()
     this.phase = 'plain'
     this.claim = undefined

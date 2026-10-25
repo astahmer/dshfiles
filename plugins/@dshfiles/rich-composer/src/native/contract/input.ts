@@ -300,8 +300,8 @@ export interface InputState {
  * Created on enter; carried by adjudicated/submit-settled/sink-settled
  * events; stale attempts are dropped (anti-backwash). Command attempts hold
  * the single frozen in-flight slot; default-sink attempts run detached and
- * concurrently. release/session teardown aborts them all, keeping every
- * promise bounded.
+ * concurrently. Release aborts adjudication and command work, but a default
+ * send already handed to its sink survives composer teardown.
  */
 export interface SubmitAttempt {
   readonly seq: number
