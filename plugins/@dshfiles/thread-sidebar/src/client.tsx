@@ -24,7 +24,7 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { startInteraction } from '@dshfiles/dshx/tracing/client'
 import { createInventoryPoll } from './inventory-poll.js'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
-import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
+import { activeQuestionSessionIds } from './pending-questions.js'
 import {
   IconArchiveOutlineRegular,
   IconCheckCircleOutlineRegular,
@@ -1301,7 +1301,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, setSelectedThreadId, threadTitle } = useSidebarState()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
-  const pendingQuestionsApi = useApi(threadSidebarPendingQuestionsApi)
   const recoveryApi = useApi(threadSidebarRecoveryApi)
   const queryClient = useQueryClient()
   const recoveryQuery = useQuery({
@@ -1635,21 +1634,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         .sort(),
     [sessionStatus, sessions],
   )
-  const activeQuestionsQuery = useQuery({
-    queryKey: ['thread-sidebar', 'pending-questions', questionCandidates],
-    queryFn: async ({ signal }) => {
-      const activeSessionIds: string[] = []
-      for (let offset = 0; offset < questionCandidates.length; offset += 500) {
-        const result = await pendingQuestionsApi.active({ sessionIds: questionCandidates.slice(offset, offset + 500) }, { signal })
-        activeSessionIds.push(...result.sessionIds)
-      }
-      return { sessionIds: activeSessionIds }
-    },
-    enabled: questionCandidates.length > 0,
-    refetchInterval: isPrimarySurface && questionCandidates.length > 0 ? 10_000 : false,
-    retry: false,
-  })
-  const continuedQuestionSessionIds = useMemo(() => new Set(activeQuestionsQuery.data?.sessionIds ?? []), [activeQuestionsQuery.data])
+  const continuedQuestionSessionIds = useMemo(
+    () => new Set(activeQuestionSessionIds(questionCandidates, sessionState.byId)),
+    [questionCandidates, sessionState.byId],
+  )
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
   const paletteThreadSections = useMemo<ReadonlyMap<string, PaletteThreadSection>>(
     () =>
