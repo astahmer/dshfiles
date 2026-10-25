@@ -78,10 +78,7 @@ test('details accept a hex prefix or a change id, which is what jj log and chat 
 test('an unknown prefix reports that no revision matches instead of a stale-revision message', async () => {
   const { run } = await scratchRepo()
 
-  await assert.rejects(
-    () => RevisionReads.details(run, 'deadbeef1234'),
-    /does not name exactly one revision/u,
-  )
+  await assert.rejects(() => RevisionReads.details(run, 'deadbeef1234'), /does not name exactly one revision/u)
 })
 
 test('details never snapshot the working copy, so a read cannot rewrite @ under other agents', async () => {
