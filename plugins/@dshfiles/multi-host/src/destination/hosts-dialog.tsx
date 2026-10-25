@@ -82,7 +82,7 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Host
   const save = useMutation({
     mutationFn: async () => {
       const result = await api.saveSshHost({
-        ...(draft.hostId === undefined ? {} : { hostId: draft.hostId }),
+        ...(draft.hostId !== undefined && { hostId: draft.hostId }),
         name: draft.name.trim() || draft.sshTarget.trim(),
         sshTarget: draft.sshTarget.trim(),
         remoteHome: draft.remoteHome.trim(),

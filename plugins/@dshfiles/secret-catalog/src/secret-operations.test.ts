@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parseSecretPrintMetadata } from './secret-metadata.js'
 import { createSecretCatalogOperations, type SecretCliRequest } from './secret-operations.js'
-import { createWorkspacePickerPorts, type WorkspacePickerRemote } from './workspace-picker-adapter.js'
+import { createWorkspacePickerPorts, type WorkspacePickerRemote } from '@dshfiles/project-folder-picker'
 
 describe('Secret Catalog metadata and exact alias actions', () => {
   it('projects only value-free metadata from the CLI JSON contract', () => {

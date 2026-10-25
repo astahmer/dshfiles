@@ -42,7 +42,7 @@ export const commentMutation = <Result>(input: { readonly client: QueryClient; r
                     actor: 'user',
                     kind: 'commented',
                     detail: request.text,
-                    ...(commentAttachments.length === 0 ? {} : { attachments: commentAttachments }),
+                    ...(commentAttachments.length !== 0 && { attachments: commentAttachments }),
                   },
                 ],
               },

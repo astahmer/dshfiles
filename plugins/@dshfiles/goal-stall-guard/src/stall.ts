@@ -98,7 +98,7 @@ export const StallDetector = (policy: StallPolicy = DEFAULT_STALL_POLICY) => {
       return {
         stalled,
         consecutiveEmptyRounds,
-        ...(openRound === undefined ? {} : { round: openRound.round }),
+        ...(openRound !== undefined && { round: openRound.round }),
       }
     },
   }

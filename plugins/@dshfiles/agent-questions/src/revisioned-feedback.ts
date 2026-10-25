@@ -238,7 +238,7 @@ export const createParentFeedbackService = (input: {
     const status = observedRevision === found.record.anchor.revision ? 'resolved' : 'stale'
     const resolutionReceipt = feedbackResolutionReceiptSchema.parse({
       disposition: resolution.answer.disposition,
-      ...(resolution.answer.note === undefined ? {} : { note: resolution.answer.note }),
+      ...(resolution.answer.note !== undefined && { note: resolution.answer.note }),
       baseRevision: found.record.anchor.revision,
       observedRevision,
       checkedAt: now(),

@@ -18,7 +18,7 @@ export class ParentQuestionToolFlow {
       agent: input.agent,
       operationId: input.operationId,
       question: input.question,
-      ...(input.context === undefined ? {} : { context: input.context }),
+      ...(input.context !== undefined && { context: input.context }),
       options: input.options,
       recommendedOptionId: input.recommendedOptionId,
       expiryBehavior: input.expiryBehavior,

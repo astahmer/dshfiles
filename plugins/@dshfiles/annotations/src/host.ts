@@ -70,7 +70,7 @@ const openAnnotations = async (ctx: Context): Promise<OpenedAnnotations> => {
     meta: domain.table('meta'),
   })
   await store.flush()
-  const roots = await SourceCatalog.discoverPluginRoots({ start: process.cwd(), env: process.env, ...(moduleUrl === undefined ? {} : { moduleUrl }) })
+  const roots = await SourceCatalog.discoverPluginRoots({ start: process.cwd(), env: process.env, ...(moduleUrl !== undefined && { moduleUrl }) })
   const pairing = createPairing({ token: () => store.token() })
   return { store, resolver: SourceCatalog.createSourceResolver({ roots }), pairing, roots, close: () => domain.close() }
 }
@@ -139,8 +139,8 @@ const annotationsApiHost = annotationsApi.host({
     const { store } = await annotationsFor(ctx)
     const query = {
       sessionId: input.sessionId,
-      ...(input.statuses === undefined ? {} : { statuses: input.statuses }),
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
+      ...(input.statuses !== undefined && { statuses: input.statuses }),
+      ...(input.limit !== undefined && { limit: input.limit }),
     }
     return { annotations: store.list(query), counts: store.counts(input.sessionId) }
   },
@@ -163,7 +163,7 @@ const annotationsApiHost = annotationsApi.host({
       id: input.id,
       revision: input.revision,
       resolvedBy: 'agent',
-      ...(input.summary === undefined ? {} : { summary: input.summary }),
+      ...(input.summary !== undefined && { summary: input.summary }),
     })
     if (!result.ok) return { ok: false as const, error: result.error }
     return { ok: true as const, annotation: result.value }
@@ -212,7 +212,7 @@ const annotationsApiHost = annotationsApi.host({
       executable,
       port: settings.cdpPort,
       profileDir: settings.profileDir.trim().length > 0 ? settings.profileDir : Chrome.defaultProfileDir({ dshHome: process.env.DSH_HOME }),
-      ...(settings.startUrl.trim().length > 0 ? { startUrl: settings.startUrl } : {}),
+      ...(settings.startUrl.trim().length > 0 && { startUrl: settings.startUrl }),
       headless: process.env.DSH_ANNOTATIONS_CHROME_HEADLESS === '1',
     })
     return chromeState()
@@ -228,7 +228,7 @@ const annotationsApiHost = annotationsApi.host({
     const pages = await CdpTransport.listPages({ endpoint: launched.endpoint })
     const requested = input.pageId === undefined ? undefined : pages.find(candidate => candidate.id === input.pageId)
     const focused = input.pageId === undefined ? await CdpTransport.focusedPageId({ pages }) : undefined
-    const page = requested ?? CdpTransport.choosePage({ pages, ...(focused === undefined ? {} : { focusedId: focused }) })
+    const page = requested ?? CdpTransport.choosePage({ pages, ...(focused !== undefined && { focusedId: focused }) })
     if (page === undefined) return { ok: false as const, reason: 'no-page' as const }
     const outcome = await CdpTransport.pickOnPage({ page, timeoutMs: settings.pickTimeoutSeconds * 1_000 })
     return outcome.ok ? { ok: true as const, target: outcome.target, point: outcome.point } : { ok: false as const, reason: outcome.reason }

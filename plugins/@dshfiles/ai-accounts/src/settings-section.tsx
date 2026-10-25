@@ -685,7 +685,10 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
         )}
       </Row>
       <Row
-        hint={pricingStatusLine({ pricing, fetchedAge: pricing === null || pricing.fetchedAt === null ? null : relativeTime(pricing.fetchedAt, Date.now()) })}
+        hint={pricingStatusLine({
+          pricing,
+          fetchedAge: pricing === null || pricing.fetchedAt === null ? null : relativeTime(pricing.fetchedAt, status.dataUpdatedAt),
+        })}
         label="Price catalog"
       >
         {() => (

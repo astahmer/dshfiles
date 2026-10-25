@@ -427,6 +427,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(registered.root) })
     },
   })
+  const { mutate: registerRepository, reset: resetRegistration } = registerMutation
 
   const autoRefresh = useAutoRefresh({
     preferences,
@@ -447,9 +448,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
     recoveredRepositoryPath.current = path
-    registerMutation.reset()
-    registerMutation.mutate(path)
-  }, [path, registerMutation.mutate, registerMutation.reset, repoId, stateQuery.error])
+    resetRegistration()
+    registerRepository(path)
+  }, [path, registerRepository, resetRegistration, repoId, stateQuery.error])
   useEffect(() => {
     if (state !== undefined) recoveredRepositoryPath.current = null
   }, [state])
@@ -564,16 +565,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       if (requested.reference !== undefined) setPendingReferenceRequest(requested.reference)
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
       autoRegisterPath.current = requested.path
-      registerMutation.mutate(requested.path)
+      registerRepository(requested.path)
     })
-  }, [sidePanel, registerMutation.mutate])
+  }, [sidePanel, registerRepository])
 
   useEffect(() => {
     const selectedPath = path.trim()
     if (repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
     autoRegisterPath.current = selectedPath
-    registerMutation.mutate(selectedPath)
-  }, [path, repoId, registerMutation.mutate])
+    registerRepository(selectedPath)
+  }, [path, repoId, registerRepository])
 
   useEffect(() => {
     if (state === undefined) return

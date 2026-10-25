@@ -45,8 +45,12 @@ import { storedTracesView, tracesViewSchema, WINDOW_OPTIONS, type TracesView } f
 
 const ALL = '__all__'
 
-const windowLabel = (minutes: number, t: TracesTranslate): string =>
-  minutes === 15 ? t('window15m') : minutes === 60 ? t('window1h') : minutes === 1_440 ? t('window24h') : t('window7d')
+const windowLabel = (minutes: number, t: TracesTranslate): string => {
+  if (minutes === 15) return t('window15m')
+  if (minutes === 60) return t('window1h')
+  if (minutes === 1_440) return t('window24h')
+  return t('window7d')
+}
 
 export const TracesPanel = (props: {
   readonly sessions: ISessions

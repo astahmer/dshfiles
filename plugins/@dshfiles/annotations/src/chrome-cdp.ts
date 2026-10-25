@@ -63,7 +63,7 @@ const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; readonl
             new Promise((resolved, failed) => {
               const id = nextId++
               pending.set(id, { resolve: resolved, reject: failed })
-              socket.send(JSON.stringify({ id, method, ...(params === undefined ? {} : { params }) }))
+              socket.send(JSON.stringify({ id, method, ...(params !== undefined && { params }) }))
             }),
           on: (method, handler) => {
             const set = listeners.get(method) ?? new Set()

@@ -864,126 +864,127 @@ export const BacklogPanel = (props: {
       ) : null}
       <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
         {showSettings ? <BacklogSettingsPanel /> : null}
-        {showSettings ? null : showsResults ? (
-          <>
-            <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-              <SearchResults
-                items={all}
-                total={list.data?.total ?? 0}
-                counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
-                statuses={stored.statuses}
-                toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                clearStatuses={() => setPreference({ statuses: [] })}
-                query={debounced}
-                triageOff={triageOff}
-                openId={openId}
-                cursorId={cursorId}
-                select={select}
-                hover={setCursorId}
-                loaded={list.isSuccess}
-                startThread={openStartThread}
-                projectPaths={projectPaths}
-              />
-            </div>
-            {inspector}
-          </>
-        ) : view === 'inbox' ? (
-          <InboxView
-            triageOff={triageOff}
-            items={inboxItems}
-            cursorId={cursorId}
-            threads={inboxThreads}
-            openId={openId}
-            select={select}
-            openThread={props.openThread}
-            acknowledgeThread={thread =>
-              void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
-            }
-            inspector={inspector}
-            loaded={inbox.isSuccess}
-            sort={stored.sort.inbox}
-            startThread={openStartThread}
-            projectPaths={projectPaths}
-          />
-        ) : (
-          <>
-            <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-              {view === 'feed' && (
-                <FeedView
-                  cursorId={cursorId}
+        {!showSettings &&
+          (showsResults ? (
+            <>
+              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                <SearchResults
+                  items={all}
+                  total={list.data?.total ?? 0}
+                  counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
+                  statuses={stored.statuses}
+                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                  clearStatuses={() => setPreference({ statuses: [] })}
+                  query={debounced}
                   triageOff={triageOff}
-                  items={filteredItems}
-                  sort={stored.sort.feed}
-                  counts={statusTotals}
-                  statuses={stored.statuses}
-                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                  clearStatuses={() => setPreference({ statuses: [] })}
-                  openId={openId}
-                  select={select}
-                  loaded={list.isSuccess}
-                  now={now}
-                  projectPaths={projectPaths}
-                  startThread={openStartThread}
-                  openThread={props.openThread}
-                />
-              )}
-              {view === 'items' && (
-                <ItemsView
-                  items={filteredItems}
-                  sort={stored.sort.items}
-                  counts={statusTotals}
-                  statuses={stored.statuses}
-                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                  clearStatuses={() => setPreference({ statuses: [] })}
                   openId={openId}
                   cursorId={cursorId}
                   select={select}
                   hover={setCursorId}
-                  groupBy={stored.groupBy}
-                  triageOff={triageOff}
-                  setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
-                  collapsed={collapsed}
-                  setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                  captureInto={startCapture}
-                  projectPaths={projectPaths}
-                  startThread={openStartThread}
-                />
-              )}
-              {view === 'board' && (
-                <BoardView
-                  triageOff={triageOff}
-                  items={items}
-                  openId={openId}
-                  cursorId={cursorId}
-                  open={select}
-                  captureInto={startCapture}
-                  projectPaths={projectPaths}
-                  startThread={openStartThread}
-                />
-              )}
-              {view === 'projects' && (
-                <ProjectsView
-                  query={debounced}
-                  matchingProjects={
-                    debounced === ''
-                      ? projectFilters.length === 0
-                        ? null
-                        : new Set(projectFilters.map(project => project ?? ''))
-                      : SearchScopes.matchingProjects(items)
-                  }
-                  triageOff={triageOff}
-                  selectedProject={selectedProject}
-                  setSelectedProject={setSelectedProject}
-                  select={select}
-                  now={now}
+                  loaded={list.isSuccess}
                   startThread={openStartThread}
                   projectPaths={projectPaths}
                 />
-              )}
-            </div>
-            {inspector}
-          </>
-        )}
+              </div>
+              {inspector}
+            </>
+          ) : view === 'inbox' ? (
+            <InboxView
+              triageOff={triageOff}
+              items={inboxItems}
+              cursorId={cursorId}
+              threads={inboxThreads}
+              openId={openId}
+              select={select}
+              openThread={props.openThread}
+              acknowledgeThread={thread =>
+                void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
+              }
+              inspector={inspector}
+              loaded={inbox.isSuccess}
+              sort={stored.sort.inbox}
+              startThread={openStartThread}
+              projectPaths={projectPaths}
+            />
+          ) : (
+            <>
+              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                {view === 'feed' && (
+                  <FeedView
+                    cursorId={cursorId}
+                    triageOff={triageOff}
+                    items={filteredItems}
+                    sort={stored.sort.feed}
+                    counts={statusTotals}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
+                    openId={openId}
+                    select={select}
+                    loaded={list.isSuccess}
+                    now={now}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                    openThread={props.openThread}
+                  />
+                )}
+                {view === 'items' && (
+                  <ItemsView
+                    items={filteredItems}
+                    sort={stored.sort.items}
+                    counts={statusTotals}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
+                    openId={openId}
+                    cursorId={cursorId}
+                    select={select}
+                    hover={setCursorId}
+                    groupBy={stored.groupBy}
+                    triageOff={triageOff}
+                    setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
+                    collapsed={collapsed}
+                    setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'board' && (
+                  <BoardView
+                    triageOff={triageOff}
+                    items={items}
+                    openId={openId}
+                    cursorId={cursorId}
+                    open={select}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'projects' && (
+                  <ProjectsView
+                    query={debounced}
+                    matchingProjects={
+                      debounced === ''
+                        ? projectFilters.length === 0
+                          ? null
+                          : new Set(projectFilters.map(project => project ?? ''))
+                        : SearchScopes.matchingProjects(items)
+                    }
+                    triageOff={triageOff}
+                    selectedProject={selectedProject}
+                    setSelectedProject={setSelectedProject}
+                    select={select}
+                    now={now}
+                    startThread={openStartThread}
+                    projectPaths={projectPaths}
+                  />
+                )}
+              </div>
+              {inspector}
+            </>
+          ))}
       </div>
       {startThreadItems === null ? null : (
         <StartThreadDialog

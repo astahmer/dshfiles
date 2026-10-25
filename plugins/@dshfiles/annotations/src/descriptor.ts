@@ -93,9 +93,9 @@ const describeTarget = ({
   const styles = Redact.safeStyles(element)
   const parsed = annotationTargetSchema.safeParse({
     ...target,
-    ...(text === undefined ? {} : { text }),
-    ...(attributes === undefined ? {} : { attributes }),
-    ...(styles === undefined ? {} : { styles }),
+    ...(text !== undefined && { text }),
+    ...(attributes !== undefined && { attributes }),
+    ...(styles !== undefined && { styles }),
   })
   return parsed.success ? parsed.data : null
 }

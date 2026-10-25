@@ -185,12 +185,12 @@ const connectRuntime = async ({
   readonly originPort?: number
 }): Promise<Gateway> => {
   if (runtime.locator.kind === 'local' && host.connector.kind === 'local')
-    return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort === undefined ? {} : { originPort }), signal })
+    return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort !== undefined && { originPort }), signal })
   if (runtime.locator.kind === 'ssh' && host.connector.kind === 'ssh')
     return SshConnector.connect({
       sshTarget: host.connector.sshTarget,
       remoteHome: runtime.locator.remoteHome,
-      ...(originPort === undefined ? {} : { originPort }),
+      ...(originPort !== undefined && { originPort }),
       signal,
     })
   throw new GatewayUnavailableError('connector-kind-mismatch', 'The runtime locator does not match its recorded host.')
@@ -281,7 +281,7 @@ const pool = createGatewayPool({
     const host = await HostDirectoryStore.findHost(runtime.hostId)
     if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime has no recorded host.')
     // A stable origin port keeps the browser cookie of an opened remote view valid across reconnects.
-    const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort === undefined ? {} : { originPort: runtime.originPort }) })
+    const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort !== undefined && { originPort: runtime.originPort }) })
     try {
       const identity = await verifyPinnedIdentity(gateway, runtime)
       await HostDirectoryStore.upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
@@ -318,10 +318,10 @@ const runtimeSummary = (record: RuntimeRecord) => ({
   hostId: record.hostId,
   name: record.name,
   identity: record.identity,
-  ...(record.locator.kind === 'ssh' ? { remoteHome: record.locator.remoteHome } : {}),
-  ...(record.lastSeenAt === undefined ? {} : { lastSeenAt: record.lastSeenAt }),
+  ...(record.locator.kind === 'ssh' && { remoteHome: record.locator.remoteHome }),
+  ...(record.lastSeenAt !== undefined && { lastSeenAt: record.lastSeenAt }),
   connected: pool.status(record.id) !== undefined,
-  ...(connectionErrors.has(record.id) ? { lastError: connectionErrors.get(record.id) } : {}),
+  ...(connectionErrors.has(record.id) && { lastError: connectionErrors.get(record.id) }),
 })
 
 const hostSummary = (record: HostRecord, runtimes: readonly RuntimeRecord[]) => ({
@@ -628,7 +628,7 @@ const multiHostHandlers = multiHostApi.host({
         name: input.name.trim(),
         connector,
         hidden: previous?.hidden ?? false,
-        ...(previous?.position === undefined ? {} : { position: previous.position }),
+        ...(previous?.position !== undefined && { position: previous.position }),
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
       const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
@@ -653,7 +653,7 @@ const multiHostHandlers = multiHostApi.host({
       name: input.name.trim(),
       connector,
       hidden: previous?.hidden ?? false,
-      ...(previous?.position === undefined ? {} : { position: previous.position }),
+      ...(previous?.position !== undefined && { position: previous.position }),
       createdAt: previous?.createdAt ?? new Date().toISOString(),
     }
     await HostDirectoryStore.upsertHost(record)
@@ -869,7 +869,7 @@ const multiHostHandlers = multiHostApi.host({
         { mutation: true, broken: brokenRpc },
       )
     } catch (error) {
-      return { ok: false as const, ...safeFailure(error), ...(sessionId === undefined ? {} : { sessionId }) }
+      return { ok: false as const, ...safeFailure(error), ...(sessionId !== undefined && { sessionId }) }
     }
   },
   threadStart: async ({ input }) => {
@@ -883,7 +883,7 @@ const multiHostHandlers = multiHostApi.host({
           const created = await NativeRpcModel.call(gateway, {
             namespace: 'session',
             method: 'create',
-            args: { request: { cwd: input.cwd, ...(input.agentPreset === undefined ? {} : { agentPreset: input.agentPreset }) } },
+            args: { request: { cwd: input.cwd, ...(input.agentPreset !== undefined && { agentPreset: input.agentPreset }) } },
           })
           if (!created.ok) return { ok: false as const, code: created.code, message: created.message }
           sessionId = sessionCreatedSchema.parse(created.value).sessionId
@@ -893,7 +893,7 @@ const multiHostHandlers = multiHostApi.host({
                 sessionId,
                 provider: input.model.provider,
                 model: input.model.model,
-                ...(input.model.reasoningEffort === undefined ? {} : { reasoningEffort: input.model.reasoningEffort }),
+                ...(input.model.reasoningEffort !== undefined && { reasoningEffort: input.model.reasoningEffort }),
               },
             })
             if (!selected.ok)
@@ -918,7 +918,7 @@ const multiHostHandlers = multiHostApi.host({
       )
     } catch (error) {
       const failure = safeFailure(error)
-      return { ok: false as const, ...failure, ...(sessionId === undefined ? {} : { sessionId }) }
+      return { ok: false as const, ...failure, ...(sessionId !== undefined && { sessionId }) }
     }
   },
   runtimeModels: async ({ input, signal }) => {
@@ -936,8 +936,8 @@ const multiHostHandlers = multiHostApi.host({
           models: group.models.map(model => ({
             id: model.id,
             name: model.name,
-            ...(model.description === undefined ? {} : { description: model.description }),
-            ...(model.reasoning === undefined ? {} : { reasoning: model.reasoning }),
+            ...(model.description !== undefined && { description: model.description }),
+            ...(model.reasoning !== undefined && { reasoning: model.reasoning }),
           })),
         })),
         failures: catalog.failures ?? [],
@@ -1000,7 +1000,7 @@ const multiHostHandlers = multiHostApi.host({
               'upload',
               {
                 agentId: input.sessionId,
-                request: { data: input.data, ...(input.name === undefined ? {} : { name: input.name }) },
+                request: { data: input.data, ...(input.name !== undefined && { name: input.name }) },
               },
               signal,
             ),
@@ -1030,10 +1030,10 @@ const multiHostHandlers = multiHostApi.host({
           return {
             ok: true as const,
             cursor: snapshot.cursor,
-            ...(snapshot.header?.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
-            ...(reduced.title === undefined ? {} : { title: reduced.title }),
-            ...(reduced.model === undefined ? {} : { model: reduced.model }),
-            ...(reduced.waiting === undefined ? {} : { waiting: reduced.waiting }),
+            ...(snapshot.header?.cwd !== undefined && { cwd: snapshot.header.cwd }),
+            ...(reduced.title !== undefined && { title: reduced.title }),
+            ...(reduced.model !== undefined && { model: reduced.model }),
+            ...(reduced.waiting !== undefined && { waiting: reduced.waiting }),
             running: reduced.running,
             entries: reduced.entries,
           }

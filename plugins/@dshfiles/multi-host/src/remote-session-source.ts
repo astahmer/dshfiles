@@ -139,7 +139,7 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
               running: false,
               blank: true,
               agentAvailable: true,
-              ...(thread.cwd === undefined ? {} : { cwd: thread.cwd }),
+              ...(thread.cwd !== undefined && { cwd: thread.cwd }),
             })),
           ]
           for (const row of runtimeRows) rememberRuntime(String(row.sessionId), runtime)
@@ -147,11 +147,11 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
             ...runtimeRows.map(row => ({
               agentAvailable: row.agentAvailable,
               blank: row.blank,
-              ...(row.cwd === undefined ? {} : { cwd: row.cwd }),
-              ...(row.formatStatus === undefined ? {} : { formatStatus: row.formatStatus }),
-              ...(row.origin === undefined ? {} : { origin: row.origin }),
-              ...(row.parentSessionId === undefined ? {} : { parentSessionId: row.parentSessionId }),
-              ...(row.projections === undefined ? {} : { projections: row.projections }),
+              ...(row.cwd !== undefined && { cwd: row.cwd }),
+              ...(row.formatStatus !== undefined && { formatStatus: row.formatStatus }),
+              ...(row.origin !== undefined && { origin: row.origin }),
+              ...(row.parentSessionId !== undefined && { parentSessionId: row.parentSessionId }),
+              ...(row.projections !== undefined && { projections: row.projections }),
               running: row.running,
               sessionId: row.sessionId,
               updatedAt: row.updatedAt,

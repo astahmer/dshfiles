@@ -58,7 +58,7 @@ export const readCodexOAuthCredential = async (codexHome: string): Promise<OAuth
     refresh,
     // A missing exp claim forces pi-ai to refresh before it serves anything.
     expires: expiresClaim === undefined ? 0 : expiresClaim * 1000,
-    ...(accountId === undefined ? {} : { accountId }),
+    ...(accountId !== undefined && { accountId }),
     persist: false,
   }
 }

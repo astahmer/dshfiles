@@ -40,7 +40,7 @@ export const createAgentCommunicationOperations = (input: {
           topic: request.topic,
           text: request.text,
           ...intent,
-          ...(request.priority === undefined ? {} : { priority: request.priority }),
+          ...(request.priority !== undefined && { priority: request.priority }),
         })
       } else if (request.agentId !== undefined) {
         message = await input.service().send({
@@ -48,7 +48,7 @@ export const createAgentCommunicationOperations = (input: {
           toAgentId: request.agentId,
           text: request.text,
           ...intent,
-          ...(request.priority === undefined ? {} : { priority: request.priority }),
+          ...(request.priority !== undefined && { priority: request.priority }),
         })
       } else {
         throw new CommunicationError('invalid-message-target', 'Choose a topic or direct Agent.')

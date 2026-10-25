@@ -23,7 +23,7 @@ const cacheOf = (
     guardBudgetMs: options.guardBudgetMs ?? 15_000,
     guardAttempts: options.guardAttempts ?? 2,
     guardCeilingMs: options.guardCeilingMs ?? 60_000,
-    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.now !== undefined && { now: options.now }),
   })
 
 describe('session activity cache', () => {

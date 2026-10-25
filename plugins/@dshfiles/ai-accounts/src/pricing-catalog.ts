@@ -55,16 +55,16 @@ const toModelPrice = (raw: unknown): ModelPrice | undefined => {
       above: tierThreshold(tier.tier.size),
       input: tier.input,
       output: tier.output,
-      ...(tier.cache_read === undefined ? {} : { cacheRead: tier.cache_read }),
-      ...(tier.cache_write === undefined ? {} : { cacheWrite: tier.cache_write }),
+      ...(tier.cache_read !== undefined && { cacheRead: tier.cache_read }),
+      ...(tier.cache_write !== undefined && { cacheWrite: tier.cache_write }),
     }))
     .slice(0, 8)
   return {
     input: cost.input,
     output: cost.output,
-    ...(cost.cache_read === undefined ? {} : { cacheRead: cost.cache_read }),
-    ...(cost.cache_write === undefined ? {} : { cacheWrite: cost.cache_write }),
-    ...(tiers.length === 0 ? {} : { tiers }),
+    ...(cost.cache_read !== undefined && { cacheRead: cost.cache_read }),
+    ...(cost.cache_write !== undefined && { cacheWrite: cost.cache_write }),
+    ...(tiers.length !== 0 && { tiers }),
   }
 }
 

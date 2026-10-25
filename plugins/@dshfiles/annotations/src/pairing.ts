@@ -45,8 +45,8 @@ export const createPairing = ({
     },
     status: () => ({
       armed: armed(),
-      ...(expiresAt === undefined ? {} : { expiresAt }),
-      ...(pairedAt === undefined ? {} : { pairedAt }),
+      ...(expiresAt !== undefined && { expiresAt }),
+      ...(pairedAt !== undefined && { pairedAt }),
     }),
     take: () => {
       if (!armed()) return undefined

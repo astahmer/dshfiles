@@ -55,8 +55,8 @@ const LabelledField = (
       </FieldLabel>
       {props.children({
         id,
-        ...(describedBy.length === 0 ? {} : { 'aria-describedby': describedBy }),
-        ...(errors.length === 0 ? {} : { 'aria-invalid': true as const }),
+        ...(describedBy.length !== 0 && { 'aria-describedby': describedBy }),
+        ...(errors.length !== 0 && { 'aria-invalid': true as const }),
       })}
       {props.description !== undefined && <FieldDescription id={descriptionId}>{props.description}</FieldDescription>}
       <FieldError errors={errors.map(message => ({ message }))} id={errorId} />

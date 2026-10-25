@@ -38,9 +38,9 @@ export const describeRegion = ({
     selector: Descriptor.elementSelector(element),
     tag: element.tagName.toLowerCase(),
     rect: normalize(rect),
-    ...(text === undefined ? {} : { text }),
-    ...(attributes === undefined ? {} : { attributes }),
-    ...(styles === undefined ? {} : { styles }),
+    ...(text !== undefined && { text }),
+    ...(attributes !== undefined && { attributes }),
+    ...(styles !== undefined && { styles }),
   })
   return parsed.success ? parsed.data : null
 }

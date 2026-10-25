@@ -139,7 +139,7 @@ const launchChrome = async ({
     const chosen = await freePort({ start: port })
     // Chrome creates the leaf but not a nested path, and a missing parent makes it exit silently.
     await mkdir(profileDir, { recursive: true })
-    const child = spawn(executable, chromeArguments({ port: chosen, profileDir, headless, ...(startUrl === undefined ? {} : { startUrl }) }), {
+    const child = spawn(executable, chromeArguments({ port: chosen, profileDir, headless, ...(startUrl !== undefined && { startUrl }) }), {
       detached: true,
       stdio: 'ignore',
     })

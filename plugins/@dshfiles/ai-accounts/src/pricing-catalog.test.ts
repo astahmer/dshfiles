@@ -59,7 +59,7 @@ describe('resolveRouteQuote', () => {
       route: { provider, model },
       cache,
       overrides: extra.overrides ?? {},
-      ...(extra.accountKind === undefined ? {} : { accountKind: extra.accountKind }),
+      ...(extra.accountKind !== undefined && { accountKind: extra.accountKind }),
     })
     return { modelsDevId: result.modelsDevId, match: result.match, free: result.free }
   }

@@ -532,7 +532,9 @@ const expandedRowClass: Record<NavigationDensity, string> = {
 }
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
-  const { collapsed, renderSlot, selectPanel, startSession, toggleSidebar } = props
+  const { collapsed, readFooterSnapshot, renderSlot, selectPanel, startSession, subscribeFooterSnapshot, toggleSidebar } = props
+  // History steps stamp their settle window from the gesture, not from render.
+  const readNow = useCallback(() => Date.now(), [])
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
@@ -762,11 +764,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }, [pluginUpdatesSupported, refetchPluginUpdates, refetchClientUpdates])
 
   useEffect(() => {
-    const sync = (): void => setFooterSnapshot(props.readFooterSnapshot())
-    const unsubscribe = props.subscribeFooterSnapshot(sync)
+    const sync = (): void => setFooterSnapshot(readFooterSnapshot())
+    const unsubscribe = subscribeFooterSnapshot(sync)
     sync()
     return unsubscribe
-  }, [props.readFooterSnapshot, props.subscribeFooterSnapshot])
+  }, [readFooterSnapshot, subscribeFooterSnapshot])
 
   useEffect(() => {
     const location = ThreadNavigationHistoryModel.currentLocation({ panelId: activePanelId, threadId: selectedThreadId })
@@ -787,7 +789,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const goToHistoryEntry = (index: number): void => {
     const step = ThreadNavigationHistoryModel.jumpHistory(history, index)
     if (step === null) return
-    pendingStep.current = { target: step.target, until: Date.now() + NAVIGATION_SETTLE_MS }
+    pendingStep.current = { target: step.target, until: readNow() + NAVIGATION_SETTLE_MS }
     setHistory(step.history)
     if (step.target.kind === 'thread') {
       props.openSession(step.target.id)

@@ -1077,7 +1077,7 @@ const applyCleanup = async (input: {
         continue
       }
       if (result?.status === 'has-work') {
-        workspaces.push({ ...planned, outcome: 'has-work', ...(result.error === null ? {} : { message: result.error }) })
+        workspaces.push({ ...planned, outcome: 'has-work', ...(result.error !== null && { message: result.error }) })
         report.settleItem('kept')
         continue
       }

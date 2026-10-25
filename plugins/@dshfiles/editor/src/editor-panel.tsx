@@ -112,6 +112,13 @@ const FilePreview = (props: { readonly document: OpenDocument; readonly remote: 
   )
 }
 
+const documentStatusOf = (document: OpenDocument): string => {
+  if (document.content.kind !== 'text') return 'Read-only'
+  if (document.dirty) return 'Unsaved'
+  if (document.sha256 === null && document.status === 'ready') return 'New file'
+  return 'Saved'
+}
+
 /** File tree, tabs and one editor surface for the session on screen. Usable as a right-pane tab or a docked panel. */
 export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const queryClient = useQueryClient()
@@ -359,17 +366,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         </span>
         {savePending && <span>Saving…</span>}
         {saveSnapshot.context.failure !== null && <span className="dshx:text-destructive">{saveSnapshot.context.failure}</span>}
-        {active !== undefined && !savePending && (
-          <span>
-            {active.content.kind !== 'text'
-              ? 'Read-only'
-              : active.dirty
-                ? 'Unsaved'
-                : active.sha256 === null && active.status === 'ready'
-                  ? 'New file'
-                  : 'Saved'}
-          </span>
-        )}
+        {active !== undefined && !savePending && <span>{documentStatusOf(active)}</span>}
       </div>
       <AlertDialog
         onOpenChange={open => {

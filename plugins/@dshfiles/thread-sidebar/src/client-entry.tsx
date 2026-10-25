@@ -408,7 +408,7 @@ export default defineClient({
           for (const controller of pendingControllers) controller.abort()
           pendingControllers.clear()
         }
-      }, [props.inputActions, props.sessionId, translate])
+      }, [props.inputActions, props.sessionId])
 
       return (
         <>

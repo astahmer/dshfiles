@@ -208,7 +208,7 @@ export const prepareRemoteFolder = async (api: MultiHostClient, destination: Run
   const provisioned = await api.runtimePluginCall({
     runtimeId: destination.runtimeId,
     method: 'provision',
-    input: { workspaceId: opened.workspaceId, isolate: destination.isolate ?? true, ...(destination.base === undefined ? {} : { base: destination.base }) },
+    input: { workspaceId: opened.workspaceId, isolate: destination.isolate ?? true, ...(destination.base !== undefined && { base: destination.base }) },
   })
   if (!provisioned.ok) throw new Error(`${provisioned.message} (${provisioned.code})`)
   const workspaceId = provisionedSchema.parse(provisioned.value).workspaceId

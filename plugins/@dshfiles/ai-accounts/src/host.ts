@@ -1,6 +1,5 @@
 import { activateAccountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
-export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
@@ -65,7 +64,6 @@ import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-c
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
 import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
-export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './provider-routes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -780,7 +778,7 @@ export default definePlugin({
                   step,
                   provider,
                   requestProvider,
-                  ...(routedAccountId === undefined ? {} : { routedAccountId }),
+                  ...(routedAccountId !== undefined && { routedAccountId }),
                   model: agent.session.requestHeader()?.config.model,
                   failure,
                   canShrink: FailureRecoveryModel.offloadResentImages(surface) !== surface,

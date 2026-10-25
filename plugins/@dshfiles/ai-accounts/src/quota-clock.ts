@@ -38,7 +38,7 @@ export const useQuotaClock = (input: { readonly resetsAt: readonly (number | nul
       setNow(at)
       timer = setTimeout(
         schedule,
-        nextQuotaTickDelayMs({ now: at, resetsAt: resets.current, ...(input.precision === undefined ? {} : { precision: input.precision }) }),
+        nextQuotaTickDelayMs({ now: at, resetsAt: resets.current, ...(input.precision !== undefined && { precision: input.precision }) }),
       )
     }
     const sync = (): void => {

@@ -146,7 +146,7 @@ export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions
     return {
       id: row.id,
       api: messagesOnly ? 'anthropic-messages' : 'openai-completions',
-      ...(row.context_length === undefined ? {} : { contextWindow: row.context_length }),
+      ...(row.context_length !== undefined && { contextWindow: row.context_length }),
     }
   })
   return entries.length === 0 ? FALLBACK : entries
@@ -161,7 +161,7 @@ const commandCodeModel = (id: string, root: string, contextWindow?: number): Mod
     provider: COMMANDCODE_KIND,
     baseUrl: root,
     reasoning: thinkingLevelMap !== undefined,
-    ...(thinkingLevelMap === undefined ? {} : { thinkingLevelMap }),
+    ...(thinkingLevelMap !== undefined && { thinkingLevelMap }),
     input: CommandCodeCapabilities.readsImages(id) ? ['text', 'image'] : ['text'],
     contextWindow: contextWindow ?? 128_000,
     maxTokens: CommandCodeCapabilities.maxOutputTokens(id),
@@ -256,7 +256,7 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
   const route = (model: Model<string>, context: TranscriptContext, streamOptions: SimpleStreamOptions | undefined): AssistantMessageEventStream => {
     const target = createAssistantMessageEventStream()
     const cli = (): AssistantMessageEventStream =>
-      streamCommandCodeCli({ root, model, context, ...(streamOptions === undefined ? {} : { options: streamOptions }) })
+      streamCommandCodeCli({ root, model, context, ...(streamOptions !== undefined && { options: streamOptions }) })
     const forward = async (source: AssistantMessageEventStream, onEarlyRefusal?: () => AssistantMessageEventStream): Promise<void> => {
       const held: AssistantMessageEvent[] = []
       let committed = onEarlyRefusal === undefined
