@@ -1,9 +1,10 @@
+import type { ToolSourceMetadata } from './fold.js'
 import { describe, expect, it } from 'vitest'
 import { toolSourceSnapshotsEqual } from './tool-source-snapshots.js'
 
-const shellRun = { source: 'api', owner: '@dshfiles/terminal' } as const
-const search = { source: 'mcp', owner: 'registry.search' } as const
-const first = new Map([['shell.run', shellRun], ['search', search]])
+const shellRun: ToolSourceMetadata = { source: 'api', owner: '@dshfiles/terminal' }
+const search: ToolSourceMetadata = { source: 'mcp', owner: 'registry.search' }
+const first = new Map<string, ToolSourceMetadata>([['shell.run', shellRun], ['search', search]])
 
 describe('tool source registry snapshots', () => {
   it('compares metadata independent of map insertion order', () => {
