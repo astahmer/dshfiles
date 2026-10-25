@@ -228,7 +228,7 @@ Feature: jj thread workspaces
     And the thread workspace gains a revision described "Queued work"
     Then the workspace menu offers to queue the integration while the thread works
     When the integration is queued from the workspace menu
-    Then the workspace menu shows the queued integration with Undo
+    Then the thread shows the queued integration notice with Undo
     When the queued integration is undone
     Then the undone integration leaves main in place and can be queued again
     When the integration is queued from the workspace menu

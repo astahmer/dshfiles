@@ -299,6 +299,14 @@ export default defineClient({
       const turnEndRefreshPending = statusRefreshBaseline !== null && status.dataUpdatedAt <= statusRefreshBaseline
       const bookmark = useBookmark()
       const thread = status.data?.thread
+      const previousThread = useRef(thread)
+      useEffect(() => {
+        const previous = previousThread.current
+        previousThread.current = thread
+        if (!newestTurnHasEnded || previous?.integrationQueuedAt === undefined || thread?.rebasedAt === undefined || previous.rebasedAt === thread.rebasedAt)
+          return
+        announceRepositoryChange()
+      }, [newestTurnHasEnded, thread])
       const threadPath = thread?.path ?? path
       const threadSessionIds = useMemo(
         () => thread?.sessionIds ?? (path === undefined ? [] : [String(props.sessionId)]),
