@@ -753,7 +753,7 @@ export class SessionInputShell implements SessionInput {
       return {
         offset: o.offset,
         length: o.length,
-        text: await inputTriggers.serializeReference(o.source, o.ref, attempt.signal),
+        text: await inputTriggers.serializeReference(o.source, o.ref, attempt.signal, o.label),
       }
     })).then(
       (parts) => {

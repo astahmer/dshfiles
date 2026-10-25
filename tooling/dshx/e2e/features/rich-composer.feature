@@ -10,6 +10,12 @@ Feature: Rich composer references
 
   @scenario:rich-composer.image-attachment-reference
   Scenario: Attach an image and refer to it inline
-    Given the isolated plugin profile "@dshfiles/rich-composer" is booted
+    Given the isolated rich-composer, input-trigger and attachment-gallery plugin profile is booted
     When an image is attached to a new thread composer
     Then the image is represented by an inline composer reference
+
+  @scenario:rich-composer.image-reference-mentions
+  Scenario: Reuse an image reference and open the selected image
+    Given the isolated rich-composer, input-trigger and attachment-gallery plugin profile is booted
+    When an image is attached to a new thread composer
+    Then an image reference can be mentioned repeatedly and opens its selected image

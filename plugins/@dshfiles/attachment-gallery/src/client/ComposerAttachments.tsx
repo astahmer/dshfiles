@@ -8,7 +8,10 @@ import { FileCard } from '../FileCard.js'
 import { ImageLightbox, type ImageLightboxLabels } from '@dshfiles/plugin-ui/components/image-lightbox'
 import { AttachmentGalleryLabelsModel } from './labels.js'
 import { installDocumentDropEvents } from './drop-events.js'
+import { imageForReference } from './image-reference.js'
 import styles from './ComposerAttachments.module.css'
+
+const IMAGE_REFERENCE_OPEN_EVENT = 'dshfiles:open-image-reference'
 
 interface ComposerRailItem extends AttachmentRailItem {
   attachment: ComposerAttachment
@@ -38,6 +41,18 @@ export function ComposerAttachments({
   useEffect(() => {
     if (preview !== null && !attachments.some(attachment => attachment.id === preview.id)) setPreview(null)
   }, [attachments, preview])
+
+  useEffect(() => {
+    const openReference = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return
+      const attachment = imageForReference(attachments, event.detail)
+      if (attachment?.kind !== 'image') return
+      event.preventDefault()
+      setPreview(attachment)
+    }
+    window.addEventListener(IMAGE_REFERENCE_OPEN_EVENT, openReference)
+    return () => window.removeEventListener(IMAGE_REFERENCE_OPEN_EVENT, openReference)
+  }, [attachments])
 
   useEffect(() => installDocumentDropEvents(canAcceptDrop, onAddFiles, dragDepth, setDragActive), [canAcceptDrop, onAddFiles])
 

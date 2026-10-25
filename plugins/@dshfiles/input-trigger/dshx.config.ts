@@ -8,6 +8,9 @@ export default defineConfig({
     bundleDependencies: ['@deepseek-ai/dsh-util-values'],
   },
   // Backlog's plain text boxes resolve @ and # tokens with the same Codex rules as the rich composer.
-  modules: { 'caret-token': 'src/caret-token.ts' },
+  modules: {
+    'caret-token': 'src/caret-token.ts',
+    'image-attachment-contract': 'src/image-attachment-contract.ts',
+  },
   build: { sourcemap: true, declarations: true, minify: true },
 })

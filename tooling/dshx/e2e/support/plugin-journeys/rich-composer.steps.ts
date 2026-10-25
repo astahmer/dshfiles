@@ -38,6 +38,7 @@ When('an image is attached to a new thread composer', async ({ page }: { page: P
   await expect(composer).toHaveAttribute('contenteditable', 'true')
   await composer.click()
   await page.locator('[data-composer-card] input[type="file"]').setInputFiles(join(attachmentFixtures, 'red.png'))
+  await expect(page.getByRole('button', { name: 'Remove image red.png', exact: true })).toBeVisible()
 })
 
 Then('the image is represented by an inline composer reference', async ({ page }: { page: Page }) => {
@@ -45,6 +46,33 @@ Then('the image is represented by an inline composer reference', async ({ page }
     const imageReference = page.locator('[data-composer-chip="image-attachment"]')
     await expect(imageReference).toHaveCount(1)
     await expect(imageReference).toHaveText('@Image 1')
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('an image reference can be mentioned repeatedly and opens its selected image', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'rich-composer-image-reference-gallery-repeat', async () => {
+    const imageReferences = page.locator('[data-composer-chip="image-attachment"]')
+    await expect(imageReferences).toHaveCount(1)
+    await expect(imageReferences.nth(0)).toHaveText('@Image 1')
+    await page.getByText('Image 1', { exact: true }).click()
+
+    const gallery = page.getByRole('dialog', { name: 'Image preview', exact: true })
+    await expect(gallery).toBeVisible()
+    await expect(gallery.locator('img').first()).toHaveAttribute('alt', 'red.png')
+    await page.getByRole('button', { name: 'Close image preview', exact: true }).click()
+
+    const composer = newThreadComposer(page)
+    await composer.focus()
+    await page.keyboard.press('End')
+    for (let pick = 0; pick < 2; pick++) {
+      await page.keyboard.type('@')
+      const imageOption = page.getByRole('option', { name: 'Image 1', exact: true })
+      await expect(imageOption).toBeVisible()
+      await imageOption.click()
+    }
+    await expect(imageReferences).toHaveCount(3)
+    await expect(imageReferences.nth(2)).toHaveText('Image 1')
   })
   await finishJourneyAssertions(page)
 })

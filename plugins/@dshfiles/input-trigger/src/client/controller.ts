@@ -367,12 +367,12 @@ export class InputTriggerController {
    * @param signal - the submit attempt's abort signal.
    * @returns the model representation (e.g. `<skill>name</skill>`).
    */
-  serializeReference(source: string, ref: string, signal: AbortSignal): Promise<string> {
+  serializeReference(source: string, ref: string, signal: AbortSignal, label: string): Promise<string> {
     const owner = this.deps.roster.all().find(s => s.name === source)
     if (owner?.codec === undefined) {
       return Promise.reject(new Error(`slash: no serializer for reference source "${source}"`))
     }
-    return owner.codec.serialize(ref, signal)
+    return owner.codec.serialize(ref, signal, label)
   }
 
   /**

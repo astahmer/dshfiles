@@ -3680,6 +3680,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(0ab00a8eb09daf0ab308290e757fa426)
+      '@dshfiles/input-trigger':
+        specifier: workspace:*
+        version: link:../input-trigger
       '@dshfiles/multi-host':
         specifier: workspace:*
         version: link:../multi-host

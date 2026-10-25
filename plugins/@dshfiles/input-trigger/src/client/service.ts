@@ -14,6 +14,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { InputTriggerSource } from '../types.js'
 import { InputTriggerController } from './controller.js'
 import type { InputTriggerServiceContract } from './contract.js'
+import type { ImageAttachmentSourceRegistration } from '../image-attachment-contract.js'
+import { imageAttachmentSource } from '../image-attachment-source.js'
 
 /**
  * All mutable service state in one holder: cordis service methods run behind
@@ -75,6 +77,15 @@ export class InputTriggerService extends Service implements InputTriggerServiceC
       live.sources.splice(at, 1)
       for (const controller of live.controllers.values) controller.sourceRemoved(src)
     }
+  }
+
+  /**
+   * Register composer image references without exposing the trigger-source contract to the composer package.
+   * @param source - Session-scoped image listing and gallery opener.
+   * @returns the source disposer.
+   */
+  registerImageAttachmentSource(source: ImageAttachmentSourceRegistration): () => void {
+    return this.registerSource(imageAttachmentSource(source))
   }
 
   /**

@@ -26,6 +26,10 @@
     "./caret-token": {
       "types": "./src/caret-token.ts",
       "default": "./dist/caret-token.js"
+    },
+    "./image-attachment-contract": {
+      "types": "./src/image-attachment-contract.ts",
+      "default": "./dist/image-attachment-contract.js"
     }
   },
   "scripts": {

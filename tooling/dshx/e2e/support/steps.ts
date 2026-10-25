@@ -270,6 +270,14 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
 })
 
+Given('the isolated rich-composer, input-trigger and attachment-gallery plugin profile is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/rich-composer', '@dshfiles/input-trigger', '@dshfiles/attachment-gallery'],
+    profileLabel: 'rich-composer-input-trigger-attachment-gallery',
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Given('the isolated ThreadSidebar and AI Accounts plugin profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/thread-sidebar', '@dshfiles/ai-accounts'],

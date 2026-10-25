@@ -18,6 +18,27 @@ const controllerFor = (sources: readonly InputTriggerSource[]): InputTriggerCont
   return new InputTriggerController({ actx: new Context(), sessionId: SessionId('session-1'), roster })
 }
 
+describe('reference serialization', () => {
+  it('routes the chip label to its named source codec', async () => {
+    const serialized: string[] = []
+    const imageSource = source({
+      trigger: '@',
+      name: 'image-attachment',
+      codec: {
+        clipboardText: () => '[Image]',
+        serialize: async (_ref, _signal, label) => {
+          serialized.push(label)
+          return `[${label}]`
+        },
+      },
+    })
+    const controller = controllerFor([imageSource])
+
+    await expect(controller.serializeReference('image-attachment', 'draft-image', new AbortController().signal, 'Image 1')).resolves.toBe('[Image 1]')
+    expect(serialized).toEqual(['Image 1'])
+  })
+})
+
 describe('persisted command chip restore', () => {
   it('claims the token through the first source that answers', async () => {
     const silent = source({ name: 'silent', matchClaim: async () => undefined })

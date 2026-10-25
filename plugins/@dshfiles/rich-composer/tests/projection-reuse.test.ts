@@ -70,6 +70,24 @@ describe('composer projection reuse', () => {
     unregister()
   })
 
+  it('keeps repeated references as separate occurrences', () => {
+    const { runtime, unregister } = runtimeFor()
+    const reference = { source: 'image-attachment', ref: 'image-1', label: 'Image 1', appearance: 'file' as const, clipboardText: '[Image 1]' }
+    expect(runtime.insertReference({ start: 0, end: 0 }, reference, '')).toBe(true)
+    const firstLength = runtime.projection.detectText.length
+    expect(runtime.insertReference({ start: firstLength, end: firstLength }, reference, '')).toBe(true)
+
+    const occurrences = runtime.projection.occurrences
+    expect(occurrences).toHaveLength(2)
+    expect(occurrences.map(occurrence => [occurrence.source, occurrence.ref])).toEqual([
+      ['image-attachment', 'image-1'],
+      ['image-attachment', 'image-1'],
+    ])
+    expect(occurrences[0]?.occurrenceId).not.toBe(occurrences[1]?.occurrenceId)
+    expect(occurrences[1]?.offset).toBeGreaterThan(occurrences[0]?.offset ?? -1)
+    unregister()
+  })
+
   it('keeps chip occurrences and their ids while only the caret moves', () => {
     const { runtime, unregister } = runtimeFor()
     runtime.setDraft('see ')

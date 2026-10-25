@@ -134,8 +134,8 @@ export interface InputTriggerPick {
 export interface ReferenceCodec {
   /** Clipboard / persistence projection of one reference (e.g. `/name`). */
   clipboardText(ref: string): string
-  /** Model serialization of one reference (e.g. `<skill>name</skill>`). */
-  serialize(ref: string, signal: AbortSignal): Promise<string>
+  /** Model serialization of one reference (e.g. `<skill>name</skill>`); label is the visible, occurrence-local chip title. */
+  serialize(ref: string, signal: AbortSignal, label: string): Promise<string>
 }
 
 /**

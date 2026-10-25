@@ -1,6 +1,7 @@
 /** Registers the target-neutral Conversation assembly, shell, input, and docks. */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
+import type { ImageAttachmentSourceRegistry } from '@dshfiles/input-trigger/image-attachment-contract'
 import z from '@deepseek-ai/schemastery'
 import type { ISessions, SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import { IconPaperclipOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -170,6 +171,34 @@ export function apply(ctx: Context, config: Config = Config({})): void {
   uiConversation.userText.register(sessionReferenceRule)
   uiConversation.userText.register(collapseWhitespaceRule)
   uiConversation.userText.register(trimWhitespaceRule)
+  ctx.inject(['inputTriggers'], (scope) => {
+    scope.effect(() => {
+      const inputTriggers = scope.get('inputTriggers') as ImageAttachmentSourceRegistry
+      return inputTriggers.registerImageAttachmentSource({
+        imagesFor: sessionId => {
+          const binding = sessions.binding(sessionId)
+          if (binding === undefined) return []
+          const conversation = liveConversation(ctx)
+          if (conversation === undefined) return []
+          const input = conversation.input.for(binding.ctx)
+          return conversation.resolveDraftAttachments(input.state.getSnapshot().attachmentIds)
+            .filter(attachment => attachment.kind === 'image')
+            .map((attachment, index) => ({ id: attachment.id, label: `Image ${index + 1}` }))
+        },
+        open: (sessionId, id) => {
+          const binding = sessions.binding(sessionId)
+          if (binding === undefined) return false
+          const conversation = liveConversation(ctx)
+          if (conversation === undefined) return false
+          const input = conversation.input.for(binding.ctx)
+          if (!input.state.getSnapshot().attachmentIds.some(attachmentId => attachmentId === id)) return false
+          const event = new CustomEvent('dshfiles:open-image-reference', { detail: { id }, cancelable: true })
+          window.dispatchEvent(event)
+          return event.defaultPrevented
+        },
+      })
+    }, 'conversation.input: image attachment references')
+  })
   slots.registerFactory({
     name: 'conversation.user.text',
     scope: 'session',

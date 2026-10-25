@@ -6,10 +6,11 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { InputTriggerSource } from '../types.js'
+import type { ImageAttachmentSourceRegistry } from '../image-attachment-contract.js'
 import type { InputTriggerController } from './controller.js'
 
 /** The `ctx.inputTriggers` service face. */
-export interface InputTriggerServiceContract {
+export interface InputTriggerServiceContract extends ImageAttachmentSourceRegistry {
   /**
    * Register one trigger source; duplicate trigger/name pairs throw.
    * @param src - source that discovers and resolves slash or reference candidates.

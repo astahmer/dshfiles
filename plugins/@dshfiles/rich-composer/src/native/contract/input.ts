@@ -112,7 +112,7 @@ export interface InputTriggerController {
   /** @returns whether Space applied a trigger result. */
   onSpace(): boolean
   /** @param source - reference source. @param ref - source-local id. @param signal - submit cancellation. @returns model text. */
-  serializeReference(source: string, ref: string, signal: AbortSignal): Promise<string>
+  serializeReference(source: string, ref: string, signal: AbortSignal, label: string): Promise<string>
   /** @param line - trimmed draft. @param signal - submit cancellation. @param envelope - attachment count. @returns winning result. */
   adjudicate(
     line: string,
