@@ -156,7 +156,7 @@ export class SessionInputShell implements SessionInput {
   private commandRestore: AbortController | undefined
   /** The mounted composer's file-picker opener (scoped pick-files event target). */
   private filePicker: Parameters<ComposerKeyboard['bindFilePicker']>[0] | undefined
-  /** Default sends retained until admission settles or scope disposal releases their attachments. */
+  /** Default sends retain their editor snapshots until admission settles. */
   private readonly detachedDrafts = new Map<number, DetachedDraft>()
   /** Failed default sends waiting to be restored together in submission order. */
   private readonly failedDetached = new Map<number, DetachedDraft>()
@@ -164,7 +164,7 @@ export class SessionInputShell implements SessionInput {
   private failedRestoreRev: number | undefined
   private restoringFailures = false
   private attachmentFlightSeq = 0
-  /** Attachment-only sends retained until admission settles or scope disposal releases their attachments. */
+  /** Attachment-only sends retain their IDs and controller until admission settles. */
   private readonly attachmentFlights = new Map<number, {
     readonly controller: AbortController
     readonly attachmentIds: readonly DraftAttachmentId[]

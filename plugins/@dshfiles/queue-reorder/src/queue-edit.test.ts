@@ -201,9 +201,31 @@ const rowsOf = (world: { readonly rows: readonly RawRow[] }) => QueueEditModel.d
 const textsOf = (world: { readonly rows: readonly RawRow[] }) =>
   world.rows.map(row => row.content.flatMap(block => (block.type === 'text' ? [block.text] : [`[${block.attachment.name}]`])).join(' '))
 
-test('the editor retains its session while loading before the edit record exists', () => {
-  assert.equal(QueueEditModel.retainsSession({ record: null, loading: true, notice: null }), true)
-  assert.equal(QueueEditModel.retainsSession({ record: null, loading: false, notice: null }), false)
+test('the editor retains its session while loading before the edit record exists', async () => {
+  const { world, ports, enqueueRow } = createWorld()
+  const target = enqueueRow([text('edit me'), image('shot.png')])
+  let finishRead: ((file: File) => void) | undefined
+  const queueEditor = createQueueEditor({
+    ...ports,
+    host: {
+      ...ports.host,
+      readImage: () =>
+        new Promise(resolve => {
+          finishRead = resolve
+        }),
+    },
+  })
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+
+  const beginning = queueEditor.begin(row)
+  assert.equal(QueueEditModel.retainsSession(queueEditor.getSnapshot()), true)
+  assert.equal(queueEditor.getSnapshot().record, null)
+  assert.ok(finishRead)
+  finishRead(new File([new Uint8Array([1])], 'shot.png', { type: 'image/png' }))
+  await beginning
+
+  assert.equal(queueEditor.getSnapshot().record?.itemId, target.id)
 })
 
 test('Edit moves the text and attachments into the composer and keeps the user draft aside', async () => {
