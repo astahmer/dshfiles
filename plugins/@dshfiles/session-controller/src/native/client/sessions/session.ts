@@ -277,40 +277,53 @@ export class Session implements SessionFace {
     this.promptAttempted = true
     if (this.blankBit) this.firstPromptPendingTurn = true
     this.notifier.markDirty()
-    let result: RemoteResult<{ accepted: true }>
-    if (this.address === undefined) {
-      await this.whenCreated()
-      const clientTimeZone = resolvedClientTimeZone()
-      result = await this.remote.session.prompt({
-        requestId: requestId ?? randomUUID() as SessionRequestId,
-        sessionId: this.sessionId,
-        mode,
-        content,
-        clientTimeZone,
-      }, signal)
-    } else if (content.some(part => part.type === 'file')) {
-      result = {
-        ok: false,
-        error: new RemoteError(
-          'subagent/attachment-invalid',
-          'subagent continuation does not accept files',
-          { reason: 'SUBAGENT_FILE_UNSUPPORTED' },
-        ),
+    const stableRequestId = requestId ?? randomUUID() as SessionRequestId
+    const clientTimeZone = resolvedClientTimeZone()
+    const address = this.address
+    const send = async (): Promise<RemoteResult<{ accepted: true }>> => {
+      if (address === undefined) {
+        await this.whenCreated()
+        return this.remote.session.prompt({
+          requestId: stableRequestId,
+          sessionId: this.sessionId,
+          mode,
+          content,
+          clientTimeZone,
+        }, signal)
       }
-    } else {
-      // The preceding branch rejects file parts before the narrower subagent
-      // wire type is used; this array is not filtered or reordered.
+      if (content.some(part => part.type === 'file')) {
+        return {
+          ok: false,
+          error: new RemoteError(
+            'subagent/attachment-invalid',
+            'subagent continuation does not accept files',
+            { reason: 'SUBAGENT_FILE_UNSUPPORTED' },
+          ),
+        }
+      }
+      // The file branch rejects attachments before this narrower wire type; preserve order.
       const routedContent = content as Exclude<PromptContentPart, { readonly type: 'file' }>[]
       const routed = await this.remote.subagents.prompt({
-        requestId: requestId ?? randomUUID() as SessionRequestId,
-        parentSessionId: this.address.parentSessionId,
-        childSessionId: this.address.childSessionId,
+        requestId: stableRequestId,
+        parentSessionId: address.parentSessionId,
+        childSessionId: address.childSessionId,
         mode: 'continuable',
         delivery: mode,
         content: routedContent,
-        clientTimeZone: resolvedClientTimeZone(),
+        clientTimeZone,
       }, signal)
-      result = routed.ok ? { ok: true, value: { accepted: true } } : routed
+      return routed.ok ? { ok: true, value: { accepted: true } } : routed
+    }
+    let result = await send()
+    if (!result.ok && result.error.code === 'gateway/internal') {
+      if (signal?.aborted === true) {
+        result = { ok: false, error: new RemoteError('gateway/cancelled', 'prompt retry was cancelled', {}) }
+      } else {
+        await new Promise<void>(resolve => { setTimeout(resolve, 100) })
+        result = signal?.aborted === true
+          ? { ok: false, error: new RemoteError('gateway/cancelled', 'prompt retry was cancelled', {}) }
+          : await send()
+      }
     }
     if (!result.ok) {
       if (requestId !== undefined) this.retireFailedSubmission(requestId)
