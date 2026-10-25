@@ -17,6 +17,10 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
+    "./review-page-context": {
+      "types": "./src/review-page-context.ts",
+      "default": "./dist/review-page-context.js"
+    },
     "./api": {
       "types": "./src/api.ts",
       "default": "./src/api.ts"

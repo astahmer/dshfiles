@@ -35,6 +35,7 @@ export interface ComposerJujutsuServices {
   readonly workspaces: IWorkspaces
   /** Open the right panel on the repository holding `path`, or collapse it when it already shows that repository. */
   readonly toggleJujutsu: (path: string) => void
+  readonly openWorkspaceReview: (workspacePath: string, sessionId: string) => void
   readonly openJujutsuReference: (
     path: string,
     reference: { readonly value: string; readonly kind: 'revision' | 'bookmark'; readonly behavior: 'focus' | 'path' },
@@ -236,9 +237,15 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
             </>
           )}
         </Button>
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground" role="status">
+        <button
+          aria-label={'Review workspace changes: ' + revisionSummary}
+          className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline disabled:dshx:cursor-default disabled:dshx:no-underline disabled:dshx:hover:text-muted-foreground"
+          disabled={(repository.revisionCounts?.ahead ?? 0) === 0}
+          onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
+          type="button"
+        >
           {revisionSummary}
-        </span>
+        </button>
         <BasePicker
           base={context.base}
           onChoose={next => {

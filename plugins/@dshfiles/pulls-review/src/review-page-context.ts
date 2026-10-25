@@ -7,6 +7,11 @@ export interface PageReviewContext {
   readonly sessionId?: string | undefined
 }
 
+export interface WorkspaceReviewRequest {
+  readonly workspacePath: string
+  readonly sessionId: string
+}
+
 let current: PageReviewContext | undefined
 const listeners = new Set<() => void>()
 
@@ -14,6 +19,9 @@ const setPageReview = (next: PageReviewContext): void => {
   current = next
   for (const listener of listeners) listener()
 }
+
+/** Set the exact isolated workspace review before selecting its main-area panel. */
+export const requestWorkspaceReview = (request: WorkspaceReviewRequest): void => setPageReview(request)
 
 const readPageReview = (): PageReviewContext | undefined => current
 

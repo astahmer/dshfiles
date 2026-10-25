@@ -16,6 +16,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { requestWorkspaceReview } from '@dshfiles/pulls-review/review-page-context'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
@@ -161,6 +162,10 @@ export default defineClient({
       sessions: ctx.sessions,
       workspaces: ctx.workspaces,
       toggleJujutsu,
+      openWorkspaceReview: (workspacePath, sessionId) => {
+        requestWorkspaceReview({ workspacePath, sessionId })
+        ctx.layout.selectPanel('pulls-review' as MainPanelId)
+      },
       openJujutsuReference: (path, reference) => {
         sidePanelRepository.request({ path, reference })
         ctx.sidebarRight.openTab(RIGHT_PANE_KIND)

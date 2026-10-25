@@ -259,8 +259,13 @@
     {
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The dock names the active DSH project, JJ workspace and nearest bookmark; the change bar separately reports exact revisions ahead of or behind its selected base.",
-      "reach": ["seed rebase-ready-thread", "click text \"New Session\"", "expect text \"1 revision ahead of main\""],
+      "summary": "The dock names the active DSH project, JJ workspace and nearest bookmark; the change bar reports exact revisions against its selected base and opens the all-files workspace review when revisions are ahead.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click text \"New Session\"",
+        "click button \"Review workspace changes: 1 revision ahead of main\"",
+        "expect text \"feature.txt\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {

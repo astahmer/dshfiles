@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { After, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
@@ -314,6 +314,15 @@ When('the repository is registered and a thread is started in it', async ({ page
   await registerWorkspaceFolder(page, repository.path)
   await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
   await sendMessage(page, 'jujutsu composer context thread')
+  const workspaces = jj(repository, ['--ignore-working-copy', 'workspace', 'list'])
+  const threadWorkspace = /^(thread-[\w-]+): (.+?)(?: \(current\))?$/mu.exec(workspaces)
+  const threadRelativePath = threadWorkspace?.[2]?.trim().split(/\s/u)[0]
+  if (threadRelativePath === undefined) throw new Error(`The thread workspace was not listed:\n${workspaces}`)
+  const threadPath = resolve(repository.path, threadRelativePath)
+  const threadRepository = { root: threadPath, path: threadPath }
+  await writeFile(join(threadPath, 'review-one.txt'), 'First reviewed file.\n')
+  await writeFile(join(threadPath, 'review-two.txt'), 'Second reviewed file.\n')
+  jj(threadRepository, ['describe', '-m', 'Two-file review fixture'])
 })
 
 /** Register the fixture repository and let its thread answer `prompt`, so the answer renders as markdown. */
@@ -464,8 +473,14 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
 })
 
 Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
-  const summary = page.getByRole('status').filter({ hasText: /(?:\d+ revisions? ahead of main|\d+ revisions? behind main|Up to date with main)/u })
+  const summary = page.getByRole('button', { name: /^Review workspace changes: 1 revision ahead of main$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
+  await summary.click()
+  const review = page.locator('[data-review-surface][data-review-source="workspace"]')
+  await recordAssertion(page, 'jujutsu-composer-summary-opens-multi-file-workspace-review', async () => {
+    await expect(review).toBeVisible()
+    await expect(review.locator('[data-review-file-path]')).toHaveCount(2)
+  })
 })
 
 After(async ({ page }: { page: Page }) => {
