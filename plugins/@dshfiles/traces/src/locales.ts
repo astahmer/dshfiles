@@ -136,7 +136,10 @@ const en = {
     'OTEL_SDK_DISABLED=true, OTEL_TRACES_EXPORTER=none or a non-HTTP OTEL_EXPORTER_OTLP_ENDPOINT in the DSH Host environment turns its exporters off.',
   diagnosisPortInUseTitle: 'Another process holds the receiver port',
   diagnosisPortInUseBody:
-    'Nothing reaches this receiver, and this Host’s exporters have no in-process target until the port is free. Stop the other process or change the “port” setting; the receiver retries every 30 s.',
+    'Nothing reaches this receiver, and this Host’s exporters have no in-process target until the port is free. Change the port in settings; the receiver retries automatically.',
+  changePort: 'Change port',
+  receiverDiagnostics: 'Diagnostics',
+  receiverPortLabel: 'Configured port',
   diagnosisFailedTitle: 'The receiver failed to start',
   diagnosisFailedBody: 'See the receiver message above.',
   restartHint:
@@ -302,8 +305,10 @@ const zh = {
   diagnosisNoExporterTitle: '此 DSH 进程没有配置 OTLP 导出器',
   diagnosisNoExporterBody: 'DSH Host 环境中的 OTEL_SDK_DISABLED=true、OTEL_TRACES_EXPORTER=none 或非 HTTP 的 OTEL_EXPORTER_OTLP_ENDPOINT 会关闭导出器。',
   diagnosisPortInUseTitle: '接收器端口被其他进程占用',
-  diagnosisPortInUseBody:
-    '在端口空出之前，没有数据能到达此接收器，此 Host 的导出器也没有进程内目标。请停止另一个进程或修改 “port” 设置；接收器每 30 秒重试一次。',
+  diagnosisPortInUseBody: '在端口空出之前，没有数据能到达此接收器，此 Host 的导出器也没有进程内目标。请在设置中更改端口；接收器会自动重试。',
+  changePort: '更改端口',
+  receiverDiagnostics: '诊断信息',
+  receiverPortLabel: '配置的端口',
   diagnosisFailedTitle: '接收器启动失败',
   diagnosisFailedBody: '请查看上方的接收器消息。',
   restartHint: '在 DSH 界面中重启会以其监督进程的环境重新启动 Host：修改启动器环境后，请在终端中重启 `dsh-web` 本身。',

@@ -114,6 +114,42 @@ export const EmptyStoreGuide = (props: { readonly status: ReceiverStatus; readon
     )
   const copy = GUIDE_COPY[diagnosis.code]
   const elsewhere = props.status.exporters?.traces.source === 'environment' ? props.status.exporters.traces.url : null
+  if (diagnosis.code === 'port-in-use')
+    return (
+      <Alert variant="destructive" data-testid="traces-empty-guide" data-diagnosis={diagnosis.code}>
+        <AlertTitle>{props.t(copy.title)}</AlertTitle>
+        <AlertDescription>
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
+            <p>{props.t(copy.body)}</p>
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3">
+              <Button
+                size="sm"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('dshfiles:open-settings', {
+                      detail: { setting: { entryId: 'dshfiles-traces', fieldPath: ['port'] } },
+                      cancelable: true,
+                    }),
+                  )
+                }}
+                data-testid="traces-change-port"
+              >
+                {props.t('changePort')}
+              </Button>
+              <details className="dshx:text-xs dshx:text-muted-foreground">
+                <summary className="dshx:cursor-pointer">{props.t('receiverDiagnostics')}</summary>
+                <div className="dshx:mt-1 dshx:break-all">
+                  <p>
+                    {props.t('receiverPortLabel')}: <code className="dshx:font-mono">{String(props.status.configuredPort)}</code>
+                  </p>
+                  <p>{diagnosis.message}</p>
+                </div>
+              </details>
+            </div>
+          </div>
+        </AlertDescription>
+      </Alert>
+    )
   return (
     <Alert variant={copy.variant} data-testid="traces-empty-guide" data-diagnosis={diagnosis.code}>
       <AlertTitle>{props.t(copy.title)}</AlertTitle>

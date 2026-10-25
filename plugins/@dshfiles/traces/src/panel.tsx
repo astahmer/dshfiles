@@ -152,7 +152,9 @@ export const TracesPanel = (props: {
           <AlertDescription>{errorMessage(statusQuery.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       ) : null}
-      {status !== undefined && (storeEmpty || exportBlocked(status)) ? <EmptyStoreGuide status={status} compact={!storeEmpty} t={t} /> : null}
+      {status !== undefined && (storeEmpty || exportBlocked(status) || status.diagnosis?.code === 'port-in-use') ? (
+        <EmptyStoreGuide status={status} compact={!storeEmpty} t={t} />
+      ) : null}
 
       {statsQuery.data === undefined ? null : (
         <ServiceStrip stats={statsQuery.data} onPick={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
