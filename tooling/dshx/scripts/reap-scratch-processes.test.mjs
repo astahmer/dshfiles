@@ -11,6 +11,7 @@ import {
   listScratchProcesses,
   parseElapsed,
   reapRecordedScratchProcesses,
+  reapRecordedScratchProcessesFromLedgers,
   reapScratchProcesses,
   recordScratchProcess,
 } from './reap-scratch-processes.mjs'
@@ -113,6 +114,37 @@ test('the ledger sweep reaps what this workspace recorded and leaves everything 
   } finally {
     await rm(ledgerPath, { force: true })
     for (const pid of [orphanPid, unrecordedPid, devPid]) if (isAlive(pid)) await killScratchProcess(pid)
+  }
+})
+
+test('the cross-workspace ledger sweep reaps only recorded orphan hosts from every ledger', async () => {
+  const marker = `dshx-reap-cross-workspace-${String(process.pid)}`
+  const firstLedger = tempLedger('cross-first')
+  const secondLedger = tempLedger('cross-second')
+  const orphanPid = await spawnOrphan(marker)
+  const unrecordedPid = await spawnOrphan(`${marker}-unrecorded`)
+  try {
+    await waitForOrphan(orphanPid, [marker])
+    await recordScratchProcess({ ledgerPath: secondLedger, pid: orphanPid, signature: marker })
+
+    const preview = await reapRecordedScratchProcessesFromLedgers({ ledgerPaths: [firstLedger, secondLedger], minAgeMs: 0, dryRun: true })
+    assert.deepEqual(
+      preview.map(entry => entry.pid),
+      [orphanPid],
+    )
+    assert.ok(isAlive(orphanPid), 'the preview leaves the recorded host running')
+
+    const reaped = await reapRecordedScratchProcessesFromLedgers({ ledgerPaths: [firstLedger, secondLedger], minAgeMs: 0 })
+    assert.deepEqual(
+      reaped.map(entry => entry.pid),
+      [orphanPid],
+    )
+    assert.equal(isAlive(orphanPid), false)
+    assert.ok(isAlive(unrecordedPid), 'an unrecorded process in another workspace survives')
+  } finally {
+    await rm(firstLedger, { force: true })
+    await rm(secondLedger, { force: true })
+    for (const pid of [orphanPid, unrecordedPid]) if (isAlive(pid)) await killScratchProcess(pid)
   }
 })
 

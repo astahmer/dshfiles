@@ -242,9 +242,11 @@ development session down with it. The harness therefore records every Host it
 spawns in a ledger (`.turbo/e2e-scratch-hosts.jsonl`), and the sweep reaps a
 recorded pid only while it is parentless and still runs the recorded command
 signature — a reused pid or an unrecorded lookalike is dropped, never killed.
-`tooling/dshx/scripts/reap-scratch-processes.mjs` runs the same sweep from a
-shell (`--dry-run`, `--workspace`, `--min-age-seconds`), and its `--patterns`
-mode is the blunt instrument for a one-off cleanup: that one does match a live
+Each JJ checkout has its own ledger, so the checks runner only cleans its own
+checkout. The supervised `dsh web` process additionally sweeps every JJ
+workspace ledger every 10 minutes, reaping only recorded hosts at least one hour
+old. The same script supports `--all-workspaces` and `--dry-run`; its `--patterns`
+mode remains the blunt instrument for a one-off cleanup and can match a live
 `dshx dev up` Host. A `dshx dev up` instance stops itself instead: its watchdog
 warns after 30 idle minutes, runs `down` once a 10 min grace ends with no keep
 (`dshx dev keep`, or any dshx command that reaches it), or as soon as its Host

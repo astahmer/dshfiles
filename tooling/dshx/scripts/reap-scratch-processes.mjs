@@ -15,7 +15,7 @@
  * pid only while it is parentless and still matches the recorded command signature. An entry whose signature no longer
  * matches is a reused pid and is dropped, not killed.
  *
- *   node tooling/dshx/scripts/reap-scratch-processes.mjs [--workspace DIR] [--dry-run] [--min-age-seconds N] [--quiet]
+ *   node tooling/dshx/scripts/reap-scratch-processes.mjs [--workspace DIR] [--all-workspaces] [--dry-run] [--min-age-seconds N] [--quiet]
  *   node tooling/dshx/scripts/reap-scratch-processes.mjs --patterns '--profile dshx-boot' --min-age-minutes 60
  *
  * `--patterns` is the blunt instrument: it also matches a live `dshx dev up` Host, so it stays off by default.
@@ -139,27 +139,50 @@ export const killScratchProcess = async (pid, { graceMs = 2_000 } = {}) => {
  * signature written when they were spawned. Returns what it reaped (or would reap with `dryRun`), and compacts the
  * ledger down to the entries that are still live.
  */
-export const reapRecordedScratchProcesses = async options => {
-  const { ledgerPath, dryRun = false, minAgeMs = defaultMinAgeMs, kill = killScratchProcess } = options
-  const entries = await readLedger(ledgerPath)
-  if (entries.length === 0) return []
+export const reapRecordedScratchProcesses = async options => reapRecordedScratchProcessesFromLedgers({ ...options, ledgerPaths: [options.ledgerPath] })
+
+/** Sweep several checkouts in one process-table read; each ledger still authorizes only its own recorded PIDs. */
+export const reapRecordedScratchProcessesFromLedgers = async options => {
+  const { ledgerPaths, dryRun = false, minAgeMs = defaultMinAgeMs, kill = killScratchProcess } = options
+  const ledgers = await Promise.all(ledgerPaths.map(async ledgerPath => ({ ledgerPath, entries: await readLedger(ledgerPath) })))
+  if (ledgers.every(ledger => ledger.entries.length === 0)) return []
   const processes = await listScratchProcesses()
   const byPid = new Map(processes.map(process_ => [process_.pid, process_]))
   const reaped = []
-  const surviving = []
-  for (const entry of entries) {
-    const process_ = byPid.get(entry.pid)
-    // Gone, or a reused pid that no longer runs what we recorded: drop the entry either way.
-    if (process_ === undefined || !process_.command.includes(entry.signature)) continue
-    if (process_.pid === process.pid || process_.ppid !== 1 || process_.ageMs < minAgeMs) {
-      surviving.push(entry)
-      continue
+  for (const ledger of ledgers) {
+    const surviving = []
+    for (const entry of ledger.entries) {
+      const process_ = byPid.get(entry.pid)
+      // Gone, or a reused pid that no longer runs what we recorded: drop the entry either way.
+      if (process_ === undefined || !process_.command.includes(entry.signature)) continue
+      if (process_.pid === process.pid || process_.ppid !== 1 || process_.ageMs < minAgeMs) {
+        surviving.push(entry)
+        continue
+      }
+      if (!dryRun) await kill(process_.pid)
+      reaped.push({ ...process_, signature: entry.signature })
     }
-    if (!dryRun) await kill(process_.pid)
-    reaped.push({ ...process_, signature: entry.signature })
+    if (!dryRun) await writeFile(ledger.ledgerPath, surviving.map(entry => `${JSON.stringify(entry)}\n`).join('')).catch(() => undefined)
   }
-  if (!dryRun) await writeFile(ledgerPath, surviving.map(entry => `${JSON.stringify(entry)}\n`).join('')).catch(() => undefined)
   return reaped
+}
+
+/** Roots returned by jj include all project and thread workspaces, unlike a single checkout's local `.turbo` ledger. */
+export const listJjWorkspaceRoots = async workspaceRoot => {
+  const { stdout } = await run('jj', ['workspace', 'list', '--ignore-working-copy', '--template', 'self.root() ++ "\\n"'], {
+    cwd: workspaceRoot,
+    timeout: 10_000,
+    maxBuffer: 1024 * 1024,
+  })
+  return [
+    ...new Set([
+      workspaceRoot,
+      ...stdout
+        .split('\n')
+        .map(root => root.trim())
+        .filter(root => root.startsWith('/')),
+    ]),
+  ]
 }
 
 /**
@@ -194,10 +217,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error('reap-scratch-processes: --min-age-minutes/--min-age-seconds needs a number')
     process.exit(2)
   }
+  const allWorkspaces = process.argv.includes('--all-workspaces')
   const reaped =
-    patternFlag === undefined
-      ? await reapRecordedScratchProcesses({ ledgerPath: scratchLedgerPath(workspaceRoot), dryRun, minAgeMs })
-      : await reapScratchProcesses({ dryRun, minAgeMs, patterns: patternFlag.split(',') })
+    patternFlag !== undefined
+      ? await reapScratchProcesses({ dryRun, minAgeMs, patterns: patternFlag.split(',') })
+      : allWorkspaces
+        ? await reapRecordedScratchProcessesFromLedgers({
+            ledgerPaths: (await listJjWorkspaceRoots(workspaceRoot)).map(scratchLedgerPath),
+            dryRun,
+            minAgeMs,
+          })
+        : await reapRecordedScratchProcesses({ ledgerPath: scratchLedgerPath(workspaceRoot), dryRun, minAgeMs })
   if (!quiet) {
     console.log(`reap-scratch-processes: ${dryRun ? 'would reap' : 'reaped'} ${String(reaped.length)} scratch process(es)`)
     for (const process_ of reaped)
