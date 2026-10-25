@@ -1,4 +1,5 @@
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
+import { resolveDshExecutable } from './dsh-executable.js'
 import { ScratchProfileRuntime } from './scratch-profile.js'
 
 export interface ProfileCompositionOptions {
@@ -21,7 +22,8 @@ export const compositionFailures = (dump: string, expectedBundles: readonly stri
 const UNSUPPORTED_NODE_MARKER = 'node-addon-require-builtin unsupported'
 
 export const readProfileComposition = async (options: ProfileCompositionOptions): Promise<string> => {
-  const child = spawnOwnedProcess(options.executable ?? 'dsh', ['--profile', options.profile, '--dump-config'], {
+  const executable = await resolveDshExecutable(options.executable)
+  const child = spawnOwnedProcess(executable, ['--profile', options.profile, '--dump-config'], {
     cwd: options.projectRoot,
     env: ScratchProfileRuntime.hostEnvironment(options.dshHome, options.profileRoot),
     stdio: ['ignore', 'pipe', 'pipe'],

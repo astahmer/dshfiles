@@ -6,6 +6,7 @@ import { prepareComposedBootProfile, type PreparedBootProfile } from '../../pack
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
+import { resolveDshExecutable } from '../../packages/dshx/src/project/dsh-executable.js'
 import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scratch-processes.mjs'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
@@ -32,23 +33,23 @@ export const traceBootPhase = (phase: string, startedAt: number, detail = ''): v
  */
 const compositionValidations = new Map<string, Promise<void>>()
 
-const compositionKeyFor = async (prepared: PreparedBootProfile): Promise<string> => {
+const compositionKeyFor = async (prepared: PreparedBootProfile, executable: string): Promise<string> => {
   const hash = createHash('sha256')
   for (const name of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
     hash.update(`${name}\0`)
     hash.update(await readFile(join(prepared.profileRoot, name)).catch(() => Buffer.from('<absent>')))
   }
-  hash.update(`\0${[...prepared.expectedBundles].sort().join(',')}`)
+  hash.update(`\0${[...prepared.expectedBundles].sort().join(',')}\0${executable}`)
   return hash.digest('hex')
 }
 
-const validateComposition = async (prepared: PreparedBootProfile, timeoutMs: number): Promise<void> => {
+const validateComposition = async (prepared: PreparedBootProfile, timeoutMs: number, executable: string): Promise<void> => {
   const dump = await readProfileComposition({
     projectRoot: DSHFILES_ROOT,
     profile: prepared.profile,
     profileRoot: prepared.profileRoot,
     dshHome: prepared.homeRoot,
-    executable: 'dsh',
+    executable,
     timeoutMs,
   })
   const missingBundles = compositionFailures(dump, prepared.expectedBundles)
@@ -109,12 +110,14 @@ export const startScratchProfile = async (
   timeoutMs: number,
   pathPrefix?: string,
   hostEnv: Readonly<Record<string, string>> = {},
+  executableOverride?: string,
 ): Promise<BootedProfile> => {
+  const executable = await resolveDshExecutable(executableOverride)
   const validatedAt = Date.now()
-  const compositionKey = await compositionKeyFor(prepared)
+  const compositionKey = await compositionKeyFor(prepared, executable)
   const known = compositionValidations.get(compositionKey)
   if (known === undefined) {
-    const validation = validateComposition(prepared, timeoutMs)
+    const validation = validateComposition(prepared, timeoutMs, executable)
     compositionValidations.set(compositionKey, validation)
     // A failure must not be remembered: the next scenario of this composition re-proves it and reports it.
     validation.catch(() => compositionValidations.delete(compositionKey))
@@ -126,7 +129,7 @@ export const startScratchProfile = async (
     const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
     const hostPath = pathPrefix === undefined ? scratchEnvironment.PATH : [pathPrefix, scratchEnvironment.PATH].filter(Boolean).join(delimiter)
     const hostEnvironment = hostPath === undefined ? scratchEnvironment : { ...scratchEnvironment, PATH: hostPath }
-    const host = spawnOwnedProcess('dsh', ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
+    const host = spawnOwnedProcess(executable, ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
       cwd: DSHFILES_ROOT,
       // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
       // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
@@ -216,6 +219,8 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
 }
 
 interface ComposedBootRequest {
+  /** Resolve once before preparing or prewarming a profile; restarts use the same installed core. */
+  readonly executable: string
   readonly packageIds: readonly [string, ...string[]]
   readonly profileLabel: string
   readonly timeoutMs: number
@@ -260,7 +265,9 @@ const compositionKeyOf = (request: ComposedBootRequest): string | undefined => {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => `${key}=${value}`)
     .join('&')
-  hash.update(`${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}\0${env}`)
+  hash.update(
+    `${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}\0${env}\0${request.executable}`,
+  )
   return hash.digest('hex')
 }
 
@@ -314,7 +321,15 @@ const bootComposedProfile = async (request: ComposedBootRequest): Promise<Booted
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     const seededHome = await request.seedHome?.(prepared.homeRoot)
-    return await startScratchProfile(prepared, request.profileLabel, expectedClientEntries, request.timeoutMs, seededHome?.hostPathPrefix, request.hostEnv)
+    return await startScratchProfile(
+      prepared,
+      request.profileLabel,
+      expectedClientEntries,
+      request.timeoutMs,
+      seededHome?.hostPathPrefix,
+      request.hostEnv,
+      request.executable,
+    )
   } catch (error) {
     await prepared.dispose()
     throw error
@@ -332,6 +347,7 @@ export const bootComposedPluginProfile = async (request: {
   readonly hostEnv?: Readonly<Record<string, string>>
 }): Promise<BootedProfile> => {
   const composed: ComposedBootRequest = {
+    executable: await resolveDshExecutable(),
     packageIds: request.packageIds,
     profileLabel: request.profileLabel,
     timeoutMs: request.timeoutMs ?? 90_000,

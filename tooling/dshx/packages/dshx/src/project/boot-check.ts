@@ -1,6 +1,8 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
+import { resolveDshExecutable } from './dsh-executable.js'
+import { ScratchProfileRuntime } from './scratch-profile.js'
 
 export interface BootCheckOptions {
   readonly projectRoot: string
@@ -56,7 +58,6 @@ const waitForHostUrl = (child: ChildProcess, output: () => string, startedAt: nu
   })
 
 export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCheckResult> => {
-  const executable = options.executable ?? 'dsh'
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   let output = ''
   let launchUrl: string | undefined
@@ -66,6 +67,7 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
   let child: ChildProcess | undefined
 
   try {
+    const executable = await resolveDshExecutable(options.executable)
     const dump = await readProfileComposition({
       projectRoot: options.projectRoot,
       profile: options.profile,
@@ -79,7 +81,7 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
       const startedAt = Date.now()
       child = spawnOwnedProcess(executable, ['--profile', options.profile, '--port', String(options.port), '--no-open'], {
         cwd: options.projectRoot,
-        env: { ...process.env, DSH_HOME: options.dshHome, DSHX_BOOT_PROFILE_ROOT: options.profileRoot },
+        env: ScratchProfileRuntime.hostEnvironment(options.dshHome, options.profileRoot),
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       const collect = (chunk: Buffer): void => {
