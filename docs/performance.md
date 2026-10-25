@@ -360,6 +360,10 @@ Other workspace polling changes stop question/quota retries after errors and avo
 
 The bounded profile also sampled Activity Timeline and background-job work; those owners are separate and need their own trace-backed follow-up rather than speculative edits here. The client/Host bundles were not activated on the live Host, so no latency improvement is claimed yet.
 
+### A restart alone did not change these numbers (2026-10-25)
+
+The live Host was restarted at 21:33, but the multi-host bundle it loaded had been built at 20:00, before either fix landed, so the old client cadence and the missing Host failure cache stayed in place. The 30-minute window after that restart measured `multi-host/runtimeStatus` 251 times (about 84 per 10 minutes, p50 3.02 s, p95 9.51 s) and `ssh command` 136 times per 10 minutes with 34% errors: the same shape as the baseline above, during heavier-than-baseline machine load. An honest after-measurement therefore needs a restart that follows a fresh `dshx build multi-host` (the checkout now builds both halves); a page reload alone delivers only the client cadence change.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
