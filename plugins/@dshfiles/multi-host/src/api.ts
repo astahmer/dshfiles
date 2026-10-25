@@ -470,7 +470,7 @@ export const multiHostApi = defineApi({
     sessionRuntime: method({
       input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtimeId: idSchema.nullable() }), failedSchema]),
-      description: 'Resolve the runtime that owns a mirrored Session, or null for a local Session.',
+      description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
     }),
     runtimeFileReferences: method({
       input: z.object({ runtimeId: idSchema, sessionId: brandedSessionIdSchema, query: z.string().max(4096) }).strict(),

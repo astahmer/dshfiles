@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { MirroredSessionSource, SessionSourceRegistry } from '@dshfiles/session-source-port'
+import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { z } from 'zod'
@@ -11,6 +11,7 @@ import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './co
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
+import { knownSessionRuntime } from './session-runtime.js'
 import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
@@ -922,17 +923,8 @@ const multiHostHandlers = multiHostApi.host({
       if (recorded !== undefined && (await HostDirectoryStore.findRuntime(recorded.runtimeId)) !== undefined) {
         return { ok: true as const, runtimeId: recorded.runtimeId }
       }
-      let source: MirroredSessionSource | undefined
-      for (const sessionSources of [...activeSessionSources].reverse()) {
-        try {
-          source = sessionSources.ownerOf(input.sessionId) ?? (await sessionSources.resolveOwner(input.sessionId))
-          if (source !== undefined) break
-        } catch {
-          continue
-        }
-      }
-      const runtimeId = source?.runtimeIdForSession === undefined ? undefined : await source.runtimeIdForSession(input.sessionId)
-      return { ok: true as const, runtimeId: runtimeId ?? null }
+      const runtimeId = await knownSessionRuntime({ sessionId: input.sessionId, sessionSources: [...activeSessionSources] })
+      return { ok: true as const, runtimeId }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }

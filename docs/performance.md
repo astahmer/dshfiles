@@ -328,6 +328,14 @@ shows a broader regression against the previous baseline, but it does not identi
 keep it separate from the JJ reference fix until per-request server timings and the exact thread-switch journey are
 captured again.
 
+### Multi-host Session ownership lookup (2026-10-25)
+
+A fresh one-switch probe on `127.0.0.1:3080` observed 55 requests; `dshx-9ca8a5fa/sessionRuntime` took 8.2 s and `session/page` took 4.9 s in the browser. Host-lag probes around the same interval had p50 4 ms, p90 32 ms, p99 403 ms, and max 702 ms; machine load was 20–21 and memory pressure was warning. The trace receiver still had no fresh spans because port 4318 was occupied, so browser duration is not treated as isolated server time.
+
+The slow `sessionRuntime` route belongs to `@dshfiles/multi-host`. Its old path called `resolveOwner` for an unclaimed ID; the remote source's `owns` implementation then tried `session/list` against configured runtimes sequentially. The live runtime directory reports two unavailable SSH runtimes. This source path is consistent with the measured delay, though the missing server trace prevents assigning all 8.2 s to SSH.
+
+The optimization now uses an existing session-source ownership claim instead of discovering owners for unknown IDs. The remote source indexes Session-to-runtime ownership from its successful list and reuses that mapping, avoiding an extra remote `session/list` when resolving a known owner. Direct source discovery for actual Session routing remains unchanged. Focused tests assert that an unclaimed local ID does not invoke owner discovery and that a listed remote Session resolves from the local index. The live Host still runs the old bundle, so a matched live after-measurement is pending a user-approved Host restart; no restart was performed.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the

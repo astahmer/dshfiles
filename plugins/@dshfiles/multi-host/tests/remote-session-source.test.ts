@@ -37,7 +37,9 @@ const runtimeFixture = () => {
         return {
           kind: 'sequenced',
           asOfSeq: 4,
-          values: { modelSelection: { lastUsed: { provider: 'deepseek', model: 'chat' }, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } } },
+          values: {
+            modelSelection: { lastUsed: { provider: 'deepseek', model: 'chat' }, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } },
+          },
         }
       if (method === 'selectModel') return { selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } }
       if (method === 'create') return { sessionId: 'session-created' }
@@ -89,12 +91,13 @@ describe('remote session source', () => {
     expect(rows[0]).not.toHaveProperty('remoteRuntimeId')
     expect(rows[0]).not.toHaveProperty('transportSecret')
     await expect(source.runtimeIdForSession?.('session-remote')).resolves.toBe('runtime-1')
+    expect(fixture.calls).toEqual([{ method: 'list', args: { _request: { projections: ['title'] } } }])
+    await expect(source.owns('session-remote' as SessionId)).resolves.toBe(true)
+    await expect(source.owns('session-unknown' as SessionId)).resolves.toBe(false)
     expect(fixture.calls).toEqual([
       { method: 'list', args: { _request: { projections: ['title'] } } },
       { method: 'list', args: { _request: {} } },
     ])
-    await expect(source.owns('session-remote' as SessionId)).resolves.toBe(true)
-    await expect(source.owns('session-unknown' as SessionId)).resolves.toBe(false)
   })
 
   it('streams a followed Session through its own connection and releases it', async () => {
@@ -181,7 +184,9 @@ describe('remote session source', () => {
     await source.list({}, new AbortController().signal)
     const projections = await source.projections?.({ sessionId: 'session-remote' as SessionId }, new AbortController().signal)
     expect(projections).toMatchObject({
-      values: { modelSelection: { lastUsed: { provider: 'deepseek', model: 'chat' }, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } } },
+      values: {
+        modelSelection: { lastUsed: { provider: 'deepseek', model: 'chat' }, next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' } },
+      },
     })
     expect(fixture.calls.at(-1)).toEqual({ method: 'projections', args: { request: { sessionId: 'session-remote' } } })
   })

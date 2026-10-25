@@ -48,8 +48,16 @@ export interface RemoteRuntimes {
  */
 export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: RemoteRuntimes }): MirroredSessionSource => {
   const ownerBySessionRefresh = new Map<string, Promise<RemoteRuntimeTarget | undefined>>()
+  const runtimeBySession = new Map<string, RemoteRuntimeTarget>()
   let recent: { readonly key: string; readonly at: number; readonly rows: readonly SessionSummary[] } | undefined
   const listCacheMs = 2_000
+  const rememberRuntime = (sessionId: string, runtime: RemoteRuntimeTarget): void => {
+    runtimeBySession.delete(sessionId)
+    runtimeBySession.set(sessionId, runtime)
+    if (runtimeBySession.size <= 20_000) return
+    const oldest = runtimeBySession.keys().next()
+    if (!oldest.done) runtimeBySession.delete(oldest.value)
+  }
 
   const runtimeFor = async (sessionId: string): Promise<RemoteRuntimeTarget | undefined> => {
     const ongoingRefresh = ownerBySessionRefresh.get(sessionId)
@@ -58,12 +66,22 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
       const runtimesNow = await runtimes.list()
       const recorded = (await runtimes.recordedSessions()).find(thread => thread.sessionId === sessionId)
       const recordedRuntime = recorded === undefined ? undefined : runtimesNow.find(runtime => runtime.id === recorded.runtimeId)
-      if (recorded !== undefined) return recordedRuntime
+      if (recorded !== undefined) {
+        if (recordedRuntime !== undefined) rememberRuntime(sessionId, recordedRuntime)
+        return recordedRuntime
+      }
+      const knownRuntime = runtimeBySession.get(sessionId)
+      if (knownRuntime !== undefined) {
+        const registeredRuntime = runtimesNow.find(runtime => runtime.id === knownRuntime.id)
+        if (registeredRuntime !== undefined) return registeredRuntime
+        runtimeBySession.delete(sessionId)
+      }
       for (const runtime of runtimesNow) {
         try {
           const value = await runtimes.run(runtime.id, gateway => gateway.run('session', 'list', { _request: {} }), { mutation: false })
           const row = SessionSourcePayload.summaries(value).find(item => String(item.sessionId) === sessionId)
           if (row === undefined) continue
+          rememberRuntime(sessionId, runtime)
           return runtime
         } catch {
           // A Session owned by an unreachable runtime cannot authorize a routed operation.
@@ -124,6 +142,7 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
               ...(thread.cwd === undefined ? {} : { cwd: thread.cwd }),
             })),
           ]
+          for (const row of runtimeRows) rememberRuntime(String(row.sessionId), runtime)
           rows.push(
             ...runtimeRows.map(row => ({
               agentAvailable: row.agentAvailable,
@@ -146,7 +165,18 @@ export const createRemoteSessionSource = ({ runtimes }: { readonly runtimes: Rem
       return rows
     },
     owns: async sessionId => (await runtimeFor(sessionId)) !== undefined,
-    runtimeIdForSession: async sessionId => (await runtimeFor(sessionId))?.id,
+    runtimeIdForSession: async sessionId => {
+      const recorded = (await runtimes.recordedSessions()).find(thread => thread.sessionId === sessionId)
+      const runtimeId = recorded?.runtimeId ?? runtimeBySession.get(sessionId)?.id
+      if (runtimeId === undefined) return undefined
+      const runtime = (await runtimes.list()).find(item => item.id === runtimeId)
+      if (runtime === undefined) {
+        runtimeBySession.delete(sessionId)
+        return undefined
+      }
+      rememberRuntime(sessionId, runtime)
+      return runtime.id
+    },
     follow: async function* (request: SessionFollowRequest, signal: AbortSignal): AsyncIterable<SessionFollowFrame> {
       const runtime = await requireRuntime(ownedSessionOf(request.address))
       const leased = await runtimes.acquire(runtime.id)
