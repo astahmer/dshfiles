@@ -11,26 +11,6 @@ import type {
   DshProjectCompatibilityAssessment,
 } from './types.js'
 
-export { PROTOCOL_2_COMPATIBILITY } from './protocol-2.js'
-export type {
-  DshCompatibility,
-  DshCompatibilityLifecycle,
-  DshCompatibilityMatrixEntry,
-  DshCompatibilityResolution,
-  DshClientConversationCompatibility,
-  DshConnectionCompatibility,
-  DshHostContributionCompatibility,
-  DshInspectCompatibility,
-  DshProfileCompatibility,
-  DshSessionCompatibility,
-  DshDeclaredRangeAnalysis,
-  DshDeclaredRangeStatus,
-  DshProjectCompatibilityAssessment,
-  DshSupportStatus,
-  DshVerifiedVersions,
-  DshxRuntimePluginSpec,
-} from './types.js'
-
 const ADAPTERS = [PROTOCOL_2_COMPATIBILITY] as const
 for (const compatibility of ADAPTERS) {
   const { minimum, latest } = compatibility.verified
@@ -179,12 +159,12 @@ export function assessProjectCompatibility(manifest: Readonly<Record<string, unk
     installedWithinDeclaredRange = satisfies(installedVersion, declaredRange, { includePrerelease: true })
   }
   return {
-    ...(declaredRange === undefined ? {} : { declaredRange }),
-    ...(developmentSpecifier === undefined ? {} : { developmentSpecifier }),
-    ...(rangeAnalysis === undefined ? {} : { rangeAnalysis }),
-    ...(installedVersion === undefined ? {} : { installedVersion }),
-    ...(installedWithinDeclaredRange === undefined ? {} : { installedWithinDeclaredRange }),
-    ...(resolution === undefined ? {} : { resolution }),
+    ...(declaredRange !== undefined && { declaredRange }),
+    ...(developmentSpecifier !== undefined && { developmentSpecifier }),
+    ...(rangeAnalysis !== undefined && { rangeAnalysis }),
+    ...(installedVersion !== undefined && { installedVersion }),
+    ...(installedWithinDeclaredRange !== undefined && { installedWithinDeclaredRange }),
+    ...(resolution !== undefined && { resolution }),
     compatibility,
     capabilities: getCompatibilityCapabilities(compatibility),
   }

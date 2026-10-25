@@ -196,7 +196,7 @@ describe('DSH platform CLI', () => {
     let archiveApiCallCount = 0
     const request = vi.fn<typeof fetch>(async (input, init) => {
       const url = input instanceof Request ? input.url : String(input)
-      calls.push({ url, ...(init === undefined ? {} : { init }) })
+      calls.push({ url, ...(init !== undefined && { init }) })
       if (init?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
       if (url.includes('?token=')) {
         return new Response(null, {

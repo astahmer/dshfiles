@@ -15,8 +15,6 @@ import {
   type SpanStatusCode,
 } from './otlp-exporter.js'
 
-export type { SpanAttributeValue, SpanKind, SpanStatusCode } from './otlp-exporter.js'
-
 export type SpanAttributes = Readonly<Record<string, SpanAttributeValue | undefined>>
 
 export type { SpanContext }

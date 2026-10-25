@@ -1,7 +1,7 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
-const PLUGIN_FIXTURE_FILES: Readonly<Record<string, string>> = {
+const PLUGIN_FIXTURE_FILES = {
   'cordis.patch.yml': `- insert:
     - id: dshx-fixture
       name: "@dshx/fixture-plugin"

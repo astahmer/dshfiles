@@ -530,12 +530,7 @@ function decodeJsonValue(value: unknown, context: string): JsonValue {
   return result.data
 }
 
-const loopbackLaunchUrl = (
-  value: string,
-): {
-  readonly origin: string
-  readonly token: string
-} => {
+const loopbackLaunchUrl = (value: string) => {
   let url: URL
   try {
     url = new URL(value)
@@ -562,10 +557,10 @@ function mapSession(value: unknown, archived?: boolean): SessionSummary {
     running: parsed.running,
     blank: parsed.blank,
     agentAvailable: parsed.agentAvailable,
-    ...(parsed.parentSessionId === undefined ? {} : { parentSessionId: parsed.parentSessionId }),
-    ...(parsed.origin === undefined ? {} : { origin: parsed.origin }),
-    ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
-    ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
+    ...(parsed.parentSessionId !== undefined && { parentSessionId: parsed.parentSessionId }),
+    ...(parsed.origin !== undefined && { origin: parsed.origin }),
+    ...(parsed.cwd !== undefined && { cwd: parsed.cwd }),
+    ...(parsed.projections !== undefined && { projections: parsed.projections }),
   }
   if (archived === undefined) return summary
   return { ...summary, archived }
@@ -576,10 +571,10 @@ function mapPlugin(value: unknown): PluginSummary {
   return {
     id: parsed.entryId,
     moduleName: parsed.moduleName,
-    ...(parsed.meta === undefined ? {} : { meta: parsed.meta }),
+    ...(parsed.meta !== undefined && { meta: parsed.meta }),
     enabled: parsed.enabled,
     phase: parsed.fiberPhase,
-    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
+    ...(parsed.readOnlyReason !== undefined && { readOnlyReason: parsed.readOnlyReason }),
   }
 }
 
@@ -587,14 +582,14 @@ function mapBundle(value: unknown): BundleSummary {
   const parsed = bundleSchema.parse(value)
   return {
     name: parsed.name,
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+    ...(parsed.description !== undefined && { description: parsed.description }),
     enabled: parsed.enabled,
     installed: parsed.installed,
     optional: parsed.optional,
     removable: parsed.removable,
-    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
-    ...(parsed.error === undefined ? {} : { error: decodeJsonValue(parsed.error, 'Bundle inventory') }),
-    ...(parsed.rows === undefined ? {} : { rowCount: parsed.rows.length }),
+    ...(parsed.readOnlyReason !== undefined && { readOnlyReason: parsed.readOnlyReason }),
+    ...(parsed.error !== undefined && { error: decodeJsonValue(parsed.error, 'Bundle inventory') }),
+    ...(parsed.rows !== undefined && { rowCount: parsed.rows.length }),
   }
 }
 
@@ -636,19 +631,17 @@ function mapChangeResult(value: unknown): ChangeResult {
   return {
     application: parsed.application,
     changed: parsed.changed,
-    ...(parsed.enabled === undefined ? {} : { enabled: parsed.enabled }),
+    ...(parsed.enabled !== undefined && { enabled: parsed.enabled }),
     warnings: parsed.warnings ?? [],
     stage: parsed.stage,
     target: parsed.target,
-    ...(parsed.error === undefined
-      ? {}
-      : {
-          error: {
-            code: parsed.error.code,
-            ...(parsed.error.diagnostic === undefined ? {} : { diagnostic: parsed.error.diagnostic }),
-            ...(parsed.error.incompatible === undefined ? {} : { incompatible: parsed.error.incompatible }),
-          },
-        }),
+    ...(parsed.error !== undefined && {
+      error: {
+        code: parsed.error.code,
+        ...(parsed.error.diagnostic !== undefined && { diagnostic: parsed.error.diagnostic }),
+        ...(parsed.error.incompatible !== undefined && { incompatible: parsed.error.incompatible }),
+      },
+    }),
   }
 }
 
@@ -659,7 +652,7 @@ function mapPluginInspection(value: unknown): PluginInspection {
       status: parsed.status,
       problem: parsed.problem,
       reason: parsed.reason,
-      ...(parsed.registries === undefined ? {} : { registries: parsed.registries }),
+      ...(parsed.registries !== undefined && { registries: parsed.registries }),
     }
   }
   return {
@@ -667,10 +660,10 @@ function mapPluginInspection(value: unknown): PluginInspection {
     kind: parsed.kind,
     bundle: parsed.bundle,
     registry: parsed.registry,
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.version === undefined ? {} : { version: parsed.version }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
-    ...(parsed.host === undefined ? {} : { host: parsed.host }),
+    ...(parsed.name !== undefined && { name: parsed.name }),
+    ...(parsed.version !== undefined && { version: parsed.version }),
+    ...(parsed.description !== undefined && { description: parsed.description }),
+    ...(parsed.host !== undefined && { host: parsed.host }),
   }
 }
 
@@ -678,9 +671,9 @@ function mapAgentPresetRow(value: z.infer<typeof agentPresetRowSchema>): AgentPr
   return {
     id: value.id,
     isDefault: value.isDefault,
-    ...(value.name === undefined ? {} : { name: value.name }),
-    ...(value.description === undefined ? {} : { description: value.description }),
-    ...(value.broken === undefined ? {} : { broken: value.broken }),
+    ...(value.name !== undefined && { name: value.name }),
+    ...(value.description !== undefined && { description: value.description }),
+    ...(value.broken !== undefined && { broken: value.broken }),
   }
 }
 
@@ -689,8 +682,8 @@ function mapAgentPresetDocument(value: unknown): AgentPresetDocument {
   return {
     agentPreset: parsed.agentPreset,
     content: parsed.content,
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
+    ...(parsed.name !== undefined && { name: parsed.name }),
+    ...(parsed.description !== undefined && { description: parsed.description }),
   }
 }
 
@@ -700,7 +693,7 @@ function mapModelCatalog(value: unknown): ModelCatalog {
     default: {
       provider: parsed.default.provider,
       model: parsed.default.model,
-      ...(parsed.default.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.default.reasoningEffort }),
+      ...(parsed.default.reasoningEffort !== undefined && { reasoningEffort: parsed.default.reasoningEffort }),
     },
     routableProviders: parsed.routableProviders,
     groups: parsed.groups.map(group => ({
@@ -709,19 +702,17 @@ function mapModelCatalog(value: unknown): ModelCatalog {
       models: group.models.map(model => ({
         id: model.id,
         name: model.name,
-        ...(model.description === undefined ? {} : { description: model.description }),
-        ...(model.reasoning === undefined
-          ? {}
-          : {
-              reasoning: {
-                efforts: model.reasoning.efforts.map(effort => ({
-                  id: effort.id,
-                  name: effort.name,
-                  ...(effort.description === undefined ? {} : { description: effort.description }),
-                })),
-                ...(model.reasoning.defaultEffort === undefined ? {} : { defaultEffort: model.reasoning.defaultEffort }),
-              },
-            }),
+        ...(model.description !== undefined && { description: model.description }),
+        ...(model.reasoning !== undefined && {
+          reasoning: {
+            efforts: model.reasoning.efforts.map(effort => ({
+              id: effort.id,
+              name: effort.name,
+              ...(effort.description !== undefined && { description: effort.description }),
+            })),
+            ...(model.reasoning.defaultEffort !== undefined && { defaultEffort: model.reasoning.defaultEffort }),
+          },
+        }),
       })),
     })),
     failures: parsed.failures.map(failure => ({
@@ -737,7 +728,7 @@ function mapModelSelection(value: unknown): ModelSelection {
   return {
     provider: parsed.provider,
     model: parsed.model,
-    ...(parsed.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.reasoningEffort }),
+    ...(parsed.reasoningEffort !== undefined && { reasoningEffort: parsed.reasoningEffort }),
   }
 }
 
@@ -746,8 +737,8 @@ function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
     name: value.name,
     description: value.description,
     modelInvocable: value.modelInvocable,
-    ...(value.path === undefined ? {} : { path: value.path }),
-    ...(value.whenToUse === undefined ? {} : { whenToUse: value.whenToUse }),
+    ...(value.path !== undefined && { path: value.path }),
+    ...(value.whenToUse !== undefined && { whenToUse: value.whenToUse }),
   }
 }
 
@@ -779,7 +770,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         request: {
           address: { kind: 'session', sessionId },
           throughSeq,
-          ...(beforeSeq === undefined ? {} : { beforeSeq }),
+          ...(beforeSeq !== undefined && { beforeSeq }),
           maxMessages,
         },
       }),
@@ -806,9 +797,7 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
         return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
       fork: async (sessionId, atSeq) =>
-        z
-          .object({ sessionId: z.string() })
-          .parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq === undefined ? {} : { atSeq }) } })),
+        z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq !== undefined && { atSeq }) } })),
       cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', { request: { sessionId } })),
       rename: async (sessionId, title) =>
         z
@@ -934,10 +923,10 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
       list: async sessionId => {
         const values = z.array(commandSchema).parse(await transport.rpc('commands', 'list', { agentId: sessionId }))
         return values.map(item => ({
-          ...(item.definitionId === undefined ? {} : { definitionId: item.definitionId }),
+          ...(item.definitionId !== undefined && { definitionId: item.definitionId }),
           name: item.name,
           description: item.description,
-          ...(item.input === undefined ? {} : { input: item.input }),
+          ...(item.input !== undefined && { input: item.input }),
         }))
       },
       execute: async (sessionId, line, signal) => {
@@ -1025,7 +1014,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
           method: `${namespace}/${method}`,
           payload: { args },
         }),
-        ...(signal === undefined ? {} : { signal }),
+        ...(signal !== undefined && { signal }),
       })
     } catch {
       if (signal?.aborted) throw new DshPlatformError('cancelled', 'DSH command request was cancelled by the caller.')

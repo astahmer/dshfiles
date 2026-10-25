@@ -70,7 +70,7 @@ async function runDsh(project: ProfileProject, args: readonly string[], timeoutM
       cwd: project.root,
       env: environmentOf(options),
       timeoutMs,
-      ...(options.executable === undefined ? {} : { executable: options.executable }),
+      ...(options.executable !== undefined && { executable: options.executable }),
     })
   } catch (cause) {
     return { stdout: '', stderr: '', cause }
@@ -309,7 +309,7 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
       })
     })
   }
-  if (rawDependencies === undefined) return { dependencies: [], ...(profileRoot === undefined ? {} : { profileRoot }) }
+  if (rawDependencies === undefined) return { dependencies: [], ...(profileRoot !== undefined && { profileRoot }) }
   if (!isObject(rawDependencies)) {
     throw new DshxError('DSHX4302', 'The inspected profile dependencies must be an object.', {
       file: project.packageFile,
@@ -328,7 +328,7 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
       return { packageId, path }
     }),
   )
-  return { dependencies, ...(profileRoot === undefined ? {} : { profileRoot }) }
+  return { dependencies, ...(profileRoot !== undefined && { profileRoot }) }
 }
 
 /** Inspect whether this exact package id and real project path are linked. */
@@ -372,7 +372,7 @@ const inspectProjectProfile = async (project: ProfileProject, options: ProfileOr
     profile: project.profile,
     packageId: project.packageId,
     root: project.root,
-    ...(profileRoot === undefined ? {} : { profileRoot }),
+    ...(profileRoot !== undefined && { profileRoot }),
   }
 }
 
@@ -393,7 +393,7 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
   const existing = await inspectProjectProfile(project, {
     ...options,
     compatibility: dsh.compatibility,
-    ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),
+    ...(dsh.executable !== undefined && { executable: dsh.executable }),
   })
   if (existing.state === 'linked') {
     return {
@@ -459,7 +459,7 @@ const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrc
   const installed = await inspectProjectProfile(project, {
     ...options,
     compatibility: dsh.compatibility,
-    ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),
+    ...(dsh.executable !== undefined && { executable: dsh.executable }),
   })
   if (installed.state !== 'linked') {
     throw new DshxError('DSHX4304', 'The profile install finished, but the project is still absent from the profile.', {

@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LocaleNamespaceOwnershipModel } from '../src/compiler/client/locale-ownership.js'
 import { ClientCapabilityAnalysis } from '../src/compiler/client/capabilities.js'
-import { buildClient } from '../src/compiler/index.js'
+import { buildClient } from '../src/compiler/client/build.js'
 
 const directories: string[] = []
 

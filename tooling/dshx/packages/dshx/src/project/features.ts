@@ -137,9 +137,9 @@ export const parseReachStep = (
   if (action === 'click' || action === 'rightclick' || action === 'hover') {
     const x = match[5]
     const y = match[6]
-    return { action, by: match[2], name: match[3], ...(x === undefined || y === undefined ? {} : { position: { x: Number(x), y: Number(y) } }) }
+    return { action, by: match[2], name: match[3], ...(!(x === undefined || y === undefined) && { position: { x: Number(x), y: Number(y) } }) }
   }
-  return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4].replace(/\\(.)/gu, '$1') }) }
+  return { action, by: match[2], name: match[3], ...(match[4] !== undefined && { value: match[4].replace(/\\(.)/gu, '$1') }) }
 }
 
 const reachSchema = z

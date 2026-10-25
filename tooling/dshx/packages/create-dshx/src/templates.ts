@@ -418,7 +418,7 @@ const LEGACY_TEMPLATE_REGISTRY = {
   },
 } as const satisfies Record<'starter' | 'showcase', TemplateDefinition>
 
-function sdkDependencies(context: TemplateContext): DependencyMap {
+function sdkDependencies(context: TemplateContext) {
   return {
     '@dshfiles/dshx': context.dshxVersion,
     '@deepseek-ai/dsh': context.dshVersion,
@@ -427,7 +427,7 @@ function sdkDependencies(context: TemplateContext): DependencyMap {
     [DSH_PACKAGES.toolCordis]: context.dshVersion,
     '@types/node': '^22.19.0',
     typescript: '^7.0.2',
-  }
+  } satisfies DependencyMap
 }
 
 function renderBasicHost(context: TemplateContext): string {
@@ -544,7 +544,7 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
       main: './dist/index.js',
       exports: {
         '.': { types: './dist/index.d.ts', default: './dist/index.js' },
-        ...(template.hostOnly ? {} : { './client': { types: './dist/client.d.ts', default: './dist/client.js' } }),
+        ...(!template.hostOnly && { './client': { types: './dist/client.d.ts', default: './dist/client.js' } }),
         './cordis.patch.yml': './cordis.patch.yml',
         './package.json': './package.json',
       },
@@ -552,16 +552,14 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
       dshx: { features: './dshx.features.json' },
       dsh: {
         bundle: { patch: './cordis.patch.yml' },
-        ...(template.hostOnly
-          ? {}
-          : {
-              client: {
-                platform: 'web',
-                inject: [...template.clientProviders],
-                external: [],
-                immediately: false,
-              },
-            }),
+        ...(!template.hostOnly && {
+          client: {
+            platform: 'web',
+            inject: [...template.clientProviders],
+            external: [],
+            immediately: false,
+          },
+        }),
       },
       scripts: {
         check: 'dshx check && pnpm lint && pnpm fmt:check',
@@ -576,7 +574,7 @@ function renderManifest(context: TemplateContext, templateName: TemplateName, st
       },
       devDependencies: {
         ...template.devDependencies(context),
-        ...(template.hostOnly ? {} : styleDefinition.devDependencies),
+        ...(!template.hostOnly && styleDefinition.devDependencies),
         vitest: '^4.1.11',
         oxlint: '1.86.0',
         oxfmt: '0.71.0',

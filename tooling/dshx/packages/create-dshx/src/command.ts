@@ -11,7 +11,7 @@ const commandAvailable = async (command: string, runner = defaultCommandRunner):
   return result.exitCode === 0
 }
 
-const installCommand = (manager: PackageManager): { readonly command: string; readonly args: readonly string[] } => {
+const installCommand = (manager: PackageManager) => {
   return { command: manager, args: ['install'] }
 }
 

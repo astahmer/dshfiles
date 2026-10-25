@@ -5,7 +5,7 @@ import { createClientPlugin } from '../src/client/runtime.js'
 import { defineSettings } from '../src/settings/index.js'
 import { defineApi, method } from '../src/api/index.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
-import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 
 describe('installed protocol-2 contract regressions', () => {
   it('exports editable Config before Loader activation', () => {

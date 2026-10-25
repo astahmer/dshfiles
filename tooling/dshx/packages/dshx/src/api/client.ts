@@ -188,7 +188,7 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     return ApiClientLifecycle.startQuery<ApiClientOutput<Methods[K]>>({
       available: () => ApiRuntimeModel.connectionAvailable(api),
       subscribe: listener => ApiRuntimeModel.subscribeConnection(api, listener),
-      ...(options?.signal === undefined ? {} : { signal: options.signal }),
+      ...(options?.signal !== undefined && { signal: options.signal }),
       onPending: fetchStatus =>
         setState(previous => {
           if (previous.status === 'success') return { status: 'success', fetchStatus, data: previous.data, error: null }

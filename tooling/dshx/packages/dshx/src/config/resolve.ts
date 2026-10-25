@@ -360,19 +360,19 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     for (const [name, entry] of Object.entries(modules ?? {})) {
       if (!MODULE_NAME_PATTERN.test(name) || RESERVED_MODULE_NAMES.has(name)) {
         throw new DshxError('DSHX4007', `Invalid shared module name ${JSON.stringify(name)}.`, {
-          ...(configFile === undefined ? {} : { file: configFile }),
+          ...(configFile !== undefined && { file: configFile }),
           hint: 'Use a lower-case name such as "contract"; "index", "client", "package" and "cordis" are reserved.',
         })
       }
       if (typeof entry !== 'string' || entry.trim() === '') {
         throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} needs a source entry.`, {
-          ...(configFile === undefined ? {} : { file: configFile }),
+          ...(configFile !== undefined && { file: configFile }),
         })
       }
       const absolute = await resolveEntry(root, { entry }, 'src/module.ts', `modules.${name}`, configFile)
       if (absolute === undefined) {
         throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} has no entry.`, {
-          ...(configFile === undefined ? {} : { file: configFile }),
+          ...(configFile !== undefined && { file: configFile }),
         })
       }
       resolved.push({ name, entry: absolute })
@@ -400,26 +400,26 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
   return {
     root,
     packageFile,
-    ...(loaded.configFile === undefined ? {} : { configFile: loaded.configFile }),
+    ...(loaded.configFile !== undefined && { configFile: loaded.configFile }),
     configDependencies: loaded.dependencies,
     packageId,
     name: loaded.config.name ?? packageId,
-    ...(hostEntry === undefined ? {} : { hostEntry }),
-    ...(clientEntry === undefined ? {} : { clientEntry }),
+    ...(hostEntry !== undefined && { hostEntry }),
+    ...(clientEntry !== undefined && { clientEntry }),
     hostBundleDependencies,
-    ...(modules.length === 0 ? {} : { modules }),
+    ...(modules.length !== 0 && { modules }),
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
-    ...(loaded.config.client === false || loaded.config.client?.shared === undefined ? {} : { clientShared: loaded.config.client.shared }),
-    ...(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined
-      ? {}
-      : { clientSharedRuntime: loaded.config.client.sharedRuntime.provide }),
-    ...(hostVitePlugins.length === 0 ? {} : { hostVitePlugins }),
-    ...(clientVitePlugins.length === 0 ? {} : { clientVitePlugins }),
+    ...(!(loaded.config.client === false || loaded.config.client?.shared === undefined) && { clientShared: loaded.config.client.shared }),
+    ...(!(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined) && {
+      clientSharedRuntime: loaded.config.client.sharedRuntime.provide,
+    }),
+    ...(hostVitePlugins.length !== 0 && { hostVitePlugins }),
+    ...(clientVitePlugins.length !== 0 && { clientVitePlugins }),
     outDir: resolve(root, 'dist'),
     profile: loaded.config.profile ?? 'web',
     dev: {
       hostRestart: loaded.config.dev?.hostRestart ?? 'auto',
-      ...(loaded.config.dev?.hostHmr === undefined ? {} : { hostHmr: loaded.config.dev.hostHmr }),
+      ...(loaded.config.dev?.hostHmr !== undefined && { hostHmr: loaded.config.dev.hostHmr }),
     },
     build: {
       sourcemap: loaded.config.build?.sourcemap ?? true,

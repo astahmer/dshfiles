@@ -7,7 +7,7 @@ import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
-import { checkProjectManifest } from '../project/index.js'
+import { checkProjectManifest } from '../project/manifest.js'
 import { ScaffoldFilePlan } from './common.js'
 import { ScaffoldPresets } from './presets.js'
 
@@ -84,7 +84,7 @@ const parseManifest = (source: string): Record<string, unknown> | undefined => {
   }
 }
 
-const copyRecord = (value: unknown): Record<string, unknown> => ({ ...(record(value) ?? {}) })
+const copyRecord = (value: unknown) => ({ ...(record(value) ?? {}) })
 
 const updateManifestForPreset = (manifest: Record<string, unknown>, preset: AddPresetName, clientRpc: boolean): Record<string, unknown> | undefined => {
   const updated = { ...manifest }
@@ -164,7 +164,7 @@ const inside = (root: string, target: string): boolean => {
 
 const toFilePlan = (file: PlannedFile) => ({
   file: file.file,
-  ...(file.before === undefined ? {} : { before: file.before }),
+  ...(file.before !== undefined && { before: file.before }),
   after: file.after,
 })
 
@@ -230,7 +230,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
     changedFiles: plan.map(item => item.file),
     generatedFiles: plan.filter(item => item.before === undefined).map(item => item.file),
     diagnostics,
-    ...(diff === undefined ? {} : { diff }),
+    ...(diff !== undefined && { diff }),
   })
   const refuse = async (item: DshxDiagnostic): Promise<AddPresetResult> => {
     diagnostics.push(item)
@@ -347,7 +347,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
       plan.push({ file: configFile, before: configBefore, after: applyEdits(configBefore, configEdits) })
       plan.push({
         file: clientEntry,
-        after: ScaffoldPresets.panelClientEntry({ preset, id, packageId: project.packageId, ...(options.title === undefined ? {} : { title: options.title }) }),
+        after: ScaffoldPresets.panelClientEntry({ preset, id, packageId: project.packageId, ...(options.title !== undefined && { title: options.title }) }),
       })
       clientEntryForCheck = clientEntry
     } else {
@@ -550,7 +550,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(
-      { ...project, ...(clientEntryForCheck === undefined ? {} : { clientEntry: clientEntryForCheck }), manifest: updatedManifest },
+      { ...project, ...(clientEntryForCheck !== undefined && { clientEntry: clientEntryForCheck }), manifest: updatedManifest },
       { compatibility },
     )
   } catch (cause) {

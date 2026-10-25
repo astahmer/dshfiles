@@ -5,13 +5,21 @@ import vm from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import type { Plugin } from 'vite'
-import { buildClient, watchClient } from '../src/compiler/index.js'
+import { buildClient, watchClient } from '../src/compiler/client/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
 
 const clientPluginShape = z.object({ name: z.string(), inject: z.array(z.string()), apply: z.function({ input: [z.unknown()], output: z.unknown() }) })
 const isClientPlugin = (value: unknown): value is z.infer<typeof clientPluginShape> => clientPluginShape.safeParse(value).success
+
+interface ClientRegistration {
+  factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
+}
+
+interface ApplyContext {
+  received?: unknown
+}
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-fixture-'))
@@ -119,7 +127,7 @@ describe('client compiler', () => {
     expect(registration?.id).toBe('@dshx/fixture-plugin')
     expect(styles).toHaveLength(0)
 
-    const requireModule = (id: string): unknown => {
+    const requireModule = (id: string) => {
       if (id === 'react') {
         const context = { Provider: 'provider' }
         return {
@@ -202,9 +210,7 @@ describe('client compiler', () => {
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     expect(code).not.toMatch(/(?:from|require)\(["']dshx\/client/)
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -279,9 +285,7 @@ describe('client compiler', () => {
       inject: ['@deepseek-ai/dsh-client-locale'],
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -326,9 +330,7 @@ describe('client compiler', () => {
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     expect(code).not.toContain("require('@deepseek-ai/dsh-client-locale")
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -552,9 +554,7 @@ describe('client compiler', () => {
       outDir: 'dist',
       inject: ['@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation'],
     })
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(await readFile(resolve(root, 'dist/client.js'), 'utf8'), {
       window: { __ModuleLoader__: { load: (value: typeof registration) => Object.assign(registration, value) } },
     })
@@ -722,9 +722,7 @@ describe('client compiler', () => {
       outDir: 'dist',
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -782,9 +780,7 @@ describe('client compiler', () => {
       outDir: 'dist',
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -798,7 +794,7 @@ describe('client compiler', () => {
       Config: unknown
       apply: (ctx: { received?: unknown }, config: unknown) => void
     }
-    const context: { received?: unknown } = {}
+    const context: ApplyContext = {}
     const config = { enabled: true }
     plugin.apply(context, config)
     expect(plugin.name).toBe('native-client')
@@ -876,9 +872,7 @@ describe('client compiler', () => {
     expect(code).toContain('settingsCapability: true')
     expect(code).not.toContain('@dshfiles/dshx/settings')
 
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -1000,9 +994,7 @@ describe('client compiler', () => {
     expect(code).not.toContain('@dshfiles/dshx/client')
     expect(code).not.toMatch(/require\(["']@deepseek-ai\/dsh-client-connection(?:\/client)?["']\)/)
 
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
+    const registration: ClientRegistration = {} as never
     vm.runInNewContext(code, {
       window: {
         __ModuleLoader__: {
@@ -1278,7 +1270,7 @@ describe('client compiler', () => {
 
     const factories = new Map<string, (requireModule: (id: string) => unknown) => unknown>()
     const materialized = new Map<string, unknown>()
-    const requireModule = (id: string): unknown => {
+    const requireModule = (id: string) => {
       if (!materialized.has(id)) materialized.set(id, factories.get(id)?.(requireModule))
       return materialized.get(id)
     }

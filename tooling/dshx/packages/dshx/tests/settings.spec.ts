@@ -24,7 +24,7 @@ describe('defineSettings', () => {
       namespace: 'runtime-secret',
       schema,
       client: {
-        decode(value): { showActivity: boolean } {
+        decode(value) {
           if (typeof value !== 'object' || value === null || !('showActivity' in value)) throw new Error('invalid settings')
           return { showActivity: Boolean(value.showActivity) }
         },

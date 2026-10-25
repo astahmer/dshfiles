@@ -117,8 +117,8 @@ export const checkPluginBoot = async (options: BootCheckOptions): Promise<BootCh
     timedOut,
     unsupportedNode,
     compositionFailures: expectedBundleFailures,
-    ...(processError === undefined ? {} : { processError }),
-    ...(spawnError === undefined ? {} : { spawnError }),
-    ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
+    ...(processError !== undefined && { processError }),
+    ...(spawnError !== undefined && { spawnError }),
+    ...(launchUrl !== undefined && { url: new URL(launchUrl).origin }),
   }
 }

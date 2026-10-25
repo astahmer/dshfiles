@@ -2,8 +2,6 @@ import type { DshCompatibility, DshSupportStatus } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 
-export type { DshSupportStatus } from '../compat/types.js'
-
 /** Captured result of one finite official DSH CLI command. */
 export interface DshCommandResult {
   readonly exitCode?: number

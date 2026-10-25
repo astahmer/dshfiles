@@ -1,6 +1,7 @@
 import { redactIdentifier } from './identifier.js'
 import { SpanRecorders, type SpanRecorder } from './recorder.js'
-import { TracerModel, type Span, type SpanAttributeValue, type SpanContext, type StartSpanOptions } from './tracer.js'
+import type { SpanAttributeValue } from './otlp-exporter.js'
+import { TracerModel, type Span, type SpanContext, type StartSpanOptions } from './tracer.js'
 
 /**
  * Run `run` with an existing span as the active parent: every span opened inside it, in any plugin of this process

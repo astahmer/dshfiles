@@ -102,11 +102,13 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
       span?.end()
     }
   }
-  const client: Record<string, unknown> = { safe: {} }
+  const client: Record<string, unknown> = {}
+  const safe: Record<string, unknown> = {}
+  client.safe = safe
   for (const name of Object.keys(contract.methods)) {
     const invoke = (input?: unknown, options?: ApiCallOptions) => call(name, input, options)
     client[name] = invoke
-    ;(client.safe as Record<string, unknown>)[name] = async (input?: unknown, options?: ApiCallOptions) => {
+    safe[name] = async (input?: unknown, options?: ApiCallOptions) => {
       try {
         return { ok: true, value: await invoke(input, options) }
       } catch (cause) {

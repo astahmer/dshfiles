@@ -50,7 +50,7 @@ export interface CreatedHostPlugin {
 
 function fail(code: 'DSHX2001' | 'DSHX2002', message: string, metadata: HostPluginMetadata, hint: string): never {
   throw new DshxError(code, message, {
-    ...(metadata.sourceFile === undefined ? {} : { file: metadata.sourceFile }),
+    ...(metadata.sourceFile !== undefined && { file: metadata.sourceFile }),
     hint,
   })
 }
@@ -65,7 +65,7 @@ async function startHostRuntime(ctx: Context, metadata: HostPluginMetadata): Pro
   const bridge = await HostInspectBridge.start(ctx, {
     packageId: metadata.packageId,
     root: metadata.root ?? process.cwd(),
-    ...(metadata.logicalName === undefined ? {} : { logicalName: metadata.logicalName }),
+    ...(metadata.logicalName !== undefined && { logicalName: metadata.logicalName }),
     runtimePlugins: runtimePlugins.plugins,
   })
   HostInspectBridge.own(ctx, bridge)
@@ -386,7 +386,7 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
   return {
     name: definition.name ?? fallbackName(metadata),
     inject,
-    ...(config === undefined ? {} : { Config: config }),
+    ...(config !== undefined && { Config: config }),
     apply(ctx, config) {
       if ((definition.tools?.length ?? 0) > 0) {
         const owners = (apiRegistry(ctx).toolOwners ??= new WeakMap())
@@ -430,8 +430,8 @@ export function createHostModule(source: Record<string, unknown>, metadata: Host
   const apply = source.apply as (ctx: Context, config?: unknown) => unknown
   return {
     name: (source.name as string | undefined) ?? fallbackName(metadata),
-    ...(source.inject === undefined ? {} : { inject: source.inject as Inject }),
-    ...(source.Config === undefined ? {} : { Config: source.Config as StandardSchemaV1 }),
+    ...(source.inject !== undefined && { inject: source.inject as Inject }),
+    ...(source.Config !== undefined && { Config: source.Config as StandardSchemaV1 }),
     apply(ctx, config) {
       return withRuntime(ctx, apply(ctx, config), metadata)
     },

@@ -23,10 +23,10 @@ const adaptHostSetup = (fallback: Setup, setup: HostSetup): Setup => {
  * Schemastery passes resolver objects whose fields are getters. Resolve those
  * fields once before exposing the config to Host setup code.
  */
-const unwrapRowConfig = (config: unknown): Record<string, unknown> => {
-  if (config === null || config === undefined || typeof config !== 'object') return {}
-  const resolved = config as Record<string, unknown>
+const unwrapRowConfig = (config: unknown) => {
   const output: Record<string, unknown> = {}
+  if (config === null || config === undefined || typeof config !== 'object') return output
+  const resolved = config as Record<string, unknown>
   for (const [key, value] of Object.entries(resolved)) {
     output[key] = typeof value === 'function' ? (value as () => unknown)() : value
   }

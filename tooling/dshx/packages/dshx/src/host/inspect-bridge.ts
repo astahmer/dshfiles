@@ -80,7 +80,7 @@ function bridgeName(packageId: string): string {
   return createHash('sha256').update(packageId).digest('hex').slice(0, 20)
 }
 
-function paths(packageId: string): { directory: string; socketPath: string; metadataPath: string } {
+function paths(packageId: string) {
   const home = runtimeHome()
   const directory = join(home, 'runtime', 'dshx', 'inspect')
   const name = bridgeName(packageId)
@@ -120,7 +120,13 @@ function responseError(requestId: string, target: HostInspectTarget, code: strin
   return { version: PROTOCOL_VERSION, requestId, ok: false, target, error: { code, message } }
 }
 
-function parseRequest(text: string, token: string): { requestId: string; target: HostInspectTarget; input?: Record<string, unknown> } {
+interface ParsedInspectRequest {
+  readonly requestId: string
+  readonly target: HostInspectTarget
+  readonly input?: Record<string, unknown>
+}
+
+function parseRequest(text: string, token: string): ParsedInspectRequest {
   let value: unknown
   try {
     value = JSON.parse(text)
@@ -166,7 +172,7 @@ function catalogItems(target: HostInspectTarget, value: unknown): readonly Recor
       ? { ...nestedMetadata, ...metadata }
       : {
           ...metadata,
-          ...(nestedMetadata === undefined ? {} : { metadata: nestedMetadata }),
+          ...(nestedMetadata !== undefined && { metadata: nestedMetadata }),
         }
     while (Object.keys(combinedMetadata).length === 1 && isRecord(combinedMetadata.metadata)) {
       combinedMetadata = combinedMetadata.metadata
@@ -174,12 +180,12 @@ function catalogItems(target: HostInspectTarget, value: unknown): readonly Recor
     return {
       name: key,
       provider: target === 'services' ? 'Service' : 'Event',
-      ...(Object.keys(combinedMetadata).length === 0 ? {} : { metadata: combinedMetadata }),
+      ...(Object.keys(combinedMetadata).length !== 0 && { metadata: combinedMetadata }),
     }
   })
 }
 
-function slotNode(node: unknown): Record<string, unknown> {
+function slotNode(node: unknown) {
   if (!isRecord(node) || typeof node.name !== 'string' || node.name.trim() === '' || typeof node.scope !== 'string' || node.scope.trim() === '')
     throw new BridgeFailure('DSHX3203', 'Slot Inspect returned a tree item without valid name and scope fields.')
   if (node.type !== undefined && node.type !== 'slot' && node.type !== 'factory')
@@ -193,10 +199,10 @@ function slotNode(node: unknown): Record<string, unknown> {
   delete rest.children
   return {
     name,
-    ...(type === undefined ? {} : { type }),
-    ...(kind === undefined ? {} : { kind }),
+    ...(type !== undefined && { type }),
+    ...(kind !== undefined && { kind }),
     scope,
-    ...(Object.keys(rest).length === 0 ? {} : { metadata: rest }),
+    ...(Object.keys(rest).length !== 0 && { metadata: rest }),
   }
 }
 
@@ -248,7 +254,7 @@ async function queryComposition(
   const timer = setTimeout(() => controller.abort(new Error('Inspect provider request timed out.')), REQUEST_TIMEOUT_MS)
   let handle: { agent: unknown; dispose(): Promise<void> } | undefined
   let items: readonly Record<string, unknown>[] | undefined
-  let failure: unknown
+  let failure: BridgeFailure | undefined
   let failed = false
   try {
     handle = await agents.create({ sessionId: `dshx-inspect-${randomUUID()}`, meta: { cwd: metadata.root } })

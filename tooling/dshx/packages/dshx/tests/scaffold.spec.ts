@@ -32,7 +32,7 @@ function project(root: string, clientEntry: string | undefined, manifest: Record
     configDependencies: [],
     packageId: '@demo/plugin',
     name: '@demo/plugin',
-    ...(clientEntry === undefined ? {} : { clientEntry }),
+    ...(clientEntry !== undefined && { clientEntry }),
     hostEntry: resolve(root, 'src/host.ts'),
     outDir: resolve(root, 'dist'),
     profile: 'web',
@@ -301,7 +301,7 @@ describe('add ui scaffold', () => {
               provider: '@demo/sidebar',
               kind: 'single',
               scope: 'root',
-              ...(options?.slotRoot === undefined ? {} : { metadata: { catalog: { registration: [], replaceRisk: 'none' }, occupants: [] } }),
+              ...(options?.slotRoot !== undefined && { metadata: { catalog: { registration: [], replaceRisk: 'none' }, occupants: [] } }),
             },
           ],
         }
@@ -342,9 +342,9 @@ describe('add ui scaffold', () => {
                 provider: '@demo/sidebar',
                 kind: options?.slotRoot === undefined ? 'list' : 'keyed',
                 scope: 'root',
-                ...(options?.slotRoot === undefined
-                  ? {}
-                  : { metadata: { catalog: { registration: [{ name: 'key', required: true, type: 'string' }], replaceRisk: 'none' } } }),
+                ...(options?.slotRoot !== undefined && {
+                  metadata: { catalog: { registration: [{ name: 'key', required: true, type: 'string' }], replaceRisk: 'none' } },
+                }),
               },
             ],
           }),

@@ -7,12 +7,12 @@ import {
   getCompatibilityCapabilities,
   getCompatibilitySmokeMatrix,
   projectCompatibilityDiagnostics,
-  PROTOCOL_2_COMPATIBILITY,
   resolveCompatibility,
   resolveDeclaredCompatibility,
   projectHostProvidedDependencyDiagnostics,
 } from '../src/compat/index.js'
-import type { DshCompatibility } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
+import type { DshCompatibility } from '../src/compat/types.js'
 
 const LEGACY_COMPATIBILITY: DshCompatibility = {
   ...PROTOCOL_2_COMPATIBILITY,
