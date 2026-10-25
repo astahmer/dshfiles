@@ -110,6 +110,8 @@ Measured on 2026-10-25 with the same mutation method plus a throwaway file-level
 
 The saving applies to leaf packages: 443 of the 1760 commits touching plugins since 2026-08-01 changed only packages with no workspace dependents. Every other plugin edit keeps its build because its dependents run their full suites against the rebuilt package. A cold workspace is detected through the missing dependency entry: with the `dshx` dist moved away, the probe returned `unbuilt workspace dependency @dshfiles/dshx`.
 
+Turbo's `ui-styles#build` also stops treating test and screenshot files as inputs. A test-only or screenshot edit now replays all 52 build tasks in 264ms instead of rebuilding the shared stylesheet; a quiet warm stylesheet build is 1.5-2.6s (the 11.5s quoted earlier was measured under load). Source edits still rebuild it, because a class can change.
+
 ### Coverage instead of a full suite
 
 Method: run each test file once with V8 coverage, keep the source files it actually executed (not merely imported), select the tests whose recorded files intersect the change, and fall back to the full suite when the changed file is absent or the index is stale. Index cost and one mutation per package:

@@ -42,6 +42,8 @@
         "!$TURBO_ROOT$/plugins/@dshfiles/**/output/**",
         "!$TURBO_ROOT$/plugins/@dshfiles/**/test-results/**",
         "!$TURBO_ROOT$/plugins/@dshfiles/**/playwright-report/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/*.{png,jpg,jpeg,webp,gif,svg}",
         "!$TURBO_ROOT$/plugins/@dshfiles/**/.features-gen/**",
         "!$TURBO_ROOT$/plugins/@dshfiles/**/.test-dist/**",
         "!.turbo/**",
