@@ -92,6 +92,15 @@ const FeedEntry = (props: {
           props.selection.selected.has(item.id) || props.open ? 'dshx:bg-accent/70' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
         )}
       >
+        {props.selection.selected.has(item.id) ? (
+          <span
+            aria-hidden="true"
+            className="dshx:pointer-events-none dshx:absolute dshx:-left-2 dshx:top-1/2 dshx:flex dshx:size-4 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded-[3px] dshx:border dshx:border-info dshx:bg-info dshx:text-[11px] dshx:text-info-foreground"
+            data-backlog-selection-indicator=""
+          >
+            ✓
+          </span>
+        ) : null}
         <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-[11px] dshx:ring-0" />
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
           <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">

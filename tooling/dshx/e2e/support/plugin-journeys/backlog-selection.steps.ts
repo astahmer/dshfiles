@@ -49,6 +49,11 @@ Then('the {string} backlog list supports coherent batch selection', async ({ pag
   await expect(page.getByRole('complementary', { name: 'Item detail' })).toBeVisible()
   await target(last).click({ modifiers: ['Shift'], position: { x: 8, y: 8 } })
   await expect(selectedRows(rows)).toHaveCount(3)
+  if (view === 'feed') {
+    const indicators = selectedRows(rows).locator('[data-backlog-selection-indicator]')
+    await expect(indicators).toHaveCount(3)
+    await expect(indicators.first()).toHaveCSS('position', 'absolute')
+  }
   await target(middle).click({ modifiers: ['ControlOrMeta'], position: { x: 8, y: 8 } })
   await expect(selectedRows(rows)).toHaveCount(2)
   await target(middle).click({ modifiers: ['ControlOrMeta'], position: { x: 8, y: 8 } })
