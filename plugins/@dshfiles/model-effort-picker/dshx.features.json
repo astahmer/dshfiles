@@ -31,7 +31,7 @@
     {
       "id": "fast-mode",
       "title": "Enable Fast mode on supported Codex models",
-      "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models. AI Accounts can enable it by default, with per-session route overrides, and adds service_tier=fast through pi-ai's supported payload hook. The composer shows a lightning icon while Fast mode is enabled.",
+      "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models. AI Accounts can enable it by default, with per-session route overrides, and adds the legacy service_tier=priority through pi-ai's supported payload hook. The composer shows a lightning icon while Fast mode is enabled.",
       "reach": [
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a scratch session for Fast mode\"",
         "click button \"Send message\"",
@@ -62,7 +62,7 @@
           "kind": "unit-test",
           "id": "model-effort-picker.codex-fast-mode-wire-tier",
           "file": "plugins/@dshfiles/ai-accounts/src/codex-fast-mode.test.ts",
-          "testName": "adds service_tier fast to the actual Codex request when enabled per thread or by default"
+          "testName": "uses the legacy priority tier when Fast mode is enabled per thread or by default"
         },
         {
           "kind": "gherkin",

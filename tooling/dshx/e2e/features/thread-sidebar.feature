@@ -41,7 +41,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.section-order
   Scenario: Keep remote threads with view groups by default or separate them
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When an archived thread and a settled thread fill the bottom sections
     Then separate remote grouping is opt-in, reorderable and persists across reloads
 

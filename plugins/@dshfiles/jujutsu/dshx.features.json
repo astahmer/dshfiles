@@ -259,13 +259,8 @@
     {
       "id": "composer-context",
       "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The change bar labels its file diff as changes since the fork point with the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
-      "reach": [
-        "seed rebase-ready-thread",
-        "click text \"New Session\"",
-        "click button \"Review workspace changes: @ vs main: 1 only on @\"",
-        "expect text \"seeded-work.md\""
-      ],
+      "summary": "The change bar labels the net file diff as changes since branching from the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
+      "reach": ["seed rebase-ready-thread", "click button \"Changes since branching from main*\"", "expect text \"seeded-work.md\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -286,7 +281,7 @@
           "key": "composerBarBase",
           "defaultValue": "main",
           "constraints": "Parent, trunk, or a local or remote bookmark; invalid input falls back to main.",
-          "choices": ["parent", "trunk", "local bookmark", "remote bookmark"],
+          "choices": ["main", "parent", "trunk", "local bookmark", "remote bookmark"],
           "coveredBy": ["jujutsu.composer-context"]
         }
       ],

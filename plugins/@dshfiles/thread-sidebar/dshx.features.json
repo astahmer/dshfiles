@@ -738,7 +738,7 @@
       "title": "Group remote threads with each view",
       "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
       "reach": [
-        "click button \"List layout\"",
+        "click button \"All threads\"",
         "expect button \"All threads\"",
         "click button \"All threads\"",
         "expect region \"Threads\"",
@@ -753,7 +753,13 @@
         "Empty sections can shift the drag position even though they are not rendered.",
         "A reordered section order or separate-group choice does not survive a reload."
       ],
-      "externalDependencies": [],
+      "externalDependencies": [
+        {
+          "id": "multi-host",
+          "boundary": "Remote thread inventory is served by the optional multi-host API.",
+          "deterministicFake": "Load @dshfiles/multi-host in the isolated profile; no remote host records are required for the empty inventory state."
+        }
+      ],
       "verification": [
         {
           "kind": "gherkin",

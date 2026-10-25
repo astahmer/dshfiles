@@ -23,7 +23,7 @@ const usage = (overrides: Partial<MemoryUsage> = {}): MemoryUsage => ({
     block: { threads: 9, meanBytes: 1_400, maxBytes: 1_600, requests: 44 },
     citations: { total: 106, agentCorrected: 2, userCorrected: 1, up: 4, down: 1 },
   },
-  noteCounts: { active: 72, superseded: 12, forgotten: 1 },
+  noteCounts: { active: 72, superseded: 12, forgotten: 1, archived: 0 },
   daily: [],
   events: [],
   topNotes: [
@@ -41,6 +41,7 @@ const usage = (overrides: Partial<MemoryUsage> = {}): MemoryUsage => ({
       updatedAt: 0,
       citations: 12,
       status: 'valid',
+      archivedAt: null,
       supersedes: null,
       supersededBy: null,
       reason: null,

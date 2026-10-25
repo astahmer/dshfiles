@@ -256,6 +256,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "backlog.board-columns-customization",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "backlog.item-text-links",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },

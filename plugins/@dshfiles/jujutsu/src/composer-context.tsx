@@ -210,7 +210,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
   if (repository === null) return null
 
   const fileCount = repository.totals?.files ?? repository.files.length
-  const heading = context.base.kind === 'parent' ? 'Working copy' : 'Since fork point with ' + repository.base.label
+  const heading = context.base.kind === 'parent' ? 'Working copy' : 'Changes since branching from ' + repository.base.label
   const revisionSummary = ComposerContextModel.revisionSummary({
     baseLabel: repository.base.label,
     baseFound: repository.base.found,
@@ -235,7 +235,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
           <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
           <span>·</span>
           {fileCount === 0 ? (
-            <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no diff from fork point'}</span>
+            <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}</span>
           ) : (
             <>
               <span>
