@@ -183,7 +183,14 @@ const isolatedHostEnvironment = (home: string, profileRoot: string, source: Node
   }
 }
 
-const redactHostOutput = (output: string): string => output.replace(/http:\/\/127\.0\.0\.1:\d+\/[^\s]*/g, match => `${new URL(match).origin}/[redacted]`)
+const redactHostOutput = (output: string): string =>
+  output.replace(/https?:\/\/[^\s]+/gu, match => {
+    try {
+      return `${new URL(match).origin}/[redacted]`
+    } catch {
+      return '[redacted-url]'
+    }
+  })
 
 export class ScratchProfileRuntime {
   static readonly hostEnvironment = isolatedHostEnvironment

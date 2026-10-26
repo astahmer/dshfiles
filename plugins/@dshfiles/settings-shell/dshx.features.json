@@ -6,15 +6,10 @@
       "id": "settings-shell-port",
       "title": "Native Settings shell, ported",
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
-      "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "expect button \"General\""
-      ],
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"General\""],
       "surfaces": ["client", "settings", "integration"],
       "configuration": [],
-      "states": ["closed", "open", "onboarding", "disconnected", "update-available"],
+      "states": ["closed", "open", "compact-navigation", "onboarding", "disconnected", "update-available"],
       "failureModes": [
         "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows the running version, so the port is refreshed instead of drifting silently.",
         "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more."
@@ -24,6 +19,11 @@
         {
           "kind": "gherkin",
           "id": "settings-shell.native-port",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.compact-navigation",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         },
         {

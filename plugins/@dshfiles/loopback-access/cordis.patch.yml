@@ -1,0 +1,24 @@
+# The owned printer lists actual local access first. Preserve all other native
+# Web runtime settings and invocation overrides; this does not change binding.
+- id: web-runtime
+  config:
+    openBrowser: !!js ctx.webStartup.openBrowser
+    printUrl: false
+    publicUrl: !!js ctx.webStartup.publicUrl
+    surfaceContext: true
+- insert:
+    - id: dshfiles-network-startup
+      name: '@dshfiles/loopback-access/startup'
+    - id: dshfiles-loopback-access
+      name: '@dshfiles/loopback-access'
+    - id: dshfiles-network-terminal-output
+      name: '@dshfiles/loopback-access/terminal-output'
+- id: webserver
+  inject: [webStartup, dshfilesNetworkStartup]
+  config:
+    host: !!js ctx.webStartup.host ?? ctx.dshfilesNetworkStartup.host ?? '127.0.0.1'
+    port: !!js ctx.webStartup.port ?? ctx.dshfilesNetworkStartup.port ?? 3080
+    tls: !!js ctx.webStartup.tls
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024

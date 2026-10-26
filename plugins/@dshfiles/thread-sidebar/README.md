@@ -2,6 +2,7 @@
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
+![Synthetic saved view retained after reload over HTTP LAN access](docs/screenshots/saved-view-http-lan.png)
 ![Start a chat directly from an expanded or collapsed project header](docs/screenshots/project-header-chat.png)
 ![Several unsent drafts in the same project](docs/screenshots/typed-project-drafts.png)
 

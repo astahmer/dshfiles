@@ -26,3 +26,4 @@ export type {} from '@deepseek-ai/dsh-tools'
 export type {} from '@deepseek-ai/dsh-system-prompt'
 
 export { waitForManagedExit, terminateManagedProcess } from './process.js'
+export { readWebStartupOverrides } from './web-startup.js'
