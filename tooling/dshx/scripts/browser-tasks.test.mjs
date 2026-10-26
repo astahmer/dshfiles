@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   cucumberExpressionPattern,
   featureOwner,
@@ -14,9 +14,80 @@ import {
   planBrowserTasks,
   resolveBrowserSelection,
   runtimeDistDigest,
+  scenarioRecipeHash,
 } from './browser-tasks.mjs'
 
 const featuresDir = resolve(dirname(fileURLToPath(import.meta.url)), '../e2e/features')
+
+test('scenario recipe hashes include shared and fixture content with deterministic source ordering', () => {
+  const recipe = {
+    steps: ['setup'],
+    definitions: [{ file: 'recipe.steps.ts', expression: 'setup', body: 'connect()' }],
+    sharedSources: [
+      ['boot.ts', 'seed-v1'],
+      ['hooks.ts', 'hooks-v1'],
+    ],
+    fixtureSources: [
+      ['profile-sync.ts', 'fixture-v1'],
+      ['profile-seed.ts', 'seed-v1'],
+    ],
+  }
+  const key = scenarioRecipeHash(recipe)
+  assert.equal(key, scenarioRecipeHash(recipe))
+  assert.equal(key, scenarioRecipeHash({ ...recipe, sharedSources: [...recipe.sharedSources].reverse(), fixtureSources: [...recipe.fixtureSources].reverse() }))
+  assert.notEqual(key, scenarioRecipeHash({ ...recipe, sharedSources: [['boot.ts', 'seed-v2'], recipe.sharedSources[1]] }))
+  assert.notEqual(key, scenarioRecipeHash({ ...recipe, fixtureSources: [['profile-sync.ts', 'fixture-v2'], recipe.fixtureSources[1]] }))
+  assert.notEqual(key, scenarioRecipeHash({ ...recipe, fixtureSources: [['renamed.ts', 'fixture-v1'], recipe.fixtureSources[1]] }))
+  assert.notEqual(key, scenarioRecipeHash({ ...recipe, sharedSources: recipe.sharedSources.slice(1) }))
+})
+
+test('the planner hashes real shared recipes and keeps fixture changes isolated to their owner', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'browser-recipes-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const write = async (file, source) => {
+    await mkdir(dirname(join(root, file)), { recursive: true })
+    await writeFile(join(root, file), source)
+  }
+  const planner = 'tooling/dshx/scripts/browser-tasks.mjs'
+  await mkdir(dirname(join(root, planner)), { recursive: true })
+  await copyFile(fileURLToPath(new URL('./browser-tasks.mjs', import.meta.url)), join(root, planner))
+  for (const name of ['multi-host', 'editor']) {
+    await write(`plugins/@dshfiles/${name}/package.json`, JSON.stringify({ name: `@dshfiles/${name}`, dsh: {} }))
+    await write(
+      `tooling/dshx/e2e/features/${name}.feature`,
+      `Feature: ${name}\n  @smoke\n  @scenario:${name}.recipe\n  Scenario: Recipe\n    Given the isolated plugin profile "@dshfiles/${name}" is booted\n`,
+    )
+  }
+  await write('tooling/dshx/packages/dshx/package.json', JSON.stringify({ name: '@dshfiles/dshx' }))
+  await write('tooling/dshx/e2e/support/plugin-journeys/recipe.steps.ts', "Given('the isolated plugin profile {string} is booted', async () => {})")
+  const boot = 'tooling/dshx/e2e/support/boot.ts'
+  const fixture = 'scripts/profile-sync.ts'
+  await write(boot, 'export const seed = "v1"\n')
+  await write(fixture, 'export const reconcile = "v1"\n')
+  const { planBrowserTasks: planFixture } = await import(pathToFileURL(join(root, planner)).href)
+  const initial = await planFixture()
+  const hash = (plan, owner) => plan.owners.get(`@dshfiles/${owner}`).scenarios[0].stepsHash
+  assert.equal(hash(await planFixture(), 'multi-host'), hash(initial, 'multi-host'))
+  for (const task of ['test:e2e', 'test:e2e:smoke']) {
+    assert.ok(initial.configs.get('@dshfiles/multi-host').tasks[task].inputs.includes(`$TURBO_ROOT$/${fixture}`))
+    assert.ok(!initial.configs.get('@dshfiles/editor').tasks[task].inputs.includes(`$TURBO_ROOT$/${fixture}`))
+  }
+  assert.ok(!initial.configs.get('@dshfiles/multi-host').tasks['test:boot'].inputs.includes(`$TURBO_ROOT$/${fixture}`))
+
+  await write(fixture, 'export const reconcile = "v2"\n')
+  const changedFixture = await planFixture()
+  assert.notEqual(hash(changedFixture, 'multi-host'), hash(initial, 'multi-host'))
+  assert.equal(hash(changedFixture, 'editor'), hash(initial, 'editor'))
+
+  await write(boot, 'export const seed = "v2"\n')
+  const changedBoot = await planFixture()
+  for (const owner of ['multi-host', 'editor']) assert.notEqual(hash(changedBoot, owner), hash(changedFixture, owner))
+
+  await write(boot, 'export const seed = "v1"\n')
+  await write(fixture, 'export const reconcile = "v1"\n')
+  const restored = await planFixture()
+  for (const owner of ['multi-host', 'editor']) assert.equal(hash(restored, owner), hash(initial, owner))
+})
 
 test('a {string} parameter matches Gherkin strings with escaped quotes', () => {
   const pattern = cucumberExpressionPattern('the fake model is asked to {string}')
@@ -192,16 +263,16 @@ test('a scenario-level impact is never wider than the task-level impact it repla
   assert.ok(affectedOwners.size < owners.size)
 })
 
-test('a scenario key moves when a step implementation changes, not only its text', async () => {
-  // The feature text is untouched here: only a definition body differs, which is exactly the case a text-only key
-  // would replay as a false pass.
-  const source = ['Feature: x', '  @scenario:x.one', '  Scenario: One', '    Given the isolated plugin profile "@dshfiles/alpha" is booted'].join('\n')
-  const scenario = featureScenarios(source)[0]
-  const definitions = parseStepDefinitions('Given("the isolated plugin profile {string} is booted", async ({ page }) => { await page.goto("a") })')
-  const keyFor = body => {
-    const matched = scenario.steps.map(step => definitions.find(definition => cucumberExpressionPattern(definition.expression)?.test(step)))
-    return matched.map(definition => definition.file + definition.body).join('\0') + body
+test('a scenario key moves when a step implementation changes, not only its text', () => {
+  const recipe = {
+    steps: ['setup'],
+    definitions: [{ file: 'recipe.steps.ts', expression: 'setup', body: 'connect()' }],
+    sharedSources: [],
+    fixtureSources: [],
   }
-  assert.notEqual(keyFor('one implementation'), keyFor('another implementation'))
-  assert.equal(keyFor('same'), keyFor('same'))
+  const key = scenarioRecipeHash(recipe)
+  assert.notEqual(key, scenarioRecipeHash({ ...recipe, steps: ['other setup'] }))
+  for (const change of [{ file: 'renamed.steps.ts' }, { expression: 'other setup' }, { body: 'reconnect()' }]) {
+    assert.notEqual(key, scenarioRecipeHash({ ...recipe, definitions: [{ ...recipe.definitions[0], ...change }] }))
+  }
 })

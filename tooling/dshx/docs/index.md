@@ -27,6 +27,7 @@ Additional references:
 - [CLI reference](./cli-reference.md)
 - [Agent communication](./agent-communication.md) — the shared typed service, quiet delivery model, CLI, MCP, and activation steps.
 - [Compatibility and verification](./compatibility.md)
+- [Installed verification binaries](./verification-binaries.md) — optional stock DSH and Chromium selection for isolated checks.
 - [Architecture](./architecture.md)
 
 ## Public entry points

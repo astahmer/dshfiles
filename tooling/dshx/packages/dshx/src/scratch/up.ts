@@ -6,6 +6,7 @@ import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
+import { resolveDshExecutable } from '../project/dsh-executable.js'
 import { ScratchReaperRuntime, type ReapedScratch, type WarnedScratch } from './reaper.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
@@ -94,6 +95,7 @@ const scratchCordisPatch = (packageIds: readonly string[]): { readonly cordisPat
 export const scratchUp = async (
   options: ScratchUpOptions,
 ): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[]; readonly warned: readonly WarnedScratch[] }> => {
+  const executable = await resolveDshExecutable()
   if (options.port === LIVE_DSH_PORT) {
     throw new ScratchError('live-port', `Port ${LIVE_DSH_PORT} belongs to the live DSH.`, 'Omit --port to take a free port.')
   }
@@ -158,6 +160,7 @@ export const scratchUp = async (
       profile: prepared.profile,
       profileRoot: prepared.profileRoot,
       dshHome: home,
+      executable,
       timeoutMs: options.timeoutMs,
     })
     const missing = compositionFailures(dump, prepared.expectedBundles)
@@ -185,7 +188,7 @@ export const scratchUp = async (
     const port = options.port ?? (await findFreePort())
     options.onProgress(`starting dsh on 127.0.0.1:${port}`)
     const hostArgs = ['--profile', prepared.profile, '--port', String(port), '--no-open']
-    hostPid = ScratchStateRuntime.spawnDetached('dsh', hostArgs, {
+    hostPid = ScratchStateRuntime.spawnDetached(executable, hostArgs, {
       cwd: DSHFILES_ROOT,
       env: ScratchProfileRuntime.hostEnvironment(home, prepared.profileRoot, hostSource),
       log: hostLog,
@@ -219,7 +222,7 @@ export const scratchUp = async (
         new ScratchError(
           'browser-timeout',
           `Chromium did not start:\n${(await readFile(browserLog, 'utf8').catch(() => '')).slice(-2_000)}`,
-          'Run "pnpm run setup:browser" from the repository root to install the Playwright Chromium.',
+          'Set DSHX_CHROMIUM_EXECUTABLE to a compatible installed Chrome/Chromium executable, or run "pnpm run setup:browser" where bundled Chromium is supported.',
         ),
     )
 
