@@ -1,4 +1,6 @@
 import { readFile, stat } from 'node:fs/promises'
+import { z } from 'zod'
+import { JsonDocumentModel, type JsonDocumentObject, type JsonDocumentValue } from './json-document.js'
 import { isAbsolute, relative, resolve } from 'node:path'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
@@ -8,26 +10,36 @@ interface PackageTarget {
   readonly target: string
 }
 
-function collectStrings(value: unknown, field: string, output: PackageTarget[]): void {
-  if (typeof value === 'string') {
-    output.push({ field, target: value })
+function collectStrings(value: JsonDocumentValue | undefined, field: string, output: PackageTarget[]): void {
+  const text = JsonDocumentModel.string(value)
+  if (text !== undefined) {
+    output.push({ field, target: text })
     return
   }
   if (Array.isArray(value)) {
     value.forEach((item, index) => collectStrings(item, `${field}[${index}]`, output))
     return
   }
-  if (typeof value !== 'object' || value === null) return
+  if (!JsonDocumentModel.isObject(value)) return
   for (const [key, nested] of Object.entries(value)) collectStrings(nested, `${field}.${key}`, output)
 }
 
 /** Concrete npm entrypoints, including conditional types and executable exports. */
 export function packageTargets(manifest: Record<string, unknown>): readonly PackageTarget[] {
   const targets: PackageTarget[] = []
-  collectStrings(manifest.main, 'main', targets)
-  collectStrings(manifest.types, 'types', targets)
-  collectStrings(manifest.bin, 'bin', targets)
-  collectStrings(manifest.exports, 'exports', targets)
+  // This public utility also accepts raw resolver metadata; decode only the fields it consumes.
+  const parsed = z
+    .object({
+      main: JsonDocumentModel.valueSchema.optional(),
+      types: JsonDocumentModel.valueSchema.optional(),
+      bin: JsonDocumentModel.valueSchema.optional(),
+      exports: JsonDocumentModel.valueSchema.optional(),
+    })
+    .parse(manifest)
+  collectStrings(parsed.main, 'main', targets)
+  collectStrings(parsed.types, 'types', targets)
+  collectStrings(parsed.bin, 'bin', targets)
+  collectStrings(parsed.exports, 'exports', targets)
   return targets
 }
 
@@ -37,11 +49,11 @@ function diagnostic(config: ResolvedDshxConfig, target: PackageTarget, message: 
 
 /** Verify every publish-facing package target after build materializes artifacts. */
 export async function checkPackageTargets(config: ResolvedDshxConfig): Promise<DshxDiagnostic[]> {
-  let manifest: Record<string, unknown>
+  let manifest: JsonDocumentObject
   try {
-    const parsed: unknown = JSON.parse(await readFile(config.packageFile, 'utf8'))
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new TypeError('package.json must contain an object')
-    manifest = parsed as Record<string, unknown>
+    const parsed = JsonDocumentModel.parse(await readFile(config.packageFile, 'utf8'))
+    if (!JsonDocumentModel.isObject(parsed)) throw new TypeError('package.json must contain an object')
+    manifest = parsed
   } catch (error) {
     return [
       {
@@ -59,7 +71,7 @@ export async function checkPackageTargets(config: ResolvedDshxConfig): Promise<D
   // A shared module other plugins import must be reachable through its own export subpath.
   for (const shared of config.modules ?? []) {
     const subpath = `./${shared.name}`
-    const exported = typeof manifest.exports === 'object' && manifest.exports !== null ? (manifest.exports as Record<string, unknown>)[subpath] : undefined
+    const exported = JsonDocumentModel.isObject(manifest.exports) ? manifest.exports[subpath] : undefined
     if (exported === undefined) {
       diagnostics.push({
         code: 'DSHX4192',

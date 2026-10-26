@@ -94,6 +94,27 @@ describe('deterministic manifest repair plan', () => {
     expect(plan.diagnostics).toContainEqual(expect.objectContaining({ code: 'DSHX4142', severity: 'warning' }))
   })
 
+  it('preserves arbitrary metadata and malformed fields while repairing only missing entries', async () => {
+    const root = await project()
+    const custom = { nested: [null, 7, true, { key: 'keep' }], constructor: { custom: false } }
+    await writeFile(
+      resolve(root, 'package.json'),
+      JSON.stringify({
+        name: 'repair-demo',
+        type: 'module',
+        custom,
+        dsh: { client: { inject: ['provider', null], immediately: 'not-boolean', custom } },
+      }),
+    )
+    const resolved = await resolveDshxConfig({ cwd: root })
+    const plan = await ManifestRepairService.createPlan(resolved)
+    const repaired = JSON.parse(plan.files[0]!.after)
+    expect(repaired).toMatchObject({ custom, dsh: { client: { inject: ['provider', null], immediately: 'not-boolean', custom } } })
+    await ManifestRepairService.applyPlan(plan)
+    expect(JSON.parse(await readFile(resolved.packageFile, 'utf8'))).toEqual(repaired)
+    expect((await ManifestRepairService.createPlan(resolved)).files).toEqual([])
+  })
+
   it('applies a reviewed plan without changing source files', async () => {
     const root = await project()
     const resolved = await resolveDshxConfig({ cwd: root })

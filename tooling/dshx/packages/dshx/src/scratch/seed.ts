@@ -654,7 +654,7 @@ const seedMultiHostHosts = async (state: ScratchState): Promise<void> => {
 
 const OTLP_SAMPLE_TRACE_ID = '5ca1ab1e0000400080000000000d5e11'
 
-const otlpSampleExport = (): unknown => {
+const otlpSampleExport = () => {
   const startNs = BigInt(Date.now() - 60_000) * 1_000_000n
   const at = (offsetMs: number): string => (startNs + BigInt(offsetMs) * 1_000_000n).toString()
   const text = (key: string, value: string) => ({ key, value: { stringValue: value } })
@@ -734,7 +734,7 @@ const otlpSampleExport = (): unknown => {
   }
 }
 
-const otlpSampleLogs = (): unknown => {
+const otlpSampleLogs = () => {
   const at = (offsetMs: number): string => ((BigInt(Date.now() - 60_000) + BigInt(offsetMs)) * 1_000_000n).toString()
   const record = (offsetMs: number, severityNumber: number, body: string, spanId: string | null, orderId: string) => ({
     timeUnixNano: at(offsetMs),
@@ -764,7 +764,7 @@ const otlpSampleLogs = (): unknown => {
   }
 }
 
-const otlpSampleMetrics = (offsetMs: number, requests: number): unknown => {
+const otlpSampleMetrics = (offsetMs: number, requests: number) => {
   const timeNs = ((BigInt(Date.now()) + BigInt(offsetMs)) * 1_000_000n).toString()
   const route = (value: string) => [{ key: 'http.route', value: { stringValue: value } }]
   return {
