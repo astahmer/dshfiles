@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { defineHost } from '@dshfiles/dshx/host'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { annotationsApi } from './api.js'
 import { INGEST_PATH, PAIR_PATH } from './limits.js'
@@ -45,9 +46,16 @@ const chromeState = async () => {
   const settings = currentSettings()
   const launched = launchedChrome()
   const endpoint = launched === undefined ? endpointOf({ port: settings.cdpPort }) : launched.endpoint
-  const reachable = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(1_000) })
-    .then(response => response.ok)
-    .catch(() => false)
+  const reachable = await withSpan('annotations probe chrome', { kind: 'client' }, async span => {
+    const response = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(1_000) }).catch(() => undefined)
+    if (response === undefined) {
+      span.setStatus('error', 'unavailable')
+      return false
+    }
+    span.setAttribute('http.response.status_code', response.status)
+    if (!response.ok) span.setStatus('error', 'http-error')
+    return response.ok
+  })
   const pages = launched === undefined ? [] : await listPages({ endpoint })
   const executable = chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath })
   return {

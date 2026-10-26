@@ -1,3 +1,4 @@
+import { withSpan } from '@dshfiles/dshx/tracing'
 import { PICK_BINDING, PICK_SOURCE } from './picker-source.js'
 import { annotationTargetSchema, type AnnotationTarget } from './schema.js'
 
@@ -32,100 +33,126 @@ export interface Cdp {
 
 /** Node 22 ships a browser-shaped `WebSocket`, so CDP needs no dependency. */
 export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; readonly timeoutMs?: number }): Promise<Cdp> =>
-  new Promise((resolve, reject) => {
-    const socket = new WebSocket(wsUrl)
-    const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
-    const listeners = new Map<string, Set<(params: Record<string, unknown>) => void>>()
-    let nextId = 1
-    let settled = false
+  withSpan(
+    'annotations open cdp',
+    { kind: 'client' },
+    () =>
+      new Promise<Cdp>((resolve, reject) => {
+        const socket = new WebSocket(wsUrl)
+        const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
+        const listeners = new Map<string, Set<(params: Record<string, unknown>) => void>>()
+        let nextId = 1
+        let settled = false
 
-    const timer = setTimeout(() => {
-      if (settled) return
-      settled = true
-      socket.close()
-      reject(new Error('cdp open timed out'))
-    }, timeoutMs)
+        const timer = setTimeout(() => {
+          if (settled) return
+          settled = true
+          socket.close()
+          reject(new Error('cdp open timed out'))
+        }, timeoutMs)
 
-    const finish = (error?: Error): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      if (error === undefined) resolve(api)
-      else reject(error)
-    }
-
-    const api: Cdp = {
-      send: (method, params) =>
-        new Promise((resolved, failed) => {
-          const id = nextId++
-          pending.set(id, { resolve: resolved, reject: failed })
-          socket.send(JSON.stringify({ id, method, ...(params === undefined ? {} : { params }) }))
-        }),
-      on: (method, handler) => {
-        const set = listeners.get(method) ?? new Set()
-        set.add(handler)
-        listeners.set(method, set)
-        return () => {
-          set.delete(handler)
+        const finish = (error?: Error): void => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          if (error === undefined) resolve(api)
+          else reject(error)
         }
-      },
-      close: () => {
-        socket.close()
-      },
-    }
 
-    socket.onopen = () => finish()
-    socket.onerror = () => finish(new Error('cdp websocket failed'))
-    socket.onclose = () => {
-      if (!settled) finish(new Error('cdp websocket closed'))
-      for (const waiter of pending.values()) waiter.reject(new Error('cdp websocket closed'))
-      pending.clear()
-    }
-    socket.onmessage = event => {
-      let message: CdpMessage
-      try {
-        message = JSON.parse(String(event.data)) as CdpMessage
-      } catch {
-        return
-      }
-      if (message.id !== undefined) {
-        const waiter = pending.get(message.id)
-        if (waiter === undefined) return
-        pending.delete(message.id)
-        if (message.error !== undefined) waiter.reject(new Error(message.error.message ?? 'cdp command failed'))
-        else waiter.resolve(message.result)
-        return
-      }
-      if (message.method === undefined) return
-      const set = listeners.get(message.method)
-      if (set === undefined) return
-      const params = typeof message.params === 'object' && message.params !== null ? (message.params as Record<string, unknown>) : {}
-      for (const handler of set) handler(params)
-    }
-  })
+        const api: Cdp = {
+          send: (method, params) =>
+            withSpan(
+              'annotations send cdp command',
+              { kind: 'client' },
+              () =>
+                new Promise((resolved, failed) => {
+                  const id = nextId++
+                  pending.set(id, { resolve: resolved, reject: failed })
+                  socket.send(JSON.stringify({ id, method, ...(params === undefined ? {} : { params }) }))
+                }),
+            ),
+          on: (method, handler) => {
+            const set = listeners.get(method) ?? new Set()
+            set.add(handler)
+            listeners.set(method, set)
+            return () => {
+              set.delete(handler)
+            }
+          },
+          close: () => {
+            socket.close()
+          },
+        }
 
-export const listPages = async ({ endpoint }: { readonly endpoint: string }): Promise<CdpPage[]> => {
-  const response = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(2_000) }).catch(() => undefined)
-  if (response === undefined || !response.ok) return []
-  const targets = (await response.json().catch(() => [])) as unknown
-  if (!Array.isArray(targets)) return []
-  const pages: CdpPage[] = []
-  for (const entry of targets) {
-    if (typeof entry !== 'object' || entry === null) continue
-    const target = entry as Record<string, unknown>
-    const wsUrl = target.webSocketDebuggerUrl
-    if (target.type !== 'page' || typeof wsUrl !== 'string' || typeof target.id !== 'string') continue
-    const url = typeof target.url === 'string' ? target.url : ''
-    if (!/^(https?|file):/i.test(url)) continue
-    pages.push({
-      id: target.id,
-      title: typeof target.title === 'string' && target.title.length > 0 ? target.title : url,
-      url,
-      wsUrl,
+        socket.onopen = () => finish()
+        socket.onerror = () => finish(new Error('cdp websocket failed'))
+        socket.onclose = () => {
+          if (!settled) finish(new Error('cdp websocket closed'))
+          for (const waiter of pending.values()) waiter.reject(new Error('cdp websocket closed'))
+          pending.clear()
+        }
+        socket.onmessage = event => {
+          let message: CdpMessage
+          try {
+            message = JSON.parse(String(event.data)) as CdpMessage
+          } catch {
+            return
+          }
+          if (message.id !== undefined) {
+            const waiter = pending.get(message.id)
+            if (waiter === undefined) return
+            pending.delete(message.id)
+            if (message.error !== undefined) waiter.reject(new Error(message.error.message ?? 'cdp command failed'))
+            else waiter.resolve(message.result)
+            return
+          }
+          if (message.method === undefined) return
+          const set = listeners.get(message.method)
+          if (set === undefined) return
+          const params = typeof message.params === 'object' && message.params !== null ? (message.params as Record<string, unknown>) : {}
+          for (const handler of set) handler(params)
+        }
+      }),
+  )
+
+export const listPages = async ({ endpoint }: { readonly endpoint: string }): Promise<CdpPage[]> =>
+  withSpan('annotations list chrome pages', { kind: 'client' }, async span => {
+    const response = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(2_000) }).catch(() => {
+      span.setStatus('error', 'unavailable')
+      return undefined
     })
-  }
-  return pages
-}
+    if (response === undefined) return []
+    span.setAttribute('http.response.status_code', response.status)
+    if (!response.ok) {
+      span.setStatus('error', 'http-error')
+      return []
+    }
+    const targets: unknown = await response.json().catch(() => {
+      span.setStatus('error', 'invalid-response')
+      return []
+    })
+    if (!Array.isArray(targets)) {
+      span.setStatus('error', 'invalid-response')
+      return []
+    }
+    const pages: CdpPage[] = []
+    for (const entry of targets) {
+      if (typeof entry !== 'object' || entry === null) continue
+      const target = entry as Record<string, unknown>
+      const wsUrl = target.webSocketDebuggerUrl
+      if (target.type !== 'page' || typeof wsUrl !== 'string' || typeof target.id !== 'string') continue
+      const url = typeof target.url === 'string' ? target.url : ''
+      if (!/^(https?|file):/i.test(url)) continue
+      pages.push({
+        id: target.id,
+        title: typeof target.title === 'string' && target.title.length > 0 ? target.title : url,
+        url,
+        wsUrl,
+      })
+    }
+    span.setAttribute('dshx.annotations.pages', pages.length)
+    return pages
+  })
 
 export const endpointOf = ({ port }: { readonly port: number }): string => `http://127.0.0.1:${port}`
 

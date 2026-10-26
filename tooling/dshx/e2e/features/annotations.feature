@@ -17,6 +17,15 @@ Feature: Element annotations in the composer
     When the annotations are added to the draft
     Then the composer draft holds the annotation block
 
+  @scenario:annotations.source-resolution
+  Scenario: Resolve a picked element to its plugin source file
+    Given the isolated plugin profile "@dshfiles/annotations" is booted
+    Then the composer shows the annotate action
+    When the element picker starts and the composer is picked
+    And the annotation note "resolve this element to its source" is added
+    Then the annotation is listed with the note "resolve this element to its source"
+    And the annotation is linked to its source file
+
   @scenario:annotations.preview-element
   Scenario: Annotate an element inside an HTML preview
     Given the isolated plugin profile "@dshfiles/annotations" is booted

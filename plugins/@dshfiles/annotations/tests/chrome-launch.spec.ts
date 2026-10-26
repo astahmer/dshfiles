@@ -64,7 +64,7 @@ describe('launchChrome', () => {
   it('creates the profile directory before spawning', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'dsh-launch-'))
     const profileDir = join(directory, 'nested', 'chrome-profile')
-    await expect(launchChrome({ executable: '/bin/echo', port: 1, profileDir, timeoutMs: 300 })).rejects.toThrow(
+    await expect(launchChrome({ executable: process.execPath, port: 1, profileDir, timeoutMs: 300 })).rejects.toThrow(
       /Chrome exited right after launch|debugging port/,
     )
     expect(existsSync(profileDir)).toBe(true)
@@ -73,7 +73,7 @@ describe('launchChrome', () => {
 
   it.skipIf(process.platform === 'win32')('records the launch span and fails fast when no port opens', async () => {
     using recorder = recordSpans()
-    await expect(launchChrome({ executable: '/bin/echo', port: 1, profileDir: '/tmp/dsh-chrome-probe', timeoutMs: 300 })).rejects.toThrow(
+    await expect(launchChrome({ executable: process.execPath, port: 1, profileDir: '/tmp/dsh-chrome-probe', timeoutMs: 300 })).rejects.toThrow(
       /Chrome exited right after launch|debugging port/,
     )
     expect(recorder.span('annotations launch chrome')).toBeDefined()

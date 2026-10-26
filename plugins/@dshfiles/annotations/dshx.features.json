@@ -97,6 +97,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "annotations.source-resolution",
+          "featureFile": "tooling/dshx/e2e/features/annotations.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "annotations.source-class-map",
           "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
@@ -352,6 +357,30 @@
           "span": "annotations launch chrome",
           "file": "plugins/@dshfiles/annotations/tests/chrome-launch.spec.ts",
           "testName": "records the launch span and fails fast when no port opens"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations list chrome pages",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp-tracing.spec.ts",
+          "testName": "records the page-list span with counts but no endpoint or page content"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations open cdp",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp-tracing.spec.ts",
+          "testName": "records connection and command spans around their actual completion"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations send cdp command",
+          "file": "plugins/@dshfiles/annotations/tests/chrome-cdp-tracing.spec.ts",
+          "testName": "records connection and command spans around their actual completion"
+        },
+        {
+          "kind": "custom",
+          "span": "annotations probe chrome",
+          "file": "plugins/@dshfiles/annotations/tests/host-tracing.spec.ts",
+          "testName": "records the Chrome version probe under its API span without response content"
         }
       ]
     }

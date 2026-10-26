@@ -3,6 +3,7 @@ import { performance } from 'node:perf_hooks'
 import { pathToFileURL } from 'node:url'
 import { chromium } from '@playwright/test'
 import { z } from 'zod'
+import { chromiumLaunchOptions } from '../packages/dshx/dist/project/chromium-launch-options.js'
 
 export const probeBrowserCache = async () => {
   const assetCount = 12
@@ -28,7 +29,7 @@ export const probeBrowserCache = async () => {
     })
     const address = z.object({ port: z.number().int().positive() }).parse(server.address())
     const origin = `http://127.0.0.1:${address.port}`
-    browser = await chromium.launch()
+    browser = await chromium.launch(await chromiumLaunchOptions())
     const scenarios = []
     for (const mode of ['route-free-controlled', 'routed-functional', 'unrelated-route']) {
       const context = await browser.newContext({ serviceWorkers: 'block' })
