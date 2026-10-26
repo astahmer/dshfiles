@@ -12,11 +12,13 @@ let pluginQueryClientInstance: QueryClient | undefined
  * chunk, so every slot of a plugin shares a cache and no two plugins do.
  * Host calls are local RPC, so a failure is rarely transient — retry once,
  * and leave focus refetching off because the Host pushes its own updates.
+ * Thirty seconds of staleness keeps a remounting panel from re-reading what it
+ * already has; mutations invalidate their keys and live views poll explicitly.
  */
 export const pluginQueryClient = (): QueryClient => {
   pluginQueryClientInstance ??= new QueryClient({
     defaultOptions: {
-      queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 5_000 },
+      queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000 },
       mutations: { retry: false },
     },
   })

@@ -13,6 +13,7 @@ import type {
   ApiQueryResult,
 } from './types.js'
 import { ApiProtocolModel } from './common.js'
+import { ApiQueryCache } from './query-cache.js'
 import { ApiRuntimeModel, type ContextLike } from './runtime.js'
 
 type ReactRuntime = typeof import('react')
@@ -172,6 +173,8 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     error: null,
   })
   const fingerprint = runtime().useMemo(() => stableJson(input), [input])
+  const cacheKey = `${contract.id}\u0000${method}\u0000${fingerprint}`
+  const staleTime = options?.staleTime ?? 30_000
   const [revision, setRevision] = runtime().useState(0)
   const manualRevision = runtime().useRef(0)
 
@@ -183,6 +186,13 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
         previous.status === 'success' ? { ...previous, fetchStatus: 'idle' } : { status: 'pending', fetchStatus: 'idle', data: undefined, error: null },
       )
       return undefined
+    }
+    if (!manuallyRequested && revision === 0) {
+      const cached = ApiQueryCache.read(cacheKey, staleTime)
+      if (cached !== undefined) {
+        setState({ status: 'success', fetchStatus: 'idle', data: cached as ApiClientOutput<Methods[K]>, error: null })
+        return undefined
+      }
     }
     let manualPending = manuallyRequested
     return ApiClientLifecycle.startQuery<ApiClientOutput<Methods[K]>>({
@@ -212,10 +222,13 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
         }),
       invoke: signal => {
         const query: ApiQueryMethod<Methods[K]> = { call: api[method] }
-        return query.call(input, { signal })
+        return query.call(input, { signal }).then(value => {
+          ApiQueryCache.write(cacheKey, value)
+          return value
+        })
       },
     })
-  }, [api, method, fingerprint, revision, options?.enabled, options?.signal])
+  }, [api, method, cacheKey, revision, staleTime, options?.enabled, options?.signal])
 
   const refetch = runtime().useCallback(() => {
     setRevision(value => {
