@@ -1,137 +1,137 @@
 # Lint cleanup campaign
 
-Resume here: rule batches run in the order below. After each batch, update its
-row, lower the rule's cap in `scripts/lint-ratchet.json` to the measured count,
-and land one described revision.
+Resume here: the assembled state lives on `local-spine` as `jj:d2fc3d02`
+(parent `jj:rwrpvyos`, the merge that brought the campaign into local-spine).
+`pnpm --dir plugins run typecheck` is green (145/145 tasks) on that commit.
+The lint gate is **not** green yet — see "Blocking the gate".
 
 ## Why
 
-`jj:69e796bf` ("chore(lint): fix the error findings and adopt the measured
-ratchet baseline") raised every warning cap to its measured count. The gate is
-green, but 2894 findings remain accepted as baseline (oxlint 2433, ast-grep
-461). This campaign removes them with real code fixes and ratchets each cap down
-as its rule empties. Caps only ever move down; no rule is disabled and no path
-is excluded.
+`chore(lint): fix the error findings and adopt the measured ratchet baseline`
+raised every warning cap to its measured count. The gate went green while ~2900
+findings stayed accepted as baseline. This campaign removes them with real code
+fixes and ratchets each cap down as a rule empties. No rule is disabled and no
+path is excluded.
 
-## Measurement
+## Where it stands
 
-```sh
-pnpm lint                                    # per-rule count vs cap
-pnpm exec oxlint tooling/dshx/packages plugins scripts apps/desktop/src \
-  --config .oxlintrc.json --format json > /tmp/oxlint.json
-pnpm sg                                      # every ast-grep match
-```
+Measured on `jj:d2fc3d02`:
 
-## Progress
+| Checker  | Start | Now |
+| -------- | ----- | --- |
+| oxlint   | 2433  | 969 |
+| ast-grep | 461   | 166 |
 
-Campaign start: 2894 accepted findings (oxlint 2433, ast-grep 461). Now 1987
-(oxlint 1736, ast-grep 251).
+Per rule (oxlint): `no-native-title` 309 → 92, `require-safety-comment` 387 →
+323, `no-unknown-parameters` 224 → 167, `no-unsafe-dictionary-type` 237 → 155,
+`no-unknown-returns` 136 → 106, `no-known-value-widening` 183 → 72,
+`no-runtime-typeof` 386 → 20, `no-conditional-empty-object-spread` 539 → 24.
 
-| Rule                                                | Start | Now | State       |
-| --------------------------------------------------- | ----- | --- | ----------- |
-| ast-grep(no-deeply-nested-ternary)                  | 7     | 0   | done        |
-| ast-grep(no-deeply-nested-ternary-tsx)              | 12    | 0   | done        |
-| ast-grep(no-wildcard-export)                        | 1     | 0   | done        |
-| ast-grep(no-export-from)                            | 179   | 0   | done        |
-| ast-grep(no-direct-json-parse)                      | 258   | 247 | in progress |
-| ast-grep(no-direct-json-parse-tsx)                  | 4     | 4   | todo        |
-| antislop(no-conditional-empty-object-spread)        | 539   | 0   | done        |
-| antislop(require-safety-comment-for-type-assertion) | 387   | 385 | todo        |
-| antislop(no-runtime-typeof)                         | 386   | 381 | next        |
-| ui-guidance(no-native-title)                        | 309   | 309 | todo        |
-| antislop(no-unsafe-dictionary-type)                 | 237   | 218 | todo        |
-| antislop(no-unknown-parameters)                     | 224   | 224 | todo        |
-| antislop(no-known-value-widening)                   | 183   | 96  | in progress |
-| antislop(no-unknown-returns)                        | 136   | 123 | todo        |
-| react(purity)                                       | 19    | 0   | done        |
-| react-hooks(exhaustive-deps)                        | 13    | 0   | done        |
+Already at zero: nested ternaries, `no-export-from`, `no-wildcard-export`,
+`react(purity)`, `no-passthrough-variable`, `no-chained-type-assertions`.
 
-## Landed batches
+ast-grep: `no-direct-json-parse` 258 → 164 (162 ts + 2 tsx),
+`no-deeply-nested-ternary-tsx` 2 left.
 
-1. `chore(lint): decode tooling JSON through one validated boundary` — scripts
-   + `plugins/scripts`, one `decodeJson`/`decodeJsonSafe` in `scripts/json.ts`;
-   package entry points declared as ast-grep boundaries.
-2. `chore(dshx): keep type evidence instead of widening it` — 90
-   known-value-widening findings, 11 internal barrels deleted, importers on
-   defining modules.
-3. `chore(plugins): clear the owned plugins' baseline lint findings` — nested
-   ternaries, render-time clocks and hook dependencies, conditional spreads,
-   and barrel importers across the owned plugins.
-4. Caps ratcheted to the measured counts (below).
+Remainder by package: dshx 76, ai-accounts 26, multi-host 11, thread-sidebar 10,
+traces 10, annotations 8, jj-integration 5, create-dshx 3, backlog 3, plugin-ui
+2, project-checks 2, plugin-marketplace 2.
 
-## Next
+## Blocking the gate
 
-1. **no-runtime-typeof** — decision taken: enable the rule's own
-   `allowInTypeGuards`, `allowWhenStaticallyTyped` and
-   `allowInBoundaryFunctions` options (341 of 386 checks sit in the decoders the
-   rule classifies as boundaries), then fix the ~30 that remain by decoding at
-   the call site.
-2. **no-direct-json-parse** — same `decodeJson` boundary for dshx (one module,
-   imported by src and tests) and for the plugins that parse stored JSON.
-3. **no-unsafe-dictionary-type / no-unknown-parameters / no-unknown-returns** —
-   `JsonValue` (already schema-backed in dshx) for transport payloads, named
-   interfaces for internal values; add `JsonValue`/`JsonObject` to the shared
-   boundary rather than repeating `Record<string, unknown>`.
-4. **require-safety-comment-for-type-assertion** — remove assertions a schema or
-   guard already establishes; add a `SAFETY:` comment only where the invariant
-   is real and not expressible in the type.
-5. **no-native-title** — Tooltip for hover help, `heading`/`label` rename for
-   section labels, with a screenshot refresh per the plugin-UI contract.
+`pnpm lint` exits 1 on ten findings, all in the error-level slot:
 
-## Decisions
+1. `plugins/@dshfiles/annotations/src/{descriptor,redact,http,chrome-cdp,chrome-launch,source,sourcemap}.ts`
+   — `antislop/no-export-bag` (cap 0). The annotations repair restored the
+   namespace-bag design from the package's own build maps, but these seven files
+   each export a helper set the rule wants grouped under one namespace class.
+   Finish the bag refactor (call sites are inside the package plus
+   `ui/picker-overlay.tsx`) or declare them boundaries.
+2. `plugins/@dshfiles/annotations/src/descriptor.ts:9` — `no-reflect-get`;
+   replace `Reflect.get` with typed property access.
+3. `plugins/@dshfiles/thread-sidebar/src/subagent-provenance/SubagentHeaderLineage.tsx:13`
+   — unused `TooltipProvider` import left over from the `NativeTooltip` fix.
+4. `plugins/@dshfiles/annotations/src/ui/annotations-action.tsx:58` —
+   `react-hooks/exhaustive-deps` (cap 0): the effect is missing `list`.
 
-These are campaign-wide, so later batches do not re-litigate them:
+All four are mechanical.
 
-- **Public package entries are boundaries.** A file that is the target of its
-  package's `exports`/`main` (a barrel whose only job is to publish the package
-  surface) is a declared public boundary. It joins `astGrepBoundaries` in
-  `scripts/lint-ratchet.ts` with the package it serves. Internal directory
-  barrels that merely aggregate a folder are not boundaries: their importers
-  move to the defining modules and the barrel is deleted.
-- **One JSON boundary per runtime.** JSON text becomes a value in one place per
-  runtime (Node and browser), through that module's schema-validated decoder.
-  That module is the documented boundary for `no-direct-json-parse`; call sites
-  pass a schema and stop calling `JSON.parse` themselves.
-- **Dynamic transport payloads are `JsonValue`, not `unknown`.** `JsonValue`
-  already ships with its schema in dshx `platform/client.ts`; plugins that take
-  arbitrary payloads use a schema-derived value type of their own. Internal
-  values get a named interface, never `Record<string, unknown>`.
-- **`title=` replacement is per element.** Intrinsic/`Button`/`span` hover help
-  becomes plugin-ui `Tooltip`; a component prop that merely labels a section or
-  card (e.g. `Breakdown title=`) is renamed to `heading`/`label` so it stops
-  looking like hover help.
+## Landed
 
-## Per-rule approach
+1. `chore(lint): decode tooling JSON through one validated boundary` — one
+   `decodeJson`/`decodeJsonSafe` in `scripts/json.ts`; package export-map entry
+   points declared as ast-grep boundaries.
+2. `feat(dshx): expose one validated JSON decode boundary` — `@dshfiles/dshx/json`
+   publishes `decodeJson`, `decodeJsonSafe`, `JsonValue`, `JsonObject`,
+   `jsonValueSchema`, `jsonObjectSchema`. The Host build inlines it through a
+   virtual module (`DSHX_JSON_PUBLIC`), which is what stops `DSHX1302` on every
+   Host bundle that decodes JSON.
+3. `chore(lint): use the typeof rule's boundary options` — 386 → 28, then the
+   last 28 decoded at their call sites (0).
+4. `fix(plugins): keep the vendored host entries visible to knip`.
+5. `chore(lint): clear the ratcheted findings across the baseline` and
+   `chore(lint): finish the baseline-warnings sweep on local-spine` — the
+   verified per-package work (dshx, annotations, ai-accounts, memory, jujutsu,
+   thread-sidebar, traces, marketplace, agent-*, backlog, plugin-ui, ~20 small
+   plugins) plus the `ProjectFolderPicker`/`CommandDialog` `title` → `heading`
+   rename.
 
-- **no-deeply-nested-ternary** — replace 3+ level cascades with early returns
-  in a named helper, or a `Record`/switch. Two-level ternaries stay.
-- **react(purity)** — `Date.now()`/`new Date()` in render: derive the instant
-  once in state/effect, or take it from props; never call it per render.
-- **react-hooks(exhaustive-deps)** — depend on the stable member the effect
-  calls (`mutation.reset`), or move the unstable expression into `useCallback`
-  / `useMemo` inputs; never silence with a disable.
-- **no-export-from / no-wildcard-export** — implementation modules stop
-  forwarding: consumers import from the defining module. A file that is the
-  export-map target of a package is a public boundary; declare it in
-  `astGrepBoundaries` in `scripts/lint-ratchet.ts` with the package it serves
-  rather than leaving a silent cap.
-- **no-direct-json-parse** — decode through the owning schema (`zod` / dshx
-  schema) at the boundary; test fixtures may reuse the production schema or a
-  local fixture schema in the test file.
-- **no-conditional-empty-object-spread** — build the object, then add optional
-  properties in a statement, or construct the narrowed object in one place.
-- **require-safety-comment-for-type-assertion** — remove the assertion when a
-  schema/guard already produces the type; otherwise add a `SAFETY:` comment
-  saying why the assertion holds.
-- **no-runtime-typeof** — decode external values at their I/O boundary; inside
-  a domain function branch on the parsed value. Enable
-  `allowInTypeGuards`/`allowWhenStaticallyTyped` only where the rule's own
-  options describe the existing guard.
-- **no-native-title** — replace `title=` with the plugin-ui `Tooltip` (or the
-  component's existing accessible label), never a raw native tooltip.
-- **no-unsafe-dictionary-type** — replace `Record<string, unknown>`/`any`
-  values with an owner contract or a schema-derived value type.
-- **no-unknown-parameters / no-unknown-returns / no-known-value-widening** —
-  parse at the boundary and name the result; drop annotations that discard
-  evidence; use `satisfies` when only checking shape.
-- **react-hooks(exhaustive-deps)** — see above.
+## Remaining work, in order
+
+1. **The ten error-level findings above** — the gate cannot pass without them.
+2. **dshx (76 ast-grep + oxlint tail)** — `no-direct-json-parse` in
+   `src/project/*`, `src/communication/bridge.ts`, `src/platform/*` and the dshx
+   tests, then the antislop tail. A 32-file overlay that reached 0 for most of
+   them was kept in `/tmp/bak-dshx` (may not survive a reboot; regenerate from
+   the tree if gone).
+3. **ai-accounts (26)** — the 21 tooltip files are in; what is left is
+   `api-key-setup-dialog.tsx` plus the antislop tail.
+4. **multi-host (11), thread-sidebar (10), traces (10), annotations (8)** —
+   mostly `no-direct-json-parse` and `unknown` parameters.
+5. **The long tail** — `no-native-title` 92, `require-safety-comment` 323,
+   `no-unknown-parameters` 167, `no-unsafe-dictionary-type` 155,
+   `no-unknown-returns` 106, `no-known-value-widening` 72,
+   `no-conditional-empty-object-spread` 24, `no-runtime-typeof` 20.
+6. **Ratchet the caps** to the measured counts once the tail is done, then
+   re-run `pnpm lint`.
+
+## Decisions (do not re-litigate)
+
+- **Public package entries are boundaries.** A file that is its package's
+  `exports`/`main` target is a declared public boundary and joins
+  `astGrepBoundaries` in `scripts/lint-ratchet.ts`. Internal directory barrels
+  are not: importers move to the defining modules and the barrel dies.
+- **One JSON boundary per runtime.** `scripts/json.ts` for repository scripts,
+  `@dshfiles/dshx/json` for package and plugin code. Call sites pass the owning
+  schema; nobody calls `JSON.parse` directly. A browser-reachable dshx module
+  must not import zod — keep the decode Host-side or use a local predicate.
+- **Transport payloads are `JsonValue`, not `unknown`.** Internal values get a
+  named interface.
+- **`title=` is hover help only.** Hover help becomes the plugin-ui `Tooltip`;
+  a prop that labels a section, card or dialog is renamed `heading`/`label`
+  (`ProjectFolderPicker`, `CommandDialog`, `ToolCard`, `Breakdown`).
+- **`typeof` inside a decoder is fine.** `allowInTypeGuards`,
+  `allowWhenStaticallyTyped` and `allowInBoundaryFunctions` are enabled; a
+  `typeof` in the middle of domain code is not.
+
+## Hazards (read before resuming)
+
+- **Another workspace reconciles this repo's working copy.** During this
+  campaign `thread-1a2080` ran `jj` operations that repeatedly force-checked-out
+  this workspace, silently reverting in-flight edits (twice destroying ~40 files
+  each time). What worked: never let a subagent run `jj`; back every finished
+  file up under `/tmp`; commit early; treat the `/tmp/bak-*` overlays as the
+  source of truth when the tree disagrees.
+- `jj status` snapshots the working copy; a snapshot taken while an external
+  process is mid-checkout can resurrect stale content.
+- Rebuild `tooling/dshx/packages/dshx/dist` after touching dshx sources, before
+  any plugin build or typecheck that resolves `@dshfiles/dshx/*`.
+- Screens are due a refresh after the Tooltip conversions: jj-integration Thread
+  Workspaces panel / destination bar / thread-control popover / notices /
+  log-download row; traces panel, span detail, logs, metrics; plugin-marketplace
+  cards + toolbar; agent-communication activity and compose rows;
+  agent-toolkit tables; agents reference preview; ai-accounts accounts page,
+  usage strip/popover, models page, settings, edge widget, API-key picker;
+  memory header, notes tab, analytics tab, reference preview. `pnpm screenshots`
+  captures them from a scratch DSH; `node --run check:screenshots` only checks
+  presence.
