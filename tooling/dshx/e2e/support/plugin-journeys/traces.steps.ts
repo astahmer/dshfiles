@@ -20,7 +20,7 @@ const openTraces = async (page: Page): Promise<void> => {
 const receiverEndpoint = async (page: Page): Promise<string> => {
   const badge = page.getByTestId('traces-receiver-state')
   await expect(badge).toHaveAttribute('data-state', 'listening', { timeout: 30_000 })
-  const endpoint = await badge.getAttribute('title')
+  const endpoint = await badge.getAttribute('data-endpoint')
   expect(endpoint).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
   return endpoint ?? ''
 }

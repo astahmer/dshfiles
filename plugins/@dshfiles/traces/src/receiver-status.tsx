@@ -16,7 +16,7 @@ export const ReceiverBadge = (props: { readonly status: ReceiverStatus; readonly
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="dshx:inline-flex">
-            <Badge variant="success" data-testid="traces-receiver-state" data-state="listening">
+            <Badge variant="success" data-testid="traces-receiver-state" data-state="listening" data-endpoint={endpoint}>
               {props.t('receiverListening')} <span className="dshx:font-mono">{endpoint}</span>
             </Badge>
           </span>

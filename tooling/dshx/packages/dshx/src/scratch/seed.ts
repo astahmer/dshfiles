@@ -83,9 +83,7 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   // name and shows only the model id.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)
   const bareModelWord = new RegExp(`(?:^|[\\s/])${bareModelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
-  const routeOption = input.page
-    .getByRole('menuitemradio', { name: modelId, exact: true })
-    .or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
+  const routeOption = input.page.getByRole('menuitemradio', { name: modelId, exact: true }).or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
   await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
   await routeOption.first().click({ timeout: input.timeoutMs })
 
@@ -1042,7 +1040,7 @@ const tracesReceiverEndpoint = async (input: {
   await page.waitForFunction(() => document.querySelector('[data-testid="traces-receiver-state"]')?.getAttribute('data-state') !== 'starting', undefined, {
     timeout: timeoutMs,
   })
-  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('title') : null
+  const endpoint = (await badge.getAttribute('data-state')) === 'listening' ? await badge.getAttribute('data-endpoint') : null
   if (endpoint === null) {
     throw new ScratchError(
       'seed-receiver-not-listening',

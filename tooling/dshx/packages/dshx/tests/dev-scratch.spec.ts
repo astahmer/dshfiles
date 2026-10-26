@@ -79,6 +79,52 @@ describe('dshx dev scratch commands', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
   })
 
+  it('posts synthetic OTLP data to the endpoint carried by the receiver badge', async () => {
+    const browser = await chromium.launch({ headless: true })
+    const page = await browser.newPage()
+    const postedUrls: string[] = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      postedUrls.push(String(input))
+      return new Response('{}', { status: 200 })
+    })
+    try {
+      await page.setContent(`
+        <nav aria-label="Global panels"><button type="button">Traces</button></nav>
+        <div data-testid="traces-receiver-state" data-state="listening" data-endpoint="http://127.0.0.1:4318">listening</div>
+        <button role="tab">Chat</button>
+      `)
+      const cwd = process.cwd()
+      const state: ScratchState = {
+        schemaVersion: 1,
+        name: 'trace-seed-test',
+        createdAt: new Date().toISOString(),
+        stateDir: cwd,
+        home: cwd,
+        profile: 'dshx-test',
+        port: 3199,
+        origin: 'http://127.0.0.1:3199',
+        launchUrl: 'http://127.0.0.1:3199/?token=unused',
+        bundles: ['@dshfiles/traces'],
+        expectedClientEntries: ['@dshfiles/traces'],
+        project: { path: cwd, workspaceId: 'sample', ownedByScratch: true },
+        host: { pid: 1, signature: ['dshx-test'] },
+        browser: { pid: 2, signature: ['browser-host.js'], cdpPort: 3200 },
+        hostLog: cwd,
+        browserLog: cwd,
+        browserEvents: cwd,
+        evidenceDir: cwd,
+      }
+      await ScratchSeedRuntime.applySeed({ state, seed: 'otlp-sample-trace', page, timeoutMs: 1_000 })
+      expect(postedUrls).toHaveLength(6)
+      expect(postedUrls).toContain('http://127.0.0.1:4318/v1/traces')
+      expect(postedUrls).toContain('http://127.0.0.1:4318/v1/logs')
+      expect(postedUrls.filter(url => url.endsWith('/v1/metrics'))).toHaveLength(4)
+    } finally {
+      fetchMock.mockRestore()
+      await browser.close()
+    }
+  })
+
   it('attaches scratch fixtures through the composer file input', async () => {
     const browser = await chromium.launch({ headless: true })
     try {
