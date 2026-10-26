@@ -16,7 +16,7 @@ const lanHost = Object.values(networkInterfaces())
   .flat()
   .find(address => address?.family === 'IPv4' && !address.internal)?.address
 
-async function mountRuntime(bindAddress: string, localhostEnabled: boolean) {
+async function mountRuntime(bindAddress: string, localhostEnabled: boolean, freshDefaults = false) {
   const host = await createTestHost()
   const reservations: ReturnType<typeof createServer>[] = []
   const releaseReservations = () => Promise.all(reservations.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve()))))
@@ -52,7 +52,8 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean) {
       overlays: [],
       telemetryDisabledEnv: undefined,
     })
-    host.ctx.provide('webStartup', {})
+    // A fresh-defaults test overrides only the port to avoid touching a live listener.
+    host.ctx.provide('webStartup', freshDefaults ? { port: 0 } : {})
     const loader = host.ctx.loader
     const editor = new ConfigEditor(host.ctx)
     const settings = new SettingsForms(host.ctx)
@@ -70,7 +71,9 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean) {
       {
         id: NETWORK_SETTINGS_NAMESPACE,
         name: 'cordis:required-localhost-startup',
-        config: { lanEnabled: bindAddress !== '127.0.0.1', bindAddress: bindAddress === '127.0.0.1' ? null : bindAddress, port, localhostEnabled },
+        config: freshDefaults
+          ? {}
+          : { lanEnabled: bindAddress !== '127.0.0.1', bindAddress: bindAddress === '127.0.0.1' ? null : bindAddress, port, localhostEnabled },
       },
     ])
     await loader.await()
@@ -102,6 +105,29 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean) {
 }
 
 describe('required localhost native Host lifecycle', () => {
+  it('keeps a fresh profile localhost-only with LAN off and no localhost-disable preference', async () => {
+    const runtime = await mountRuntime('127.0.0.1', false, true)
+    const client = new Socket()
+    client.on('error', () => undefined)
+    try {
+      const snapshot = runtime.controller.snapshot()
+      expect(runtime.host.ctx.dshfilesNetworkStartup.preferences).toEqual({ lanEnabled: null, bindAddress: null, port: null })
+      expect(runtime.settings.describe().find(item => item.ns === NETWORK_SETTINGS_NAMESPACE)?.value).not.toHaveProperty('localhostEnabled')
+      expect(snapshot).toMatchObject({
+        saved: { lanEnabled: false, localhostEnabled: true, bindAddress: null },
+        active: { host: '127.0.0.1', localhostEnabled: true },
+        pendingRestart: false,
+      })
+      expect(runtime.host.ctx.dshfilesLoopbackAccess.status()).toMatchObject({ state: 'native-loopback', listeners: [] })
+      const connected = once(client, 'connect', { signal: AbortSignal.timeout(2_000) })
+      client.connect({ host: '127.0.0.1', port: snapshot.active.port })
+      await connected
+    } finally {
+      client.destroy()
+      await runtime.host.dispose()
+    }
+  })
+
   it('opens loopback despite legacy false and releases adjunct sockets without disposing LAN', async ({ skip }) => {
     if (lanHost === undefined) return skip()
     const runtime = await mountRuntime(lanHost, false)

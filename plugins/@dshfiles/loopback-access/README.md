@@ -13,6 +13,8 @@ it needs no systemd, launchd, shell utility, fixed LAN IP, or fixed port.
 Settings → **Network access** lets you enable LAN access, explicitly choose an
 available interface address, and set an advanced port. **Localhost stays enabled**
 whether LAN access is on or off; there is no localhost-disable option.
+A fresh profile is **localhost-only** (`127.0.0.1`): LAN access is off unless you
+explicitly enable it or supply an explicit native `--host` override.
 **Save** stages validated, revision-checked preferences without changing
 active listeners or disconnecting clients. A later user-controlled restart loads
 them. Explicit native `--host` / `--port` flags retain priority. Missing addresses
