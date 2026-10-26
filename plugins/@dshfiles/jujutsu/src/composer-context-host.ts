@@ -103,7 +103,7 @@ const operationHeads = (root: string): string | null => {
 
 /** Read-only JJ context for the composer: one snapshotting read, then parallel reads that skip the working copy. */
 /** Memoized JJ reads: in-flight reads are shared, snapshotting reads last two seconds, view reads one operation head. */
-export const composerReads = (directRun: RunJj): RunJj => {
+const composerReads = (directRun: RunJj): RunJj => {
   const readResults = new Map<string, { readonly value: Awaited<ReturnType<RunJj>>; readonly at: number }>()
   const readsInFlight = new Map<string, Promise<Awaited<ReturnType<RunJj>>>>()
   return (ctx, cwd, args, signal, options) => {
@@ -125,93 +125,112 @@ export const composerReads = (directRun: RunJj): RunJj => {
   }
 }
 
-export const composerContextHost = (directRun: RunJj) => {
+/** One composer snapshot for a Session cwd; exported so its decoders are tested without a Host. */
+const readComposerContext = async (
+  args: {
+    readonly input: { readonly cwd: string; readonly base: ComposerBase }
+    readonly ctx: Context
+    readonly signal: AbortSignal | undefined
+  },
+  run: RunJj,
+) => {
+  const { input, ctx, signal } = args
+  const root = await workspaceRoot(ctx, run, input.cwd, signal)
+  if (root === null) return { repository: null }
+  const headResult = await run(ctx, root, ['log', '--no-graph', '--revisions', '@', '--template', COMPOSER_HEAD_TEMPLATE], signal, { outputLimit: 64_000 })
+  const head = JujutsuOutputModel.parseJsonLines(headResult.stdout, value => headSchema.parse(value))[0]
+  if (head === undefined) return { repository: null }
+  const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
+  const range = ComposerContextModel.composerDiffRange(input.base)
+  const [nearest, baseTarget, baseRevision, stat, files, localBookmarks, remoteBookmarks, workspaces] = await Promise.all([
+    read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
+    read(
+      ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE],
+      16_000,
+    ).catch(() => null),
+    read(
+      ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', 'commit_id ++ "\\n"'],
+      256,
+    ).catch(() => null),
+    read(['diff', ...range, '--stat'], 256_000).catch(() => null),
+    read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
+    read(['bookmark', 'list', '--template', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
+    read(['log', '--no-graph', '--revisions', 'remote_bookmarks()', '--template', COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
+    read(['workspace', 'list', '--template', COMPOSER_WORKSPACE_TEMPLATE], 16_000).catch(() => null),
+  ])
+  const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
+    result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
+  const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
+  const targetBookmarks = baseTarget === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
+  const baseRevisionIds =
+    baseRevision === null || baseRevision.truncated || baseRevision.stdout.trim().length === 0
+      ? []
+      : baseRevisionIdsSchema.parse(baseRevision.stdout.trim().split('\n'))
+  const resolvedBaseCommitId = baseRevisionIds.length === 1 ? baseRevisionIds[0] : undefined
+  const readRevisionCount = async (revset: string): Promise<number | null> => {
+    try {
+      const result = await read(['log', '--no-graph', '--revisions', revset, '--template', '"x"'], 1_000_000)
+      return ComposerContextModel.parseRevisionCount(result.stdout, result.truncated)
+    } catch {
+      return null
+    }
+  }
+  const revisionCounts =
+    resolvedBaseCommitId === undefined
+      ? null
+      : await (async () => {
+          const revsets = ComposerContextModel.revisionCountRevsets(resolvedBaseCommitId)
+          const [ahead, behind] = await Promise.all([readRevisionCount(revsets.ahead), readRevisionCount(revsets.behind)])
+          return ahead === null || behind === null ? null : { ahead, behind }
+        })()
+  const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
+  const bookmarkNames =
+    localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
+  // The remote-bookmark template emits plain `name@remote` lines, not JSON records.
+  const remoteBookmarkRows =
+    remoteBookmarks === null ? [] : JujutsuOutputModel.parseLines(completeLines(remoteBookmarks), line => remoteBookmarkRowSchema.parse(line))
+  const remoteBookmarkNames = remoteBookmarkRows.flatMap(value => {
+    const separator = value.lastIndexOf('@')
+    if (separator < 1 || separator === value.length - 1) return []
+    return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
+  })
+  const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
+  return {
+    repository: {
+      root,
+      // Two workspaces sharing one @ commit both match; the first is the usual single match.
+      workspace: workspaceNames[0] ?? null,
+      changeId: head.changeId,
+      commitId: head.commitId,
+      description: head.description.slice(0, 500),
+      empty: head.empty,
+      conflict: head.conflict,
+      bookmarks: head.bookmarks,
+      nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
+      base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: resolvedBaseCommitId !== undefined },
+      revisionCounts,
+      totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
+      files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
+      filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
+      localBookmarks: bookmarkNames.slice(0, 200),
+      remoteBookmarks: remoteBookmarkListSchema.parse(
+        [...new Map(remoteBookmarkNames.map(bookmark => [bookmark.name + '@' + bookmark.remote, bookmark])).values()].slice(0, 200),
+      ),
+    },
+  }
+}
+
+/** The composer context host, grouped as one export for its three seams. */
+export class ComposerContextHost {
+  static readonly reads = composerReads
+  static readonly read = readComposerContext
+  static readonly create = (directRun: RunJj) => composerContextHost(directRun)
+}
+
+const composerContextHost = (directRun: RunJj) => {
   const run = composerReads(directRun)
   return composerContextApi.host({
-    context: async ({ input, ctx, signal }) => {
-      const root = await workspaceRoot(ctx, run, input.cwd, signal)
-      if (root === null) return { repository: null }
-      const headResult = await run(ctx, root, ['log', '--no-graph', '--revisions', '@', '--template', COMPOSER_HEAD_TEMPLATE], signal, { outputLimit: 64_000 })
-      const head = JujutsuOutputModel.parseJsonLines(headResult.stdout, value => headSchema.parse(value))[0]
-      if (head === undefined) return { repository: null }
-      const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
-      const range = ComposerContextModel.composerDiffRange(input.base)
-      const [nearest, baseTarget, baseRevision, stat, files, localBookmarks, remoteBookmarks, workspaces] = await Promise.all([
-        read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
-        read(
-          ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE],
-          16_000,
-        ).catch(() => null),
-        read(
-          ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', 'commit_id ++ "\\n"'],
-          256,
-        ).catch(() => null),
-        read(['diff', ...range, '--stat'], 256_000).catch(() => null),
-        read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
-        read(['bookmark', 'list', '--template', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
-        read(['log', '--no-graph', '--revisions', 'remote_bookmarks()', '--template', COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
-        read(['workspace', 'list', '--template', COMPOSER_WORKSPACE_TEMPLATE], 16_000).catch(() => null),
-      ])
-      const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
-        result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-      const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
-      const targetBookmarks = baseTarget === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
-      const baseRevisionIds =
-        baseRevision === null || baseRevision.truncated || baseRevision.stdout.trim().length === 0
-          ? []
-          : baseRevisionIdsSchema.parse(baseRevision.stdout.trim().split('\n'))
-      const resolvedBaseCommitId = baseRevisionIds.length === 1 ? baseRevisionIds[0] : undefined
-      const readRevisionCount = async (revset: string): Promise<number | null> => {
-        try {
-          const result = await read(['log', '--no-graph', '--revisions', revset, '--template', '"x"'], 1_000_000)
-          return ComposerContextModel.parseRevisionCount(result.stdout, result.truncated)
-        } catch {
-          return null
-        }
-      }
-      const revisionCounts =
-        resolvedBaseCommitId === undefined
-          ? null
-          : await (async () => {
-              const revsets = ComposerContextModel.revisionCountRevsets(resolvedBaseCommitId)
-              const [ahead, behind] = await Promise.all([readRevisionCount(revsets.ahead), readRevisionCount(revsets.behind)])
-              return ahead === null || behind === null ? null : { ahead, behind }
-            })()
-      const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
-      const bookmarkNames =
-        localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
-      const remoteBookmarkRows =
-        remoteBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(remoteBookmarks), value => remoteBookmarkRowSchema.parse(value))
-      const remoteBookmarkNames = remoteBookmarkRows.flatMap(value => {
-        const separator = value.lastIndexOf('@')
-        if (separator < 1 || separator === value.length - 1) return []
-        return [{ name: value.slice(0, separator), remote: value.slice(separator + 1) }]
-      })
-      const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
-      return {
-        repository: {
-          root,
-          // Two workspaces sharing one @ commit both match; the first is the usual single match.
-          workspace: workspaceNames[0] ?? null,
-          changeId: head.changeId,
-          commitId: head.commitId,
-          description: head.description.slice(0, 500),
-          empty: head.empty,
-          conflict: head.conflict,
-          bookmarks: head.bookmarks,
-          nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
-          base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: resolvedBaseCommitId !== undefined },
-          revisionCounts,
-          totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
-          files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
-          filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
-          localBookmarks: bookmarkNames.slice(0, 200),
-          remoteBookmarks: remoteBookmarkListSchema.parse(
-            [...new Map(remoteBookmarkNames.map(bookmark => [bookmark.name + '@' + bookmark.remote, bookmark])).values()].slice(0, 200),
-          ),
-        },
-      }
-    },
+    context: async args => readComposerContext(args, run),
     diff: async ({ input, ctx, signal }) => {
       try {
         const root = await workspaceRoot(ctx, run, input.cwd, signal)

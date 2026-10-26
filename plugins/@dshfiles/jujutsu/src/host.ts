@@ -12,7 +12,7 @@ import { RevisionReads, type JjRun } from './revision-reads.js'
 import { withJjSpan } from './jj-span.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { ReferenceGraphModel } from './reference-graph.js'
-import { composerContextHost } from './composer-context-host.js'
+import { ComposerContextHost } from './composer-context-host.js'
 import { closeReviewProgress, jujutsuReviewProgressApiHost, reviewProgressFor } from './review-progress-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
@@ -902,7 +902,7 @@ export default defineHost({
   apis: [
     jujutsuHostApi,
     jujutsuReviewProgressApiHost,
-    composerContextHost((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options)),
+    ComposerContextHost.create((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options)),
   ],
   prompts: [chatReferenceSection],
   settings: [jujutsuSettings],

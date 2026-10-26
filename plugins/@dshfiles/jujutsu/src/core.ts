@@ -169,6 +169,16 @@ const parseJsonLines = <T>(text: string, decode: (value: unknown) => T): T[] => 
   return rows
 }
 
+/** Decode one plain (non-JSON) value per line, the shape some jj templates emit. */
+const parseLines = <T>(text: string, decode: (line: string) => T): T[] => {
+  const rows: T[] = []
+  for (const line of text.split(/\r?\n/)) {
+    if (line.length === 0) continue
+    rows.push(decode(line))
+  }
+  return rows
+}
+
 /** Match JJ's recorded argv metadata, never a coincidental phrase in an operation description. */
 const isRecordedJjGitPush = (attributes: string): boolean => {
   const args = attributes.split(/\r?\n/).find(line => /^args\s*:/i.test(line))
@@ -227,6 +237,7 @@ export class JujutsuMutationModel {
 export class JujutsuOutputModel {
   static readonly fileStatusLetter = fileStatusLetter
   static readonly parseJsonLines = parseJsonLines
+  static readonly parseLines = parseLines
   static readonly isRecordedJjGitPush = isRecordedJjGitPush
   static readonly parsePatchStats = parsePatchStats
   static readonly redactRemoteOutput = redactRemoteOutput
