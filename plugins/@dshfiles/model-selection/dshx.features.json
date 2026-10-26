@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "draft-model-selection",
+      "title": "Choose a model before typing in a new conversation",
+      "summary": "The full native model directory, reasoning menu and /model popup share one selection owner. Client-only blanks stage their selection without creating a Host Session; existing Sessions retain native RPC and projection behavior.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Send message\"",
+        "expect button \"Select model*\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["local-default", "local-staged", "catalog-loading", "catalog-error", "host-projected"],
+      "failureModes": [
+        "Catalog failures retain the native retry and provider failure surfaces.",
+        "A reconnect reloads the catalog without erasing the draft owner's staged selection.",
+        "Real Host Sessions continue to surface writer-held and other selectModel failures."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/session-controller",
+          "boundary": "The public draft-client SessionDrafts service owns local/model metadata and stageModel, then applies staged selection before the first prompt.",
+          "deterministicFake": "Focused directory tests use a typed SessionDrafts seam and observable draft metadata; the scratch journey uses the real owner."
+        }
+      ],
+      "telemetry": [
+        { "kind": "not-applicable", "reason": "Client-only native row replacement; catalog and Host selection retain the existing native RPC instrumentation." }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "model-selection.local-staging-unit",
+          "file": "plugins/@dshfiles/model-selection/tests/draft-selection.test.ts",
+          "testName": "loads the default without a Host projection and stages model plus effort without an RPC"
+        },
+        {
+          "kind": "gherkin",
+          "id": "model-selection.pretyping-draft-choices",
+          "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"
+        }
+      ]
+    }
+  ]
+}

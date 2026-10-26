@@ -28,6 +28,9 @@ import { whileSessionRetained } from './retained-send.ts'
 import { reportMessageSubmission } from './submission-analytics.ts'
 import { readConversationDraft } from '../stores.ts'
 import { AgentWarmup } from '../../agent-warmup.ts'
+import { observeSessionDraft } from '../../session-draft-tracking.ts'
+import { submitMaterializedDraft } from '../../draft-submission.ts'
+import type {} from '@dshfiles/session-controller/draft-client'
 import { isRetainedScope } from '../../retained-scope.ts'
 
 /** Structural command face for per-session popup resolution. */
@@ -155,6 +158,11 @@ export class InputHub implements SessionInputResolver {
           shell.consumeToken(req.guard) ? true : undefined),
         actx.on('slash/input-insert-text', req =>
           shell.insertText(req.text, req.span, req.continue === true) ? true : undefined),
+        // Publish content to the identity owner before first-edit warmup (also when restoring a saved draft).
+        observeSessionDraft({
+          state: shell.state,
+          update: draft => this.rootCtx.get('sessionDrafts')?.update(binding.sessionId, draft),
+        }),
         // dshfiles delta: opening a thread no longer resumes its Agent; its first draft edit does.
         AgentWarmup.onFirstEdit({ ctx: this.rootCtx, sessionId: binding.sessionId, state: shell.state }),
       ]
@@ -230,10 +238,9 @@ export class InputHub implements SessionInputResolver {
   }
 
   /**
-   * Default sink: optimistic clear + prompt. The session is always a real
-   * host entity (materialized when its workspace was picked), so there is
-   * exactly one path; a failed first prompt is an ordinary prompt failure
-   * (banner via promptError, draft restored only while untouched).
+   * Default sink: materialize before workspace intake, attachment routing and
+   * the final prompt. An immediate first send must not skip destination hooks
+   * just because its local identity has not attached to the Host workspace yet.
    */
   private async sink(
     session: SessionFace,
@@ -246,7 +253,20 @@ export class InputHub implements SessionInputResolver {
     return whileSessionRetained({
       sessions: this.sessions(),
       session,
-      operation: () => this.conversation().sendSession(session, text, attachmentIds, mode, signal),
+      operation: () => submitMaterializedDraft({
+        signal,
+        whenCreated: async waiterSignal => {
+          const drafts = this.rootCtx.get('sessionDrafts')
+          if (drafts === undefined) return
+          // Attachment commit and async reference serialization may already have cleared the editor.
+          // Admit the captured outgoing payload, not the editor's now-empty observation, before retrying.
+          drafts.update(session.sessionId, { text, hasAttachments: attachmentIds.length > 0 })
+          // Sending is also an explicit retry; failure keeps the existing editor restoration path.
+          void drafts.retry(session.sessionId).catch(() => undefined)
+          await drafts.whenCreated(session.sessionId, waiterSignal)
+        },
+        send: () => this.conversation().sendSession(session, text, attachmentIds, mode, signal),
+      }),
     })
   }
 

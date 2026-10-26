@@ -22,7 +22,7 @@ function NoConversationWidthControls() {
 export function ConversationContent(props: ConversationContentProps) {
   const {
     sessionId, phase, hero, useSession, useSessions, useSessionStatus,
-    useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
+    useWorkspaces, useInput, useComposerBlock, useDraftWorkspace, renderSlot, renderSlotChain,
     selectWorkspace, t, useFactorySlot,
   } = props
   const session = useSession(snapshot => snapshot)
@@ -66,9 +66,11 @@ export function ConversationContent(props: ConversationContentProps) {
     seatObserver.current.observe(scroller)
   }, [])
 
+  const draftWorkspaceId = useDraftWorkspace(id => id)
   const sessionWorkspace = sessionId === undefined
     ? undefined
     : workspaces.items.find(workspace => workspace.sessionIds.includes(sessionId))
+      ?? workspaces.items.find(workspace => workspace.workspaceId === draftWorkspaceId)
   const pendingWorkspace = workspaces.items.find(
     workspace => workspace.workspaceId === pendingWorkspaceId,
   )

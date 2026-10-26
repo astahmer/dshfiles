@@ -7,11 +7,14 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
+import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
+import { isListedUnsentThread, presentUnsentThread } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
+import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
 import { useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -245,6 +248,8 @@ type InjectedActions = {
   /** Open the thread a page-load link names without closing a panel the user opened while the list was loading. */
   openLinkedSession?: (sessionId: SessionSummary['id']) => void
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
+  startProjectSession: (projectId: string) => void
+  drafts?: SessionDrafts['list'] | undefined
   /** Fork the thread into another project and settle it; resolves to the continuing thread and whether it settled. */
   continueInProject: (
     sessionId: SessionSummary['id'],
@@ -1285,6 +1290,7 @@ type SidebarGroupedViewEntry = {
   readonly activityAt: number
 }
 
+const EMPTY_UNSENT_DRAFTS: Readonly<Record<string, SessionDraft>> = Object.freeze({})
 const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set()
 const EMPTY_HOISTED_SESSIONS: readonly SessionSummary[] = []
 const EMPTY_HOISTED_USAGE_LIMIT_ROWS: readonly UsageLimitRow<SessionSummary>[] = []
@@ -1295,7 +1301,28 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // Both surfaces can be mounted at once: URL ownership, notifications, attention polling and the auto-archive/settle
   // scans stay with the sidebar mount, so one session change is never handled twice.
   const isPrimarySurface = !isBoard
-  const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
+  const hostSessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
+  const subscribeDrafts = useCallback((listener: () => void) => props.drafts?.subscribe(listener) ?? (() => undefined), [props.drafts])
+  const readDrafts = useCallback(() => props.drafts?.getSnapshot() ?? EMPTY_UNSENT_DRAFTS, [props.drafts])
+  const unsentDrafts = useSyncExternalStore(subscribeDrafts, readDrafts, readDrafts)
+  const translateDraft = props.tSidebar
+  const sessionState = useMemo(
+    () => ({
+      ...hostSessionState,
+      byId: Object.fromEntries(
+        Object.values(hostSessionState.byId).map(session => [
+          session.id,
+          presentUnsentThread({
+            session,
+            draft: unsentDrafts[session.id],
+            newChatLabel: translateDraft('threadSidebarNewChat'),
+            draftLabel: preview => translateDraft('threadSidebarUnsentDraft', { preview }),
+          }),
+        ]),
+      ),
+    }),
+    [hostSessionState, unsentDrafts, translateDraft],
+  )
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, hostBacked, threadViewWritePending, setSelectedThreadId, threadTitle } = useSidebarState()
@@ -1523,7 +1550,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [sessions, workspaceState.items],
   )
   /** The workspace a Session really lives in, for the deep link; grouping keeps using the project attribution. */
-  const realWorkspaceBySession = useMemo(() => SidebarOrganization.sessionWorkspaceIds(workspaceState.items), [workspaceState.items])
+  const realWorkspaceBySession = useMemo(() => {
+    const result = SidebarOrganization.sessionWorkspaceIds(workspaceState.items)
+    // Local blank identities are not attached on the Host until typing begins.
+    for (const draft of Object.values(unsentDrafts)) {
+      if (!result.has(draft.sessionId) && draft.workspaceId !== undefined) result.set(draft.sessionId, draft.workspaceId)
+    }
+    return result
+  }, [workspaceState.items, unsentDrafts])
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const settledSessionIds = useMemo(() => setIncludes(preferences.settledSessionIds), [preferences.settledSessionIds])
@@ -1668,10 +1702,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const draftSessions = useMemo(
     () =>
       DraftThreadsModel.draftThreadsOf({
-        sessions,
+        sessions: sessions.filter(session => unsentDrafts[session.id] === undefined),
         exclusions: { archivedSessionIds, pinnedSessionIds, selectedSessionId },
       }),
-    [archivedSessionIds, pinnedSessionIds, selectedSessionId, sessions],
+    [archivedSessionIds, pinnedSessionIds, selectedSessionId, sessions, unsentDrafts],
   )
   const draftSessionIds = useMemo(() => new Set(draftSessions.map(draft => draft.id)), [draftSessions])
   const [draftsOpen, setDraftsOpen] = useState(false)
@@ -1924,7 +1958,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [sessions],
   )
 
-  useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
+  // The current empty chat has a row, not a durable navigation-history entry.
+  const historySessionId =
+    selectedSession !== undefined &&
+    isListedUnsentThread({
+      session: selectedSession,
+      selectedSessionId: undefined,
+      draft: unsentDrafts[selectedSession.id],
+    })
+      ? selectedSession.id
+      : null
+  useEffect(() => setSelectedThreadId(historySessionId), [historySessionId, setSelectedThreadId])
   useEffect(() => {
     if (!isPrimarySurface) return
     const onFocusThread = (event: Event): void => {
@@ -2731,14 +2775,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const listed: SessionSummary[] = []
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
-      if (session === undefined || session.blank || draftSessionIds.has(session.id) || ThreadViewModel.isSideChat(session)) continue
+      if (
+        session === undefined ||
+        !isListedUnsentThread({ session, selectedSessionId, draft: unsentDrafts[session.id] }) ||
+        draftSessionIds.has(session.id) ||
+        ThreadViewModel.isSideChat(session)
+      )
+        continue
       const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (activeWorkspaceFilter !== null && (workspaceId ?? '') !== activeWorkspaceFilter) continue
       const ownRow = session.parentId !== undefined && !SidebarOrganization.foldsUnderParent(session, sessionState.byId, workspaceBySession)
       listed.push(ownRow ? SidebarOrganization.withoutParent(session) : session)
     }
     return groupThreadChildren({ threads: listed })
-  }, [draftSessionIds, activeWorkspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
+  }, [draftSessionIds, activeWorkspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession, selectedSessionId, unsentDrafts])
 
   useEffect(() => {
     if (!isPrimarySurface || threadToScrollTo === null) return
@@ -3575,6 +3625,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       groupBy: threadView.groupBy,
       entries,
       workspaceTitles,
+      localProjectIds: new Set(displayWorkspaces.map(workspace => workspace.id)),
       unassignedTitle: tSidebar('threadSidebarUnassigned'),
       dateTitles: {
         today: tSidebar('threadSidebarToday'),
@@ -5027,23 +5078,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       aria-label={isBoard ? `${group.label || props.tSidebar('threadSidebarAllThreads')} column` : showHeader ? groupLabel : undefined}
                     >
                       {showHeader ? (
-                        <button
-                          type="button"
-                          data-thread-section-header=""
-                          className={cn(
-                            stickyHeaderClass,
-                            'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-                          )}
-                          aria-expanded={!groupCollapsed}
-                          onClick={() => toggleGroup(group.key)}
-                        >
-                          <span className="dshx:whitespace-nowrap">{groupLabel}</span>
-                          <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
-                          <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                          <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                            {groupCollapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
-                          </span>
-                        </button>
+                        <ThreadGroupHeader
+                          label={groupLabel}
+                          count={group.threads.length}
+                          collapsed={groupCollapsed}
+                          projectId={group.projectId}
+                          className={stickyHeaderClass}
+                          onToggle={() => toggleGroup(group.key)}
+                          startProjectSession={props.startProjectSession}
+                          t={props.tSidebar}
+                        />
                       ) : null}
                       {groupCollapsed
                         ? null

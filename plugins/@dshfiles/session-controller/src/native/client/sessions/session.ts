@@ -97,6 +97,8 @@ export interface SessionOptions {
    * Host refuses a Session it has not created yet.
    */
   creation?: Promise<SessionId>
+  /** Local draft gate: ordinary RPCs cannot address an identity before Host materialization. */
+  beforeRpc?(signal?: AbortSignal): Promise<void>
 }
 
 /**
@@ -282,7 +284,8 @@ export class Session implements SessionFace {
     const address = this.address
     const send = async (): Promise<RemoteResult<{ accepted: true }>> => {
       if (address === undefined) {
-        await this.whenCreated()
+        await this.whenCreated(signal)
+        signal?.throwIfAborted()
         return this.remote.session.prompt({
           requestId: stableRequestId,
           sessionId: this.sessionId,
@@ -417,6 +420,7 @@ export class Session implements SessionFace {
    * @returns the admission result.
    */
   async command(line: string): Promise<RemoteResult<{ matched: boolean }>> {
+    await this.whenCreated()
     const result = await this.remote.commands.execute(this.sessionId, line, [])
     if (!result.ok) return result
     return { ok: true, value: { matched: result.value !== undefined } }
@@ -647,20 +651,17 @@ export class Session implements SessionFace {
   /** @param generation - openGeneration at launch; stale passes cannot publish after replacement. */
   /**
    * Wait for a provisional Session's Host creation before addressing it.
-   * A refused creation is swallowed here: the RPC that follows reports it, and
-   * navigation owns the notice.
+   * Failure propagates without issuing an RPC against a nonexistent identity.
+   * A local draft's gate owns retry and independent waiter cancellation.
    */
-  private async whenCreated(): Promise<void> {
-    if (this.options.creation === undefined) return
-    try {
-      await this.options.creation
-    } catch {
-      // The refused identity no longer exists; the next RPC surfaces the failure.
-    }
+  private async whenCreated(signal?: AbortSignal): Promise<void> {
+    if (this.options.beforeRpc !== undefined) return this.options.beforeRpc(signal)
+    await this.options.creation
   }
 
   private async doOpen(generation: number): Promise<void> {
-    await this.whenCreated()
+    await this.options.creation
+    if (generation !== this.openGeneration) return
     this.openState = 'loading'
     this.openError = null
     this.notifier.markDirty()

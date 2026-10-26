@@ -19,6 +19,7 @@ describe('thread view grouping', () => {
         ['alpha', 'Alpha'],
         ['zeta', 'Zeta'],
       ]),
+      localProjectIds: new Set(),
       unassignedTitle: 'Unassigned',
       dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
       now: 100,
@@ -30,6 +31,52 @@ describe('thread view grouping', () => {
     ])
   })
 
+  it('keeps creation targets by registered project identity, not duplicate display titles', () => {
+    const groups = ThreadViewModel.groupEntries({
+      groupBy: 'project',
+      entries: [
+        { thread: { id: 'first', updatedAt: 10 }, workspaceId: 'local:first' },
+        { thread: { id: 'second', updatedAt: 10 }, workspaceId: 'local:second' },
+        { thread: { id: 'remote', updatedAt: 10 }, workspaceId: 'remote-project:machine:shared' },
+        { thread: { id: 'deleted', updatedAt: 10 }, workspaceId: 'deleted' },
+        { thread: { id: 'unassigned', updatedAt: 10 }, workspaceId: undefined },
+      ],
+      workspaceTitles: new Map([
+        ['local:first', 'Shared'],
+        ['local:second', 'Shared'],
+        ['remote-project:machine:shared', 'Shared'],
+        ['deleted', 'Shared'],
+      ]),
+      localProjectIds: new Set(['local:first', 'local:second']),
+      unassignedTitle: 'Unassigned',
+      dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
+      now: 100,
+    })
+
+    expect(new Map(groups.map(group => [group.threads[0]?.id, group.projectId]))).toEqual(
+      new Map([
+        ['first', 'local:first'],
+        ['second', 'local:second'],
+        ['remote', undefined],
+        ['deleted', undefined],
+        ['unassigned', undefined],
+      ]),
+    )
+  })
+
+  it.each(['date', 'none'] as const)('never exposes a creation target for %s grouping', groupBy => {
+    const groups = ThreadViewModel.groupEntries({
+      groupBy,
+      entries: [{ thread: { id: 'local', updatedAt: 10 }, workspaceId: 'local' }],
+      workspaceTitles: new Map([['local', 'Local']]),
+      localProjectIds: new Set(['local']),
+      unassignedTitle: 'Unassigned',
+      dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
+      now: 100,
+    })
+    expect(groups.map(group => group.projectId)).toEqual([undefined])
+  })
+
   it('uses recent finished activity when a thread summary still has its old creation date', () => {
     const now = new Date(2026, 9, 23, 0, 18).getTime()
     const oldThreadDate = new Date(2026, 9, 20, 15, 25).getTime()
@@ -39,6 +86,7 @@ describe('thread view grouping', () => {
       groupBy: 'date',
       entries: [{ thread: { id: 'backlog-started', updatedAt: oldThreadDate }, workspaceId: undefined, activityAt }],
       workspaceTitles: new Map(),
+      localProjectIds: new Set(),
       unassignedTitle: 'Unassigned',
       dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
       now,
@@ -55,6 +103,7 @@ describe('thread view grouping', () => {
         { thread: { id: 'remote-thread', updatedAt: 20 }, workspaceId: 'project:shared' },
       ],
       workspaceTitles: new Map([['project:shared', 'Shared project']]),
+      localProjectIds: new Set(),
       unassignedTitle: 'Unassigned',
       dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
       now: 100,
@@ -89,6 +138,7 @@ describe('thread view grouping', () => {
           { thread: { id: 'last-seven-days', updatedAt: new Date(2025, 3, 4, 8).getTime() }, workspaceId: undefined },
         ],
         workspaceTitles: new Map(),
+        localProjectIds: new Set(),
         unassignedTitle: 'Unassigned',
         dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
         now,
@@ -107,6 +157,7 @@ describe('thread view grouping', () => {
           { thread: { id: 'newer', updatedAt: 20 }, workspaceId: 'two' },
         ],
         workspaceTitles: new Map(),
+        localProjectIds: new Set(),
         unassignedTitle: 'Unassigned',
         dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
         now,

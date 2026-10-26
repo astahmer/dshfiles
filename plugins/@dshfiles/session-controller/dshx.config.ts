@@ -2,7 +2,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/session-controller',
-  modules: { 'interruption-api': 'src/interruption-api.ts', 'continuation-api': 'src/continuation-api.ts' },
+  modules: { 'draft-client': 'src/draft-client.ts', 'interruption-api': 'src/interruption-api.ts', 'continuation-api': 'src/continuation-api.ts' },
   // tsc lowers the Host's TC39 `@Remote` decorators first, as the native build does; the bundler keeps them as is.
   host: { entry: 'build/host/host.js' },
   client: {
