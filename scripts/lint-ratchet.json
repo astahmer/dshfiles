@@ -1,26 +1,26 @@
 {
   "oxlint": {
-    "antislop(no-conditional-empty-object-spread)": 539,
+    "antislop(no-conditional-empty-object-spread)": 0,
     "antislop(no-export-bag)": 0,
-    "antislop(no-known-value-widening)": 183,
-    "antislop(no-runtime-typeof)": 386,
+    "antislop(no-known-value-widening)": 96,
+    "antislop(no-runtime-typeof)": 381,
     "antislop(no-unknown-parameters)": 224,
-    "antislop(no-unknown-returns)": 136,
-    "antislop(no-unsafe-dictionary-type)": 237,
-    "antislop(require-safety-comment-for-type-assertion)": 387,
-    "react(purity)": 19,
-    "react-hooks(exhaustive-deps)": 13,
+    "antislop(no-unknown-returns)": 123,
+    "antislop(no-unsafe-dictionary-type)": 218,
+    "antislop(require-safety-comment-for-type-assertion)": 385,
+    "react(purity)": 0,
+    "react-hooks(exhaustive-deps)": 0,
     "ui-guidance(no-native-title)": 309
   },
   "ast-grep": {
-    "no-deeply-nested-ternary": 7,
-    "no-deeply-nested-ternary-tsx": 12,
-    "no-direct-json-parse": 258,
+    "no-deeply-nested-ternary": 0,
+    "no-deeply-nested-ternary-tsx": 0,
+    "no-direct-json-parse": 247,
     "no-direct-json-parse-tsx": 4,
-    "no-export-from": 179,
+    "no-export-from": 0,
     "no-identity-hook-selector": 0,
     "no-identity-hook-selector-tsx": 0,
     "no-native-select": 0,
-    "no-wildcard-export": 1
+    "no-wildcard-export": 0
   }
 }
