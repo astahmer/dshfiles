@@ -12,6 +12,10 @@ export const COMPOSER_HEAD_TEMPLATE =
 
 export const COMPOSER_BOOKMARKS_TEMPLATE = '"[" ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ "]\\n"'
 
+export const COMPOSER_BASE_TEMPLATE =
+  '"{\\"commitId\\":" ++ self.commit_id().short(64).escape_json() ++ ' +
+  '",\\"bookmarks\\":[" ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ "]}" ++ "\\n"'
+
 export const COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE = 'if(!self.remote(), self.name().escape_json() ++ "\\n")'
 export const COMPOSER_REMOTE_BOOKMARK_LIST_TEMPLATE = 'self.remote_bookmarks().map(|b| b.name() ++ "@" ++ b.remote()).join("\\n") ++ "\\n"'
 

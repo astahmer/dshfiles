@@ -18,8 +18,10 @@ const fakeRun = (): DirectRun => async (_ctx, cwd, args) => {
   if (joined.includes(' diff ')) {
     return { stdout: joined.includes('--stat') ? '0 files changed, 0 insertions(+), 0 deletions(-)\n' : '', truncated: false }
   }
-  if (joined.includes('commit_id')) return { stdout: `${'b'.repeat(40)}\n`, truncated: false }
-  if (joined.includes('bookmarks(exact:"main")')) return { stdout: '["main"]\n', truncated: false }
+  if (joined.includes('self.commit_id()')) {
+    const base = JSON.stringify({ commitId: 'b'.repeat(40), bookmarks: ['main'] })
+    return { stdout: `${base}\n`, truncated: false }
+  }
   return { stdout: '', truncated: false }
 }
 

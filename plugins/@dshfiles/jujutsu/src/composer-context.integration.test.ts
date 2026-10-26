@@ -7,6 +7,7 @@ import { expect, onTestFinished, test } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ComposerContextHost } from './composer-context-host.ts'
 import {
+  COMPOSER_BASE_TEMPLATE,
   COMPOSER_BOOKMARKS_TEMPLATE,
   COMPOSER_FILE_TEMPLATE,
   COMPOSER_HEAD_TEMPLATE,
@@ -99,6 +100,21 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
     '-T',
     'commit_id ++ "\\n"',
   ]).trim()
+  const baseRows = JujutsuOutputModel.parseJsonLines(
+    runJj(repo, home, [
+      '--ignore-working-copy',
+      'log',
+      '--no-graph',
+      '-r',
+      ComposerContextModel.composerBaseTarget({ kind: 'bookmark', name: 'main' }),
+      '--limit',
+      '2',
+      '-T',
+      COMPOSER_BASE_TEMPLATE,
+    ]),
+    value => value,
+  )
+  expect(baseRows).toEqual([{ commitId: baseCommitId, bookmarks: ['main'] }])
   const revisionCountRevsets = ComposerContextModel.revisionCountRevsets(baseCommitId)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.ahead, '-T', '"x"']).length).toBe(2)
   expect(runJj(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '-r', revisionCountRevsets.behind, '-T', '"x"']).length).toBe(0)

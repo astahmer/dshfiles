@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { composerContextApi, type ComposerBase } from './composer-context-api.js'
 import { RevisionReads } from './revision-reads.js'
 import {
+  COMPOSER_BASE_TEMPLATE,
   COMPOSER_BOOKMARKS_TEMPLATE,
   COMPOSER_FILE_TEMPLATE,
   COMPOSER_HEAD_TEMPLATE,
@@ -35,8 +36,8 @@ const headSchema = z.object({
 
 const fileRowSchema = z.object({ path: z.string().max(2048), status: z.string().max(32) })
 const baseRevisionIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
-const baseRevisionIdsSchema = z.array(baseRevisionIdSchema).max(2)
 const nameListSchema = z.array(z.string().max(256)).max(64)
+const baseRevisionRowSchema = z.object({ commitId: baseRevisionIdSchema, bookmarks: nameListSchema })
 const remoteBookmarkListSchema = z.array(z.object({ name: z.string().max(256), remote: z.string().max(256) })).max(200)
 const remoteBookmarkRowSchema = z.string().max(513)
 const MAX_FILES = 500
@@ -142,15 +143,11 @@ const readComposerContext = async (
   if (head === undefined) return { repository: null }
   const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
   const range = ComposerContextModel.composerDiffRange(input.base)
-  const [nearest, baseTarget, baseRevision, stat, files, localBookmarks, remoteBookmarks, workspaces] = await Promise.all([
+  const [nearest, base, stat, files, localBookmarks, remoteBookmarks, workspaces] = await Promise.all([
     read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
     read(
-      ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE],
-      16_000,
-    ).catch(() => null),
-    read(
-      ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', 'commit_id ++ "\\n"'],
-      256,
+      ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '2', '--template', COMPOSER_BASE_TEMPLATE],
+      64_000,
     ).catch(() => null),
     read(['diff', ...range, '--stat'], 256_000).catch(() => null),
     read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
@@ -161,12 +158,9 @@ const readComposerContext = async (
   const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
     result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
   const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
-  const targetBookmarks = baseTarget === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
-  const baseRevisionIds =
-    baseRevision === null || baseRevision.truncated || baseRevision.stdout.trim().length === 0
-      ? []
-      : baseRevisionIdsSchema.parse(baseRevision.stdout.trim().split('\n'))
-  const resolvedBaseCommitId = baseRevisionIds.length === 1 ? baseRevisionIds[0] : undefined
+  const baseRows = base === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(base), value => baseRevisionRowSchema.parse(value))
+  const targetBookmarks = baseRows[0]?.bookmarks ?? []
+  const resolvedBaseCommitId = base === null || base.truncated || baseRows.length !== 1 ? undefined : baseRows[0]?.commitId
   const readRevisionCount = async (revset: string): Promise<number | null> => {
     try {
       const result = await read(['log', '--no-graph', '--revisions', revset, '--template', '"x"'], 1_000_000)
@@ -207,7 +201,7 @@ const readComposerContext = async (
       conflict: head.conflict,
       bookmarks: head.bookmarks,
       nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
-      base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: resolvedBaseCommitId !== undefined },
+      base: { label: baseLabel(input.base, targetBookmarks), found: resolvedBaseCommitId !== undefined },
       revisionCounts,
       totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
       files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
