@@ -303,6 +303,18 @@ export type AccountOrderDirection = z.infer<typeof accountOrderDirectionSchema>
 export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>
 export type UsageHistoryMeta = z.infer<typeof usageMetaSchema>
 
+export const FORECAST_HISTORY_DAYS = 36
+export const FORECAST_HISTORY_BUCKET_MINUTES = 30
+// Keep batches small: dshx rejects JSON API payloads over 1 MiB.
+export const MAX_FORECAST_HISTORY_BATCH_SIZE = 2
+export const forecastHistoryBatchInputSchema = z
+  .object({
+    instanceIds: z.array(z.string().min(1).max(64)).min(1).max(MAX_FORECAST_HISTORY_BATCH_SIZE),
+  })
+  .superRefine(({ instanceIds }, context) => {
+    if (new Set(instanceIds).size !== instanceIds.length) context.addIssue({ code: 'custom', path: ['instanceIds'], message: 'Account ids must be unique.' })
+  })
+
 /** Icon names the page offers, matching the reference account page. */
 export const PROVIDER_ICONS = ['Bot', 'Rocket', 'Sparkles', 'Terminal', 'Layers', 'Brain', 'Globe', 'Code', 'Gem'] as const
 
@@ -465,6 +477,20 @@ export const aiAccountsApi = defineApi({
             ? `No stored quota readings for ${output.instanceId} in that window.`
             : `${String(output.points.length)} reading(s) for ${output.instanceId}: ${compactJson(output.points)}`,
       },
+    }),
+    forecastHistoryBatch: method({
+      input: forecastHistoryBatchInputSchema,
+      output: z.object({
+        histories: z
+          .array(
+            z.object({
+              instanceId: z.string().min(1).max(64),
+              points: z.array(usageHistoryPointSchema).max(MAX_USAGE_HISTORY_POINTS),
+            }),
+          )
+          .max(MAX_FORECAST_HISTORY_BATCH_SIZE),
+      }),
+      description: 'Stored 36-day quota history for up to two accounts in one bounded read. Read-only.',
     }),
     fastModeHistory: method({
       input: z.object({ instanceId: z.string().min(1).max(64), days: z.number().int().min(1).max(365).default(30) }),

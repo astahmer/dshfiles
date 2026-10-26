@@ -415,7 +415,12 @@
       "id": "quota-forecast",
       "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
       "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
-      "reach": ["click button \"Quota forecast\"", "expect tab \"Forecast\"", "click tab \"Hand-off\"", "expect text \"Work on\""],
+      "reach": [
+        "click button \"Quota forecast\"",
+        "expect tab \"Forecast\"",
+        "click tab \"Hand-off\"",
+        "expect text \"Enable an account with quota to see where it is heading.\""
+      ],
       "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
         {

@@ -72,6 +72,22 @@ afterEach(async () => {
 })
 
 describe('usage history collection', () => {
+  it('reads multiple account histories in the requested order', async () => {
+    const ctx = await openContext()
+    const service = createUsageHistoryService(ctx)
+    const resetsAt = Date.now() + 3_600_000
+    const accounts = [profile('codex_a', 'codex'), profile('claude_a', 'claude')]
+    const answers: Record<string, UsageCard> = {
+      codex_a: okCard(42, resetsAt),
+      claude_a: okCard(10, resetsAt),
+    }
+    await service.collect(accounts, async account => answers[account.instanceId] ?? okCard(0, resetsAt))
+
+    const histories = await service.readMany(['claude_a', 'codex_a'], 0)
+    expect(histories.map(history => history.instanceId)).toEqual(['claude_a', 'codex_a'])
+    expect(histories.map(history => history.points)).toEqual([await service.read('claude_a', 0), await service.read('codex_a', 0)])
+  })
+
   it('records every enabled account that answers, of every provider kind, and skips failures', async () => {
     const ctx = await openContext()
     const resetsAt = Date.now() + 3_600_000

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AccountsRules, accountDraftSchema, type AccountDraft } from './api.js'
+import { AccountsRules, accountDraftSchema, forecastHistoryBatchInputSchema, type AccountDraft } from './api.js'
 
 const draft: AccountDraft = {
   instanceId: 'commandcode_work',
@@ -43,6 +43,18 @@ describe('account draft boundary', () => {
 
   it.each(['relative/home', '~/../etc', '/Users/me/../../etc', '~/.codex/\0'])('refuses %s as a home path', homePath =>
     expect(accepts({ homePath })).toBe(false),
+  )
+})
+
+describe('forecast history batch boundary', () => {
+  it('accepts one or two distinct account ids', () => {
+    expect(forecastHistoryBatchInputSchema.safeParse({ instanceIds: ['work'] }).success).toBe(true)
+    expect(forecastHistoryBatchInputSchema.safeParse({ instanceIds: ['work', 'home'] }).success).toBe(true)
+  })
+
+  it.each([{ instanceIds: [] }, { instanceIds: [''] }, { instanceIds: ['work', 'work'] }, { instanceIds: ['a', 'b', 'c'] }, { instanceIds: ['x'.repeat(65)] }])(
+    'rejects invalid account batches',
+    input => expect(forecastHistoryBatchInputSchema.safeParse(input).success).toBe(false),
   )
 })
 

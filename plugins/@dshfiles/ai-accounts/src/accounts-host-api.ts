@@ -7,6 +7,8 @@ import { hostname } from 'node:os'
 import {
   aiAccountsApi,
   baseModelName,
+  FORECAST_HISTORY_BUCKET_MINUTES,
+  FORECAST_HISTORY_DAYS,
   isKeyEnvName,
   type AccountsFile,
   type AccountsUsage,
@@ -186,6 +188,20 @@ export const accountsHostApi = aiAccountsApi.host({
   history: async ({ input, ctx }) => ({
     instanceId: input.instanceId,
     points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000, input.bucketMinutes))],
+  }),
+  forecastHistoryBatch: async ({ input, ctx }) => ({
+    histories: (
+      await createUsageHistoryService(ctx).readMany(input.instanceIds, Date.now() - FORECAST_HISTORY_DAYS * 24 * 60 * 60_000, FORECAST_HISTORY_BUCKET_MINUTES)
+    ).map(history => ({
+      instanceId: history.instanceId,
+      points: history.points.map(point => ({
+        at: point.at,
+        windows: point.windows,
+        resetsAt: point.resetsAt,
+        bankedResets: point.bankedResets,
+        bankedResetExpiries: point.bankedResetExpiries ?? [],
+      })),
+    })),
   }),
   fastModeHistory: async ({ input, ctx }) => ({
     instanceId: input.instanceId,

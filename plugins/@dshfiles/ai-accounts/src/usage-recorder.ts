@@ -171,17 +171,40 @@ const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<n
   return removed
 }
 
-/** Readings for one account, oldest first, so a chart reads left to right. */
-const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number, bucketMinutes?: number): Promise<readonly QuotaSnapshot[]> => {
+const readUsageHistories = async (
+  ctx: Context,
+  instanceIds: readonly string[],
+  sinceMs: number,
+  bucketMinutes?: number,
+): Promise<readonly { readonly instanceId: string; readonly points: readonly QuotaSnapshot[] }[]> => {
+  const rowsByInstance = new Map(instanceIds.map(instanceId => [instanceId, [] as QuotaSnapshot[]]))
   const opening = usageDomain(ctx)
-  if (opening === undefined) return []
+  if (opening === undefined) return instanceIds.map(instanceId => ({ instanceId, points: [] }))
   const domain = await opening
-  const rows = [...domain.table('quota').entries()]
-    .filter(([key, value]) => UsageHistoryModel.parseBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
-    .map(([, value]) => value)
-    .map(value => ({ ...value, bankedResetExpiries: value.bankedResetExpiries ?? [] }))
-  return UsageHistoryModel.boundPoints(bucketMinutes === undefined ? rows : UsageHistoryModel.thinPoints(rows, bucketMinutes))
+  for (const [key, value] of domain.table('quota').entries()) {
+    const parsed = UsageHistoryModel.parseBucketKey(key)
+    if (parsed === null || !rowsByInstance.has(parsed.instanceId) || value.at < sinceMs) continue
+    rowsByInstance.get(parsed.instanceId)?.push({
+      at: value.at,
+      instanceId: value.instanceId,
+      windows: value.windows,
+      resetsAt: value.resetsAt,
+      bankedResets: value.bankedResets,
+      bankedResetExpiries: value.bankedResetExpiries ?? [],
+    })
+  }
+  return instanceIds.map(instanceId => {
+    const rows = rowsByInstance.get(instanceId) ?? []
+    return {
+      instanceId,
+      points: UsageHistoryModel.boundPoints(bucketMinutes === undefined ? rows : UsageHistoryModel.thinPoints(rows, bucketMinutes)),
+    }
+  })
 }
+
+/** Readings for one account, oldest first, so a chart reads left to right. */
+const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number, bucketMinutes?: number): Promise<readonly QuotaSnapshot[]> =>
+  (await readUsageHistories(ctx, [instanceId], sinceMs, bucketMinutes))[0]?.points ?? []
 
 export interface UsageHistoryScheduler {
   collectNow(): Promise<number>
@@ -261,6 +284,7 @@ export const createUsageHistoryService = (ctx: Context) => ({
   collect: collectUsageHistory.bind(null, ctx),
   prune: pruneUsageHistory.bind(null, ctx),
   read: readUsageHistory.bind(null, ctx),
+  readMany: readUsageHistories.bind(null, ctx),
   createScheduler: createUsageHistoryScheduler.bind(null, ctx),
 })
 

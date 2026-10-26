@@ -403,6 +403,17 @@ A 30-second V8 profile of the live Host sampled 1.604 seconds of non-idle CPU; `
 
 A fresh read-only live-DB probe on a 10-core machine (load 3.8) measured separate medians after one warmup: span count 12 ms, metric count 34 ms, all ordered trace rows 177 ms (38,276 rows), and resource sweep 72 ms; logs were empty. These are independent query timings, not an end-to-end measurement; their ~295 ms sum excludes Zod parsing and deletion and is not a request-latency claim. The pruning implementation now uses bounded oldest-trace pages, indexed resource checks, and cached log/metric counts. Focused tests and build/typecheck evidence are recorded by the performance thread; no live before/after has been measured because the running Host still serves the old bundle. A synthetic in-memory SQLite comparison (15.838 ms median for the full-scan/sort path versus 0.744 ms for a candidate aggregate/bounded-page/indexed check) is a query-shape estimate, not production evidence.
 
+## Quota forecast history batching (2026-10-26)
+
+A live forecast render with seven enabled accounts sent seven successful `ai-accounts/history` requests. Request-start through response-body-read times were 133–292 ms; the bodies totalled 2,137,208 bytes (37,148–495,259 bytes each). One combined response would exceed dshx's 1,048,576-byte JSON limit. Even the two largest captured bodies sum to 944,594 bytes, leaving room for the batched envelope without dropping forecast history.
+
+| Path | RPCs / quota-table scans | Payload and timing |
+| --- | --- | --- |
+| Before | 7 / 7 | 2,137,208 bytes total; 133–292 ms per response through body read |
+| After, verified by query test | 4 / 4 (batches of 2, 2, 2, 1) | All seven histories retained; the seven-account test asserts the exact four-call grouping. No post-change 7-account live timing was captured: the live Host was not restarted, and the scratch browser journey uses two synthetic accounts. |
+
+The Host scans quota storage once per batch, and the client falls back to the unchanged single-account endpoint when an older Host lacks the batch route or a batch contract fails. The scratch `quota-forecast` browser journey passed with its two fake accounts. The package-wide E2E command exited 1 on four other journeys (the plan-title assertion, two quota-recovery journeys, and model-effort fast-mode); those paths are outside this change. The scratch `dshx dev open` path was corrected to expect the real no-account empty state; its screenshot intentionally had no history requests.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the

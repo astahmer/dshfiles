@@ -4,7 +4,7 @@ import { Empty, EmptyDescription, EmptyHeader } from '@dshfiles/plugin-ui/compon
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { ChevronLeftIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { useQueries } from '@dshfiles/plugin-ui/query'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
@@ -36,18 +36,19 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
   const [coverageSelection, setCoverageSelection] = useState<CoverageSelection | null>(null)
 
   const cards = useMemo(() => (usage?.cards ?? []).filter(card => card.enabled), [usage])
-  const histories = useQueries({
-    queries: cards.map(card => aiAccountsQueries.forecastHistory(accounts, { instanceId: card.instanceId, refetchInterval: usageRefreshMs })),
-  })
-  const loading = usage === null || histories.some(history => history.isLoading)
+  const histories = useQuery(
+    aiAccountsQueries.forecastHistories(accounts, { instanceIds: cards.map(card => card.instanceId), refetchInterval: usageRefreshMs }),
+  )
+  const historiesById = new Map(histories.data?.histories.map(history => [history.instanceId, history.points]))
+  const loading = usage === null || (cards.length > 0 && histories.isLoading)
   // The sweep time, not render time: the board is a reading of that moment.
   const now = usage?.readAt ?? 0
-  const inputs = cards.map((card, index) => ({
+  const inputs = cards.map(card => ({
     instanceId: card.instanceId,
     displayName: card.displayName || card.instanceId,
     kind: card.kind,
     usage: card.usage,
-    points: histories[index]?.data?.points ?? [],
+    points: historiesById.get(card.instanceId) ?? [],
   }))
   const board = QuotaForecastModel.board({ accounts: inputs, now })
   const pace = QuotaPaceModel.current(board)

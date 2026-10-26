@@ -1,7 +1,8 @@
+import { createApiClient } from '@dshfiles/dshx/client'
 import { QueryClient, type QueryKey } from '@dshfiles/plugin-ui/query'
 import { describe, expect, it } from 'vitest'
 import { aiAccountsQueries } from './accounts-queries.js'
-import type { NativeProviders } from './api.js'
+import { aiAccountsApi, type NativeProviders } from './api.js'
 
 /** What an older Host actually sends: JSON that the current schema types do not describe. */
 const overTheWire = (value: unknown) => JSON.parse(JSON.stringify(value))
@@ -101,6 +102,96 @@ describe('ai-accounts queries', () => {
       ),
     )
     expect(signals[0]).toBeInstanceOf(AbortSignal)
+  })
+
+  it('batches forecast histories into bounded calls and forwards cancellation', async () => {
+    const calls: string[][] = []
+    const signals: (AbortSignal | undefined)[] = []
+    const options = aiAccountsQueries.forecastHistories(
+      {
+        forecastHistoryBatch: async (input, callOptions) => {
+          calls.push(input.instanceIds)
+          signals.push(callOptions?.signal)
+          return { histories: input.instanceIds.map(instanceId => ({ instanceId, points: [] })) }
+        },
+        history: async input => ({ instanceId: input.instanceId, points: [] }),
+      },
+      { instanceIds: ['cursor', 'codex', 'claude', 'copilot', 'commandcode', 'deepseek', 'opencode'], refetchInterval: 60_000 },
+    )
+    const result = await new QueryClient().fetchQuery(options)
+
+    expect(calls).toEqual([['claude', 'codex'], ['commandcode', 'copilot'], ['cursor', 'deepseek'], ['opencode']])
+    expect(result.histories.map(history => history.instanceId)).toEqual(['claude', 'codex', 'commandcode', 'copilot', 'cursor', 'deepseek', 'opencode'])
+    expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
+    expect(options.refetchInterval).toBe(60_000)
+  })
+
+  it('falls back to individual history reads when an older Host lacks the batch route', async () => {
+    const methods: string[] = []
+    const legacyInstanceIds = ['first', 'second', 'third', 'fourth']
+    let legacyIndex = 0
+    const accounts = createApiClient(
+      {
+        get: (_name: string) => ({
+          rpc: {
+            call: async (_channel: string, route: string) => {
+              const method = route.slice(route.lastIndexOf('/') + 1)
+              methods.push(method)
+              if (method === 'forecastHistoryBatch') throw new Error('HTTP 404')
+              const instanceId = legacyInstanceIds[legacyIndex] ?? 'unexpected'
+              legacyIndex += 1
+              return { ok: true, value: { version: aiAccountsApi.version, output: { instanceId, points: [] } } }
+            },
+          },
+        }),
+      },
+      aiAccountsApi,
+      '@dshfiles/ai-accounts',
+    )
+    const queryClient = new QueryClient()
+    const first = await queryClient.fetchQuery(aiAccountsQueries.forecastHistories(accounts, { instanceIds: ['first', 'second'], refetchInterval: 60_000 }))
+    const second = await queryClient.fetchQuery(aiAccountsQueries.forecastHistories(accounts, { instanceIds: ['third', 'fourth'], refetchInterval: 60_000 }))
+
+    expect(methods).toEqual(['forecastHistoryBatch', 'history', 'history', 'history', 'history'])
+    expect(first.histories.map(history => history.instanceId)).toEqual(['first', 'second'])
+    expect(second.histories.map(history => history.instanceId)).toEqual(['third', 'fourth'])
+  })
+
+  it('falls back to individual history reads when a pair exceeds the API payload limit', async () => {
+    const methods: string[] = []
+    let legacyIndex = 0
+    const accounts = createApiClient(
+      {
+        get: (_name: string) => ({
+          rpc: {
+            call: async (_channel: string, route: string) => {
+              const method = route.slice(route.lastIndexOf('/') + 1)
+              methods.push(method)
+              if (method === 'forecastHistoryBatch') return { ok: false, error: { code: 'contract', message: 'API payload exceeds 1048576 bytes.' } }
+              const instanceId = ['first', 'second'][legacyIndex] ?? 'unexpected'
+              legacyIndex += 1
+              return { ok: true, value: { version: aiAccountsApi.version, output: { instanceId, points: [] } } }
+            },
+          },
+        }),
+      },
+      aiAccountsApi,
+      '@dshfiles/ai-accounts',
+    )
+    const result = await new QueryClient().fetchQuery(
+      aiAccountsQueries.forecastHistories(accounts, { instanceIds: ['first', 'second'], refetchInterval: 60_000 }),
+    )
+
+    expect(methods).toEqual(['forecastHistoryBatch', 'history', 'history'])
+    expect(result.histories.map(history => history.instanceId)).toEqual(['first', 'second'])
+  })
+
+  it('does not request forecast histories when no accounts are enabled', () => {
+    const options = aiAccountsQueries.forecastHistories(
+      { forecastHistoryBatch: async () => ({ histories: [] }), history: async input => ({ instanceId: input.instanceId, points: [] }) },
+      { instanceIds: [], refetchInterval: 60_000 },
+    )
+    expect(options.enabled).toBe(false)
   })
 
   it('keeps the history page drawing when the Host has no history settings', async () => {
