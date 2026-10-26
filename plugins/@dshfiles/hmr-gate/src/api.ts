@@ -37,8 +37,7 @@ export const hmrGateApi = defineApi({
     status: method({
       input: z.object({}),
       output: hmrGateStatusSchema,
-      description:
-        'Plugin client rebuilds held back because their Host half changed and the running Host has not loaded it. Read-only.',
+      description: 'Plugin client rebuilds held back because their Host half changed and the running Host has not loaded it. Read-only.',
       tool: { name: 'hmr_gate_status', readOnly: true, render: compactStatus },
     }),
   },
