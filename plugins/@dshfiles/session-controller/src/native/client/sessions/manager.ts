@@ -152,6 +152,9 @@ export class SessionManager {
   private readonly provisional = new Map<SessionId, SessionSummary>()
   /** Creation still settling per provisional identity; history and RPCs wait on it. */
   private readonly pendingCreations = new Map<SessionId, Promise<SessionId>>()
+  private readonly deferredRpc = new Map<SessionId, (signal?: AbortSignal) => Promise<void>>()
+  private readonly hostNonblank = new Set<SessionId>()
+  private readonly hostKnown = new Set<SessionId>()
 
 
   private listSnapshotCache: SessionListSnapshot
@@ -317,6 +320,7 @@ export class SessionManager {
       ? undefined
       : this.agentAvailable(address.parentSessionId)
     const creation = this.pendingCreations.get(sessionId)
+    const beforeRpc = this.deferredRpc.get(sessionId)
     return new Session(sessionId, this.remote, {
       ...(address === undefined ? {} : {
         address,
@@ -336,6 +340,7 @@ export class SessionManager {
       ...(creation === undefined
         ? {}
         : { creation }),
+      ...(beforeRpc === undefined ? {} : { beforeRpc }),
       projections: this.projectionStore(sessionId),
     })
   }
@@ -390,6 +395,8 @@ export class SessionManager {
    * @returns completion of the current or newly started read.
    */
   refreshProjections(sessionId: SessionId): Promise<void> {
+    // Local blanks have no Host projection document. Reconnect must not address them either.
+    if (this.deferredRpc.has(sessionId)) return Promise.resolve()
     const existing = this.projectionInflight.get(sessionId)
     if (existing !== undefined) return existing.promise
     if (this.projectionLoads.get(sessionId)?.state === 'ready') return Promise.resolve()
@@ -478,6 +485,10 @@ export class SessionManager {
           const removedSincePull = new Set<SessionId>()
           for (const mutation of mutations) {
             if (mutation.kind === 'remove') removedSincePull.add(mutation.sessionId)
+          }
+          for (const s of result.value.items) {
+            this.hostKnown.add(s.sessionId)
+            if (!s.blank) this.hostNonblank.add(s.sessionId)
           }
           for (const s of baseline) {
             if (s.running && !removedSincePull.has(s.sessionId)) this.engagedSessions.add(s.sessionId)
@@ -573,6 +584,7 @@ export class SessionManager {
       : { ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }), ...shared }
     const result = await this.remote.session.create(payload)
     if (result.ok) {
+      this.hostKnown.add(result.value.sessionId)
       this.recordMutation({ kind: 'placeholder', summary: { agentAvailable: true,
         sessionId: result.value.sessionId, updatedAt: Date.now(), running: false, blank: true,
         ...(opts.cwd !== undefined ? { cwd: opts.cwd } : {}),
@@ -651,6 +663,38 @@ export class SessionManager {
    * @param sessionId - any identity; non-provisional ones report undefined.
    * @returns the settling identity, or undefined once creation finished.
    */
+  /** Install a local blank's success gate before any scope can open or issue RPCs. */
+  deferCreation(sessionId: SessionId, created: Promise<SessionId>, beforeRpc: (signal?: AbortSignal) => Promise<void>): void {
+    this.pendingCreations.set(sessionId, created)
+    this.deferredRpc.set(sessionId, beforeRpc)
+  }
+
+  /** Drop only the provisional overlay; the created Host row and unsent metadata remain. */
+  finishDeferred(sessionId: SessionId): void {
+    this.provisional.delete(sessionId)
+    this.pendingCreations.delete(sessionId)
+    this.deferredRpc.delete(sessionId)
+    this.notifier.markDirty()
+  }
+
+  /** Forget an abandoned empty local identity without addressing the Host. */
+  discardDeferred(sessionId: SessionId): void {
+    if (!this.deferredRpc.has(sessionId)) return
+    this.provisional.delete(sessionId)
+    this.pendingCreations.delete(sessionId)
+    this.deferredRpc.delete(sessionId)
+    this.recordMutation({ kind: 'remove', sessionId })
+  }
+
+  /** Host-only evidence: first-send optimism is deliberately excluded. */
+  draftEvidence(): { nonblank: ReadonlySet<SessionId>; hostIds: ReadonlySet<SessionId> } {
+    const nonblank = new Set(this.hostNonblank)
+    for (const [id, store] of this.projectionStores) {
+      if (store.values().sessionListMetadata?.blank === false) nonblank.add(id)
+    }
+    return { nonblank, hostIds: this.hostKnown }
+  }
+
   creationFor(sessionId: SessionId): Promise<SessionId> | undefined {
     return this.pendingCreations.get(sessionId)
   }
@@ -777,6 +821,8 @@ export class SessionManager {
    * @param summary - current Host summary for the added Session.
    */
   handleSessionAdded(summary: SessionSummary): void {
+    this.hostKnown.add(summary.sessionId)
+    if (!summary.blank) this.hostNonblank.add(summary.sessionId)
     this.mergeSummary(summary)
     if (!this.disposed && summary.running) this.engagedSessions.add(summary.sessionId)
     this.sessions.get(summary.sessionId)?.handleBlank(this.effectiveBlank(summary))
@@ -812,6 +858,8 @@ export class SessionManager {
    * @param sessionId - removed Session identity.
    */
   handleSessionRemoved(sessionId: SessionId): void {
+    this.hostKnown.delete(sessionId)
+    this.hostNonblank.delete(sessionId)
     const durableSubagent = this.subagentAddress(sessionId) !== undefined
       || this.summaries.some(summary => summary.sessionId === sessionId && summary.origin === 'subagent')
     this.recordMutation(durableSubagent

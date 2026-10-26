@@ -2,6 +2,8 @@
 
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
+![Start a chat directly from an expanded or collapsed project header](docs/screenshots/project-header-chat.png)
+![Several unsent drafts in the same project](docs/screenshots/typed-project-drafts.png)
 
 ![Group remote threads with each view](docs/screenshots/section-order.png)
 
@@ -21,6 +23,47 @@ Active/Inactive status grouping.
 A local status section with no rows folds away and keeps its saved slot while the
 shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
+
+**New chat from a project header.** With **Group: Project**, each registered local
+project has an always-visible **+** beside its collapse chevron. It opens a fresh
+chat in that project without changing whether the group is collapsed. The selected
+blank chat appears as **New chat** in **All threads**, but stays local: leaving it
+empty does not create a saved Host conversation. Typing meaningful text (or adding
+an attachment) saves its identity before sending and changes its row to **Draft:
+…**. Reopen drafts from their rows. You can keep several independent unsent chats
+in the same project; **+** and global **New thread** never overwrite them.
+
+The tooltip and accessible name say **New chat in &lt;project&gt;**; Enter and Space
+activate it. Draft text uses the existing per-Session composer storage, including
+page-reload restoration in the same browser origin; it is not synced between
+devices or between localhost and LAN addresses. No separate project text cache is
+introduced. Workspace isolation and error feedback remain with the existing
+creation flow. Unassigned, remote and unavailable project groups, and date/status
+groups, have no **+**.
+
+The draft lifecycle uses the paired owned `session-controller`, `workspace-nav`
+and `rich-composer` bundles. The native `model-selection` and `agent-preset` row
+forks stage choices without addressing a nonexistent Host identity. Include both
+in the profile; replacing only the visible model picker cannot adapt the native
+preset controller or `/model` owner. These are supported plugin replacements,
+not DSH core patches. Old saved blank sessions are not deleted automatically.
+
+The project-header browser journeys cover selected blanks without a create RPC,
+whitespace-only input, independent same-project drafts, reload and first send,
+global New thread, pretyping model/preset choices, and the compact model picker:
+
+```sh
+pnpm --dir tooling/dshx run test:e2e:gen
+pnpm --dir tooling/dshx exec playwright test --config=playwright.e2e.config.ts project-header-chat --workers=1
+```
+
+Use the scratch executable/browser overrides described by `verify-dsh` when the
+personal launcher rewrites the scratch home or bundled Chromium is unavailable.
+The six affected packages pass focused tests/typechecks and Host bundle imports.
+The four scratch journeys pass without a provider response or live-instance restart.
+This does not establish cross-device draft sync, arbitrary plugin compatibility,
+or deployment into an existing profile. New profile rows require user-controlled
+activation/restart; merely building an isolated worktree does not update the GUI.
 
 **Moving a row between sections.** Drag a thread row onto another section header
 (or anywhere inside that section) to put it there; while a row is in flight every

@@ -11,13 +11,17 @@ const HiddenPermissionSelector = (): null => null
 
 export default defineClient({
   name: '@dshfiles/rich-composer',
-  inject,
+  inject: [...inject, 'sessionDrafts'],
   setup(ctx) {
     apply(ctx)
 
     const warmup = createApiClient(ctx, agentWarmupApi)
     ctx.on('dshfiles/composer/first-edit', sessionId => {
-      void warmup.warm({ sessionId }).catch(() => undefined)
+      // A New chat is only local until its first edit. Never warm a Host identity before creation settles.
+      void (async () => {
+        await ctx.get('sessionDrafts')?.whenCreated(sessionId)
+        await warmup.warm({ sessionId })
+      })().catch(() => undefined)
     })
 
     // The permission seat is a single slot: a lower-priority empty occupant shadows the native selector, and

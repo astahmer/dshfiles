@@ -396,6 +396,10 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
       hooks: {
         composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
+        draftWorkspace: {
+          getSnapshot: () => sessionId === undefined ? undefined : ctx.sessionDrafts.list.getSnapshot()[sessionId]?.workspaceId,
+          subscribe: listener => ctx.sessionDrafts.list.subscribe(listener),
+        },
       },
       selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, nextId => {
         if (sessionId === undefined || nextId === sessionId) return

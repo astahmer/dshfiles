@@ -197,6 +197,69 @@
       ]
     },
     {
+      "id": "project-header-chat",
+      "title": "Start a chat from a project group header",
+      "summary": "Open a fresh local New chat from a project header. All threads shows the selected blank immediately; typing saves a distinct unsent draft before sending. Reopen any of several project drafts from their rows, without creating saved empty conversations.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Project header example\"",
+        "press Enter",
+        "expect text \"Project header example\"",
+        "click button \"All threads\"",
+        "click button \"Group: Status\"",
+        "click menuitemradio \"Project\"",
+        "expect button \"New chat in sample\"",
+        "click button \"New chat in sample\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unsent project prompt\"",
+        "expect text \"Draft: Unsent project prompt\"",
+        "click text \"Project header example\" at 16,8",
+        "click text \"Draft: Unsent project prompt\" at 16,8",
+        "expect text \"Unsent project prompt\""
+      ],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["expanded-project", "collapsed-project", "blank-chat", "project-draft", "fresh-after-send"],
+      "failureModes": [
+        "Creation uses the chosen project's ID, not its display label or the currently open thread's project.",
+        "Date, status, Unassigned, remote and unavailable project groups have no creation button.",
+        "Creation failures use the existing New thread feedback; no fallback silently creates in another project."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.project-header-chat",
+          "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.project-header-drafts",
+          "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.pretyping-draft-choices",
+          "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.custom-draft-picker",
+          "featureFile": "tooling/dshx/e2e/features/project-header-chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The header delegates to existing workspace navigation and Session creation; it adds no independent I/O or custom spans."
+        }
+      ]
+    },
+    {
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
       "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, and open an archived thread by restoring it: DSH drops an archived Session from the main view, so one click restores and opens it instead of retrying a view that keeps closing.",

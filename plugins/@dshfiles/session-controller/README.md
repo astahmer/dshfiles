@@ -53,6 +53,34 @@ arrived after the interruption but never started a turn does not invalidate it:
 a restart can persist the message and leave no turn to run it, so the stopped
 task still offers Resume.
 
+### Local unsent drafts
+
+The public `@dshfiles/session-controller/draft-client` dshx module owns `ctx.sessionDrafts`:
+
+- `list`: observable identity/workspace/preview metadata plus `local`, staged `model` and `agentPreset`;
+  empty local blanks have `preview: ''`.
+- `create({ workspaceId, cwd, agentPreset? })`: allocates a fresh retainable local identity, with no Host call.
+- `update(id, { text, hasAttachments })`: stores bounded preview metadata before the first nonempty update
+  materializes the Host Session. The composer alone owns full text and attachments in its existing conversation store.
+- `stageModel(id, selection)` / `stagePreset(id, preset)`: consume local choices without a Host RPC;
+  return false for an already-materialized Session so controls retain their native mutation path. Empty choices
+  stay in memory only. The latest choices drain after creation and before history, warmup or first-send readiness.
+- `whenCreated(id, signal?)`: waits without activating an empty blank; abort cancels only this waiter.
+- `retry(id)`: retries failed materialization; sending again also retries. Failure keeps the identity, metadata,
+  and composer buffer, and appears in the Session error snapshot.
+
+Only typed/attachment draft metadata is persisted (`dsh.sessionDrafts`). It survives creation failure and reload;
+Host-derived nonblank evidence retires it, independently of the hero's existing `blank` presentation.
+Writes re-read browser storage, merge only changed identities, and remove only explicitly cleared/retired identities,
+so independent tabs do not replace each other's draft lists. Rejected writes preserve the in-memory draft and pending
+metadata changes and show a Session warning; a later edit retries the write.
+Local history/follow, projections and Session mutation methods never address an uncreated identity.
+A local `mainView`/`sidebarView` reference is synchronously binding-ready; its Session stays `cold` until
+materialization enables background history. Other operation references keep real-history readiness.
+`using()` waits for local creation before acquiring a reference, so speculative command-catalog warmup cannot
+keep an abandoned empty view alive; caller cancellation and Controller disposal cancel that unretained wait.
+`ctx.sessions.create` and `createOptimistic` retain their native real-creation semantics for agent and JJ flows.
+
 ### Session sources (remote Sessions)
 
 `src/mirrored-sessions.ts` (new, not vendored) lets another plugin register Sessions this Host does not own — today

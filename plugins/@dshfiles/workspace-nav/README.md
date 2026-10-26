@@ -1,8 +1,8 @@
 # @dshfiles/workspace-nav
 
 Owned fork of `@deepseek-ai/dsh-client-ui-workspace` (the Workspace picker and the `uiWorkspace` navigation
-service). A New thread switches the main view to its Session **before** the Host creates it, so the composer is
-usable while `session/create` is in flight.
+service). New thread opens a fresh **local blank**. No Host Session or log is created until the composer
+contains real text or attachments, and multiple unsent drafts in one project keep independent identities.
 
 Without the fork, `UiWorkspace.startSession` awaited `session/create` before revealing the composer: 1.7 s on a
 quiet Host, up to 9.5 s under load ([performance](../../../docs/performance.md#first-send-no-longer-waits-for-its-thread-workspace)).
@@ -11,20 +11,21 @@ first-send wait, not the click wait; this fork removes the click wait.
 
 ## What changes
 
-Every New thread entry point (sidebar `+`, main-tabs `+`, command palette, ⌘N, the hero project picker, the
-schedule dialog) funnels into `UiWorkspace.startSession` / `openWorkspace`, so the fork fixes them all at once:
+Every ordinary New thread entry point funnels into `UiWorkspace.startSession`:
 
-1. `newThreadRequest` (non-vendored, tested in `tests/new-thread-request.test.ts`) picks the request: the
-   Workspace's first listed blank when draft options allow reuse, otherwise no `sessionId` so the Host mints one.
-2. `ctx.sessions.createOptimistic` (from `@dshfiles/session-controller`) publishes the provisional blank list row
-   synchronously and settles `session/create` in the background.
-3. `replaceMain` runs immediately: the composer binds to the provisional Session, the draft and references move
-   with it, and the saved selection records it.
-4. The Host creates (or reuses) the Session under that identity. If it returns another identity, the view follows
-   it; a refused creation shows the create-failed notice, drops the provisional row and returns the view.
+1. `ctx.sessionDrafts.create` allocates a fresh identity through the canonical
+   `@dshfiles/session-controller/draft-client` service. It never reuses another typed draft.
+2. `replaceMain` binds the composer immediately. Blank identities are not persisted; typed/attachment drafts
+   keep metadata and the composer's existing conversation buffer for reload and later reopening.
+3. The first content update materializes that exact identity once. Creation failures leave the draft selected
+   and intact; the Session shows the error, and another Send retries.
+4. Startup restores saved typed-draft metadata before considering Host blanks. A missing selection's ordinary
+   fallback is another local blank, not a Host creation.
 
-`connectWorkspace` stays waiting on purpose: jj-integration's thread warmup resolves a thread workspace's blank
-Session before it sends into it.
+`openWorkspace` uses the same local lifecycle for the hero and project picker, while preserving its
+synchronous `beforeOpen` draft-transfer hook. `connectWorkspace` keeps real Host creation/reuse on purpose:
+jj-integration resolves a thread workspace's Session before sending into it. `newThreadRequest`
+(`tests/new-thread-request.test.ts`) still owns blank reuse for those explicit flows.
 
 ## Provenance
 
@@ -38,7 +39,7 @@ Session before it sends into it.
 | Verification        | `node scripts/native-fork-diff.mjs workspace-nav`, `tests/new-thread-request.test.ts`       |
 
 Update policy: bump with `node scripts/native-fork-diff.mjs workspace-nav --to <new-tag>`, re-apply the
-`navigation.ts` delta (the `openOptimistic` path and `blankRequest`), and re-run the journeys below.
+`navigation.ts` delta (local draft navigation and `blankRequest` for explicit Host connections), and re-run the journeys below.
 
 ## Journeys
 

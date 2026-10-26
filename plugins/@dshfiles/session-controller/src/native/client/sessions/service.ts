@@ -4,6 +4,8 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry/remote'
 import { SESSION_SEARCH_RESULT_LIMIT } from '../../types.ts'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import {
@@ -22,6 +24,7 @@ import type { SessionRemotes } from './remotes.ts'
 import type { SessionListPhase, SessionSearchResultItem, SessionProjectionSnapshot } from './manager.ts'
 import type { Session } from './session.ts'
 import type { SessionListEntry } from './lineage.ts'
+import { ClientSessionDrafts } from '../../../draft-state.ts'
 
 /** Session list row projected from the host list RPC plus live stream increments. */
 export interface SessionSummary {
@@ -199,6 +202,12 @@ class ClientSessionReference implements SessionReference {
     return this.record.binding
   }
 
+  /** Local presentation is synchronously binding-ready, including same-turn replacement. */
+  attachBinding(signal?: AbortSignal): void {
+    signal?.throwIfAborted()
+    this.readiness.resolve(this.binding)
+  }
+
   attachOpening(opening: Promise<void>, signal?: AbortSignal): void {
     const waitSignal = signal === undefined
       ? this.released.signal
@@ -249,6 +258,8 @@ export class ClientSessions implements ISessions {
   private readonly retainObservers = new Map<SessionId, RetentionObserver>()
   private readonly scopeDrops = new Set<Promise<void>>()
   private closed = false
+  private readonly lifetime = new AbortController()
+  readonly drafts: ClientSessionDrafts
 
   /**
    * @param ctx - client root context (scope fibers mount under it).
@@ -262,9 +273,47 @@ export class ClientSessions implements ISessions {
     this.list = createSnapshotStore<SessionListState>({
       ids: [], byId: {}, phase: 'pending', projectionsBySession: {},
     })
+    this.drafts = new ClientSessionDrafts({
+      begin: opts => this.manager.beginProvisional(opts),
+      defer: (id, created, beforeRpc) => { this.manager.deferCreation(id, created, beforeRpc) },
+      materialize: async metadata => {
+        const result = await this.manager.create({
+          sessionId: metadata.sessionId, cwd: metadata.cwd,
+          ...(metadata.workspaceId === undefined ? {} : { workspaceId: metadata.workspaceId }),
+          ...(metadata.agentPreset === undefined ? {} : { agentPreset: metadata.agentPreset }),
+        })
+        if (!result.ok) throw new SessionCreateError(result.error, metadata.sessionId)
+        this.projectList()
+        return result.value.sessionId
+      },
+      selectModel: async (sessionId, selection) => {
+        const result = await remote.session.selectModel({ sessionId, ...selection })
+        if (!result.ok) throw new SessionCreateError(result.error, sessionId)
+      },
+      selectPreset: async (sessionId, agentPreset) => {
+        const result = await rootCtx.remote.agentPresets.select(sessionId, agentPreset)
+        if (!result.ok) throw new SessionCreateError(result.error, sessionId)
+      },
+      finish: id => { this.manager.finishDeferred(id) },
+      discard: id => { this.manager.discardDeferred(id) },
+      lookup: id => {
+        const row = this.list.getSnapshot().byId[id]
+        if (row === undefined || !row.blank || row.cwd === undefined) return undefined
+        const workspaceId = rootCtx.get('workspaces')?.list.getSnapshot().items
+          .find(workspace => workspace.sessionIds.includes(id))?.workspaceId
+        return { sessionId: id, cwd: row.cwd, preview: '', ...(workspaceId === undefined ? {} : { workspaceId }) }
+      },
+      failed: (id, error) => {
+        this.manager.handleSessionError(id, error instanceof Error ? error.message : String(error))
+      },
+    })
+    this.projectList()
+    rootCtx.reflect.provide('sessionDrafts', this.drafts, undefined)
     const disposeManagerProjection = this.manager.subscribe(() => { this.projectList() })
     rootCtx.effect(() => async () => {
       this.closed = true
+      this.lifetime.abort(new Error('Session Controller is disposed'))
+      this.drafts.dispose()
       disposeManagerProjection()
       const scopes = [...this.scopes]
       this.scopes.clear()
@@ -290,7 +339,19 @@ export class ClientSessions implements ISessions {
     const id = this.manager.resolveTarget(target)
     const reference = this.retainScope(id, source)
     try {
-      reference.attachOpening(this.manager.get(id).open(), signal)
+      const session = this.manager.get(id)
+      const opening = session.open()
+      if (this.drafts.list.getSnapshot()[id]?.local === true && ['mainView', 'sidebarView'].includes(source)) {
+        // A local view needs the binding, not a Host history document which does not exist yet.
+        reference.attachBinding(signal)
+        void opening.catch((error: unknown) => {
+          // Leaving an empty local view deliberately rejects its creation gate.
+          if (this.closed || this.scopes.get(id)?.session !== session) return
+          this.manager.handleSessionError(id, error instanceof Error ? error.message : String(error))
+        })
+      } else {
+        reference.attachOpening(opening, signal)
+      }
       return reference
     } catch (error) {
       reference.release()
@@ -303,6 +364,14 @@ export class ClientSessions implements ISessions {
     options: SessionRetainOptions,
     operation: (reference: SessionReference) => T | Promise<T>,
   ): Promise<T> {
+    const id = typeof target === 'string' ? target : target.childSessionId
+    if (this.drafts.list.getSnapshot()[id]?.local === true) {
+      const signal = options.signal === undefined
+        ? this.lifetime.signal
+        : AbortSignal.any([this.lifetime.signal, options.signal])
+      // Catalog warmup and other operations must not pin an otherwise abandoned blank view.
+      await this.drafts.whenCreated(id, signal)
+    }
     const reference = this.retain(target, options)
     try {
       await reference.ready
@@ -619,6 +688,7 @@ export class ClientSessions implements ISessions {
     if (this.scopes.get(id) === record) this.scopes.delete(id)
     record.session.unbindScope()
     const sessionDisposal = this.manager.drop(id, record.session)
+    this.drafts.abandonEmpty(id)
     this.projectList()
     this.publishRetention(id)
     this.startScopeDrop(id, record, disposeFiber, sessionDisposal)
@@ -720,6 +790,8 @@ export class ClientSessions implements ISessions {
       }
     }
     this.list.set({ ids, byId, phase, projectionsBySession })
+    const { nonblank, hostIds } = this.manager.draftEvidence()
+    this.drafts.reconcile(nonblank, hostIds)
   }
 
   private startScopeDrop(

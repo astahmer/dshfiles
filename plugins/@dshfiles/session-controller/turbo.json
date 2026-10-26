@@ -7,8 +7,11 @@
       "dependsOn": [],
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__session-controller.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__session-source-port.sha256",
+        "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/session-controller/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/session-controller/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/session-source-port/cordis.patch.yml",

@@ -1,0 +1,5 @@
+- id: ui-agent-preset
+  disabled: true
+- insert:
+    - id: dshfiles-agent-preset
+      name: '@dshfiles/agent-preset'

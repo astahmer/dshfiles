@@ -1,0 +1,29 @@
+{
+  "$comment": "Pinned whole native Loader row fork; run node scripts/native-fork-diff.mjs model-selection after changes.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-client-ui-model-selection",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/client/ui-model-selection"
+  },
+  "files": [
+    {
+      "upstream": "src/client",
+      "local": "src/native"
+    },
+    {
+      "upstream": "src/index.ts",
+      "local": "src/host.ts"
+    },
+    {
+      "upstream": "src/css-modules.d.ts",
+      "local": "src/css-modules.d.ts"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
+  ],
+  "delta": ["src/native/directory.ts", "src/native/service.ts", "src/native/index.ts"]
+}
