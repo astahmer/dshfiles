@@ -6,6 +6,7 @@ policy. This plugin uses Node's cross-platform TCP implementation;
 it needs no systemd, launchd, shell utility, fixed LAN IP, or fixed port.
 
 ![Staged Network access settings](docs/screenshots/network-access-settings.png)
+![Compact Network access settings](docs/screenshots/network-access-settings-compact.png)
 
 ## Network access settings
 
@@ -104,15 +105,14 @@ native CLI overrides without restating the native Context contract in the plugin
 There is no personal launcher integration, trusted-host exception or replacement
 authentication layer. Listener changes require a user-controlled Host restart.
 
-## Permission and license status
+## License and provenance
 
-The author explicitly authorized publishing this optional contribution as a
-draft for review. The source manifest said MIT but shipped no package license
-text, and this repository has no root license grant. This draft does not invent
-one: the package remains private and marked `UNLICENSED` pending the author's
-formal license choice before adoption or redistribution under an open-source
-license. The existing SDK/libraries retain their own licenses; no third-party
-provenance or license is claimed for the new code.
+The author explicitly selected the **MIT License** for this contribution and
+authorized its upstream merge. The complete grant is included in [LICENSE](LICENSE).
+The package remains `private` to prevent accidental registry publication; this
+does not restrict the MIT grant. Existing SDK/libraries retain their own licenses.
+The implementation provenance above is unchanged; no third-party proxy code or
+license ownership is claimed.
 
 ## Verification
 

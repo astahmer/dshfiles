@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "Keep localhost access to the same authenticated DSH when its Web server binds a LAN interface.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "files": [
     "dist",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "type": "module",
   "main": "./dist/index.js",
