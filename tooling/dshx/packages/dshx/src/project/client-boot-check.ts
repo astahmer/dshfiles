@@ -104,7 +104,7 @@ const parseBootText = (text: string): ClientBootCheckEntry[] => {
     entries.push({
       id: match.groups.id ?? '',
       state: match.groups.state ?? '',
-      ...(detail === undefined || detail === '' ? {} : { detail }),
+      ...(!(detail === undefined || detail === '') && { detail }),
     })
   }
   return entries
@@ -328,12 +328,12 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     browserReady,
     failureCardVisible,
     timedOut,
-    ...(processError === undefined ? {} : { processError: ScratchProfileRuntime.redactHostOutput(processError) }),
-    ...(spawnError === undefined ? {} : { spawnError: ScratchProfileRuntime.redactHostOutput(spawnError) }),
-    ...(evidence === undefined ? {} : { evidence }),
-    ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
-    ...(browserError === undefined ? {} : { browserError: ScratchProfileRuntime.redactHostOutput(browserError) }),
-    ...(readinessError === undefined ? {} : { readinessError: ScratchProfileRuntime.redactHostOutput(readinessError) }),
+    ...(processError !== undefined && { processError: ScratchProfileRuntime.redactHostOutput(processError) }),
+    ...(spawnError !== undefined && { spawnError: ScratchProfileRuntime.redactHostOutput(spawnError) }),
+    ...(evidence !== undefined && { evidence }),
+    ...(launchUrl !== undefined && { url: new URL(launchUrl).origin }),
+    ...(browserError !== undefined && { browserError: ScratchProfileRuntime.redactHostOutput(browserError) }),
+    ...(readinessError !== undefined && { readinessError: ScratchProfileRuntime.redactHostOutput(readinessError) }),
   }
 }
 

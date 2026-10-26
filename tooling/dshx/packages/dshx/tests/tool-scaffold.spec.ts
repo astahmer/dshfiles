@@ -9,11 +9,11 @@ function project(root: string, hostEntry?: string, configFile?: string): Resolve
   return {
     root,
     packageFile: resolve(root, 'package.json'),
-    ...(configFile === undefined ? {} : { configFile }),
+    ...(configFile !== undefined && { configFile }),
     configDependencies: [],
     packageId: '@demo/plugin',
     name: '@demo/plugin',
-    ...(hostEntry === undefined ? {} : { hostEntry }),
+    ...(hostEntry !== undefined && { hostEntry }),
     outDir: resolve(root, 'dist'),
     profile: 'web',
     dev: { hostRestart: 'manual' },

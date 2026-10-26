@@ -413,10 +413,10 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
       api.list(
         {
           locale,
-          ...(sort === 'latest' ? {} : { sort }),
-          ...(category === undefined ? {} : { category }),
-          ...(query === undefined ? {} : { query }),
-          ...(pageParam === null ? {} : { cursor: pageParam }),
+          ...(sort !== 'latest' && { sort }),
+          ...(category !== undefined && { category }),
+          ...(query !== undefined && { query }),
+          ...(pageParam !== null && { cursor: pageParam }),
         },
         { signal },
       ),

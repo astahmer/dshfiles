@@ -112,6 +112,9 @@ export class RemoteModelDirectory {
   }
 
   private isRoutable(selection: ModelSelection | null): boolean {
-    return selection !== null && (this.catalog?.groups.some(group => group.id === selection.provider && group.models.some(model => model.id === selection.model)) ?? false)
+    return (
+      selection !== null &&
+      (this.catalog?.groups.some(group => group.id === selection.provider && group.models.some(model => model.id === selection.model)) ?? false)
+    )
   }
 }

@@ -7,7 +7,7 @@ export const remoteDirectoryPicker = (api: MultiHostClient, runtimeId: string) =
     throw new Error('The native folder chooser only opens on this machine; browse the host instead.')
   },
   list: async (path: string | undefined, signal: AbortSignal): Promise<DirectoryListing> => {
-    const result = await api.runtimeBrowse({ runtimeId, ...(path === undefined ? {} : { path }) }, { signal })
+    const result = await api.runtimeBrowse({ runtimeId, ...(path !== undefined && { path }) }, { signal })
     if (!result.ok) throw new Error(`${result.message} (${result.code})`)
     return { path: result.path, home: result.home, crumbs: result.crumbs, entries: result.entries, truncated: result.truncated }
   },

@@ -74,7 +74,6 @@ const runtimeRegistrationSchema = z.discriminatedUnion('ok', [
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
 )
-export { nativeRpcRequestSchema } from './native-rpc.js'
 const nativeRpcResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: jsonValueSchema }).strict(),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).strict(),
@@ -99,7 +98,6 @@ export type WorkspaceSummary = z.infer<typeof workspaceSchema>
 export type SessionSummaryRow = z.infer<typeof sessionSummarySchema>
 export type RuntimeStatusValue = z.infer<typeof runtimeStatusSchema>
 export type RuntimeRegistrationResult = z.infer<typeof runtimeRegistrationSchema>
-export type { NativeRpcRequest } from './native-rpc.js'
 export type NativeRpcResult = z.infer<typeof nativeRpcResultSchema>
 
 export interface MultiHost {
@@ -126,7 +124,7 @@ export const connectMultiHost = async (options: { readonly url?: string }): Prom
     packageId: '@dshfiles/multi-host',
     apiId: 'multi-host',
     version: 1,
-    ...(options.url === undefined ? {} : { url: options.url }),
+    ...(options.url !== undefined && { url: options.url }),
   })
   return {
     list: async () => z.object({ hosts: z.array(hostSummarySchema), runtimes: z.array(runtimeSummarySchema) }).parse(await call('list')),

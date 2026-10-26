@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { inspectProjectComposition, ProviderInspectionModel } from '../src/inspect/index.js'
+import { inspectProjectComposition, ProviderInspectionModel } from '../src/inspect/provider.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 
 function project(): ResolvedDshxConfig {
   return {

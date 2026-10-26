@@ -5,6 +5,7 @@ import { Session } from '../../src/native/client/sessions/session.js'
 import type { SessionRemotes } from '../../src/native/client/sessions/remotes.js'
 
 const sessionWithPrompt = (prompt: SessionRemotes['session']['prompt'], options: ConstructorParameters<typeof Session>[2] = {}): Session =>
+  // oxlint-disable-next-line antislop/no-chained-type-assertions -- test stub: the Session under test only reaches `session.prompt`; the rest of the surface is never called.
   new Session(SessionId('session-retry-test'), { session: { prompt } } as unknown as SessionRemotes, options)
 
 const text = [{ type: 'text', text: 'hello' }] as const

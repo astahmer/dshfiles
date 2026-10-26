@@ -222,6 +222,6 @@ test('review writes a markdown and JSON artifact and prints a summary', async ()
   assert.match(text, /## Limits of this report/)
 
   const report = JSON.parse(await readFile(join(out, json), 'utf8'))
-  assert.equal(typeof report.current.from, 'number')
+  assert.ok(Number.isFinite(report.current.from))
   assert.ok(Array.isArray(report.candidates))
 })

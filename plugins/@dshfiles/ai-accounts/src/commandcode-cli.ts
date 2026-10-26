@@ -236,8 +236,8 @@ const requestBody = (model: Model<string>, context: TranscriptContext, options: 
       system: system === '' ? '' : [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       max_tokens: options?.maxTokens ?? model.maxTokens,
       stream: true,
-      ...(options?.temperature === undefined ? {} : { temperature: options.temperature }),
-      ...(typeof reasoningEffort === 'string' ? { reasoning_effort: reasoningEffort } : {}),
+      ...(options?.temperature !== undefined && { temperature: options.temperature }),
+      ...(typeof reasoningEffort === 'string' && { reasoning_effort: reasoningEffort }),
     },
     threadId: threadIdFor(options?.sessionId),
   }
@@ -379,7 +379,7 @@ export const streamCommandCodeCli = (input: {
             output: usage?.outputTokens ?? 0,
             cacheRead,
             cacheWrite: written,
-            ...(usage?.reasoningTokens === undefined ? {} : { reasoning: usage.reasoningTokens }),
+            ...(usage?.reasoningTokens !== undefined && { reasoning: usage.reasoningTokens }),
             totalTokens: (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
             cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
           }

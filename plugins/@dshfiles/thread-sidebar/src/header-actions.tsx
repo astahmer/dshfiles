@@ -102,6 +102,8 @@ export const HeaderThreadActions = ({
   const [actionFailed, setActionFailed] = useState(false)
   const [copyStatus, setCopyStatus] = useState('')
   const [bar, setBar] = useState<HTMLElement | null>(null)
+  // Expired mutes are pruned by the sidebar's own clock; this header only needs the moment it opened.
+  const [openedAt] = useState(() => Date.now())
   const crowded = useCrowdedHeader(bar)
   const workspaceBySession = useMemo(
     () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(sessionState.byId) }),
@@ -112,7 +114,7 @@ export const HeaderThreadActions = ({
   const archived = archivedSessionIds.includes(sessionId)
   const pinned = pinnedSessionIds.includes(sessionId)
   const parked = preferences.parkedSessionIds.includes(sessionId)
-  const muted = ThreadMuteModel.isSessionMuted(preferences.mutedThreads, sessionId, Date.now())
+  const muted = ThreadMuteModel.isSessionMuted(preferences.mutedThreads, sessionId, openedAt)
   const actionThreads = Object.values(sessionState.byId).filter(candidate => !candidate.blank)
   const targetIds = ThreadChildrenModel.threadActionTargetIds({
     threadId: sessionId,

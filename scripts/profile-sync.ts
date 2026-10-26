@@ -22,6 +22,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { z } from 'zod'
+import { decodeJson } from './json.ts'
 
 /**
  * Link owned bundles into a DSH profile and install it. The single reconciler for profiles: `pnpm profile:sync`, the
@@ -64,8 +65,7 @@ const syncStateSchema = z.object({
 })
 type SyncState = z.infer<typeof syncStateSchema>
 
-const parseJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
-const readJson = <Output>(schema: z.ZodType<Output>, path: string): Output => parseJson(schema, readFileSync(path, 'utf8'))
+const readJson = <Schema extends z.ZodType>(schema: Schema, path: string): z.output<Schema> => decodeJson(schema, readFileSync(path, 'utf8'))
 const errorCode = (error: unknown): string | undefined => z.object({ code: z.string() }).safeParse(error).data?.code
 const isOwned = (name: string): boolean => name.startsWith('@dshfiles/')
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex')
@@ -279,7 +279,7 @@ const syncSeededProfile = async (): Promise<void> => {
 
   await withProfileLock(async () => {
     const currentText = readFileSync(manifestPath, 'utf8')
-    const manifest = parseJson(profileManifestSchema, currentText)
+    const manifest = decodeJson(profileManifestSchema, currentText)
     const previous = readState()
 
     const dependencies = { ...manifest.dependencies }

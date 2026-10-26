@@ -12,8 +12,6 @@ import { secretCatalogSettings } from './settings.js'
 import { createSecretCatalogCredentialBridge } from './credential-bridge.js'
 import { createSecretCatalogValues } from './secret-reference-resolver.js'
 
-export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from './credential-bridge.js'
-
 const operationsByContext = new WeakMap<Context, SecretCatalogOperations>()
 /** One operations instance per Host context, so concurrent metadata reads share one CLI process. */
 const operationsFor = (ctx: Context): SecretCatalogOperations => {

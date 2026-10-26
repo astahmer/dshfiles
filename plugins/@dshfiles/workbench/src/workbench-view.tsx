@@ -13,7 +13,7 @@ import {
   type DockviewTheme,
   type IDockviewPanelProps,
 } from 'dockview-react'
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
 import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore, type WorkbenchDefaultLayout } from './layout-store.js'
 import type { WorkbenchTranslate } from './locales.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
@@ -70,7 +70,7 @@ const defaultLayoutOf = (surface: WorkbenchViewProps['surface']): WorkbenchDefau
   surface === 'dock' ? 'dock-default' : surface === 'bottom' ? 'empty' : 'editor'
 
 export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
-  const { registry, store, t } = props
+  const { acceptDroppedPanel, onOpenPanel, region, registry, store, t } = props
   const defaultLayout = defaultLayoutOf(props.surface)
   const definitions = usePanelDefinitions(registry)
   const [api, setApi] = useState<DockviewApi | null>(null)
@@ -179,17 +179,17 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   // The surface answers for its region while it is mounted, so a drop in any
   // other region can find the panel here and take it away.
   useEffect(() => {
-    if (api === null || props.region === undefined) return
-    return workbenchRegions().set(props.region, api)
-  }, [api, props.region])
+    if (api === null || region === undefined) return
+    return workbenchRegions().set(region, api)
+  }, [api, region])
 
   // Dockview checks the drop overlay against this event; accepting a transfer
   // from another region is what lets a panel be dropped here at all.
   useEffect(() => {
-    if (api === null || props.acceptDroppedPanel === undefined) return
-    const subscription = api.onUnhandledDragOver(event => props.acceptDroppedPanel?.(event))
+    if (api === null || acceptDroppedPanel === undefined) return
+    const subscription = api.onUnhandledDragOver(event => acceptDroppedPanel?.(event))
     return () => subscription.dispose()
-  }, [api, props.acceptDroppedPanel])
+  }, [acceptDroppedPanel, api])
 
   /**
    * `getPanelData()` is Dockview's own page-global transfer, so the panel id
@@ -261,11 +261,14 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     return () => document.removeEventListener('dragend', reset)
   }, [foreignDragOver])
 
-  const open = (definition: WorkbenchPanelDefinition): void => {
-    if (api === null) return
-    if (props.onOpenPanel !== undefined) props.onOpenPanel(definition, api)
-    else WorkbenchLayout.openPanel(api, definition)
-  }
+  const open = useCallback(
+    (definition: WorkbenchPanelDefinition): void => {
+      if (api === null) return
+      if (onOpenPanel !== undefined) onOpenPanel(definition, api)
+      else WorkbenchLayout.openPanel(api, definition)
+    },
+    [api, onOpenPanel],
+  )
 
   useEffect(() => {
     if (api === null) return
@@ -284,7 +287,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       persist.dispose()
       unsubscribe()
     }
-  }, [api, registry, store])
+  }, [api, open, registry, store])
 
   // Panels another region already shows are not "closed": adding one here moves
   // it, so the menu lists what no surface holds yet.

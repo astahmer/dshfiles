@@ -38,6 +38,7 @@
     "@deepseek-ai/dsh-win32-process": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",
+    "tsx": "4.23.15",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

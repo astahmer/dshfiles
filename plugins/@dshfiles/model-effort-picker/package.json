@@ -54,7 +54,6 @@
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
-    "@dshfiles/session-controller": "workspace:*",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "oxfmt": "catalog:",

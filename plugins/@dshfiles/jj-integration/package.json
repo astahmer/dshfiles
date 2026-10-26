@@ -74,6 +74,7 @@
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
+    "jsdom": "26.1.0",
     "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

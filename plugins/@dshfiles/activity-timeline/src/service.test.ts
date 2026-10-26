@@ -25,7 +25,7 @@ const routine = (index: number, at: number, sessionId = 'session-a', correlation
   type: 'communication.activity',
   level: 'routine',
   sessionId,
-  ...(correlationId === undefined ? {} : { correlationId }),
+  ...(correlationId !== undefined && { correlationId }),
   summary: `read ${String(index)}`,
   metadata: {},
   references: [],
@@ -95,7 +95,7 @@ describe('activity timeline service', () => {
     expect(newest.hasMore).toBe(true)
     expect(newest.nextCursor).not.toBeNull()
     expect(newest.items[59]?.at).toBe(now + 199)
-    const older = await service.page({ limit: 60, detailed: true, ...(newest.nextCursor === null ? {} : { cursor: newest.nextCursor }) })
+    const older = await service.page({ limit: 60, detailed: true, ...(newest.nextCursor !== null && { cursor: newest.nextCursor }) })
     expect(older.items[older.items.length - 1]?.at).toBe(now + 139)
     const seen = new Set([...newest.items, ...older.items].map(item => item.id))
     expect(seen.size).toBe(120)

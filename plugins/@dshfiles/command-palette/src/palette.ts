@@ -107,8 +107,7 @@ export interface ThreadIndex {
   readonly entries: readonly IndexedThread[]
 }
 
-const isTopLevelThread = (session: Pick<SessionSummary, 'origin' | 'parentId'>): boolean =>
-  session.origin !== 'subagent' && session.parentId === undefined
+const isTopLevelThread = (session: Pick<SessionSummary, 'origin' | 'parentId'>): boolean => session.origin !== 'subagent' && session.parentId === undefined
 
 const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex => ({
   recent: [...threads].sort((left, right) => right.updatedAt - left.updatedAt),

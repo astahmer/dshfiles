@@ -43,8 +43,6 @@
     "@deepseek-ai/dsh-client-ui-trajectory": "0.2.1-rc.2",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
-    "@testing-library/dom": "catalog:",
-    "@testing-library/react": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

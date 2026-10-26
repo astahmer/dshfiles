@@ -1,8 +1,6 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { quotaContinuationRecordSchema, type QuotaContinuationRecord } from './quota-continuation-model.js'
 
-export { quotaContinuationRecordSchema, quotaContinuationStateSchema, quotaContinuationSummarySchema } from './quota-continuation-model.js'
-export type { QuotaContinuationRecord, QuotaContinuationSummary } from './quota-continuation-model.js'
 export type QuotaContinuationTable = KvTable<string, QuotaContinuationRecord>
 
 export const quotaContinuationDomain = defineDomain({

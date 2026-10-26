@@ -232,7 +232,7 @@ describe('client boot outcome reader', () => {
     failureCardVisible: evidence === 'failure-card',
     text,
     timedOut: !ready,
-    ...(ready ? {} : { readinessError: 'Native readiness was not established.' }),
+    ...(!ready && { readinessError: 'Native readiness was not established.' }),
     evidence,
   })
 

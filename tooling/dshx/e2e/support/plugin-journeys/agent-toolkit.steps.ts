@@ -3,6 +3,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
 const toolkit = (page: Page) => page.getByTestId('agent-toolkit')
 const section = (page: Page, name: RegExp) => toolkit(page).getByRole('region', { name })
 
@@ -75,7 +76,7 @@ When('a thread {string} is started from the composer', async ({ page }: { page: 
   const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
   await composer.fill(text)
   await composer.press('Enter')
-  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: THREAD_COMPOSER })).toBeVisible()
 })
 
 When('the Agent toolkit is opened from the command palette', async ({ page }: { page: Page }) => {

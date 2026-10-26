@@ -16,7 +16,7 @@ const redactResult = <Output>(result: StandardSchemaV1.Result<Output>): Standard
     return {
       issues: result.issues.map(issue => ({
         message: CONFIG_VALIDATION_ERROR,
-        ...(issue.path === undefined ? {} : { path: safePath(issue.path) }),
+        ...(issue.path !== undefined && { path: safePath(issue.path) }),
       })),
     }
   } catch {

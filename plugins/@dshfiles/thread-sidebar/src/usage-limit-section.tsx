@@ -95,7 +95,10 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
           >
             <span
               aria-hidden="true"
-              className={cn('dshx:size-2 dshx:shrink-0 dshx:self-start dshx:mt-1.5 dshx:rounded-full', snoozed ? 'dshx:bg-muted-foreground/45' : 'dshx:bg-warning')}
+              className={cn(
+                'dshx:size-2 dshx:shrink-0 dshx:self-start dshx:mt-1.5 dshx:rounded-full',
+                snoozed ? 'dshx:bg-muted-foreground/45' : 'dshx:bg-warning',
+              )}
             />
             <button
               draggable

@@ -3,7 +3,7 @@ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { Model, SimpleStreamOptions } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { z } from 'zod'
-import type { FastModeUsageObservation } from './fast-mode-usage-history.js'
+import type { FastModeUsageObservation } from './fast-mode-usage-model.js'
 import type { FastModeStatus } from './model-fast-mode-api.js'
 
 const fastModeRequestBodySchema = z.record(z.string(), z.json().optional())

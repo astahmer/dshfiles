@@ -376,10 +376,10 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const topicEntries = [...topics.entries()].sort(([left], [right]) => labels.topic(left).localeCompare(labels.topic(right)))
   const conversationKey = selectionKey(selection)
   const browseInputFor = (beforeId: string | null): AgentCommunicationBrowseInput => ({
-    ...(selection.kind === 'topic' ? { topic: selection.topic } : {}),
-    ...(selection.kind === 'direct' ? { agentId: selection.agentId } : {}),
-    ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
-    ...(beforeId === null ? {} : { beforeId }),
+    ...(selection.kind === 'topic' && { topic: selection.topic }),
+    ...(selection.kind === 'direct' && { agentId: selection.agentId }),
+    ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
+    ...(beforeId !== null && { beforeId }),
     limit: PAGE_SIZE,
   })
   const browseMessages = (beforeId: string | null, signal: AbortSignal) =>

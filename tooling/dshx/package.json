@@ -29,12 +29,18 @@
     "test:scenario-cache": "node --test e2e/support/scenario-cache.test.mjs"
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "catalog:",
+    "@deepseek-ai/dsh-session": "catalog:",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.2.1-rc.2",
     "@hono/node-server": "catalog:",
     "@playwright/test": "1.56.1",
     "@types/node": "catalog:",
     "hono": "catalog:",
+    "jsdom": "catalog:",
     "knip": "6.32.2",
+    "playwright": "1.56.1",
     "playwright-bdd": "8.5.1",
     "typescript": "catalog:",
     "vitest": "catalog:",

@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { parseCliArgs } from '../src/cli/args.js'
 import { runCli } from '../src/cli/run.js'
 import type { CliIO } from '../src/cli/run.js'
-import type { DevEvent, DevSession } from '../src/dev/index.js'
+import type { DevEvent, DevSession } from '../src/dev/types.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
-import type { PreparedProjectProfile } from '../src/profile/index.js'
-import type { InspectOptions, InspectTarget } from '../src/inspect/index.js'
+import type { PreparedProjectProfile } from '../src/profile/types.js'
+import type { InspectOptions, InspectTarget } from '../src/inspect/types.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 
 function project(): ResolvedDshxConfig {

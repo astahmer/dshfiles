@@ -1,8 +1,5 @@
 import { CLIENT_SLOT_REFERENCES } from 'create-dshx/slot-capabilities'
 
-export { CLIENT_SLOT_REFERENCES } from 'create-dshx/slot-capabilities'
-export type { ClientSlotReference } from 'create-dshx/slot-capabilities'
-
 /** Look up one slot, or `undefined` when the name is not in the verified catalog. */
 export const findClientSlot = (name: string) => CLIENT_SLOT_REFERENCES.find(slot => slot.name === name)
 

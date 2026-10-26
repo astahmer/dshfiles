@@ -166,12 +166,12 @@ const outcomeOf = (record: ParentQuestionRecord): ParentQuestionOutcome => {
       questionId: record.questionId,
       childSessionId: record.childSessionId,
       question: record.question,
-      ...(record.context === undefined ? {} : { context: record.context }),
+      ...(record.context !== undefined && { context: record.context }),
       options: record.options,
       recommendedOption,
       createdAt: record.createdAt,
       deferredAt: record.updatedAt,
-      ...(record.deferredFilePath === undefined ? {} : { filePath: record.deferredFilePath }),
+      ...(record.deferredFilePath !== undefined && { filePath: record.deferredFilePath }),
     }
   }
   if (record.status === 'pending') throw new Error('A pending question has no terminal outcome.')
@@ -317,7 +317,7 @@ export const createParentQuestionService = (input: {
       const parsed = requestInputSchema.parse({
         operationId: request.operationId,
         question: request.question,
-        ...(request.context === undefined ? {} : { context: request.context }),
+        ...(request.context !== undefined && { context: request.context }),
         options: request.options,
         recommendedOptionId: request.recommendedOptionId,
         expiryBehavior: request.expiryBehavior,
@@ -367,7 +367,7 @@ export const createParentQuestionService = (input: {
             childSessionId: request.agent.id,
             operationId: parsed.operationId,
             question: parsed.question,
-            ...(parsed.context === undefined ? {} : { context: parsed.context }),
+            ...(parsed.context !== undefined && { context: parsed.context }),
             options: parsed.options,
             recommendedOptionId: parsed.recommendedOptionId,
             expiryBehavior: parsed.expiryBehavior,

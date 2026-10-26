@@ -31,7 +31,7 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
         catalogFile,
         id: feature.id,
         title: feature.title,
-        ...(feature.reach === undefined ? {} : { reach: feature.reach }),
+        ...(feature.reach !== undefined && { reach: feature.reach }),
       })
     }
   }
@@ -226,7 +226,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
       steps,
       ok,
       path: new URL(page.url()).pathname,
-      ...(failureShot === undefined ? {} : { failureShot }),
+      ...(failureShot !== undefined && { failureShot }),
     }
   } finally {
     await browser.close()

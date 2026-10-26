@@ -72,7 +72,7 @@ function fail(
   hint: string,
 ): never {
   throw new DshxError(code, message, {
-    ...(metadata.sourceFile === undefined ? {} : { file: metadata.sourceFile }),
+    ...(metadata.sourceFile !== undefined && { file: metadata.sourceFile }),
     hint,
   })
 }
@@ -402,8 +402,8 @@ export function createClientModule(source: Record<string, unknown>, metadata: Cl
   const apply = source.apply as (ctx: Context | ClientContext, config?: unknown) => unknown
   return {
     name: (source.name as string | undefined) ?? fallbackName(metadata),
-    ...(source.inject === undefined ? {} : { inject: source.inject }),
-    ...(source.Config === undefined ? {} : { Config: source.Config }),
+    ...(source.inject !== undefined && { inject: source.inject }),
+    ...(source.Config !== undefined && { Config: source.Config }),
     apply(ctx, config) {
       registerPluginPage(ctx, metadata)
       return apply(ctx, config)

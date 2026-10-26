@@ -60,7 +60,7 @@ const disposeFiber = async (fiber: Fiber): Promise<void> => {
 const mountImplementation = async (context: Context, implementation: HostGenerationImplementation, config: unknown): Promise<Fiber> => {
   const plugin = {
     name: implementation.name,
-    ...(implementation.inject === undefined ? {} : { inject: implementation.inject }),
+    ...(implementation.inject !== undefined && { inject: implementation.inject }),
     apply: (childContext: Context) => implementation.apply(childContext, config),
   }
   const fiber = context.plugin(plugin)
@@ -75,8 +75,8 @@ const mountImplementation = async (context: Context, implementation: HostGenerat
 
 export const createHostGenerationPlugin = (options: HostGenerationPluginOptions): HostGenerationImplementation => ({
   name: options.implementation.name,
-  ...(options.implementation.inject === undefined ? {} : { inject: options.implementation.inject }),
-  ...(options.implementation.Config === undefined ? {} : { Config: options.implementation.Config }),
+  ...(options.implementation.inject !== undefined && { inject: options.implementation.inject }),
+  ...(options.implementation.Config !== undefined && { Config: options.implementation.Config }),
   async apply(context, config) {
     let active: ActiveGeneration | undefined
     let watcher: FSWatcher | undefined
@@ -138,8 +138,8 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
       }
       return {
         name: candidate.name,
-        ...(candidate.inject === undefined ? {} : { inject: candidate.inject }),
-        ...(config === undefined ? {} : { Config: config }),
+        ...(candidate.inject !== undefined && { inject: candidate.inject }),
+        ...(config !== undefined && { Config: config }),
         apply: candidate.apply,
       }
     }

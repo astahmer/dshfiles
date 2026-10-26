@@ -1,6 +1,7 @@
 import type { ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import { defineTool } from '@dshfiles/dshx/host'
-import type { SecretCatalogOperations, SecretScope } from './secret-operations.js'
+import type { SecretScope } from '@dshfiles/credential-port'
+import type { SecretCatalogOperations } from './secret-operations.js'
 
 const listOutputSchema = {
   type: 'object',

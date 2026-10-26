@@ -34,6 +34,17 @@ const minimumPanelHeight = 120
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), Math.max(min, max))
 
+const chooseSide = (props: {
+  readonly fitsBelow: boolean
+  readonly fitsAbove: boolean
+  readonly below: number
+  readonly above: number
+}): PanelPlacement['side'] => {
+  if (props.fitsBelow) return 'bottom'
+  if (props.fitsAbove) return 'top'
+  return props.below >= props.above ? 'bottom' : 'top'
+}
+
 /**
  * Keeps the alias panel inside the viewport: it opens below the field, flips above when that side has more room, and
  * caps its height to the room left on the chosen side, so the list scrolls instead of leaving the screen.
@@ -45,7 +56,7 @@ export const placeSecretPanel = (props: { readonly anchor: AnchorBounds; readonl
   const above = props.anchor.top - margin - gap
   const fitsBelow = below >= props.panel.height
   const fitsAbove = above >= props.panel.height
-  const side = fitsBelow ? 'bottom' : fitsAbove ? 'top' : below >= above ? 'bottom' : 'top'
+  const side = chooseSide({ fitsBelow, fitsAbove, below, above })
   const maxHeight = Math.max(0, side === 'bottom' ? below : above)
   // A field can fill nearly the whole viewport. Then no side has usable room, so the panel covers it from the top
   // instead of collapsing to a sliver.

@@ -1449,6 +1449,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false)
   const [now, setNow] = useState(() => Date.now())
+  // The render path reads `now`; gestures and notices stamp with this reader instead, outside render.
+  const readNow = useCallback(() => Date.now(), [])
   const settingsId = useId()
   const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
   const notice = noticeQueueState.current
@@ -1561,13 +1563,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const settledSessionIds = useMemo(() => setIncludes(preferences.settledSessionIds), [preferences.settledSessionIds])
+  const defaultProjectTitle = props.tSidebar('threadSidebarDefaultProject')
   const displayWorkspaces = useMemo(
     () =>
       SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({
         id: workspace.workspaceId,
-        title: workspace.title.length > 0 ? workspace.title : props.tSidebar('threadSidebarDefaultProject'),
+        title: workspace.title.length > 0 ? workspace.title : defaultProjectTitle,
       })),
-    [props.tSidebar, workspaceState.items],
+    [defaultProjectTitle, workspaceState.items],
   )
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
@@ -2353,7 +2356,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         status: { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt },
         parkedSessionIds: preferences.parkedSessionIds,
         sessionIds,
-        now: Date.now(),
+        now: readNow(),
       }),
     )
     void SettledThreadsModel.unpinSettledThreads({
@@ -2393,7 +2396,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return session === undefined || session.blank ? [] : [session]
     })
     if (targets.length === 0) return
-    changePreferences({ mutedThreads: muteSessions({ mutes: preferences.mutedThreads, sessions: targets, until: muteUntil(option, Date.now()) }) })
+    changePreferences({ mutedThreads: muteSessions({ mutes: preferences.mutedThreads, sessions: targets, until: muteUntil(option, readNow()) }) })
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
 
@@ -2486,7 +2489,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (
       storedNotificationsMuted.get() === true ||
       !ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) ||
-      isMuteActive(mutedThreads[sessionId], Date.now())
+      isMuteActive(mutedThreads[sessionId], readNow())
     )
       return
     const session = sessionState.byId[sessionId]
@@ -2602,14 +2605,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const idleSectionOverrides = { ...preferences.idleSectionOverrides }
     for (const targetId of targets) {
       if (plan.idleOverride === null) delete idleSectionOverrides[targetId]
-      else idleSectionOverrides[targetId] = { section: plan.idleOverride, at: Date.now() }
+      else idleSectionOverrides[targetId] = { section: plan.idleOverride, at: readNow() }
     }
     // A drop opens the destination instead of folding it: the section the row was dragged inside is already open,
     // so toggling would fold it and hide the row that just landed.
     const nextCollapsedSections = collapsedSections.filter(item => item !== section)
     const nextPreferences = {
       parkedSessionIds: [...nextParked],
-      ...(plan.settle ? SettledThreadsModel.settle(status, targets, Date.now()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
+      ...(plan.settle ? SettledThreadsModel.settle(status, targets, readNow()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
       idleSectionOverrides,
     }
     if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
@@ -2697,7 +2700,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const dueSessionIds = new Set<string>()
 
       if (SidebarOrganization.shouldScanForAutoSettle(latest.preferences)) {
-        const now = Date.now()
+        const now = readNow()
         for (const session of latest.sessions) {
           const isCandidate = SidebarOrganization.isAutoSettleCandidate({
             session,
@@ -3876,7 +3879,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     ]
     const disposers = actions.map(action => PaletteApi.registerAction(action))
     return () => disposers.forEach(dispose => dispose())
-  }, [isPrimarySurface])
+  }, [asideOpener, isPrimarySurface])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {
     return {

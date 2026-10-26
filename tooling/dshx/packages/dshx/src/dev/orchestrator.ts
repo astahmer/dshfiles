@@ -67,51 +67,46 @@ function childFromExeca(
   return Promise.resolve(child)
 }
 
-function buildOptions(
-  project: ResolvedDshxConfig,
-  compatibility: import('../compat/types.js').DshCompatibility,
-): {
-  host?: BuildHostOptions
-  client?: BuildClientOptions
-} {
+interface BuildPaths {
+  readonly host?: BuildHostOptions
+  readonly client?: BuildClientOptions
+}
+
+function buildOptions(project: ResolvedDshxConfig, compatibility: import('../compat/types.js').DshCompatibility): BuildPaths {
   return {
-    ...(project.hostEntry === undefined
-      ? {}
-      : {
-          host: {
-            packageId: project.packageId,
-            logicalName: project.name,
-            root: project.root,
-            entry: project.hostEntry,
-            outDir: project.outDir,
-            sourcemap: project.build.sourcemap,
-            declarations: project.build.declarations ?? true,
-            bundleDependencies: project.hostBundleDependencies ?? [],
-            ...(project.hostVitePlugins === undefined ? {} : { vite: { plugins: project.hostVitePlugins } }),
-            compatibility,
-            ...(project.dev.hostHmr === undefined ? {} : { generation: { hostContractVersion: project.dev.hostHmr.hostContractVersion } }),
-          },
-        }),
-    ...(project.clientEntry === undefined
-      ? {}
-      : {
-          client: {
-            packageId: project.packageId,
-            logicalName: project.name,
-            root: project.root,
-            entry: project.clientEntry,
-            outDir: project.outDir,
-            sourcemap: project.build.sourcemap,
-            declarations: project.build.declarations ?? true,
-            bundleDependencies: project.clientBundleDependencies ?? [],
-            ...(project.clientShared === undefined ? {} : { shared: project.clientShared }),
-            ...(project.clientSharedRuntime === undefined ? {} : { sharedRuntime: project.clientSharedRuntime }),
-            ...(project.clientVitePlugins === undefined ? {} : { vite: { plugins: project.clientVitePlugins } }),
-            external: clientManifestArray(project, 'external'),
-            inject: clientManifestArray(project, 'inject'),
-            compatibility,
-          },
-        }),
+    ...(project.hostEntry !== undefined && {
+      host: {
+        packageId: project.packageId,
+        logicalName: project.name,
+        root: project.root,
+        entry: project.hostEntry,
+        outDir: project.outDir,
+        sourcemap: project.build.sourcemap,
+        declarations: project.build.declarations ?? true,
+        bundleDependencies: project.hostBundleDependencies ?? [],
+        ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
+        compatibility,
+        ...(project.dev.hostHmr !== undefined && { generation: { hostContractVersion: project.dev.hostHmr.hostContractVersion } }),
+      },
+    }),
+    ...(project.clientEntry !== undefined && {
+      client: {
+        packageId: project.packageId,
+        logicalName: project.name,
+        root: project.root,
+        entry: project.clientEntry,
+        outDir: project.outDir,
+        sourcemap: project.build.sourcemap,
+        declarations: project.build.declarations ?? true,
+        bundleDependencies: project.clientBundleDependencies ?? [],
+        ...(project.clientShared !== undefined && { shared: project.clientShared }),
+        ...(project.clientSharedRuntime !== undefined && { sharedRuntime: project.clientSharedRuntime }),
+        ...(project.clientVitePlugins !== undefined && { vite: { plugins: project.clientVitePlugins } }),
+        external: clientManifestArray(project, 'external'),
+        inject: clientManifestArray(project, 'inject'),
+        compatibility,
+      },
+    }),
   }
 }
 

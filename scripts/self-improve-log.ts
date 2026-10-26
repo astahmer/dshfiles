@@ -2,6 +2,7 @@ import { open, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 import { z } from 'zod'
+import { decodeJson } from './json.ts'
 
 /**
  * Discovers and streams DSH Session logs (`session.v<N>.jsonl.zstd`).
@@ -161,7 +162,7 @@ const parseSince = (input: string, now: number): number | undefined => {
  * reports and flags are always schema-validated before use.
  */
 export class SessionLogs {
-  static readonly decodeJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
+  static readonly decodeJson = <Schema extends z.ZodType>(schema: Schema, text: string): z.output<Schema> => decodeJson(schema, text)
 
   static readonly decodeJsonSafe = <Output>(schema: z.ZodType<Output>, text: string): Output | undefined => {
     try {

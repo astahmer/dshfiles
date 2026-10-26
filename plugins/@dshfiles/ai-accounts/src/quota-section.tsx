@@ -33,7 +33,7 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
       index="04"
       title="Quota"
     >
-      <UsageCardView usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
+      <UsageCardView now={usage?.readAt ?? 0} usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
       <QuotaHistoryChart
         ariaLabel={`Remaining quota over the last ${String(historyDays)} days`}
         emptyMessage="Not enough history yet. Quota is recorded on an interval; check back shortly."

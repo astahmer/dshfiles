@@ -33,6 +33,13 @@ const previewCard = (data: MemoryPreview | undefined): PreviewCard | undefined =
   return { kind: 'excerpt', summary: data.summary }
 }
 
+const copyTextOf = (card: PreviewCard | undefined): string => {
+  if (card === undefined) return ''
+  if (card.kind === 'note') return card.note.text
+  if (card.kind === 'digest') return card.thread.digest
+  return card.summary
+}
+
 const SectionHeading = (props: { readonly title: string; readonly trailing?: string }): JSX.Element => (
   <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
     <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.title}</h4>
@@ -427,7 +434,7 @@ export const MemoryReferenceOverlay = (props: {
 
   if (request === null) return null
   const card = previewCard(preview.data)
-  const copyText = card === undefined ? '' : card.kind === 'note' ? card.note.text : card.kind === 'digest' ? card.thread.digest : card.summary
+  const copyText = copyTextOf(card)
   return (
     <Popover open onOpenChange={open => !open && setRequest(null)}>
       <PopoverAnchor asChild>

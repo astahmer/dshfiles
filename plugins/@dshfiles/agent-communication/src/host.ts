@@ -344,10 +344,10 @@ const publishTool = defineTool({
           sender,
           topic: args.topic,
           text: args.text,
-          ...(args.intent === undefined ? {} : { intent: args.intent }),
+          ...(args.intent !== undefined && { intent: args.intent }),
           priority: args.priority ?? 'normal',
-          ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
-          ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
+          ...(args.correlationId !== undefined && { correlationId: args.correlationId }),
+          ...(args.dedupeKey !== undefined && { dedupeKey: args.dedupeKey }),
         })
         hostContext?.emit('dshfiles/activity/event', {
           kind: 'communication-message',
@@ -358,7 +358,7 @@ const publishTool = defineTool({
             recipientCount: message.recipients.length,
             intent: message.intent,
             topic: message.topic,
-            ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+            ...(message.correlationId !== null && { correlationId: message.correlationId }),
             sessionId: sender.id,
           },
         })
@@ -403,10 +403,10 @@ const sendTool = defineTool({
           sender,
           toAgentId: args.toAgentId,
           text: args.text,
-          ...(args.intent === undefined ? {} : { intent: args.intent }),
+          ...(args.intent !== undefined && { intent: args.intent }),
           priority: args.priority ?? 'normal',
-          ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
-          ...(args.dedupeKey === undefined ? {} : { dedupeKey: args.dedupeKey }),
+          ...(args.correlationId !== undefined && { correlationId: args.correlationId }),
+          ...(args.dedupeKey !== undefined && { dedupeKey: args.dedupeKey }),
         })
         hostContext?.emit('dshfiles/activity/event', {
           kind: 'communication-message',
@@ -417,7 +417,7 @@ const sendTool = defineTool({
             recipientCount: message.recipients.length,
             intent: message.intent,
             topic: message.topic,
-            ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+            ...(message.correlationId !== null && { correlationId: message.correlationId }),
             sessionId: sender.id,
           },
         })
@@ -658,7 +658,7 @@ const setupHost = (context: Context): Effect<void> => {
               recipientCount: message.recipients.length,
               intent: message.intent,
               topic: message.topic,
-              ...(message.correlationId === null ? {} : { correlationId: message.correlationId }),
+              ...(message.correlationId !== null && { correlationId: message.correlationId }),
               sessionId: message.sender.kind === 'agent' ? message.sender.id : null,
             },
           })

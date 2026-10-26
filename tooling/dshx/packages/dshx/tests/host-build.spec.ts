@@ -5,11 +5,15 @@ import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Plugin } from 'vite'
-import { buildHost } from '../src/compiler/index.js'
+import { buildHost } from '../src/compiler/host/build.js'
 import { watchHost } from '../src/compiler/host/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
+
+interface ApplyContext {
+  received?: unknown
+}
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-host-'))
@@ -552,9 +556,9 @@ describe('host compiler', () => {
       name: string
       inject: unknown
       Config: unknown
-      apply(ctx: { received?: unknown }, config: unknown): unknown
+      apply(ctx: ApplyContext, config: unknown): unknown
     }
-    const ctx: { received?: unknown } = {}
+    const ctx: ApplyContext = {}
     const config = { enabled: true }
     expect(plugin.name).toBe('native-host')
     expect(plugin.inject).toEqual({ agents: { mode: 'test' } })

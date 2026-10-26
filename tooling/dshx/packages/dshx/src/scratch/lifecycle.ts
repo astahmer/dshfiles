@@ -34,21 +34,21 @@ export const scratchDoctor = async (options: { readonly state: ScratchState; rea
     id: 'isolated',
     ok: isolated,
     detail: isolated ? `port ${state.port}, home ${state.home}` : 'state points at the live DSH port or home',
-    ...(isolated ? {} : { fix: 'Do not use this state; run "dshx dev down --dry-run" and inspect it by hand.' }),
+    ...(!isolated && { fix: 'Do not use this state; run "dshx dev down --dry-run" and inspect it by hand.' }),
   })
   const host = ScratchStateRuntime.ownedProcessStatus(state.host)
   checks.push({
     id: 'host-process',
     ok: host === 'running',
     detail: `pid ${state.host.pid} ${host}`,
-    ...(host === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
+    ...(host !== 'running' && { fix: 'Run "dshx dev down" then "dshx dev up".' }),
   })
   const browser = ScratchStateRuntime.ownedProcessStatus(state.browser)
   checks.push({
     id: 'browser-process',
     ok: browser === 'running',
     detail: `pid ${state.browser.pid} ${browser}`,
-    ...(browser === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
+    ...(browser !== 'running' && { fix: 'Run "dshx dev down" then "dshx dev up".' }),
   })
   const idleTimeoutMinutes = state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES
   const warnMinutes = state.warnMinutes ?? DEFAULT_WARN_MINUTES
@@ -113,7 +113,7 @@ export const scratchDoctor = async (options: { readonly state: ScratchState; rea
           ]
             .filter(Boolean)
             .join('; '),
-      ...(ok ? {} : { fix: 'The first entry named is often a dependent; read the host log and run "dshx check --boot" in the plugin.' }),
+      ...(!ok && { fix: 'The first entry named is often a dependent; read the host log and run "dshx check --boot" in the plugin.' }),
     })
   }
   const hostErrors = (await readFile(state.hostLog, 'utf8').catch(() => ''))
@@ -124,7 +124,7 @@ export const scratchDoctor = async (options: { readonly state: ScratchState; rea
     id: 'host-log',
     ok: hostErrors.length === 0,
     detail: hostErrors.length === 0 ? 'no error lines' : hostErrors.slice(-10).join('\n'),
-    ...(hostErrors.length === 0 ? {} : { fix: `Read ${state.hostLog} (it holds the launch token; do not paste it).` }),
+    ...(hostErrors.length !== 0 && { fix: `Read ${state.hostLog} (it holds the launch token; do not paste it).` }),
   })
   return checks
 }

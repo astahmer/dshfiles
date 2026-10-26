@@ -11,12 +11,8 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-schedule'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-workspace'
-import {
-  quotaContinuationDomain,
-  type QuotaContinuationRecord,
-  type QuotaContinuationSummary,
-  type QuotaContinuationTable,
-} from './quota-continuation-store.js'
+import { quotaContinuationDomain, type QuotaContinuationTable } from './quota-continuation-store.js'
+import type { QuotaContinuationRecord, QuotaContinuationSummary } from './quota-continuation-model.js'
 import { QuotaContinuationMessage, type UserActivityIdentity } from './quota-continuation-message.js'
 import { resetAtFromMessage } from './quota-reset.js'
 

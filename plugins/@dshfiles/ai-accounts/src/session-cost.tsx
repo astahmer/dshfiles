@@ -58,26 +58,35 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
   const quotes = quotesQuery.data
   const quoteMap = useMemo(() => new Map((quotes?.quotes ?? []).map(quote => [CostEstimateModel.routeKey(quote), quote])), [quotes])
 
-  const session = view === null || quotes === undefined || quotes === null ? null : CostEstimateModel.estimateCost({ groups: view.groups, quotes: quoteMap })
-  const turn = session === null || view === null || view.turn === null ? null : CostEstimateModel.estimateCost({ groups: view.turn.groups, quotes: quoteMap })
-  const inlineValue =
-    session === null || !session.priced
-      ? undefined
-      : {
-          amount: amountText(session),
-          description: `Estimated session cost ${amountText(session)}. Estimate from published API prices, not an invoice.`,
-          rows: [
-            ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
-              ? [{ tokens: undefined, amount: undefined }]
-              : []),
-            { tokens: session.tokens.uncachedInputTokens, amount: CostEstimateModel.formatUsd(session.cost.input) },
-            { tokens: session.tokens.cacheReadTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheRead) },
-            ...(session.tokens.cacheWriteTokens > 0
-              ? [{ tokens: session.tokens.cacheWriteTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheWrite) }]
-              : []),
-            { tokens: session.tokens.outputTokens, amount: CostEstimateModel.formatUsd(session.cost.output) },
-          ],
-        }
+  const session = useMemo(
+    () => (view === null || quotes === undefined || quotes === null ? null : CostEstimateModel.estimateCost({ groups: view.groups, quotes: quoteMap })),
+    [quoteMap, quotes, view],
+  )
+  const turn = useMemo(
+    () => (session === null || view === null || view.turn === null ? null : CostEstimateModel.estimateCost({ groups: view.turn.groups, quotes: quoteMap })),
+    [quoteMap, session, view],
+  )
+  const inlineValue = useMemo(
+    () =>
+      session === null || !session.priced
+        ? undefined
+        : {
+            amount: amountText(session),
+            description: `Estimated session cost ${amountText(session)}. Estimate from published API prices, not an invoice.`,
+            rows: [
+              ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
+                ? [{ tokens: undefined, amount: undefined }]
+                : []),
+              { tokens: session.tokens.uncachedInputTokens, amount: CostEstimateModel.formatUsd(session.cost.input) },
+              { tokens: session.tokens.cacheReadTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheRead) },
+              ...(session.tokens.cacheWriteTokens > 0
+                ? [{ tokens: session.tokens.cacheWriteTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheWrite) }]
+                : []),
+              { tokens: session.tokens.outputTokens, amount: CostEstimateModel.formatUsd(session.cost.output) },
+            ],
+          },
+    [session],
+  )
   const hasInlineValue = inlineValue !== undefined
 
   useEffect(() => {
@@ -156,7 +165,8 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
           ))}
         </ul>
         <p className="dshx:text-muted-foreground">
-          Estimate from published API prices (models.dev{fetchedAt === null ? '' : `, ${fetchedAgo(relativeTime(fetchedAt, Date.now()))}`}), not an invoice.
+          Estimate from published API prices (models.dev{fetchedAt === null ? '' : `, ${fetchedAgo(relativeTime(fetchedAt, quotesQuery.dataUpdatedAt))}`}), not
+          an invoice.
           {session.partial ? ' Routes without a price are left out.' : ''}
         </p>
       </HoverCardContent>

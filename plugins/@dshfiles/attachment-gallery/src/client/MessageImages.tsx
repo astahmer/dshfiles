@@ -35,7 +35,7 @@ export function MessageImages({ images, loadImage, align, compact, thumbnail, re
     images,
     loadImage,
     align,
-    ...(compact === undefined ? {} : { compact }),
-    ...(thumbnail === undefined ? {} : { thumbnail }),
+    ...(compact !== undefined && { compact }),
+    ...(thumbnail !== undefined && { thumbnail }),
   })
 }

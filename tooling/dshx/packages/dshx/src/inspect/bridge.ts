@@ -117,7 +117,7 @@ function bridgeName(packageId: string): string {
   return createHash('sha256').update(packageId).digest('hex').slice(0, 20)
 }
 
-function endpointPaths(packageId: string, env: Readonly<NodeJS.ProcessEnv>): { metadataPath: string; socketPath: string } {
+function endpointPaths(packageId: string, env: Readonly<NodeJS.ProcessEnv>) {
   const dshHome = env.DSH_HOME?.trim() ? resolve(env.DSH_HOME.trim()) : join(homedir(), '.dsh')
   const directory = join(dshHome, 'runtime', 'dshx', 'inspect')
   const name = bridgeName(packageId)
@@ -359,7 +359,7 @@ const request = async <Item>({
   const metadata = await readMetadata(paths.metadataPath, project, paths.socketPath)
   const requestId = `inspect-${randomUUID()}`
   const payload =
-    JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input === undefined ? {} : { input }) }) + '\n'
+    JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input !== undefined && { input }) }) + '\n'
   const value = await JsonLineTransport.request(paths.socketPath, payload, {
     maxRequestBytes: MAX_MESSAGE_BYTES,
     maxResponseBytes: MAX_MESSAGE_BYTES,

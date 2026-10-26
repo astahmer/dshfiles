@@ -14,8 +14,10 @@ import { resolveDshxConfig } from '../src/config/resolve.js'
 import { createPresetScaffold } from '../src/scaffold/preset.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import { renderProjectTemplate } from '../../create-dshx/src/templates.js'
-import { buildClient, buildHost } from '../src/compiler/index.js'
-import { checkPackageTargets, checkProjectManifest } from '../src/project/index.js'
+import { buildClient } from '../src/compiler/client/build.js'
+import { buildHost } from '../src/compiler/host/build.js'
+import { checkPackageTargets } from '../src/project/package-targets.js'
+import { checkProjectManifest } from '../src/project/manifest.js'
 import { typecheckProject } from '../src/project/typecheck.js'
 import { testProject } from '../src/toolchain/index.js'
 import { createTestHost } from '../src/testing/index.js'
@@ -92,7 +94,8 @@ const setup = async (faces: 'both' | 'client-only' | 'host-only') => {
   await mkdir(resolve(root, 'node_modules/@dshfiles'), { recursive: true })
   await symlink(fileURLToPath(new URL('..', import.meta.url)), resolve(root, 'node_modules/@dshfiles/dshx'))
   await symlink(fileURLToPath(new URL('../node_modules/@deepseek-ai', import.meta.url)), resolve(root, 'node_modules/@deepseek-ai'))
-  const manifest = {
+  const manifest: Record<string, unknown> = {}
+  Object.assign(manifest, {
     name: '@demo/plugin',
     private: true,
     type: 'module',
@@ -134,7 +137,7 @@ const setup = async (faces: 'both' | 'client-only' | 'host-only') => {
       '@deepseek-ai/dsh-client-ui-layout': '>=0.2.0-rc.1 <0.3.0-0',
       '@deepseek-ai/dsh-client-ui-sidebar': '>=0.2.0-rc.1 <0.3.0-0',
     },
-  } as Record<string, unknown>
+  })
   if (faces === 'host-only') {
     delete (manifest.exports as Record<string, string>)['./client']
     delete (manifest.dsh as Record<string, unknown>).client
@@ -326,7 +329,7 @@ describe('add panel/api CLI', () => {
       const hostBuild = await buildHost({
         root: value.root,
         packageId: project.packageId,
-        ...(project.hostEntry === undefined ? {} : { entry: project.hostEntry }),
+        ...(project.hostEntry !== undefined && { entry: project.hostEntry }),
         outDir: project.outDir,
         declarations: true,
       })

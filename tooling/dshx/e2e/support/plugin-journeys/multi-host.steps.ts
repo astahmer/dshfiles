@@ -568,7 +568,12 @@ Then('the manager lists it as started on the host', async ({ page }: { readonly 
   const call = await hostApi(pair.manager)
   const directory = runtimeDirectorySchema.parse(await call('list'))
   const hostName = observed.hostName
-  const status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  // The Host answers `runtime-status-refreshing` while its first snapshot loads asynchronously, so one call is not a verdict.
+  let status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  for (let attempt = 0; attempt < 40 && !status.ok && status.code === 'runtime-status-refreshing'; attempt += 1) {
+    await delay(500)
+    status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  }
   if (!status.ok) throw new Error(`The scratch runtime status was unavailable: ${status.code}.`)
   expect(directory.hosts.some(host => host.name === hostName)).toBe(true)
   const row = mergeInventory({

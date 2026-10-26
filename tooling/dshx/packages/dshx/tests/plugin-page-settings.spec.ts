@@ -66,14 +66,12 @@ const pageContext = (options: { readonly whileServed?: boolean } = {}) => {
     configForms: {
       get: () => ({}),
       describe: () => ({ getSnapshot: () => describeSnapshot, subscribe: () => () => undefined }),
-      ...(options.whileServed === false
-        ? {}
-        : {
-            whileServed: (_namespaces: readonly string[], register: () => () => void) => {
-              serve = register
-              return () => undefined
-            },
-          }),
+      ...(options.whileServed !== false && {
+        whileServed: (_namespaces: readonly string[], register: () => () => void) => {
+          serve = register
+          return () => undefined
+        },
+      }),
     },
     settingsSchema: { rehydrate: (json: unknown) => new Schema(json as never) },
     slots: {

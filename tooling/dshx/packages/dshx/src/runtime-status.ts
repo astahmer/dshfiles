@@ -9,7 +9,12 @@ export interface RuntimePluginReport {
   readonly diagnostics: readonly DshxDiagnostic[]
 }
 
-function packageStatus(spec: DshxRuntimePluginSpec, require: NodeRequire): { readonly status: RuntimePluginStatusKind; readonly message?: string } {
+interface RuntimePackageStatus {
+  readonly status: RuntimePluginStatusKind
+  readonly message?: string
+}
+
+function packageStatus(spec: DshxRuntimePluginSpec, require: NodeRequire): RuntimePackageStatus {
   try {
     require.resolve(spec.packageName)
     return { status: 'available' }
@@ -31,7 +36,7 @@ export function inspectRuntimePlugins(project: ResolvedDshxConfig, compatibility
       packageName: spec.packageName,
       provides: spec.provides,
       status: result.status,
-      ...(result.message === undefined ? {} : { message: result.message }),
+      ...(result.message !== undefined && { message: result.message }),
     }
     plugins.push(plugin)
     if (result.status === 'missing') {

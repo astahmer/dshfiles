@@ -2,9 +2,6 @@ import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { MAX_USAGE_HISTORY_POINTS, quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
 import type { QuotaSnapshot } from './usage-history-model.js'
 
-export { quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
-export type { QuotaSnapshot, UsageMeta } from './usage-history-model.js'
-
 /**
  * Durable quota history.
  *

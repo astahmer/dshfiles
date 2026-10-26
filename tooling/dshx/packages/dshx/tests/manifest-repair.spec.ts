@@ -2,9 +2,9 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
-import { ManifestRepairService } from '../src/project/index.js'
+import { ManifestRepairService } from '../src/project/repair.js'
 
 const roots: string[] = []
 

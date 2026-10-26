@@ -442,6 +442,13 @@ const requireStore = (): MemoryStore => {
   return store
 }
 
+const panelStatusOf = (note: NoteRecord): PanelNote['status'] => {
+  if (note.archivedAt !== null) return 'archived'
+  if (note.valid) return 'valid'
+  if (note.forgottenAt !== null) return 'forgotten'
+  return 'superseded'
+}
+
 const panelNote = (note: NoteRecord): PanelNote => ({
   id: note.id,
   project: note.project,
@@ -455,7 +462,7 @@ const panelNote = (note: NoteRecord): PanelNote => ({
   createdAt: note.firstCreatedAt,
   updatedAt: note.createdAt,
   citations: note.uses,
-  status: note.archivedAt !== null ? 'archived' : note.valid ? 'valid' : note.forgottenAt !== null ? 'forgotten' : 'superseded',
+  status: panelStatusOf(note),
   archivedAt: note.archivedAt,
   supersedes: note.supersedes,
   supersededBy: note.supersededBy,

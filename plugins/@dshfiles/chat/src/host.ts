@@ -8,12 +8,6 @@ import { TRANSCRIPT_VIEW_FIELD } from './chat-settings.ts'
 
 import { ChatSettingsFields } from './chat-settings.ts'
 
-export {
-  CHAT_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, LEGACY_TRANSCRIPT_VIEW_MODE,
-  LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE, TRANSCRIPT_VIEW_FIELD,
-  TRANSCRIPT_VIEW_MODES, type ChatSettings, type TranscriptViewMode,
-} from './chat-settings.ts'
-
 /** Runtime preferences projected to the browser. */
 export interface Config {
   /** Completed turn transcript presentation. */

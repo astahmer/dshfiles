@@ -278,7 +278,7 @@ const applyManifestRepairPlan = async (plan: ManifestRepairPlan): Promise<void> 
   if (plan.files.length === 0) return
   if (plan.diagnostics.some(item => item.severity === 'error')) {
     throw new DshxError('DSHX4144', 'The manifest repair plan contains errors and cannot be applied.', {
-      ...(plan.files[0] === undefined ? {} : { file: plan.files[0].file }),
+      ...(plan.files[0] !== undefined && { file: plan.files[0].file }),
       hint: 'Resolve the reported manifest diagnostics manually before applying a repair plan.',
     })
   }

@@ -163,6 +163,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   useEffect(() => sendNavigation({ type: 'mode.sync', mode: props.mode }), [props.mode, sendNavigation])
   const emptyQuery = deferredQuery.trim().length === 0
   const [askPending, setAskPending] = useState(false)
+  // Ranking happens within one palette visit, so the instant it opened is the whole clock the memo needs.
+  const [openedAt] = useState(() => Date.now())
   const askInFlight = useRef(false)
   const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
   const latestOnClose = useRef(props.onClose)
@@ -193,7 +195,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
   const runningAction = actionSnapshot.matches('running')
   const frecency = paletteFrecency.useValue()
-  const boosts = useMemo(() => PaletteFrecency.boosts(frecency, Date.now()), [frecency])
+  const boosts = useMemo(() => PaletteFrecency.boosts(frecency, openedAt), [frecency, openedAt])
   const registeredActions = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot).actions
   const actionOptions = useMemo<PaletteActionOption[]>(() => {
     // Several bundles register the same command ("New thread" comes from this palette, the sidebar header and the

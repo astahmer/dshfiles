@@ -1,9 +1,8 @@
 import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
-import { parseSecretPrintMetadata, type SecretMetadata, type SecretScope } from './secret-metadata.js'
-
-export type { SecretScope } from './secret-metadata.js'
+import type { SecretScope } from '@dshfiles/credential-port'
+import { parseSecretPrintMetadata, type SecretMetadata } from './secret-metadata.js'
 
 export interface SecretCliRequest {
   readonly args: readonly string[]
@@ -163,7 +162,7 @@ export const createSecretCatalogOperations = (runCli: SecretCliRunner): SecretCa
         args,
         cwd,
         captureStdout: false,
-        ...(input.valueMode === 'manual' && input.value !== null ? { stdin: input.value } : {}),
+        ...(input.valueMode === 'manual' && input.value !== null && { stdin: input.value }),
       })
       return { created: true }
     },

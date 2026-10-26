@@ -118,13 +118,11 @@ function makeContribution<Kind extends string, Events extends ConversationEventD
       }
       return node
     },
-    ...(Object.values(lifecycle.events).some(value => value?.publication !== undefined)
-      ? {
-          publication(match: ConversationMatch) {
-            return descriptorFor(lifecycle.events, match.event)?.publication ?? 'immediate'
-          },
-        }
-      : {}),
+    ...(Object.values(lifecycle.events).some(value => value?.publication !== undefined) && {
+      publication(match: ConversationMatch) {
+        return descriptorFor(lifecycle.events, match.event)?.publication ?? 'immediate'
+      },
+    }),
   }
   const renderer = (props: ConversationRendererSlotProps<Kind, Data>) =>
     createElement(authorComponent, { ...props, data: props.node.data } as ConversationRendererProps<Kind, Data>)

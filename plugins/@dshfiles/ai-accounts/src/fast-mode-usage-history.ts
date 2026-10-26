@@ -103,4 +103,3 @@ export const createFastModeUsageHistoryService = (
 }
 
 export type FastModeUsageHistoryService = ReturnType<typeof createFastModeUsageHistoryService>
-export type { FastModeUsageEvent, FastModeUsageObservation } from './fast-mode-usage-model.js'

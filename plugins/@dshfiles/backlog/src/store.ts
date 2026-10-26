@@ -342,7 +342,7 @@ const createBacklogStore = ({
       ...change,
       actors: withActor(change.actors ?? item.actors, actorId, 'contributor'),
       lastActivityAt: at,
-      events: BacklogItems.appendEvent(item.events, { at, actor: actorId, ...event, ...(fieldChanges.length === 0 ? {} : { fieldChanges }) }),
+      events: BacklogItems.appendEvent(item.events, { at, actor: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }),
     }
     await persist(next)
     const stored = next.events.at(-1)

@@ -1,11 +1,11 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
-import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
+import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
 import type { BuildHostOptions } from '../src/compiler/host/build.js'
 import type { ResolvedDshxConfig } from '../src/tooling/index.js'
-import { startDevSession } from '../src/dev/index.js'
-import type { DevBuildEvent, DevChildProcess, DevEvent, DevProjectWatcher, DevWatcher } from '../src/dev/index.js'
-import type { PreparedProjectProfile } from '../src/profile/index.js'
+import { startDevSession } from '../src/dev/orchestrator.js'
+import type { DevBuildEvent, DevChildProcess, DevEvent, DevProjectWatcher, DevWatcher } from '../src/dev/types.js'
+import type { PreparedProjectProfile } from '../src/profile/types.js'
 
 class FakeWatcher extends EventEmitter implements DevWatcher {
   close = vi.fn(async () => undefined)
@@ -64,8 +64,8 @@ function project(faces: 'host' | 'client' | 'full' = 'full', hostRestart: 'manua
     configDependencies: [],
     packageId: '@test/plugin',
     name: '@test/plugin',
-    ...(faces === 'client' ? {} : { hostEntry: `${root}/src/host.ts` }),
-    ...(faces === 'host' ? {} : { clientEntry: `${root}/src/client.tsx` }),
+    ...(faces !== 'client' && { hostEntry: `${root}/src/host.ts` }),
+    ...(faces !== 'host' && { clientEntry: `${root}/src/client.tsx` }),
     outDir: `${root}/dist`,
     profile: 'web',
     dev: { hostRestart },

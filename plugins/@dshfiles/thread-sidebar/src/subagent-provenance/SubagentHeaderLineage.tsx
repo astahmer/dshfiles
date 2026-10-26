@@ -171,6 +171,29 @@ function isKnownLeaf(catalog: SubagentCatalogSnapshot | undefined): boolean {
   return catalog?.state === 'ready' && catalog.entries.length === 0
 }
 
+const modeLabelOf = (props: {
+  readonly mode: SubagentCatalogSnapshot['entries'][number]['mode']
+  readonly external: boolean
+  readonly t: TranslateNS<typeof NS>
+}): string => {
+  if (props.external) return props.t('mode.external')
+  if (props.mode === 'unknown') return props.t('mode.unknown')
+  if (props.mode === 'one-shot') return props.t('mode.oneShot')
+  return props.t('mode.continuable')
+}
+
+const activityLabelOf = (props: {
+  readonly external: boolean
+  readonly running: boolean
+  readonly completed: boolean
+  readonly t: TranslateNS<typeof NS>
+}): string | undefined => {
+  if (props.external) return undefined
+  if (props.running) return props.t('activity.running')
+  if (props.completed) return props.t('activity.completed')
+  return props.t('activity.inactive')
+}
+
 /** Render one catalog level and recurse only through explicitly expanded rows. */
 function CatalogRows({
   parentSessionId,
@@ -228,16 +251,10 @@ function CatalogRows({
         const childLoading = childCatalog === undefined || (childCatalog.state === 'loading' && childCatalog.entries.length === 0)
         const summary = summaries[entry.id]
         const label = entry.label ?? entry.id
-        const mode = external
-          ? t('mode.external')
-          : entry.mode === 'unknown'
-            ? t('mode.unknown')
-            : entry.mode === 'one-shot'
-              ? t('mode.oneShot')
-              : t('mode.continuable')
+        const mode = modeLabelOf({ mode: entry.mode, external, t })
         const runningEntry = entry.activity === 'running'
         const completed = !external && !runningEntry && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
-        const activity = external ? undefined : runningEntry ? t('activity.running') : completed ? t('activity.completed') : t('activity.inactive')
+        const activity = activityLabelOf({ external, running: runningEntry, completed, t })
         const agentRoute = SubagentRouteLabelModel.displayedAgentRouteLabel(
           summary?.projectionValues?.threadSidebarModelRoute,
           summary?.projectionValues?.subagent,

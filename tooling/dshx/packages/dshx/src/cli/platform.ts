@@ -13,7 +13,8 @@ import { SessionSearchModel } from '../platform/session-search.js'
 import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runCommunicationCommand } from '../communication/cli.js'
-import { connectMultiHost, nativeRpcRequestSchema, type MultiHost, type RuntimeStatusValue } from '../platform/dshx-channel.js'
+import { connectMultiHost, type MultiHost, type RuntimeStatusValue } from '../platform/dshx-channel.js'
+import { nativeRpcRequestSchema } from '../platform/native-rpc.js'
 import { SessionDigestModel } from '../platform/session-digest.js'
 
 const runFile = promisify(execFile)
@@ -49,10 +50,7 @@ function commandName(args: CliArgs): string {
   return action === undefined ? (args.command ?? 'unknown') : `${args.command} ${action}`
 }
 
-function safeMessage(error: unknown): {
-  readonly code: string
-  readonly message: string
-} {
+function safeMessage(error: unknown) {
   if (error instanceof z.ZodError) {
     return { code: 'invalid-response', message: `DSH returned data outside its API contract:\n${z.prettifyError(error)}` }
   }
@@ -186,10 +184,10 @@ function changeData(result: import('../platform/client.js').ChangeResult): JsonV
     application: result.application,
     changed: result.changed,
     restartRequired: result.application === 'restart-required',
-    ...(result.stage === undefined ? {} : { stage: result.stage }),
-    ...(result.target === undefined ? {} : { target: result.target }),
-    ...(result.enabled === undefined ? {} : { enabled: result.enabled }),
-    ...(result.error === undefined ? {} : { error: result.error }),
+    ...(result.stage !== undefined && { stage: result.stage }),
+    ...(result.target !== undefined && { target: result.target }),
+    ...(result.enabled !== undefined && { enabled: result.enabled }),
+    ...(result.error !== undefined && { error: result.error }),
     warnings: result.warnings,
   }
 }
@@ -537,7 +535,7 @@ const runtimeStatusText = (status: RuntimeStatusValue): string => {
 }
 
 /** The finder reports `search-unavailable`; the CLI documents one code for "no Session content search" across both paths. */
-function finderFailure(error: unknown): unknown {
+function finderFailure(error: unknown) {
   if (error instanceof DshPlatformError && error.code === 'search-unavailable') return new DshPlatformError('session-search-unavailable', error.message)
   return error
 }
@@ -569,7 +567,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
     const connect = connectMultiHostRuntime(runtime)
     let multiHost: MultiHost
     try {
-      multiHost = await connect({ ...(args.url === undefined ? {} : { url: args.url }) })
+      multiHost = await connect({ ...(args.url !== undefined && { url: args.url }) })
     } catch (error) {
       return emitError(args, runtime.io, error)
     }
@@ -711,7 +709,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
   if (args.command === 'comm') {
     return runCommunicationCommand(args, {
       io: runtime.io,
-      ...(runtime.connectCommunication === undefined ? {} : { connect: runtime.connectCommunication }),
+      ...(runtime.connectCommunication !== undefined && { connect: runtime.connectCommunication }),
     })
   }
 
@@ -719,7 +717,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
   let client: DshPlatformClient
   if (args.command === 'sessions' && args.hostSelector !== undefined) {
     try {
-      const multiHost = await connectMultiHostRuntime(runtime)({ ...(args.url === undefined ? {} : { url: args.url }) })
+      const multiHost = await connectMultiHostRuntime(runtime)({ ...(args.url !== undefined && { url: args.url }) })
       selectedPlacement = await selectRemoteRuntime(multiHost, args.hostSelector)
       client = remoteSessionClient(multiHost, selectedPlacement.runtimeId)
     } catch (error) {
@@ -805,8 +803,8 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
       }
       if (action === 'create') {
         const result = await client.sessions.create({
-          ...(args.cwd === undefined ? {} : { cwd: args.cwd }),
-          ...(args.agentPreset === undefined ? {} : { agentPreset: args.agentPreset }),
+          ...(args.cwd !== undefined && { cwd: args.cwd }),
+          ...(args.agentPreset !== undefined && { agentPreset: args.agentPreset }),
         })
         emitSessionResult(result, `Created Session ${result.sessionId}`)
         return 0
@@ -815,8 +813,8 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         // One command for the three RPCs a human otherwise chains: create, optional title, first message.
         const text = parameters.join(' ').trim()
         const created = await client.sessions.create({
-          ...(args.cwd === undefined ? {} : { cwd: args.cwd }),
-          ...(args.agentPreset === undefined ? {} : { agentPreset: args.agentPreset }),
+          ...(args.cwd !== undefined && { cwd: args.cwd }),
+          ...(args.agentPreset !== undefined && { agentPreset: args.agentPreset }),
         })
         let title: string | undefined
         if (args.title !== undefined) {
@@ -840,10 +838,10 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         }
         const data = {
           sessionId: created.sessionId,
-          ...(title === undefined ? {} : { title }),
-          ...(created.agentPreset === undefined ? {} : { agentPreset: created.agentPreset }),
-          ...(delivery === undefined ? {} : { prompt: delivery }),
-          ...(promptError === undefined ? {} : { promptError }),
+          ...(title !== undefined && { title }),
+          ...(created.agentPreset !== undefined && { agentPreset: created.agentPreset }),
+          ...(delivery !== undefined && { prompt: delivery }),
+          ...(promptError !== undefined && { promptError }),
         }
         emitSessionResult(
           data,
@@ -901,11 +899,11 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           schemaVersion: 1,
           source: 'dshx',
           sessionId,
-          ...(selectedPlacement === undefined ? {} : { placement: selectedPlacement }),
+          ...(selectedPlacement !== undefined && { placement: selectedPlacement }),
           records: await client.sessions.export(sessionId, {
-            ...(args.sinceSeq === undefined ? {} : { afterSeq: args.sinceSeq }),
-            ...(args.tail === undefined ? {} : { newest: args.tail }),
-            ...(args.types === undefined ? {} : { keep: SessionDigestModel.eventFilter(args.types) }),
+            ...(args.sinceSeq !== undefined && { afterSeq: args.sinceSeq }),
+            ...(args.tail !== undefined && { newest: args.tail }),
+            ...(args.types !== undefined && { keep: SessionDigestModel.eventFilter(args.types) }),
           }),
         }
         if (args.output !== undefined) {
@@ -931,7 +929,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
       if (!summary) throw new DshPlatformError('not-found', `No DSH Session named ${JSON.stringify(sessionId)} exists.`)
       const records = await client.sessions.export(sessionId)
       const now = Date.now()
-      const digest = SessionDigestModel.digest({ summary, records, now, ...(args.limit === undefined ? {} : { actionLimit: args.limit }) })
+      const digest = SessionDigestModel.digest({ summary, records, now, ...(args.limit !== undefined && { actionLimit: args.limit }) })
       emitSessionResult(digest, SessionDigestModel.render(digest, now))
       return 0
     }
@@ -948,7 +946,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         throughSeq,
         keep,
         ...(args.sinceSeq === undefined ? { newest: args.tail ?? 40 } : { afterSeq: args.sinceSeq }),
-        ...(args.sinceSeq !== undefined && args.tail !== undefined ? { newest: args.tail } : {}),
+        ...(args.sinceSeq !== undefined && args.tail !== undefined && { newest: args.tail }),
       }
       const initial = describeAll(await client.sessions.export(sessionId, initialRange))
       if (!args.follow) {
@@ -1109,8 +1107,8 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
             providerName: group.name,
             id: model.id,
             name: model.name,
-            ...(model.description === undefined ? {} : { description: model.description }),
-            ...(model.reasoning === undefined ? {} : { reasoning: model.reasoning }),
+            ...(model.description !== undefined && { description: model.description }),
+            ...(model.reasoning !== undefined && { reasoning: model.reasoning }),
           })),
         )
         const table = rows(items, [
@@ -1141,7 +1139,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         const selection = await client.models.select(sessionId, {
           provider: parameters[0] ?? '',
           model: parameters[1] ?? '',
-          ...(args.reasoningEffort === undefined ? {} : { reasoningEffort: args.reasoningEffort }),
+          ...(args.reasoningEffort !== undefined && { reasoningEffort: args.reasoningEffort }),
         })
         emitResult(
           args,

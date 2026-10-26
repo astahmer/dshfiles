@@ -101,7 +101,7 @@ const homeDirectory = (stateHome?: string): string => {
   return join(home, 'runtime', 'dshx', 'communication')
 }
 
-const bridgePaths = (stateHome?: string): { readonly directory: string; readonly socketPath: string; readonly metadataPath: string } => {
+const bridgePaths = (stateHome?: string) => {
   const directory = homeDirectory(stateHome)
   const longSocket = join(directory, 'host.sock')
   const socketPath = longSocket.length > 90 ? join(tmpdir(), `dshx-comm-${createHash('sha256').update(directory).digest('hex').slice(0, 20)}.sock`) : longSocket
@@ -118,7 +118,7 @@ const communicationTransportError = (error: JsonLineTransportError): Communicati
   return new CommunicationError('invalid-response', 'Communication bridge returned invalid JSON.')
 }
 
-const responseError = (requestId: string, code: string, message: string): Record<string, unknown> => ({
+const responseError = (requestId: string, code: string, message: string) => ({
   version: PROTOCOL_VERSION,
   requestId,
   ok: false,
@@ -177,8 +177,8 @@ const dispatch = async (
       .parse(request.input)
     return service.subscribe(request.principal, {
       topic: input.topic,
-      ...(input.delivery === undefined ? {} : { delivery: input.delivery }),
-      ...(input.allowSteerFrom === undefined ? {} : { allowSteerFrom: input.allowSteerFrom }),
+      ...(input.delivery !== undefined && { delivery: input.delivery }),
+      ...(input.allowSteerFrom !== undefined && { allowSteerFrom: input.allowSteerFrom }),
     })
   }
   if (request.operation === 'unsubscribe') {
@@ -204,10 +204,10 @@ const dispatch = async (
       sender: request.principal,
       topic: input.topic,
       text: input.text,
-      ...(input.intent === undefined ? {} : { intent: input.intent }),
-      ...(input.priority === undefined ? {} : { priority: input.priority }),
-      ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
-      ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
+      ...(input.intent !== undefined && { intent: input.intent }),
+      ...(input.priority !== undefined && { priority: input.priority }),
+      ...(input.correlationId !== undefined && { correlationId: input.correlationId }),
+      ...(input.dedupeKey !== undefined && { dedupeKey: input.dedupeKey }),
     })
   }
   if (request.operation === 'send') {
@@ -226,10 +226,10 @@ const dispatch = async (
       sender: request.principal,
       toAgentId: input.toAgentId,
       text: input.text,
-      ...(input.intent === undefined ? {} : { intent: input.intent }),
-      ...(input.priority === undefined ? {} : { priority: input.priority }),
-      ...(input.correlationId === undefined ? {} : { correlationId: input.correlationId }),
-      ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
+      ...(input.intent !== undefined && { intent: input.intent }),
+      ...(input.priority !== undefined && { priority: input.priority }),
+      ...(input.correlationId !== undefined && { correlationId: input.correlationId }),
+      ...(input.dedupeKey !== undefined && { dedupeKey: input.dedupeKey }),
     })
   }
   if (request.operation === 'inbox') {
@@ -240,8 +240,8 @@ const dispatch = async (
     return {
       items: await service.inbox({
         principal: request.principal,
-        ...(input.topic === undefined ? {} : { topic: input.topic }),
-        ...(input.limit === undefined ? {} : { limit: input.limit }),
+        ...(input.topic !== undefined && { topic: input.topic }),
+        ...(input.limit !== undefined && { limit: input.limit }),
       }),
     }
   }
@@ -381,7 +381,7 @@ export const connectCommunicationClient = async (options: ConnectCommunicationCl
   const metadata = await readMetadata(options.stateHome)
   const request = async (operation: z.infer<typeof operationSchema>, input?: unknown): Promise<unknown> => {
     const requestId = randomUUID()
-    const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input === undefined ? {} : { input }) })}\n`
+    const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input !== undefined && { input }) })}\n`
     const value = await JsonLineTransport.request(metadata.socketPath, body, {
       maxRequestBytes: MAX_REQUEST_BYTES,
       maxResponseBytes: MAX_RESPONSE_BYTES,
