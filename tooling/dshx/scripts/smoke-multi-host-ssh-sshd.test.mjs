@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { constants } from 'node:fs'
 import { once } from 'node:events'
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { createConnection, createServer } from 'node:net'
-import { tmpdir, userInfo } from 'node:os'
+import { userInfo } from 'node:os'
 import { delimiter, join, resolve, sep } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test } from 'node:test'
@@ -116,14 +116,21 @@ const stopSshClient = async clientProcess => {
 }
 
 test('loopback OpenSSH verifies its local forward with scratch keys and known_hosts', { timeout: 30_000 }, async context => {
-  const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-loopback-sshd-'))
-  const resolvedScratchRoot = resolve(scratchRoot)
+  const account = userInfo()
+  // StrictModes checks every AuthorizedKeysFile ancestor back to the account home.
+  // A private directory under /tmp still fails because /tmp itself is world-writable.
+  const home = await realpath(account.homedir)
+  const scratchRoot = await mkdtemp(join(home, '.dsh-loopback-sshd-'))
+  const resolvedScratchRoot = await realpath(scratchRoot)
   assert.equal(resolvedScratchRoot, scratchRoot)
-  assert.ok(resolvedScratchRoot.startsWith(`${resolve(tmpdir())}${sep}`))
+  assert.ok(resolvedScratchRoot.startsWith(`${home}${sep}.dsh-loopback-sshd-`))
   let serverProcess
   let serverStderr = ''
 
   try {
+    const scratchStat = await stat(scratchRoot)
+    assert.equal(scratchStat.uid, account.uid)
+    assert.equal(scratchStat.mode & 0o777, 0o700)
     const sshdPath = await findExecutable('sshd')
     const sshKeygenPath = await findExecutable('ssh-keygen')
     const sshPath = await findExecutable('ssh')
@@ -140,6 +147,7 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
     const knownHostsPath = join(scratchRoot, 'known_hosts')
     const configPath = join(scratchRoot, 'sshd_config')
     const pidFilePath = join(scratchRoot, 'sshd.pid')
+    const logPath = join(scratchRoot, 'sshd.log')
     if (!generateKey(sshKeygenPath, hostKeyPath) || !generateKey(sshKeygenPath, clientKeyPath)) {
       context.skip('OpenSSH key generator is not installed; no SSH server was started.')
       return
@@ -169,7 +177,7 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
       'UseDNS no',
       'PrintMotd no',
       'PrintLastLog no',
-      'LogLevel ERROR',
+      'LogLevel VERBOSE',
     ].join('\n')
     await writeFile(configPath, `${config}\n`, { mode: 0o600 })
     await writeFile(knownHostsPath, `[127.0.0.1]:${port} ${hostPublicKey.trim()}\n`, { mode: 0o600 })
@@ -178,12 +186,15 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
     assert.equal(configCheck.error, undefined, configCheck.stderr)
     assert.equal(configCheck.status, 0, configCheck.stderr)
 
-    serverProcess = spawn(sshdPath, ['-D', '-e', '-f', configPath], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] })
+    // File-backed logs cannot fill a stderr pipe while the synchronous SSH probe runs.
+    await writeFile(logPath, '', { mode: 0o600 })
+    serverProcess = spawn(sshdPath, ['-D', '-E', logPath, '-f', configPath], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] })
     serverProcess.stderr.on('data', chunk => {
       serverStderr += String(chunk)
     })
     const listening = await waitForLoopbackListener({ serverProcess, port })
     if (!listening) {
+      serverStderr = `${serverStderr}\n${await readFile(logPath, 'utf8')}`.slice(-16_384)
       const reason = `exit=${serverProcess.exitCode ?? serverProcess.signalCode ?? 'still-running'}, stderr=${serverStderr.trim() || '<empty>'}`
       if (/Bind to port \d+ on 127\.0\.0\.1 failed: (?:Permission denied|Operation not permitted)/i.test(serverStderr)) {
         context.skip(`The test sandbox denied binding the loopback SSH port: ${reason}`)
@@ -192,14 +203,15 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
       assert.fail(`OpenSSH did not listen on 127.0.0.1:${port}: ${reason}`)
     }
 
-    const username = userInfo().username
+    const username = account.username
     const connection = spawnSync(
       sshPath,
       [...buildSshOptions({ sshKey: clientKeyPath, knownHosts: knownHostsPath, sshPort: port }), `${username}@127.0.0.1`, 'printf fixture-ok'],
       { encoding: 'utf8', timeout: 10_000 },
     )
     assert.equal(connection.error, undefined, connection.stderr)
-    assert.equal(connection.status, 0, connection.stderr)
+    const authenticationDiagnostics = `${connection.stderr}\n${await readFile(logPath, 'utf8')}`.slice(-16_384)
+    assert.equal(connection.status, 0, authenticationDiagnostics)
     assert.equal(connection.stdout, 'fixture-ok')
 
     const occupiedPort = await reserveLoopbackPort()
@@ -213,7 +225,14 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
       assert.notEqual(localPort, occupiedPort, 'the randomized SSH port must not reuse an already listening port')
       const forward = spawn(
         sshPath,
-        [...buildSshOptions({ sshKey: clientKeyPath, knownHosts: knownHostsPath, sshPort: port }), '-v', '-N', '-L', `127.0.0.1:${localPort}:127.0.0.1:${port}`, `${username}@127.0.0.1`],
+        [
+          ...buildSshOptions({ sshKey: clientKeyPath, knownHosts: knownHostsPath, sshPort: port }),
+          '-v',
+          '-N',
+          '-L',
+          `127.0.0.1:${localPort}:127.0.0.1:${port}`,
+          `${username}@127.0.0.1`,
+        ],
         { stdio: ['ignore', 'ignore', 'pipe'] },
       )
       let forwardDiagnostics = ''
@@ -235,6 +254,7 @@ test('loopback OpenSSH verifies its local forward with scratch keys and known_ho
     try {
       await stopServer(serverProcess)
     } finally {
+      assert.equal(await realpath(scratchRoot), resolvedScratchRoot)
       await rm(scratchRoot, { recursive: true, force: true })
     }
   }
