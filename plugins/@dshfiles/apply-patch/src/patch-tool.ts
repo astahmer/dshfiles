@@ -1,5 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
+import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { defineTool } from '@dshfiles/dshx/host'
 import { z } from 'zod'
@@ -86,10 +88,11 @@ export const createApplyPatchTool = (ctx: Context) =>
     execute: async (args, execution) => {
       const input = inputSchema.parse(args)
       const agent = execution.agent
-      const cwd = agent === undefined ? undefined : await ctx.workingDirectory.ensure(agent, execution.signal)
-      const resolveOptions: { readonly cwd?: string; readonly signal: AbortSignal } =
-        cwd === undefined ? { signal: execution.signal } : { cwd, signal: execution.signal }
-      const target = await ctx.fs.resolve(input.path, resolveOptions)
+      if (agent === undefined) throw new Error('cannot patch without a caller session')
+      const session = ctx.sessions.get(agent.id)
+      if (session === undefined) throw new Error('cannot patch because the caller session is no longer live')
+      const cwd = await ctx.workingDirectory.ensure(agent, execution.signal)
+      const target = await ctx.fs.resolve(input.path, { cwd, signal: execution.signal })
       const info = await ctx.fs.stat(target, execution.signal)
       if (info === undefined) {
         ctx.emit('fs/observed', target, { kind: 'absent' }, execution)
@@ -103,7 +106,8 @@ export const createApplyPatchTool = (ctx: Context) =>
       )
       const result = applyEdits({ content: before, edits })
       if (!result.ok) throw new Error(`cannot patch "${target.displayPath}": ${describeEditsFailure(result.error)}`)
-      const outcome = await ctx.fs.writeText(target, result.value.content, undefined, execution.signal)
+      const sandboxPolicy = ctx.sandboxPolicy.resolve({ session })
+      const outcome = await ctx.fs.writeText(target, result.value.content, undefined, execution.signal, sandboxPolicy)
       ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, execution)
       return {
         path: ctx.fs.processPath(target),

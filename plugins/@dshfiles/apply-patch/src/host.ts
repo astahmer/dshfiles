@@ -3,7 +3,7 @@ import { createApplyPatchTool } from './patch-tool.js'
 
 export default defineHost({
   name: '@dshfiles/apply-patch',
-  inject: ['tools', 'fs', 'workingDirectory'],
+  inject: ['tools', 'fs', 'workingDirectory', 'sessions', 'sandboxPolicy'],
   setup: ctx => {
     // Registered from `setup` so the tool closes over this context: a scoped
     // `execution.agent.ctx` only resolves services it injects, and reading
