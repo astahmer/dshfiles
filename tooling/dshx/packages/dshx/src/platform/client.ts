@@ -556,46 +556,48 @@ const loopbackLaunchUrl = (
 
 function mapSession(value: unknown, archived?: boolean): SessionSummary {
   const parsed = sessionSummarySchema.parse(value)
-  const summary = {
+  const summary: SessionSummary = {
     sessionId: parsed.sessionId,
     updatedAt: parsed.updatedAt,
     running: parsed.running,
     blank: parsed.blank,
     agentAvailable: parsed.agentAvailable,
-    ...(parsed.parentSessionId === undefined ? {} : { parentSessionId: parsed.parentSessionId }),
-    ...(parsed.origin === undefined ? {} : { origin: parsed.origin }),
-    ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
-    ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
   }
-  if (archived === undefined) return summary
-  return { ...summary, archived }
+  if (parsed.parentSessionId !== undefined) Object.assign(summary, { parentSessionId: parsed.parentSessionId })
+  if (parsed.origin !== undefined) Object.assign(summary, { origin: parsed.origin })
+  if (parsed.cwd !== undefined) Object.assign(summary, { cwd: parsed.cwd })
+  if (parsed.projections !== undefined) Object.assign(summary, { projections: parsed.projections })
+  if (archived !== undefined) Object.assign(summary, { archived })
+  return summary
 }
 
 function mapPlugin(value: unknown): PluginSummary {
   const parsed = pluginSchema.parse(value)
-  return {
+  const summary: PluginSummary = {
     id: parsed.entryId,
     moduleName: parsed.moduleName,
-    ...(parsed.meta === undefined ? {} : { meta: parsed.meta }),
     enabled: parsed.enabled,
     phase: parsed.fiberPhase,
-    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
   }
+  if (parsed.meta !== undefined) Object.assign(summary, { meta: parsed.meta })
+  if (parsed.readOnlyReason !== undefined) Object.assign(summary, { readOnlyReason: parsed.readOnlyReason })
+  return summary
 }
 
 function mapBundle(value: unknown): BundleSummary {
   const parsed = bundleSchema.parse(value)
-  return {
+  const summary: BundleSummary = {
     name: parsed.name,
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
     enabled: parsed.enabled,
     installed: parsed.installed,
     optional: parsed.optional,
     removable: parsed.removable,
-    ...(parsed.readOnlyReason === undefined ? {} : { readOnlyReason: parsed.readOnlyReason }),
-    ...(parsed.error === undefined ? {} : { error: decodeJsonValue(parsed.error, 'Bundle inventory') }),
-    ...(parsed.rows === undefined ? {} : { rowCount: parsed.rows.length }),
   }
+  if (parsed.description !== undefined) Object.assign(summary, { description: parsed.description })
+  if (parsed.readOnlyReason !== undefined) Object.assign(summary, { readOnlyReason: parsed.readOnlyReason })
+  if (parsed.error !== undefined) Object.assign(summary, { error: decodeJsonValue(parsed.error, 'Bundle inventory') })
+  if (parsed.rows !== undefined) Object.assign(summary, { rowCount: parsed.rows.length })
+  return summary
 }
 
 function mapSettings(value: unknown): SettingsDescription {
@@ -633,96 +635,87 @@ function mapChangeResult(value: unknown): ChangeResult {
       warnings: z.array(z.string()).optional(),
     })
     .parse(value)
-  return {
+  const result: ChangeResult = {
     application: parsed.application,
     changed: parsed.changed,
-    ...(parsed.enabled === undefined ? {} : { enabled: parsed.enabled }),
     warnings: parsed.warnings ?? [],
     stage: parsed.stage,
     target: parsed.target,
-    ...(parsed.error === undefined
-      ? {}
-      : {
-          error: {
-            code: parsed.error.code,
-            ...(parsed.error.diagnostic === undefined ? {} : { diagnostic: parsed.error.diagnostic }),
-            ...(parsed.error.incompatible === undefined ? {} : { incompatible: parsed.error.incompatible }),
-          },
-        }),
   }
+  if (parsed.enabled !== undefined) Object.assign(result, { enabled: parsed.enabled })
+  if (parsed.error !== undefined) {
+    const error: NonNullable<ChangeResult['error']> = { code: parsed.error.code }
+    if (parsed.error.diagnostic !== undefined) Object.assign(error, { diagnostic: parsed.error.diagnostic })
+    if (parsed.error.incompatible !== undefined) Object.assign(error, { incompatible: parsed.error.incompatible })
+    Object.assign(result, { error })
+  }
+  return result
 }
 
 function mapPluginInspection(value: unknown): PluginInspection {
   const parsed = pluginInspectionSchema.parse(value)
   if (parsed.status === 'refused') {
-    return {
+    const result: Extract<PluginInspection, { status: 'refused' }> = {
       status: parsed.status,
       problem: parsed.problem,
       reason: parsed.reason,
-      ...(parsed.registries === undefined ? {} : { registries: parsed.registries }),
     }
+    if (parsed.registries !== undefined) Object.assign(result, { registries: parsed.registries })
+    return result
   }
-  return {
+  const result: Extract<PluginInspection, { status: 'accepted' }> = {
     status: parsed.status,
     kind: parsed.kind,
     bundle: parsed.bundle,
     registry: parsed.registry,
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.version === undefined ? {} : { version: parsed.version }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
-    ...(parsed.host === undefined ? {} : { host: parsed.host }),
   }
+  if (parsed.name !== undefined) Object.assign(result, { name: parsed.name })
+  if (parsed.version !== undefined) Object.assign(result, { version: parsed.version })
+  if (parsed.description !== undefined) Object.assign(result, { description: parsed.description })
+  if (parsed.host !== undefined) Object.assign(result, { host: parsed.host })
+  return result
 }
 
 function mapAgentPresetRow(value: z.infer<typeof agentPresetRowSchema>): AgentPresetRow {
-  return {
-    id: value.id,
-    isDefault: value.isDefault,
-    ...(value.name === undefined ? {} : { name: value.name }),
-    ...(value.description === undefined ? {} : { description: value.description }),
-    ...(value.broken === undefined ? {} : { broken: value.broken }),
-  }
+  const row: AgentPresetRow = { id: value.id, isDefault: value.isDefault }
+  if (value.name !== undefined) Object.assign(row, { name: value.name })
+  if (value.description !== undefined) Object.assign(row, { description: value.description })
+  if (value.broken !== undefined) Object.assign(row, { broken: value.broken })
+  return row
 }
 
 function mapAgentPresetDocument(value: unknown): AgentPresetDocument {
   const parsed = agentPresetDocumentSchema.parse(value)
-  return {
-    agentPreset: parsed.agentPreset,
-    content: parsed.content,
-    ...(parsed.name === undefined ? {} : { name: parsed.name }),
-    ...(parsed.description === undefined ? {} : { description: parsed.description }),
-  }
+  const document: AgentPresetDocument = { agentPreset: parsed.agentPreset, content: parsed.content }
+  if (parsed.name !== undefined) Object.assign(document, { name: parsed.name })
+  if (parsed.description !== undefined) Object.assign(document, { description: parsed.description })
+  return document
 }
 
 function mapModelCatalog(value: unknown): ModelCatalog {
   const parsed = modelCatalogSchema.parse(value)
   return {
-    default: {
-      provider: parsed.default.provider,
-      model: parsed.default.model,
-      ...(parsed.default.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.default.reasoningEffort }),
-    },
+    default: mapModelSelection(parsed.default),
     routableProviders: parsed.routableProviders,
     groups: parsed.groups.map(group => ({
       id: group.id,
       name: group.name,
-      models: group.models.map(model => ({
-        id: model.id,
-        name: model.name,
-        ...(model.description === undefined ? {} : { description: model.description }),
-        ...(model.reasoning === undefined
-          ? {}
-          : {
-              reasoning: {
-                efforts: model.reasoning.efforts.map(effort => ({
-                  id: effort.id,
-                  name: effort.name,
-                  ...(effort.description === undefined ? {} : { description: effort.description }),
-                })),
-                ...(model.reasoning.defaultEffort === undefined ? {} : { defaultEffort: model.reasoning.defaultEffort }),
-              },
+      models: group.models.map(model => {
+        const result: ModelCatalog['groups'][number]['models'][number] = { id: model.id, name: model.name }
+        if (model.description !== undefined) Object.assign(result, { description: model.description })
+        if (model.reasoning !== undefined) {
+          const reasoning: NonNullable<typeof result.reasoning> = {
+            efforts: model.reasoning.efforts.map(effort => {
+              const result: NonNullable<typeof reasoning>['efforts'][number] = { id: effort.id, name: effort.name }
+              if (effort.description !== undefined) Object.assign(result, { description: effort.description })
+              return result
             }),
-      })),
+          }
+          if (model.reasoning.defaultEffort !== undefined) Object.assign(reasoning, { defaultEffort: model.reasoning.defaultEffort })
+          Object.assign(result, { reasoning })
+        }
+        return result
+      }),
     })),
     failures: parsed.failures.map(failure => ({
       id: failure.id,
@@ -734,21 +727,16 @@ function mapModelCatalog(value: unknown): ModelCatalog {
 
 function mapModelSelection(value: unknown): ModelSelection {
   const parsed = modelSelectionSchema.parse(value)
-  return {
-    provider: parsed.provider,
-    model: parsed.model,
-    ...(parsed.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.reasoningEffort }),
-  }
+  const selection: ModelSelection = { provider: parsed.provider, model: parsed.model }
+  if (parsed.reasoningEffort !== undefined) Object.assign(selection, { reasoningEffort: parsed.reasoningEffort })
+  return selection
 }
 
 function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
-  return {
-    name: value.name,
-    description: value.description,
-    modelInvocable: value.modelInvocable,
-    ...(value.path === undefined ? {} : { path: value.path }),
-    ...(value.whenToUse === undefined ? {} : { whenToUse: value.whenToUse }),
-  }
+  const entry: SkillEntry = { name: value.name, description: value.description, modelInvocable: value.modelInvocable }
+  if (value.path !== undefined) Object.assign(entry, { path: value.path })
+  if (value.whenToUse !== undefined) Object.assign(entry, { whenToUse: value.whenToUse })
+  return entry
 }
 
 function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
@@ -774,16 +762,9 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   }
 
   const page = async (sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages = 100): Promise<SessionPage> => {
-    const result = z.object({ records: z.array(jsonValueSchema), hasMore: z.boolean() }).parse(
-      await transport.rpc('session', 'page', {
-        request: {
-          address: { kind: 'session', sessionId },
-          throughSeq,
-          ...(beforeSeq === undefined ? {} : { beforeSeq }),
-          maxMessages,
-        },
-      }),
-    )
+    const request = { address: { kind: 'session', sessionId }, throughSeq, maxMessages }
+    if (beforeSeq !== undefined) Object.assign(request, { beforeSeq })
+    const result = z.object({ records: z.array(jsonValueSchema), hasMore: z.boolean() }).parse(await transport.rpc('session', 'page', { request }))
     return { records: result.records, hasMore: result.hasMore }
   }
 
@@ -805,10 +786,11 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
           .parse(await transport.rpc('session', 'create', { request: input }))
         return parsed.agentPreset === undefined ? { sessionId: parsed.sessionId } : { sessionId: parsed.sessionId, agentPreset: parsed.agentPreset }
       },
-      fork: async (sessionId, atSeq) =>
-        z
-          .object({ sessionId: z.string() })
-          .parse(await transport.rpc('session', 'fork', { request: { sessionId, ...(atSeq === undefined ? {} : { atSeq }) } })),
+      fork: async (sessionId, atSeq) => {
+        const request = { sessionId }
+        if (atSeq !== undefined) Object.assign(request, { atSeq })
+        return z.object({ sessionId: z.string() }).parse(await transport.rpc('session', 'fork', { request }))
+      },
       cancel: async sessionId => z.object({ accepted: z.literal(true) }).parse(await transport.rpc('session', 'cancel', { request: { sessionId } })),
       rename: async (sessionId, title) =>
         z
@@ -933,12 +915,12 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     commands: {
       list: async sessionId => {
         const values = z.array(commandSchema).parse(await transport.rpc('commands', 'list', { agentId: sessionId }))
-        return values.map(item => ({
-          ...(item.definitionId === undefined ? {} : { definitionId: item.definitionId }),
-          name: item.name,
-          description: item.description,
-          ...(item.input === undefined ? {} : { input: item.input }),
-        }))
+        return values.map(item => {
+          const command: CommandSummary = { name: item.name, description: item.description }
+          if (item.definitionId !== undefined) Object.assign(command, { definitionId: item.definitionId })
+          if (item.input !== undefined) Object.assign(command, { input: item.input })
+          return command
+        })
       },
       execute: async (sessionId, line, signal) => {
         if (!line.startsWith('/')) throw new DshPlatformError('invalid-command', 'DSH commands must start with / at byte 0.')
@@ -1015,7 +997,7 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     const rpcId = randomUUID()
     let response: Response
     try {
-      response = await request(`${parsed.origin}/api/${encodeURIComponent(namespace)}/${encodeURIComponent(method)}`, {
+      const options: RequestInit = {
         method: 'POST',
         redirect: 'error',
         headers: { 'content-type': 'application/json', cookie },
@@ -1025,8 +1007,9 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
           method: `${namespace}/${method}`,
           payload: { args },
         }),
-        ...(signal === undefined ? {} : { signal }),
-      })
+      }
+      if (signal !== undefined) options.signal = signal
+      response = await request(`${parsed.origin}/api/${encodeURIComponent(namespace)}/${encodeURIComponent(method)}`, options)
     } catch {
       if (signal?.aborted) throw new DshPlatformError('cancelled', 'DSH command request was cancelled by the caller.')
       throw new DshPlatformError('rpc-unreachable', 'The DSH API request failed. Confirm the local Host is running and use its current launch URL.')
