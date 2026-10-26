@@ -62,6 +62,10 @@
       "types": "./dist/conversation/index.d.ts",
       "default": "./dist/conversation/index.js"
     },
+    "./json": {
+      "types": "./dist/json.d.ts",
+      "default": "./dist/json.js"
+    },
     "./tooling": {
       "types": "./dist/tooling/index.d.ts",
       "default": "./dist/tooling/index.js"

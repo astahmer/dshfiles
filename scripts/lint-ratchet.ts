@@ -10,6 +10,7 @@ const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts', 'apps/desktop/
 // text into a value. Everything else imports the defining module directly.
 const astGrepBoundaries = [
   'scripts/json.ts',
+  'tooling/dshx/packages/dshx/src/json.ts',
   'plugins/@dshfiles/agents/src/contract.ts',
   'plugins/@dshfiles/credential-port/src/index.ts',
   'plugins/@dshfiles/multi-host/src/destination/index.ts',
