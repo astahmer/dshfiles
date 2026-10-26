@@ -36,11 +36,14 @@ import {
 } from './types.js'
 
 const snapshotKey = ['worktree-memory', 'snapshot'] as const
+const pressureKey = ['worktree-memory', 'pressure'] as const
 const POLL_MS = 5_000
 // The stop API refuses more than 200 targets, so a page-wide stop continues in batches until every listed tree is asked for.
 const STOP_BATCH_SIZE = 200
 // The sidebar badge is always mounted, so it polls far less often than the open panel; both share one cache entry.
 const BADGE_POLL_MS = 30_000
+// The detached total needs the full process probe, which is seconds of work; the badge only refreshes it rarely.
+const BADGE_SNAPSHOT_POLL_MS = 180_000
 
 const CATEGORY_KEY = {
   'dev-server': 'categoryDevServer',
@@ -102,13 +105,20 @@ const compactGigabytes = (bytes: number): string => `${Math.max(0.1, bytes / 102
  */
 export const MemoryGlyph = (props: { readonly size?: number; readonly t: WorktreeMemoryTranslate }): JSX.Element => {
   const api = useApi(worktreeMemoryApi)
-  const snapshot = useQuery({
-    queryKey: snapshotKey,
-    queryFn: async ({ signal }) => api.snapshot({}, { signal }),
+  // The dot comes from the cheap pressure read; the full snapshot only exists for the detached-total pill.
+  const pressureQuery = useQuery({
+    queryKey: pressureKey,
+    queryFn: async ({ signal }) => api.pressure({}, { signal }),
     refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : BADGE_POLL_MS),
     retry: false,
   })
-  const pressure = snapshot.data?.pressure ?? 'unknown'
+  const snapshot = useQuery({
+    queryKey: snapshotKey,
+    queryFn: async ({ signal }) => api.snapshot({}, { signal }),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : BADGE_SNAPSHOT_POLL_MS),
+    retry: false,
+  })
+  const pressure = pressureQuery.data?.pressure ?? snapshot.data?.pressure ?? 'unknown'
   const strained = pressure === 'warning' || pressure === 'critical'
   const detachedBytes = snapshot.data?.detachedBytes ?? 0
   const status = [strained ? props.t(PRESSURE[pressure].key) : null, detachedBytes > 0 ? `${formatBytes(detachedBytes)} ${props.t('detachedTotal')}` : null]

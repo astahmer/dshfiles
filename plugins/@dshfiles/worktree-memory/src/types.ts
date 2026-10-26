@@ -74,6 +74,14 @@ export const memorySnapshotSchema = z.object({
 })
 export type MemorySnapshot = z.infer<typeof memorySnapshotSchema>
 
+export const pressureSnapshotSchema = z.object({
+  takenAt: z.number(),
+  supported: z.boolean(),
+  pressure: z.enum(memoryPressureValues),
+  systemBytes: z.number().nonnegative(),
+})
+export type PressureSnapshot = z.infer<typeof pressureSnapshotSchema>
+
 export const stopTargetSchema = z
   .object({
     pid: z.number().int().positive().describe('Root pid of a process tree from the snapshot.'),

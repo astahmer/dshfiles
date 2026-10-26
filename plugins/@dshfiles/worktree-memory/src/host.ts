@@ -248,6 +248,15 @@ const stop = async (active: MemoryRuntime, targets: readonly StopTarget[]): Prom
 
 const api = worktreeMemoryApi.host({
   snapshot: async () => (await currentProbe(requireRuntime(), false)).snapshot,
+  pressure: async () => {
+    const supported = process.platform === 'darwin' || process.platform === 'linux'
+    return {
+      takenAt: Date.now(),
+      supported,
+      pressure: supported ? await readPressure(requireRuntime().context) : 'unknown',
+      systemBytes: totalmem(),
+    }
+  },
   stop: ({ input }) => stop(requireRuntime(), input.targets),
 })
 
