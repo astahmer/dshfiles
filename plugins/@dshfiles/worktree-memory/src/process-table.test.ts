@@ -82,7 +82,9 @@ describe('ProcessTable', () => {
     const withSessionMetadata = ProcessTable.snapshot(input)
     const withoutSessionMetadata = ProcessTable.snapshot({ ...input, sessions: [] })
     const stopIdentities = (snapshot: typeof withSessionMetadata) =>
-      snapshot.groups.flatMap(group => group.trees.map(({ pid, startedAt, jobId, sessionId }) => ({ pid, startedAt, jobId, sessionId })))
+      snapshot.groups.flatMap(group =>
+        group.trees.map(({ pid, startedAt, jobId, sessionId }) => ({ pid, startedAt, jobId, sessionId })),
+      )
 
     expect(stopIdentities(withoutSessionMetadata)).toEqual(stopIdentities(withSessionMetadata))
   })

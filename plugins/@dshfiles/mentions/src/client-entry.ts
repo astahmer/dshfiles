@@ -198,22 +198,21 @@ export default defineClient({
           request.signal.throwIfAborted()
           const state = reference.binding.session.getSnapshot()
           if (state.openState !== 'open') throw state.openError ?? new Error(`session "${session.sessionId}" is not open`)
-          const fileLookup: Promise<readonly FileReferenceCandidate[]> =
-            query.scope === 'thread'
-              ? Promise.resolve([])
-              : (async () => {
-                  const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal })
-                  if (!ownership.ok) return []
-                  if (ownership.runtimeId === null) {
-                    const result = await ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal)
-                    return result.ok ? result.value : []
-                  }
-                  const result = await multiHost.runtimeFileReferences(
-                    { runtimeId: ownership.runtimeId, sessionId: session.sessionId, query: query.text },
-                    { signal: request.signal },
-                  )
-                  return result.ok ? result.candidates : []
-                })()
+          const fileLookup: Promise<readonly FileReferenceCandidate[]> = query.scope === 'thread'
+            ? Promise.resolve([])
+            : (async () => {
+                const ownership = await multiHost.sessionRuntime({ sessionId: session.sessionId }, { signal: request.signal })
+                if (!ownership.ok) return []
+                if (ownership.runtimeId === null) {
+                  const result = await ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal)
+                  return result.ok ? result.value : []
+                }
+                const result = await multiHost.runtimeFileReferences(
+                  { runtimeId: ownership.runtimeId, sessionId: session.sessionId, query: query.text },
+                  { signal: request.signal },
+                )
+                return result.ok ? result.candidates : []
+              })()
           const threadLookup: Promise<readonly SessionReferenceMentionCandidate[]> =
             query.scope === 'file'
               ? Promise.resolve([])

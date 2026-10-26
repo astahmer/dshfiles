@@ -41,9 +41,6 @@ answered.
 The delta's regression tests live upstream, in `packages/client/ui-user-questions/tests/browser-plugin.client.spec.ts`
 at `69f2241e`: the vendored components import browser-only native bundles that this repository's Vitest cannot load.
 `node scripts/native-fork-diff.mjs user-questions` proves every other vendored file equals the pinned tag.
-`pnpm --dir plugins/@dshfiles/user-questions test` additionally checks the loadable
-native reply parser and selected/custom/skipped-answer presentation. It does not
-claim to replace the upstream browser reconciliation regression.
 
 ## Dropping the fork
 

@@ -22,8 +22,6 @@ export const sessionProjectPath = (
   const visited = new Set([sessionId])
   let parentId = session.parentId
   while (parentId !== undefined && !visited.has(parentId)) {
-    // Snapshot the ancestor for the callback before advancing the mutable parent cursor.
-    // oxlint-disable-next-line antislop/no-passthrough-variable
     const currentParentId = parentId
     visited.add(currentParentId)
     const parentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(currentParentId))

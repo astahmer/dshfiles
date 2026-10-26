@@ -2,18 +2,17 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { defineHost } from '@dshfiles/dshx/host'
-import { withSpan } from '@dshfiles/dshx/tracing'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { annotationsApi } from './api.js'
 import { INGEST_PATH, PAIR_PATH } from './limits.js'
 import { createIngestHandler } from './ingest.js'
-import { AnnotationSources, type SourceResolver } from './source.js'
+import { classCandidates, createSourceResolver, discoverPluginRoots, type SourceResolver } from './source.js'
 import { EXTENSION_ID, extensionOrigins } from './extension.js'
 import { createPairHandler, createPairing, type Pairing } from './pairing.js'
 import { readPreview } from './preview.js'
 import { annotationsSettings } from './settings.js'
-import { ChromeCdp } from './chrome-cdp.js'
-import { ChromeLauncher } from './chrome-launch.js'
+import { choosePage, endpointOf, focusedPageId, listPages, pickOnPage } from './chrome-cdp.js'
+import { chromeExecutable, defaultProfileDir, launchChrome, launchedChrome, stopChrome } from './chrome-launch.js'
 import { annotationsDomain, createAnnotationStore, type AnnotationStore, type StoreResult } from './store.js'
 import type { AnnotationDraft, AnnotationOrigin, AnnotationTarget } from './schema.js'
 
@@ -44,20 +43,13 @@ const currentSettings = () => {
  */
 const chromeState = async () => {
   const settings = currentSettings()
-  const launched = ChromeLauncher.launchedChrome()
-  const endpoint = launched === undefined ? ChromeCdp.endpointOf({ port: settings.cdpPort }) : launched.endpoint
-  const reachable = await withSpan('annotations probe chrome', { kind: 'client' }, async span => {
-    const response = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(1_000) }).catch(() => undefined)
-    if (response === undefined) {
-      span.setStatus('error', 'unavailable')
-      return false
-    }
-    span.setAttribute('http.response.status_code', response.status)
-    if (!response.ok) span.setStatus('error', 'http-error')
-    return response.ok
-  })
-  const pages = launched === undefined ? [] : await ChromeCdp.listPages({ endpoint })
-  const executable = ChromeLauncher.chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath })
+  const launched = launchedChrome()
+  const endpoint = launched === undefined ? endpointOf({ port: settings.cdpPort }) : launched.endpoint
+  const reachable = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(1_000) })
+    .then(response => response.ok)
+    .catch(() => false)
+  const pages = launched === undefined ? [] : await listPages({ endpoint })
+  const executable = chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath })
   return {
     running: launched !== undefined && reachable,
     endpoint,
@@ -78,9 +70,9 @@ const openAnnotations = async (ctx: Context): Promise<OpenedAnnotations> => {
     meta: domain.table('meta'),
   })
   await store.flush()
-  const roots = await AnnotationSources.discoverPluginRoots({ start: process.cwd(), env: process.env, moduleUrl })
+  const roots = await discoverPluginRoots({ start: process.cwd(), env: process.env, ...(moduleUrl === undefined ? {} : { moduleUrl }) })
   const pairing = createPairing({ token: () => store.token() })
-  return { store, resolver: AnnotationSources.createSourceResolver({ roots }), pairing, roots, close: () => domain.close() }
+  return { store, resolver: createSourceResolver({ roots }), pairing, roots, close: () => domain.close() }
 }
 
 const annotationsFor = (ctx: Context): Promise<OpenedAnnotations> => {
@@ -114,7 +106,7 @@ const unwrap = <Value>(result: StoreResult<Value>): Value => {
 const sourceFor = async ({ resolver, target }: { readonly resolver: SourceResolver; readonly target: AnnotationTarget }): Promise<AnnotationTarget> => {
   if (target.source !== undefined) return target
   try {
-    const names = AnnotationSources.classCandidates(target.selector)
+    const names = classCandidates(target.selector)
     if (names.length > 0) {
       const hit = (await resolver.resolve(names))[0]
       if (hit !== undefined) {
@@ -145,9 +137,11 @@ const enrich = async ({ resolver, drafts }: { readonly resolver: SourceResolver;
 const annotationsApiHost = annotationsApi.host({
   list: async ({ ctx, input }) => {
     const { store } = await annotationsFor(ctx)
-    const query: Parameters<AnnotationStore['list']>[0] = { sessionId: input.sessionId }
-    if (input.statuses !== undefined) Object.assign(query, { statuses: input.statuses })
-    if (input.limit !== undefined) Object.assign(query, { limit: input.limit })
+    const query = {
+      sessionId: input.sessionId,
+      ...(input.statuses === undefined ? {} : { statuses: input.statuses }),
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+    }
     return { annotations: store.list(query), counts: store.counts(input.sessionId) }
   },
   create: async ({ ctx, input }) => {
@@ -164,14 +158,13 @@ const annotationsApiHost = annotationsApi.host({
   },
   resolve: async ({ ctx, input }) => {
     const { store } = await annotationsFor(ctx)
-    const resolution: Parameters<AnnotationStore['resolve']>[0] = {
+    const result = await store.resolve({
       sessionId: input.sessionId,
       id: input.id,
       revision: input.revision,
       resolvedBy: 'agent',
-    }
-    if (input.summary !== undefined) Object.assign(resolution, { summary: input.summary })
-    const result = await store.resolve(resolution)
+      ...(input.summary === undefined ? {} : { summary: input.summary }),
+    })
     if (!result.ok) return { ok: false as const, error: result.error }
     return { ok: true as const, annotation: result.value }
   },
@@ -205,7 +198,7 @@ const annotationsApiHost = annotationsApi.host({
     return {
       extensionPath: root === undefined ? '' : `${root}/annotations/extension`,
       extensionId: EXTENSION_ID,
-      chromePath: ChromeLauncher.chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath }) ?? '',
+      chromePath: chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath }) ?? '',
       pickActiveTab: settings.pickActiveTab,
       startUrl: settings.startUrl,
     }
@@ -213,34 +206,31 @@ const annotationsApiHost = annotationsApi.host({
   chromeStatus: async () => chromeState(),
   chromeLaunch: async () => {
     const settings = currentSettings()
-    const executable = ChromeLauncher.chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath })
+    const executable = chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '', configured: settings.chromePath })
     if (executable === undefined) throw new Error('No Chrome or Chromium found. Set its path in the annotations settings.')
-    const launch: Parameters<typeof ChromeLauncher.launchChrome>[0] = {
+    await launchChrome({
       executable,
       port: settings.cdpPort,
-      profileDir: settings.profileDir.trim().length > 0 ? settings.profileDir : ChromeLauncher.defaultProfileDir({ dshHome: process.env.DSH_HOME }),
+      profileDir: settings.profileDir.trim().length > 0 ? settings.profileDir : defaultProfileDir({ dshHome: process.env.DSH_HOME }),
+      ...(settings.startUrl.trim().length > 0 ? { startUrl: settings.startUrl } : {}),
       headless: process.env.DSH_ANNOTATIONS_CHROME_HEADLESS === '1',
-    }
-    if (settings.startUrl.trim().length > 0) Object.assign(launch, { startUrl: settings.startUrl })
-    await ChromeLauncher.launchChrome(launch)
+    })
     return chromeState()
   },
   chromeStop: async () => {
-    ChromeLauncher.stopChrome()
+    stopChrome()
     return chromeState()
   },
   chromePick: async ({ input }) => {
     const settings = currentSettings()
-    const launched = ChromeLauncher.launchedChrome()
+    const launched = launchedChrome()
     if (launched === undefined) return { ok: false as const, reason: 'no-page' as const }
-    const pages = await ChromeCdp.listPages({ endpoint: launched.endpoint })
+    const pages = await listPages({ endpoint: launched.endpoint })
     const requested = input.pageId === undefined ? undefined : pages.find(candidate => candidate.id === input.pageId)
-    const focused = input.pageId === undefined ? await ChromeCdp.focusedPageId({ pages }) : undefined
-    const selection: Parameters<typeof ChromeCdp.choosePage>[0] = { pages }
-    if (focused !== undefined) Object.assign(selection, { focusedId: focused })
-    const page = requested ?? ChromeCdp.choosePage(selection)
+    const focused = input.pageId === undefined ? await focusedPageId({ pages }) : undefined
+    const page = requested ?? choosePage({ pages, ...(focused === undefined ? {} : { focusedId: focused }) })
     if (page === undefined) return { ok: false as const, reason: 'no-page' as const }
-    const outcome = await ChromeCdp.pickOnPage({ page, timeoutMs: settings.pickTimeoutSeconds * 1_000 })
+    const outcome = await pickOnPage({ page, timeoutMs: settings.pickTimeoutSeconds * 1_000 })
     return outcome.ok ? { ok: true as const, target: outcome.target, point: outcome.point } : { ok: false as const, reason: outcome.reason }
   },
   pair: async ({ ctx, input }) => {

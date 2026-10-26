@@ -9,7 +9,8 @@ export const workspaceName = (path: string): string | undefined => {
   return name === '' ? undefined : name
 }
 
-export const workspaceNameLabel = (name: string | undefined, projectTitle: string | undefined): string | undefined => (name === projectTitle ? undefined : name)
+export const workspaceNameLabel = (name: string | undefined, projectTitle: string | undefined): string | undefined =>
+  name === projectTitle ? undefined : name
 
 /** Where a registered workspace sits relative to the project it belongs to. */
 export class WorkspacePaths {

@@ -5,15 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
  * cross-origin caller: without these headers the browser hides the response and the
  * extension would look connected while receiving nothing.
  */
-interface CorsHeaders {
-  readonly 'access-control-allow-origin'?: string
-  readonly 'access-control-allow-methods'?: string
-  readonly 'access-control-allow-headers'?: string
-  readonly 'access-control-max-age'?: string
-  readonly vary?: string
-}
-
-const corsFor = ({ origin, allowed }: { readonly origin: string | undefined; readonly allowed: readonly string[] }): CorsHeaders => {
+export const corsFor = ({ origin, allowed }: { readonly origin: string | undefined; readonly allowed: readonly string[] }): Record<string, string> => {
   if (origin === undefined) return {}
   if (allowed.length > 0 && !allowed.includes(origin)) return {}
   return {
@@ -25,7 +17,7 @@ const corsFor = ({ origin, allowed }: { readonly origin: string | undefined; rea
   }
 }
 
-const respond = ({
+export const respond = ({
   response,
   status,
   body,
@@ -34,7 +26,7 @@ const respond = ({
   readonly response: ServerResponse
   readonly status: number
   readonly body: unknown
-  readonly headers?: CorsHeaders
+  readonly headers?: Record<string, string>
 }): void => {
   const payload = body === undefined ? '' : JSON.stringify(body)
   response.writeHead(status, {
@@ -47,7 +39,7 @@ const respond = ({
 }
 
 /** Answers a preflight, and reports whether the request was one. */
-const answerPreflight = ({
+export const answerPreflight = ({
   request,
   response,
   allowed,
@@ -59,10 +51,4 @@ const answerPreflight = ({
   if (request.method !== 'OPTIONS') return false
   respond({ response, status: 204, body: undefined, headers: corsFor({ origin: request.headers.origin, allowed }) })
   return true
-}
-
-export class AnnotationHttp {
-  static readonly corsFor = corsFor
-  static readonly respond = respond
-  static readonly answerPreflight = answerPreflight
 }

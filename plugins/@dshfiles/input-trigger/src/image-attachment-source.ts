@@ -8,8 +8,7 @@ export const imageAttachmentSource = (deps: ImageAttachmentSourceRegistration): 
   showGroupTitle: false,
   async candidates(session, request) {
     const query = request.query.trim().toLocaleLowerCase()
-    return deps
-      .imagesFor(session.sessionId)
+    return deps.imagesFor(session.sessionId)
       .filter(image => query === '' || image.label.toLocaleLowerCase().includes(query))
       .map(image => ({ name: image.label, icon: 'file', value: image.id }))
   },

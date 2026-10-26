@@ -8,4 +8,5 @@ export const shouldReregisterRepository = (input: {
   readonly repoId: string | null
   readonly path: string
   readonly recoveredPath: string | null
-}): boolean => input.hasError && input.repoId !== null && input.path.trim().length > 0 && input.recoveredPath !== input.path
+}): boolean =>
+  input.hasError && input.repoId !== null && input.path.trim().length > 0 && input.recoveredPath !== input.path

@@ -27,7 +27,10 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            tooling/dshx/pnpm-lock.yaml
+            plugins/pnpm-lock.yaml
       - name: Install jj
         run: |
           curl -fsSL https://github.com/jj-vcs/jj/releases/download/v0.45.1/jj-v0.45.1-x86_64-unknown-linux-musl.tar.gz | tar -xz -C "$RUNNER_TEMP" ./jj

@@ -10,11 +10,7 @@ describe('imageAttachmentSource', () => {
     })
     const session = { sessionId: SessionId('session-a') }
     const candidates = await source.candidates(session, {
-      query: '',
-      quoted: false,
-      position: 'leading',
-      drilled: false,
-      signal: new AbortController().signal,
+      query: '', quoted: false, position: 'leading', drilled: false, signal: new AbortController().signal,
     })
     const candidate = candidates[0]
     expect(candidate).toMatchObject({ name: 'Image 1', value: 'draft-image-a' })

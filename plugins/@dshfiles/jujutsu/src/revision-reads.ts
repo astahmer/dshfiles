@@ -95,23 +95,17 @@ export class RevisionReads {
     if (JujutsuMutationModel.isCommitId(reference)) return reference
     let stdout: string
     try {
-      const resolved = await run([RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', reference, '--limit', '2', '--template', 'commit_id'], {
-        outputLimit: 1_000,
-      })
+      const resolved = await run(
+        [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', reference, '--limit', '2', '--template', 'commit_id'],
+        { outputLimit: 1_000 },
+      )
       stdout = resolved.stdout
     } catch (error) {
       if (error instanceof Error && /cancelled|timed out/.test(error.message)) throw error
       // jj exits non-zero for both "no such revision" and an ambiguous prefix; neither is a repo failure.
       throw new Error(`"${reference}" does not name exactly one revision. Use a longer commit id prefix, or the full id from jj log.`)
     }
-    const ids = [
-      ...new Set(
-        stdout
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => JujutsuMutationModel.isCommitId(line)),
-      ),
-    ]
+    const ids = [...new Set(stdout.split('\n').map(line => line.trim()).filter(line => JujutsuMutationModel.isCommitId(line)))]
     if (ids.length === 1 && ids[0] !== undefined) return ids[0]
     if (ids.length === 0) throw new Error(`No revision matches "${reference}". Check the id against jj log and try again.`)
     throw new Error(`"${reference}" matches more than one revision (${ids.map(id => id.slice(0, 12)).join(', ')}). Use a longer prefix.`)

@@ -1,13 +1,13 @@
 import { annotationTargetSchema, MAX_SELECTOR_CHARS, type AnnotationSurface, type AnnotationTarget } from './schema.js'
-import { AnnotationRedaction } from './redact.js'
+import { elementText, privateAncestor, redactUrl, safeAttributes, safeStyles, sensitiveField } from './redact.js'
 
 const MAX_PATH_DEPTH = 4
 const MAX_CLASSES_PER_LEVEL = 2
 const SAFE_IDENTIFIER = /^[A-Za-z0-9_-]+$/
 
 const escapeCss = (value: string): string => {
-  const css: { readonly escape?: (text: string) => string } | undefined = globalThis.CSS
-  if (css?.escape !== undefined) return css.escape(value)
+  const css = Reflect.get(globalThis, 'CSS')
+  if (typeof css === 'object' && css !== null && 'escape' in css && typeof css.escape === 'function') return css.escape(value)
   return value.replace(/([^A-Za-z0-9_-])/g, '\\$1')
 }
 
@@ -27,7 +27,7 @@ const segment = (element: Element): string => {
   return classes.length === 0 ? tag : `${tag}.${classes.join('.')}`
 }
 
-const elementSelector = (element: Element): string => {
+export const elementSelector = (element: Element): string => {
   const own = element.getAttribute('id')
   if (own !== null && SAFE_IDENTIFIER.test(own)) return `#${own}`
   const body = element.ownerDocument.body
@@ -57,20 +57,19 @@ const DECORATION = new Set(['svg', 'path', 'g', 'circle', 'rect', 'line', 'polyl
  * its nearest capturable container, because a note about a control belongs to the
  * surface around it. A private subtree is refused outright — never bubbled past.
  */
-const pickableElement = (element: Element): Element | null => {
-  if (AnnotationRedaction.privateAncestor(element) !== undefined) return null
+export const pickableElement = (element: Element): Element | null => {
+  if (privateAncestor(element) !== undefined) return null
   const interactive = element.closest(INTERACTIVE)
-  if (interactive !== null && AnnotationRedaction.privateAncestor(interactive) === undefined && !AnnotationRedaction.sensitiveField(interactive))
-    return interactive
+  if (interactive !== null && privateAncestor(interactive) === undefined && !sensitiveField(interactive)) return interactive
   let current: Element | null = element
   for (let depth = 0; current !== null && depth < MAX_BUBBLE_DEPTH; depth += 1) {
-    if (!AnnotationRedaction.sensitiveField(current) && !DECORATION.has(current.tagName.toLowerCase())) return current
+    if (!sensitiveField(current) && !DECORATION.has(current.tagName.toLowerCase())) return current
     current = current.parentElement
   }
   return null
 }
 
-const describeTarget = ({
+export const describeTarget = ({
   element,
   surface,
   url,
@@ -79,36 +78,31 @@ const describeTarget = ({
   readonly surface: AnnotationSurface
   readonly url: string
 }): AnnotationTarget | null => {
-  if (AnnotationRedaction.privateAncestor(element) !== undefined) return null
-  if (AnnotationRedaction.sensitiveField(element)) return null
+  if (privateAncestor(element) !== undefined) return null
+  if (sensitiveField(element)) return null
   const rect = element.getBoundingClientRect()
   const target: AnnotationTarget = {
     surface,
-    url: AnnotationRedaction.redactUrl(url),
+    url: redactUrl(url),
     selector: elementSelector(element),
     tag: element.tagName.toLowerCase(),
     rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
   }
-  const text = AnnotationRedaction.elementText(element)
-  const attributes = AnnotationRedaction.safeAttributes(element)
-  const styles = AnnotationRedaction.safeStyles(element)
-  if (text !== undefined) target.text = text
-  if (attributes !== undefined) target.attributes = attributes
-  if (styles !== undefined) target.styles = styles
-  const parsed = annotationTargetSchema.safeParse(target)
+  const text = elementText(element)
+  const attributes = safeAttributes(element)
+  const styles = safeStyles(element)
+  const parsed = annotationTargetSchema.safeParse({
+    ...target,
+    ...(text === undefined ? {} : { text }),
+    ...(attributes === undefined ? {} : { attributes }),
+    ...(styles === undefined ? {} : { styles }),
+  })
   return parsed.success ? parsed.data : null
 }
 
-const matchesTarget = ({ element, target }: { readonly element: Element; readonly target: AnnotationTarget }): boolean => {
+export const matchesTarget = ({ element, target }: { readonly element: Element; readonly target: AnnotationTarget }): boolean => {
   if (element.tagName.toLowerCase() !== target.tag) return false
   if (target.text === undefined) return true
-  const current = AnnotationRedaction.elementText(element)
+  const current = elementText(element)
   return current !== undefined && current.startsWith(target.text.slice(0, 24))
-}
-
-export class ElementDescriptor {
-  static readonly elementSelector = elementSelector
-  static readonly pickableElement = pickableElement
-  static readonly describeTarget = describeTarget
-  static readonly matchesTarget = matchesTarget
 }

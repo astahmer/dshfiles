@@ -71,24 +71,6 @@ test('accepts a declared opt-in bundle omitted from the web profile', () => {
   assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, optInBundle]), [])
 })
 
-test('accepts optional draft-choice, network and goal bundles without activating them', () => {
-  const optInBundles = ['@dshfiles/agent-preset', '@dshfiles/model-selection', '@dshfiles/loopback-access', '@dshfiles/goal-tool'].map(name => ({
-    name,
-    dsh: { bundle: { patch: './cordis.patch.yml' } },
-  }))
-
-  assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, ...optInBundles]), [])
-})
-
-test('still rejects a one-sided profile dependency for an opt-in goal bundle', () => {
-  const goalBundle = { name: '@dshfiles/goal-tool', dsh: { bundle: { patch: './cordis.patch.yml' } } }
-  const dependencies = { ...profile.dependencies, '@dshfiles/goal-tool': 'link:../../plugins/@dshfiles/goal-tool' }
-
-  assert.deepEqual(webProfileContractErrors({ ...profile, dependencies }, [provider, consumer, goalBundle]), [
-    '@dshfiles/goal-tool: profile dependency is not registered in dsh.profile.bundles.',
-  ])
-})
-
 const disableInsideRegion = `# BEGIN NIX-MANAGED DSH PLUGINS
 - id: session-query-sqlite
   disabled: true

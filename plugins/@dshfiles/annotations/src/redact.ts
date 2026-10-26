@@ -1,8 +1,17 @@
 import { MAX_ATTRIBUTE_CHARS, MAX_ATTRIBUTES, MAX_STYLES, MAX_TEXT_CHARS, MAX_URL_CHARS } from './schema.js'
 
-const SAFE_ATTRIBUTE_KEYS: readonly string[] = ['data-testid', 'data-test', 'data-qa', 'data-cy', 'data-component', 'role', 'aria-label', 'aria-describedby']
+export const SAFE_ATTRIBUTE_KEYS: readonly string[] = [
+  'data-testid',
+  'data-test',
+  'data-qa',
+  'data-cy',
+  'data-component',
+  'role',
+  'aria-label',
+  'aria-describedby',
+]
 
-const SAFE_STYLE_KEYS: readonly string[] = [
+export const SAFE_STYLE_KEYS: readonly string[] = [
   'display',
   'position',
   'color',
@@ -21,11 +30,11 @@ const SAFE_STYLE_KEYS: readonly string[] = [
   'width',
 ]
 
-const PRIVATE_ATTRIBUTES: readonly string[] = ['data-private', 'data-visual-edit-private']
+export const PRIVATE_ATTRIBUTES: readonly string[] = ['data-private', 'data-visual-edit-private']
 
 const MAX_ANCESTOR_WALK = 16
 
-const redactUrl = (raw: string): string => {
+export const redactUrl = (raw: string): string => {
   try {
     const url = new URL(raw)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return url.protocol.slice(0, MAX_URL_CHARS)
@@ -35,7 +44,7 @@ const redactUrl = (raw: string): string => {
   }
 }
 
-const collapseText = (raw: string | null | undefined): string | undefined => {
+export const collapseText = (raw: string | null | undefined): string | undefined => {
   if (raw === null || raw === undefined) return undefined
   const collapsed = raw.replace(/\s+/g, ' ').trim()
   if (collapsed.length === 0) return undefined
@@ -50,7 +59,7 @@ const attributeOf = (element: Element, name: string): string | undefined => {
   return trimmed.slice(0, MAX_ATTRIBUTE_CHARS)
 }
 
-const privateAncestor = (element: Element): Element | undefined => {
+export const privateAncestor = (element: Element): Element | undefined => {
   let current: Element | null = element
   let depth = 0
   while (current !== null && depth < MAX_ANCESTOR_WALK) {
@@ -64,14 +73,14 @@ const privateAncestor = (element: Element): Element | undefined => {
 const SENSITIVE_TAGS = new Set(['input', 'textarea', 'select', 'option'])
 const SENSITIVE_EDITABLE = new Set(['true', 'plaintext-only', ''])
 
-const sensitiveField = (element: Element): boolean => {
+export const sensitiveField = (element: Element): boolean => {
   const tag = element.tagName.toLowerCase()
   if (SENSITIVE_TAGS.has(tag)) return true
   const editable = element.getAttribute('contenteditable')
   return editable !== null && SENSITIVE_EDITABLE.has(editable.trim().toLowerCase())
 }
 
-const safeAttributes = (element: Element): Record<string, string> | undefined => {
+export const safeAttributes = (element: Element): Record<string, string> | undefined => {
   const captured: Record<string, string> = {}
   for (const name of SAFE_ATTRIBUTE_KEYS) {
     const value = attributeOf(element, name)
@@ -81,7 +90,7 @@ const safeAttributes = (element: Element): Record<string, string> | undefined =>
   return Object.keys(captured).length === 0 ? undefined : captured
 }
 
-const safeStyles = (element: Element): Record<string, string> | undefined => {
+export const safeStyles = (element: Element): Record<string, string> | undefined => {
   const view = element.ownerDocument.defaultView
   if (view === null) return undefined
   let computed: CSSStyleDeclaration
@@ -104,15 +113,5 @@ const safeStyles = (element: Element): Record<string, string> | undefined => {
  * The accessible name first: a control's text content changes with its state (a count
  * badge, a spinner), while its label is the stable way to find it again.
  */
-const elementText = (element: Element): string | undefined =>
+export const elementText = (element: Element): string | undefined =>
   collapseText(element.getAttribute('aria-label')) ?? collapseText(element.getAttribute('title')) ?? collapseText(element.textContent)
-
-export class AnnotationRedaction {
-  static readonly redactUrl = redactUrl
-  static readonly collapseText = collapseText
-  static readonly privateAncestor = privateAncestor
-  static readonly sensitiveField = sensitiveField
-  static readonly safeAttributes = safeAttributes
-  static readonly safeStyles = safeStyles
-  static readonly elementText = elementText
-}

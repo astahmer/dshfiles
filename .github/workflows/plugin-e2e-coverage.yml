@@ -33,14 +33,10 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: tooling/dshx/pnpm-lock.yaml
 
       - name: Install the DSHX workspace
         run: pnpm install --frozen-lockfile
-        working-directory: tooling/dshx
-
-      - name: Build scaffold and SDK prerequisites
-        run: pnpm run build
         working-directory: tooling/dshx
 
       - name: Test dynamic plugin inventory

@@ -7,11 +7,6 @@ export default defineConfig({
   client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   // Other plugins read the same attention records through this contract, and
   // thread-listing plugins share the Host snapshot selectors.
-  modules: {
-    'attention-api': 'src/attention-api.ts',
-    'thread-views-api': 'src/thread-views-api.ts',
-    snapshots: 'src/snapshots.ts',
-    'thread-mention': 'src/thread-mention.ts',
-  },
+  modules: { 'attention-api': 'src/attention-api.ts', 'thread-views-api': 'src/thread-views-api.ts', snapshots: 'src/snapshots.ts', 'thread-mention': 'src/thread-mention.ts' },
   build: { sourcemap: true, declarations: true, minify: true },
 })

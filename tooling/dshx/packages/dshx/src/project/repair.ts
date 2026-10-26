@@ -1,5 +1,4 @@
 import { readFile } from 'node:fs/promises'
-import { JsonDocumentModel, type JsonDocumentObject, type JsonDocumentValue } from './json-document.js'
 import { resolve } from 'node:path'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
@@ -22,6 +21,10 @@ export interface ManifestRepairOptions {
   readonly compatibility?: DshCompatibility
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function issue(code: string, severity: 'error' | 'warning', message: string, file: string, hint: string): DshxDiagnostic {
   return { code, severity, message, file, hint }
 }
@@ -32,7 +35,7 @@ function repairDiff(file: string, before: string, after: string): string {
   return [`--- ${file}`, `+++ ${file}`, ...oldLines.map(line => `-${line}`), ...newLines.map(line => `+${line}`), ''].join('\n')
 }
 
-function addMissing(record: JsonDocumentObject, key: string, value: JsonDocumentValue): boolean {
+function addMissing(record: Record<string, unknown>, key: string, value: unknown): boolean {
   if (record[key] !== undefined) return false
   record[key] = value
   return true
@@ -61,9 +64,9 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
       diff: '',
     }
   }
-  let manifest: JsonDocumentValue
+  let manifest: unknown
   try {
-    manifest = JsonDocumentModel.parse(source)
+    manifest = JSON.parse(source)
   } catch (error) {
     return {
       root: config.root,
@@ -81,7 +84,7 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
       diff: '',
     }
   }
-  if (!JsonDocumentModel.isObject(manifest)) {
+  if (!isObject(manifest)) {
     return {
       root: config.root,
       files: [],
@@ -95,12 +98,12 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
   const diagnostics: DshxDiagnostic[] = []
   let changed = false
 
-  let exportsField: JsonDocumentObject
+  let exportsField: Record<string, unknown>
   if (manifest.exports === undefined) {
     exportsField = {}
     manifest.exports = exportsField
     changed = true
-  } else if (JsonDocumentModel.isObject(manifest.exports)) {
+  } else if (isObject(manifest.exports)) {
     exportsField = manifest.exports
   } else {
     diagnostics.push(
@@ -119,12 +122,12 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
   changed = addMissing(exportsField, './package.json', './package.json') || changed
   if (config.clientEntry !== undefined) changed = addMissing(exportsField, './client', './dist/client.js') || changed
 
-  let dsh: JsonDocumentObject
+  let dsh: Record<string, unknown>
   if (manifest.dsh === undefined) {
     dsh = {}
     manifest.dsh = dsh
     changed = true
-  } else if (JsonDocumentModel.isObject(manifest.dsh)) {
+  } else if (isObject(manifest.dsh)) {
     dsh = manifest.dsh
   } else {
     diagnostics.push(
@@ -138,12 +141,12 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
     )
     dsh = {}
   }
-  let bundle: JsonDocumentObject
+  let bundle: Record<string, unknown>
   if (dsh.bundle === undefined) {
     bundle = {}
     dsh.bundle = bundle
     changed = true
-  } else if (JsonDocumentModel.isObject(dsh.bundle)) {
+  } else if (isObject(dsh.bundle)) {
     bundle = dsh.bundle
   } else {
     diagnostics.push(
@@ -184,12 +187,12 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
     )
 
   if (config.clientEntry !== undefined) {
-    let client: JsonDocumentObject
+    let client: Record<string, unknown>
     if (dsh.client === undefined) {
       client = {}
       dsh.client = client
       changed = true
-    } else if (JsonDocumentModel.isObject(dsh.client)) {
+    } else if (isObject(dsh.client)) {
       client = dsh.client
     } else {
       diagnostics.push(
@@ -220,34 +223,26 @@ const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: Man
     if (await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-locale')
     const localeNamespaces = await ClientCapabilityAnalysis.localeNamespaces(config.clientEntry, config.root)
     if (localeNamespaces !== undefined && localeNamespaces.length > 0) {
-      const declared = new Set(
-        Array.isArray(client.locales)
-          ? client.locales.flatMap(value => {
-              const text = JsonDocumentModel.string(value)
-              return text === undefined ? [] : [text]
-            })
-          : [],
-      )
+      const declared = new Set(Array.isArray(client.locales) ? client.locales.filter((value): value is string => typeof value === 'string') : [])
       if (!localeNamespaces.every(namespace => declared.has(namespace))) {
         client.locales = [...declared, ...localeNamespaces.filter(namespace => !declared.has(namespace))]
         changed = true
       }
     }
-    const inject = JsonDocumentModel.stringArray(client.inject)
-    if (inject !== undefined) {
-      client.inject = inject
+    if (Array.isArray(client.inject) && client.inject.every(value => typeof value === 'string')) {
+      const inject = client.inject as string[]
       for (const provider of providers)
         if (!inject.includes(provider)) {
           inject.push(provider)
           changed = true
         }
       if (inject.length > 0) {
-        let peerDependencies: JsonDocumentObject | undefined
+        let peerDependencies: Record<string, unknown> | undefined
         if (manifest.peerDependencies === undefined) {
           peerDependencies = {}
           manifest.peerDependencies = peerDependencies
           changed = true
-        } else if (JsonDocumentModel.isObject(manifest.peerDependencies)) {
+        } else if (isObject(manifest.peerDependencies)) {
           peerDependencies = manifest.peerDependencies
         } else {
           diagnostics.push(

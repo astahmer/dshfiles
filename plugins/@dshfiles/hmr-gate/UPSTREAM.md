@@ -9,13 +9,13 @@
 
 Each vendored behaviour and where it is:
 
-| Upstream behaviour                                                | Here                                                          |
-| ----------------------------------------------------------------- | ------------------------------------------------------------- |
-| GET `/plugins/events` SSE route via `ctx.webServer.register`      | `src/host.ts`, `hmr-gate: /plugins/events channel`            |
+| Upstream behaviour | Here |
+| ------------------ | ---- |
+| GET `/plugins/events` SSE route via `ctx.webServer.register` | `src/host.ts`, `hmr-gate: /plugins/events channel` |
 | 500 ms stat poll of each row's client bundle (`artifactBaseline`) | `src/host.ts`, `POLL_INTERVAL_MS`, `hmr-gate: bundle watches` |
-| `graph` frames on connect and on graph change                     | `src/host.ts`, `broadcast`                                    |
-| `rebuilt` frames from `clientModules.onRebuilt`                   | `src/host.ts`                                                 |
-| browser half: `entries.sync(graph)` / `entries.reload(id, rev)`   | `src/client.tsx`                                              |
+| `graph` frames on connect and on graph change | `src/host.ts`, `broadcast` |
+| `rebuilt` frames from `clientModules.onRebuilt` | `src/host.ts` |
+| browser half: `entries.sync(graph)` / `entries.reload(id, rev)` | `src/client.tsx` |
 
 The delta is the gate: instead of announcing every `clientModules.rebuilt(id)`,
 the Host compares the package's Host artifact on disk with the digest it loaded

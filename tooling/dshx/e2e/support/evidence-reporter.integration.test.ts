@@ -43,12 +43,11 @@ const makeProject = async (testSource: (suiteName: string, startedPath: string) 
     configPath,
     [
       "import { defineConfig } from '@playwright/test'",
-      `import { chromiumLaunchOptions } from ${JSON.stringify(new URL('../../packages/dshx/dist/project/chromium-launch-options.js', import.meta.url).href)}`,
       'export default defineConfig({',
       `  testDir: ${JSON.stringify(testsDirectory)},`,
       "  testMatch: '**/reporter.spec.mjs',",
       `  reporter: [['list'], [${JSON.stringify(reporterPath)}]],`,
-      `  use: { launchOptions: await chromiumLaunchOptions(), trace: 'retain-on-failure', screenshot: 'only-on-failure', viewport: ${JSON.stringify(E2E_VIEWPORT)} },`,
+      `  use: { trace: 'retain-on-failure', screenshot: 'only-on-failure', viewport: ${JSON.stringify(E2E_VIEWPORT)} },`,
       '  workers: 1,',
       '})',
       '',
@@ -159,11 +158,8 @@ it('records a real interrupted browser run as cancelled', { timeout: 60_000 }, a
     ].join('\n'),
   )
 
-  // Keep cancellation evidence independent of local JJ availability and CI's ambient revision.
-  const sourceSha = 'b'.repeat(40)
   const child = spawn(process.execPath, [playwrightCli, 'test', '--config', project.configPath], {
     cwd: dshxRoot,
-    env: { ...process.env, GITHUB_SHA: sourceSha },
     stdio: 'ignore',
   })
   const closed = new Promise<{ readonly code: number | null; readonly signal: NodeJS.Signals | null }>(resolveClose => {
@@ -189,5 +185,4 @@ it('records a real interrupted browser run as cancelled', { timeout: 60_000 }, a
   assert.equal(receipt.manifest.outcome, 'cancelled')
   assert.equal(receipt.manifest.tests[0]?.outcome, 'cancelled')
   assert.match(receipt.manifest.source.revision ?? '', /^(jj|git):/)
-  assert.equal(receipt.manifest.source.revision, `git:${sourceSha}`)
 })

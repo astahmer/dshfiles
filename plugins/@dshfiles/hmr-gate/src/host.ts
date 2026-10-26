@@ -71,7 +71,8 @@ const registerGate = (ctx: Context): GateRuntime => {
   const watched = new Map<string, WatchRow>()
   const connections = new Set<ServerResponse>()
 
-  const deferredPackages = (): readonly DeferredPackage[] => gate.deferred().map(id => ({ id, reason: DEFERRED_REASON }))
+  const deferredPackages = (): readonly DeferredPackage[] =>
+    gate.deferred().map(id => ({ id, reason: DEFERRED_REASON }))
 
   const broadcast = (value: ServerFrame): void => {
     const line = frame(value)

@@ -1,43 +1,11 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { Session } from '../../src/native/client/sessions/session.js'
 import type { SessionRemotes } from '../../src/native/client/sessions/remotes.js'
 
-const sessionWithPrompt = (prompt: SessionRemotes['session']['prompt'], options: ConstructorParameters<typeof Session>[2] = {}): Session => {
-  const remote: SessionRemotes = {
-    $stream: () => {
-      throw new Error('Unexpected stream in prompt retry fixture')
-    },
-    commands: { execute: vi.fn<SessionRemotes['commands']['execute']>() },
-    subagents: {
-      prompt: vi.fn<SessionRemotes['subagents']['prompt']>(),
-      interruptByParent: vi.fn<SessionRemotes['subagents']['interruptByParent']>(),
-    },
-    session: {
-      attachment: vi.fn<SessionRemotes['session']['attachment']>(),
-      cancel: vi.fn<SessionRemotes['session']['cancel']>(),
-      canOpenWorkspacePath: vi.fn<SessionRemotes['session']['canOpenWorkspacePath']>(),
-      control: vi.fn<SessionRemotes['session']['control']>(),
-      create: vi.fn<SessionRemotes['session']['create']>(),
-      follow: vi.fn<SessionRemotes['session']['follow']>(),
-      fork: vi.fn<SessionRemotes['session']['fork']>(),
-      initializeDefaultModel: vi.fn<SessionRemotes['session']['initializeDefaultModel']>(),
-      list: vi.fn<SessionRemotes['session']['list']>(),
-      modelCatalog: vi.fn<SessionRemotes['session']['modelCatalog']>(),
-      openWorkspacePath: vi.fn<SessionRemotes['session']['openWorkspacePath']>(),
-      page: vi.fn<SessionRemotes['session']['page']>(),
-      projections: vi.fn<SessionRemotes['session']['projections']>(),
-      prompt,
-      rename: vi.fn<SessionRemotes['session']['rename']>(),
-      search: vi.fn<SessionRemotes['session']['search']>(),
-      selectModel: vi.fn<SessionRemotes['session']['selectModel']>(),
-      updateQueue: vi.fn<SessionRemotes['session']['updateQueue']>(),
-      workspacePathApplications: vi.fn<SessionRemotes['session']['workspacePathApplications']>(),
-    },
-  }
-  return new Session(SessionId('session-retry-test'), remote, options)
-}
+const sessionWithPrompt = (prompt: SessionRemotes['session']['prompt'], options: ConstructorParameters<typeof Session>[2] = {}): Session =>
+  new Session(SessionId('session-retry-test'), { session: { prompt } } as unknown as SessionRemotes, options)
 
 const text = [{ type: 'text', text: 'hello' }] as const
 

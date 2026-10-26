@@ -6,10 +6,10 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ChromeCdp, type Cdp } from '../src/chrome-cdp.js'
-import { ChromeLauncher } from '../src/chrome-launch.js'
+import { choosePage, endpointOf, listPages, openCdp, pickOnPage, type Cdp } from '../src/chrome-cdp.js'
+import { chromeExecutable } from '../src/chrome-launch.js'
 
-const CHROME = process.env.CHROME_PATH ?? ChromeLauncher.chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '' })
+const CHROME = process.env.CHROME_PATH ?? chromeExecutable({ platform: process.platform, pathValue: process.env.PATH ?? '' })
 const PAGE = '<title>Pick fixture</title><h1>Fixture</h1><button id="save" aria-label="Save changes">Save</button>'
 
 let chrome: ChildProcessWithoutNullStreams | undefined
@@ -90,18 +90,18 @@ const buttonCenter = async ({ cdp }: { cdp: Cdp }): Promise<{ x: number; y: numb
 describe.skipIf(CHROME === undefined || !existsSync(CHROME))('chrome cdp picker', () => {
   it('lists the page and returns the clicked element', async () => {
     if (!started) throw new Error('chrome did not start')
-    let pages = await ChromeCdp.listPages({ endpoint: ChromeCdp.endpointOf({ port }) })
+    let pages = await listPages({ endpoint: endpointOf({ port }) })
     for (let attempt = 0; attempt < 40 && pages.length === 0; attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 250))
-      pages = await ChromeCdp.listPages({ endpoint: ChromeCdp.endpointOf({ port }) })
+      pages = await listPages({ endpoint: endpointOf({ port }) })
     }
     expect(pages.length).toBeGreaterThan(0)
     const page = pages[0]
     if (page === undefined) throw new Error('no page')
 
-    const cdp = await ChromeCdp.openCdp({ wsUrl: page.wsUrl })
+    const cdp = await openCdp({ wsUrl: page.wsUrl })
     try {
-      const picking = ChromeCdp.pickOnPage({ page, timeoutMs: 15_000 })
+      const picking = pickOnPage({ page, timeoutMs: 15_000 })
       await waitForPicker({ cdp })
       const center = await buttonCenter({ cdp })
       const base = { x: center.x, y: center.y, button: 'left', clickCount: 1 }
@@ -132,15 +132,15 @@ describe('choosePage', () => {
 
   it('prefers the focused tab', () => {
     const pages = [page('a'), page('b')]
-    expect(ChromeCdp.choosePage({ pages, focusedId: 'b' })?.id).toBe('b')
+    expect(choosePage({ pages, focusedId: 'b' })?.id).toBe('b')
   })
 
   it('falls back to the first tab when focus is unknown', () => {
-    expect(ChromeCdp.choosePage({ pages: [page('a'), page('b')] })?.id).toBe('a')
-    expect(ChromeCdp.choosePage({ pages: [page('a')], focusedId: 'gone' })?.id).toBe('a')
+    expect(choosePage({ pages: [page('a'), page('b')] })?.id).toBe('a')
+    expect(choosePage({ pages: [page('a')], focusedId: 'gone' })?.id).toBe('a')
   })
 
   it('returns nothing for no pages', () => {
-    expect(ChromeCdp.choosePage({ pages: [] })).toBeUndefined()
+    expect(choosePage({ pages: [] })).toBeUndefined()
   })
 })

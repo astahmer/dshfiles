@@ -23,10 +23,10 @@ client code live.
 
 ## What it does
 
-| Frame      | Meaning                                                                    |
-| ---------- | -------------------------------------------------------------------------- |
-| `graph`    | the composed client graph (same as stock)                                  |
-| `rebuilt`  | a client bundle the page may apply now (same as stock)                     |
+| Frame | Meaning |
+| ----- | ------- |
+| `graph` | the composed client graph (same as stock) |
+| `rebuilt` | a client bundle the page may apply now (same as stock) |
 | `deferred` | this package's addition: a rebuild held back because its Host half changed |
 
 The Host tracks, per client row:
@@ -66,7 +66,7 @@ artifact on disk matches the loaded one again:
   need the fetch path the stock client also carries.
 - This replaces the stock row, so `webWork` profile composition must disable
   `client-hmr`; the bundled `cordis.patch.yml` does that.
-- It gates _announcements_, not Host loading: a Host restart is still the only way
+- It gates *announcements*, not Host loading: a Host restart is still the only way
   to run the new Host half in this profile.
 
 ## Verify

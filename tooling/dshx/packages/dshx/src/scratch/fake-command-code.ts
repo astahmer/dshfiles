@@ -1,4 +1,5 @@
 import { createAdaptorServer } from '@hono/node-server'
+import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
 import { z } from 'zod'
@@ -245,7 +246,12 @@ export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
   return app
 }
 
-type ListenableServer = Pick<ReturnType<typeof createAdaptorServer>, 'once' | 'off' | 'listen' | 'address' | 'close'> & {
+interface ListenableServer {
+  once(event: 'error', listener: (error: Error) => void): unknown
+  off(event: 'error', listener: (error: Error) => void): unknown
+  listen(port: number, host: string, listener: () => void): unknown
+  address(): AddressInfo | string | null
+  close(listener: () => void): unknown
   closeAllConnections?(): void
 }
 

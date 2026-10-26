@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { INGEST_RATE_LIMIT, INGEST_RATE_WINDOW_MS, MAX_INGEST_BYTES } from './limits.js'
 import { annotationDraftSchema, type AnnotationDraft, type UnassignedAnnotation } from './schema.js'
-import { AnnotationHttp } from './http.js'
+import { answerPreflight, corsFor, respond } from './http.js'
 
 const ingestBodySchema = z
   .object({
@@ -54,52 +54,52 @@ export const createIngestHandler =
   async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const remote = request.socket.remoteAddress ?? ''
     if (!LOOPBACK.has(remote)) {
-      AnnotationHttp.respond({ response, status: 403, body: { error: 'loopback only' } })
+      respond({ response, status: 403, body: { error: 'loopback only' } })
       return
     }
     const allowed = allowedOrigins()
-    if (AnnotationHttp.answerPreflight({ request, response, allowed })) return
+    if (answerPreflight({ request, response, allowed })) return
     if (request.method !== 'POST') {
-      AnnotationHttp.respond({ response, status: 405, body: { error: 'method not allowed' } })
+      respond({ response, status: 405, body: { error: 'method not allowed' } })
       return
     }
     if (!tokenMatches({ provided: bearerOf(request), expected: await token() })) {
-      AnnotationHttp.respond({ response, status: 401, body: { error: 'invalid token' } })
+      respond({ response, status: 401, body: { error: 'invalid token' } })
       return
     }
     const origin = request.headers.origin
     if (origin === undefined || !EXTENSION_ORIGIN.test(origin)) {
-      AnnotationHttp.respond({ response, status: 403, body: { error: 'browser extension origin required' } })
+      respond({ response, status: 403, body: { error: 'browser extension origin required' } })
       return
     }
     if (allowed.length > 0 && !allowed.includes(origin)) {
-      AnnotationHttp.respond({ response, status: 403, body: { error: 'origin not allowed' } })
+      respond({ response, status: 403, body: { error: 'origin not allowed' } })
       return
     }
     const rate = rateFor(origin, now())
     if (rate === false) {
-      AnnotationHttp.respond({ response, status: 429, body: { error: 'too many requests' } })
+      respond({ response, status: 429, body: { error: 'too many requests' } })
       return
     }
     const raw = await readBody({ request, limit: MAX_INGEST_BYTES })
     if (raw === undefined) {
-      AnnotationHttp.respond({ response, status: 413, body: { error: 'payload too large' } })
+      respond({ response, status: 413, body: { error: 'payload too large' } })
       return
     }
     let parsed: unknown
     try {
       parsed = JSON.parse(raw)
     } catch {
-      AnnotationHttp.respond({ response, status: 400, body: { error: 'invalid json' } })
+      respond({ response, status: 400, body: { error: 'invalid json' } })
       return
     }
     const body = ingestBodySchema.safeParse(parsed)
     if (!body.success) {
-      AnnotationHttp.respond({ response, status: 400, body: { error: 'invalid annotation' } })
+      respond({ response, status: 400, body: { error: 'invalid annotation' } })
       return
     }
     const accepted = await ingest({ drafts: body.data.drafts, extensionOrigin: origin })
-    AnnotationHttp.respond({ response, status: 202, body: { accepted: accepted.length }, headers: AnnotationHttp.corsFor({ origin, allowed }) })
+    respond({ response, status: 202, body: { accepted: accepted.length }, headers: corsFor({ origin, allowed }) })
   }
 
 const windows = new Map<string, { readonly start: number; count: number }>()

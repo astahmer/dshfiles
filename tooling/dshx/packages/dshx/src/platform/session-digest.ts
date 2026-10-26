@@ -50,17 +50,6 @@ const projectionValuesSchema = z
   .partial()
 
 type SessionEvent = z.infer<typeof eventRecordSchema>['event']
-interface SessionEventPosition {
-  seq: number
-  time?: number
-}
-interface SessionEventHeading extends SessionEventPosition {
-  type: string
-}
-interface SessionCallTiming {
-  name: string
-  time?: number
-}
 
 /** Event types `tail` hides unless `--types` asks for them: per-step bookkeeping and request plumbing. */
 const noiseEventTypes = new Set([
@@ -253,16 +242,13 @@ const createSessionEventDescriber = (): ((
   return record => {
     const event = decodeEvent(record)
     if (event === undefined) return undefined
-    const base: SessionEventHeading = { seq: event.seq, type: event.type }
-    if (event.time !== undefined) base.time = event.time
+    const base = { seq: event.seq, ...(event.time === undefined ? {} : { time: event.time }), type: event.type }
     const describe = (): string => {
       const data = event.data
       if (event.type === 'tool/call') {
         const call = toolCallSchema.safeParse(data)
         if (!call.success) return ''
-        const entry: SessionCallTiming = { name: call.data.name }
-        if (event.time !== undefined) entry.time = event.time
-        calls.set(call.data.callId, entry)
+        calls.set(call.data.callId, { name: call.data.name, ...(event.time === undefined ? {} : { time: event.time }) })
         return describeToolCall(call.data.name, parseArguments(call.data.arguments), homeRelative)
       }
       if (event.type === 'tool/result') {
@@ -409,11 +395,10 @@ export const digestSession = (input: {
   let retries = 0
   let failedTurns = 0
   const subagents = new Map<string, string | undefined>()
-  const at = (event: SessionEvent): SessionEventPosition => {
-    const position: SessionEventPosition = { seq: event.seq }
-    if (event.time !== undefined) position.time = event.time
-    return position
-  }
+  const at = (event: SessionEvent): { readonly seq: number; readonly time?: number } => ({
+    seq: event.seq,
+    ...(event.time === undefined ? {} : { time: event.time }),
+  })
 
   for (const event of events) {
     const data = event.data
@@ -427,15 +412,14 @@ export const digestSession = (input: {
       if (result?.isError) failure = oneLine(stripRoot(resultHeadline(result.text, 'tool-error')), 160)
       else if (result !== undefined && exit !== undefined) failure = oneLine(`${exit}: ${stripRoot(resultHeadline(result.text, 'shell-failure'))}`, 160)
       const status = result === undefined ? 'pending' : failure === undefined ? 'ok' : 'error'
-      const action: SessionDigestAction & { readonly callKey: string } = {
+      actions.push({
         ...at(event),
         callKey: `${call.data.name} ${call.data.arguments ?? ''}`,
         tool: call.data.name,
         summary: describeToolCall(call.data.name, args, display, workRoot),
         status,
-      }
-      if (failure !== undefined) Object.assign(action, { error: failure })
-      actions.push(action)
+        ...(failure === undefined ? {} : { error: failure }),
+      })
       const path = stringArgument(args, 'file_path', 'path', 'filePath')
       if (mutatingFileTools.has(call.data.name) && path !== undefined && status !== 'error') {
         const key = display(path)
@@ -444,9 +428,7 @@ export const digestSession = (input: {
       const command = shellTools.has(call.data.name) ? stringArgument(args, 'command') : undefined
       for (const match of command?.matchAll(vcsCommandPattern) ?? []) {
         const message = vcsMessage(match[2] ?? '')
-        const revision: SessionDigest['revisions'][number] = { seq: event.seq, command: `jj ${(match[1] ?? '').replace(/\s+/g, ' ')}`, status }
-        if (message !== undefined) Object.assign(revision, { message })
-        revisions.push(revision)
+        revisions.push({ seq: event.seq, command: `jj ${(match[1] ?? '').replace(/\s+/g, ' ')}`, ...(message === undefined ? {} : { message }), status })
       }
       continue
     }
@@ -483,8 +465,11 @@ export const digestSession = (input: {
       const parsed = turnEndSchema.safeParse(data)
       if (!parsed.success) continue
       if (parsed.data.reason.kind === 'error') failedTurns += 1
-      lastTurnEnd = { seq: event.seq, kind: parsed.data.reason.kind }
-      if (parsed.data.reason.error !== undefined) Object.assign(lastTurnEnd, { error: parsed.data.reason.error.message })
+      lastTurnEnd = {
+        seq: event.seq,
+        kind: parsed.data.reason.kind,
+        ...(parsed.data.reason.error === undefined ? {} : { error: parsed.data.reason.error.message }),
+      }
       continue
     }
     if (event.type === 'turn/start') {
@@ -555,20 +540,39 @@ export const digestSession = (input: {
   const projectedTitle = projections.title ?? title
   const projectedGoal = projections.goal?.goal ?? goal
 
-  const digest: SessionDigest = {
+  return {
     sessionId: input.summary.sessionId,
+    ...(projectedTitle === undefined || projectedTitle === null ? {} : { title: projectedTitle }),
     running: input.summary.running,
+    ...(cwd === undefined ? {} : { cwd }),
+    ...(lastModel === undefined || lastModel === null
+      ? model === undefined
+        ? {}
+        : { model }
+      : { model: `${lastModel.provider}/${lastModel.model}${lastModel.reasoningEffort === undefined ? '' : ` (${lastModel.reasoningEffort})`}` }),
+    ...(lastEvent === undefined ? {} : { lastSeq: lastEvent.seq }),
+    ...(lastEventAt === undefined ? {} : { lastEventAt }),
+    ...(idleMs === undefined ? {} : { idleMs }),
     eventCount: events.length,
+    ...(projections.sessionStats === undefined || projections.sessionStats === null
+      ? {}
+      : { turns: projections.sessionStats.turns, steps: projections.sessionStats.steps }),
     compactions,
+    ...(lastTurnEnd === undefined ? {} : { lastTurnEnd }),
     attention,
+    ...(projectedGoal === undefined ? {} : { goal: projectedGoal }),
     todos: projectedTodos,
     intents: intents.slice(-4),
+    ...(lastUserPrompt === undefined ? {} : { lastUserPrompt }),
+    ...(lastAgentMessage === undefined ? {} : { lastAgentMessage }),
+    ...(lastAssistantText === undefined ? {} : { lastAssistantText }),
     actions: actions.slice(-(input.actionLimit ?? 15)).map(({ callKey: _callKey, ...action }) => action),
     toolCallCount: actions.length,
     workDirectories: [...directoryCounts.entries()].sort((left, right) => right[1] - left[1]).map(([path, calls]) => ({ path, calls })),
     filesChanged: [...files.entries()].sort((left, right) => right[1].lastSeq - left[1].lastSeq).map(([path, value]) => ({ path, ...value })),
     revisions,
     undescribedEdits: {
+      ...(lastDescribe === undefined ? {} : { sinceSeq: lastDescribe.seq }),
       edits: editsAfterDescribe.length,
       files: new Set(editsAfterDescribe.map(action => action.summary)).size,
     },
@@ -578,41 +582,18 @@ export const digestSession = (input: {
       failedTurns,
       recent: failedActions.slice(-5).map(action => ({ seq: action.seq, summary: action.summary, error: action.error ?? 'failed' })),
     },
-    subagents: [...subagents.entries()].map(([id, label]) => {
-      const child: SessionDigest['subagents'][number] = { id }
-      if (label !== undefined) Object.assign(child, { label })
-      return child
-    }),
+    ...(tokenUsage === undefined || tokenUsage === null
+      ? {}
+      : {
+          tokens: {
+            input: tokenUsage.uncachedInputTokens,
+            cachedInput: tokenUsage.cacheReadTokens ?? 0,
+            output: tokenUsage.outputTokens,
+            ...(pressure === undefined || pressure === null ? {} : { contextTokens: pressure.projectedTokens, contextWindow: pressure.contextWindow }),
+          },
+        }),
+    subagents: [...subagents.entries()].map(([id, label]) => ({ id, ...(label === undefined ? {} : { label }) })),
   }
-  if (projectedTitle !== undefined && projectedTitle !== null) Object.assign(digest, { title: projectedTitle })
-  if (cwd !== undefined) Object.assign(digest, { cwd })
-  if (lastModel !== undefined && lastModel !== null) {
-    Object.assign(digest, {
-      model: `${lastModel.provider}/${lastModel.model}${lastModel.reasoningEffort === undefined ? '' : ` (${lastModel.reasoningEffort})`}`,
-    })
-  } else if (model !== undefined) Object.assign(digest, { model })
-  if (lastEvent !== undefined) Object.assign(digest, { lastSeq: lastEvent.seq })
-  if (lastEventAt !== undefined) Object.assign(digest, { lastEventAt })
-  if (idleMs !== undefined) Object.assign(digest, { idleMs })
-  if (projections.sessionStats !== undefined && projections.sessionStats !== null) {
-    Object.assign(digest, { turns: projections.sessionStats.turns, steps: projections.sessionStats.steps })
-  }
-  if (lastTurnEnd !== undefined) Object.assign(digest, { lastTurnEnd })
-  if (projectedGoal !== undefined) Object.assign(digest, { goal: projectedGoal })
-  if (lastUserPrompt !== undefined) Object.assign(digest, { lastUserPrompt })
-  if (lastAgentMessage !== undefined) Object.assign(digest, { lastAgentMessage })
-  if (lastAssistantText !== undefined) Object.assign(digest, { lastAssistantText })
-  if (lastDescribe !== undefined) Object.assign(digest.undescribedEdits, { sinceSeq: lastDescribe.seq })
-  if (tokenUsage !== undefined && tokenUsage !== null) {
-    const tokens: NonNullable<SessionDigest['tokens']> = {
-      input: tokenUsage.uncachedInputTokens,
-      cachedInput: tokenUsage.cacheReadTokens ?? 0,
-      output: tokenUsage.outputTokens,
-    }
-    if (pressure !== undefined && pressure !== null) Object.assign(tokens, { contextTokens: pressure.projectedTokens, contextWindow: pressure.contextWindow })
-    Object.assign(digest, { tokens })
-  }
-  return digest
 }
 
 const formatCount = (value: number): string =>

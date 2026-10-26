@@ -211,10 +211,10 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
         label: window.label,
         remainingPercent: window.percentRemaining,
         resetsAt: window.resetsAt,
-        now: usage?.readAt ?? points.at(-1)?.at ?? 0,
+        now: Date.now(),
       }),
     }))
-  }, [current, points, usage?.readAt])
+  }, [current, points])
   const bankChanges = useMemo(() => QuotaHistoryAnalysis.changedBankedResetSnapshots(points).slice(-BANK_EVENT_LIMIT).reverse(), [points])
 
   const resetCount = points.at(-1)?.bankedResets ?? 0
