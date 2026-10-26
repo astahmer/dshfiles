@@ -39,6 +39,10 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: tooling/dshx
 
+      - name: Build scaffold and SDK prerequisites
+        run: pnpm run build
+        working-directory: tooling/dshx
+
       - name: Test dynamic plugin inventory
         run: pnpm run test:inventory
         working-directory: tooling/dshx
