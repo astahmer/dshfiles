@@ -111,6 +111,11 @@ const MIGRATIONS = [
   `
   CREATE INDEX spans_session ON spans (session_id, trace_id);
   `,
+  `
+  CREATE INDEX traces_retention_order ON traces (received_ms, start_us);
+  CREATE INDEX spans_resource ON spans (resource_id);
+  CREATE INDEX logs_resource ON logs (resource_id);
+  `,
 ]
 
 export type Retention = { readonly maxAgeHours: number; readonly maxSpans: number; readonly maxLogs: number; readonly maxMetricPoints: number }
@@ -142,6 +147,8 @@ type ClearResult = { readonly removedSpans: number; readonly removedTraces: numb
 
 const MAX_METRIC_SERIES = 20
 const MAX_SERIES_POINTS = 500
+
+const PRUNE_TRACE_BATCH_SIZE = 128
 
 const metricTypeSchema = z.enum(['gauge', 'sum', 'histogram', 'exponentialHistogram', 'summary'])
 
@@ -233,6 +240,13 @@ const spanRowSchema = z.object({
 
 const countSchema = z.object({ count: z.number() })
 
+const oldestTraceRowSchema = z.object({
+  trace_id: z.string(),
+  span_count: z.number(),
+  received_ms: z.number(),
+  start_us: z.number(),
+})
+
 const logRowSchema = z.object({
   id: z.number(),
   time_us: z.number(),
@@ -310,6 +324,9 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     return statement
   }
 
+  let storedLogCount = countSchema.parse(prepare('SELECT COUNT(*) AS count FROM logs').get()).count
+  let storedMetricPointCount = countSchema.parse(prepare('SELECT COUNT(*) AS count FROM metric_points').get()).count
+
   const transaction = <Result>(work: () => Result): Result => {
     database.exec('BEGIN IMMEDIATE')
     try {
@@ -365,7 +382,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const spanCount = (): number => countSchema.parse(prepare('SELECT COUNT(*) AS count FROM spans').get()).count
+  const spanCount = (): number => countSchema.parse(prepare('SELECT COALESCE(SUM(span_count), 0) AS count FROM traces').get()).count
 
   /** Retention drops whole traces, oldest received first, so a kept trace never loses part of its tree. */
   const prune = (retention: Retention): number => {
@@ -378,26 +395,50 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     if (expired.length > 0) transaction(() => deleteTraces(expired))
     let excess = spanCount() - retention.maxSpans
     if (excess > 0) {
-      const oldest = z
-        .array(z.object({ trace_id: z.string(), span_count: z.number() }))
-        .parse(prepare('SELECT trace_id, span_count FROM traces ORDER BY received_ms, start_us').all())
       const victims: string[] = []
-      for (const trace of oldest) {
-        if (excess <= 0) break
-        victims.push(trace.trace_id)
-        excess -= trace.span_count
+      let cursor: { readonly receivedMs: number; readonly startUs: number; readonly traceId: string } | undefined
+      while (excess > 0) {
+        const oldest = z
+          .array(oldestTraceRowSchema)
+          .parse(
+            cursor === undefined
+              ? prepare('SELECT trace_id, span_count, received_ms, start_us FROM traces ORDER BY received_ms, start_us, trace_id LIMIT ?').all(
+                  PRUNE_TRACE_BATCH_SIZE,
+                )
+              : prepare(
+                  'SELECT trace_id, span_count, received_ms, start_us FROM traces WHERE (received_ms, start_us, trace_id) > (?, ?, ?) ORDER BY received_ms, start_us, trace_id LIMIT ?',
+                ).all(cursor.receivedMs, cursor.startUs, cursor.traceId, PRUNE_TRACE_BATCH_SIZE),
+          )
+        if (oldest.length === 0) break
+        for (const trace of oldest) {
+          victims.push(trace.trace_id)
+          excess -= trace.span_count
+          if (excess <= 0) break
+        }
+        const last = oldest.at(-1)
+        if (last !== undefined) cursor = { receivedMs: last.received_ms, startUs: last.start_us, traceId: last.trace_id }
       }
       removed += victims.length
-      transaction(() => deleteTraces(victims))
+      if (victims.length > 0) transaction(() => deleteTraces(victims))
     }
     const expiredLogs = Number(prepare('DELETE FROM logs WHERE received_ms < ?').run(cutoff).changes)
+    storedLogCount -= expiredLogs
     const excessLogs = logCount() - retention.maxLogs
     const droppedLogs = excessLogs > 0 ? Number(prepare('DELETE FROM logs WHERE id IN (SELECT id FROM logs ORDER BY id LIMIT ?)').run(excessLogs).changes) : 0
-    prepare('DELETE FROM metric_points WHERE received_ms < ?').run(cutoff)
+    storedLogCount -= droppedLogs
+    const expiredMetricPoints = Number(prepare('DELETE FROM metric_points WHERE received_ms < ?').run(cutoff).changes)
+    storedMetricPointCount -= expiredMetricPoints
     const excessPoints = metricPointCount() - retention.maxMetricPoints
-    if (excessPoints > 0) prepare('DELETE FROM metric_points WHERE id IN (SELECT id FROM metric_points ORDER BY id LIMIT ?)').run(excessPoints)
+    if (excessPoints > 0) {
+      const droppedMetricPoints = Number(
+        prepare('DELETE FROM metric_points WHERE id IN (SELECT id FROM metric_points ORDER BY id LIMIT ?)').run(excessPoints).changes,
+      )
+      storedMetricPointCount -= droppedMetricPoints
+    }
     if (removed > 0 || expiredLogs + droppedLogs > 0)
-      prepare('DELETE FROM resources WHERE id NOT IN (SELECT resource_id FROM spans UNION SELECT resource_id FROM logs)').run()
+      prepare(
+        'DELETE FROM resources WHERE NOT EXISTS (SELECT 1 FROM spans WHERE spans.resource_id = resources.id) AND NOT EXISTS (SELECT 1 FROM logs WHERE logs.resource_id = resources.id)',
+      ).run()
     return removed
   }
 
@@ -431,6 +472,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
           receivedMs,
         )
     })
+    storedLogCount += logs.length
     prune(retention)
     return logs.length
   }
@@ -510,7 +552,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const metricPointCount = (): number => countSchema.parse(prepare('SELECT COUNT(*) AS count FROM metric_points').get()).count
+  const metricPointCount = (): number => storedMetricPointCount
 
   const ingestMetrics = (points: readonly NormalizedMetricPoint[], retention: Retention): number => {
     if (points.length === 0) return 0
@@ -536,6 +578,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
           receivedMs,
         )
     })
+    storedMetricPointCount += points.length
     prune(retention)
     return points.length
   }
@@ -642,7 +685,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const logCount = (): number => countSchema.parse(prepare('SELECT COUNT(*) AS count FROM logs').get()).count
+  const logCount = (): number => storedLogCount
 
   const ingest = (spans: readonly NormalizedSpan[], retention: Retention): IngestResult => {
     if (spans.length === 0) return { stored: 0, prunedTraces: 0 }
@@ -1098,12 +1141,16 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const clear = (): ClearResult =>
-    transaction(() => {
+  const clear = (): ClearResult => {
+    const removed = transaction(() => {
       const before = summary()
       database.exec('DELETE FROM spans; DELETE FROM traces; DELETE FROM logs; DELETE FROM metric_points; DELETE FROM resources;')
       return { removedSpans: before.spans, removedTraces: before.traces, removedLogs: before.logs, removedMetricPoints: before.metricPoints }
     })
+    storedLogCount = 0
+    storedMetricPointCount = 0
+    return removed
+  }
 
   return {
     ingest,
