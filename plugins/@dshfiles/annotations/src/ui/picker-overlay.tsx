@@ -6,7 +6,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { annotationsApi } from '../api.js'
-import { describeTarget, pickableElement } from '../descriptor.js'
+import { ElementDescriptor } from '../descriptor.js'
 import { describeRegion } from '../region.js'
 import type { AnnotationIntent, AnnotationSeverity, AnnotationTarget } from '../schema.js'
 import { annotationsUi, useAnnotationsUi, type PickedTarget, type PickMode } from './state.js'
@@ -37,11 +37,11 @@ const targetAt = ({ x, y }: { readonly x: number; readonly y: number }, eventTar
   const hit = fromEvent ?? document.elementFromPoint(x, y)
   if (hit === null) return null
   if (hit.closest('[data-annotations-ui]') !== null) return null
-  return pickableElement(hit)
+  return ElementDescriptor.pickableElement(hit)
 }
 
 const describeAt = ({ element, surface, url }: { readonly element: Element; readonly surface: 'dsh'; readonly url: string }): AnnotationTarget | null =>
-  describeTarget({ element, surface, url })
+  ElementDescriptor.describeTarget({ element, surface, url })
 
 const CommentForm = ({ picked }: { readonly picked: PickedTarget }): JSX.Element => {
   const api = useApi(annotationsApi)

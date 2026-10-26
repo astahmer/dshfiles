@@ -5,7 +5,8 @@ import { connect } from 'node:net'
 import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { withSpan } from '@dshfiles/dshx/tracing'
-import { endpointOf } from './chrome-cdp.js'
+import { z } from 'zod'
+import { ChromeCdp } from './chrome-cdp.js'
 
 const MAC_PATHS = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium']
 const LINUX_NAMES = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']
@@ -28,7 +29,7 @@ const onPath = ({ name, pathValue }: { readonly name: string; readonly pathValue
  * A configured path wins; otherwise the platform's usual install locations and PATH.
  * Nothing here guesses a browser for a platform it does not know.
  */
-export const chromeExecutable = ({
+const chromeExecutable = ({
   platform,
   pathValue = '',
   configured = '',
@@ -50,7 +51,7 @@ export const chromeExecutable = ({
   return undefined
 }
 
-export const defaultProfileDir = ({ dshHome }: { readonly dshHome: string | undefined }): string =>
+const defaultProfileDir = ({ dshHome }: { readonly dshHome: string | undefined }): string =>
   join(dshHome === undefined || dshHome.length === 0 ? join(homedir(), '.dsh') : dshHome, 'plugins', 'annotations', 'chrome-profile')
 
 export interface LaunchedChrome {
@@ -61,9 +62,9 @@ export interface LaunchedChrome {
 
 let running: LaunchedChrome | undefined
 
-export const launchedChrome = (): LaunchedChrome | undefined => running
+const launchedChrome = (): LaunchedChrome | undefined => running
 
-export const chromeArguments = ({
+const chromeArguments = ({
   port,
   profileDir,
   startUrl,
@@ -100,18 +101,19 @@ const portBusy = ({ port, timeoutMs = 500 }: { readonly port: number; readonly t
     socket.once('error', () => settle(false))
   })
 
+const versionSchema = z.object({ webSocketDebuggerUrl: z.string() })
+
 const reachable = async ({ port }: { readonly port: number }): Promise<boolean> => {
-  const response = await fetch(`${endpointOf({ port })}/json/version`, { signal: AbortSignal.timeout(700) }).catch(() => undefined)
+  const response = await fetch(`${ChromeCdp.endpointOf({ port })}/json/version`, { signal: AbortSignal.timeout(700) }).catch(() => undefined)
   if (response === undefined || !response.ok) return false
-  const version = (await response.json().catch(() => undefined)) as { readonly webSocketDebuggerUrl?: unknown } | undefined
-  return typeof version?.webSocketDebuggerUrl === 'string'
+  return versionSchema.safeParse(await response.json().catch(() => undefined)).success
 }
 
 /**
  * Never attach to a browser we did not start: if the configured port already answers,
  * take the next free one instead of driving someone else's Chrome.
  */
-export const freePort = async ({ start, attempts = 20 }: { readonly start: number; readonly attempts?: number }): Promise<number> => {
+const freePort = async ({ start, attempts = 20 }: { readonly start: number; readonly attempts?: number }): Promise<number> => {
   for (let offset = 0; offset < attempts; offset += 1) {
     const candidate = start + offset
     if (!(await portBusy({ port: candidate }))) return candidate
@@ -119,7 +121,7 @@ export const freePort = async ({ start, attempts = 20 }: { readonly start: numbe
   throw new Error(`No free debugging port between ${start} and ${start + attempts - 1}.`)
 }
 
-export const launchChrome = async ({
+const launchChrome = async ({
   executable,
   port,
   profileDir,
@@ -139,7 +141,9 @@ export const launchChrome = async ({
     const chosen = await freePort({ start: port })
     // Chrome creates the leaf but not a nested path, and a missing parent makes it exit silently.
     await mkdir(profileDir, { recursive: true })
-    const child = spawn(executable, chromeArguments({ port: chosen, profileDir, headless, ...(startUrl === undefined ? {} : { startUrl }) }), {
+    const options: Parameters<typeof chromeArguments>[0] = { port: chosen, profileDir, headless }
+    if (startUrl !== undefined) Object.assign(options, { startUrl })
+    const child = spawn(executable, chromeArguments(options), {
       detached: true,
       stdio: 'ignore',
     })
@@ -148,7 +152,7 @@ export const launchChrome = async ({
     child.once('exit', () => {
       exited = true
     })
-    const endpoint = endpointOf({ port: chosen })
+    const endpoint = ChromeCdp.endpointOf({ port: chosen })
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
       if (exited) throw new Error('Chrome exited right after launch. Quit any window already using that profile and try again.')
@@ -167,7 +171,7 @@ export const launchChrome = async ({
  * The launcher was spawned detached, so it leads its own process group: signalling the
  * group closes the helpers too instead of leaving a headless browser behind.
  */
-export const stopChrome = (): boolean => {
+const stopChrome = (): boolean => {
   if (running === undefined) return false
   const pid = running.pid
   try {
@@ -182,4 +186,14 @@ export const stopChrome = (): boolean => {
   }
   running = undefined
   return true
+}
+
+export class ChromeLauncher {
+  static readonly chromeExecutable = chromeExecutable
+  static readonly defaultProfileDir = defaultProfileDir
+  static readonly launchedChrome = launchedChrome
+  static readonly chromeArguments = chromeArguments
+  static readonly freePort = freePort
+  static readonly launchChrome = launchChrome
+  static readonly stopChrome = stopChrome
 }

@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { answerPreflight, corsFor, respond } from './http.js'
+import { AnnotationHttp } from './http.js'
 import { PAIR_WINDOW_MS } from './limits.js'
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
@@ -43,11 +43,12 @@ export const createPairing = ({
       pairedAt = undefined
       return { armed: true, expiresAt }
     },
-    status: () => ({
-      armed: armed(),
-      ...(expiresAt === undefined ? {} : { expiresAt }),
-      ...(pairedAt === undefined ? {} : { pairedAt }),
-    }),
+    status: () => {
+      const status: PairingStatus = { armed: armed() }
+      if (expiresAt !== undefined) Object.assign(status, { expiresAt })
+      if (pairedAt !== undefined) Object.assign(status, { pairedAt })
+      return status
+    },
     take: () => {
       if (!armed()) return undefined
       expiresAt = undefined
@@ -66,28 +67,28 @@ export const createPairHandler =
   ({ pairing, allowedOrigins }: PairHandlerOptions) =>
   (request: IncomingMessage, response: ServerResponse): void => {
     if (!LOOPBACK.has(request.socket.remoteAddress ?? '')) {
-      respond({ response, status: 403, body: { error: 'loopback only' } })
+      AnnotationHttp.respond({ response, status: 403, body: { error: 'loopback only' } })
       return
     }
     const allowed = allowedOrigins()
-    if (answerPreflight({ request, response, allowed })) return
+    if (AnnotationHttp.answerPreflight({ request, response, allowed })) return
     if (request.method !== 'POST') {
-      respond({ response, status: 405, body: { error: 'method not allowed' } })
+      AnnotationHttp.respond({ response, status: 405, body: { error: 'method not allowed' } })
       return
     }
     const origin = request.headers.origin
     if (origin === undefined || !EXTENSION_ORIGIN.test(origin)) {
-      respond({ response, status: 403, body: { error: 'browser extension origin required' } })
+      AnnotationHttp.respond({ response, status: 403, body: { error: 'browser extension origin required' } })
       return
     }
     if (allowed.length > 0 && !allowed.includes(origin)) {
-      respond({ response, status: 403, body: { error: 'origin not allowed' } })
+      AnnotationHttp.respond({ response, status: 403, body: { error: 'origin not allowed' } })
       return
     }
     const token = pairing.take()
     if (token === undefined) {
-      respond({ response, status: 409, body: { error: 'open the pairing window in DSH first' } })
+      AnnotationHttp.respond({ response, status: 409, body: { error: 'open the pairing window in DSH first' } })
       return
     }
-    respond({ response, status: 200, body: { token }, headers: corsFor({ origin, allowed }) })
+    AnnotationHttp.respond({ response, status: 200, body: { token }, headers: AnnotationHttp.corsFor({ origin, allowed }) })
   }

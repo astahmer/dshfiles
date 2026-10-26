@@ -1,6 +1,6 @@
 import { annotationTargetSchema, type AnnotationSurface, type AnnotationTarget } from './schema.js'
-import { elementText, privateAncestor, redactUrl, safeAttributes, safeStyles, sensitiveField } from './redact.js'
-import { elementSelector } from './descriptor.js'
+import { AnnotationRedaction } from './redact.js'
+import { ElementDescriptor } from './descriptor.js'
 
 export interface DragRect {
   readonly x: number
@@ -27,20 +27,21 @@ export const describeRegion = ({
   readonly url: string
   readonly rect: DragRect
 }): AnnotationTarget | null => {
-  if (privateAncestor(element) !== undefined) return null
-  if (sensitiveField(element)) return null
-  const attributes = safeAttributes(element)
-  const styles = safeStyles(element)
-  const text = elementText(element)
-  const parsed = annotationTargetSchema.safeParse({
+  if (AnnotationRedaction.privateAncestor(element) !== undefined) return null
+  if (AnnotationRedaction.sensitiveField(element)) return null
+  const attributes = AnnotationRedaction.safeAttributes(element)
+  const styles = AnnotationRedaction.safeStyles(element)
+  const text = AnnotationRedaction.elementText(element)
+  const target: AnnotationTarget = {
     surface,
-    url: redactUrl(url),
-    selector: elementSelector(element),
+    url: AnnotationRedaction.redactUrl(url),
+    selector: ElementDescriptor.elementSelector(element),
     tag: element.tagName.toLowerCase(),
     rect: normalize(rect),
-    ...(text === undefined ? {} : { text }),
-    ...(attributes === undefined ? {} : { attributes }),
-    ...(styles === undefined ? {} : { styles }),
-  })
+  }
+  if (text !== undefined) target.text = text
+  if (attributes !== undefined) target.attributes = attributes
+  if (styles !== undefined) target.styles = styles
+  const parsed = annotationTargetSchema.safeParse(target)
   return parsed.success ? parsed.data : null
 }

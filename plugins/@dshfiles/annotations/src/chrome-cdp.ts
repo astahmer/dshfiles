@@ -1,4 +1,5 @@
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { z } from 'zod'
 import { PICK_BINDING, PICK_SOURCE } from './picker-source.js'
 import { annotationTargetSchema, type AnnotationTarget } from './schema.js'
 
@@ -17,30 +18,48 @@ export interface PickedInPage {
 
 export type PickOutcome = PickedInPage | { readonly ok: false; readonly reason: 'cancelled' | 'timeout' | 'unavailable' }
 
-interface CdpMessage {
-  readonly id?: number
-  readonly method?: string
-  readonly params?: unknown
-  readonly result?: unknown
-  readonly error?: { readonly message?: string }
+const cdpValueSchema = z.json()
+type CdpValue = z.infer<typeof cdpValueSchema>
+type CdpParams = Readonly<Record<string, CdpValue>>
+const cdpParamsSchema = z.record(z.string(), cdpValueSchema)
+const cdpMessageSchema = z.object({
+  id: z.number().optional(),
+  method: z.string().optional(),
+  params: cdpValueSchema.optional(),
+  result: cdpValueSchema.optional(),
+  error: z.object({ message: z.string().optional() }).optional(),
+})
+const pageEntrySchema = z.object({
+  type: z.literal('page'),
+  id: z.string(),
+  webSocketDebuggerUrl: z.string(),
+  url: z.string().catch(''),
+  title: z.string().catch(''),
+})
+const evaluationSchema = z.object({ result: z.object({ value: cdpValueSchema.optional() }).optional() })
+
+interface CdpCommand {
+  id: number
+  method: string
+  params?: CdpParams
 }
 
 export interface Cdp {
-  send(method: string, params?: Record<string, unknown>): Promise<unknown>
-  on(method: string, handler: (params: Record<string, unknown>) => void): () => void
+  send(method: string, params?: CdpParams): Promise<CdpValue | undefined>
+  on(method: string, handler: (params: CdpParams) => void): () => void
   close(): void
 }
 
 /** Node 22 ships a browser-shaped `WebSocket`, so CDP needs no dependency. */
-export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; readonly timeoutMs?: number }): Promise<Cdp> =>
+const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; readonly timeoutMs?: number }): Promise<Cdp> =>
   withSpan(
     'annotations open cdp',
     { kind: 'client' },
     () =>
       new Promise<Cdp>((resolve, reject) => {
         const socket = new WebSocket(wsUrl)
-        const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
-        const listeners = new Map<string, Set<(params: Record<string, unknown>) => void>>()
+        const pending = new Map<number, { resolve: (value: CdpValue | undefined) => void; reject: (error: Error) => void }>()
+        const listeners = new Map<string, Set<(params: CdpParams) => void>>()
         let nextId = 1
         let settled = false
 
@@ -68,7 +87,9 @@ export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; 
                 new Promise((resolved, failed) => {
                   const id = nextId++
                   pending.set(id, { resolve: resolved, reject: failed })
-                  socket.send(JSON.stringify({ id, method, ...(params === undefined ? {} : { params }) }))
+                  const command: CdpCommand = { id, method }
+                  if (params !== undefined) command.params = params
+                  socket.send(JSON.stringify(command))
                 }),
             ),
           on: (method, handler) => {
@@ -92,9 +113,9 @@ export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; 
           pending.clear()
         }
         socket.onmessage = event => {
-          let message: CdpMessage
+          let message: z.infer<typeof cdpMessageSchema>
           try {
-            message = JSON.parse(String(event.data)) as CdpMessage
+            message = cdpMessageSchema.parse(JSON.parse(String(event.data)))
           } catch {
             return
           }
@@ -109,13 +130,13 @@ export const openCdp = ({ wsUrl, timeoutMs = 5_000 }: { readonly wsUrl: string; 
           if (message.method === undefined) return
           const set = listeners.get(message.method)
           if (set === undefined) return
-          const params = typeof message.params === 'object' && message.params !== null ? (message.params as Record<string, unknown>) : {}
-          for (const handler of set) handler(params)
+          const params = cdpParamsSchema.safeParse(message.params)
+          for (const handler of set) handler(params.success ? params.data : {})
         }
       }),
   )
 
-export const listPages = async ({ endpoint }: { readonly endpoint: string }): Promise<CdpPage[]> =>
+const listPages = async ({ endpoint }: { readonly endpoint: string }): Promise<CdpPage[]> =>
   withSpan('annotations list chrome pages', { kind: 'client' }, async span => {
     const response = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(2_000) }).catch(() => {
       span.setStatus('error', 'unavailable')
@@ -137,31 +158,29 @@ export const listPages = async ({ endpoint }: { readonly endpoint: string }): Pr
     }
     const pages: CdpPage[] = []
     for (const entry of targets) {
-      if (typeof entry !== 'object' || entry === null) continue
-      const target = entry as Record<string, unknown>
-      const wsUrl = target.webSocketDebuggerUrl
-      if (target.type !== 'page' || typeof wsUrl !== 'string' || typeof target.id !== 'string') continue
-      const url = typeof target.url === 'string' ? target.url : ''
-      if (!/^(https?|file):/i.test(url)) continue
+      const parsed = pageEntrySchema.safeParse(entry)
+      if (!parsed.success) continue
+      const target = parsed.data
+      if (!/^(https?|file):/i.test(target.url)) continue
       pages.push({
         id: target.id,
-        title: typeof target.title === 'string' && target.title.length > 0 ? target.title : url,
-        url,
-        wsUrl,
+        title: target.title.length > 0 ? target.title : target.url,
+        url: target.url,
+        wsUrl: target.webSocketDebuggerUrl,
       })
     }
     span.setAttribute('dshx.annotations.pages', pages.length)
     return pages
   })
 
-export const endpointOf = ({ port }: { readonly port: number }): string => `http://127.0.0.1:${port}`
+const endpointOf = ({ port }: { readonly port: number }): string => `http://127.0.0.1:${port}`
 
 /**
  * `/json/list` has no "active" flag, so ask each tab whether it holds focus. A
  * browser window that is behind another app reports nothing focused, and then the
  * first page is the sensible default.
  */
-export const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPage[] }): Promise<string | undefined> => {
+const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPage[] }): Promise<string | undefined> => {
   for (const page of pages.slice(0, 20)) {
     const focused = await (async () => {
       let cdp: Cdp
@@ -171,11 +190,13 @@ export const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPag
         return false
       }
       try {
-        const result = (await cdp.send('Runtime.evaluate', {
-          expression: 'document.hasFocus() && document.visibilityState === "visible"',
-          returnByValue: true,
-        })) as { readonly result?: { readonly value?: unknown } }
-        return result.result?.value === true
+        const result = evaluationSchema.safeParse(
+          await cdp.send('Runtime.evaluate', {
+            expression: 'document.hasFocus() && document.visibilityState === "visible"',
+            returnByValue: true,
+          }),
+        )
+        return result.success && result.data.result?.value === true
       } catch {
         return false
       } finally {
@@ -187,7 +208,7 @@ export const focusedPageId = async ({ pages }: { readonly pages: readonly CdpPag
   return undefined
 }
 
-export const choosePage = ({ pages, focusedId }: { readonly pages: readonly CdpPage[]; readonly focusedId?: string }): CdpPage | undefined => {
+const choosePage = ({ pages, focusedId }: { readonly pages: readonly CdpPage[]; readonly focusedId?: string }): CdpPage | undefined => {
   if (focusedId !== undefined) {
     const focused = pages.find(page => page.id === focusedId)
     if (focused !== undefined) return focused
@@ -195,31 +216,30 @@ export const choosePage = ({ pages, focusedId }: { readonly pages: readonly CdpP
   return pages[0]
 }
 
-const parsePick = (payload: unknown): PickOutcome => {
-  if (typeof payload !== 'string') return { ok: false, reason: 'unavailable' }
-  let parsed: unknown
+const pickEnvelopeSchema = z.object({ ok: cdpValueSchema.optional() }).passthrough()
+const pickedSchema = z.object({
+  target: annotationTargetSchema,
+  point: z.object({ x: z.number().catch(0), y: z.number().catch(0) }),
+})
+const parsePick = (payload: CdpValue | undefined): PickOutcome => {
+  const text = z.string().safeParse(payload)
+  if (!text.success) return { ok: false, reason: 'unavailable' }
+  let envelope: z.infer<typeof pickEnvelopeSchema>
   try {
-    parsed = JSON.parse(payload)
+    envelope = pickEnvelopeSchema.parse(JSON.parse(text.data))
   } catch {
     return { ok: false, reason: 'unavailable' }
   }
-  if (typeof parsed !== 'object' || parsed === null) return { ok: false, reason: 'unavailable' }
-  const envelope = parsed as Record<string, unknown>
   if (envelope.ok !== true) return { ok: false, reason: 'cancelled' }
-  const target = annotationTargetSchema.safeParse(envelope.target)
-  const point = envelope.point
-  if (!target.success || typeof point !== 'object' || point === null) return { ok: false, reason: 'unavailable' }
-  const coordinates = point as Record<string, unknown>
-  const x = typeof coordinates.x === 'number' ? coordinates.x : 0
-  const y = typeof coordinates.y === 'number' ? coordinates.y : 0
-  return { ok: true, target: target.data, point: { x, y } }
+  const picked = pickedSchema.safeParse(envelope)
+  return picked.success ? { ok: true, target: picked.data.target, point: picked.data.point } : { ok: false, reason: 'unavailable' }
 }
 
 /**
  * Arms the injected picker on one page and waits for the binding call. The page owns
  * the interaction, so this resolves only when the user clicks or cancels.
  */
-export const pickOnPage = async ({ page, timeoutMs }: { readonly page: CdpPage; readonly timeoutMs: number }): Promise<PickOutcome> => {
+const pickOnPage = async ({ page, timeoutMs }: { readonly page: CdpPage; readonly timeoutMs: number }): Promise<PickOutcome> => {
   let cdp: Cdp
   try {
     cdp = await openCdp({ wsUrl: page.wsUrl })
@@ -251,9 +271,19 @@ export const pickOnPage = async ({ page, timeoutMs }: { readonly page: CdpPage; 
   }
 }
 
-export const dispatchClick = async ({ cdp, x, y }: { readonly cdp: Cdp; readonly x: number; readonly y: number }): Promise<void> => {
+const dispatchClick = async ({ cdp, x, y }: { readonly cdp: Cdp; readonly x: number; readonly y: number }): Promise<void> => {
   const base = { x, y, button: 'left', clickCount: 1 }
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...base })
   await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...base })
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...base })
+}
+
+export class ChromeCdp {
+  static readonly openCdp = openCdp
+  static readonly listPages = listPages
+  static readonly endpointOf = endpointOf
+  static readonly focusedPageId = focusedPageId
+  static readonly choosePage = choosePage
+  static readonly pickOnPage = pickOnPage
+  static readonly dispatchClick = dispatchClick
 }
