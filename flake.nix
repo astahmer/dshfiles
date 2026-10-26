@@ -130,13 +130,13 @@
         packages = [ pkgs.fnm ];
 
         # dsh's native loader probe requires the official Node build. fnm only
-        # prepends its directory to PATH, and mkShell leaves ~/.nix-profile/bin
-        # in front of it, so strip the nix node and put fnm's first.
+        # prepends its directory to PATH, so pin that first. The rest of the
+        # profile bin must stay: jj, secret and direnv live only there, and
+        # dropping the whole directory to hide its node broke every one of them.
         shellHook = ''
           eval "$(fnm env --shell bash)"
           fnm use --install-if-missing --silent-if-unchanged
           if [ -n "''${FNM_DIR:-}" ]; then
-            PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "^$HOME/.nix-profile/bin$" | paste -sd: -)"
             export PATH="$FNM_DIR/bin:$PATH"
           fi
           hash -r 2>/dev/null || true
