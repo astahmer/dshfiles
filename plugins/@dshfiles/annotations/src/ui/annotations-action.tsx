@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query
 import { annotationsApi } from '../api.js'
 import { INGEST_PATH } from '../limits.js'
 import { formatAnnotationBlock } from '../draft.js'
+import { annotationsListPollMs } from '../list-poll.js'
 import type { Annotation } from '../schema.js'
 import { staleAnnotations } from '../stale.js'
 import { annotationsUi } from './state.js'
@@ -49,9 +50,13 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     queryKey: ['annotations', sessionId],
     queryFn: ({ signal }) =>
       runHostRequest({ signal, request: hostSignal => api.list({ sessionId, statuses: [...OPEN_STATUSES], limit: 50 }, { signal: hostSignal }) }),
-    refetchInterval: 4_000,
+    refetchInterval: annotationsListPollMs(open),
+    refetchOnWindowFocus: !open,
     retry: 1,
   })
+  useEffect(() => {
+    if (open) void list.refetch()
+  }, [list.refetch, open])
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
 
