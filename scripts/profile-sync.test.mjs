@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { afterEach, beforeEach, test } from 'node:test'
 
 const script = join(import.meta.dirname, 'profile-sync.ts')
@@ -31,10 +31,14 @@ const writeSeed = bundles =>
     dependencies: Object.fromEntries(bundles.map(name => [`@dshfiles/${name}`, `link:../../plugins/@dshfiles/${name}`])),
     dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', ...bundles.map(name => `@dshfiles/${name}`)] } },
   })
-const sync = (...args) => {
-  const result = spawnSync(process.execPath, [script, '--profile', 'web', '--home', home, '--seed', seedDirectory, ...args], { encoding: 'utf8' })
+const syncWithEnv = (env, ...args) => {
+  const result = spawnSync(process.execPath, [script, '--profile', 'web', '--home', home, '--seed', seedDirectory, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  })
   return { status: result.status, output: `${result.stdout}${result.stderr}` }
 }
+const sync = (...args) => syncWithEnv({}, ...args)
 
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), 'profile-sync-test-')))
@@ -85,6 +89,53 @@ test('adds and removes seed bundles and keeps what the user added', () => {
   assert.equal(next.dependencies['user-plugin'], `link:${join(root, 'user-plugin')}`)
   assert.ok(existsSync(join(profileDirectory(), 'node_modules/@dshfiles/gamma/package.json')))
   assert.equal(readFileSync(join(profileDirectory(), 'cordis.patch.yml'), 'utf8'), `- id: user-entry\n${patchRegion}`)
+})
+
+test('explicitly updates the profile lockfile after seed changes under CI', () => {
+  const first = syncWithEnv({ CI: 'true' })
+  assert.equal(first.status, 0, first.output)
+  const lockfile = join(profileDirectory(), 'pnpm-lock.yaml')
+  const previousLockfile = readFileSync(lockfile, 'utf8')
+  writeSeed(['alpha', 'gamma'])
+
+  const pnpm = process.env.PATH.split(delimiter)
+    .map(directory => join(directory, 'pnpm'))
+    .find(path => existsSync(path))
+  assert.ok(pnpm)
+  const bin = join(root, 'bin')
+  const invocation = join(root, 'pnpm-invocation.json')
+  const wrapper = join(bin, 'pnpm')
+  write(
+    wrapper,
+    `#!${process.execPath}
+const { spawnSync } = require('node:child_process')
+const { readFileSync, writeFileSync } = require('node:fs')
+writeFileSync(${JSON.stringify(invocation)}, JSON.stringify({
+  args: process.argv.slice(2),
+  cwd: process.cwd(),
+  ci: process.env.CI,
+  lock: readFileSync('package.json.lock', 'utf8'),
+}))
+const result = spawnSync(${JSON.stringify(pnpm)}, process.argv.slice(2), { stdio: 'inherit' })
+if (result.error) throw result.error
+process.exit(result.status ?? 1)
+`,
+  )
+  chmodSync(wrapper, 0o700)
+
+  const result = syncWithEnv({ CI: 'true', PATH: `${bin}${delimiter}${process.env.PATH}` })
+  assert.equal(result.status, 0, result.output)
+  const recorded = JSON.parse(readFileSync(invocation, 'utf8'))
+  assert.deepEqual(recorded.args, ['install', '--prefer-offline', '--no-frozen-lockfile'])
+  assert.equal(recorded.cwd, profileDirectory())
+  assert.equal(recorded.ci, 'true')
+  assert.match(recorded.lock, /^\d+\n$/)
+  assert.notEqual(readFileSync(lockfile, 'utf8'), previousLockfile)
+  assert.ok(existsSync(join(profileDirectory(), 'node_modules/@dshfiles/gamma/package.json')))
+  assert.ok(!existsSync(join(profileDirectory(), 'package.json.lock')))
+  const unchanged = syncWithEnv({ CI: 'true' })
+  assert.equal(unchanged.status, 0, unchanged.output)
+  assert.match(unchanged.output, /is up to date/)
 })
 
 test('drops a managed entry the seed no longer has, unless the user changed it', () => {

@@ -33,7 +33,7 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: tooling/dshx/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install the DSHX workspace
         run: pnpm install --frozen-lockfile

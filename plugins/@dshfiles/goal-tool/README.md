@@ -15,7 +15,7 @@ Owned Host fork of DSH's `@deepseek-ai/dsh-tool-goal` package. It replaces the n
 
 This leaves skipped, failed, stale/unknown, or merely queued replies unauthorized. The upstream live-agent, driver, open-turn, root-agent, compare-and-set, goal-round, and blocked-threshold checks remain unchanged. If the `userQuestions` projection is unavailable, the gate fails closed.
 
-The `cordis.patch.yml` disables the native row and inserts this package. The web profile must restart for Host behavior and the profile patch to change.
+Activation is **opt-in**: the checked-in web profile keeps the stock goal tools. To select this replacement in a profile you own, add a local `link:` dependency and include `@dshfiles/goal-tool` in that profile's `dsh.profile.bundles`, then install its dependencies. The `cordis.patch.yml` disables the native row and inserts this package only when the bundle is selected. Applying it requires a user-controlled Host restart; building this repository does not activate it.
 
 ## Updating from DSH
 

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { selectTests } from './test-selection.mjs'
@@ -14,21 +17,86 @@ const summarize = selection => selection.map(({ name, mode }) => ({ name, mode }
 const selectionScript = fileURLToPath(new URL('./test-selection.mjs', import.meta.url))
 
 const dryRun = path => JSON.parse(execFileSync(process.execPath, [selectionScript, 'related', path, '--dry-run'], { encoding: 'utf8' }))
-const dryRunAutoBuild = path =>
-  JSON.parse(execFileSync(process.execPath, [selectionScript, 'related', path, '--dry-run', '--build=auto'], { encoding: 'utf8' }))
+// Run the unchanged CLI from a private repository: its root is derived from import.meta.url.
+// Only zod is linked from the installation; every package and build entry is fixture-owned.
+const buildFixture = t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'test-selection-')))
+  t.after(() => {
+    assert.equal(realpathSync(root), root)
+    rmSync(root, { recursive: true, force: true })
+  })
+  const write = (path, content) => {
+    const target = join(root, path)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, content)
+  }
+  write('package.json', JSON.stringify({ private: true, type: 'module' }))
+  mkdirSync(join(root, 'scripts'))
+  for (const name of ['test-selection.mjs', 'turbo-cache.mjs']) copyFileSync(new URL(name, import.meta.url), join(root, 'scripts', name))
+  mkdirSync(join(root, 'node_modules'))
+  symlinkSync(fileURLToPath(new URL('../node_modules/zod', import.meta.url)), join(root, 'node_modules/zod'), 'dir')
+  write('tooling/dshx/packages/dshx/package.json', JSON.stringify({ name: '@dshfiles/dshx', exports: { '.': { default: './dist/index.js' } } }))
+  for (const [name, dependencies, testSource] of [
+    ['shared-streams', { '@dshfiles/dshx': 'workspace:*' }, "import { value } from './shim'\n"],
+    ['prompt-stash', {}, "import { value } from '../dist/index.js'\n"],
+    ['usage', {}, "import { value } from './command-identifiers'\n"],
+    ['consumer', { '@dshfiles/usage': 'workspace:*' }, "import { value } from '@dshfiles/usage'\n"],
+  ]) {
+    const directory = `plugins/@dshfiles/${name}`
+    write(`${directory}/package.json`, JSON.stringify({ name: `@dshfiles/${name}`, scripts: { test: 'vitest run' }, devDependencies: dependencies }))
+    write(`${directory}/src/value.test.ts`, testSource)
+  }
+  const sourceOnly = 'plugins/@dshfiles/shared-streams/src/shim.ts'
+  write(sourceOnly, 'export const value = 1\n')
+  write('plugins/@dshfiles/prompt-stash/src/host.ts', 'export const value = 1\n')
+  write('plugins/@dshfiles/usage/src/command-identifiers.ts', 'export const value = 1\n')
+  return {
+    sourceOnly,
+    buildDependency: () => write('tooling/dshx/packages/dshx/dist/index.js', 'export {}\n'),
+    dryRun: (path, ...args) =>
+      JSON.parse(
+        execFileSync(process.execPath, [join(root, 'scripts/test-selection.mjs'), 'related', path, '--dry-run', ...args], { cwd: root, encoding: 'utf8' }),
+      ),
+  }
+}
 
-test('auto build is the default and skips source-only related runs', () => {
-  assert.equal(dryRun('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
+test('default and explicit auto build respect cold and warm workspace dependencies', async t => {
+  for (const args of [[], ['--build=auto']]) {
+    await t.test(args[0] ?? 'default', t => {
+      const fixture = buildFixture(t)
+      const cold = fixture.dryRun(fixture.sourceOnly, ...args)
+      assert.deepEqual(cold.packages, [{ name: '@dshfiles/shared-streams', mode: 'related', files: [fixture.sourceOnly] }])
+      assert.deepEqual(cold.build, { required: true, reason: 'unbuilt workspace dependency @dshfiles/dshx' })
+
+      // Add only the fixture dependency's declared export; never build or mutate this checkout.
+      fixture.buildDependency()
+      const warm = fixture.dryRun(fixture.sourceOnly, ...args)
+      assert.deepEqual(warm.packages, cold.packages)
+      assert.deepEqual(warm.build, { required: false, reason: 'related tests import source only' })
+      assert.deepEqual(fixture.dryRun(fixture.sourceOnly, '--build=always').build, { required: true, reason: 'forced' })
+    })
+  }
 })
 
-test('auto build skips source-only related runs and builds dist loaders and full dependents', () => {
-  assert.equal(dryRunAutoBuild('plugins/@dshfiles/shared-streams/src/shim.ts').build.required, false)
+test('auto build still builds dist loaders and full dependents with warm dependencies', t => {
+  const fixture = buildFixture(t)
+  fixture.buildDependency()
+  const dryRunAutoBuild = path => fixture.dryRun(path, '--build=auto')
+  assert.deepEqual(dryRunAutoBuild(fixture.sourceOnly).build, { required: false, reason: 'related tests import source only' })
   const distLoader = dryRunAutoBuild('plugins/@dshfiles/prompt-stash/src/host.ts')
-  assert.equal(distLoader.build.required, true)
-  assert.match(distLoader.build.reason, /loads dist/)
-  const dependent = dryRunAutoBuild('plugins/@dshfiles/usage/src/command-identifiers.ts')
-  assert.equal(dependent.build.required, true)
-  assert.match(dependent.build.reason, /built packages|full suite/)
+  assert.deepEqual(distLoader.build, { required: true, reason: '@dshfiles/prompt-stash test loads dist: plugins/@dshfiles/prompt-stash/src/value.test.ts' })
+  const dependentPath = 'plugins/@dshfiles/usage/src/command-identifiers.ts'
+  const dependent = dryRunAutoBuild(dependentPath)
+  assert.deepEqual(summarize(dependent.packages), [
+    { name: '@dshfiles/usage', mode: 'related' },
+    { name: '@dshfiles/consumer', mode: 'full' },
+  ])
+  assert.deepEqual(dependent.build, { required: true, reason: 'dependent tests load built packages' })
+  assert.deepEqual(dependent.consumers, [{ name: '@dshfiles/consumer', tests: 1, files: ['src/value.test.ts'] }])
+  assert.deepEqual(fixture.dryRun(dependentPath, '--build=auto', '--consumers=full').build, {
+    required: true,
+    reason: '@dshfiles/consumer runs its full suite',
+  })
 })
 
 test('consumer narrowing drops unrelated dependents and keeps bundle-boot tests', () => {

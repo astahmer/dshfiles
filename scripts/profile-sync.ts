@@ -190,7 +190,8 @@ const signalGroup = (processGroupId: number, signal: NodeJS.Signals): void => {
 const installProfile = async (): Promise<void> => {
   const startedAt = Date.now()
   log(`pnpm install in ${profileDirectory}`)
-  const child = spawn('pnpm', ['install', '--prefer-offline'], { cwd: profileDirectory, stdio: 'inherit', detached: true })
+  // Reconciliation changes this profile's manifest, so its lockfile must stay writable even under CI.
+  const child = spawn('pnpm', ['install', '--prefer-offline', '--no-frozen-lockfile'], { cwd: profileDirectory, stdio: 'inherit', detached: true })
   const exited = new Promise<number | null>((resolveExit, rejectExit) => {
     child.once('error', rejectExit)
     child.once('exit', (code, signal) => resolveExit(signal === null ? code : null))

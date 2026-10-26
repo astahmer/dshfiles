@@ -30,7 +30,14 @@ const bundleManifestSchema = z
 const readJson = async (path, schema) => schema.parse(JSON.parse(await readFile(path, 'utf8')))
 const isOwnedPackage = packageId => /^@dshfiles\/[^/]+$/.test(packageId)
 const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0]
-const optInWebBundles = new Set(['@dshfiles/tool-search'])
+// Optional replacements and adjuncts require explicit profile selection, not automatic CI-driven activation.
+const optInWebBundles = new Set([
+  '@dshfiles/agent-preset',
+  '@dshfiles/model-selection',
+  '@dshfiles/loopback-access',
+  '@dshfiles/goal-tool',
+  '@dshfiles/tool-search',
+])
 
 /** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */
 const managedRegion = patch => {
