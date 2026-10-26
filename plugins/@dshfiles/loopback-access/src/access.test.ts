@@ -17,20 +17,6 @@ describe('native listener policy', () => {
     expect(access.status().state).toBe('stopped')
   })
 
-  it('honors LAN-only preferences without opening loopback sockets', async () => {
-    const access = new LoopbackAccess(server('192.0.2.1', 3198), false)
-    await access.start()
-    expect(access.status()).toMatchObject({ state: 'disabled', localhostOrigin: null, listeners: [] })
-    await access.close()
-  })
-
-  it('keeps the native loopback listener authoritative even when the adjunct is disabled', async () => {
-    const access = new LoopbackAccess(server('127.0.0.1', 3198), false)
-    await access.start()
-    expect(access.status()).toMatchObject({ state: 'native-loopback', listeners: [] })
-    await access.close()
-  })
-
   it('does not guess a port before the native listener is ready', async () => {
     const access = new LoopbackAccess(server('192.0.2.1', undefined))
     await expect(access.start()).rejects.toThrow('initialized Web server port')

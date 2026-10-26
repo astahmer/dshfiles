@@ -26,7 +26,7 @@ export default defineHost({
   inject: ['webServer', 'webStartup', 'dshfilesNetworkStartup', 'settings', 'configEditor'],
   apis: [hostApi],
   setup: (ctx: Context) => {
-    const access = new LoopbackAccess(ctx.webServer, ctx.dshfilesNetworkStartup.localhostEnabled)
+    const access = new LoopbackAccess(ctx.webServer)
     ctx.provide('dshfilesLoopbackAccess', access)
     const network = new NetworkController(ctx, access, ctx.dshfilesNetworkStartup)
     runtimes.set(ctx, { access, network })

@@ -55,14 +55,13 @@ const localNetworkAddresses = (): NetworkSnapshot['addresses'] => {
 const preferencesToForm = (preferences: Readonly<NetworkPreferences>, host: string, port: number): NetworkForm => ({
   lanEnabled: preferences.lanEnabled ?? !isLoopbackHost(host),
   bindAddress: preferences.bindAddress ?? (isLoopbackHost(host) ? null : host),
-  localhostEnabled: preferences.localhostEnabled,
+  localhostEnabled: true,
   port: preferences.port ?? port,
 })
 
 const intendedBinding = (form: NetworkForm) => ({
   host: form.lanEnabled ? form.bindAddress : '127.0.0.1',
   port: form.port,
-  localhostEnabled: !form.lanEnabled || form.localhostEnabled,
 })
 
 export class NetworkController {
@@ -132,18 +131,16 @@ export class NetworkController {
         throw new PluginApiError('The selected LAN address is no longer available. Choose a current interface address.', {
           code: 'network-address-unavailable',
         })
-      if (!parsed.lanEnabled && !parsed.localhostEnabled)
-        throw new PluginApiError('Keep localhost access enabled when LAN access is off.', { code: 'network-localhost-required' })
       const preferences = NetworkPreferencesModel.normalize({
         lanEnabled: parsed.lanEnabled,
         bindAddress: parsed.bindAddress,
         port: parsed.port,
-        localhostEnabled: parsed.localhostEnabled,
       })
       signal.throwIfAborted()
       // Every owned field is volatile: only desired preferences change. The
       // upstream startup provider and native listener retain their boot values.
-      await this.#ctx.settings.update(NETWORK_SETTINGS_NAMESPACE, preferences, parsed.expectedRevision)
+      // Replace the owned section so a legacy localhost flag is not persisted again.
+      await this.#ctx.settings.replace(NETWORK_SETTINGS_NAMESPACE, preferences, parsed.expectedRevision)
       return this.snapshot()
     })
     this.#pending = change.catch(() => undefined)

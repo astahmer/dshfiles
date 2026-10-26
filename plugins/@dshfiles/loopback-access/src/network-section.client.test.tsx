@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
 import { networkEnglish, type NetworkTranslate } from './locales.js'
-import type { NetworkSnapshot } from './network-api.js'
+import { networkSnapshotSchema, type NetworkSnapshot } from './network-api.js'
 import { NetworkPreferences, NetworkSection } from './network-section.js'
 
 const unavailableHost = vi.hoisted(() => ({
@@ -71,21 +71,42 @@ afterEach(() => {
 })
 
 describe('Network access preferences', () => {
-  it('remembers an explicit address and forces localhost on when disabling LAN', async () => {
+  it('offers only a LAN switch and keeps localhost enabled across LAN changes', async () => {
     const snapshot = initialSnapshot()
     snapshot.saved.bindAddress = '192.168.1.94'
     const { save } = mount(snapshot)
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(screen.getByRole('switch', { name: 'Localhost access' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('switch', { name: 'Localhost access' })).toBeNull()
+    expect(screen.getAllByRole('switch')).toHaveLength(1)
     fireEvent.click(screen.getByRole('switch', { name: 'LAN access' }))
     expect(screen.getByRole('combobox', { name: 'LAN address' }).textContent).toContain('en0 · 192.168.1.94')
-    fireEvent.click(screen.getByRole('switch', { name: 'Localhost access' }))
-    expect(screen.getByRole('switch', { name: 'Localhost access' }).getAttribute('aria-checked')).toBe('false')
-    fireEvent.click(screen.getByRole('switch', { name: 'LAN access' }))
-    expect(screen.getByRole('switch', { name: 'Localhost access' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByRole('switch', { name: 'Localhost access' })).toBeNull()
+    expect(screen.getAllByRole('switch')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
-      expect(save).toHaveBeenCalledWith({ lanEnabled: false, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 4 }),
+      expect(save).toHaveBeenCalledWith({ lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 4 }),
+    )
+    fireEvent.click(screen.getByRole('switch', { name: 'LAN access' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(save).toHaveBeenLastCalledWith({ lanEnabled: false, bindAddress: '192.168.1.94', localhostEnabled: true, port: 0, expectedRevision: 5 }),
+    )
+  })
+
+  it('can save against an older Host without restoring its localhost opt-out', async () => {
+    const original = initialSnapshot()
+    const snapshot = networkSnapshotSchema.parse({
+      ...original,
+      saved: { ...original.saved, lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: false },
+      active: { ...original.active, localhostEnabled: false },
+    })
+    const { save } = mount(snapshot)
+    expect(snapshot.active.localhostEnabled).toBe(false)
+    expect(screen.queryByRole('switch', { name: 'Localhost access' })).toBeNull()
+    fireEvent.change(screen.getByLabelText('Port'), { target: { value: '4321' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith({ lanEnabled: true, bindAddress: '192.168.1.94', localhostEnabled: true, port: 4321, expectedRevision: 4 }),
     )
   })
 

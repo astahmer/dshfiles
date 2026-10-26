@@ -15,6 +15,12 @@ export const networkQueryKey = ['loopback-access', 'network'] as const
 
 type NetworkSaveInput = NetworkForm & { readonly expectedRevision: number }
 
+const networkDraft = (preferences: NetworkForm) => ({
+  lanEnabled: preferences.lanEnabled,
+  bindAddress: preferences.bindAddress,
+  port: String(preferences.port),
+})
+
 const Row = (props: { readonly label: string; readonly hint: string; readonly htmlFor: string; readonly children: ReactNode }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-4 dshx:py-3">
     <div className="dshx:min-w-0 dshx:flex-1">
@@ -37,11 +43,12 @@ export const NetworkPreferences = (props: {
   const { snapshot, t } = props
   const id = useId()
   const revision = useRef(snapshot.revision)
-  const [initial, setInitial] = useState(() => ({ ...snapshot.saved, port: String(snapshot.saved.port) }))
+  const [initial, setInitial] = useState(() => networkDraft(snapshot.saved))
   const save = useMutation({ mutationFn: (input: NetworkSaveInput) => props.save(input) })
   const readOnly = !snapshot.writable || snapshot.integration !== 'managed' || props.unavailable === true
   const disabled = readOnly || save.isPending
   const draftSchema = networkFormSchema
+    .omit({ localhostEnabled: true })
     .extend({
       port: z.string().refine(value => /^\d+$/u.test(value) && Number(value) <= 65535, t('invalidPort')),
     })
@@ -58,12 +65,13 @@ export const NetworkPreferences = (props: {
       try {
         const result = await save.mutateAsync({
           ...value,
-          localhostEnabled: !value.lanEnabled || value.localhostEnabled,
+          // Older Hosts require this wire field; it is no longer an editable preference.
+          localhostEnabled: true,
           port: Number(value.port),
           expectedRevision: revision.current,
         })
         revision.current = result.revision
-        const next = { ...result.saved, port: String(result.saved.port) }
+        const next = networkDraft(result.saved)
         setInitial(next)
         formApi.reset(next)
       } catch {
@@ -131,7 +139,6 @@ export const NetworkPreferences = (props: {
                   onCheckedChange={enabled => {
                     field.handleChange(enabled)
                     save.reset()
-                    if (!enabled) form.setFieldValue('localhostEnabled', true)
                   }}
                 />
               </Row>
@@ -176,26 +183,6 @@ export const NetworkPreferences = (props: {
                 </form.Field>
               ) : null
             }
-          </form.Subscribe>
-          <form.Subscribe selector={state => state.values.lanEnabled}>
-            {lanEnabled => (
-              <form.Field name="localhostEnabled">
-                {field => (
-                  <Row htmlFor={`${id}-localhost`} label={t('localhostEnabled')} hint={t(lanEnabled ? 'localhostHint' : 'localhostRequired')}>
-                    <Switch
-                      id={`${id}-localhost`}
-                      aria-label={t('localhostEnabled')}
-                      checked={!lanEnabled || field.state.value}
-                      disabled={disabled || !lanEnabled}
-                      onCheckedChange={value => {
-                        field.handleChange(value)
-                        save.reset()
-                      }}
-                    />
-                  </Row>
-                )}
-              </form.Field>
-            )}
           </form.Subscribe>
           <details className="dshx:border-t dshx:border-border dshx:py-3">
             <summary className="dshx:cursor-pointer dshx:text-sm dshx:font-medium">{t('advanced')}</summary>

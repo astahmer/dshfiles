@@ -18,9 +18,11 @@ export const preferencesSchema = z
     lanEnabled: z.boolean().nullable().default(null),
     bindAddress: lanAddressSchema.nullable().default(null),
     port: z.number().int().min(0).max(65535).nullable().default(null),
-    localhostEnabled: z.boolean().default(true),
+    // Read old profiles without retaining an editable localhost preference.
+    localhostEnabled: z.boolean().optional(),
   })
   .strict()
+  .transform(({ lanEnabled, bindAddress, port }) => ({ lanEnabled, bindAddress, port }))
   .superRefine((preferences, context) => {
     if (preferences.lanEnabled === true && preferences.bindAddress === null) {
       context.addIssue({ code: 'custom', path: ['bindAddress'], message: 'Choose an interface address before enabling LAN access.' })
@@ -34,7 +36,6 @@ export interface NetworkStartupValues {
   readonly preferences: Readonly<NetworkPreferences>
   readonly host: string | null
   readonly port: number | null
-  readonly localhostEnabled: boolean
 }
 
 export class NetworkPreferencesModel {
@@ -60,7 +61,6 @@ export class NetworkPreferencesModel {
       preferences,
       host: preferences.lanEnabled === null ? null : preferences.lanEnabled ? preferences.bindAddress : '127.0.0.1',
       port: preferences.port,
-      localhostEnabled: preferences.localhostEnabled,
     })
   }
 }

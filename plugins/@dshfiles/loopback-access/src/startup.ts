@@ -21,7 +21,6 @@ export const Config = schema
       lanEnabled: schema.union([schema.boolean(), schema.const(null)]).default(null),
       bindAddress: schema.union([schema.transform(schema.string(), NetworkPreferencesModel.normalizeLanAddress), schema.const(null)]).default(null),
       port: schema.union([schema.natural().max(65535), schema.const(null)]).default(null),
-      localhostEnabled: schema.boolean().default(true),
     }),
     value => preferencesSchema.parse(value),
   )

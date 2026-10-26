@@ -31,7 +31,11 @@ Given('the isolated LAN-bound localhost-access profile is booted', async ({ page
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/loopback-access'],
     profileLabel: 'loopback-access-lan',
-    cordisPatch: `- id: webserver
+    // A saved value from the retired switch must not remove localhost at boot.
+    cordisPatch: `- id: dshfiles-network-startup
+  config:
+    localhostEnabled: false
+- id: webserver
   config:
     host: ${JSON.stringify(lan)}
     port: !!js ctx.webStartup.port ?? 0
@@ -176,11 +180,14 @@ Given('the isolated managed Network access profile is booted', async ({ page }: 
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/loopback-access', '@dshfiles/settings-shell', '@dshfiles/command-palette'],
     profileLabel: 'network-access-settings',
-    cordisPatch: `- id: web-runtime
+    cordisPatch: `- id: dshfiles-network-startup
+  config:
+    localhostEnabled: false
+- id: web-runtime
   inject: [webStartup]
   config:
     openBrowser: false
-    printUrl: true
+    printUrl: false
     surfaceContext: true
     publicUrl: !!js ${JSON.stringify("'http://127.0.0.1:' + (ctx.webStartup.port ?? 3080) + '/'")}
 `,
@@ -212,10 +219,9 @@ Then('network choices are staged safely and loaded at the next isolated startup'
   await openNetworkSettings(page)
 
   await recordAssertion(page, 'network-access-save-preserves-live-listener-and-connection', async () => {
-    const localhost = page.getByRole('switch', { name: 'Localhost access', exact: true })
-    await expect(localhost).toBeChecked()
-    await expect(localhost).toBeDisabled()
+    await expect(page.getByRole('switch', { name: 'Localhost access', exact: true })).toHaveCount(0)
     await page.getByRole('switch', { name: 'LAN access', exact: true }).click()
+    await expect(page.getByRole('switch', { name: 'Localhost access', exact: true })).toHaveCount(0)
     await page.getByRole('combobox', { name: 'LAN address', exact: true }).click()
     await page.getByRole('option').filter({ hasText: address.address }).click()
     const agent = new Agent({ keepAlive: true, maxSockets: 1 })
@@ -254,13 +260,16 @@ Then('network choices are staged safely and loaded at the next isolated startup'
     const saved = await read()
     const patchPath = join(profile.homeRoot, 'profiles', profile.profile, 'cordis.patch.yml')
     const persisted = await readFile(patchPath, 'utf8')
+    expect(persisted.includes('localhostEnabled')).toBe(false)
     await expect(call('saveNetwork', { ...saved.saved, expectedRevision: before.revision }, AbortSignal.timeout(10_000))).rejects.toThrow()
     await expect(
       call('saveNetwork', { ...saved.saved, bindAddress: '0.0.0.0', expectedRevision: saved.revision }, AbortSignal.timeout(10_000)),
     ).rejects.toThrow()
-    await expect(
-      call('saveNetwork', { ...saved.saved, lanEnabled: false, localhostEnabled: false, expectedRevision: saved.revision }, AbortSignal.timeout(10_000)),
-    ).rejects.toThrow()
+    for (const lanEnabled of [true, false]) {
+      await expect(
+        call('saveNetwork', { ...saved.saved, lanEnabled, localhostEnabled: false, expectedRevision: saved.revision }, AbortSignal.timeout(10_000)),
+      ).rejects.toThrow()
+    }
     const settings = createDshxApiCaller({ origin, cookie, packageId: '@dshfiles/settings-shell', apiId: 'settings-shell', version: 1 })
     await expect(
       settings('set', { namespace: 'dshfiles-network-startup', patch: { lanEnabled: true, bindAddress: null } }, AbortSignal.timeout(10_000)),

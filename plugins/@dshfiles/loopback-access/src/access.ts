@@ -17,10 +17,7 @@ export class LoopbackAccess {
   #closed = false
   #state: LoopbackAccessStatus['state'] = 'starting'
 
-  constructor(
-    server: Pick<WebServer, 'host' | 'port' | 'protocol' | 'getOrigin'>,
-    private readonly enabled = true,
-  ) {
+  constructor(server: Pick<WebServer, 'host' | 'port' | 'protocol' | 'getOrigin'>) {
     this.#server = server
   }
 
@@ -33,10 +30,6 @@ export class LoopbackAccess {
     if (this.#closed) return
     if (isLoopbackHost(this.#server.host)) {
       this.#state = 'native-loopback'
-      return
-    }
-    if (!this.enabled) {
-      this.#state = 'disabled'
       return
     }
     try {

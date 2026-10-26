@@ -4,10 +4,9 @@ import { NetworkPreferencesModel, preferencesSchema } from './network-preference
 describe('network launch preferences', () => {
   it('inherits the native host and port when no preferences are saved', () => {
     expect(NetworkPreferencesModel.startupValues(NetworkPreferencesModel.normalize({}))).toEqual({
-      preferences: { lanEnabled: null, bindAddress: null, port: null, localhostEnabled: true },
+      preferences: { lanEnabled: null, bindAddress: null, port: null },
       host: null,
       port: null,
-      localhostEnabled: true,
     })
   })
 
@@ -19,7 +18,20 @@ describe('network launch preferences', () => {
     const startup = NetworkPreferencesModel.startupValues(
       NetworkPreferencesModel.normalize({ lanEnabled: true, bindAddress, port: 0, localhostEnabled: false }),
     )
-    expect(startup).toMatchObject({ host: bindAddress, port: 0, localhostEnabled: false })
+    expect(startup).toEqual({ host: bindAddress, port: 0, preferences: { lanEnabled: true, bindAddress, port: 0 } })
+  })
+
+  it.each([false, true])('discards legacy localhostEnabled=%s without changing LAN/bind/port', localhostEnabled => {
+    expect(NetworkPreferencesModel.normalize({ lanEnabled: true, bindAddress: '192.0.2.10', port: 3198, localhostEnabled })).toEqual({
+      lanEnabled: true,
+      bindAddress: '192.0.2.10',
+      port: 3198,
+    })
+  })
+
+  it('rejects unknown preferences and malformed legacy flags', () => {
+    expect(preferencesSchema.safeParse({ arbitrary: true }).success).toBe(false)
+    expect(preferencesSchema.safeParse({ localhostEnabled: 'false' }).success).toBe(false)
   })
 
   it('trims an address before persisting it', () => {

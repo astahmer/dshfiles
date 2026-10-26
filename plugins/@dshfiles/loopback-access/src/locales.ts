@@ -5,7 +5,8 @@ export const NETWORK_LOCALE_NAMESPACE = 'dshfiles.loopback-access'
 
 export const networkEnglish = {
   networkAccess: 'Network access',
-  description: 'Choose how this DSH is reachable. Saving stages preferences; it does not restart DSH or change the current connection.',
+  description:
+    'Choose how this DSH is reachable. Localhost access stays enabled. Saving stages preferences; it does not restart DSH or change the current connection.',
   lanEnabled: 'LAN access',
   lanHint: 'Allow other devices to connect through one specific local address.',
   bindAddress: 'LAN address',
@@ -13,9 +14,6 @@ export const networkEnglish = {
   addressSearch: 'Search network addresses',
   noAddresses: 'No network addresses available',
   missingAddress: 'Unavailable saved address',
-  localhostEnabled: 'Localhost access',
-  localhostHint: 'Keep access from this computer through localhost.',
-  localhostRequired: 'Localhost stays enabled while LAN access is off.',
   advanced: 'Advanced',
   port: 'Port',
   portHint: '0 chooses an available port. Otherwise use 1–65535.',
@@ -42,7 +40,7 @@ export const networkEnglish = {
 
 const zh = {
   networkAccess: '网络访问',
-  description: '选择如何访问此 DSH。保存仅记录偏好设置，不会重启 DSH 或改变当前连接。',
+  description: '选择如何访问此 DSH。本机访问始终保持启用。保存仅记录偏好设置，不会重启 DSH 或改变当前连接。',
   lanEnabled: '局域网访问',
   lanHint: '允许其他设备通过指定的本地地址连接。',
   bindAddress: '局域网地址',
@@ -50,9 +48,6 @@ const zh = {
   addressSearch: '搜索网络地址',
   noAddresses: '没有可用的网络地址',
   missingAddress: '已保存的地址不可用',
-  localhostEnabled: '本机访问',
-  localhostHint: '保留通过 localhost 从此计算机访问的能力。',
-  localhostRequired: '关闭局域网访问时，本机访问保持启用。',
   advanced: '高级',
   port: '端口',
   portHint: '0 表示自动选择可用端口；否则请输入 1–65535。',

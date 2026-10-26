@@ -8,7 +8,7 @@
       "summary": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Print the actual localhost launch URL first and the available LAN/advertised addresses after startup settles. Native loopback-only binds remain unchanged.",
       "surfaces": ["host", "integration", "api", "tool"],
       "configuration": [],
-      "states": ["starting", "native-loopback", "forwarding", "disabled", "stopped", "failed"],
+      "states": ["starting", "native-loopback", "forwarding", "stopped", "failed"],
       "failureModes": [
         "An occupied loopback port rejects startup and rolls back listeners instead of taking over another application.",
         "Unavailable IPv6 leaves the IPv4 loopback listener available; other listener failures are not hidden.",
@@ -55,7 +55,7 @@
         { "kind": "automatic", "source": "agent-tool" }
       ],
       "title": "Choose how DSH is reachable",
-      "summary": "Choose LAN access and a concrete interface address, retain or disable localhost, and set an advanced port. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
+      "summary": "Choose LAN access and a concrete interface address, and set an advanced port. Localhost stays enabled independently of LAN access. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Network access\"", "expect switch \"LAN access\""],
       "surfaces": ["client", "host", "settings"],
       "configuration": [
@@ -72,12 +72,6 @@
           "coveredBy": ["loopback-access.network-access-settings"]
         },
         {
-          "key": "localhostEnabled",
-          "defaultValue": "true",
-          "constraints": "LAN-only is allowed; disabling both LAN and localhost is refused by the save API.",
-          "coveredBy": ["loopback-access.network-access-settings"]
-        },
-        {
           "key": "port",
           "defaultValue": "null (inherit profile)",
           "constraints": "0 chooses an available port; explicit ports are whole numbers 1–65535. CLI flags keep priority.",
@@ -88,7 +82,6 @@
         "loading",
         "local-only",
         "lan-and-localhost",
-        "lan-only",
         "pending-restart",
         "cli-overridden",
         "read-only",
@@ -105,6 +98,12 @@
       "externalDependencies": [],
       "verification": [
         { "kind": "gherkin", "id": "loopback-access.network-access-settings", "featureFile": "tooling/dshx/e2e/features/loopback-access.feature" },
+        {
+          "kind": "unit-test",
+          "id": "loopback-access.localhost-required",
+          "file": "plugins/@dshfiles/loopback-access/src/network-section.client.test.tsx",
+          "testName": "offers only a LAN switch and keeps localhost enabled across LAN changes"
+        },
         {
           "kind": "unit-test",
           "id": "loopback-access.network-form",

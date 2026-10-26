@@ -10,8 +10,9 @@ it needs no systemd, launchd, shell utility, fixed LAN IP, or fixed port.
 ## Network access settings
 
 Settings → **Network access** lets you enable LAN access, explicitly choose an
-available interface address, retain or disable localhost, and set an advanced
-port. **Save** stages validated, revision-checked preferences without changing
+available interface address, and set an advanced port. **Localhost stays enabled**
+whether LAN access is on or off; there is no localhost-disable option.
+**Save** stages validated, revision-checked preferences without changing
 active listeners or disconnecting clients. A later user-controlled restart loads
 them. Explicit native `--host` / `--port` flags retain priority. Missing addresses
 stay visible rather than silently selecting a different network; a custom native
@@ -19,6 +20,10 @@ binding remains read-only when startup integration is overridden.
 
 The `network_access_settings` and `network_access_save` tools expose the same
 snapshot and staged write contract. Saving is not permission to restart DSH.
+Legacy saved `localhostEnabled: false` values are ignored at startup and removed
+on the next settings save. The API retains an always-true compatibility field for
+older clients/Hosts, not a setting that can disable access. Active status still
+reports actual availability rather than claiming that a failed listener works.
 No checked-in profile enables this bundle.
 
 ## Behavior
