@@ -4,7 +4,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ChartQuery, type ChartView } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
@@ -44,14 +44,14 @@ const Change = (props: { readonly current: number; readonly previous: number }):
 }
 
 const Breakdown = (props: {
-  readonly title: string
+  readonly heading: string
   readonly rows: ChartView['breakdown']['model']
   readonly onSelect: (key: string) => void
 }): JSX.Element => {
   const top = props.rows.slice(0, 8)
   const max = Math.max(...top.map(row => row.cost), 0)
   return (
-    <Panel title={props.title} description="Select a row to see its requests.">
+    <Panel title={props.heading} description="Select a row to see its requests.">
       {top.length === 0 ? (
         <p className="dshx:text-xs">No requests.</p>
       ) : (
@@ -110,7 +110,9 @@ export const UsageCharts = (props: {
     refetchInterval: 60_000,
     retry: 1,
   })
-  const now = new Date()
+  const [openedAt] = useState(() => Date.now())
+  const sampledAt = charts.dataUpdatedAt || openedAt
+  const now = new Date(sampledAt)
   const jevRange = {
     from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
     to: new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(),
@@ -266,7 +268,7 @@ export const UsageCharts = (props: {
 
   const summary = view.summary
   const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
-  const days = Math.max(1, (Math.min(Date.now(), props.range.to) - props.range.from) / DAY_MS)
+  const days = Math.max(1, (Math.min(sampledAt, props.range.to) - props.range.from) / DAY_MS)
   const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
 
   return (
@@ -340,9 +342,9 @@ export const UsageCharts = (props: {
       </Panel>
 
       <div className="dshx:grid dshx:gap-3 dshx:lg:grid-cols-3">
-        <Breakdown title="Cost per model" rows={view.breakdown.model} onSelect={props.onShowRequests} />
-        <Breakdown title="Cost per provider" rows={view.breakdown.provider} onSelect={props.onShowRequests} />
-        <Breakdown title="Cost per project" rows={view.breakdown.project} onSelect={props.onShowRequests} />
+        <Breakdown heading="Cost per model" rows={view.breakdown.model} onSelect={props.onShowRequests} />
+        <Breakdown heading="Cost per provider" rows={view.breakdown.provider} onSelect={props.onShowRequests} />
+        <Breakdown heading="Cost per project" rows={view.breakdown.project} onSelect={props.onShowRequests} />
       </div>
 
       <div className="dshx:grid dshx:gap-3 dshx:lg:grid-cols-2">

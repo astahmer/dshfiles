@@ -74,8 +74,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
     storedPreferences.set({ ...storedPreferences.get(), ...patch })
   }
   const [logSearch, setLogSearch] = useState('')
-  const now = Math.floor(Date.now() / 60_000) * 60_000
-  const range = rangeOf(preferences, now)
+  const [openedAt] = useState(() => Date.now())
   const purposes = preferences.purposes.length === 0 ? undefined : preferences.purposes
 
   const statusQuery = useQuery({
@@ -92,6 +91,9 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
     },
   })
 
+  // Query completion owns the refresh clock; repeated renders read one stable timestamp.
+  const now = statusQuery.dataUpdatedAt || openedAt
+  const range = rangeOf(preferences, Math.floor(now / 60_000) * 60_000)
   const status = statusQuery.data
   const togglePurpose = (purpose: RequestPurpose): void => {
     const current = new Set(preferences.purposes)
@@ -109,7 +111,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
             Every model request from the session logs, side calls included. Costs are list-price estimates from the models.dev catalog AI Accounts keeps
             {status?.pricingFetchedAt == null
               ? ' (no catalog cached yet)'
-              : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, Date.now(), relativeTime)})`}
+              : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)})`}
             ; subscription traffic is priced as if it were metered.
           </p>
         </div>
@@ -119,7 +121,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
               ? 'Connecting…'
               : status.indexing
                 ? 'Indexing session logs…'
-                : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, Date.now(), relativeTime)}`}`}
+                : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`}
           </span>
           <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending} aria-label="Re-index session logs">
             <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin' : undefined} /> Refresh

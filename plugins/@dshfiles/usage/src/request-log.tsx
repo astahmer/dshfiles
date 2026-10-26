@@ -89,7 +89,8 @@ export const RequestLog = (props: {
     refetchInterval: 30_000,
     retry: 1,
   })
-  const now = Date.now()
+  const [openedAt] = useState(() => Date.now())
+  const now = page.dataUpdatedAt || openedAt
   const onSort = (column: SortColumn): void =>
     setSort(current => (current.column === column ? { column, direction: current.direction === 'desc' ? 'asc' : 'desc' } : { column, direction: 'desc' }))
   const open = (row: RequestView): void => {
