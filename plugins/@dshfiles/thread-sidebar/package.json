@@ -21,6 +21,10 @@
       "types": "./src/attention-api.ts",
       "default": "./dist/attention-api.js"
     },
+    "./attention-client": {
+      "types": "./src/attention-client.ts",
+      "default": "./dist/attention-client.js"
+    },
     "./thread-views-api": {
       "types": "./src/thread-views-api.ts",
       "default": "./dist/thread-views-api.js"

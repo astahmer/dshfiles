@@ -1987,24 +1987,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     refreshAttention()
   }, [isPrimarySurface, refreshAttention, runningSignature])
-  useEffect(() => {
-    if (!isPrimarySurface) return
-    const refresh = (): void => refreshAttention()
-    const onVisibility = (): void => {
-      if (document.visibilityState === 'visible') refresh()
-    }
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', onVisibility)
-    // Another browser can acknowledge a thread at any time; this keeps this tab's list honest.
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refresh()
-    }, 15_000)
-    return () => {
-      window.removeEventListener('focus', refresh)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.clearInterval(timer)
-    }
-  }, [isPrimarySurface, refreshAttention])
+  // The shared attention store owns the page-wide poll and its focus/visibility catch-up, so this
+  // mount only refreshes when the running set changes (the one fact that makes attention stale fast).
   const selectedAttention = selectedSessionId === undefined ? undefined : attention.records.get(selectedSessionId)
   const acknowledgeAttention = attention.acknowledge
   const acknowledgeManualUnread = attention.clearUnread

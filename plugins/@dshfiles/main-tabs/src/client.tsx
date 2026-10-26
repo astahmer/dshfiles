@@ -6,9 +6,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, runHostCommand, useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, runHostCommand, useSettings } from '@dshfiles/dshx/client'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
-import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
+import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
@@ -270,26 +270,10 @@ export default defineClient({
             [byId, workspaceItems],
           )
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
-          // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges.
-          const attention = useApiQuery(threadSidebarAttentionApi, 'state')
-          const attentionRefresh = attention.refetch
-          useEffect(() => {
-            const refresh = (): void => attentionRefresh()
-            const onVisibility = (): void => {
-              if (document.visibilityState === 'visible') refresh()
-            }
-            window.addEventListener('focus', refresh)
-            document.addEventListener('visibilitychange', onVisibility)
-            const timer = window.setInterval(() => {
-              if (document.visibilityState === 'visible') refresh()
-            }, 5_000)
-            return () => {
-              window.removeEventListener('focus', refresh)
-              document.removeEventListener('visibilitychange', onVisibility)
-              window.clearInterval(timer)
-            }
-          }, [attentionRefresh])
-          const attentionSessionIds = useMemo(() => new Set((attention.data?.sessions ?? []).map(record => record.sessionId)), [attention.data])
+          // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
+          // and both read the one page-wide poll instead of each holding their own interval.
+          const attention = useThreadAttention({ enabled: true })
+          const attentionSessionIds = useMemo(() => new Set(attention.views.map(record => record.sessionId)), [attention.views])
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const host = useStripHost()
 

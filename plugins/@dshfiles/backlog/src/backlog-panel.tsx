@@ -1,6 +1,5 @@
-import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
-import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
+import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -550,15 +549,8 @@ export const BacklogPanel = (props: {
   const savedViews = pendingViews ?? storedViews ?? []
   const inboxThreadsMode = settings.value?.inboxThreads ?? 'failures'
   const triageOff = settings.value !== undefined && !settings.value.jevEnabled && (settings.value.triageProvider === '' || settings.value.triageModel === '')
-  const attentionApi = useApi(threadSidebarAttentionApi)
-  const attention = useQuery({
-    queryKey: [BacklogQueries.key, 'thread-attention'],
-    queryFn: async ({ signal }) => (await attentionApi.state(undefined, { signal })).sessions,
-    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 10_000),
-    retry: false,
-    enabled: inboxThreadsMode !== 'off',
-  })
-  const attentionOwnerMissing = isApiOwnerMissing(attention.error)
+  const attention = useThreadAttention({ enabled: inboxThreadsMode !== 'off' })
+  const attentionOwnerMissing = attention.ownerMissing
   const now = list.dataUpdatedAt
   const all = useMemo(() => list.data?.items ?? [], [list.data])
   const items = useMemo(
@@ -572,11 +564,11 @@ export const BacklogPanel = (props: {
     () =>
       inboxThreadsFrom({
         mode: inboxThreadsMode,
-        records: attentionOwnerMissing ? [] : (attention.data ?? []),
+        records: attentionOwnerMissing ? [] : attention.views,
         items: all,
         titles: new Map(props.listThreads().map(thread => [thread.id, thread.title])),
       }),
-    [attention.data, attentionOwnerMissing, all, inboxThreadsMode, props],
+    [attention.views, attentionOwnerMissing, all, inboxThreadsMode, props],
   )
   const inboxEntries = inboxRows({ items: inboxItems, threads: inboxThreads })
   const unread = inboxEntries.filter(
@@ -896,9 +888,7 @@ export const BacklogPanel = (props: {
             openId={openId}
             select={select}
             openThread={props.openThread}
-            acknowledgeThread={thread =>
-              void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
-            }
+            acknowledgeThread={thread => attention.acknowledge(thread.sessionId, thread.version)}
             inspector={inspector}
             loaded={inbox.isSuccess}
             sort={stored.sort.inbox}

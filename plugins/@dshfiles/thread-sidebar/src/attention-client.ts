@@ -1,11 +1,16 @@
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { threadSidebarAttentionApi, type ThreadAttentionMigrationEntry, type ThreadAttentionSnapshot, type ThreadAttentionView } from './attention-api.js'
+import { useApi } from '@dshfiles/dshx/client'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { threadSidebarAttentionApi, type ThreadAttentionMigrationEntry, type ThreadAttentionView } from './attention-api.js'
+import { sharedThreadAttentionStore, threadAttentionViews } from './attention-client-store.js'
 
 export interface ThreadAttentionState {
   /** True once the Host served a snapshot; an older Host without this API leaves attention unavailable. */
   readonly available: boolean
+  /** The loaded Host does not serve this API, so no retry can succeed. */
+  readonly ownerMissing: boolean
   readonly records: ReadonlyMap<string, ThreadAttentionView>
+  /** The same records in Host order, for surfaces that filter or sort them. */
+  readonly views: readonly ThreadAttentionView[]
   readonly acknowledge: (sessionId: string, version: number) => void
   readonly clearUnread: (sessionId: string, version: number) => void
   readonly markUnread: (sessionId: string) => void
@@ -17,51 +22,43 @@ export interface ThreadAttentionState {
 /**
  * Threads the user has not acknowledged yet, read from the Host. Every browser,
  * plugin and CLI shares one record, so acknowledging in one tab clears it everywhere.
+ * Surfaces on the same page share one slow poll through a page-wide store instead of
+ * each adding an interval for the same snapshot.
  */
 export const useThreadAttention = (options: { readonly enabled: boolean }): ThreadAttentionState => {
   const api = useApi(threadSidebarAttentionApi)
-  const query = useApiQuery(threadSidebarAttentionApi, 'state', { enabled: options.enabled })
-  const [snapshot, setSnapshot] = useState<ThreadAttentionSnapshot | null>(null)
-  const revision = useRef(0)
-
-  const adopt = useCallback((next: ThreadAttentionSnapshot) => {
-    if (next.revision < revision.current) return
-    revision.current = next.revision
-    setSnapshot(next)
-  }, [])
+  const store = sharedThreadAttentionStore()
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
 
   useEffect(() => {
-    if (query.data !== undefined) adopt(query.data)
-  }, [adopt, query.data])
-
-  // A write answers with the state it produced; a read that started earlier must not replace it.
-  const mutate = useCallback(
-    async (call: () => Promise<ThreadAttentionSnapshot>): Promise<void> => {
-      adopt(await call())
-    },
-    [adopt],
-  )
+    if (!options.enabled) return
+    return store.attach(api)
+  }, [api, options.enabled, store])
 
   const acknowledge = useCallback(
     (sessionId: string, version: number) => {
-      void mutate(() => api.acknowledge({ sessionId, version })).catch(() => undefined)
+      void store.acknowledge(sessionId, version).catch(() => undefined)
     },
-    [api, mutate],
+    [store],
   )
   const clearUnread = useCallback(
     (sessionId: string, version: number) => {
-      void mutate(() => api.clearUnread({ sessionId, version })).catch(() => undefined)
+      void store.clearUnread(sessionId, version).catch(() => undefined)
     },
-    [api, mutate],
+    [store],
   )
   const markUnread = useCallback(
     (sessionId: string) => {
-      void mutate(() => api.markUnread({ sessionId })).catch(() => undefined)
+      void store.markUnread(sessionId).catch(() => undefined)
     },
-    [api, mutate],
+    [store],
   )
-  const migrate = useCallback((entries: readonly ThreadAttentionMigrationEntry[]) => mutate(() => api.migrate({ entries: [...entries] })), [api, mutate])
+  const migrate = useCallback((entries: readonly ThreadAttentionMigrationEntry[]) => store.migrate(entries), [store])
+  const refresh = useCallback(() => {
+    void store.refresh()
+  }, [store])
 
-  const records = useMemo(() => new Map((snapshot?.sessions ?? []).map(view => [view.sessionId, view])), [snapshot])
-  return { available: snapshot !== null, records, acknowledge, clearUnread, markUnread, migrate, refresh: query.refetch }
+  const views = useMemo(() => threadAttentionViews(state.snapshot), [state.snapshot])
+  const records = useMemo(() => new Map(views.map(view => [view.sessionId, view])), [views])
+  return { available: state.snapshot !== null, ownerMissing: state.ownerMissing, records, views, acknowledge, clearUnread, markUnread, migrate, refresh }
 }
