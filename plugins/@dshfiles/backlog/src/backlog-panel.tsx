@@ -1,5 +1,6 @@
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
-import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
+import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
@@ -129,8 +131,13 @@ const ProjectFilter = (props: {
       trigger={
         <>
           {singleProject !== null ? <ItemGlyphs.ProjectDot project={singleProject} /> : <FolderIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />}
-          <span className="dshx:min-w-0 dshx:truncate dshx:@max-[72rem]:sr-only" title={pathTitle}>
-            {label}
+          <span className="dshx:min-w-0 dshx:truncate dshx:@max-[72rem]:sr-only">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>{label}</span>
+              </TooltipTrigger>
+              <TooltipContent>{pathTitle}</TooltipContent>
+            </Tooltip>
           </span>
         </>
       }
@@ -549,8 +556,15 @@ export const BacklogPanel = (props: {
   const savedViews = pendingViews ?? storedViews ?? []
   const inboxThreadsMode = settings.value?.inboxThreads ?? 'failures'
   const triageOff = settings.value !== undefined && !settings.value.jevEnabled && (settings.value.triageProvider === '' || settings.value.triageModel === '')
-  const attention = useThreadAttention({ enabled: inboxThreadsMode !== 'off' })
-  const attentionOwnerMissing = attention.ownerMissing
+  const attentionApi = useApi(threadSidebarAttentionApi)
+  const attention = useQuery({
+    queryKey: [BacklogQueries.key, 'thread-attention'],
+    queryFn: async ({ signal }) => (await attentionApi.state(undefined, { signal })).sessions,
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 10_000),
+    retry: false,
+    enabled: inboxThreadsMode !== 'off',
+  })
+  const attentionOwnerMissing = isApiOwnerMissing(attention.error)
   const now = list.dataUpdatedAt
   const all = useMemo(() => list.data?.items ?? [], [list.data])
   const items = useMemo(
@@ -564,11 +578,11 @@ export const BacklogPanel = (props: {
     () =>
       inboxThreadsFrom({
         mode: inboxThreadsMode,
-        records: attentionOwnerMissing ? [] : attention.views,
+        records: attentionOwnerMissing ? [] : (attention.data ?? []),
         items: all,
         titles: new Map(props.listThreads().map(thread => [thread.id, thread.title])),
       }),
-    [attention.views, attentionOwnerMissing, all, inboxThreadsMode, props],
+    [attention.data, attentionOwnerMissing, all, inboxThreadsMode, props],
   )
   const inboxEntries = inboxRows({ items: inboxItems, threads: inboxThreads })
   const unread = inboxEntries.filter(
@@ -686,7 +700,8 @@ export const BacklogPanel = (props: {
     )
 
   return (
-    <main
+    <TooltipProvider delayDuration={500}>
+      <main
       ref={panelRoot}
       tabIndex={-1}
       onKeyDown={onKeyDown}
@@ -697,66 +712,71 @@ export const BacklogPanel = (props: {
           {views.map((entry, index) => {
             const Icon = viewIcons[entry]
             return (
-              <button
-                key={entry}
-                type="button"
-                aria-current={view === entry ? 'page' : undefined}
-                title={`${viewLabels[entry]} (${String(index + 1)})`}
-                onClick={() => switchView(entry)}
-                className={cn(
-                  'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:transition-colors',
-                  view === entry ? 'dshx:bg-background dshx:text-foreground dshx:shadow-xs' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
-                )}
-              >
-                <Icon aria-hidden className="dshx:size-3.5" />
-                <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
-                {entry === 'inbox' && inboxEntries.length > 0 ? (
-                  <span
+              <Tooltip key={entry}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-current={view === entry ? 'page' : undefined}
+                    onClick={() => switchView(entry)}
                     className={cn(
-                      'dshx:min-w-4 dshx:rounded-full dshx:px-1 dshx:text-center dshx:text-[10px] dshx:tabular-nums',
-                      unread > 0 ? 'dshx:bg-info dshx:text-white' : 'dshx:bg-muted dshx:text-muted-foreground',
+                      'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:transition-colors',
+                      view === entry ? 'dshx:bg-background dshx:text-foreground dshx:shadow-xs' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
                     )}
                   >
-                    {inboxEntries.length}
-                  </span>
-                ) : null}
-              </button>
+                    <Icon aria-hidden className="dshx:size-3.5" />
+                    <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
+                    {entry === 'inbox' && inboxEntries.length > 0 ? (
+                      <span
+                        className={cn(
+                          'dshx:min-w-4 dshx:rounded-full dshx:px-1 dshx:text-center dshx:text-[10px] dshx:tabular-nums',
+                          unread > 0 ? 'dshx:bg-info dshx:text-white' : 'dshx:bg-muted dshx:text-muted-foreground',
+                        )}
+                      >
+                        {inboxEntries.length}
+                      </span>
+                    ) : null}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{`${viewLabels[entry]} (${String(index + 1)})`}</TooltipContent>
+              </Tooltip>
             )
           })}
         </nav>
         <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <label className="dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
-            <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-            <input
-              ref={searchInput}
-              aria-label="Search backlog"
-              placeholder="Search items, tags, links…"
-              title="Filters this view; press Enter for all results"
-              value={query}
-              onChange={event => {
-                const next = event.currentTarget.value
-                setSearch(scope => SearchScopes.type(scope, next))
-              }}
-              onKeyDown={event => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  setSearch(SearchScopes.submit)
-                  return
-                }
-                if (event.key !== 'Escape') return
-                setSearch(SearchScopes.idle)
-                event.currentTarget.blur()
-              }}
-              className="dshx:w-44 dshx:min-w-0 dshx:bg-transparent dshx:text-xs dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground dshx:@max-pane-compact:w-24"
-            />
-            {query === '' ? (
-              <Kbd className="dshx:@max-pane-compact:hidden">/</Kbd>
-            ) : search.submitted ? null : (
-              <Kbd title="Press Enter for all results" className="dshx:@max-pane-compact:hidden">
-                ↵
-              </Kbd>
-            )}
-          </label>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-input">
+                <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
+                <input
+                  ref={searchInput}
+                  aria-label="Search backlog"
+                  placeholder="Search items, tags, links…"
+                  value={query}
+                  onChange={event => {
+                    const next = event.currentTarget.value
+                    setSearch(scope => SearchScopes.type(scope, next))
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      setSearch(SearchScopes.submit)
+                      return
+                    }
+                    if (event.key !== 'Escape') return
+                    setSearch(SearchScopes.idle)
+                    event.currentTarget.blur()
+                  }}
+                  className="dshx:w-44 dshx:min-w-0 dshx:bg-transparent dshx:text-xs dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground dshx:@max-pane-compact:w-24"
+                />
+                {query === '' ? (
+                  <Kbd className="dshx:@max-pane-compact:hidden">/</Kbd>
+                ) : search.submitted ? null : (
+                  <Kbd className="dshx:@max-pane-compact:hidden">↵</Kbd>
+                )}
+              </label>
+            </TooltipTrigger>
+            <TooltipContent>Filters this view; press Enter for all results</TooltipContent>
+          </Tooltip>
           <SavedViews
             views={savedViews}
             query={query}
@@ -774,14 +794,18 @@ export const BacklogPanel = (props: {
           <ProjectFilter projects={projectFilters} projectPaths={projectPaths} onPick={projects => setPreference({ projects: [...projects], project: null })} />
           {view === 'feed' || view === 'inbox' || view === 'items' ? (
             <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label={`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}
-                title={`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}
-                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground"
-              >
-                <ArrowDownWideNarrowIcon className="dshx:size-3.5" />
-                <span className="dshx:@max-[72rem]:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
-              </DropdownMenuTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger
+                    aria-label={`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}
+                    className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground"
+                  >
+                    <ArrowDownWideNarrowIcon className="dshx:size-3.5" />
+                    <span className="dshx:@max-[72rem]:sr-only">{sort === 'updated' ? 'Last update' : 'Created'}</span>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{`Sort by ${sort === 'updated' ? 'last update' : 'creation date'}`}</TooltipContent>
+              </Tooltip>
               <DropdownMenuContent align="end" className="dshx-root">
                 <DropdownMenuLabel>Sort by</DropdownMenuLabel>
                 <DropdownMenuRadioGroup
@@ -802,20 +826,24 @@ export const BacklogPanel = (props: {
             </DropdownMenu>
           ) : null}
           <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
-          <button
-            type="button"
-            aria-label={showSettings ? 'Backlog views' : 'Backlog settings'}
-            title={showSettings ? 'Back to backlog' : 'Backlog settings'}
-            onClick={() => setShowSettings(value => !value)}
-            aria-pressed={showSettings}
-            className={cn(
-              'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent',
-              showSettings ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
-            )}
-          >
-            <Settings2Icon aria-hidden className="dshx:size-3.5" />
-            <span className="dshx:@max-[72rem]:sr-only">{showSettings ? 'Backlog' : 'Settings'}</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={showSettings ? 'Backlog views' : 'Backlog settings'}
+                onClick={() => setShowSettings(value => !value)}
+                aria-pressed={showSettings}
+                className={cn(
+                  'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent',
+                  showSettings ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+                )}
+              >
+                <Settings2Icon aria-hidden className="dshx:size-3.5" />
+                <span className="dshx:@max-[72rem]:sr-only">{showSettings ? 'Backlog' : 'Settings'}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{showSettings ? 'Back to backlog' : 'Backlog settings'}</TooltipContent>
+          </Tooltip>
           {showSettings ? null : (
             <>
               <span
@@ -829,16 +857,20 @@ export const BacklogPanel = (props: {
               >
                 <LoaderCircleIcon aria-hidden className={cn('dshx:size-3.5', aiWorking && 'dshx:animate-spin')} />
               </span>
-              <button
-                type="button"
-                aria-label="Backfill triage"
-                title="Triage items captured before triage was set up"
-                onClick={() => setBackfillOpen(true)}
-                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-              >
-                <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-                <span className="dshx:@max-[72rem]:sr-only">Backfill</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Backfill triage"
+                    onClick={() => setBackfillOpen(true)}
+                    className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+                  >
+                    <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
+                    <span className="dshx:@max-[72rem]:sr-only">Backfill</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Triage items captured before triage was set up</TooltipContent>
+              </Tooltip>
               <button
                 type="button"
                 onClick={() => startCapture(null)}
@@ -856,124 +888,127 @@ export const BacklogPanel = (props: {
       ) : null}
       <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1">
         {showSettings ? <BacklogSettingsPanel /> : null}
-        {showSettings ? null : showsResults ? (
-          <>
-            <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-              <SearchResults
-                items={all}
-                total={list.data?.total ?? 0}
-                counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
-                statuses={stored.statuses}
-                toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                clearStatuses={() => setPreference({ statuses: [] })}
-                query={debounced}
-                triageOff={triageOff}
-                openId={openId}
-                cursorId={cursorId}
-                select={select}
-                hover={setCursorId}
-                loaded={list.isSuccess}
-                startThread={openStartThread}
-                projectPaths={projectPaths}
-              />
-            </div>
-            {inspector}
-          </>
-        ) : view === 'inbox' ? (
-          <InboxView
-            triageOff={triageOff}
-            items={inboxItems}
-            cursorId={cursorId}
-            threads={inboxThreads}
-            openId={openId}
-            select={select}
-            openThread={props.openThread}
-            acknowledgeThread={thread => attention.acknowledge(thread.sessionId, thread.version)}
-            inspector={inspector}
-            loaded={inbox.isSuccess}
-            sort={stored.sort.inbox}
-            startThread={openStartThread}
-            projectPaths={projectPaths}
-          />
-        ) : (
-          <>
-            <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-              {view === 'feed' && (
-                <FeedView
-                  cursorId={cursorId}
+        {!showSettings &&
+          (showsResults ? (
+            <>
+              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                <SearchResults
+                  items={all}
+                  total={list.data?.total ?? 0}
+                  counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
+                  statuses={stored.statuses}
+                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                  clearStatuses={() => setPreference({ statuses: [] })}
+                  query={debounced}
                   triageOff={triageOff}
-                  items={filteredItems}
-                  sort={stored.sort.feed}
-                  counts={statusTotals}
-                  statuses={stored.statuses}
-                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                  clearStatuses={() => setPreference({ statuses: [] })}
-                  openId={openId}
-                  select={select}
-                  loaded={list.isSuccess}
-                  now={now}
-                  projectPaths={projectPaths}
-                  startThread={openStartThread}
-                  openThread={props.openThread}
-                />
-              )}
-              {view === 'items' && (
-                <ItemsView
-                  items={filteredItems}
-                  sort={stored.sort.items}
-                  counts={statusTotals}
-                  statuses={stored.statuses}
-                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                  clearStatuses={() => setPreference({ statuses: [] })}
                   openId={openId}
                   cursorId={cursorId}
                   select={select}
                   hover={setCursorId}
-                  groupBy={stored.groupBy}
-                  triageOff={triageOff}
-                  setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
-                  collapsed={collapsed}
-                  setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                  captureInto={startCapture}
-                  projectPaths={projectPaths}
-                  startThread={openStartThread}
-                />
-              )}
-              {view === 'board' && (
-                <BoardView
-                  triageOff={triageOff}
-                  items={items}
-                  openId={openId}
-                  cursorId={cursorId}
-                  open={select}
-                  captureInto={startCapture}
-                  projectPaths={projectPaths}
-                  startThread={openStartThread}
-                />
-              )}
-              {view === 'projects' && (
-                <ProjectsView
-                  query={debounced}
-                  matchingProjects={
-                    debounced === ''
-                      ? projectFilters.length === 0
-                        ? null
-                        : new Set(projectFilters.map(project => project ?? ''))
-                      : SearchScopes.matchingProjects(items)
-                  }
-                  triageOff={triageOff}
-                  selectedProject={selectedProject}
-                  setSelectedProject={setSelectedProject}
-                  select={select}
-                  now={now}
+                  loaded={list.isSuccess}
                   startThread={openStartThread}
                   projectPaths={projectPaths}
                 />
-              )}
-            </div>
-            {inspector}
-          </>
-        )}
+              </div>
+              {inspector}
+            </>
+          ) : view === 'inbox' ? (
+            <InboxView
+              triageOff={triageOff}
+              items={inboxItems}
+              cursorId={cursorId}
+              threads={inboxThreads}
+              openId={openId}
+              select={select}
+              openThread={props.openThread}
+              acknowledgeThread={thread =>
+                void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
+              }
+              inspector={inspector}
+              loaded={inbox.isSuccess}
+              sort={stored.sort.inbox}
+              startThread={openStartThread}
+              projectPaths={projectPaths}
+            />
+          ) : (
+            <>
+              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                {view === 'feed' && (
+                  <FeedView
+                    cursorId={cursorId}
+                    triageOff={triageOff}
+                    items={filteredItems}
+                    sort={stored.sort.feed}
+                    counts={statusTotals}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
+                    openId={openId}
+                    select={select}
+                    loaded={list.isSuccess}
+                    now={now}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                    openThread={props.openThread}
+                  />
+                )}
+                {view === 'items' && (
+                  <ItemsView
+                    items={filteredItems}
+                    sort={stored.sort.items}
+                    counts={statusTotals}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
+                    openId={openId}
+                    cursorId={cursorId}
+                    select={select}
+                    hover={setCursorId}
+                    groupBy={stored.groupBy}
+                    triageOff={triageOff}
+                    setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
+                    collapsed={collapsed}
+                    setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'board' && (
+                  <BoardView
+                    triageOff={triageOff}
+                    items={items}
+                    openId={openId}
+                    cursorId={cursorId}
+                    open={select}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'projects' && (
+                  <ProjectsView
+                    query={debounced}
+                    matchingProjects={
+                      debounced === ''
+                        ? projectFilters.length === 0
+                          ? null
+                          : new Set(projectFilters.map(project => project ?? ''))
+                        : SearchScopes.matchingProjects(items)
+                    }
+                    triageOff={triageOff}
+                    selectedProject={selectedProject}
+                    setSelectedProject={setSelectedProject}
+                    select={select}
+                    now={now}
+                    startThread={openStartThread}
+                    projectPaths={projectPaths}
+                  />
+                )}
+              </div>
+              {inspector}
+            </>
+          ))}
       </div>
       {startThreadItems === null ? null : (
         <StartThreadDialog
@@ -1035,6 +1070,7 @@ export const BacklogPanel = (props: {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </TooltipProvider>
   )
 }

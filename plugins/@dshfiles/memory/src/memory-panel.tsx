@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { BarChart3Icon, BrainIcon, ChevronDownIcon, FileTextIcon, MessagesSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -201,6 +202,7 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
     setSelectedNoteId(id)
   }
   return (
+    <TooltipProvider delayDuration={500}>
     <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground">
       <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-3 dshx:px-5 dshx:pt-5 dshx:pb-2">
         <div className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-2xl dshx:bg-primary/10 dshx:text-primary dshx:ring-1 dshx:ring-primary/15">
@@ -210,17 +212,20 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <h1 className="dshx:text-xl dshx:font-semibold dshx:leading-tight">Memory</h1>
             {usage.data === undefined ? null : (
-              <Badge
-                variant="outline"
-                className="dshx:border-transparent dshx:bg-muted dshx:text-[10px] dshx:text-muted-foreground"
-                title={usage.data.retrieval.reason ?? undefined}
-              >
-                {usage.data.retrieval.active === 'hybrid'
-                  ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
-                  : usage.data.retrieval.requested === 'hybrid'
-                    ? 'Retrieval: BM25 (hybrid unavailable)'
-                    : 'Retrieval: BM25'}
-              </Badge>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:inline-flex">
+                    <Badge variant="outline" className="dshx:border-transparent dshx:bg-muted dshx:text-[10px] dshx:text-muted-foreground">
+                      {usage.data.retrieval.active === 'hybrid'
+                        ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
+                        : usage.data.retrieval.requested === 'hybrid'
+                          ? 'Retrieval: BM25 (hybrid unavailable)'
+                          : 'Retrieval: BM25'}
+                    </Badge>
+                  </span>
+                </TooltipTrigger>
+                {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
+              </Tooltip>
             )}
           </div>
           <p className="dshx:text-xs dshx:text-muted-foreground">{subtitleOf(tab)}</p>
@@ -305,5 +310,6 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
         onCreated={noteCreated}
       />
     </main>
+    </TooltipProvider>
   )
 }

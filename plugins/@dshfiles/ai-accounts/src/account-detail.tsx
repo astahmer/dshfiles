@@ -85,7 +85,7 @@ export const AccountDetail = (props: {
               </Button>
             }
             index="03"
-            title="Models"
+            heading="Models"
           >
             <p className="dshx:text-xs dshx:text-muted-foreground">
               Show or hide models in the picker, star the ones you reach for, and pin a default reasoning effort per model.

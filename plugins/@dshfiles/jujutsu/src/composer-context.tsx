@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -23,6 +24,7 @@ import { z } from 'zod'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
+import type { FileStatus } from './api.js'
 import { ComposerContextModel, composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
 import { installChatReferenceLinks } from './chat-reference-links.js'
@@ -129,13 +131,13 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
 
 const basename = (path: string): string => path.replace(/\/+$/, '').split('/').at(-1) ?? path
 
-const STATUS_CLASS: Record<string, string> = {
+const STATUS_CLASS = {
   A: 'dshx:text-success',
   D: 'dshx:text-destructive',
   R: 'dshx:text-warning',
   C: 'dshx:text-warning',
   M: 'dshx:text-muted-foreground',
-}
+} satisfies Record<FileStatus, string>
 
 const BasePicker = (props: { readonly repository: ComposerRepository; readonly base: ComposerBase; readonly onChoose: (base: ComposerBase) => void }) => {
   const [filter, setFilter] = useState('')
@@ -221,134 +223,148 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
   }
 
   return (
-    <div className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs" ref={context.ref} style={ABOVE_STYLE}>
-      <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-1 dshx:py-0.5">
-        <Button
-          aria-expanded={expanded}
-          className="dshx:min-w-0 dshx:shrink dshx:justify-start dshx:overflow-hidden dshx:text-muted-foreground"
-          disabled={fileCount === 0}
-          onClick={() => setExpanded(open => !open)}
-          size="xs"
-          type="button"
-          variant="ghost"
-        >
-          <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
-          <span>·</span>
-          {fileCount === 0 ? (
-            <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}</span>
-          ) : (
-            <>
-              <span>
-                {fileCount} {fileCount === 1 ? 'file' : 'files'}
-                {repository.totals !== null && ','}
-              </span>
-              {repository.totals !== null && (
-                <span className="dshx:font-mono! dshx:tabular-nums">
-                  <span className="dshx:text-success">+{repository.totals.additions}</span>{' '}
-                  <span className="dshx:text-destructive">−{repository.totals.deletions}</span>
+    <TooltipProvider delayDuration={500}>
+      <div className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs" ref={context.ref} style={ABOVE_STYLE}>
+        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-1 dshx:py-0.5">
+          <Button
+            aria-expanded={expanded}
+            className="dshx:min-w-0 dshx:shrink dshx:justify-start dshx:overflow-hidden dshx:text-muted-foreground"
+            disabled={fileCount === 0}
+            onClick={() => setExpanded(open => !open)}
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            <span className="dshx:font-medium dshx:text-foreground">{heading}</span>
+            <span>·</span>
+            {fileCount === 0 ? (
+              <span>{context.base.kind === 'parent' ? 'no working copy changes' : 'no net file changes'}</span>
+            ) : (
+              <>
+                <span>
+                  {fileCount} {fileCount === 1 ? 'file' : 'files'}
+                  {repository.totals !== null && ','}
                 </span>
-              )}
-              <ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />
-            </>
-          )}
-        </Button>
-        <button
-          aria-label={'Review workspace changes: ' + revisionSummary}
-          className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline disabled:dshx:cursor-default disabled:dshx:no-underline disabled:dshx:hover:text-muted-foreground"
-          disabled={(repository.revisionCounts?.ahead ?? 0) === 0}
-          onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
-          type="button"
-        >
-          {revisionSummary}
-        </button>
-        <BasePicker
-          base={context.base}
-          onChoose={next => {
-            context.chooseBase(next)
-            setExpanded(false)
-          }}
-          repository={repository}
-        />
-      </div>
-      {expanded && fileCount > 0 && (
-        <ul className="dshx:max-h-56 dshx:overflow-y-auto dshx:border-t dshx:py-1">
-          {repository.files.map(file => {
-            const counts = countsByPath.get(file.path)
-            const slash = file.path.lastIndexOf('/')
-            return (
-              <li className="dshx:group dshx:flex dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-0.5 dshx:hover:bg-accent" key={file.path}>
-                <span className={cn('dshx:w-3 dshx:flex-none dshx:font-mono! dshx:font-semibold', STATUS_CLASS[file.status])}>{file.status}</span>
-                <button
-                  className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-baseline dshx:gap-1.5 dshx:text-left"
-                  onClick={() => setFullDiffPath(file.path)}
-                  title={file.path}
-                  type="button"
-                >
-                  <span className="dshx:truncate dshx:text-foreground">{file.path.slice(slash + 1)}</span>
-                  {slash > 0 && <span className="dshx:truncate dshx:text-muted-foreground">{file.path.slice(0, slash)}</span>}
-                </button>
-                {counts !== undefined && (
-                  <span className="dshx:flex-none dshx:font-mono! dshx:tabular-nums">
-                    <span className="dshx:text-success">+{counts.additions}</span> <span className="dshx:text-destructive">−{counts.deletions}</span>
+                {repository.totals !== null && (
+                  <span className="dshx:font-mono! dshx:tabular-nums">
+                    <span className="dshx:text-success">+{repository.totals.additions}</span>{' '}
+                    <span className="dshx:text-destructive">−{repository.totals.deletions}</span>
                   </span>
                 )}
-                <Button
-                  aria-label={'Open diff of ' + file.path}
-                  onClick={() => setFullDiffPath(file.path)}
-                  size="icon-xs"
-                  title="Open diff"
-                  type="button"
-                  variant="ghost"
-                >
-                  <FileDiffIcon />
-                </Button>
-                <Button
-                  aria-label={'Open ' + file.path}
-                  disabled={file.status === 'D'}
-                  onClick={() => openFile(file.path)}
-                  size="icon-xs"
-                  title="Open file"
-                  type="button"
-                  variant="ghost"
-                >
-                  <FileCodeIcon />
-                </Button>
-              </li>
-            )
-          })}
-          {repository.filesTruncated && <li className="dshx:px-2 dshx:py-0.5 dshx:text-muted-foreground">More files are not listed.</li>}
-        </ul>
-      )}
-      {fullDiffPath !== undefined && (
-        <FullDiffDialog
-          error={diffQuery.isError ? 'Could not load the diff.' : null}
-          focusPath={fullDiffPath}
-          layout="unified"
-          onClose={() => setFullDiffPath(undefined)}
-          onOpenInEditor={path => {
-            if (openInEditor({ path, cwd: repository.root })) setFullDiffPath(undefined)
-          }}
-          patch={diffQuery.data?.patch}
-          title={heading + ' · ' + basename(repository.root)}
-          truncated={diffQuery.data?.truncated ?? false}
-        />
-      )}
-    </div>
+                <ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />
+              </>
+            )}
+          </Button>
+          <button
+            aria-label={'Review workspace changes: ' + revisionSummary}
+            className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline disabled:dshx:cursor-default disabled:dshx:no-underline disabled:dshx:hover:text-muted-foreground"
+            disabled={(repository.revisionCounts?.ahead ?? 0) === 0}
+            onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
+            type="button"
+          >
+            {revisionSummary}
+          </button>
+          <BasePicker
+            base={context.base}
+            onChoose={next => {
+              context.chooseBase(next)
+              setExpanded(false)
+            }}
+            repository={repository}
+          />
+        </div>
+        {expanded && fileCount > 0 && (
+          <ul className="dshx:max-h-56 dshx:overflow-y-auto dshx:border-t dshx:py-1">
+            {repository.files.map(file => {
+              const counts = countsByPath.get(file.path)
+              const slash = file.path.lastIndexOf('/')
+              return (
+                <li className="dshx:group dshx:flex dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-0.5 dshx:hover:bg-accent" key={file.path}>
+                  <span className={cn('dshx:w-3 dshx:flex-none dshx:font-mono! dshx:font-semibold', STATUS_CLASS[file.status])}>{file.status}</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-baseline dshx:gap-1.5 dshx:text-left"
+                        onClick={() => setFullDiffPath(file.path)}
+                        type="button"
+                      >
+                        <span className="dshx:truncate dshx:text-foreground">{file.path.slice(slash + 1)}</span>
+                        {slash > 0 && <span className="dshx:truncate dshx:text-muted-foreground">{file.path.slice(0, slash)}</span>}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{file.path}</TooltipContent>
+                  </Tooltip>
+                  {counts !== undefined && (
+                    <span className="dshx:flex-none dshx:font-mono! dshx:tabular-nums">
+                      <span className="dshx:text-success">+{counts.additions}</span> <span className="dshx:text-destructive">−{counts.deletions}</span>
+                    </span>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button aria-label={'Open diff of ' + file.path} onClick={() => setFullDiffPath(file.path)} size="icon-xs" type="button" variant="ghost">
+                        <FileDiffIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Open diff</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={'Open ' + file.path}
+                        disabled={file.status === 'D'}
+                        onClick={() => openFile(file.path)}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <FileCodeIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Open file</TooltipContent>
+                  </Tooltip>
+                </li>
+              )
+            })}
+            {repository.filesTruncated && <li className="dshx:px-2 dshx:py-0.5 dshx:text-muted-foreground">More files are not listed.</li>}
+          </ul>
+        )}
+        {fullDiffPath !== undefined && (
+          <FullDiffDialog
+            error={diffQuery.isError ? 'Could not load the diff.' : null}
+            focusPath={fullDiffPath}
+            heading={heading + ' · ' + basename(repository.root)}
+            layout="unified"
+            onClose={() => setFullDiffPath(undefined)}
+            onOpenInEditor={path => {
+              if (openInEditor({ path, cwd: repository.root })) setFullDiffPath(undefined)
+            }}
+            patch={diffQuery.data?.patch}
+            truncated={diffQuery.data?.truncated ?? false}
+          />
+        )}
+      </div>
+    </TooltipProvider>
   )
 }
 
-const Chip = (props: { readonly title: string; readonly onClick: () => void; readonly className?: string; readonly children: ReactNode }) => (
-  <button
-    className={cn(
-      'dshx:flex dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-1 dshx:whitespace-nowrap dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:hover:bg-accent dshx:hover:text-foreground dshx:[&_svg]:size-3 dshx:[&_svg]:flex-none',
-      props.className,
-    )}
-    onClick={props.onClick}
-    title={props.title}
-    type="button"
-  >
-    {props.children}
-  </button>
+const Chip = (props: { readonly tooltip: string; readonly onClick: () => void; readonly className?: string; readonly children: ReactNode }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        className={cn(
+          'dshx:flex dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-1 dshx:whitespace-nowrap dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:hover:bg-accent dshx:hover:text-foreground dshx:[&_svg]:size-3 dshx:[&_svg]:flex-none',
+          props.className,
+        )}
+        onClick={props.onClick}
+        type="button"
+      >
+        {props.children}
+      </button>
+    </TooltipTrigger>
+    <TooltipContent className="dshx:whitespace-pre-line" side="bottom">
+      {props.tooltip}
+    </TooltipContent>
+  </Tooltip>
 )
 
 /** One contextual chip below the composer; it opens the Jujutsu panel for this repository. */
@@ -396,17 +412,19 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
     .filter((value): value is string => value !== undefined)
     .join('\n')
   return (
-    <div
-      className="dshx-root dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
-      ref={context.ref}
-    >
-      <Chip className="dshx:max-w-full dshx:shrink" onClick={toggle} title={title}>
-        <FolderIcon />
-        <span className="dshx:min-w-0 dshx:truncate">{project}</span>
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-foreground">({label})</span>
-        {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
-      </Chip>
-    </div>
+    <TooltipProvider delayDuration={500}>
+      <div
+        className="dshx-root dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
+        ref={context.ref}
+      >
+        <Chip className="dshx:max-w-full dshx:shrink" onClick={toggle} tooltip={title}>
+          <FolderIcon />
+          <span className="dshx:min-w-0 dshx:truncate">{project}</span>
+          <span className="dshx:min-w-0 dshx:truncate dshx:text-foreground">({label})</span>
+          {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
+        </Chip>
+      </div>
+    </TooltipProvider>
   )
 }
 
@@ -434,17 +452,23 @@ export const ConversationHeaderToggle = (props: ComposerSlotProps & { readonly i
   if (repository === null) return null
   const label = 'Toggle Jujutsu on ' + basename(repository.root)
   return (
-    <Button
-      aria-label={label}
-      className="dshx-root dshx:text-muted-foreground"
-      onClick={() => props.jujutsu.toggleJujutsu(repository.root)}
-      ref={context.ref}
-      size="icon-sm"
-      title={label + ' (' + repository.root + ')'}
-      type="button"
-      variant="ghost"
-    >
-      {props.icon}
-    </Button>
+    <TooltipProvider delayDuration={500}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            aria-label={label}
+            className="dshx-root dshx:text-muted-foreground"
+            onClick={() => props.jujutsu.toggleJujutsu(repository.root)}
+            ref={context.ref}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            {props.icon}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{label + ' (' + repository.root + ')'}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

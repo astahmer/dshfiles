@@ -47,11 +47,11 @@ const breakdownQuery = (client: BoardsClient, board: BuiltinBoard, windowMinutes
 
 const numeric = 'dshx:text-right dshx:font-mono dshx:text-xs'
 
-const HEADER_KEYS: Partial<Record<BoardColumn, TracesAlertsKey>> = { count: 'count', errorRate: 'errorRate', measure: 'ttft' }
-
 const headerOf = (column: BoardColumn, t: TracesAlertsTranslate): string => {
-  const key = HEADER_KEYS[column]
-  return key === undefined ? column : t(key)
+  if (column === 'count') return t('count')
+  if (column === 'errorRate') return t('errorRate')
+  if (column === 'measure') return t('ttft')
+  return column
 }
 
 const cellOf = (column: BoardColumn, row: BreakdownRow): string => {

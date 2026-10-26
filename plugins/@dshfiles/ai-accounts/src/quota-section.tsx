@@ -31,7 +31,7 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
         </>
       }
       index="04"
-      title="Quota"
+      heading="Quota"
     >
       <UsageCardView now={usage?.readAt ?? 0} usage={usage?.cards.find(card => card.instanceId === selected?.instanceId)?.usage} />
       <QuotaHistoryChart

@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import type { ToolMetaTranslate } from './locales.js'
 
@@ -69,9 +70,9 @@ export class ToolTimingModel {
   static readonly waitTimerOf = (owner: WaitTimerOwner, now: number): WaitTimer | undefined => {
     const parsedOwner = waitCallOwnerSchema.safeParse(owner)
     if (!parsedOwner.success) return undefined
-    let rawArguments: unknown
+    let rawArguments: JsonValue
     try {
-      rawArguments = JSON.parse(parsedOwner.data.block.argsRaw)
+      rawArguments = decodeJson(jsonValueSchema, parsedOwner.data.block.argsRaw)
     } catch {
       return undefined
     }

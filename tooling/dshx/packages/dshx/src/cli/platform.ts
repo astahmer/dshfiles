@@ -4,6 +4,8 @@ import type { Writable } from 'node:stream'
 import { promisify } from 'node:util'
 import semver from 'semver'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonObject } from '../json.js'
 import type { CliArgs } from './args.js'
 import { renderCliUsage } from './usage.js'
 import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient, DshPlatformLaunchUrl } from '../platform/client.js'
@@ -258,21 +260,14 @@ function overlapsSecretPath(path: readonly string[], secretPath: readonly string
   return path.slice(0, commonLength).every((segment, index) => segment === secretPath[index])
 }
 
-function isJsonObject(value: JsonValue | undefined): value is { readonly [key: string]: JsonValue } {
+function isJsonObject(value: JsonValue | undefined): value is JsonObject {
   return value !== undefined && value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-function asJsonValue(value: unknown): JsonValue {
-  const result = z.json().safeParse(value)
-  if (!result.success) throw new DshPlatformError('invalid-json-value', 'config set requires a valid JSON value.')
-  return result.data
 }
 
 function parseJsonInput(value: string): JsonValue {
   try {
-    return asJsonValue(JSON.parse(value))
-  } catch (error) {
-    if (error instanceof DshPlatformError) throw error
+    return decodeJson(jsonValueSchema, value)
+  } catch {
     throw new DshPlatformError('invalid-json-value', 'config set requires a valid JSON value.')
   }
 }

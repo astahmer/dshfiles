@@ -1,6 +1,7 @@
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshCommandRunner, ProfileOrchestratorOptions, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
+import type { JsonObject } from '../json.js'
 
 export type InspectTarget = 'slots' | 'tools' | 'services' | 'events'
 
@@ -14,27 +15,27 @@ export interface SlotSummary {
   readonly provider?: string
   readonly kind?: string
   readonly scope?: string
-  readonly metadata?: Readonly<Record<string, unknown>>
+  readonly metadata?: JsonObject
 }
 
 export interface ToolSummary {
   readonly name: string
   readonly provider?: string
   readonly description?: string
-  readonly metadata?: Readonly<Record<string, unknown>>
+  readonly metadata?: JsonObject
 }
 
 export interface ServiceSummary {
   readonly name: string
   readonly provider?: string
   readonly scope?: string
-  readonly metadata?: Readonly<Record<string, unknown>>
+  readonly metadata?: JsonObject
 }
 
 export interface EventSummary {
   readonly name: string
   readonly provider?: string
-  readonly metadata?: Readonly<Record<string, unknown>>
+  readonly metadata?: JsonObject
 }
 
 export interface InspectProvider {

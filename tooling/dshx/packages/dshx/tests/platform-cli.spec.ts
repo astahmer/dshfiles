@@ -1,4 +1,5 @@
 import { PassThrough } from 'node:stream'
+import type { JsonValue } from '../src/json.js'
 import { z } from 'zod'
 import { describe, expect, it, vi } from 'vitest'
 import { parseCliArgs } from '../src/cli/args.js'
@@ -770,7 +771,7 @@ describe('DSH platform CLI', () => {
       readonly method: string
       readonly args: Parameters<DshPlatformTransport['rpc']>[2]
     }[] = []
-    let resolveInstall: ((result: unknown) => void) | undefined
+    let resolveInstall: ((result: PromiseLike<JsonValue> | JsonValue) => void) | undefined
     const client = clientWith(async (namespace, method, args) => {
       calls.push({ namespace, method, args })
       if (namespace === 'pluginManager' && method === 'installBundle')

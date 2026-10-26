@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 
 const dshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const workspacePolicyPath = join(dshxRoot, 'scratch-pnpm-policy.yaml')
@@ -102,7 +103,7 @@ export const createScratchProfile = async (options: ScratchProfileOptions): Prom
 
   try {
     const sourceText = await readFile(join(sourceRoot, 'package.json'), 'utf8')
-    const sourceData: unknown = JSON.parse(sourceText)
+    const sourceData = decodeJson(jsonValueSchema, sourceText)
     const parsedSource = sourceManifestSchema.safeParse(sourceData)
     if (!parsedSource.success) throw new Error('The E2E source profile package.json has an invalid shape.')
 

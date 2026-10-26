@@ -5,6 +5,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowUpRightIcon, BookOpenIcon, CheckIcon, CopyIcon, MessageSquareIcon, SearchIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
@@ -40,9 +41,9 @@ const copyTextOf = (card: PreviewCard | undefined): string => {
   return card.summary
 }
 
-const SectionHeading = (props: { readonly title: string; readonly trailing?: string }): JSX.Element => (
+const SectionHeading = (props: { readonly heading: string; readonly trailing?: string }): JSX.Element => (
   <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-    <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.title}</h4>
+    <h4 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{props.heading}</h4>
     {props.trailing === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{props.trailing}</span>}
   </div>
 )
@@ -75,7 +76,7 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
       </div>
 
       <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
-        <SectionHeading title="Source & evidence" trailing={`${String(props.note.citations)} citation${props.note.citations === 1 ? '' : 's'}`} />
+        <SectionHeading heading="Source & evidence" trailing={`${String(props.note.citations)} citation${props.note.citations === 1 ? '' : 's'}`} />
         {props.note.sourceThread === null ? (
           <p className="dshx:rounded-xl dshx:border dshx:border-dashed dshx:border-border dshx:p-3 dshx:text-xs dshx:text-muted-foreground">
             No source thread: {originLabels[props.note.origin]}.
@@ -90,13 +91,17 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
       </section>
 
       <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Metadata">
-        <SectionHeading title="Metadata" />
+        <SectionHeading heading="Metadata" />
+        <TooltipProvider delayDuration={500}>
         <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
           <div className="dshx:flex dshx:flex-col">
             <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
-            <dd className="dshx:truncate" title={props.note.project}>
-              {PanelFormat.projectName(props.note.project)}
-            </dd>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <dd className="dshx:truncate">{PanelFormat.projectName(props.note.project)}</dd>
+              </TooltipTrigger>
+              <TooltipContent>{props.note.project}</TooltipContent>
+            </Tooltip>
           </div>
           <div className="dshx:flex dshx:flex-col">
             <dt className="dshx:text-[11px] dshx:text-muted-foreground">Type</dt>
@@ -119,6 +124,7 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
             <dd>{PanelFormat.formatStamp(props.note.updatedAt)}</dd>
           </div>
         </dl>
+        </TooltipProvider>
         {props.note.status === 'valid' ? null : (
           <p className="dshx:text-[11px] dshx:text-muted-foreground">
             {noteStatusLabels[props.note.status]}
@@ -252,23 +258,28 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
       {props.thread.source === 'model' ? 'Written by a cheap model from the thread transcript.' : 'Built from the thread record without a model call.'}
     </p>
     <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Source and evidence">
-      <SectionHeading title="Source & evidence" trailing={`${String(props.thread.citations)} citation${props.thread.citations === 1 ? '' : 's'}`} />
+      <SectionHeading heading="Source & evidence" trailing={`${String(props.thread.citations)} citation${props.thread.citations === 1 ? '' : 's'}`} />
       <ThreadLink sessionId={props.thread.id} onOpenThread={props.onOpenThread} />
     </section>
     <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Metadata">
-      <SectionHeading title="Metadata" />
+      <SectionHeading heading="Metadata" />
+      <TooltipProvider delayDuration={500}>
       <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
         <div className="dshx:flex dshx:flex-col">
           <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
-          <dd className="dshx:truncate" title={props.thread.project}>
-            {PanelFormat.projectName(props.thread.project)}
-          </dd>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <dd className="dshx:truncate">{PanelFormat.projectName(props.thread.project)}</dd>
+            </TooltipTrigger>
+            <TooltipContent>{props.thread.project}</TooltipContent>
+          </Tooltip>
         </div>
         <div className="dshx:flex dshx:flex-col">
           <dt className="dshx:text-[11px] dshx:text-muted-foreground">Digested</dt>
           <dd>{props.thread.digestedAt === null ? 'not yet' : PanelFormat.formatStamp(props.thread.digestedAt)}</dd>
         </div>
       </dl>
+      </TooltipProvider>
     </section>
   </div>
 )

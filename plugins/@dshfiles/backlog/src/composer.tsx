@@ -119,7 +119,7 @@ const ReferenceDialog = (props: {
   })
   const title = props.mode === 'item' ? 'Link a backlog item' : 'Link a thread'
   return (
-    <CommandDialog open={open} onOpenChange={next => (next ? undefined : props.onClose())} title={title} description="Search by name">
+    <CommandDialog open={open} onOpenChange={next => (next ? undefined : props.onClose())} heading={title} description="Search by name">
       <CommandInput
         placeholder="Search by title…"
         value={query}

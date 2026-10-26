@@ -19,6 +19,8 @@ import { zstdDecompressSync } from 'node:zlib'
 import { Context } from '@deepseek-ai/cordis'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
+
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite')
 
 const LOG_NAME = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/
@@ -102,7 +104,7 @@ const readHeaderLine = async path => {
     if (first === undefined) throw new Error(`no complete Zstandard frame in the first ${HEADER_BYTES} bytes of ${path}`)
     const text = zstdDecompressSync(view.subarray(first.start, first.end)).toString('utf8')
     const newline = text.indexOf('\n')
-    return JSON.parse(newline < 0 ? text : text.slice(0, newline))
+    return decodeJson(jsonObjectSchema, newline < 0 ? text : text.slice(0, newline))
   } finally {
     await handle.close()
   }
@@ -173,12 +175,12 @@ const parseLog = async (path, record) => {
   const decodeMs = Date.now() - decodeStartedAt
   const parseStartedAt = Date.now()
   const lines = plain.split('\n')
-  const header = JSON.parse(lines[0] ?? '{}')
+  const header = decodeJson(jsonObjectSchema, lines[0] ?? '{}')
   const events = []
   for (const line of lines.slice(1)) {
     if (line.length === 0) continue
     try {
-      events.push(JSON.parse(line))
+      events.push(decodeJson(jsonObjectSchema, line))
     } catch {
       break
     }
@@ -369,7 +371,7 @@ const startExternalProbe = async socketPath => {
       await new Promise(resolve => server.close(resolve))
       await rm(socketPath, { force: true })
       try {
-        return JSON.parse(output)
+        return decodeJson(jsonObjectSchema, output)
       } catch {
         return { error: 'the external probe produced no reading' }
       }

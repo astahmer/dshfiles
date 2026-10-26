@@ -4136,7 +4136,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       key={`${thread.runtimeId}:${thread.sessionId}`}
       runtimeId={thread.runtimeId}
       sessionId={thread.sessionId}
-      title={thread.title}
+      label={thread.title}
       cwd={thread.cwd}
       hostName={thread.hostName}
       connected={thread.connected}
@@ -4869,7 +4869,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         headerClassName={stickyHeaderClass}
                         onOpen={props.openRemoteThreads}
                         onOpenSession={props.openRemoteSession}
-                        title={props.tSidebar('threadSidebarSectionReorderHint')}
+                        hint={props.tSidebar('threadSidebarSectionReorderHint')}
                         keepEmpty
                         onHeaderRef={element => {
                           sectionHeaderRefs.current[index] = element

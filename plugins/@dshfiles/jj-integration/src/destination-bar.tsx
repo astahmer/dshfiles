@@ -5,6 +5,7 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
@@ -277,78 +278,99 @@ export const DestinationBar = (props: {
 
   return (
     // display: contents makes each chip an item of the native row, so the host chip can lead it.
-    <div className="dshx-root dshx:contents" aria-label={t('destination')}>
-      <HostChipSlot />
-      {toggle.busy ? (
-        // Order 0 keeps it right after the native folder chip, which it stands in for until the switch lands.
-        <span
-          data-pending=""
-          role="status"
-          aria-label={toggle.pending?.name ?? t('switchingDestination')}
-          className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:font-mono! dshx:text-xs dshx:text-muted-foreground"
-          style={{ order: 0 }}
-        >
-          <Spinner className="dshx:size-3.5" />
-          {toggle.pending?.name ?? t('switchingDestination')}
-        </span>
-      ) : null}
-      {isJj ? (
-        <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
-          <Popover open={branchOpen} onOpenChange={setBranchOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" className={chip} disabled={toggle.busy} title={isolated ? undefined : t('bookmarkIsolates')}>
-                <GitBranchIcon className="dshx:size-3.5" />
-                {current?.bookmark ?? '—'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="dshx:w-72 dshx:p-0">
-              <Command>
-                <CommandInput placeholder={t('searchBookmarks')} />
-                <CommandList>
-                  <CommandEmpty>{t('noBookmarks')}</CommandEmpty>
-                  {(current?.bookmarks ?? []).map(name => (
-                    <CommandItem
-                      key={name}
-                      value={name}
-                      onSelect={() => {
-                        setBranchOpen(false)
-                        move({ isolate: true, base: name })
-                      }}
-                    >
-                      <span className="dshx:flex-1 dshx:truncate">{name}</span>
-                      {name === current?.bookmark ? <CheckIcon className="dshx:size-3.5" /> : null}
-                    </CommandItem>
-                  ))}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:border-l dshx:px-2 dshx:text-sm" title={t('isolateHint')}>
-            <Checkbox
-              checked={isolated}
-              disabled={toggle.busy}
-              onCheckedChange={checked => {
-                const isolate = checked === true
-                if (current === undefined || current.bookmark === null) {
-                  move({ isolate })
-                  return
-                }
-                move({ isolate, base: current.bookmark })
-              }}
-            />
-            {t('workspace')}
-          </label>
-        </span>
-      ) : null}
-      {newThreadId !== null && destination.isError ? (
-        <span role="alert" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-destructive">
-          {t('workspaceDestinationUnavailable')}
-          <Button variant="link" size="sm" onClick={() => void destination.refetch()}>
-            {t('retryDestination')}
-          </Button>
-        </span>
-      ) : null}
-      {toggle.error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
-    </div>
+    <TooltipProvider>
+      <div className="dshx-root dshx:contents" aria-label={t('destination')}>
+        <HostChipSlot />
+        {toggle.busy ? (
+          // Order 0 keeps it right after the native folder chip, which it stands in for until the switch lands.
+          <span
+            data-pending=""
+            role="status"
+            aria-label={toggle.pending?.name ?? t('switchingDestination')}
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:bg-muted dshx:px-2 dshx:font-mono! dshx:text-xs dshx:text-muted-foreground"
+            style={{ order: 0 }}
+          >
+            <Spinner className="dshx:size-3.5" />
+            {toggle.pending?.name ?? t('switchingDestination')}
+          </span>
+        ) : null}
+        {isJj ? (
+          <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
+            <Popover open={branchOpen} onOpenChange={setBranchOpen}>
+              {isolated ? (
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className={chip} disabled={toggle.busy}>
+                    <GitBranchIcon className="dshx:size-3.5" />
+                    {current?.bookmark ?? '—'}
+                  </Button>
+                </PopoverTrigger>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" className={chip} disabled={toggle.busy}>
+                        <GitBranchIcon className="dshx:size-3.5" />
+                        {current?.bookmark ?? '—'}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('bookmarkIsolates')}</TooltipContent>
+                </Tooltip>
+              )}
+              <PopoverContent align="start" className="dshx:w-72 dshx:p-0">
+                <Command>
+                  <CommandInput placeholder={t('searchBookmarks')} />
+                  <CommandList>
+                    <CommandEmpty>{t('noBookmarks')}</CommandEmpty>
+                    {(current?.bookmarks ?? []).map(name => (
+                      <CommandItem
+                        key={name}
+                        value={name}
+                        onSelect={() => {
+                          setBranchOpen(false)
+                          move({ isolate: true, base: name })
+                        }}
+                      >
+                        <span className="dshx:flex-1 dshx:truncate">{name}</span>
+                        {name === current?.bookmark ? <CheckIcon className="dshx:size-3.5" /> : null}
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:border-l dshx:px-2 dshx:text-sm">
+                  <Checkbox
+                    checked={isolated}
+                    disabled={toggle.busy}
+                    onCheckedChange={checked => {
+                      const isolate = checked === true
+                      if (current === undefined || current.bookmark === null) {
+                        move({ isolate })
+                        return
+                      }
+                      move({ isolate, base: current.bookmark })
+                    }}
+                  />
+                  {t('workspace')}
+                </label>
+              </TooltipTrigger>
+              <TooltipContent>{t('isolateHint')}</TooltipContent>
+            </Tooltip>
+          </span>
+        ) : null}
+        {newThreadId !== null && destination.isError ? (
+          <span role="alert" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-destructive">
+            {t('workspaceDestinationUnavailable')}
+            <Button variant="link" size="sm" onClick={() => void destination.refetch()}>
+              {t('retryDestination')}
+            </Button>
+          </span>
+        ) : null}
+        {toggle.error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
+      </div>
+    </TooltipProvider>
   )
 }

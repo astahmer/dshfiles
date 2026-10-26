@@ -1,3 +1,4 @@
+import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import type { RegistryEntry } from './api.js'
 
@@ -191,8 +192,7 @@ const readBoundedJson = async (response: Response): Promise<RegistryPayload> => 
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  const payload: unknown = JSON.parse(new TextDecoder().decode(bytes))
-  return registryPayloadSchema.parse(payload)
+  return decodeJson(registryPayloadSchema, new TextDecoder().decode(bytes))
 }
 
 export type RegistrySearchFetcher = (input: URL, init: RequestInit) => Promise<Response>

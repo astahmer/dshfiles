@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -137,6 +138,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
   }
 
   return (
+    <TooltipProvider delayDuration={500}>
     <section aria-label="AI Accounts" className="dshx-root dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-2">
       <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
         <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
@@ -174,12 +176,18 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
                     {KIND_LABEL[profile.kind]} · {profile.identity ?? STATE_LABEL[profile.state]}
                   </span>
                 </div>
-                <span
-                  aria-label={profile.signedIn ? 'Signed in' : 'Not signed in'}
-                  className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', profile.signedIn ? 'dshx:bg-success' : 'dshx:bg-destructive')}
-                  role="img"
-                  title={profile.signedIn ? 'Signed in' : profile.loginHint}
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      aria-label={profile.signedIn ? 'Signed in' : 'Not signed in'}
+                      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', profile.signedIn ? 'dshx:bg-success' : 'dshx:bg-destructive')}
+                      role="img"
+                    />
+                  </TooltipTrigger>
+                  {(profile.signedIn ? 'Signed in' : profile.loginHint) === '' ? null : (
+                    <TooltipContent>{profile.signedIn ? 'Signed in' : profile.loginHint}</TooltipContent>
+                  )}
+                </Tooltip>
                 <Switch
                   aria-label={`${profile.enabled ? 'Disable' : 'Enable'} ${profile.displayName}`}
                   checked={profile.enabled}
@@ -213,5 +221,6 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
         <NativeProvidersList />
       </div>
     </section>
+    </TooltipProvider>
   )
 }

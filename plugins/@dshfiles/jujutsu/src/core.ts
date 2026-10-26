@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isAbsolute, join, normalize, parse } from 'node:path'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { workspaceNameSchema, type FileStatus, type Mutation } from './api.js'
 
 export interface FileChange {
@@ -154,13 +155,13 @@ const FILE_STATUS_LETTERS = new Map<string, FileStatus>([
 const fileStatusLetter = (status: string): FileStatus => FILE_STATUS_LETTERS.get(status) ?? 'M'
 
 /** Decode one JSON record per line; malformed or oversized rows fail closed. */
-const parseJsonLines = <T>(text: string, decode: (value: unknown) => T): T[] => {
+const parseJsonLines = <T>(text: string, decode: (value: JsonValue) => T): T[] => {
   const rows: T[] = []
   for (const line of text.split(/\r?\n/)) {
     if (line.length === 0) continue
-    let value: unknown
+    let value: JsonValue
     try {
-      value = JSON.parse(line) as unknown
+      value = decodeJson(jsonValueSchema, line)
     } catch {
       throw new Error('Jujutsu returned an unreadable revision record.')
     }
@@ -250,7 +251,7 @@ export class PreviewStore {
   put(id: string, entry: PreparedMutation, now = Date.now()): void {
     this.prune(now)
     while (this.entries.size >= 32) {
-      const oldest = this.entries.keys().next().value as string | undefined
+      const oldest = this.entries.keys().next().value
       if (oldest === undefined) break
       this.entries.delete(oldest)
     }

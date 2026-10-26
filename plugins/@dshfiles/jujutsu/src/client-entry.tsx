@@ -164,6 +164,7 @@ export default defineClient({
       toggleJujutsu,
       openWorkspaceReview: (workspacePath, sessionId) => {
         requestWorkspaceReview({ workspacePath, sessionId })
+        // SAFETY: the pulls-review plugin registers this main panel id in every profile that loads jujutsu.
         ctx.layout.selectPanel('pulls-review' as MainPanelId)
       },
       openJujutsuReference: (path, reference) => {

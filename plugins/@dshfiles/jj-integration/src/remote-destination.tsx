@@ -3,6 +3,7 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, FolderIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker, type RegisteredProject } from '@dshfiles/project-folder-picker'
@@ -130,27 +131,31 @@ export const RemoteDestinationChips = (props: {
   const bookmark = destination.base ?? remote?.bookmark ?? null
 
   return (
-    <>
-      <Button
-        variant="ghost"
-        className={chipClassName}
-        onClick={() => props.onPickerOpenChange(true)}
-        title={destination.folder ?? t('chooseProject')}
-        data-remote-folder=""
-      >
-        <FolderIcon className="dshx:size-3.5" />
-        {destination.folder === undefined ? t('chooseProject') : baseName(destination.folder)}
-      </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" className={chipClassName} onClick={() => props.onPickerOpenChange(true)} data-remote-folder="">
+            <FolderIcon className="dshx:size-3.5" />
+            {destination.folder === undefined ? t('chooseProject') : baseName(destination.folder)}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent className="dshx:max-w-96">{destination.folder ?? t('chooseProject')}</TooltipContent>
+      </Tooltip>
       {jj.isFetching ? <Spinner className="dshx:size-3.5" /> : null}
       {remote?.vcs === 'jj' ? (
         <span className="dshx:inline-flex dshx:items-center dshx:rounded-md">
           <Popover open={branchOpen} onOpenChange={setBranchOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" className={chipClassName} title={t('bookmarkIsolates')}>
-                <GitBranchIcon className="dshx:size-3.5" />
-                {bookmark ?? '—'}
-              </Button>
-            </PopoverTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className={chipClassName}>
+                    <GitBranchIcon className="dshx:size-3.5" />
+                    {bookmark ?? '—'}
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{t('bookmarkIsolates')}</TooltipContent>
+            </Tooltip>
             <PopoverContent align="start" className="dshx:w-72 dshx:p-0">
               <Command>
                 <CommandInput placeholder={t('searchBookmarks')} />
@@ -173,10 +178,15 @@ export const RemoteDestinationChips = (props: {
               </Command>
             </PopoverContent>
           </Popover>
-          <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:border-l dshx:px-2 dshx:text-sm" title={t('isolateHint')}>
-            <Checkbox checked={isolated} onCheckedChange={checked => update({ isolate: checked === true })} />
-            {t('workspace')}
-          </label>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:border-l dshx:px-2 dshx:text-sm">
+                <Checkbox checked={isolated} onCheckedChange={checked => update({ isolate: checked === true })} />
+                {t('workspace')}
+              </label>
+            </TooltipTrigger>
+            <TooltipContent>{t('isolateHint')}</TooltipContent>
+          </Tooltip>
         </span>
       ) : null}
       {props.pickerOpen ? (
@@ -192,10 +202,10 @@ export const RemoteDestinationChips = (props: {
           showNativePicker={false}
           recentFolders={recentFolders}
           machineName={props.hostName}
-          title={`${t('chooseProject')} · ${props.hostName}`}
+          heading={`${t('chooseProject')} · ${props.hostName}`}
         />
       ) : null}
-    </>
+    </TooltipProvider>
   )
 }
 

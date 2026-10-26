@@ -2,7 +2,7 @@
 
 export interface ProjectionRefreshQueueOptions {
   /** Reads one session's projection; the queue only decides when each id is asked for. */
-  readonly refresh: (sessionId: string) => Promise<unknown>
+  readonly refresh: (sessionId: string) => Promise<void>
   /** How many refreshes may be in flight at once. */
   readonly concurrency?: number
   /** A failed refresh is retried once after this delay. */

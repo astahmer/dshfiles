@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 const argumentsSchema = z.object({ command: z.string().max(4_096) })
@@ -98,7 +99,7 @@ export const identifyCommand = (input: { readonly toolName: string; readonly arg
   let decoded: unknown = input.arguments
   if (serialized.success) {
     try {
-      decoded = JSON.parse(serialized.data)
+      decoded = decodeJson(jsonValueSchema, serialized.data)
     } catch {
       return { normalizedCommand: null, testRunner: null }
     }

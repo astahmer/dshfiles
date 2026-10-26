@@ -48,7 +48,7 @@ export interface ProjectFolderPickerProps {
   readonly showNativePicker?: boolean
   readonly disabled?: boolean
   readonly loading?: boolean
-  readonly title?: string
+  readonly heading?: string
   /**
    * Identity of the machine these paths live on, shown with each row the way the
    * reference does. The picker is host-agnostic, so this is supplied by the
@@ -283,7 +283,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     }
   }
 
-  const title = props.title ?? (props.mode === 'directories' ? 'Choose a folder' : 'Choose a project or folder')
+  const title = props.heading ?? (props.mode === 'directories' ? 'Choose a folder' : 'Choose a project or folder')
 
   return (
     <Dialog

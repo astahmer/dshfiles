@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError } from './client.js'
 import { connectDshxApi } from './dshx-api.js'
@@ -71,9 +72,6 @@ const runtimeRegistrationSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), runtime: runtimeSummarySchema }).strict(),
   z.object({ ok: z.literal(false), code: z.string().min(1).max(128), message: z.string().max(2048) }).strict(),
 ])
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
-)
 const nativeRpcResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: jsonValueSchema }).strict(),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).strict(),
@@ -81,13 +79,11 @@ const nativeRpcResultSchema = z.discriminatedUnion('ok', [
 const runtimeViewSchema = z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }).strict()
 
 const toJsonValue = (value: unknown): JsonValue => {
-  let parsed: unknown
   try {
-    parsed = JSON.parse(JSON.stringify(value))
+    return decodeJson(jsonValueSchema, JSON.stringify(value))
   } catch {
     throw new DshPlatformError('invalid-request', 'The multi-host request could not be represented as JSON.')
   }
-  return jsonValueSchema.parse(parsed)
 }
 
 export type HostConnector = z.infer<typeof connectorSchema>

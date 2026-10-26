@@ -3,6 +3,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { Check, ChevronLeft, ChevronRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
@@ -213,19 +214,24 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
               const itemReviewed = item.filePaths.filter(path => reviewedPaths.has(path)).length
               const active = item.key === scope?.key
               return (
-                <Button
-                  key={item.key}
-                  variant={active ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setSelectedKey(item.key)}
-                  title={item.summary}
-                  className={cn('dshx:gap-1.5 dshx:font-normal', !active && 'dshx:text-muted-foreground')}
-                >
-                  {item.label}
-                  <span className="dshx:font-mono dshx:text-[11px] dshx:opacity-70">
-                    {itemReviewed}/{item.filePaths.length}
-                  </span>
-                </Button>
+                <TooltipProvider delayDuration={500} key={item.key}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={active ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => setSelectedKey(item.key)}
+                        className={cn('dshx:gap-1.5 dshx:font-normal', !active && 'dshx:text-muted-foreground')}
+                      >
+                        {item.label}
+                        <span className="dshx:font-mono dshx:text-[11px] dshx:opacity-70">
+                          {itemReviewed}/{item.filePaths.length}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{item.summary}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )
             })}
           </div>
@@ -288,40 +294,46 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
                   const isSelected = selectedPaths.has(path)
                   return (
                     <li key={path} className={cn(isSelected && 'dshx:rounded-md dshx:bg-info/8')}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Click to mark reviewed; Shift-click selects a range; Cmd/Ctrl-click toggles the selection"
-                        className="dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-mono dshx:text-[11px]"
-                        onClick={event => {
-                          if (event.shiftKey) {
-                            extendPath(path)
-                            return
-                          }
-                          if (event.metaKey || event.ctrlKey) {
-                            togglePath(path)
-                            return
-                          }
-                          markReviewed(path)
-                        }}
-                      >
-                        <span
-                          aria-hidden
-                          className={cn(
-                            'dshx:flex dshx:size-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-border',
-                            isReviewed && 'dshx:border-primary dshx:bg-primary dshx:text-primary-foreground',
-                          )}
-                        >
-                          {isReviewed ? <Check className="dshx:size-3" aria-hidden /> : null}
-                        </span>
-                        <span className="dshx:min-w-0 dshx:truncate">{path}</span>
-                        {file === undefined ? null : (
-                          <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:gap-1">
-                            <Stat label={`+${file.additions}`} tone="add" />
-                            <Stat label={`−${file.deletions}`} tone="del" />
-                          </span>
-                        )}
-                      </Button>
+                      <TooltipProvider delayDuration={500}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-mono dshx:text-[11px]"
+                              onClick={event => {
+                                if (event.shiftKey) {
+                                  extendPath(path)
+                                  return
+                                }
+                                if (event.metaKey || event.ctrlKey) {
+                                  togglePath(path)
+                                  return
+                                }
+                                markReviewed(path)
+                              }}
+                            >
+                              <span
+                                aria-hidden
+                                className={cn(
+                                  'dshx:flex dshx:size-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-border',
+                                  isReviewed && 'dshx:border-primary dshx:bg-primary dshx:text-primary-foreground',
+                                )}
+                              >
+                                {isReviewed ? <Check className="dshx:size-3" aria-hidden /> : null}
+                              </span>
+                              <span className="dshx:min-w-0 dshx:truncate">{path}</span>
+                              {file === undefined ? null : (
+                                <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:gap-1">
+                                  <Stat label={`+${file.additions}`} tone="add" />
+                                  <Stat label={`−${file.deletions}`} tone="del" />
+                                </span>
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Click to mark reviewed; Shift-click selects a range; Cmd/Ctrl-click toggles the selection</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </li>
                   )
                 })}

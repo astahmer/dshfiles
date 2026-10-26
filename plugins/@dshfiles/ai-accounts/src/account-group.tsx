@@ -1,6 +1,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowDownIcon, ArrowUpIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountDraftModel } from './account-draft.js'
@@ -20,6 +21,7 @@ export const AccountGroup = (props: {
 }): JSX.Element | null => {
   if (props.accounts.length === 0) return null
   return (
+    <TooltipProvider delayDuration={500}>
     <section className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pt-2">
       <h2 className="dshx:px-2 dshx:pb-1 dshx:text-[11px] dshx:font-semibold dshx:tracking-wider dshx:text-muted-foreground dshx:uppercase">
         {KIND_LABEL[props.kind]}
@@ -51,37 +53,51 @@ export const AccountGroup = (props: {
                   <ItemDescription className="dshx:line-clamp-1 dshx:text-xs">{profile.identity ?? STATE_LABEL[profile.state]}</ItemDescription>
                 </ItemContent>
               </button>
-              <Switch
-                aria-label={`${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`}
-                checked={profile.enabled}
-                onCheckedChange={() => props.onToggle(profile)}
-                size="sm"
-                title={profile.enabled ? 'Hide from the model picker' : 'Show in the model picker'}
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:inline-flex dshx:shrink-0">
+                    <Switch
+                      aria-label={`${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`}
+                      checked={profile.enabled}
+                      onCheckedChange={() => props.onToggle(profile)}
+                      size="sm"
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{profile.enabled ? 'Hide from the model picker' : 'Show in the model picker'}</TooltipContent>
+              </Tooltip>
               {routedKind(profile.kind) ? (
                 <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0">
-                  <Button
-                    aria-label={`Move ${profile.displayName} earlier in account order`}
-                    disabled={firstInGroup || props.reorderingDisabled}
-                    onClick={() => props.onMove(profile.instanceId, 'earlier')}
-                    size="icon-xs"
-                    title="Move earlier in account order"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ArrowUpIcon />
-                  </Button>
-                  <Button
-                    aria-label={`Move ${profile.displayName} later in account order`}
-                    disabled={lastInGroup || props.reorderingDisabled}
-                    onClick={() => props.onMove(profile.instanceId, 'later')}
-                    size="icon-xs"
-                    title="Move later in account order"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <ArrowDownIcon />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={`Move ${profile.displayName} earlier in account order`}
+                        disabled={firstInGroup || props.reorderingDisabled}
+                        onClick={() => props.onMove(profile.instanceId, 'earlier')}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <ArrowUpIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Move earlier in account order</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={`Move ${profile.displayName} later in account order`}
+                        disabled={lastInGroup || props.reorderingDisabled}
+                        onClick={() => props.onMove(profile.instanceId, 'later')}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <ArrowDownIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Move later in account order</TooltipContent>
+                  </Tooltip>
                 </div>
               ) : null}
             </Item>
@@ -89,5 +105,6 @@ export const AccountGroup = (props: {
         })}
       </ItemGroup>
     </section>
+    </TooltipProvider>
   )
 }

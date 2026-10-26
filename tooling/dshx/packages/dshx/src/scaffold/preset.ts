@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import type { ArrayExpression, Expression, ObjectExpression, Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
+import { jsonObjectSchema } from '../json.js'
 import { CLIENT_CAPABILITIES, DSH_PROTOCOL_2, HOST_CAPABILITIES, SDK_RUNTIME_DEPENDENCIES } from 'create-dshx/capabilities'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
@@ -550,7 +551,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(
-      { ...project, ...(clientEntryForCheck !== undefined && { clientEntry: clientEntryForCheck }), manifest: updatedManifest },
+      { ...project, ...(clientEntryForCheck !== undefined && { clientEntry: clientEntryForCheck }), manifest: jsonObjectSchema.parse(updatedManifest) },
       { compatibility },
     )
   } catch (cause) {

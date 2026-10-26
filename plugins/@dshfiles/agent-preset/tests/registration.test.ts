@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply, inject } from '../src/native/index.ts'
+import { apply, inject } from '../src/native/index.js'
 import { AgentPresetSeatController } from '../src/native/seat-store.ts'
 import { AgentPresetSeat } from '../src/native/AgentPresetSeat.tsx'
 import { AgentPresetLabel } from '../src/native/AgentPresetLabel.tsx'

@@ -1,5 +1,6 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CircleCheckIcon, TriangleAlertIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState } from 'react'
@@ -53,29 +54,34 @@ export const WorkspaceCleanupTrail = (props: { readonly onFinished: () => void }
     if (latest === undefined || !settledVisible || latest.id === dismissed) return null
     const failed = latest.state === 'failed'
     return (
-      <div
-        aria-live="polite"
-        className={cn(
-          'dshx:flex dshx:min-w-0 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs',
-          failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
-        )}
-        role="status"
-      >
-        {failed ? <TriangleAlertIcon className="dshx:size-3.5 dshx:flex-none" /> : <CircleCheckIcon className="dshx:size-3.5 dshx:flex-none" />}
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={CleanupJobTrailModel.summary(latest)}>
-          {CleanupJobTrailModel.summary(latest)}
-        </span>
-        <Button
-          aria-label="Dismiss the cleanup result"
-          className="dshx:flex-none"
-          onClick={() => setDismissed(latest.id)}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
+      <TooltipProvider delayDuration={500}>
+        <div
+          aria-live="polite"
+          className={cn(
+            'dshx:flex dshx:min-w-0 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs',
+            failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
+          )}
+          role="status"
         >
-          <XIcon />
-        </Button>
-      </div>
+          {failed ? <TriangleAlertIcon className="dshx:size-3.5 dshx:flex-none" /> : <CircleCheckIcon className="dshx:size-3.5 dshx:flex-none" />}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{CleanupJobTrailModel.summary(latest)}</span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{CleanupJobTrailModel.summary(latest)}</TooltipContent>
+          </Tooltip>
+          <Button
+            aria-label="Dismiss the cleanup result"
+            className="dshx:flex-none"
+            onClick={() => setDismissed(latest.id)}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <XIcon />
+          </Button>
+        </div>
+      </TooltipProvider>
     )
   }
 

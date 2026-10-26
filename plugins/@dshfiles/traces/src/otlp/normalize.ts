@@ -137,7 +137,10 @@ const contentPlaceholder = (value: AttributeValue): string => {
 
 export type NormalizeOptions = { readonly redactContent: boolean }
 
-type SpanAttributes = Record<string, AttributeValue>
+/** Attribute values keyed by OTLP attribute name; the wire names them, so the dictionary stays open. */
+interface SpanAttributes {
+  [name: string]: AttributeValue
+}
 
 const attributesOf = (attributes: readonly OtlpKeyValue[] | undefined, options: NormalizeOptions): SpanAttributes => {
   const result: SpanAttributes = {}

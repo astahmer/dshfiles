@@ -1,5 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
+import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep, type ReachPosition } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
@@ -23,7 +25,7 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
     const catalogFile = join(pluginsRoot, entry.name, 'dshx.features.json')
     const source = await readFile(catalogFile, 'utf8').catch(() => undefined)
     if (source === undefined) continue
-    const catalog = DshxFeatureCatalogSchema.safeParse(JSON.parse(source))
+    const catalog = DshxFeatureCatalogSchema.safeParse(decodeJson(jsonValueSchema, source))
     if (!catalog.success) continue
     for (const feature of catalog.data.features) {
       features.push({
@@ -233,11 +235,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
   }
 }
 
-interface BrowserEvent {
-  readonly at: string
-  readonly kind: string
-  readonly detail: string
-}
+const browserEventSchema = z.object({ at: z.string(), kind: z.string(), detail: z.string() })
+
+type BrowserEvent = z.infer<typeof browserEventSchema>
 
 export interface ShotResult {
   readonly screenshot: string
@@ -269,7 +269,7 @@ export const scratchShot = async (state: ScratchState, label: string, outDir: st
   const events = (await readFile(state.browserEvents, 'utf8').catch(() => ''))
     .split('\n')
     .filter(line => line.trim() !== '')
-    .map((line): BrowserEvent => JSON.parse(line))
+    .map((line): BrowserEvent => decodeJson(browserEventSchema, line))
   const count = (kind: string): number => events.filter(event => event.kind === kind).length
   const errorEvents = events.filter(event => event.kind !== 'console.warning')
   const result: ShotResult = {

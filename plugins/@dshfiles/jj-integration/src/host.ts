@@ -65,9 +65,29 @@ import { registeredProjects } from './registered-projects.js'
 import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
 import { locateBestEffort, locateOrMissing } from './workspace-location.js'
 
+/**
+ * The `workspace` payload this bundle emits on `dshfiles/activity/event`;
+ * `@dshfiles/activity-timeline` decodes it into one Activity item.
+ */
+interface WorkspaceActivityEventPayload {
+  readonly kind: 'workspace'
+  readonly value: {
+    readonly id: string
+    readonly at: number
+    readonly type: string
+    readonly level: ActivityLevel
+    readonly summary: string
+    readonly detail: string | null
+    readonly sessionId: string | null
+    readonly correlationId: string | null
+    readonly workspaceId: string | null
+    readonly workspaceName: string | null
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/event'(payload: WorkspaceActivityEventPayload): void
   }
 }
 
@@ -550,7 +570,7 @@ const askAgent = async (path: string, sessionId: string | undefined, text: strin
   const archived = new Set<string>(registryOf().archivedSessionIds)
   const target = sessionId ?? [...(workspace?.sessionIds ?? [])].reverse().find(candidate => !archived.has(candidate))
   if (target === undefined) return false
-  // SessionRequestId is a type-only brand over a client-minted unique id.
+  // SAFETY: SessionRequestId is a type-only brand, so the unique id `randomUUID` mints is a valid one.
   const requestId = randomUUID() as SessionRequestId
   await controller.prompt({ requestId, sessionId: SessionId(target), mode: 'queue', content: [{ type: 'text', text }] }, AbortSignal.timeout(15_000))
   return true

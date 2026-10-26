@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { OtlpBody } from './decode.js'
-import { otlpTraceRequestSchema } from './json-schema.js'
+import { otlpTraceRequestSchema, type OtlpSpan } from './json-schema.js'
 import { SPAN_BOUNDS, SpanNormalizer } from './normalize.js'
 import { OtlpProtobuf, ProtobufDecodeError } from './protobuf.js'
 import { SdkFixtures } from './sdk-fixture.test-support.js'
@@ -78,7 +78,7 @@ describe('OTLP trace decoding', () => {
   })
 })
 
-const jsonRequest = (span: Record<string, unknown>) =>
+const jsonRequest = (span: OtlpSpan) =>
   otlpTraceRequestSchema.parse({
     resourceSpans: [
       { resource: { attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }] }, scopeSpans: [{ scope: { name: 'scope' }, spans: [span] }] },

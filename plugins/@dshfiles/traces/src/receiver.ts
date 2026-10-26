@@ -25,11 +25,11 @@ export type ReceiverConfig = {
 export type Wire = 'json' | 'protobuf'
 export type OtlpSignal = 'traces' | 'metrics' | 'logs'
 
-const OTLP_SIGNAL_BY_PATH: Record<string, OtlpSignal> = {
-  '/v1/traces': 'traces',
-  '/v1/metrics': 'metrics',
-  '/v1/logs': 'logs',
-}
+const SIGNAL_BY_PATH = new Map<string, OtlpSignal>([
+  ['/v1/traces', 'traces'],
+  ['/v1/metrics', 'metrics'],
+  ['/v1/logs', 'logs'],
+])
 
 /** Decodes one signal's body and stores it; throws `RequestRejection` for a client error. */
 export type SignalHandler = (input: { readonly body: Buffer; readonly wire: Wire }) => { readonly accepted: number; readonly rejected: number }
@@ -201,7 +201,7 @@ const createReceiver = (options: {
 
   const handle = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const path = new URL(request.url ?? '/', 'http://receiver').pathname
-    const signal: OtlpSignal | null = OTLP_SIGNAL_BY_PATH[path] ?? null
+    const signal = SIGNAL_BY_PATH.get(path) ?? null
     const handler = signal === null ? undefined : options.handlers[signal]
     if (signal === null || handler === undefined) throw new RequestRejection(404, `Not an OTLP path this receiver serves: ${path.slice(0, 80)}`)
     if (request.method !== 'POST') throw new RequestRejection(405, 'Use POST.')

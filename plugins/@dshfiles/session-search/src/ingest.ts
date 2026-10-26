@@ -8,6 +8,7 @@ import { open } from 'node:fs/promises'
 import { setImmediate } from 'node:timers/promises'
 import { buildSessionEventSearchDocuments, extractSessionEventText } from '@deepseek-ai/dsh-session-query'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { FrameLog, type SessionLogFile } from './frame-log.js'
 import type { DocumentRow, SearchIndex } from './index-db.js'
 import { withoutUndefined } from './optional-fields.js'
@@ -40,7 +41,7 @@ const parseEvents = (text: string, skipHeader: boolean): readonly SessionEvent[]
     if (skipHeader && position === 0) continue
     try {
       // SAFETY: the line is a committed session-log event; the persistence contract guarantees the shape core reads.
-      events.push(JSON.parse(line) as SessionEvent)
+      events.push(decodeJson(jsonValueSchema, line) as SessionEvent)
     } catch {
       break
     }

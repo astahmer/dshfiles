@@ -61,7 +61,7 @@ const ruleFormSchema = z
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>
 
-const PERCENTILE_OF: Record<RuleFormValues['percentile'], AlertRuleDraft['percentile']> = { '50': 50, '90': 90, '95': 95, '99': 99 }
+const PERCENTILE_OF = { '50': 50, '90': 90, '95': 95, '99': 99 } satisfies Record<RuleFormValues['percentile'], AlertRuleDraft['percentile']>
 
 const percentileOf = (text: RuleFormValues['percentile']): AlertRuleDraft['percentile'] => PERCENTILE_OF[text]
 

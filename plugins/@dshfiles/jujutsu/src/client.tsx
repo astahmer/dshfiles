@@ -40,7 +40,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
-import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ArrowDownIcon,
   CalendarIcon,
@@ -1007,7 +1007,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           if (state !== undefined && openInEditor({ path, cwd: state.root })) setFullDiff(null)
         }}
         patch={fullDiffQuery.data?.patch}
-        title={fullDiff.title}
+        heading={fullDiff.title}
       />
     )
   const diffHidden = fullDiff !== null && !visibleRevisions.some(revision => revision.commitId === fullDiff.commitId)
@@ -1245,14 +1245,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             {revisionDates(revision, editTimes.get(revision.commitId)).replaceAll('\n', ' · ')}
           </time>
           <span aria-hidden>·</span>
-          <button
-            className="dshx:font-mono dshx:hover:text-foreground"
-            onClick={() => void copyText(revision.commitId, 'Commit ID for this revision')}
-            title={`Copy commit ID ${revision.commitId}`}
-            type="button"
-          >
-            {revision.commitId.slice(0, 12)}
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="dshx:font-mono dshx:hover:text-foreground"
+                onClick={() => void copyText(revision.commitId, 'Commit ID for this revision')}
+                type="button"
+              >
+                {revision.commitId.slice(0, 12)}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{`Copy commit ID ${revision.commitId}`}</TooltipContent>
+          </Tooltip>
           {revision.immutable && (
             <Badge className={COMPACT_BADGE} variant="outline">
               immutable
@@ -1342,9 +1346,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               <span className="dshx:font-semibold dshx:uppercase dshx:tracking-wide">Changed files</span>
               <span className="dshx:font-mono">{details.files.length}</span>
               <FileViewToggle onChange={value => setPreference('fileView', value)} value={preferences.fileView} />
-              <span title="Files marked reviewed in this browser">
-                {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} reviewed
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    {selectedReviewProgress.reviewed}/{selectedReviewProgress.total} reviewed
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Files marked reviewed in this browser</TooltipContent>
+              </Tooltip>
               {details.truncated && (
                 <Badge className={COMPACT_BADGE} variant="warning">
                   diff truncated; counts partial
@@ -1415,16 +1424,20 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1">
             <div className="dshx:mr-auto dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1">
               <LandmarkControls navigation={navigation} onLocate={locateRevision} />
-              <Button
-                disabled={workingCopy === undefined && selectedRevision === undefined}
-                onClick={compareCurrentRevision}
-                size="xs"
-                title="Compare selected revision, or current workspace revision, with a landmark"
-                type="button"
-                variant="outline"
-              >
-                Compare
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={workingCopy === undefined && selectedRevision === undefined}
+                    onClick={compareCurrentRevision}
+                    size="xs"
+                    type="button"
+                    variant="outline"
+                  >
+                    Compare
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Compare selected revision, or current workspace revision, with a landmark</TooltipContent>
+              </Tooltip>
             </div>
             <Toggle
               className="dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground"
@@ -1806,17 +1819,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               </span>
               <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
                 {props.surface === 'main' ? (
-                  <Button
-                    aria-label="Open this repository in a new tab"
-                    disabled={shownRoot === null}
-                    onClick={openInNewTab}
-                    size="icon-sm"
-                    title="Open this repository in a new tab"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <CopyPlusIcon />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label="Open this repository in a new tab"
+                        disabled={shownRoot === null}
+                        onClick={openInNewTab}
+                        size="icon-sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <CopyPlusIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Open this repository in a new tab</TooltipContent>
+                  </Tooltip>
                 ) : null}
                 <PreferencesMenu />
                 <DropdownMenu>
@@ -1866,9 +1883,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
-                          <span title={state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}>
-                            Last recorded JJ push command: {lastPushLabel}
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>Last recorded JJ push command: {lastPushLabel}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">{state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}</TooltipContent>
+                          </Tooltip>
                           {state.evolutionHistoryTruncated && <span>Evolution scan limited; some evolved markers may be missing.</span>}
                         </div>
                       </>
@@ -1878,57 +1898,75 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               </div>
             </div>
             <div className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <Button
-                aria-label="Choose repository"
-                className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal"
-                onClick={() => setPickerOpen(true)}
-                title={state?.root ?? (path || 'Choose repository')}
-                type="button"
-                variant="outline"
-              >
-                <FolderGit2Icon className="dshx:text-muted-foreground" />
-                {state !== undefined || path.length > 0 ? (
-                  <>
-                    <span className="dshx:flex-none dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
-                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{state?.root ?? path}</span>
-                  </>
-                ) : (
-                  <span className="dshx:text-muted-foreground">Choose repository…</span>
-                )}
-                <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
-              </Button>
-              <Button
-                disabled={repoId === null || selectedRemote === '' || busy}
-                onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
-                size="sm"
-                title={selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}
-                type="button"
-                variant="outline"
-              >
-                Fetch
-              </Button>
-              <Button
-                disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
-                onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
-                size="sm"
-                title={selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
-                type="button"
-                variant="outline"
-              >
-                Push
-              </Button>
-              <Button
-                aria-busy={busy}
-                aria-label="Refresh"
-                disabled={busy || repoId === null}
-                onClick={refreshRepository}
-                size="icon-sm"
-                title="Refresh"
-                type="button"
-                variant="outline"
-              >
-                {busy ? <Spinner /> : <RefreshCwIcon />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Choose repository"
+                    className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal"
+                    onClick={() => setPickerOpen(true)}
+                    type="button"
+                    variant="outline"
+                  >
+                    <FolderGit2Icon className="dshx:text-muted-foreground" />
+                    {state !== undefined || path.length > 0 ? (
+                      <>
+                        <span className="dshx:flex-none dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
+                        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{state?.root ?? path}</span>
+                      </>
+                    ) : (
+                      <span className="dshx:text-muted-foreground">Choose repository…</span>
+                    )}
+                    <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{state?.root ?? (path || 'Choose repository')}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={repoId === null || selectedRemote === '' || busy}
+                    onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Fetch
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
+                    onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Push
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-busy={busy}
+                    aria-label="Refresh"
+                    disabled={busy || repoId === null}
+                    onClick={refreshRepository}
+                    size="icon-sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {busy ? <Spinner /> : <RefreshCwIcon />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Refresh</TooltipContent>
+              </Tooltip>
               {busy && !loadingRepository && (
                 <span className="dshx:sr-only" role="status">
                   Working…
@@ -1969,9 +2007,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               {provisionedPath !== null && (
                 <Alert className="dshx:px-3 dshx:py-2" variant="success">
                   <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-foreground" title={provisionedPath}>
-                      Created: {provisionedPath}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-foreground">Created: {provisionedPath}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{provisionedPath}</TooltipContent>
+                    </Tooltip>
                     <Button
                       disabled={launchMutation.isPending}
                       onClick={() => launchMutation.mutate(provisionedPath)}
@@ -2009,6 +2050,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         {pickerOpen && (
           <ProjectFolderPicker
             directoryPicker={props.directoryPicker}
+            heading="Choose a Jujutsu repository"
             onClose={() => setPickerOpen(false)}
             onRegisterWorkspace={props.registerWorkspace}
             onSelect={selected => {
@@ -2020,7 +2062,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             }}
             projects={props.projects}
             recentFolders={repoHistory}
-            title="Choose a Jujutsu repository"
           />
         )}
 
@@ -2034,11 +2075,16 @@ const PreferencesMenu = (): JSX.Element => {
   const [preferences, setPreference] = usePreferences()
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button aria-label="Jujutsu view settings" size="icon-sm" title="View settings" type="button" variant="ghost">
-          <Settings2Icon />
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button aria-label="Jujutsu view settings" size="icon-sm" type="button" variant="ghost">
+              <Settings2Icon />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">View settings</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-60">
         <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Saved in this browser</DropdownMenuLabel>
         <DropdownMenuCheckboxItem
@@ -2287,20 +2333,31 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
       )}
       onContextMenu={event => event.stopPropagation()}
-      title={`${revision.workingCopy ? `Working copy of workspace ${workspace}` : `Workspace ${workspace}`} · right-click for actions`}
     >
       <MonitorIcon aria-hidden className="dshx:size-3 dshx:flex-none" />
       <span className="dshx:truncate">{workspace}</span>
     </span>
   )
+  const workspaceHint = (workspace: string): string =>
+    revision.workingCopy ? `Working copy of workspace ${workspace} · right-click for actions` : `Workspace ${workspace} · right-click for actions`
   const labels = (
     <>
       {workspaceLabels.map(workspace =>
         workspace === 'default' ? (
-          <span key={workspace}>{workspaceLabel(workspace)}</span>
+          <Tooltip key={workspace}>
+            <TooltipTrigger asChild>
+              <span>{workspaceLabel(workspace)}</span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{workspaceHint(workspace)}</TooltipContent>
+          </Tooltip>
         ) : (
           <ContextMenu key={workspace}>
-            <ContextMenuTrigger asChild>{workspaceLabel(workspace)}</ContextMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ContextMenuTrigger asChild>{workspaceLabel(workspace)}</ContextMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{workspaceHint(workspace)}</TooltipContent>
+            </Tooltip>
             {props.workspaceMenu(workspace, revision.commitId)}
           </ContextMenu>
         ),
@@ -2309,45 +2366,55 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         const local = revision.localBookmarks.includes(name)
         return (
           <ContextMenu key={name}>
-            <ContextMenuTrigger asChild>
-              <span
-                className={cn(
-                  'dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:font-medium',
-                  local
-                    ? 'dshx:cursor-grab dshx:border-foreground/45 dshx:text-foreground'
-                    : 'dshx:border-dashed dshx:border-muted-foreground/50 dshx:text-muted-foreground',
-                )}
-                draggable={local}
-                onContextMenu={event => event.stopPropagation()}
-                onDragStart={event => {
-                  event.stopPropagation()
-                  event.dataTransfer.setData(BOOKMARK_MIME, name)
-                  event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
-                  event.dataTransfer.effectAllowed = 'move'
-                  props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
-                }}
-                title={local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
-              >
-                {name}
-              </span>
-            </ContextMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ContextMenuTrigger asChild>
+                  <span
+                    className={cn(
+                      'dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:font-medium',
+                      local
+                        ? 'dshx:cursor-grab dshx:border-foreground/45 dshx:text-foreground'
+                        : 'dshx:border-dashed dshx:border-muted-foreground/50 dshx:text-muted-foreground',
+                    )}
+                    draggable={local}
+                    onContextMenu={event => event.stopPropagation()}
+                    onDragStart={event => {
+                      event.stopPropagation()
+                      event.dataTransfer.setData(BOOKMARK_MIME, name)
+                      event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
+                      event.dataTransfer.effectAllowed = 'move'
+                      props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
+                    }}
+                  >
+                    {name}
+                  </span>
+                </ContextMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
+              </TooltipContent>
+            </Tooltip>
             {props.bookmarkMenu(name, local)}
           </ContextMenu>
         )
       })}
       {revision.tags.map(name => (
-        <span
-          className="dshx:h-4 dshx:max-w-32 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:border-warning/60 dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:text-warning"
-          key={name}
-          title={`Tag ${name}`}
-        >
-          {name}
-        </span>
+        <Tooltip key={name}>
+          <TooltipTrigger asChild>
+            <span className="dshx:h-4 dshx:max-w-32 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:border-warning/60 dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:text-warning">
+              {name}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{`Tag ${name}`}</TooltipContent>
+        </Tooltip>
       ))}
       {revision.divergent && (
-        <span className="dshx:flex-none dshx:text-[11px] dshx:text-violet" title="Divergent: several visible commits share this change ID">
-          divergent
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="dshx:flex-none dshx:text-[11px] dshx:text-violet">divergent</span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Divergent: several visible commits share this change ID</TooltipContent>
+        </Tooltip>
       )}
     </>
   )
@@ -2388,7 +2455,6 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               props.onDragStart({ kind: 'revision', sourceId: revision.commitId })
             }}
             style={{ height: props.rowHeight }}
-            title={draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
           >
             <RevisionGraphCell height={props.rowHeight} layout={props.graphLayout} metrics={props.metrics} revision={revision} width={props.graphWidth} />
             <div className={cn('dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5', props.connectionDimmed && 'dshx:opacity-40')}>
@@ -2401,25 +2467,36 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 onClick={props.onToggle}
               />
               {labels}
-              <button
-                aria-expanded={props.expanded}
-                className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:text-[13px] dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-                data-row-focus=""
-                onClick={props.onToggle}
-                type="button"
-              >
-                {revision.conflict && <span className="dshx:sr-only">Conflict:</span>}
-                {revision.empty && <span className="dshx:flex-none dshx:text-muted-foreground dshx:italic">(empty)</span>}
-                {described ? (
-                  <span
-                    className={cn('dshx:min-w-0 dshx:truncate', revision.workingCopy && 'dshx:font-medium', revision.immutable && 'dshx:text-muted-foreground')}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    aria-expanded={props.expanded}
+                    className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:text-[13px] dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                    data-row-focus=""
+                    onClick={props.onToggle}
+                    type="button"
                   >
-                    {firstLine(revision.description)}
-                  </span>
-                ) : (
-                  <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground dshx:italic">(no description)</span>
-                )}
-              </button>
+                    {revision.conflict && <span className="dshx:sr-only">Conflict:</span>}
+                    {revision.empty && <span className="dshx:flex-none dshx:text-muted-foreground dshx:italic">(empty)</span>}
+                    {described ? (
+                      <span
+                        className={cn(
+                          'dshx:min-w-0 dshx:truncate',
+                          revision.workingCopy && 'dshx:font-medium',
+                          revision.immutable && 'dshx:text-muted-foreground',
+                        )}
+                      >
+                        {firstLine(revision.description)}
+                      </span>
+                    ) : (
+                      <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground dshx:italic">(no description)</span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
+                </TooltipContent>
+              </Tooltip>
               {!described && !revision.immutable && (
                 <button
                   className="dshx:flex-none dshx:rounded-sm dshx:bg-muted dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground dshx:opacity-0 dshx:outline-none dshx:group-hover/row:opacity-100 dshx:hover:text-foreground dshx:focus-visible:opacity-100 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
@@ -2429,32 +2506,37 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                   Describe
                 </button>
               )}
-              <time
-                className={cn(
-                  'dshx:flex-none dshx:text-right dshx:text-[11px] dshx:text-muted-foreground/80 dshx:tabular-nums dshx:@max-xs:hidden',
-                  props.revisionDate === 'both' ? 'dshx:w-16' : 'dshx:w-8',
-                )}
-                dateTime={props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime)}
-                title={revisionDates(revision, props.editedAt)}
-              >
-                {formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
-                {props.revisionDate === 'both' && props.editedAt !== undefined && (
-                  <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>
-                )}
-              </time>
-              <span
-                aria-hidden
-                className="dshx:w-12 dshx:flex-none dshx:text-right"
-                title={fullRevisionId(revision) + (revision.evolved ? ' · rewritten from an earlier commit' : '')}
-              >
-                <span className="dshx:rounded-sm dshx:bg-muted-foreground/15 dshx:px-1 dshx:py-px dshx:font-mono dshx:text-[10px]">
-                  <span className={revision.immutable ? 'dshx:text-muted-foreground' : 'dshx:font-semibold dshx:text-foreground/85'}>
-                    {changeId.slice(0, revision.shortestChangeId.length)}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <time
+                    className={cn(
+                      'dshx:flex-none dshx:text-right dshx:text-[11px] dshx:text-muted-foreground/80 dshx:tabular-nums dshx:@max-xs:hidden',
+                      props.revisionDate === 'both' ? 'dshx:w-16' : 'dshx:w-8',
+                    )}
+                    dateTime={props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime)}
+                  >
+                    {formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
+                    {props.revisionDate === 'both' && props.editedAt !== undefined && (
+                      <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>
+                    )}
+                  </time>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{revisionDates(revision, props.editedAt)}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span aria-hidden className="dshx:w-12 dshx:flex-none dshx:text-right">
+                    <span className="dshx:rounded-sm dshx:bg-muted-foreground/15 dshx:px-1 dshx:py-px dshx:font-mono dshx:text-[10px]">
+                      <span className={revision.immutable ? 'dshx:text-muted-foreground' : 'dshx:font-semibold dshx:text-foreground/85'}>
+                        {changeId.slice(0, revision.shortestChangeId.length)}
+                      </span>
+                      <span className="dshx:text-muted-foreground">{changeId.slice(revision.shortestChangeId.length)}</span>
+                      {revision.divergent && <span className="dshx:text-violet">/{revision.changeOffset}</span>}
+                    </span>
                   </span>
-                  <span className="dshx:text-muted-foreground">{changeId.slice(revision.shortestChangeId.length)}</span>
-                  {revision.divergent && <span className="dshx:text-violet">/{revision.changeOffset}</span>}
-                </span>
-              </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{fullRevisionId(revision) + (revision.evolved ? ' · rewritten from an earlier commit' : '')}</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </ContextMenuTrigger>

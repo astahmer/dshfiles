@@ -4,6 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { ChevronDownIcon, ChevronRightIcon, SearchIcon, WaypointsIcon } from '@dshfiles/plugin-ui/icons'
@@ -83,9 +84,12 @@ export const LogRow = (props: { readonly log: LogRecord; readonly onOpenTrace: (
         onClick={() => setOpen(current => !current)}
       >
         {open ? <ChevronDownIcon className="dshx:mt-0.5 dshx:size-3 dshx:shrink-0" /> : <ChevronRightIcon className="dshx:mt-0.5 dshx:size-3 dshx:shrink-0" />}
-        <span className="dshx:w-20 dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground" title={new Date(log.timeMs).toLocaleString()}>
-          {TraceFormat.clock(log.timeMs)}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="dshx:w-20 dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground">{TraceFormat.clock(log.timeMs)}</span>
+          </TooltipTrigger>
+          <TooltipContent>{new Date(log.timeMs).toLocaleString()}</TooltipContent>
+        </Tooltip>
         <Badge variant={severityVariant(log.severityNumber)} className="dshx:w-14 dshx:shrink-0 dshx:justify-center">
           {severityLabel(log)}
         </Badge>

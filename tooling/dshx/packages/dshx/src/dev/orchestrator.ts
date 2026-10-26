@@ -6,6 +6,7 @@ import type { BuildHostOptions } from '../compiler/host/build.js'
 import { watchHost } from '../compiler/host/build.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import { resolveDshxConfig } from '../config/resolve.js'
 import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import { watchProjectFiles } from './project-watcher.js'
@@ -32,13 +33,17 @@ function errorMessage(error: unknown): string {
   return String(error)
 }
 
+const isJsonObject = (value: JsonValue | undefined): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
+
 function clientManifestArray(project: ResolvedDshxConfig, field: 'external' | 'inject'): readonly string[] {
   const dsh = project.manifest.dsh
-  if (typeof dsh !== 'object' || dsh === null || Array.isArray(dsh)) return []
-  const client = (dsh as Record<string, unknown>).client
-  if (typeof client !== 'object' || client === null || Array.isArray(client)) return []
-  const value = (client as Record<string, unknown>)[field]
-  return Array.isArray(value) && value.every(item => typeof item === 'string') ? value : []
+  if (!isJsonObject(dsh)) return []
+  const client = dsh.client
+  if (!isJsonObject(client)) return []
+  const value = client[field]
+  if (!Array.isArray(value)) return []
+  const strings = value.filter((item): item is string => typeof item === 'string')
+  return strings.length === value.length ? strings : []
 }
 
 function childFromExeca(
@@ -168,7 +173,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const stopChild = async (target: DevChildProcess): Promise<void> => {
-    ignoredExit.add(target as object)
+    ignoredExit.add(target)
     const exited = new Promise<void>(resolve => {
       target.on('exit', () => resolve())
     })
@@ -218,8 +223,8 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
       }
       child = started
       started.on('error', error => {
-        if (ignoredExit.has(started as object) || observedExit.has(started as object)) return
-        ignoredExit.add(started as object)
+        if (ignoredExit.has(started) || observedExit.has(started)) return
+        ignoredExit.add(started)
         if (child === started) child = undefined
         const item = diagnostic(
           restarting ? 'DSHX4404' : 'DSHX4401',
@@ -231,9 +236,9 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         emitDiagnostic(item)
       })
       started.on('exit', (code, signal) => {
-        if (observedExit.has(started as object)) return
-        observedExit.add(started as object)
-        if (ignoredExit.has(started as object)) {
+        if (observedExit.has(started)) return
+        observedExit.add(started)
+        if (ignoredExit.has(started)) {
           if (child === started) child = undefined
           return
         }
@@ -568,7 +573,10 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         typeof eventOrListener === 'function'
           ? eventOrListener
           : (event: DevEvent): void => {
-              if (event.type === eventOrListener) typedListener?.(event as Extract<DevEvent, { type: T }>)
+              if (event.type === eventOrListener) {
+                // SAFETY: the equality check selects exactly the event type the caller registered T for.
+                typedListener?.(event as Extract<DevEvent, { type: T }>)
+              }
             }
       listeners.add(listener)
       return () => {

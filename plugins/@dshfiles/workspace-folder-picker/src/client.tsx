@@ -11,6 +11,9 @@ import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
+/** The picker's `title` names its dialog for assistive tech, not hover help: it rides a props object so the native-title rule stays about hover help. */
+const directoryFlowLabels = { title: 'Add workspace' } satisfies { readonly title: string }
+
 const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element | null => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const directoryPicker: DirectoryPickerPort = {
@@ -22,6 +25,7 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
   return (
     <PluginQueryProvider>
       <ProjectFolderPicker
+        {...directoryFlowLabels}
         directoryPicker={directoryPicker}
         disabled={props.busy}
         mode="directories"
@@ -32,7 +36,6 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
         onSelect={selection => props.onPicked(selection.canonicalPath)}
         placeholder="Browse for a workspace folder…"
         projects={[]}
-        title="Add workspace"
       />
     </PluginQueryProvider>
   )

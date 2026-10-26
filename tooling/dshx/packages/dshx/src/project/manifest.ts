@@ -1,16 +1,19 @@
 import { readFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parse } from 'yaml'
+import { z } from 'zod'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
 import { LocaleNamespaceOwnershipModel } from '../compiler/client/locale-ownership.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
+import { decodeJson, decodeJsonSafe, jsonObjectSchema, jsonValueSchema } from '../json.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import { projectHostProvidedDependencyDiagnostics } from '../compat/index.js'
 import { featureCatalogIssues } from './features.js'
 
-function isObject(value: unknown): value is Record<string, unknown> {
+function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -18,22 +21,26 @@ function issue(code: string, severity: DshxDiagnosticSeverity, message: string, 
   return { code, severity, message, file, hint }
 }
 
-function conditionalTarget(value: unknown): string | undefined {
-  if (typeof value === 'string') return value
-  if (isObject(value) && typeof value.default === 'string') return value.default
-  return undefined
+const conditionalTargetObjectSchema = z.looseObject({ default: z.string() })
+const conditionalTargetStringSchema = z.string()
+
+function parseConditionalTarget(value: unknown): string | undefined {
+  const target = conditionalTargetStringSchema.safeParse(value)
+  if (target.success) return target.data
+  const conditional = conditionalTargetObjectSchema.safeParse(value)
+  return conditional.success ? conditional.data.default : undefined
 }
 
-function exportTarget(exportsField: unknown, subpath: string): string | undefined {
+function parseExportTarget(exportsField: unknown, subpath: string): string | undefined {
   if (subpath === '.' && (typeof exportsField === 'string' || (isObject(exportsField) && 'default' in exportsField))) {
-    return conditionalTarget(exportsField)
+    return parseConditionalTarget(exportsField)
   }
   if (!isObject(exportsField)) return undefined
-  return conditionalTarget(exportsField[subpath])
+  return parseConditionalTarget(exportsField[subpath])
 }
 
 function checkExport(diagnostics: DshxDiagnostic[], exportsField: unknown, subpath: string, expected: string, code: string, file: string): void {
-  const actual = exportTarget(exportsField, subpath)
+  const actual = parseExportTarget(exportsField, subpath)
   if (actual === expected) return
   diagnostics.push(
     issue(
@@ -123,7 +130,7 @@ async function checkPatch(diagnostics: DshxDiagnostic[], root: string, packageFi
   }
 }
 
-function checkPublishingHints(diagnostics: DshxDiagnostic[], manifest: Record<string, unknown>, file: string): void {
+function checkPublishingHints(diagnostics: DshxDiagnostic[], manifest: JsonObject, file: string): void {
   if (manifest.main !== './dist/index.js') {
     diagnostics.push(
       issue(
@@ -152,7 +159,7 @@ function checkPublishingHints(diagnostics: DshxDiagnostic[], manifest: Record<st
   }
 }
 
-function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>, compatibility: DshCompatibility): void {
+function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject, compatibility: DshCompatibility): void {
   const file = config.packageFile
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const declaration = dsh?.client
@@ -278,7 +285,7 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
   }
 }
 
-async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
+async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
   if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
@@ -295,7 +302,7 @@ async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: Re
   )
 }
 
-async function checkApiCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
+async function checkApiCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
   if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
@@ -312,7 +319,7 @@ async function checkApiCapability(diagnostics: DshxDiagnostic[], config: Resolve
   )
 }
 
-async function checkConversationCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
+async function checkConversationCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
   if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesConversationComponents(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
@@ -331,7 +338,7 @@ async function checkConversationCapability(diagnostics: DshxDiagnostic[], config
   )
 }
 
-async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
+async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
   if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
@@ -348,7 +355,7 @@ async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: Reso
   )
 }
 
-async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
+async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: JsonObject): Promise<void> {
   if (config.clientEntry === undefined) return
   const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root)
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
@@ -423,7 +430,7 @@ async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], conf
   }
 }
 
-const checkFeatureCatalog = async (diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, packageManifest: Record<string, unknown>): Promise<void> => {
+const checkFeatureCatalog = async (diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, packageManifest: JsonObject): Promise<void> => {
   if (packageManifest.dshx === undefined) return
   if (!isObject(packageManifest.dshx)) {
     diagnostics.push(
@@ -480,9 +487,9 @@ const checkFeatureCatalog = async (diagnostics: DshxDiagnostic[], config: Resolv
     )
     return
   }
-  let value: unknown
+  let catalog: JsonValue
   try {
-    value = JSON.parse(source)
+    catalog = decodeJson(jsonValueSchema, source)
   } catch (error) {
     diagnostics.push(
       issue(
@@ -495,7 +502,7 @@ const checkFeatureCatalog = async (diagnostics: DshxDiagnostic[], config: Resolv
     )
     return
   }
-  for (const message of featureCatalogIssues(value)) {
+  for (const message of featureCatalogIssues(catalog)) {
     diagnostics.push(
       issue(
         'DSHX4232',
@@ -525,9 +532,10 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
       ),
     ]
   }
-  let manifest: unknown
+  let manifest: JsonObject | undefined
   try {
-    manifest = JSON.parse(source)
+    const decoded = decodeJsonSafe(jsonObjectSchema, source)
+    if (decoded.success) manifest = decoded.data
   } catch (error) {
     return [
       issue(
@@ -539,7 +547,7 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
       ),
     ]
   }
-  if (!isObject(manifest)) {
+  if (manifest === undefined) {
     return [
       issue(
         'DSHX4101',

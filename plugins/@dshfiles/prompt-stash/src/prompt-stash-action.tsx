@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, type RecentPrompt } from './recent-prompts.js'
@@ -153,17 +154,23 @@ const PromptStashAction = (props: PromptActionProps): JSX.Element => {
                 <Button type="button" size="xs" disabled={currentPromptSaveDisabled} onClick={saveCurrentPrompt}>
                   Save current
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-xs"
-                  aria-label="New prompt"
-                  title="New prompt"
-                  disabled={prompts.length >= MAX_PROMPTS}
-                  onClick={beginNewPrompt}
-                >
-                  <PlusIcon />
-                </Button>
+                <TooltipProvider delayDuration={500}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-xs"
+                        aria-label="New prompt"
+                        disabled={prompts.length >= MAX_PROMPTS}
+                        onClick={beginNewPrompt}
+                      >
+                        <PlusIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>New prompt</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             ) : null}
           </div>

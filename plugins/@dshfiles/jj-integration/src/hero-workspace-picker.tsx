@@ -147,7 +147,7 @@ export const HeroWorkspacePicker = (
         showNativePicker={false}
         disabled={projects.isLoading}
         loading={projects.isLoading}
-        title={props.t('chooseProject')}
+        heading={props.t('chooseProject')}
       />
     </>
   )

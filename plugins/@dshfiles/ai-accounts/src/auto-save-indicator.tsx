@@ -1,5 +1,6 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, CircleAlertIcon, RotateCcwIcon } from '@dshfiles/plugin-ui/icons'
 import type { AutoSaveStatus } from './auto-save.js'
 
@@ -14,16 +15,21 @@ export const AutoSaveIndicator = (props: {
   const base = 'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs'
   if (props.status.kind === 'error') {
     return (
-      <span className={`${base} dshx:text-destructive`} role="alert">
-        <CircleAlertIcon className="dshx:size-3.5 dshx:shrink-0" />
-        <span className="dshx:truncate" title={props.status.message}>
-          Couldn&apos;t save: {props.status.message}
+      <TooltipProvider delayDuration={500}>
+        <span className={`${base} dshx:text-destructive`} role="alert">
+          <CircleAlertIcon className="dshx:size-3.5 dshx:shrink-0" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:truncate">Couldn&apos;t save: {props.status.message}</span>
+            </TooltipTrigger>
+            <TooltipContent>{props.status.message}</TooltipContent>
+          </Tooltip>
+          <Button className="dshx:shrink-0" onClick={props.onRetry} size="xs" type="button" variant="outline">
+            <RotateCcwIcon />
+            Retry
+          </Button>
         </span>
-        <Button className="dshx:shrink-0" onClick={props.onRetry} size="xs" type="button" variant="outline">
-          <RotateCcwIcon />
-          Retry
-        </Button>
-      </span>
+      </TooltipProvider>
     )
   }
   if (props.dirty && props.problem !== null) {

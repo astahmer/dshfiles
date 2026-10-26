@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import type { NormalizedLog, NormalizedMetricPoint, NormalizedSpan } from './otlp/normalize.js'
 import { SpanCost } from './span-cost.js'
@@ -9,6 +10,7 @@ import { buildSpanTree } from './span-tree.js'
 import { LatencyStats } from './stats.js'
 import {
   attributeValueSchema,
+  type AttributeValue,
   type ErrorGroup,
   type LogList,
   type MetricSeries,
@@ -399,7 +401,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     return removed
   }
 
-  const storeResource = (resource: Readonly<Record<string, unknown>>): string => {
+  const storeResource = (resource: Readonly<Record<string, AttributeValue>>): string => {
     const resourceJson = JSON.stringify(resource)
     const resourceId = createHash('sha1').update(resourceJson).digest('hex')
     prepare('INSERT OR IGNORE INTO resources (id, attributes) VALUES (?, ?)').run(resourceId, resourceJson)
@@ -501,8 +503,8 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         traceId: row.trace_id,
         spanId: row.span_id,
         eventName: row.event_name,
-        attributes: attributesJsonSchema.parse(JSON.parse(row.attributes)),
-        resource: row.resource === null ? {} : attributesJsonSchema.parse(JSON.parse(row.resource)),
+        attributes: decodeJson(attributesJsonSchema, row.attributes),
+        resource: row.resource === null ? {} : decodeJson(attributesJsonSchema, row.resource),
       })),
       nextCursor: rows.length > limit && last !== undefined ? `${String(last.time_us)}:${String(last.id)}` : null,
     }
@@ -635,7 +637,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
               return { timeMs: point.timeMs, value: point.value >= previous ? point.value - previous : point.value }
             })
           : values
-        return { attributes: attributesJsonSchema.parse(JSON.parse(attributes)), points: charted.slice(-MAX_SERIES_POINTS) }
+        return { attributes: decodeJson(attributesJsonSchema, attributes), points: charted.slice(-MAX_SERIES_POINTS) }
       }),
     }
   }
@@ -748,7 +750,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         durationMs: usToMs(row.end_us - row.start_us),
         spanCount: row.span_count,
         errorCount: row.error_count,
-        services: z.array(z.string()).parse(JSON.parse(row.services)),
+        services: decodeJson(z.array(z.string()), row.services),
         sessionId: row.session_id,
         costUsd: row.cost_usd,
       })),
@@ -786,9 +788,9 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
         status: STATUSES[entry.span.status_code] ?? 'unset',
         statusMessage: entry.span.status_message,
         sessionId: entry.span.session_id,
-        attributes: attributesJsonSchema.parse(JSON.parse(entry.span.attributes)),
-        resource: entry.span.resource === null ? {} : attributesJsonSchema.parse(JSON.parse(entry.span.resource)),
-        events: eventsJsonSchema.parse(JSON.parse(entry.span.events)).map(event => ({
+        attributes: decodeJson(attributesJsonSchema, entry.span.attributes),
+        resource: entry.span.resource === null ? {} : decodeJson(attributesJsonSchema, entry.span.resource),
+        events: decodeJson(eventsJsonSchema, entry.span.events).map(event => ({
           name: event.name,
           offsetMs: usToMs(event.timeUs - startUs),
           attributes: event.attributes,
@@ -1023,7 +1025,7 @@ export const openTraceStore = (options: { readonly path: string; readonly now?: 
     }
   }
 
-  const spanSamples = (query: SpanSampleQuery): { readonly samples: SpanSample[]; readonly truncated: boolean } => {
+  const spanSamples = (query: SpanSampleQuery) => {
     const sinceUs = Math.round(query.endedAfterMs * 1000)
     const conditions = ['s.start_us >= ?', 's.end_us >= ?']
     const parameters: SQLInputValue[] = [sinceUs - SAMPLE_LOOKBACK_US, sinceUs]

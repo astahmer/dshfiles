@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { describe, expect, it, vi } from 'vitest'
 import { McpOAuthModel, type OAuthGrant, type PendingAuthorization } from './oauth.js'
 
@@ -111,7 +112,7 @@ describe('MCP OAuth authorization code flow', () => {
 
   it('registers a public client and builds a PKCE authorization URL', async () => {
     const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
-      expect(JSON.parse(String(init.body))).toMatchObject({ redirect_uris: ['http://127.0.0.1:4100/cb'], token_endpoint_auth_method: 'none' })
+      expect(decodeJson(jsonValueSchema, String(init.body))).toMatchObject({ redirect_uris: ['http://127.0.0.1:4100/cb'], token_endpoint_auth_method: 'none' })
       return json({ client_id: 'client-1' }, 201)
     })
     const client = await McpOAuthModel.registerClient({ authorizationServer, redirectUri: 'http://127.0.0.1:4100/cb', clientName: 'DSH', fetcher })

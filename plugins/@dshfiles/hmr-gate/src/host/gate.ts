@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 /** Why a rebuilt client bundle must wait: the Host code it pairs with is not the code the Host loaded. */
@@ -85,7 +86,7 @@ export const hostArtifactOf = (clientPath: string): string | undefined => {
   } catch {
     return undefined
   }
-  const manifest = manifestSchema.safeParse(JSON.parse(raw))
+  const manifest = decodeJsonSafe(manifestSchema, raw)
   if (!manifest.success) return undefined
   const entry = entryOf(manifest.data)
   if (entry === undefined) return undefined

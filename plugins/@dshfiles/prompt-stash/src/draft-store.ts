@@ -1,3 +1,4 @@
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 /** Drafts once shared the prompt library's key, so each save overwrote the library; they now have their own. */
@@ -80,8 +81,7 @@ const draftSaveBlock = (input: {
 const parseDraftStore = (source: string | null): DraftStore | null => {
   if (source === null || new TextEncoder().encode(source).byteLength > MAX_DRAFT_STORE_BYTES) return null
   try {
-    const decoded: unknown = JSON.parse(source)
-    const result = draftStoreSchema.safeParse(decoded)
+    const result = decodeJsonSafe(draftStoreSchema, source)
     return result.success ? result.data : null
   } catch {
     return null
@@ -155,7 +155,7 @@ const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
     drafts: current.drafts.filter(draft => draft.id !== draftId),
   })
 
-const sentPromptFromNode = (source: unknown): SentPrompt | null => {
+const parseSentPromptFromNode = (source: unknown): SentPrompt | null => {
   const result = sentPromptNodeSchema.safeParse(source)
   if (!result.success || result.data.content.length === 0) return null
   if (result.data.content.some(block => block.type !== 'text' || block.text === undefined)) return null
@@ -175,5 +175,5 @@ export class PromptDrafts {
   static readonly defaultTitle = defaultDraftTitle
   static readonly save = saveDraft
   static readonly remove = removeDraft
-  static readonly sentPromptFromNode = sentPromptFromNode
+  static readonly parseSentPromptFromNode = parseSentPromptFromNode
 }

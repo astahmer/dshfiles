@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 
@@ -89,9 +90,9 @@ export default defineClient({
   inject: ['modules', 'slots'],
   setup(ctx) {
     const receive = (data: string): void => {
-      let decoded: unknown
+      let decoded: JsonValue
       try {
-        decoded = JSON.parse(data)
+        decoded = decodeJson(jsonValueSchema, data)
       } catch {
         return
       }

@@ -1,6 +1,7 @@
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
+import type { JsonObject } from '../json.js'
 import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import type { ProfileOrchestratorOptions, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
 import type { EventSummary, InspectOptions, InspectResult, InspectTarget, ServiceSummary, SlotSummary, ToolSummary } from './types.js'
@@ -65,18 +66,18 @@ function invalidProviderDto(file: string, error: unknown) {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+function optionalString(record: JsonObject, key: string): string | undefined {
   const value = record[key]
   if (value === undefined) return undefined
   if (typeof value !== 'string') throw new Error(`Inspect field ${JSON.stringify(key)} must be a string when present.`)
   return value
 }
 
-function metadata(record: Record<string, unknown>, known: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+function metadata(record: JsonObject, known: readonly string[]): JsonObject | undefined {
   const knownSet = new Set(known)
   const nested = record.metadata
   if (nested !== undefined && !isRecord(nested)) throw new Error('Inspect field "metadata" must be an object when present.')

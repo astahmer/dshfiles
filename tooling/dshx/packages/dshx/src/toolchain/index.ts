@@ -3,6 +3,8 @@ import { dirname, resolve } from 'node:path'
 import { execa } from 'execa'
 import type { Writable } from 'node:stream'
 import { DshxError } from '../diagnostics.js'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 
 export interface TestProjectOptions {
   readonly stdout?: Writable
@@ -57,9 +59,9 @@ interface PackMetadata {
 }
 
 function packMetadata(stdout: string): PackMetadata {
-  const parsed: unknown = JSON.parse(stdout)
+  const parsed = decodeJson(jsonValueSchema, stdout)
   if (!Array.isArray(parsed) || parsed.length !== 1) throw new Error('npm returned an unexpected pack report')
-  const value: unknown = parsed[0]
+  const value: JsonValue | undefined = parsed[0]
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -70,7 +72,7 @@ function packMetadata(stdout: string): PackMetadata {
   ) {
     throw new Error('npm returned an incomplete pack report')
   }
-  const files = value.files.map((file: unknown) => {
+  const files = value.files.map(file => {
     if (typeof file !== 'object' || file === null || !('path' in file) || typeof file.path !== 'string') throw new Error('npm returned an invalid pack file')
     return { path: file.path }
   })

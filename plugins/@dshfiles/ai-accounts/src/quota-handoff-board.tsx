@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { CSSProperties } from 'react'
 import { KIND_LABEL } from './account-labels.js'
@@ -50,6 +51,7 @@ const PlanSection = (props: { readonly plan: HandoffPlan; readonly now: number; 
   const total = plan.hours * HOUR_MS
   const widthOf = (segment: { readonly start: number; readonly end: number }): string => `${String(((segment.end - segment.start) / total) * 100)}%`
   return (
+    <TooltipProvider delayDuration={500}>
     <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:pb-5">
       <header className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:justify-between dshx:gap-2">
         <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-base dshx:font-medium">
@@ -76,15 +78,18 @@ const PlanSection = (props: { readonly plan: HandoffPlan; readonly now: number; 
             aria-label={`Who serves ${KIND_LABEL[plan.kind]} over the next seven days`}
           >
             {plan.segments.map(segment => (
-              <span
-                className={cn(
-                  'dshx:border-r dshx:border-background dshx:last:border-r-0',
-                  segment.instanceId === null ? 'dshx:bg-destructive/15 dshx:text-destructive/70' : toneOf(order.indexOf(segment.instanceId)),
-                )}
-                key={segment.start}
-                style={segment.instanceId === null ? { ...HATCH, width: widthOf(segment) } : { width: widthOf(segment) }}
-                title={`${nameOf(segment.instanceId)} · ${span(segment.start, segment.end, now)}`}
-              />
+              <Tooltip key={segment.start}>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      'dshx:border-r dshx:border-background dshx:last:border-r-0',
+                      segment.instanceId === null ? 'dshx:bg-destructive/15 dshx:text-destructive/70' : toneOf(order.indexOf(segment.instanceId)),
+                    )}
+                    style={segment.instanceId === null ? { ...HATCH, width: widthOf(segment) } : { width: widthOf(segment) }}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{`${nameOf(segment.instanceId)} · ${span(segment.start, segment.end, now)}`}</TooltipContent>
+              </Tooltip>
             ))}
           </div>
           <WorkBand plan={plan} workHours={props.workHours} />
@@ -127,6 +132,7 @@ const PlanSection = (props: { readonly plan: HandoffPlan; readonly now: number; 
       ) : null}
       {plan.unread.length === 0 ? null : <p className="dshx:text-xs dshx:text-muted-foreground">Left out without a forecast: {plan.unread.join(', ')}.</p>}
     </section>
+    </TooltipProvider>
   )
 }
 

@@ -129,10 +129,17 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
               {filesQuery.isFetching ? <Spinner className="dshx:size-3" /> : <RefreshCwIcon />}
             </IconAction>
             <Select onValueChange={value => props.onAncestorCountChange(Number(value))} value={String(props.ancestorCount)}>
-              <SelectTrigger aria-label="Ancestor groups" className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-[11px]" size="sm" title="Ancestor groups shown">
-                <span className="dshx:text-muted-foreground">@-</span>
-                <SelectValue />
-              </SelectTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SelectTrigger aria-label="Ancestor groups" className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-[11px]" size="sm">
+                    <span className="dshx:text-muted-foreground">@-</span>
+                    <SelectValue />
+                  </SelectTrigger>
+                </TooltipTrigger>
+                <TooltipContent className="dshx-root" side="bottom">
+                  Ancestor groups shown
+                </TooltipContent>
+              </Tooltip>
               <SelectContent className="dshx-root">
                 {ANCESTOR_COUNT_OPTIONS.map(option => (
                   <SelectItem key={option} value={String(option)}>
@@ -160,18 +167,18 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
               value={message}
             />
             <div className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <Button
-                className="dshx:flex-1"
-                disabled={props.busy || commitMessage.length === 0}
-                onClick={commit}
-                size="xs"
-                title="jj commit: describe @ and start a new empty change"
-                type="button"
-              >
-                <CheckIcon />
-                Commit
-                <Kbd className="dshx:ml-1 dshx:h-4 dshx:bg-primary-foreground/20 dshx:text-[10px] dshx:text-primary-foreground">⌘↵</Kbd>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button className="dshx:flex-1" disabled={props.busy || commitMessage.length === 0} onClick={commit} size="xs" type="button">
+                    <CheckIcon />
+                    Commit
+                    <Kbd className="dshx:ml-1 dshx:h-4 dshx:bg-primary-foreground/20 dshx:text-[10px] dshx:text-primary-foreground">⌘↵</Kbd>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="dshx-root" side="bottom">
+                  jj commit: describe @ and start a new empty change
+                </TooltipContent>
+              </Tooltip>
               <Button
                 disabled={props.busy || !messageChanged}
                 onClick={() => props.onAction({ kind: 'describe', commitId: workingCopy.commitId, message })}
@@ -204,34 +211,40 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
           return (
             <section aria-label={`${label} ${revision.shortestChangeId}`} key={revision.commitId}>
               <div className="dshx:group/header dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:h-7 dshx:items-center dshx:gap-1 dshx:bg-background dshx:pr-2 dshx:pl-1 dshx:hover:bg-accent">
-                <button
-                  aria-expanded={open}
-                  className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:text-left dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-                  onClick={() =>
-                    setCollapsed(current => {
-                      const next = new Set(current)
-                      if (next.has(revision.commitId)) next.delete(revision.commitId)
-                      else next.add(revision.commitId)
-                      return next
-                    })
-                  }
-                  title={revision.description || '(no description)'}
-                  type="button"
-                >
-                  <ChevronRightIcon
-                    className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', open && 'dshx:rotate-90')}
-                  />
-                  <span className="dshx:flex-none dshx:font-semibold">{label}</span>
-                  <span className="dshx:flex-none dshx:font-mono dshx:text-info">{revision.shortestChangeId}</span>
-                  <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-muted-foreground', revision.description.trim().length === 0 && 'dshx:italic')}>
-                    {firstLine(revision.description)}
-                  </span>
-                  {revision.immutable && (
-                    <Badge className="dshx:h-4 dshx:rounded-sm dshx:px-1 dshx:py-0 dshx:text-[10px]" variant="outline">
-                      immutable
-                    </Badge>
-                  )}
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      aria-expanded={open}
+                      className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:text-left dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                      onClick={() =>
+                        setCollapsed(current => {
+                          const next = new Set(current)
+                          if (next.has(revision.commitId)) next.delete(revision.commitId)
+                          else next.add(revision.commitId)
+                          return next
+                        })
+                      }
+                      type="button"
+                    >
+                      <ChevronRightIcon
+                        className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', open && 'dshx:rotate-90')}
+                      />
+                      <span className="dshx:flex-none dshx:font-semibold">{label}</span>
+                      <span className="dshx:flex-none dshx:font-mono dshx:text-info">{revision.shortestChangeId}</span>
+                      <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-muted-foreground', revision.description.trim().length === 0 && 'dshx:italic')}>
+                        {firstLine(revision.description)}
+                      </span>
+                      {revision.immutable && (
+                        <Badge className="dshx:h-4 dshx:rounded-sm dshx:px-1 dshx:py-0 dshx:text-[10px]" variant="outline">
+                          immutable
+                        </Badge>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="dshx-root" side="bottom">
+                    {revision.description || '(no description)'}
+                  </TooltipContent>
+                </Tooltip>
                 <span className="dshx:flex dshx:flex-none dshx:items-center dshx:opacity-0 dshx:group-hover/header:opacity-100 dshx:focus-within:opacity-100">
                   <IconAction label="Full diff" onClick={() => props.onOpenDiff(revision, null)}>
                     <FileDiffIcon />

@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -17,7 +18,6 @@ import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
-import { threadStatusPollMs } from './thread-status-poll.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
@@ -75,8 +75,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
       return current
     },
-    refetchInterval: query =>
-      threadStatusPollMs({ hasThread: query.state.data?.thread != null, queued: query.state.data?.thread?.integrationQueuedAt !== undefined }),
+    refetchInterval: query => (query.state.data?.thread === null ? false : 5_000),
   })
   const rebase = useMutation({
     mutationKey: threadRebaseMutationKey,
@@ -219,24 +218,28 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     ) : null
 
   const trigger = (
-    <Button
-      aria-label={triggerLabel}
-      className="dshx-root dshx:min-w-0 dshx:max-w-44 dshx:shrink dshx:gap-1.5 dshx:px-2"
-      size="sm"
-      title={current?.path ?? cwd ?? triggerLabel}
-      type="button"
-      variant="outline"
-    >
-      {glyph}
-      <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{name}</span>
-      {countBadge}
-      {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
-      <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={triggerLabel}
+          className="dshx-root dshx:min-w-0 dshx:max-w-44 dshx:shrink dshx:gap-1.5 dshx:px-2"
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {glyph}
+          <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{name}</span>
+          {countBadge}
+          {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
+          <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="dshx:max-w-96">{current?.path ?? cwd ?? triggerLabel}</TooltipContent>
+    </Tooltip>
   )
 
   return (
-    <>
+    <TooltipProvider>
       <span className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1">
         <Popover>
           {current === null || current === undefined ? (
@@ -250,9 +253,14 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 <FolderGit2Icon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-sm dshx:font-medium">{name}</span>
               </div>
-              <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={current?.path ?? cwd ?? ''}>
-                {current?.path ?? cwd ?? props.t('unknownWorkspace')}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
+                    {current?.path ?? cwd ?? props.t('unknownWorkspace')}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="dshx:max-w-96">{current?.path ?? cwd ?? ''}</TooltipContent>
+              </Tooltip>
             </div>
             <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
             {isThread &&
@@ -261,78 +269,94 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                   <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">
                     <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
                     <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">{props.t('integrationQueuedHint', { bookmark: props.bookmark })}</p>
-                    <Button
-                      aria-label={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
-                      className="dshx-root dshx:shrink"
-                      disabled={undoQueuedIntegration.isPending}
-                      onClick={() => undoQueuedIntegration.mutate(current.path)}
-                      size="sm"
-                      title={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
-                      type="button"
-                      variant="ghost"
-                    >
-                      {undoQueuedIntegration.isPending ? <Spinner /> : <Undo2Icon aria-hidden="true" className="dshx:size-3.5" />}
-                      {props.t('undoQueuedIntegration')}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          aria-label={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
+                          className="dshx-root dshx:shrink"
+                          disabled={undoQueuedIntegration.isPending}
+                          onClick={() => undoQueuedIntegration.mutate(current.path)}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {undoQueuedIntegration.isPending ? <Spinner /> : <Undo2Icon aria-hidden="true" className="dshx:size-3.5" />}
+                          {props.t('undoQueuedIntegration')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               ) : canQueueIntegration ? (
                 <div className="dshx:px-3 dshx:pb-3">
-                  <Button
-                    aria-label={props.t('queueIntegration', { bookmark: props.bookmark })}
-                    className="dshx-root dshx:w-full"
-                    disabled={queueIntegration.isPending}
-                    onClick={() => queueIntegration.mutate(current.path)}
-                    size="sm"
-                    title={props.t('queueIntegrationHint')}
-                    type="button"
-                    variant="outline"
-                  >
-                    {queueIntegration.isPending ? <Spinner /> : <ClockIcon aria-hidden="true" className="dshx:size-3.5" />}
-                    {props.t('queueIntegration', { bookmark: props.bookmark })}
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={props.t('queueIntegration', { bookmark: props.bookmark })}
+                        className="dshx-root dshx:w-full"
+                        disabled={queueIntegration.isPending}
+                        onClick={() => queueIntegration.mutate(current.path)}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {queueIntegration.isPending ? <Spinner /> : <ClockIcon aria-hidden="true" className="dshx:size-3.5" />}
+                        {props.t('queueIntegration', { bookmark: props.bookmark })}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{props.t('queueIntegrationHint')}</TooltipContent>
+                  </Tooltip>
                   <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">
                     {blockedReason === undefined ? props.t('queueIntegrationHint') : `${blockedReason} ${props.t('queueIntegrationHint')}`}
                   </p>
                 </div>
               ) : (
                 <div className="dshx:px-3 dshx:pb-3">
-                  <Button
-                    aria-label={label}
-                    className="dshx-root dshx:w-full"
-                    disabled={rebaseDisabled}
-                    onClick={() => rebase.mutate(current.path)}
-                    size="sm"
-                    title={canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}
-                    type="button"
-                    variant="outline"
-                  >
-                    {rebasesPending ? <Spinner /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3.5" />}
-                    {props.t('rebaseOnto', { bookmark: props.bookmark })}
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={label}
+                        className="dshx-root dshx:w-full"
+                        disabled={rebaseDisabled}
+                        onClick={() => rebase.mutate(current.path)}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {rebasesPending ? <Spinner /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3.5" />}
+                        {props.t('rebaseOnto', { bookmark: props.bookmark })}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}</TooltipContent>
+                  </Tooltip>
                   {blockedReason === undefined ? null : <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">{blockedReason}</p>}
                 </div>
               ))}
             <Separator />
             <div className="dshx:p-1">
-              <Button
-                aria-label={props.t('openSidePanel')}
-                className="dshx-root dshx:w-full dshx:justify-start"
-                onClick={props.openThreadWorkspaces}
-                size="sm"
-                title={props.t('openSidePanel')}
-                type="button"
-                variant="ghost"
-              >
-                <PanelRightIcon aria-hidden="true" className="dshx:size-3.5" />
-                {props.t('openSidePanel')}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={props.t('openSidePanel')}
+                    className="dshx-root dshx:w-full dshx:justify-start"
+                    onClick={props.openThreadWorkspaces}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <PanelRightIcon aria-hidden="true" className="dshx:size-3.5" />
+                    {props.t('openSidePanel')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{props.t('openSidePanel')}</TooltipContent>
+              </Tooltip>
               <SessionLogDownloadRow sessionId={props.sessionId} port={props.sessionLog} t={props.t} />
             </div>
           </PopoverContent>
         </Popover>
       </span>
       {toast.element}
-    </>
+    </TooltipProvider>
   )
 }

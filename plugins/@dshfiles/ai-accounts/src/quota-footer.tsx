@@ -123,13 +123,14 @@ const SummaryItem = (props: {
             const exhausted = Math.round(window.percentRemaining) <= 0
             const windowTone = exhausted ? 'critical' : quotaTone(window.percentRemaining)
             return (
-              <span
-                className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[windowTone])}
-                key={window.label}
-                title={window.label}
-              >
-                {String(Math.round(window.percentRemaining))}%
-              </span>
+              <Tooltip key={window.label}>
+                <TooltipTrigger asChild>
+                  <span className={cn('dshx:text-[11px] dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[windowTone])}>
+                    {String(Math.round(window.percentRemaining))}%
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{window.label}</TooltipContent>
+              </Tooltip>
             )
           })}
         </span>
@@ -270,8 +271,12 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
   const now = useQuotaClock({ resetsAt: items.map(item => item.resetsAt) })
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
   const critical = UsageOverviewModel.mostCritical(items)
+  const stripTitle = items.map(item => describeItem(item, now)).join('\n') || label
   return (
+    <TooltipProvider delayDuration={500}>
     <Popover onOpenChange={setOpen} open={open}>
+      <Tooltip>
+      <TooltipTrigger asChild>
       <PopoverTrigger asChild>
         <button
           aria-label={label}
@@ -280,7 +285,6 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
             'dshx:h-auto dshx:min-h-8 dshx:flex-col dshx:gap-0.5 dshx:overflow-hidden dshx:py-1',
             open && 'dshx:bg-accent dshx:text-foreground',
           )}
-          title={items.map(item => describeItem(item, now)).join('\n') || label}
           type="button"
         >
           {/* The rail is ~56px wide: the glyph over the percent, no account tag or reset, so nothing clips. */}
@@ -301,8 +305,12 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
           )}
         </button>
       </PopoverTrigger>
+      </TooltipTrigger>
+      <TooltipContent className="dshx-root dshx:whitespace-pre-line">{stripTitle}</TooltipContent>
+      </Tooltip>
       <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} />
     </Popover>
+    </TooltipProvider>
   )
 }
 

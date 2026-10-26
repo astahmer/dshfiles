@@ -2,6 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, ChevronDownIcon, LocateFixedIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
@@ -26,20 +27,25 @@ export const LandmarkControls = ({ navigation, onLocate }: LandmarkControlsProps
     {navigation.landmarks.map(landmark => {
       const revision = landmark.status === 'resolved' ? landmark.revisions[0] : undefined
       return (
-        <Button
-          aria-label={`Locate ${landmark.label}`}
-          disabled={revision === undefined}
-          key={landmark.kind}
-          onClick={() => {
-            if (revision !== undefined) onLocate(revision)
-          }}
-          size="xs"
-          title={revision === undefined ? `${landmark.label}: ${landmark.status}` : `${landmark.label} · ${revision.shortestChangeId} · ${revision.commitId}`}
-          type="button"
-          variant="ghost"
-        >
-          {landmark.label}
-        </Button>
+        <Tooltip key={landmark.kind}>
+          <TooltipTrigger asChild>
+            <Button
+              aria-label={`Locate ${landmark.label}`}
+              disabled={revision === undefined}
+              onClick={() => {
+                if (revision !== undefined) onLocate(revision)
+              }}
+              size="xs"
+              type="button"
+              variant="ghost"
+            >
+              {landmark.label}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {revision === undefined ? `${landmark.label}: ${landmark.status}` : `${landmark.label} · ${revision.shortestChangeId} · ${revision.commitId}`}
+          </TooltipContent>
+        </Tooltip>
       )
     })}
     {navigation.landmarksQuery.error !== null && (
@@ -138,9 +144,12 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
     >
       <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5">
         <strong className="dshx:font-medium">Compare</strong>
-        <span className={selected.workingCopy ? 'dshx:font-medium' : 'dshx:font-mono'} title={selected.description}>
-          {subjectLabel}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className={selected.workingCopy ? 'dshx:font-medium' : 'dshx:font-mono'}>{subjectLabel}</span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{selected.description}</TooltipContent>
+        </Tooltip>
         <span className="dshx:text-muted-foreground">with</span>
         <Select onValueChange={navigation.chooseTarget} value={navigation.targetKey}>
           <SelectTrigger aria-label="Comparison target" className="dshx:w-40 dshx:max-w-full dshx:px-2 dshx:text-xs" size="sm">
@@ -157,16 +166,14 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
           </SelectContent>
         </Select>
         {target !== undefined && (
-          <Button
-            aria-label="Locate comparison target"
-            onClick={() => onLocate(target)}
-            size="icon-xs"
-            title="Locate target in graph"
-            type="button"
-            variant="ghost"
-          >
-            <LocateFixedIcon aria-hidden />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button aria-label="Locate comparison target" onClick={() => onLocate(target)} size="icon-xs" type="button" variant="ghost">
+                <LocateFixedIcon aria-hidden />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Locate target in graph</TooltipContent>
+          </Tooltip>
         )}
         <Button aria-label="Close comparison" onClick={navigation.closeComparison} size="icon-xs" type="button" variant="ghost">
           <XIcon />
@@ -206,18 +213,29 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
       {relationship !== undefined && (
         <>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <div
-              aria-live="polite"
-              className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1"
-              title="Exact revision ancestry counts; not a file or patch comparison."
-            >
-              <strong className="dshx:font-medium">{GraphNavigationModel.relationshipLabel(relationship.relation)}</strong>
-              <span title={`Changes reachable only from ${subjectLabel}`}>
-                <strong>{relationship.selectedOnlyCount}</strong> only in {subjectLabel}
-              </span>
-              <span title={`Changes reachable only from ${navigation.targetLabel}`}>
-                <strong>{relationship.targetOnlyCount}</strong> only in {navigation.targetLabel}
-              </span>
+            <div aria-live="polite" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <strong className="dshx:font-medium">{GraphNavigationModel.relationshipLabel(relationship.relation)}</strong>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Exact revision ancestry counts; not a file or patch comparison.</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <strong>{relationship.selectedOnlyCount}</strong> only in {subjectLabel}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{`Changes reachable only from ${subjectLabel}`}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <strong>{relationship.targetOnlyCount}</strong> only in {navigation.targetLabel}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{`Changes reachable only from ${navigation.targetLabel}`}</TooltipContent>
+              </Tooltip>
               <span className="dshx:text-muted-foreground">{relationship.commonAncestorIds.length} shared</span>
             </div>
             <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
@@ -227,16 +245,22 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
               <Button disabled={unavailableConnection} onClick={() => navigation.applyRelationship('connection')} size="xs" type="button" variant="outline">
                 Show only path
               </Button>
-              <Button
-                disabled={relationship.selectedOnlyCount === 0}
-                onClick={() => navigation.applyRelationship('difference')}
-                size="xs"
-                title={relationship.selectedOnlyCount === 0 ? 'No changes exist only on this side.' : 'Show changes on this side that are not in the target.'}
-                type="button"
-                variant="outline"
-              >
-                Work since target
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled={relationship.selectedOnlyCount === 0}
+                    onClick={() => navigation.applyRelationship('difference')}
+                    size="xs"
+                    type="button"
+                    variant="outline"
+                  >
+                    Work since target
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {relationship.selectedOnlyCount === 0 ? 'No changes exist only on this side.' : 'Show changes on this side that are not in the target.'}
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
           {relationship.truncated && (

@@ -2,7 +2,9 @@ import { access, readFile, realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import { DshxError } from '../diagnostics.js'
+import { decodeJsonSafe, jsonObjectSchema } from '../json.js'
 import { resolveVitePlugins } from './vite-plugins.js'
+import type { JsonObject, JsonValue } from '../json.js'
 import type { DshxConfig, DshxModuleEntry, ResolvedDshxConfig, ResolveDshxConfigOptions } from './types.js'
 
 const CONFIG_FILENAME = 'dshx.config.ts'
@@ -13,7 +15,12 @@ const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
 const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
-function isObject(value: unknown): value is Record<string, unknown> {
+/** A project `package.json` whose `name` readManifest already validated. */
+interface ProjectManifest extends JsonObject {
+  readonly name: string
+}
+
+function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -41,32 +48,34 @@ async function findProjectRoot(cwd: string): Promise<string> {
   }
 }
 
-async function readManifest(packageFile: string): Promise<Record<string, unknown>> {
+async function readManifest(packageFile: string): Promise<ProjectManifest> {
   let source: string
   try {
     source = await readFile(packageFile, 'utf8')
   } catch (cause) {
     throw new DshxError('DSHX4002', `Cannot read project manifest: ${packageFile}`, { cause, file: packageFile })
   }
-  let value: unknown
+  let value: JsonObject | undefined
   try {
-    value = JSON.parse(source)
+    const decoded = decodeJsonSafe(jsonObjectSchema, source)
+    if (decoded.success) value = decoded.data
   } catch (cause) {
     throw new DshxError('DSHX4002', `Project manifest is not valid JSON: ${packageFile}`, { cause, file: packageFile })
   }
-  if (!isObject(value)) {
+  if (value === undefined) {
     throw new DshxError('DSHX4002', 'Project package.json must contain a JSON object.', { file: packageFile })
   }
-  if (typeof value.name !== 'string' || value.name.trim() === '') {
+  const name = value.name
+  if (typeof name !== 'string' || name.trim() === '') {
     throw new DshxError('DSHX4002', 'Project package.json must declare a non-empty string name.', {
       file: packageFile,
       hint: 'Use the installable package id, for example "@scope/my-plugin".',
     })
   }
-  return value
+  return { ...value, name }
 }
 
-function rejectUnknownKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>, label: string, file: string): void {
+function rejectUnknownKeys(value: JsonObject, allowed: ReadonlySet<string>, label: string, file: string): void {
   const unknown = Object.keys(value).filter(key => !allowed.has(key))
   if (unknown.length > 0) {
     throw new DshxError('DSHX4004', `${label} contains unknown field${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}.`, {
@@ -76,7 +85,7 @@ function rejectUnknownKeys(value: Record<string, unknown>, allowed: ReadonlySet<
   }
 }
 
-function optionalNonEmptyString(value: unknown, field: string, file: string): string | undefined {
+function optionalNonEmptyString(value: JsonValue | undefined, field: string, file: string): string | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'string' || value.trim() === '') {
     throw new DshxError('DSHX4004', `${field} must be a non-empty string.`, {
@@ -87,7 +96,7 @@ function optionalNonEmptyString(value: unknown, field: string, file: string): st
   return value
 }
 
-function optionalPackageNames(value: unknown, field: string, file: string): readonly string[] | undefined {
+function optionalPackageNames(value: JsonValue | undefined, field: string, file: string): readonly string[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) {
     throw new DshxError('DSHX4004', `${field} must be an array of bare package roots.`, {
@@ -111,7 +120,7 @@ function optionalPackageNames(value: unknown, field: string, file: string): read
   return names
 }
 
-function validateSharedRuntime(client: Record<string, unknown>, file: string): void {
+function validateSharedRuntime(client: JsonObject, file: string): void {
   const packageName = /^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/
   if (client.shared !== undefined && (typeof client.shared !== 'string' || !packageName.test(client.shared))) {
     throw new DshxError('DSHX4004', 'client.shared must be the package id of a shared-runtime supplier.', {
@@ -142,7 +151,7 @@ function validateSharedRuntime(client: Record<string, unknown>, file: string): v
   rejectUnknownKeys(client.sharedRuntime, new Set(['provide']), 'client.sharedRuntime', file)
 }
 
-function validateConfig(value: unknown, file: string): DshxConfig {
+function checkConfig(value: unknown, file: string): DshxConfig {
   if (!isObject(value)) {
     throw new DshxError('DSHX4003', 'dshx.config.ts must default-export an object.', {
       file,
@@ -262,6 +271,7 @@ function validateConfig(value: unknown, file: string): DshxConfig {
       })
     }
   }
+  // SAFETY: every field above was validated against the DshxConfig contract, including the nested faces.
   return value as DshxConfig
 }
 
@@ -289,7 +299,7 @@ async function loadUserConfig(root: string): Promise<{
     })
   }
   return {
-    config: validateConfig(loaded.config, loaded.path),
+    config: checkConfig(loaded.config, loaded.path),
     configFile: loaded.path,
     dependencies: [...loaded.dependencies],
   }
@@ -396,7 +406,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     })
   }
   const modules = await resolveModules(root, loaded.config.modules, loaded.configFile)
-  const packageId = manifest.name as string
+  const packageId = manifest.name
   return {
     root,
     packageFile,

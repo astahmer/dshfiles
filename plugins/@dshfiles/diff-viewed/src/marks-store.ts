@@ -51,7 +51,7 @@ const createViewedMarksStore = ({
   let revision = Math.max(now(), ...[...records.values()].map(mark => mark.version))
   let writes: Promise<void> = Promise.resolve()
 
-  const enqueue = (operation: () => Promise<unknown>): Promise<void> => {
+  const enqueue = <Result>(operation: () => Promise<Result>): Promise<void> => {
     const result = writes.then(operation).then(() => undefined)
     writes = result.catch(() => undefined)
     return result

@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, open, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { defineTool } from '@dshfiles/dshx/host'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { AttachmentId, type AttachmentStore, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { InferValue, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
@@ -198,9 +199,9 @@ const fetchTweet = async (input: {
   }
   if (!response.ok) throw new Error(`FxEmbed could not fetch this post (HTTP ${String(response.status)}).`)
 
-  let json: unknown
+  let json: JsonValue
   try {
-    json = JSON.parse(await boundedResponseText({ response, maxBytes: MAX_API_RESPONSE_BYTES }))
+    json = decodeJson(jsonValueSchema, await boundedResponseText({ response, maxBytes: MAX_API_RESPONSE_BYTES }))
   } catch {
     throw new Error('FxEmbed returned an unreadable post response.')
   }

@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { decodeJsonSafe, jsonObjectSchema } from '../json.js'
+import type { JsonObject } from '../json.js'
 import type { JsonValue, SessionSummary } from './client.js'
 
 const eventRecordSchema = z.object({
@@ -149,17 +151,17 @@ const homeRelative = (text: string): string => text.replace(/(?<![\w./-])\/(?:Us
 
 const joinPath = (base: string, path: string): string => (path.startsWith('/') ? path : `${base.replace(/\/$/, '')}/${path.replace(/^\.\//, '')}`)
 
-const parseArguments = (value: string | undefined): Readonly<Record<string, unknown>> => {
+const parseArguments = (value: string | undefined): JsonObject => {
   if (value === undefined) return {}
   try {
-    const parsed = z.record(z.string(), z.unknown()).safeParse(JSON.parse(value))
+    const parsed = decodeJsonSafe(jsonObjectSchema, value)
     return parsed.success ? parsed.data : {}
   } catch {
     return {}
   }
 }
 
-const stringArgument = (args: Readonly<Record<string, unknown>>, ...names: string[]): string | undefined => {
+const stringArgument = (args: JsonObject, ...names: string[]): string | undefined => {
   for (const name of names) {
     const value = args[name]
     if (typeof value === 'string' && value.length > 0) return value
@@ -178,7 +180,7 @@ const reasoningHeadlines = (text: string): string[] => [
 ]
 
 /** The directory a shell command runs in: its `workdir` argument, or a leading `cd <dir> &&`. */
-const shellDirectory = (args: Readonly<Record<string, unknown>>): string | undefined => {
+const shellDirectory = (args: JsonObject): string | undefined => {
   const workdir = stringArgument(args, 'workdir', 'cwd')
   if (workdir !== undefined) return workdir
   const command = stringArgument(args, 'command')
@@ -212,7 +214,7 @@ const vcsMessage = (rest: string): string | undefined => {
 }
 
 /** A one-line description of one tool call, keyed on the argument a supervisor needs to see. */
-const describeToolCall = (name: string, args: Readonly<Record<string, unknown>>, display: (path: string) => string, workRoot?: string): string => {
+const describeToolCall = (name: string, args: JsonObject, display: (path: string) => string, workRoot?: string): string => {
   if (shellTools.has(name)) {
     const command = (stringArgument(args, 'command', 'cmd') ?? '').replace(/^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;)\s*/, '')
     const background = args.run_in_background === true ? ' (background)' : ''

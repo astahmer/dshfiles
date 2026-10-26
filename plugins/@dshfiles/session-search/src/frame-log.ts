@@ -6,6 +6,7 @@
  */
 import { open, readdir, stat } from 'node:fs/promises'
 import { zstdDecompressSync } from 'node:zlib'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { sessionHeaderSchema, type SessionHeaderRow } from './protocol.js'
 
 const ZSTD_MAGIC = 4247762216
@@ -129,7 +130,7 @@ export class FrameLog {
       if (first === undefined) throw new Error(`no complete Zstandard frame in the first ${String(HEADER_BYTES)} bytes of ${path}`)
       const text = zstdDecompressSync(view.subarray(first.start, first.end)).toString('utf8')
       const newline = text.indexOf('\n')
-      return sessionHeaderSchema.parse(JSON.parse(newline < 0 ? text : text.slice(0, newline)))
+      return decodeJson(sessionHeaderSchema, newline < 0 ? text : text.slice(0, newline))
     } finally {
       await handle.close()
     }

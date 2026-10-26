@@ -9,6 +9,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   CheckIcon,
   CircleCheckIcon,
@@ -305,9 +306,12 @@ const PluginCard = ({
         <PluginIcon plugin={plugin} />
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-            <h4 className="dshx:truncate dshx:text-sm dshx:font-semibold" title={plugin.name}>
-              {plugin.name}
-            </h4>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <h4 className="dshx:truncate dshx:text-sm dshx:font-semibold">{plugin.name}</h4>
+              </TooltipTrigger>
+              <TooltipContent>{plugin.name}</TooltipContent>
+            </Tooltip>
             <Badge className="dshx:shrink-0" variant={plugin.badge === 'official' ? 'info' : 'muted'}>
               {t(plugin.badge)}
             </Badge>
@@ -328,25 +332,41 @@ const PluginCard = ({
               </span>
             ) : null}
             {plugin.updated !== null ? (
-              <span className="dshx:hidden dshx:shrink-0 dshx:@md:inline" title={interpolate(t('updatedLabel'), { date: plugin.updated })}>
-                {plugin.updated}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:hidden dshx:shrink-0 dshx:@md:inline">{plugin.updated}</span>
+                </TooltipTrigger>
+                <TooltipContent>{interpolate(t('updatedLabel'), { date: plugin.updated })}</TooltipContent>
+              </Tooltip>
             ) : null}
           </div>
         </div>
       </div>
-      <p className="dshx:line-clamp-2 dshx:min-h-[2lh] dshx:text-xs dshx:text-muted-foreground" title={plugin.description}>
-        {plugin.description}
-      </p>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <p className="dshx:line-clamp-2 dshx:min-h-[2lh] dshx:text-xs dshx:text-muted-foreground">{plugin.description}</p>
+        </TooltipTrigger>
+        <TooltipContent className="dshx:max-w-96">{plugin.description}</TooltipContent>
+      </Tooltip>
       <div className="dshx:mt-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2">
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <code className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={plugin.packageName}>
-            {plugin.packageName}
-          </code>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <code className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{plugin.packageName}</code>
+            </TooltipTrigger>
+            <TooltipContent>{plugin.packageName}</TooltipContent>
+          </Tooltip>
           {!plugin.installed && plugin.compatibility !== 'compatible' ? (
-            <Badge className="dshx:shrink-0" title={plugin.compatibilityRange} variant={plugin.compatibility === 'incompatible' ? 'warning' : 'muted'}>
-              {t(plugin.compatibility === 'incompatible' ? 'incompatible' : 'compatibilityUnknown')}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="dshx:inline-flex">
+                  <Badge className="dshx:shrink-0" variant={plugin.compatibility === 'incompatible' ? 'warning' : 'muted'}>
+                    {t(plugin.compatibility === 'incompatible' ? 'incompatible' : 'compatibilityUnknown')}
+                  </Badge>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{plugin.compatibilityRange}</TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
         <Button
@@ -463,231 +483,246 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   })
 
   return (
-    <section aria-busy={initialLoading || catalog.isFetchingNextPage} className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
-      <header className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:bg-background dshx:pt-1 dshx:pb-2.5">
-        <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-3">
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-            <h3 className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-semibold">
-              <StoreIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-              <span className="dshx:truncate">{t('title')}</span>
-              {total !== null ? (
-                <Badge className="dshx:shrink-0" variant="muted">
-                  {interpolate(t('resultCount'), { count: String(total) })}
-                </Badge>
-              ) : null}
-            </h3>
-            <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{interpolate(t('subtitle'), { host: hubHost(hubBaseUrl) })}</p>
+    <TooltipProvider>
+      <section aria-busy={initialLoading || catalog.isFetchingNextPage} className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
+        <header className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:bg-background dshx:pt-1 dshx:pb-2.5">
+          <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-3">
+            <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+              <h3 className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:font-semibold">
+                <StoreIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+                <span className="dshx:truncate">{t('title')}</span>
+                {total !== null ? (
+                  <Badge className="dshx:shrink-0" variant="muted">
+                    {interpolate(t('resultCount'), { count: String(total) })}
+                  </Badge>
+                ) : null}
+              </h3>
+              <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{interpolate(t('subtitle'), { host: hubHost(hubBaseUrl) })}</p>
+            </div>
+            <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={t('refresh')}
+                    disabled={catalog.isFetching}
+                    onClick={() => {
+                      void catalog.refetch()
+                    }}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <RefreshCwIcon className={cn(catalog.isFetching && 'dshx:animate-spin')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('refresh')}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild size="icon-sm" variant="ghost">
+                    <a aria-label={t('openHub')} href={hubBaseUrl} rel="noreferrer" target="_blank">
+                      <ExternalLinkIcon />
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('openHub')}</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-          <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5">
-            <Button
-              aria-label={t('refresh')}
-              disabled={catalog.isFetching}
-              onClick={() => {
-                void catalog.refetch()
-              }}
-              size="icon-sm"
-              title={t('refresh')}
-              type="button"
-              variant="ghost"
-            >
-              <RefreshCwIcon className={cn(catalog.isFetching && 'dshx:animate-spin')} />
-            </Button>
-            <Button asChild size="icon-sm" title={t('openHub')} variant="ghost">
-              <a aria-label={t('openHub')} href={hubBaseUrl} rel="noreferrer" target="_blank">
-                <ExternalLinkIcon />
-              </a>
-            </Button>
-          </div>
-        </div>
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <InputGroup className="dshx:h-7 dshx:min-w-48 dshx:flex-1">
-            <InputGroupAddon>
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('searchLabel')}
-              autoComplete="off"
-              maxLength={MAX_QUERY_LENGTH}
-              onChange={event => {
-                setSearch(event.currentTarget.value)
-              }}
-              placeholder={t('searchPlaceholder')}
-              type="search"
-              value={search}
-            />
-            {search.length > 0 ? (
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton
-                  aria-label={t('clearSearch')}
-                  onClick={() => {
-                    setSearch('')
-                  }}
-                  size="icon-xs"
-                >
-                  <XIcon />
-                </InputGroupButton>
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <InputGroup className="dshx:h-7 dshx:min-w-48 dshx:flex-1">
+              <InputGroupAddon>
+                <SearchIcon />
               </InputGroupAddon>
-            ) : null}
-          </InputGroup>
-          <ToggleGroup
-            aria-label={t('sortLabel')}
-            onValueChange={value => {
-              if (value === 'latest' || value === 'stars') setSortOverride(value)
-            }}
-            size="sm"
-            type="single"
-            value={sort}
-            variant="outline"
-          >
-            <ToggleGroupItem className="dshx:px-2.5 dshx:text-xs" value="latest">
-              {t('sortLatest')}
-            </ToggleGroupItem>
-            <ToggleGroupItem className="dshx:px-2.5 dshx:text-xs" value="stars">
-              {t('sortStars')}
-            </ToggleGroupItem>
-          </ToggleGroup>
-          <Toggle
-            className="dshx:px-2.5 dshx:text-xs"
-            onPressedChange={pressed => {
-              setCompatibleOverride(pressed)
-            }}
-            pressed={compatibleOnly}
-            size="sm"
-            variant="outline"
-          >
-            <ShieldCheckIcon />
-            {t('compatibleOnly')}
-          </Toggle>
-        </div>
-        <nav aria-label={t('categoriesLabel')} className="dshx:-mb-1 dshx:flex dshx:gap-1.5 dshx:overflow-x-auto dshx:pb-1">
-          <Toggle
-            className="dshx:h-6 dshx:shrink-0 dshx:px-2 dshx:text-xs"
-            onPressedChange={() => {
-              setCategory(undefined)
-            }}
-            pressed={category === undefined}
-            size="sm"
-            variant="outline"
-          >
-            {t('all')}
-          </Toggle>
-          {categories.map(item => (
-            <Toggle
-              className="dshx:h-6 dshx:shrink-0 dshx:px-2 dshx:text-xs"
-              key={item.slug}
-              onPressedChange={() => {
-                setCategory(item.slug)
+              <InputGroupInput
+                aria-label={t('searchLabel')}
+                autoComplete="off"
+                maxLength={MAX_QUERY_LENGTH}
+                onChange={event => {
+                  setSearch(event.currentTarget.value)
+                }}
+                placeholder={t('searchPlaceholder')}
+                type="search"
+                value={search}
+              />
+              {search.length > 0 ? (
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    aria-label={t('clearSearch')}
+                    onClick={() => {
+                      setSearch('')
+                    }}
+                    size="icon-xs"
+                  >
+                    <XIcon />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              ) : null}
+            </InputGroup>
+            <ToggleGroup
+              aria-label={t('sortLabel')}
+              onValueChange={value => {
+                if (value === 'latest' || value === 'stars') setSortOverride(value)
               }}
-              pressed={category === item.slug}
+              size="sm"
+              type="single"
+              value={sort}
+              variant="outline"
+            >
+              <ToggleGroupItem className="dshx:px-2.5 dshx:text-xs" value="latest">
+                {t('sortLatest')}
+              </ToggleGroupItem>
+              <ToggleGroupItem className="dshx:px-2.5 dshx:text-xs" value="stars">
+                {t('sortStars')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Toggle
+              className="dshx:px-2.5 dshx:text-xs"
+              onPressedChange={pressed => {
+                setCompatibleOverride(pressed)
+              }}
+              pressed={compatibleOnly}
               size="sm"
               variant="outline"
             >
-              {item.name}
+              <ShieldCheckIcon />
+              {t('compatibleOnly')}
             </Toggle>
-          ))}
-        </nav>
-      </header>
-
-      {initialLoading ? (
-        <div aria-label={t('loading')} className={GRID_CLASS} role="status">
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
-      ) : null}
-      {listFailed && !initialLoading ? (
-        <Alert className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3" variant="destructive">
-          <AlertDescription>{t('unavailable')}</AlertDescription>
-          <Button
-            className="dshx:shrink-0"
-            onClick={() => {
-              void catalog.refetch()
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {t('retry')}
-          </Button>
-        </Alert>
-      ) : null}
-      {!initialLoading && catalog.isSuccess && visibleItems.length === 0 ? (
-        <Empty className="dshx:border dshx:p-6 dshx:md:p-8">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <PackageSearchIcon />
-            </EmptyMedia>
-            <EmptyDescription>
-              {hiddenCount > 0 ? interpolate(t('hiddenIncompatible'), { count: String(hiddenCount) }) : query !== undefined ? t('noSearchMatches') : t('empty')}
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
-
-      {visibleItems.length > 0 ? (
-        <ul aria-label={t('pluginsLabel')} className={GRID_CLASS}>
-          {visibleItems.map(plugin => (
-            <PluginCard
-              failed={failedSlugs.has(plugin.slug)}
-              installBusy={installingSlug !== null}
-              installing={installingSlug === plugin.slug}
-              key={plugin.slug}
-              onDownload={() => {
-                setModal({ kind: 'confirm', plugin })
+          </div>
+          <nav aria-label={t('categoriesLabel')} className="dshx:-mb-1 dshx:flex dshx:gap-1.5 dshx:overflow-x-auto dshx:pb-1">
+            <Toggle
+              className="dshx:h-6 dshx:shrink-0 dshx:px-2 dshx:text-xs"
+              onPressedChange={() => {
+                setCategory(undefined)
               }}
-              plugin={plugin}
-              starFormat={starFormat}
-              t={t}
-            />
-          ))}
-        </ul>
-      ) : null}
+              pressed={category === undefined}
+              size="sm"
+              variant="outline"
+            >
+              {t('all')}
+            </Toggle>
+            {categories.map(item => (
+              <Toggle
+                className="dshx:h-6 dshx:shrink-0 dshx:px-2 dshx:text-xs"
+                key={item.slug}
+                onPressedChange={() => {
+                  setCategory(item.slug)
+                }}
+                pressed={category === item.slug}
+                size="sm"
+                variant="outline"
+              >
+                {item.name}
+              </Toggle>
+            ))}
+          </nav>
+        </header>
 
-      {visibleItems.length > 0 && hiddenCount > 0 ? (
-        <p className="dshx:text-center dshx:text-xs dshx:text-muted-foreground">{interpolate(t('hiddenIncompatible'), { count: String(hiddenCount) })}</p>
-      ) : null}
+        {initialLoading ? (
+          <div aria-label={t('loading')} className={GRID_CLASS} role="status">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        ) : null}
+        {listFailed && !initialLoading ? (
+          <Alert className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3" variant="destructive">
+            <AlertDescription>{t('unavailable')}</AlertDescription>
+            <Button
+              className="dshx:shrink-0"
+              onClick={() => {
+                void catalog.refetch()
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {t('retry')}
+            </Button>
+          </Alert>
+        ) : null}
+        {!initialLoading && catalog.isSuccess && visibleItems.length === 0 ? (
+          <Empty className="dshx:border dshx:p-6 dshx:md:p-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <PackageSearchIcon />
+              </EmptyMedia>
+              <EmptyDescription>
+                {hiddenCount > 0
+                  ? interpolate(t('hiddenIncompatible'), { count: String(hiddenCount) })
+                  : query !== undefined
+                    ? t('noSearchMatches')
+                    : t('empty')}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : null}
 
-      {catalog.hasNextPage && !showingPrevious ? (
-        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:pb-2">
-          {catalog.isFetchNextPageError ? (
-            <>
-              <Alert variant="destructive">
-                <AlertDescription>{t('unavailable')}</AlertDescription>
-              </Alert>
-              <Button onClick={() => void catalog.fetchNextPage()} size="sm" type="button" variant="outline">
-                {t('retry')}
-              </Button>
-            </>
-          ) : null}
-          {catalog.isFetchingNextPage ? (
-            <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
-              <InstallSpinner /> {t('loadingMore')}
-            </span>
-          ) : null}
-          <div key="marketplace-load-more-sentinel" ref={loadMoreSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
-        </div>
-      ) : null}
+        {visibleItems.length > 0 ? (
+          <ul aria-label={t('pluginsLabel')} className={GRID_CLASS}>
+            {visibleItems.map(plugin => (
+              <PluginCard
+                failed={failedSlugs.has(plugin.slug)}
+                installBusy={installingSlug !== null}
+                installing={installingSlug === plugin.slug}
+                key={plugin.slug}
+                onDownload={() => {
+                  setModal({ kind: 'confirm', plugin })
+                }}
+                plugin={plugin}
+                starFormat={starFormat}
+                t={t}
+              />
+            ))}
+          </ul>
+        ) : null}
 
-      {modal !== null ? (
-        <InstallDialog
-          installing={installingSlug === modal.plugin.slug}
-          onClose={() => {
-            if (installingSlug === null) setModal(null)
-          }}
-          onContinue={plugin => {
-            setModal({ kind: 'risk', plugin })
-          }}
-          onInstall={plugin => {
-            if (installingSlug === null) install.mutate(plugin)
-          }}
-          onRetry={plugin => {
-            setModal({ kind: 'confirm', plugin })
-          }}
-          state={modal}
-          t={t}
-        />
-      ) : null}
-    </section>
+        {visibleItems.length > 0 && hiddenCount > 0 ? (
+          <p className="dshx:text-center dshx:text-xs dshx:text-muted-foreground">{interpolate(t('hiddenIncompatible'), { count: String(hiddenCount) })}</p>
+        ) : null}
+
+        {catalog.hasNextPage && !showingPrevious ? (
+          <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:pb-2">
+            {catalog.isFetchNextPageError ? (
+              <>
+                <Alert variant="destructive">
+                  <AlertDescription>{t('unavailable')}</AlertDescription>
+                </Alert>
+                <Button onClick={() => void catalog.fetchNextPage()} size="sm" type="button" variant="outline">
+                  {t('retry')}
+                </Button>
+              </>
+            ) : null}
+            {catalog.isFetchingNextPage ? (
+              <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
+                <InstallSpinner /> {t('loadingMore')}
+              </span>
+            ) : null}
+            <div key="marketplace-load-more-sentinel" ref={loadMoreSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+          </div>
+        ) : null}
+
+        {modal !== null ? (
+          <InstallDialog
+            installing={installingSlug === modal.plugin.slug}
+            onClose={() => {
+              if (installingSlug === null) setModal(null)
+            }}
+            onContinue={plugin => {
+              setModal({ kind: 'risk', plugin })
+            }}
+            onInstall={plugin => {
+              if (installingSlug === null) install.mutate(plugin)
+            }}
+            onRetry={plugin => {
+              setModal({ kind: 'confirm', plugin })
+            }}
+            state={modal}
+            t={t}
+          />
+        ) : null}
+      </section>
+    </TooltipProvider>
   )
 }

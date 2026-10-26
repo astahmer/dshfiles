@@ -127,7 +127,7 @@ export const ApiKeySetupDialog = (props: {
         placeholder="Search projects or type / for a folder…"
         projects={[]}
         recentFolders={cwd === null ? [] : [cwd]}
-        title="Choose a Secret Catalog folder"
+        heading="Choose a Secret Catalog folder"
       />
     )
   }

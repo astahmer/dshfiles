@@ -2,8 +2,9 @@ import { ReferenceChip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
@@ -23,6 +24,12 @@ const CLOSE_GRACE_MS = 140
 
 const titleRequestKey = (request: ChatReferenceTitleRequest): string =>
   `${request.sessionId}\u0000${request.cwd}\u0000${request.reference.kind}\u0000${request.reference.value}`
+
+/**
+ * The hidden template chip keeps the native chip's markup; the native component names its label through `title`, so it
+ * travels as typed props rather than a native title attribute.
+ */
+const referenceTemplateProps: ComponentProps<typeof ReferenceChip> = { appearance: 'session', label: 'Jujutsu reference', title: 'Jujutsu reference' }
 
 /**
  * The revision-graph preview for a `jj:` reference in chat. A native session-reference chip lives inside its code node;
@@ -189,9 +196,9 @@ export const ChatReferenceOverlay = (): JSX.Element => {
   const failure = matches.length > 1 ? 'This reference exists in multiple registered repositories, so it cannot be selected unambiguously.' : undefined
   const rendered = referenceGraph?.graph
   return (
-    <>
+    <TooltipProvider delayDuration={500}>
       <span aria-hidden="true" data-composer-card data-dshfiles-jj-reference-template hidden>
-        <ReferenceChip appearance="session" label="Jujutsu reference" title="Jujutsu reference" />
+        <ReferenceChip {...referenceTemplateProps} />
       </span>
       {request === null ? null : (
         <Popover open onOpenChange={open => !open && setRequest(null)}>
@@ -229,7 +236,13 @@ export const ChatReferenceOverlay = (): JSX.Element => {
               <div className="dshx:flex dshx:flex-wrap dshx:gap-x-3 dshx:text-xs dshx:text-muted-foreground">
                 {referenceGraph.commitId === null ? null : (
                   <span>
-                    Commit ID: <code title={referenceGraph.commitId}>{referenceGraph.commitId.slice(0, 8)}</code>
+                    Commit ID:{' '}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <code>{referenceGraph.commitId.slice(0, 8)}</code>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{referenceGraph.commitId}</TooltipContent>
+                    </Tooltip>
                   </span>
                 )}
                 {referenceGraph.changeId === null ? null : (
@@ -270,6 +283,6 @@ export const ChatReferenceOverlay = (): JSX.Element => {
           </PopoverContent>
         </Popover>
       )}
-    </>
+    </TooltipProvider>
   )
 }

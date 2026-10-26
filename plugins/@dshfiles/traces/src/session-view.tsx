@@ -4,6 +4,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
@@ -154,133 +155,135 @@ export const SessionTracesView = (
   }
 
   return (
-    <main
-      className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-4 dshx:@max-pane-narrow:p-2"
-      data-testid="traces-session-view"
-      data-session-id={props.sessionId}
-      data-receiver-endpoint={
-        statusQuery.data === undefined || statusQuery.data.state !== 'listening' ? undefined : (receiverEndpoint(statusQuery.data) ?? undefined)
-      }
-    >
-      {empty ? (
-        <div className="dshx:flex dshx:flex-col dshx:gap-2" data-testid="traces-session-empty">
-          <Alert>
-            <AlertTitle>{t('sessionEmptyTitle')}</AlertTitle>
-            <AlertDescription>{t('sessionEmptyBody')}</AlertDescription>
-          </Alert>
-          {statusQuery.data === undefined ? null : <EmptyStoreGuide status={statusQuery.data} compact t={t} />}
-        </div>
-      ) : (
-        <>
-          {summary === undefined ? null : <SummaryGrid summary={summary} t={t} />}
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              aria-label={t('sessionSections')}
-              value={section}
-              onValueChange={value => {
-                if (value === 'turns' || value === 'logs') setSection(value)
-              }}
-            >
-              <ToggleGroupItem value="turns">{t('sectionTurns')}</ToggleGroupItem>
-              <ToggleGroupItem value="logs">{t('tabLogs')}</ToggleGroupItem>
-            </ToggleGroup>
-            {section === 'logs' && correlation !== null ? (
-              <Button variant="secondary" size="sm" onClick={() => setCorrelation(null)} aria-label={t('clearCorrelation')}>
-                {correlation.spanId === null ? t('logsOfTrace') : t('logsOfSpan')}: {(correlation.spanId ?? correlation.traceId).slice(0, 12)}… ✕
-              </Button>
-            ) : null}
-            {section === 'turns' && traceId !== null ? (
-              <Button variant="ghost" size="sm" onClick={() => setTraceId(null)}>
-                <ArrowLeftIcon /> {t('back')}
-              </Button>
-            ) : null}
-          </div>
-          {turnFocus === null ? null : (
-            <p className="dshx:text-sm dshx:text-muted-foreground" data-testid="traces-turn-pending">
-              {t('turnTraceLoading', { turn: turnFocus.turn })}
-            </p>
-          )}
-          {missingTurn === null ? null : (
-            <Alert data-testid="traces-turn-missing">
-              <AlertDescription>{t('turnTraceMissing', { turn: missingTurn })}</AlertDescription>
+    <TooltipProvider>
+      <main
+        className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-4 dshx:@max-pane-narrow:p-2"
+        data-testid="traces-session-view"
+        data-session-id={props.sessionId}
+        data-receiver-endpoint={
+          statusQuery.data === undefined || statusQuery.data.state !== 'listening' ? undefined : (receiverEndpoint(statusQuery.data) ?? undefined)
+        }
+      >
+        {empty ? (
+          <div className="dshx:flex dshx:flex-col dshx:gap-2" data-testid="traces-session-empty">
+            <Alert>
+              <AlertTitle>{t('sessionEmptyTitle')}</AlertTitle>
+              <AlertDescription>{t('sessionEmptyBody')}</AlertDescription>
             </Alert>
-          )}
-          {section === 'turns' && traceId === null ? (
-            <>
-              {listQuery.isError ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{errorMessage(listQuery.error, t('loadFailed'))}</AlertDescription>
-                </Alert>
-              ) : null}
-              <TraceList
-                traces={traces}
-                hasMore={listQuery.hasNextPage}
-                loadingMore={listQuery.isFetchingNextPage}
-                onLoadMore={() => void listQuery.fetchNextPage()}
-                onOpen={openedTraceId => {
-                  setMissingTurn(null)
-                  setTraceId(openedTraceId)
+            {statusQuery.data === undefined ? null : <EmptyStoreGuide status={statusQuery.data} compact t={t} />}
+          </div>
+        ) : (
+          <>
+            {summary === undefined ? null : <SummaryGrid summary={summary} t={t} />}
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                aria-label={t('sessionSections')}
+                value={section}
+                onValueChange={value => {
+                  if (value === 'turns' || value === 'logs') setSection(value)
                 }}
-                t={t}
-              />
-            </>
-          ) : null}
-          {section === 'turns' && traceId !== null ? (
-            <>
-              {traceQuery.isError ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{t('traceNotFound')}</AlertDescription>
-                </Alert>
+              >
+                <ToggleGroupItem value="turns">{t('sectionTurns')}</ToggleGroupItem>
+                <ToggleGroupItem value="logs">{t('tabLogs')}</ToggleGroupItem>
+              </ToggleGroup>
+              {section === 'logs' && correlation !== null ? (
+                <Button variant="secondary" size="sm" onClick={() => setCorrelation(null)} aria-label={t('clearCorrelation')}>
+                  {correlation.spanId === null ? t('logsOfTrace') : t('logsOfSpan')}: {(correlation.spanId ?? correlation.traceId).slice(0, 12)}… ✕
+                </Button>
               ) : null}
-              {traceQuery.data === undefined ? null : (
-                <TraceDetailView
-                  key={traceQuery.data.traceId}
-                  trace={traceQuery.data}
-                  onOpenThread={showInThread}
-                  currentSessionId={sessionId}
-                  onShowLogs={spanId => {
-                    setCorrelation({ traceId: traceQuery.data.traceId, spanId })
-                    setSection('logs')
+              {section === 'turns' && traceId !== null ? (
+                <Button variant="ghost" size="sm" onClick={() => setTraceId(null)}>
+                  <ArrowLeftIcon /> {t('back')}
+                </Button>
+              ) : null}
+            </div>
+            {turnFocus === null ? null : (
+              <p className="dshx:text-sm dshx:text-muted-foreground" data-testid="traces-turn-pending">
+                {t('turnTraceLoading', { turn: turnFocus.turn })}
+              </p>
+            )}
+            {missingTurn === null ? null : (
+              <Alert data-testid="traces-turn-missing">
+                <AlertDescription>{t('turnTraceMissing', { turn: missingTurn })}</AlertDescription>
+              </Alert>
+            )}
+            {section === 'turns' && traceId === null ? (
+              <>
+                {listQuery.isError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{errorMessage(listQuery.error, t('loadFailed'))}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <TraceList
+                  traces={traces}
+                  hasMore={listQuery.hasNextPage}
+                  loadingMore={listQuery.isFetchingNextPage}
+                  onLoadMore={() => void listQuery.fetchNextPage()}
+                  onOpen={openedTraceId => {
+                    setMissingTurn(null)
+                    setTraceId(openedTraceId)
                   }}
                   t={t}
                 />
-              )}
-            </>
-          ) : null}
-          {section === 'logs' ? (
-            <>
-              {logsQuery.isError ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{errorMessage(logsQuery.error, t('loadFailed'))}</AlertDescription>
-                </Alert>
-              ) : null}
-              {logs.length === 0 && logsQuery.isSuccess ? (
-                <p className="dshx:text-sm dshx:text-muted-foreground">{t('noSessionLogs')}</p>
-              ) : (
-                <ul className="dshx:flex dshx:flex-col" aria-label={t('tabLogs')}>
-                  {logs.map(log => (
-                    <LogRow key={log.id} log={log} onOpenTrace={openTrace} t={t} />
-                  ))}
-                </ul>
-              )}
-              {logsQuery.hasNextPage ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="dshx:self-center"
-                  disabled={logsQuery.isFetchingNextPage}
-                  onClick={() => void logsQuery.fetchNextPage()}
-                >
-                  {t('loadMoreLogs')}
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-        </>
-      )}
-    </main>
+              </>
+            ) : null}
+            {section === 'turns' && traceId !== null ? (
+              <>
+                {traceQuery.isError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{t('traceNotFound')}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {traceQuery.data === undefined ? null : (
+                  <TraceDetailView
+                    key={traceQuery.data.traceId}
+                    trace={traceQuery.data}
+                    onOpenThread={showInThread}
+                    currentSessionId={sessionId}
+                    onShowLogs={spanId => {
+                      setCorrelation({ traceId: traceQuery.data.traceId, spanId })
+                      setSection('logs')
+                    }}
+                    t={t}
+                  />
+                )}
+              </>
+            ) : null}
+            {section === 'logs' ? (
+              <>
+                {logsQuery.isError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{errorMessage(logsQuery.error, t('loadFailed'))}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {logs.length === 0 && logsQuery.isSuccess ? (
+                  <p className="dshx:text-sm dshx:text-muted-foreground">{t('noSessionLogs')}</p>
+                ) : (
+                  <ul className="dshx:flex dshx:flex-col" aria-label={t('tabLogs')}>
+                    {logs.map(log => (
+                      <LogRow key={log.id} log={log} onOpenTrace={openTrace} t={t} />
+                    ))}
+                  </ul>
+                )}
+                {logsQuery.hasNextPage ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="dshx:self-center"
+                    disabled={logsQuery.isFetchingNextPage}
+                    onClick={() => void logsQuery.fetchNextPage()}
+                  >
+                    {t('loadMoreLogs')}
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        )}
+      </main>
+    </TooltipProvider>
   )
 }

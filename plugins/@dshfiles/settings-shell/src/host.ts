@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type { Context } from '@deepseek-ai/cordis'
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 import { createSettingsTools, type SettingsSurface } from './settings-tools.js'
 import { settingsShellApi } from './shell-api.js'
@@ -33,7 +34,7 @@ const installedVersion = (packageName: string): string | null => {
   try {
     const require = createRequire(realpathSync(entry))
     const manifestPath = require.resolve(`${packageName}/package.json`)
-    return packageVersionSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8'))).version
+    return decodeJson(packageVersionSchema, readFileSync(manifestPath, 'utf8')).version
   } catch {
     return null
   }

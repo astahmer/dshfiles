@@ -1,3 +1,4 @@
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 export const MAX_REVIEW_MARKS = 3_000
@@ -48,8 +49,7 @@ const emptyReviewStore = (): ReviewStore => ({ schemaVersion: 1, marks: [] })
 const readReviewStore = (source: string | null): ReviewStore => {
   if (source === null || new TextEncoder().encode(source).byteLength > MAX_REVIEW_STORE_BYTES) return emptyReviewStore()
   try {
-    const decoded: unknown = JSON.parse(source)
-    const result = reviewStoreSchema.safeParse(decoded)
+    const result = decodeJsonSafe(reviewStoreSchema, source)
     return result.success ? result.data : emptyReviewStore()
   } catch {
     return emptyReviewStore()
@@ -111,12 +111,7 @@ const applyFileReviews = ({
     store,
   )
 
-const reviewProgress = (
-  store: ReviewStore,
-  repositoryRoot: string,
-  commitId: string,
-  files: readonly ReviewFile[],
-): { readonly reviewed: number; readonly total: number } => {
+const reviewProgress = (store: ReviewStore, repositoryRoot: string, commitId: string, files: readonly ReviewFile[]) => {
   const reviewableFiles = files.filter(file => file.contentDigest !== null)
   return {
     reviewed: reviewableFiles.filter(file => isFileReviewed(store, repositoryRoot, commitId, file)).length,

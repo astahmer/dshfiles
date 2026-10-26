@@ -17,7 +17,7 @@ interface PanelRetentionInput {
  * Upstream drops the selection the moment the active panel's entry disappears, which turns every reload of that
  * plugin into a jump back to the thread. This waits the grace out first and releases only a panel that is still gone.
  */
-const createPanelRetention = (input: PanelRetentionInput): { readonly check: () => void; readonly dispose: () => void } => {
+const createPanelRetention = (input: PanelRetentionInput) => {
   let cancelPending: (() => void) | undefined
   const cancel = (): void => {
     cancelPending?.()

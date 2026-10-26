@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { decodeJson, jsonValueSchema } from '../json.js'
 import { parse } from 'yaml'
 import { CORDIS_IDENTITY_DEPENDENCIES } from 'create-dshx/capabilities'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
@@ -154,15 +155,15 @@ const prepareBootProfiles = async (
 ): Promise<PreparedBootProfile> => {
   const sourceHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const sourceProfileRoot = options.sourceProfileRoot ?? join(sourceHome, 'profiles', 'web')
-  const sourceManifest = ProfilePackage.parse(JSON.parse(await readFile(join(sourceProfileRoot, 'package.json'), 'utf8')))
+  const sourceManifest = ProfilePackage.parse(decodeJson(jsonValueSchema, await readFile(join(sourceProfileRoot, 'package.json'), 'utf8')))
   const pnpmWorkspace = await readFile(join(sourceProfileRoot, 'pnpm-workspace.yaml'))
-  const workspaceManifest = WorkspacePackage.parse(JSON.parse(await readFile(join(WORKSPACE_ROOT, 'tooling/dshx/package.json'), 'utf8')))
+  const workspaceManifest = WorkspacePackage.parse(decodeJson(jsonValueSchema, await readFile(join(WORKSPACE_ROOT, 'tooling/dshx/package.json'), 'utf8')))
   const pinnedNode = (await readFile(join(WORKSPACE_ROOT, '.node-version'), 'utf8')).trim()
   if (pinnedNode !== '' && process.versions.node !== pinnedNode) {
     throw new Error(`Boot checks require repository Node ${pinnedNode}; current Node is ${process.versions.node}.`)
   }
   for (const bundle of localBundles) {
-    const projectManifest = ProjectPackage.parse(JSON.parse(await readFile(join(bundle.projectRoot, 'package.json'), 'utf8')))
+    const projectManifest = ProjectPackage.parse(decodeJson(jsonValueSchema, await readFile(join(bundle.projectRoot, 'package.json'), 'utf8')))
     if (typeof projectManifest.dsh !== 'object' || projectManifest.dsh === null || Array.isArray(projectManifest.dsh)) {
       throw new Error(`Cannot prepare a DSH boot profile for ${bundle.packageId}: package.json has no dsh bundle metadata.`)
     }

@@ -1,5 +1,7 @@
 import { createConnection } from 'node:net'
 import type { Socket } from 'node:net'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 
 export type JsonLineTransportCode = 'request-too-large' | 'response-too-large' | 'invalid-json' | 'connection' | 'timeout'
 
@@ -54,46 +56,51 @@ export interface JsonLineRequestOptions {
   readonly timeoutMs: number
 }
 
-const requestJsonLine = async (socketPath: string, payload: string, options: JsonLineRequestOptions): Promise<unknown> => {
+const requestJsonLine = async (socketPath: string, payload: string, options: JsonLineRequestOptions): Promise<JsonValue> => {
   if (Buffer.byteLength(payload) > options.maxRequestBytes) {
     throw new JsonLineTransportError('request-too-large', 'JSON-line request exceeds the size limit.')
   }
 
-  return await new Promise((resolve, reject) => {
+  return await new Promise<JsonValue>((resolve, reject) => {
     const socket = createConnection(socketPath)
     let settled = false
     let timer: NodeJS.Timeout | undefined
-    const finish = (error?: JsonLineTransportError, value?: unknown): void => {
-      if (settled) return
+    const settle = (): boolean => {
+      if (settled) return false
       settled = true
       if (timer !== undefined) clearTimeout(timer)
       socket.destroy()
-      if (error !== undefined) reject(error)
-      else resolve(value)
+      return true
+    }
+    const fail = (error: JsonLineTransportError): void => {
+      if (settle()) reject(error)
+    }
+    const succeed = (value: JsonValue): void => {
+      if (settle()) resolve(value)
     }
 
-    timer = setTimeout(() => finish(new JsonLineTransportError('timeout', 'JSON-line request timed out.')), options.timeoutMs)
-    socket.once('error', error => finish(new JsonLineTransportError('connection', error.message)))
+    timer = setTimeout(() => fail(new JsonLineTransportError('timeout', 'JSON-line request timed out.')), options.timeoutMs)
+    socket.once('error', error => fail(new JsonLineTransportError('connection', error.message)))
     acceptJsonLine(socket, options.maxResponseBytes, {
       onLine: line => {
         try {
-          finish(undefined, JSON.parse(line))
+          succeed(decodeJson(jsonValueSchema, line))
         } catch (error) {
-          finish(new JsonLineTransportError('invalid-json', String(error)))
+          fail(new JsonLineTransportError('invalid-json', String(error)))
         }
       },
-      onTooLarge: () => finish(new JsonLineTransportError('response-too-large', 'JSON-line response exceeds the size limit.')),
+      onTooLarge: () => fail(new JsonLineTransportError('response-too-large', 'JSON-line response exceeds the size limit.')),
     })
     socket.once('connect', () => socket.write(payload))
   })
 }
 
-export interface JsonLineWriteOptions {
+export interface JsonLineWriteOptions<Fallback = never> {
   readonly maxBytes?: number
-  readonly onTooLarge?: () => unknown
+  readonly onTooLarge?: () => Fallback
 }
 
-const writeJsonLine = (socket: Socket, value: unknown, options: JsonLineWriteOptions = {}): void => {
+const writeJsonLine = <Value, Fallback>(socket: Socket, value: Value, options: JsonLineWriteOptions<Fallback> = {}): void => {
   const text = JSON.stringify(value)
   if (text === undefined) throw new Error('JSON-line response could not be serialized.')
   if (options.maxBytes !== undefined && Buffer.byteLength(text) > options.maxBytes) {

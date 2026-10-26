@@ -23,9 +23,41 @@ import { RecipientDirectoryModel } from './recipient-directory.js'
 import { SessionHistoryModel } from './session-history.js'
 import { UnreadNudgeRules } from './unread-nudge.js'
 
+/**
+ * The `communication-message` payload this bundle emits on `dshfiles/activity/event`;
+ * `@dshfiles/activity-timeline` decodes it by `kind` into one Activity item.
+ */
+interface CommunicationMessageActivityPayload {
+  readonly kind: 'communication-message'
+  readonly value: {
+    readonly at: number
+    readonly messageId: string
+    readonly senderId: string
+    readonly recipientCount: number
+    readonly intent: 'notice' | 'request'
+    readonly topic: string | null
+    readonly correlationId?: string | undefined
+    readonly sessionId: string | null
+  }
+}
+
+/** The `communication-activity` payload for one tracked tool call on the same event. */
+interface CommunicationOperationActivityPayload {
+  readonly kind: 'communication-activity'
+  readonly value: {
+    readonly at: number
+    readonly sessionId: string
+    readonly operation: CommunicationActivityOperation
+    readonly outcome: 'success' | 'failure'
+    readonly callId: ToolRunContext['callId']
+    readonly rootCallId: string | null
+    readonly errorCode: string | null
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/event'(payload: CommunicationMessageActivityPayload | CommunicationOperationActivityPayload): void
     'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
   }
 }

@@ -17,7 +17,7 @@ const write = (stream: Writable, text: string): void => {
 
 const commandName = (args: CliArgs): string => `comm ${args.platformArgs?.[0] ?? ''}`.trim()
 
-const emitResult = (args: CliArgs, io: PlatformCliIO, data: unknown, message: string): void => {
+const emitResult = <Data>(args: CliArgs, io: PlatformCliIO, data: Data, message: string): void => {
   if (args.json) {
     write(io.stdout, JSON.stringify({ schemaVersion: 1, command: commandName(args), ok: true, data }, null, 2))
     return

@@ -2,6 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { defineClientPlugin, useSettings, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { createElement, useEffect, useMemo, type ComponentType } from 'react'
 import { z } from 'zod'
 import { testRunsSettings } from './settings.js'
@@ -18,7 +19,7 @@ const shellArgs = z.object({ command: z.string() })
 const commandOf = (argsRaw: string | undefined): string | undefined => {
   if (argsRaw === undefined) return undefined
   try {
-    const parsed = shellArgs.safeParse(JSON.parse(argsRaw))
+    const parsed = decodeJsonSafe(shellArgs, argsRaw)
     return parsed.success ? parsed.data.command : undefined
   } catch {
     return undefined

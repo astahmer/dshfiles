@@ -62,10 +62,10 @@ const ProjectTitle = (props: { readonly projectKey: string; readonly large?: boo
     </span>
   )
 
-const Card = (props: { readonly title: string; readonly action?: ReactNode; readonly children: ReactNode; readonly className?: string }): JSX.Element => (
+const Card = (props: { readonly heading: string; readonly action?: ReactNode; readonly children: ReactNode; readonly className?: string }): JSX.Element => (
   <section className={cn('dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4', props.className)}>
     <div className="dshx:flex dshx:items-center dshx:justify-between">
-      <h3 className="dshx:text-[13px] dshx:font-semibold">{props.title}</h3>
+      <h3 className="dshx:text-[13px] dshx:font-semibold">{props.heading}</h3>
       {props.action}
     </div>
     {props.children}
@@ -181,7 +181,7 @@ const Overview = (props: {
       <div className="dshx:grid dshx:grid-cols-1 dshx:gap-4 dshx:@min-[56rem]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
           <Card
-            title="Progress"
+            heading="Progress"
             action={
               <span className="dshx:text-xs dshx:text-muted-foreground">
                 {project.counts.done} of {total} done
@@ -205,7 +205,7 @@ const Overview = (props: {
             </div>
           </Card>
           {needsYou.length === 0 ? null : (
-            <Card title="Needs you">
+            <Card heading="Needs you">
               <ul className="dshx:-mx-2 dshx:flex dshx:flex-col">
                 {needsYou.map(item => (
                   <ItemLine
@@ -230,7 +230,7 @@ const Overview = (props: {
               </ul>
             </Card>
           )}
-          <Card title="Active work" action={<span className="dshx:text-xs dshx:text-muted-foreground">{active.length}</span>}>
+          <Card heading="Active work" action={<span className="dshx:text-xs dshx:text-muted-foreground">{active.length}</span>}>
             {active.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">Nothing open.</p> : null}
             <ul className="dshx:-mx-2 dshx:flex dshx:flex-col">
               {active.slice(0, 12).map(item => (
@@ -257,7 +257,7 @@ const Overview = (props: {
           </Card>
         </div>
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
-          <Card title="Details">
+          <Card heading="Details">
             <dl className="dshx:grid dshx:grid-cols-[96px_minmax(0,1fr)] dshx:gap-y-2.5 dshx:text-[13px]">
               <dt className="dshx:text-muted-foreground">Items</dt>
               <dd className="dshx:tabular-nums">{progressStatuses.reduce((sum, status) => sum + project.counts[status], 0) + project.counts.dropped}</dd>
@@ -284,7 +284,7 @@ const Overview = (props: {
               <dd>{ItemGlyphs.ago(project.lastActivityAt)} ago</dd>
             </dl>
           </Card>
-          <Card title="Recent activity">
+          <Card heading="Recent activity">
             <ol className="dshx:flex dshx:flex-col dshx:gap-3">
               {recent.map(item => (
                 <BacklogItemMenu

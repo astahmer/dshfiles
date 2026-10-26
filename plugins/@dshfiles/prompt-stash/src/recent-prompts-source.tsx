@@ -42,7 +42,7 @@ export const selectRecentPrompts = (chat: ChatNodes): readonly RecentPrompt[] =>
 export const selectSentPrompts = (chat: ChatNodes): readonly SentPrompt[] => {
   const prompts: SentPrompt[] = []
   for (const node of newestFirstNodes(chat)) {
-    const prompt = PromptDrafts.sentPromptFromNode(node?.data)
+    const prompt = PromptDrafts.parseSentPromptFromNode(node?.data)
     if (prompt !== null) prompts.push(prompt)
   }
   return prompts

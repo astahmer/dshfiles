@@ -8,8 +8,9 @@ import {
   IconChevronRightOutlineRegular,
   IconRefreshOutlineRegular,
   StateDot,
-  Tooltip,
+  Tooltip as NativeTooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
@@ -349,14 +350,17 @@ function CatalogRows({
                   <span className={css.metrics}>
                     {tokenMetric !== undefined && <span className={css.metricToken}>{tokenMetric}</span>}
                     {durationMetric !== undefined && (
-                      <span className={css.metricDuration} title={t('duration.exactTitle', { duration: durationMetric.exact })}>
-                        {durationMetric.compact}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={css.metricDuration}>{durationMetric.compact}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">{t('duration.exactTitle', { duration: durationMetric.exact })}</TooltipContent>
+                      </Tooltip>
                     )}
                   </span>
                 )}
                 {!isCurrent && !external && (
-                  <Tooltip label={t('open.sidebar')} side="bottom" align="end">
+                  <NativeTooltip label={t('open.sidebar')} side="bottom" align="end">
                     <button
                       type="button"
                       className={css.sidebarButton}
@@ -368,7 +372,7 @@ function CatalogRows({
                     >
                       <IconChevronRightOutlineRegular />
                     </button>
-                  </Tooltip>
+                  </NativeTooltip>
                 )}
               </div>
             </div>

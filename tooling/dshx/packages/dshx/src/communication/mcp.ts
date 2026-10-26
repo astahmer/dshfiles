@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { CommunicationError } from './service.js'
 import type { CommunicationClient } from './bridge.js'
 
-const jsonToolResult = (value: unknown) => ({
+const jsonToolResult = <Value>(value: Value) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(value) }],
 })
 
@@ -18,7 +18,7 @@ const failureToolResult = (error: unknown) => ({
   ],
 })
 
-const runTool = async (operation: () => Promise<unknown>) => {
+const runTool = async <Value>(operation: () => Promise<Value>) => {
   try {
     return jsonToolResult(await operation())
   } catch (error) {

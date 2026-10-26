@@ -62,14 +62,14 @@ describe('saved prompt drafts', () => {
 describe('sent prompt history', () => {
   it('reads only bounded plain-text user messages', () => {
     expect(
-      PromptDrafts.sentPromptFromNode({
+      PromptDrafts.parseSentPromptFromNode({
         kind: 'user',
         seq: 4,
         content: [{ type: 'text', text: 'Earlier prompt' }],
       }),
     ).toEqual({ id: 4, text: 'Earlier prompt' })
     expect(
-      PromptDrafts.sentPromptFromNode({
+      PromptDrafts.parseSentPromptFromNode({
         kind: 'user',
         seq: 5,
         content: [
@@ -78,10 +78,10 @@ describe('sent prompt history', () => {
         ],
       }),
     ).toEqual({ id: 5, text: 'first second' })
-    expect(PromptDrafts.sentPromptFromNode({ kind: 'steering', seq: 6, content: [{ type: 'text', text: 'steer' }] })).toBeNull()
-    expect(PromptDrafts.sentPromptFromNode({ kind: 'user', seq: 7, content: [{ type: 'text', text: 'prompt' }, { type: 'file' }] })).toBeNull()
-    expect(PromptDrafts.sentPromptFromNode({ kind: 'user', seq: 8, content: [{ type: 'text', text: 'x'.repeat(24_001) }] })).toBeNull()
-    expect(PromptDrafts.sentPromptFromNode({ kind: 'user', seq: -1, content: [{ type: 'text', text: 'invalid' }] })).toBeNull()
+    expect(PromptDrafts.parseSentPromptFromNode({ kind: 'steering', seq: 6, content: [{ type: 'text', text: 'steer' }] })).toBeNull()
+    expect(PromptDrafts.parseSentPromptFromNode({ kind: 'user', seq: 7, content: [{ type: 'text', text: 'prompt' }, { type: 'file' }] })).toBeNull()
+    expect(PromptDrafts.parseSentPromptFromNode({ kind: 'user', seq: 8, content: [{ type: 'text', text: 'x'.repeat(24_001) }] })).toBeNull()
+    expect(PromptDrafts.parseSentPromptFromNode({ kind: 'user', seq: -1, content: [{ type: 'text', text: 'invalid' }] })).toBeNull()
   })
 })
 

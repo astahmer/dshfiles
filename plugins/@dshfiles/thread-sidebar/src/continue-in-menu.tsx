@@ -1,4 +1,5 @@
 import { useApiQuery } from '@dshfiles/dshx/client'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComponentType, JSX } from 'react'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -22,9 +23,12 @@ export const ContinueInProjectItems = ({ t, continueIn, Item }: ContinueInProjec
     <>
       {query.data.projects.map(project => (
         <Item key={project.projectId} onSelect={() => continueIn(project.projectId)}>
-          <span className="dshx:min-w-0 dshx:truncate" title={project.path}>
-            {project.title}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:min-w-0 dshx:truncate">{project.title}</span>
+            </TooltipTrigger>
+            <TooltipContent side="right">{project.path}</TooltipContent>
+          </Tooltip>
         </Item>
       ))}
     </>

@@ -1,6 +1,7 @@
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronRightIcon, CircleXIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -24,7 +25,6 @@ export const FileStatusLetter = (props: { readonly status: FileStatus; readonly 
   <span
     aria-label={STATUS_LABEL[props.status]}
     className={cn('dshx:w-3 dshx:flex-none dshx:text-center dshx:font-mono dshx:text-[11px] dshx:font-semibold', STATUS_TONE[props.status], props.className)}
-    title={STATUS_LABEL[props.status]}
   >
     {props.status}
   </span>
@@ -110,34 +110,40 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
             onCheckedChange={checked => setSelected([file.path], checked === true)}
           />
         )}
-        <button
-          className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-          onClick={event => {
-            if (openInEditor !== undefined && (event.metaKey || event.ctrlKey)) openInEditor(file.path)
-            else props.onOpen(file.path)
-          }}
-          title={openInEditor === undefined ? `${file.path} · open diff` : `${file.path} · open diff (⌘/Ctrl-click: open in editor)`}
-          type="button"
-        >
-          {file.conflict === true ? (
-            <CircleXIcon aria-label="Conflicted" className="dshx:size-3 dshx:flex-none dshx:text-destructive" role="img" />
-          ) : (
-            props.statusAtEnd !== true && <FileStatusLetter status={file.status} />
-          )}
-          <span
-            className={cn(
-              'dshx:flex-none dshx:truncate dshx:text-xs dshx:font-medium',
-              file.status === 'D' && 'dshx:line-through dshx:opacity-70',
-              file.conflict === true && 'dshx:text-destructive',
-            )}
-          >
-            {parts.name}
-          </span>
-          {props.view === 'flat' && parts.directory.length > 0 && (
-            <span className="dshx:min-w-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{parts.directory}</span>
-          )}
-          {props.showCounts !== false && <LineCounts additions={file.additions} deletions={file.deletions} />}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              onClick={event => {
+                if (openInEditor !== undefined && (event.metaKey || event.ctrlKey)) openInEditor(file.path)
+                else props.onOpen(file.path)
+              }}
+              type="button"
+            >
+              {file.conflict === true ? (
+                <CircleXIcon aria-label="Conflicted" className="dshx:size-3 dshx:flex-none dshx:text-destructive" role="img" />
+              ) : (
+                props.statusAtEnd !== true && <FileStatusLetter status={file.status} />
+              )}
+              <span
+                className={cn(
+                  'dshx:flex-none dshx:truncate dshx:text-xs dshx:font-medium',
+                  file.status === 'D' && 'dshx:line-through dshx:opacity-70',
+                  file.conflict === true && 'dshx:text-destructive',
+                )}
+              >
+                {parts.name}
+              </span>
+              {props.view === 'flat' && parts.directory.length > 0 && (
+                <span className="dshx:min-w-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">{parts.directory}</span>
+              )}
+              {props.showCounts !== false && <LineCounts additions={file.additions} deletions={file.deletions} />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {openInEditor === undefined ? `${file.path} · open diff` : `${file.path} · open diff (⌘/Ctrl-click: open in editor)`}
+          </TooltipContent>
+        </Tooltip>
         {props.actions !== undefined && (
           <span className="dshx:ml-auto dshx:flex dshx:flex-none dshx:items-center dshx:opacity-0 dshx:group-hover/file:opacity-100 dshx:focus-within:opacity-100">
             {props.actions(file)}
@@ -208,8 +214,10 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
     })
 
   return (
-    <ul aria-label="Changed files" className={cn('dshx:flex dshx:flex-col', props.className)}>
-      {props.view === 'tree' ? treeRows(tree, 0) : props.files.map(file => fileRow(file, 0))}
-    </ul>
+    <TooltipProvider delayDuration={500}>
+      <ul aria-label="Changed files" className={cn('dshx:flex dshx:flex-col', props.className)}>
+        {props.view === 'tree' ? treeRows(tree, 0) : props.files.map(file => fileRow(file, 0))}
+      </ul>
+    </TooltipProvider>
   )
 }

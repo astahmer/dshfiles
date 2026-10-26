@@ -1,4 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
 import { z } from 'zod'
 
 export const MAX_VIEWED_MARKS = 2000
@@ -24,9 +25,9 @@ export const viewedKey = (file: ViewedFile): string => JSON.stringify([file.sess
 const viewedKeyPartsSchema = z.tuple([sessionIdSchema, z.number().int().nonnegative(), z.string().min(1)])
 
 export const viewedFileFromKey = (key: string): ViewedFile | null => {
-  let parsed: unknown
+  let parsed: JsonValue
   try {
-    parsed = JSON.parse(key)
+    parsed = decodeJson(jsonValueSchema, key)
   } catch {
     return null
   }

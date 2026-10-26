@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { BacklogActivityReferences } from './activity-thread-reference.js'
 
 /**
@@ -24,17 +25,21 @@ export const ActivityDescription = (props: {
   return (
     <>
       {description.slice(0, reference.start)}
-      <a
-        href={`?thread=${encodeURIComponent(threadId)}`}
-        title={`Open thread ${label}`}
-        className="dshx:font-medium dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground"
-        onClick={event => {
-          event.preventDefault()
-          props.openThread(threadId)
-        }}
-      >
-        {text}
-      </a>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <a
+            href={`?thread=${encodeURIComponent(threadId)}`}
+            className="dshx:font-medium dshx:text-info dshx:underline dshx:underline-offset-2 dshx:hover:text-foreground"
+            onClick={event => {
+              event.preventDefault()
+              props.openThread(threadId)
+            }}
+          >
+            {text}
+          </a>
+        </TooltipTrigger>
+        <TooltipContent>{`Open thread ${label}`}</TooltipContent>
+      </Tooltip>
       {description.slice(reference.end)}
     </>
   )

@@ -1786,21 +1786,25 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             </Popover>
           ) : null}
           {launchUrl === null ? null : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="dshx:shrink-0 dshx:text-muted-foreground"
-              aria-label={text(props.t, 'threadSidebarCopyLaunchUrl')}
-              title={text(props.t, 'threadSidebarCopyLaunchUrl')}
-              onClick={() =>
-                void navigator.clipboard.writeText(launchUrl).then(() => {
-                  setLaunchUrlCopied(true)
-                  window.setTimeout(() => setLaunchUrlCopied(false), 1500)
-                })
-              }
-            >
-              {launchUrlCopied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="dshx:shrink-0 dshx:text-muted-foreground"
+                  aria-label={text(props.t, 'threadSidebarCopyLaunchUrl')}
+                  onClick={() =>
+                    void navigator.clipboard.writeText(launchUrl).then(() => {
+                      setLaunchUrlCopied(true)
+                      window.setTimeout(() => setLaunchUrlCopied(false), 1500)
+                    })
+                  }
+                >
+                  {launchUrlCopied ? <CheckIcon className="dshx:size-4" aria-hidden="true" /> : <LinkIcon className="dshx:size-4" aria-hidden="true" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{text(props.t, 'threadSidebarCopyLaunchUrl')}</TooltipContent>
+            </Tooltip>
           )}
           {visibleFooterEntries.map((entry, index) => {
             const concealed = !footerEntryInline(entry, index)
@@ -1834,17 +1838,21 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             )
           })}
           <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
-                aria-label={text(props.t, 'threadSidebarMore')}
-                title={text(props.t, 'threadSidebarMore')}
-              >
-                <IconEllipsisOutlineRegular size={16} />
-              </Button>
-            </PopoverTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
+                    aria-label={text(props.t, 'threadSidebarMore')}
+                  >
+                    <IconEllipsisOutlineRegular size={16} />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">{text(props.t, 'threadSidebarMore')}</TooltipContent>
+            </Tooltip>
             <PopoverContent
               side={wide ? 'top' : 'right'}
               align={wide ? 'end' : 'start'}

@@ -1,4 +1,5 @@
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useApi } from '@dshfiles/dshx/client'
 import { useEffect } from 'react'
 import { useMutation, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -42,14 +43,21 @@ export const QuotaAutoResumeToggle = (props: { readonly sessionId: string; reado
     ? `Resume this thread 1 minute after your limit resets ${resetLabel(continuation.resetAt ?? 0)}.`
     : 'Automatic resume needs a known reset time.'
   return (
-    <label className="dshx-root dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground" title={title}>
-      <Checkbox
-        aria-label="Automatically resume after the limit resets"
-        checked={continuation.autoRetry}
-        disabled={!knownReset || retry.isPending}
-        onCheckedChange={checked => retry.mutate(checked === true)}
-      />
-      <span className="dshx:whitespace-nowrap">Auto-resume</span>
-    </label>
+    <TooltipProvider delayDuration={500}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="dshx-root dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+            <Checkbox
+              aria-label="Automatically resume after the limit resets"
+              checked={continuation.autoRetry}
+              disabled={!knownReset || retry.isPending}
+              onCheckedChange={checked => retry.mutate(checked === true)}
+            />
+            <span className="dshx:whitespace-nowrap">Auto-resume</span>
+          </label>
+        </TooltipTrigger>
+        <TooltipContent>{title}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

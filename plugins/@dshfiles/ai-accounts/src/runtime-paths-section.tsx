@@ -113,7 +113,7 @@ export const RuntimePathsSection = (props: {
       }
       description="Absolute path on this host"
       index="02"
-      title="Runtime paths"
+      heading="Runtime paths"
     >
       {draft.kind === 'codex' ? (
         <>

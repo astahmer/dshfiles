@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
@@ -40,6 +41,7 @@ export const NativeProvidersList = (props: { readonly compact?: boolean }): JSX.
   const toggle = (provider: Provider, enabled: boolean): void => toggleMutation.mutate({ entryId: provider.entryId, enabled })
 
   return (
+    <TooltipProvider delayDuration={500}>
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <ul className={cn('dshx:flex dshx:flex-col', props.compact === true ? 'dshx:gap-0.5' : 'dshx:gap-1.5')}>
         {state.providers.map(provider => (
@@ -52,9 +54,12 @@ export const NativeProvidersList = (props: { readonly compact?: boolean }): JSX.
           >
             <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
               <span className="dshx:truncate dshx:text-sm">{provider.label}</span>
-              <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" title={provider.lockedReason ?? provider.entryId}>
-                {statusOf(provider, state.liveReload)}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{statusOf(provider, state.liveReload)}</span>
+                </TooltipTrigger>
+                <TooltipContent>{provider.lockedReason ?? provider.entryId}</TooltipContent>
+              </Tooltip>
             </div>
             <Switch
               aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
@@ -75,5 +80,6 @@ export const NativeProvidersList = (props: { readonly compact?: boolean }): JSX.
         Off keeps the provider&apos;s settings and API key. {state.liveReload ? 'Changes apply within a few seconds.' : 'Restart DSH to apply a change.'}
       </p>
     </div>
+    </TooltipProvider>
   )
 }

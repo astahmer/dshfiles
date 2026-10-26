@@ -3,6 +3,8 @@ import { randomBytes } from 'node:crypto'
 import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { decodeJson, jsonValueSchema } from '../json.js'
+import type { JsonValue } from '../json.js'
 import type { Page } from 'playwright'
 import { z } from 'zod'
 import type { ReachSeed } from '../project/features.js'
@@ -81,7 +83,9 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   // name and shows only the model id.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)
   const bareModelWord = new RegExp(`(?:^|[\\s/])${bareModelId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`)
-  const routeOption = input.page.getByRole('menuitemradio', { name: modelId, exact: true }).or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
+  const routeOption = input.page
+    .getByRole('menuitemradio', { name: modelId, exact: true })
+    .or(modelList.getByRole('button').filter({ hasText: bareModelWord }))
   await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
   await routeOption.first().click({ timeout: input.timeoutMs })
 
@@ -237,10 +241,10 @@ type FakeProviderAccount = z.infer<typeof FAKE_PROVIDER_ACCOUNTS_FILE>['accounts
 /** What ai-accounts persisted for the fake route, read from its store in the scratch home: the panel's draft can differ. */
 const readFakeProviderAccount = async (home: string): Promise<FakeProviderAccount | undefined> => {
   const source = await readFile(join(home, 'plugins', 'ai-accounts', 'accounts.json'), 'utf8').catch(() => '')
-  let json: unknown
+  let json: JsonValue
   // The store is rewritten in place; a read mid-write is not JSON yet and counts as no account.
   try {
-    json = JSON.parse(source)
+    json = decodeJson(jsonValueSchema, source)
   } catch {
     return undefined
   }

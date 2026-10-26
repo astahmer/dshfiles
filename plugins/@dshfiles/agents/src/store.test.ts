@@ -5,10 +5,7 @@ import type { AgentTable, AgentThreadTable } from './store.js'
 import type { Agent, AgentDraft, AgentThread } from './agent.js'
 import { AgentRegistry } from './store.js'
 
-const memoryTable = <Key extends string, Value>(
-  initial: readonly Value[] = [],
-  keyOf: (value: Value) => Key,
-): { readonly rows: Map<Key, Value>; readonly table: KvTable<Key, Value> } => {
+const memoryTable = <Key extends string, Value>(initial: readonly Value[] = [], keyOf: (value: Value) => Key) => {
   const rows = new Map<Key, Value>(initial.map(value => [keyOf(value), value]))
   const table: KvTable<Key, Value> = {
     get: key => rows.get(key),

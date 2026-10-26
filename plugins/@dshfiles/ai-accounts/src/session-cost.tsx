@@ -1,24 +1,29 @@
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@dshfiles/plugin-ui/components/ui/hover-card'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CoinsIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef } from 'react'
+import type { z } from 'zod'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
-import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema, type CostEstimate, type RouteQuote } from './cost-estimate.js'
+import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema, type CostEstimate } from './cost-estimate.js'
 import { fetchedAgo } from './pricing-status.js'
 import { SessionCostDisplay, sessionCostDockScope } from './session-cost-display.js'
 import { usePreferences } from './use-preferences.js'
 
-type ProjectionHook = (key: string) => unknown
+/** What the composer's projection hook hands over before `sessionCostViewSchema` decodes it. */
+type ProjectionSnapshot = z.input<typeof sessionCostViewSchema>
+
+type ProjectionHook = (key: string) => ProjectionSnapshot | undefined
 
 const isProjectionHook = (value: unknown): value is ProjectionHook => typeof value === 'function'
 
 const compactTokens = (tokens: number): string =>
   tokens >= 1_000_000 ? `${(tokens / 1_000_000).toFixed(1)}M` : tokens >= 1_000 ? `${(tokens / 1_000).toFixed(1)}k` : String(tokens)
 
-const MATCH_LABEL: Readonly<Record<RouteQuote['match'], string>> = {
+const MATCH_LABEL = {
   override: 'override',
   exact: 'models.dev',
   fuzzy: 'models.dev, closest id',
@@ -150,20 +155,27 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
             </div>
           )}
         </dl>
+        <TooltipProvider delayDuration={500}>
         <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2">
           {session.routes.map(route => (
             <li className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2" key={CostEstimateModel.routeKey(route)}>
-              <span className="dshx:min-w-0 dshx:truncate" title={route.modelsDevId ?? undefined}>
-                {route.provider}/{route.model}
-                <span className="dshx:text-muted-foreground">
-                  {' · '}
-                  {route.free ? 'free' : MATCH_LABEL[route.match]}
-                </span>
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="dshx:min-w-0 dshx:truncate">
+                    {route.provider}/{route.model}
+                    <span className="dshx:text-muted-foreground">
+                      {' · '}
+                      {route.free ? 'free' : MATCH_LABEL[route.match]}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                {route.modelsDevId === null ? null : <TooltipContent>{route.modelsDevId}</TooltipContent>}
+              </Tooltip>
               <span className="dshx:shrink-0 dshx:tabular-nums">{route.cost === null ? '—' : CostEstimateModel.formatUsd(route.cost.total)}</span>
             </li>
           ))}
         </ul>
+        </TooltipProvider>
         <p className="dshx:text-muted-foreground">
           Estimate from published API prices (models.dev{fetchedAt === null ? '' : `, ${fetchedAgo(relativeTime(fetchedAt, quotesQuery.dataUpdatedAt))}`}), not
           an invoice.

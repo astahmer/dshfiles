@@ -3,6 +3,7 @@ import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/prom
 import { dirname, relative, resolve, sep } from 'node:path'
 import type { Program } from 'oxc-parser'
 import { SourceSyntax } from '../project/syntax.js'
+import { jsonObjectSchema } from '../json.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -693,7 +694,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   const postProject: ResolvedDshxConfig = {
     ...project,
     ...(clientBefore === undefined && { clientEntry: clientFile }),
-    manifest,
+    manifest: jsonObjectSchema.parse(manifest),
   }
   const compatibility = dependencies.compatibility ?? inspect.dsh?.compatibility ?? DEFAULT_COMPATIBILITY
   let postDiagnostics: readonly DshxDiagnostic[]

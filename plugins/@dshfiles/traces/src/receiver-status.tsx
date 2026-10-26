@@ -1,6 +1,7 @@
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import type { TracesLocaleKey, TracesTranslate } from './locales.js'
 import type { DiagnosisCode, ReceiverStatus } from './types.js'
@@ -12,9 +13,16 @@ export const ReceiverBadge = (props: { readonly status: ReceiverStatus; readonly
   const endpoint = receiverEndpoint(props.status)
   if (props.status.state === 'listening' && endpoint !== null)
     return (
-      <Badge variant="success" data-testid="traces-receiver-state" data-state="listening" title={endpoint}>
-        {props.t('receiverListening')} <span className="dshx:font-mono">{endpoint}</span>
-      </Badge>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="dshx:inline-flex">
+            <Badge variant="success" data-testid="traces-receiver-state" data-state="listening">
+              {props.t('receiverListening')} <span className="dshx:font-mono">{endpoint}</span>
+            </Badge>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{endpoint}</TooltipContent>
+      </Tooltip>
     )
   if (props.status.state === 'port-in-use')
     return (

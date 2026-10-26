@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { Hono } from 'hono'
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
 import { z } from 'zod'
+import { decodeJson } from '../json.js'
 
 /**
  * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address, so a
@@ -121,7 +122,7 @@ const toolCalls = (calls: readonly { readonly name: string; readonly argumentsJs
 const toolCall = (name: string, argumentsJson: string): ChatDelta => toolCalls([{ name, argumentsJson }])
 
 const streamAnswer = (delta: ChatDelta, delayBetweenWordsMs = 0): ChatCompletionResult => ({ kind: 'stream', delta, delayBetweenWordsMs })
-const responseAnswer = (payload: unknown, status: number): ChatCompletionResult => ({ kind: 'response', response: Response.json(payload, { status }) })
+const responseAnswer = <Payload>(payload: Payload, status: number): ChatCompletionResult => ({ kind: 'response', response: Response.json(payload, { status }) })
 
 const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; readonly key: string; readonly body: unknown }): ChatCompletionResult => {
   const parsed = chatRequestSchema.safeParse(input.body)
@@ -174,7 +175,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
       input.state.oneShotCalls.add(directive)
     }
     const rawArguments = match[3] ?? '{}'
-    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? z.string().parse(JSON.parse(`"${rawArguments}"`)) : rawArguments
+    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? decodeJson(z.string(), `"${rawArguments}"`) : rawArguments
     return [{ name: match[2] ?? '', argumentsJson }]
   })
   if (calls.length > 0) return streamAnswer(toolCalls(calls))
@@ -247,11 +248,11 @@ export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
 }
 
 interface ListenableServer {
-  once(event: 'error', listener: (error: Error) => void): unknown
-  off(event: 'error', listener: (error: Error) => void): unknown
-  listen(port: number, host: string, listener: () => void): unknown
+  once(event: 'error', listener: (error: Error) => void): ListenableServer
+  off(event: 'error', listener: (error: Error) => void): ListenableServer
+  listen(port: number, host: string, listener: () => void): ListenableServer
   address(): AddressInfo | string | null
-  close(listener: () => void): unknown
+  close(listener: () => void): ListenableServer
   closeAllConnections?(): void
 }
 

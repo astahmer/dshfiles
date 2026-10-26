@@ -1,6 +1,7 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@dshfiles/plugin-ui/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
@@ -48,7 +49,6 @@ export const TraceList = (props: {
               className="dshx:cursor-pointer"
               tabIndex={0}
               aria-label={`${trace.rootService} ${trace.rootName}`}
-              title={`${new Date(trace.startMs).toLocaleString()} · ${trace.rootService} ${trace.rootName}`}
               onClick={() => props.onOpen(trace.traceId)}
               onKeyDown={event => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -57,23 +57,30 @@ export const TraceList = (props: {
                 }
               }}
             >
-              <TableCell
-                className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden"
-                title={new Date(trace.startMs).toLocaleString()}
-              >
-                {TraceFormat.clock(trace.startMs)}
+              <TableCell className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>{TraceFormat.clock(trace.startMs)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>{new Date(trace.startMs).toLocaleString()}</TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell className="dshx:max-w-0">
-                <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  <ServiceDot service={trace.rootService} error={trace.errorCount > 0} />
-                  <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{trace.rootService}</span>
-                  <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{trace.rootName}</span>
-                  {trace.services.length > 1 ? (
-                    <Badge variant="outline" className="dshx:shrink-0 dshx:@max-pane-compact:hidden">
-                      {trace.services.length} {props.t('service').toLowerCase()}
-                    </Badge>
-                  ) : null}
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                      <ServiceDot service={trace.rootService} error={trace.errorCount > 0} />
+                      <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{trace.rootService}</span>
+                      <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{trace.rootName}</span>
+                      {trace.services.length > 1 ? (
+                        <Badge variant="outline" className="dshx:shrink-0 dshx:@max-pane-compact:hidden">
+                          {trace.services.length} {props.t('service').toLowerCase()}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{`${new Date(trace.startMs).toLocaleString()} · ${trace.rootService} ${trace.rootName}`}</TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell>
                 <div className="dshx:flex dshx:items-center dshx:gap-2">

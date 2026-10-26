@@ -2,6 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, StarIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
@@ -119,10 +120,15 @@ export const ModelCuration = (props: {
           >
             <StarIcon className={cn(isFavorite && 'dshx:fill-current')} />
           </Button>
-          <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-2" title={model.id}>
-            <strong className="dshx:truncate dshx:text-sm dshx:font-medium">{model.name}</strong>
-            <small className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{model.id}</small>
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-2">
+                <strong className="dshx:truncate dshx:text-sm dshx:font-medium">{model.name}</strong>
+                <small className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{model.id}</small>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{model.id}</TooltipContent>
+          </Tooltip>
           <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-1">
             {model.efforts.length === 0 ? null : (
               <Select onValueChange={effortId => setEffort(model.id, effortId)} value={pinned ?? model.defaultEffort ?? PROVIDER_DEFAULT}>
@@ -182,6 +188,7 @@ export const ModelCuration = (props: {
   ]
 
   return (
+    <TooltipProvider delayDuration={500}>
     <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-2">
       <form
         className="dshx:flex dshx:gap-2"
@@ -228,5 +235,6 @@ export const ModelCuration = (props: {
         ),
       )}
     </div>
+    </TooltipProvider>
   )
 }

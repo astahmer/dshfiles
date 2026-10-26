@@ -94,10 +94,10 @@ const CurrentQuota = (props: { accountId: string; usage: AccountsUsage | null })
   )
 }
 
-const HistoryCard = (props: { readonly title: string; readonly description: string; readonly children: ReactNode }): JSX.Element => (
+const HistoryCard = (props: { readonly heading: string; readonly description: string; readonly children: ReactNode }): JSX.Element => (
   <Card className="dshx:mx-auto dshx:w-full dshx:max-w-[1500px] dshx:gap-3 dshx:py-4">
     <CardHeader className="dshx:gap-1 dshx:px-4">
-      <CardTitle className="dshx:text-sm">{props.title}</CardTitle>
+      <CardTitle className="dshx:text-sm">{props.heading}</CardTitle>
       <CardDescription className="dshx:text-xs">{props.description}</CardDescription>
     </CardHeader>
     <CardContent className="dshx:px-4">{props.children}</CardContent>
@@ -312,13 +312,13 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
             </CollapsibleContent>
           </Collapsible>
 
-          <HistoryCard description={`${selected.displayName || selected.instanceId}${selected.kind ? ` · ${selected.kind}` : ''}`} title="Current limits">
+          <HistoryCard description={`${selected.displayName || selected.instanceId}${selected.kind ? ` · ${selected.kind}` : ''}`} heading="Current limits">
             <CurrentQuota accountId={selectedId} usage={usage} />
           </HistoryCard>
 
           <HistoryCard
             description="Linear estimates use recent snapshots from the current reset cycle. They are a guide, not provider forecasts."
-            title="Usage pace"
+            heading="Usage pace"
           >
             {forecasts.length === 0 ? (
               <p className="dshx:text-xs dshx:text-muted-foreground">A current quota reading is not available for this account.</p>
@@ -350,7 +350,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
                 ? `Showing up to ${String(MAX_USAGE_HISTORY_POINTS)} sampled readings from the last ${String(days)} days.`
                 : `${String(points.length)} snapshots in the last ${String(days)} days.`
             }
-            title="Quota over time"
+            heading="Quota over time"
           >
             <div className="dshx:flex dshx:flex-col dshx:gap-2">
               <QuotaHistoryChart
@@ -365,7 +365,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
 
           <HistoryCard
             description={`${String(resetCount)} reset credits in the latest snapshot across ${String(points.length)} quota snapshots.`}
-            title="Banked reset history"
+            heading="Banked reset history"
           >
             {bankChanges.length === 0 || !bankChanges.some(point => point.bankedResets > 0) ? (
               <p className="dshx:text-xs dshx:text-muted-foreground">This provider has not reported banked resets in the selected period.</p>

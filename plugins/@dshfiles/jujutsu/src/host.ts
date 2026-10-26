@@ -4,6 +4,7 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
+import { z } from 'zod'
 import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
@@ -27,6 +28,12 @@ const PREVIEW_TTL = 5 * 60_000
 const MAX_REVISIONS = 500
 const INITIAL_GRAPH_PAGE_SIZE = 100
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
+
+/** One `jj evolog` row from EVOLUTION_TEMPLATE. */
+const evolutionRowSchema = z.object({ commitId: z.string(), predecessors: z.array(z.string()) })
+
+/** One `jj operation log` row from OPERATION_TEMPLATE. */
+const operationRowSchema = z.object({ description: z.string(), attributes: z.string(), time: z.string() })
 
 interface RegisteredRepo {
   readonly id: string
@@ -204,7 +211,7 @@ const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSig
   if (confirmed.truncated || (await realpath(confirmed.stdout.trim())) !== root) throw new Error('Repository root changed during registration.')
   await assertRepoIdentity(repo)
   while (repos.size >= 32) {
-    const oldest = repos.keys().next().value as string | undefined
+    const oldest = repos.keys().next().value
     if (oldest === undefined) break
     repos.delete(oldest)
   }
@@ -330,16 +337,11 @@ const readEvolvedCommitIds = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      if (typeof value !== 'object' || value === null) throw new Error('Invalid evolution record.')
-      const row = value as { commitId?: unknown; predecessors?: unknown }
-      if (
-        !JujutsuMutationModel.isCommitId(String(row.commitId ?? '')) ||
-        !Array.isArray(row.predecessors) ||
-        !row.predecessors.every(id => typeof id === 'string' && JujutsuMutationModel.isCommitId(id))
-      ) {
+      const row = evolutionRowSchema.safeParse(value)
+      if (!row.success || !JujutsuMutationModel.isCommitId(row.data.commitId) || !row.data.predecessors.every(id => JujutsuMutationModel.isCommitId(id))) {
         throw new Error('Invalid evolution record.')
       }
-      return { commitId: row.commitId as string, predecessors: row.predecessors as string[] }
+      return row.data
     })
     return {
       commitIds: new Set(rows.filter(row => row.predecessors.length > 0).map(row => row.commitId)),
@@ -389,10 +391,9 @@ const readLastPush = async (
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
     const operations = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
-      if (typeof value !== 'object' || value === null) throw new Error('Invalid operation row.')
-      const row = value as { description?: unknown; attributes?: unknown; time?: unknown }
-      if (typeof row.description !== 'string' || typeof row.attributes !== 'string' || typeof row.time !== 'string') throw new Error('Invalid operation row.')
-      return { attributes: row.attributes, time: row.time }
+      const row = operationRowSchema.safeParse(value)
+      if (!row.success) throw new Error('Invalid operation row.')
+      return { attributes: row.data.attributes, time: row.data.time }
     })
     const push = operations.find(row => JujutsuOutputModel.isRecordedJjGitPush(row.attributes))
     return {

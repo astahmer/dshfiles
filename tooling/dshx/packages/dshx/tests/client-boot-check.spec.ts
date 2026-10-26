@@ -223,7 +223,7 @@ describe('client boot outcome reader', () => {
   type NativeOutcome = Omit<BrowserBootOutcome, 'ok' | 'slotFailures'>
 
   interface StubPage {
-    evaluate: () => Promise<unknown>
+    evaluate<Argument, Result>(pageFunction: (argument: Argument) => Result, argument?: Argument): Promise<Result>
   }
 
   const nativeOutcome = (evidence: BrowserBootEvidence, ready: boolean, text = ''): NativeOutcome => ({
@@ -239,9 +239,10 @@ describe('client boot outcome reader', () => {
   const page = (outcome: NativeOutcome, slotErrors: string[] = []): StubPage => {
     let evaluation = 0
     return {
-      evaluate: async () => {
+      evaluate: async <Argument, Result>(_pageFunction: (argument: Argument) => Result, _argument?: Argument): Promise<Result> => {
         evaluation += 1
-        return evaluation === 1 ? outcome : JSON.stringify(slotErrors)
+        // SAFETY: the stub stands in for Playwright's Page; the reader's own return type describes this JSON payload.
+        return (evaluation === 1 ? outcome : JSON.stringify(slotErrors)) as Result
       },
     }
   }
