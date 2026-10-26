@@ -114,7 +114,7 @@
           "kind": "unit-test",
           "id": "loopback-access.staged-startup",
           "file": "plugins/@dshfiles/loopback-access/src/startup.test.ts",
-          "testName": "commits desired volatile changes without reactivating or changing the boot service"
+          "testName": "ignores legacy localhostEnabled=%s through native Config/Settings without reactivating the boot service"
         }
       ]
     }
