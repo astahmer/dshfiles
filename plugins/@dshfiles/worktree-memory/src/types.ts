@@ -60,6 +60,30 @@ export const workspaceGroupSchema = z.object({
 })
 export type WorkspaceGroup = z.infer<typeof workspaceGroupSchema>
 
+export const nodeProcessSampleSchema = z.object({
+  pid: z.number().int().positive(),
+  rssBytes: z.number().nonnegative(),
+})
+export type NodeProcessSample = z.infer<typeof nodeProcessSampleSchema>
+
+export const nodeProcessOriginSchema = z.object({
+  name: z.string().max(120),
+  source: z.string().max(120).nullable(),
+  cwd: z.string().max(1024).nullable(),
+  processCount: z.number().int().nonnegative(),
+  rssBytes: z.number().nonnegative(),
+  samples: z.array(nodeProcessSampleSchema).max(5),
+})
+export type NodeProcessOrigin = z.infer<typeof nodeProcessOriginSchema>
+
+export const nodeProcessSummarySchema = z.object({
+  processCount: z.number().int().nonnegative(),
+  rssBytes: z.number().nonnegative(),
+  truncated: z.boolean(),
+  origins: z.array(nodeProcessOriginSchema).max(100),
+})
+export type NodeProcessSummary = z.infer<typeof nodeProcessSummarySchema>
+
 export const memorySnapshotSchema = z.object({
   takenAt: z.number(),
   supported: z.boolean(),
@@ -71,6 +95,7 @@ export const memorySnapshotSchema = z.object({
   detachedCount: z.number().int().nonnegative(),
   categoryBytes: z.record(z.enum(processCategoryValues), z.number().nonnegative()),
   groups: z.array(workspaceGroupSchema).max(200),
+  nodeProcesses: nodeProcessSummarySchema.optional(),
 })
 export type MemorySnapshot = z.infer<typeof memorySnapshotSchema>
 

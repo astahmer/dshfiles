@@ -59,6 +59,14 @@ When('the RAM panel is opened', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('heading', { name: 'RAM', exact: true, level: 1 })).toBeVisible()
 })
 
+Then('the Node origin summary is visible', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'worktree-memory-node-origins-are-summarized', async () => {
+    const summary = page.locator('[data-node-process-summary]')
+    await expect(summary).toBeVisible()
+    await expect.poll(async () => Number(await summary.getAttribute('data-node-process-count')), { timeout: 30_000 }).toBeGreaterThan(0)
+  })
+})
+
 Then('the decoy is listed as a detached tree of its workspace', async ({ page }: { page: Page }) => {
   const decoy = requireDecoy(page)
   await recordAssertion(page, 'worktree-memory-lists-the-detached-decoy-under-its-workspace', async () => {

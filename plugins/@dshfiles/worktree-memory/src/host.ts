@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-workspace'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { worktreeMemoryApi } from './api.js'
+import { nodeProcessCwdPids, summarizeNodeProcesses } from './node-process-summary.js'
 import { ProcessTable, type KnownSession, type ProcessRow } from './process-table.js'
 import { createSessionMetadataCache, type SessionMetadataCache } from './session-metadata-cache.js'
 import { emptyCategoryBytes, type MemoryPressure, type MemorySnapshot, type ProcessTree, type StopResult, type StopTarget } from './types.js'
@@ -22,6 +23,7 @@ const SESSIONS_TIMEOUT_MS = 2_500
 const KILL_GRACE_MS = 3_000
 const MAX_PS_BYTES = 8 * 1024 * 1024
 const MAX_CWD_PROBES = 400
+const MAX_NODE_CWD_PROBES = 100
 const STOP_REASON = 'stopped from the worktree memory panel'
 
 interface JobRegistry {
@@ -60,6 +62,7 @@ const unsupported = (now: number): MemorySnapshot => ({
   detachedCount: 0,
   categoryBytes: emptyCategoryBytes(),
   groups: [],
+  nodeProcesses: { processCount: 0, rssBytes: 0, truncated: false, origins: [] },
 })
 
 const run = (context: Context, command: string, args: readonly string[]): Promise<string> =>
@@ -157,17 +160,19 @@ const probe = async (active: MemoryRuntime, includeSessions: boolean): Promise<P
   const sessions = includeSessions ? active.sessionMetadata.read(() => readSessions(context)) : []
   const [rows, pressure] = await Promise.all([readProcessTable(context), readPressure(context)])
   const candidates = ProcessTable.candidates({ rows, hostPid: process.pid })
-  const cwds = await readCwds(context, [...candidates.hostChildren, ...candidates.orphans])
+  const nodePids = nodeProcessCwdPids({ rows, limit: MAX_NODE_CWD_PROBES })
+  const cwds = await readCwds(context, [...new Set([...candidates.hostChildren, ...candidates.orphans, ...nodePids])])
   const registry = context.get('workspaceRegistry')
   const workspaces = (registry?.list() ?? []).map(workspace => ({ path: workspace.path, title: workspace.title }))
   const jobs = [...active.jobs.values()]
     .filter(job => job.status === 'running' || job.status === 'stopping')
     .map(job => ({ id: job.id, label: job.label, owner: job.owner ?? null, startedAt: job.startedAt }))
+  const home = userInfo().homedir
   const snapshot = ProcessTable.snapshot({
     rows,
     cwds,
     hostPid: process.pid,
-    home: userInfo().homedir,
+    home,
     now,
     workspaces,
     sessions,
@@ -175,7 +180,7 @@ const probe = async (active: MemoryRuntime, includeSessions: boolean): Promise<P
     pressure,
     systemBytes: totalmem(),
   })
-  return { snapshot, rows }
+  return { snapshot: { ...snapshot, nodeProcesses: summarizeNodeProcesses({ rows, cwds, home }) }, rows }
 }
 
 /** One probe serves every caller within the TTL, so a polling panel in several tabs costs one `ps`. */

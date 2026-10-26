@@ -13,7 +13,7 @@ export const worktreeMemoryApi = defineApi({
       input: z.object({}).strict(),
       output: memorySnapshotSchema,
       description:
-        'Resident memory of every process tree the threads started, grouped by workspace: live background jobs (with their owning Session), other children of this Host, and detached trees still running inside a workspace after their parent exited. Includes the memory-pressure level. Read-only.',
+        'Resident memory of DSH process trees grouped by workspace, plus a deterministic, argv-redacted summary of this user’s Node processes grouped by script label, nearest app or parent, and working directory. Node memory is resident RSS. Includes the memory-pressure level. Read-only.',
       tool: { name: 'worktree_memory_snapshot', readOnly: true, render: compactJson },
     }),
     pressure: method({

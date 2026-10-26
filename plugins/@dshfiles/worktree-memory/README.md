@@ -1,23 +1,27 @@
 # DSH worktree memory
 
-![Process memory by workspace](docs/screenshots/memory-board.png)
+![Process memory and Node origins](docs/screenshots/memory-board.png)
 
-Activity Monitor shows forty `node` rows and nothing about which thread started them. This page groups the resident
-memory of everything the threads spawned by workspace, so "what is eating my RAM" is one look, and "stop it" is two
-clicks. Inspired by Fusebox, a menu-bar app built around Lovable's dev setup; no code is taken from it.
+System monitors show many `node` rows without context. This page adds a rule-based summary of current-user Node
+processes (known script labels, nearest app ancestor or immediate parent, and working directory) alongside DSH trees
+grouped by workspace. Node origins are read-only: they expose process IDs and resident RSS, not command arguments or
+environment values. Stops remain scoped to DSH trees and require confirmation.
 
 ## Where the rows come from
 
 ```
-ps (pid, ppid, rss, lstart, args) ──► candidates ──► lsof cwd (macOS) / /proc/<pid>/cwd (Linux)
+ps (current UID, pid, ppid, rss, lstart, args) ──► DSH candidates + Node rows ──► bounded cwd probes
                                           │
 ctx.jobs live views ──────────────────────┼──► ProcessTable.snapshot ──► worktree-memory API ──► RAM panel
 workspaceRegistry + sessionController ────┘
 ```
 
 - **Candidates** are this Host's direct children and the user's orphans (`ppid = 1`) that are not apps or system
-  agents. Only those get a working-directory probe, which keeps the scan cheap on a loaded machine (a full `lsof`
-  cwd scan took 20 s here; the bounded one takes ~0.5 s).
+  agents. The Host also probes up to 100 highest-RSS Node PIDs, within the same 400-process limit.
+
+- **Node origin** uses a fixed script-name rule list, the nearest `.app` ancestor (or immediate parent executable), and
+  working directory. Home paths display as `~`; unknown scripts use the generic `Node process` label. The summary
+  covers only the current OS user and never returns argv or env. RSS is resident memory, not compressed or swapped.
 - **Workspace** is the deepest registered workspace containing the working directory, else a jj sibling checkout of
   one (`<repo>-<name>`, `<repo>-threads/<name>`). An orphan outside every workspace is not ours and is not listed.
 - **Origin**: `job` when a live job of this Host owns the tree (matched by label prefix, then by a unique start time),
@@ -28,7 +32,7 @@ workspaceRegistry + sessionController ────┘
   (`node …/node_modules/vitest/vitest.mjs run` reads as `vitest run`).
 - The Host that serves the page and every ancestor of it (a supervisor) are never listed, so they cannot be stopped.
 
-One probe serves every caller for 3 s, and nothing scans while no panel or agent asks.
+The sidebar samples every 30 s and the open panel polls every 5 s; both share one 3 s process-table cache.
 
 ## Stop
 
