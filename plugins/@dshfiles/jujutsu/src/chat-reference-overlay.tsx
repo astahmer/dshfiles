@@ -109,22 +109,14 @@ export const ChatReferenceOverlay = (): JSX.Element => {
       queryFn: ({ signal: querySignal }) => jjIntegration.projects({}, { signal: querySignal }),
       staleTime: 30_000,
     })
-    const paths = [...projects.projects, ...(projects.workspaces ?? [])].map(project => project.path)
-    const repositories = await Promise.all(
-      [...new Set(paths)].slice(0, 31).map(async path => {
-        try {
-          return {
-            path,
-            repository: await queryClient.fetchQuery({
-              queryKey: chatReferenceQueryKeys.repository(path),
-              queryFn: ({ signal: querySignal }) => api.registerRepository({ path }, { signal: querySignal }),
-              staleTime: 30_000,
-            }),
-          }
-        } catch {
-          return undefined
-        }
-      }),
+    const paths = [...new Set([...projects.projects, ...(projects.workspaces ?? [])].map(project => project.path))].slice(0, 31)
+    const registered = await queryClient.fetchQuery({
+      queryKey: chatReferenceQueryKeys.repositories(paths),
+      queryFn: ({ signal: querySignal }) => api.registerRepositories({ paths }, { signal: querySignal }),
+      staleTime: 30_000,
+    })
+    const repositories = registered.repositories.flatMap(entry =>
+      entry.repoId === null || entry.root === null ? [] : [{ path: entry.path, repository: { repoId: entry.repoId, root: entry.root } }],
     )
     const repositoryIds = new Set<string>()
     const candidates = repositories.flatMap(candidate => {

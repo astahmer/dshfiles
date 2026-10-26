@@ -7,6 +7,7 @@ import { isAbsolute, join, normalize, relative } from 'node:path'
 import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
+import { registerRepositoryBatch } from './repository-batch.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
 import { withJjSpan } from './jj-span.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
@@ -751,6 +752,17 @@ const jujutsuHostApi = jujutsuApi.host({
     const repo = await registerRepo(ctx, input.path, signal)
     return { repoId: repo.id, root: repo.root }
   }),
+  registerRepositories: async ({ input, ctx, signal }) => {
+    const repositories = await registerRepositoryBatch({
+      paths: input.paths,
+      signal,
+      register: async path => {
+        const repo = await registerRepo(ctx, path, signal)
+        return { repoId: repo.id, root: repo.root }
+      },
+    })
+    return { repositories: [...repositories] }
+  },
   workspaces: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     return { workspaces: [...(await readWorkspaces(ctx, repo, signal))] }

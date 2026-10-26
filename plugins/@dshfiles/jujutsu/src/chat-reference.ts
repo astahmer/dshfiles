@@ -27,6 +27,7 @@ export const chatReferenceQueryKeys = {
   search: (cwd: string, reference: string) => ['jujutsu', 'reference-search', cwd, reference] as const,
   projects: ['jujutsu', 'reference-projects'] as const,
   repository: (path: string) => ['jujutsu', 'reference-repository', path] as const,
+  repositories: (paths: readonly string[]) => ['jujutsu', 'reference-repositories', [...paths].sort().join('\n')] as const,
 }
 
 const referenceOf = (token: string): ChatReference | undefined => {

@@ -15,6 +15,11 @@ describe('chat reference tokens', () => {
     expect(chatReferenceQueryKeys.localTitle('/repo', 'main')).not.toEqual(chatReferenceQueryKeys.localTitle('/repo', 'release'))
   })
 
+  it('keys a repository batch by its path set, not its order', () => {
+    expect(chatReferenceQueryKeys.repositories(['/a', '/b'])).toEqual(chatReferenceQueryKeys.repositories(['/b', '/a']))
+    expect(chatReferenceQueryKeys.repositories(['/a', '/b'])).not.toEqual(chatReferenceQueryKeys.repositories(['/a']))
+  })
+
   it('deduplicates local-title reads and caches repository registration', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     let localTitleCalls = 0

@@ -216,6 +216,22 @@ export const jujutsuApi = defineApi({
       description: 'Resolve a folder to its jj repository and return the repoId every other jujutsu tool takes. Read-only.',
       tool: { name: 'jj_register_repository', readOnly: true, render: output => `${output.repoId} · ${output.root}` },
     }),
+    registerRepositories: method({
+      input: z.object({ paths: z.array(repoPathSchema).min(1).max(31) }),
+      output: z.object({
+        repositories: z
+          .array(
+            z.object({
+              path: repoPathSchema,
+              repoId: repoIdSchema.nullable(),
+              root: z.string().max(2048).nullable(),
+            }),
+          )
+          .max(31),
+      }),
+      description:
+        'Resolve up to 31 folders to their jj repositories in one call, reporting a null row per non-repository path instead of failing the batch. Read-only.',
+    }),
     load: method({
       input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(500).default(100) }),
       output: z.union([stateSchema, readFailureSchema]),
