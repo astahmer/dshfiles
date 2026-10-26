@@ -40,10 +40,16 @@
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/frame-layout": {
-      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
       // @deepseek-ai/dsh-client-store's node build imports zustand and immer without declaring them; the
       // persisted-widths unit test drives that store, so the engine's own deps stay in devDependencies.
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "zustand", "immer"],
+    },
+    "plugins/@dshfiles/goal-tool": {
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/agent-communication": {
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
