@@ -17,6 +17,7 @@ import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
+import { threadStatusPollMs } from './thread-status-poll.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
@@ -74,7 +75,8 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
       return current
     },
-    refetchInterval: query => (query.state.data?.thread === null ? false : 5_000),
+    refetchInterval: query =>
+      threadStatusPollMs({ hasThread: query.state.data?.thread != null, queued: query.state.data?.thread?.integrationQueuedAt !== undefined }),
   })
   const rebase = useMutation({
     mutationKey: threadRebaseMutationKey,
