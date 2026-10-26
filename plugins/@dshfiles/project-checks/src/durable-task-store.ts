@@ -108,8 +108,7 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
       const putReceipt = this.#database.prepare(
         'INSERT OR IGNORE INTO attempt_receipts (task_id, attempt_id, session_id, finished_at, payload) VALUES (?, ?, ?, ?, ?)',
       )
-      for (const saved of data.receipts) {
-        const receipt = saved
+      for (const receipt of data.receipts) {
         if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) continue
         const exists = this.#database.prepare('SELECT 1 AS found FROM tasks WHERE task_id = ?').get(receipt.taskId)
         if (exists === undefined) continue
@@ -203,9 +202,8 @@ export class DurableTaskStore implements DurableTaskExecutionStore {
     return this.#transaction(() => this.#database.prepare('DELETE FROM tasks WHERE task_id = ?').run(taskId).changes > 0)
   }
 
-  async saveAttemptReceipt(receiptInput: StoredReceipt): Promise<void> {
+  async saveAttemptReceipt(receipt: StoredReceipt): Promise<void> {
     this.#assertOpen()
-    const receipt = receiptInput
     if (receipt.taskId === undefined || receipt.taskAttemptId === undefined) throw new Error('A durable attempt receipt needs both task identities.')
     const taskId = receipt.taskId
     const attemptId = receipt.taskAttemptId
