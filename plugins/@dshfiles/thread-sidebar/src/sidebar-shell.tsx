@@ -114,7 +114,8 @@ type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMeta
 const NAVIGATION_SETTLE_MS = 1500
 /** Holding Back or Forward this long opens the history menu, as browsers do. */
 const HISTORY_HOLD_MS = 450
-const PLUGIN_UPDATE_CHECK_MS = 60_000
+// A rebuilt plugin is noticed on the next check or on returning to the window; five minutes is often enough.
+const PLUGIN_UPDATE_CHECK_MS = 300_000
 const DRAG_THRESHOLD_PX = 5
 
 const rowActionLabelKeys = {
