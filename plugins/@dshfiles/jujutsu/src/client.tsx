@@ -66,7 +66,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
-import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
+import { REVISION_PAGE_SIZE, type GraphLandmark, type Mutation, type ReadFailure, type Revision } from './api.js'
 import { ChatReferenceModel } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { RevisionGraphModel, reverseHexChangeId, type RevisionGraphRow } from './graph.js'
@@ -144,7 +144,7 @@ const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.a
 const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: z.string(), fallback: '' })
 
 const REPOSITORY_ID_LIMIT = 32
-const INITIAL_GRAPH_PAGE_SIZE = 100
+const INITIAL_GRAPH_PAGE_SIZE = REVISION_PAGE_SIZE
 const EMPTY_REVISIONS: readonly Revision[] = []
 const REPOSITORY_QUERY_CACHE = { staleTime: JUJUTSU_QUERY_STALE_TIME, gcTime: JUJUTSU_QUERY_GC_TIME }
 

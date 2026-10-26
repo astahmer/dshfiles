@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
 import { z } from 'zod'
-import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
+import { jujutsuApi, REVISION_PAGE_SIZE, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { registerRepositoryBatch } from './repository-batch.js'
@@ -26,7 +26,7 @@ const COMMAND_TIMEOUT = 30_000
 const NETWORK_TIMEOUT = 120_000
 const PREVIEW_TTL = 5 * 60_000
 const MAX_REVISIONS = 500
-const INITIAL_GRAPH_PAGE_SIZE = 100
+const INITIAL_GRAPH_PAGE_SIZE = REVISION_PAGE_SIZE
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 
 /** One `jj evolog` row from EVOLUTION_TEMPLATE. */

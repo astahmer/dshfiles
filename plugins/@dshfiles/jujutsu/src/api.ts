@@ -1,6 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 
+export const REVISION_PAGE_SIZE = 10
+
 export const revisionSchema = z.object({
   commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
   changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
@@ -176,6 +178,8 @@ export const revisionRelationshipSchema = graphSliceSchema.extend({
   differenceIds: z.array(commitIdSchema).max(500),
 })
 
+export const graphPageOutputSchema = z.object({ revisions: z.array(revisionSchema).max(REVISION_PAGE_SIZE), hasMore: z.boolean() })
+
 export const referenceGraphSchema = z.object({
   label: z.string().min(1).max(255),
   commitId: commitIdSchema.nullable(),
@@ -233,7 +237,7 @@ export const jujutsuApi = defineApi({
         'Resolve up to 31 folders to their jj repositories in one call, reporting a null row per non-repository path instead of failing the batch. Read-only.',
     }),
     load: method({
-      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(500).default(100) }),
+      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(1).max(REVISION_PAGE_SIZE).default(REVISION_PAGE_SIZE) }),
       output: z.union([stateSchema, readFailureSchema]),
       description: 'Repository status and the first page of the revision graph: root, revisions, changed paths, remotes and the last push. Read-only.',
       tool: {
@@ -251,7 +255,7 @@ export const jujutsuApi = defineApi({
         query: z.string().max(256).default(''),
         excludeCommitIds: z.array(commitIdSchema).max(10_000),
       }),
-      output: z.union([z.object({ revisions: z.array(revisionSchema).max(100), hasMore: z.boolean() }), readFailureSchema]),
+      output: z.union([graphPageOutputSchema, readFailureSchema]),
       description: 'Load the next revision graph page, or search all visible revisions with a query. Read-only.',
       tool: {
         name: 'jj_graph_page',
