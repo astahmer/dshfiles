@@ -52,6 +52,8 @@ export const WorkspaceCleanupTrail = (props: { readonly onFinished: () => void }
 
   if (active === undefined) {
     if (latest === undefined || !settledVisible || latest.id === dismissed) return null
+    const summary = CleanupJobTrailModel.summary(latest)
+    if (summary === '') return null
     const failed = latest.state === 'failed'
     return (
       <TooltipProvider delayDuration={500}>
@@ -66,9 +68,11 @@ export const WorkspaceCleanupTrail = (props: { readonly onFinished: () => void }
           {failed ? <TriangleAlertIcon className="dshx:size-3.5 dshx:flex-none" /> : <CircleCheckIcon className="dshx:size-3.5 dshx:flex-none" />}
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{CleanupJobTrailModel.summary(latest)}</span>
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={summary}>
+                {summary}
+              </span>
             </TooltipTrigger>
-            <TooltipContent side="bottom">{CleanupJobTrailModel.summary(latest)}</TooltipContent>
+            <TooltipContent side="bottom">{summary}</TooltipContent>
           </Tooltip>
           <Button
             aria-label="Dismiss the cleanup result"
