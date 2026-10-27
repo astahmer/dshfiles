@@ -24,6 +24,8 @@
 
 ![A board card opens the item detail beside the board](docs/screenshots/board-card-detail.png)
 
+![Choose to open or copy a linked URL](docs/screenshots/url-reference-actions.png)
+
 ![File and scope items by project](docs/screenshots/project-scope.png)
 
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
@@ -112,8 +114,9 @@ instead.
 
 The peek opens beside the list (over it in a narrow pane). Edit the title and the markdown body in place, change kind and status, pin, link and unlink targets, comment, and read every event
 with its actor (`user`, `system` or `agent:<sessionId>`). **Referenced by** lists the items that link to
-this one. Fields the user changes by hand are recorded in `humanFields`, so later automatic moves can
-leave them alone. Nothing is deleted; `dropped` closes an item.
+this one. Click a URL reference to open a popover with **Open in browser** and **Copy URL** actions. Fields
+the user changes by hand are recorded in `humanFields`, so later automatic moves can leave them alone.
+Nothing is deleted; `dropped` closes an item.
 
 The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
 for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.

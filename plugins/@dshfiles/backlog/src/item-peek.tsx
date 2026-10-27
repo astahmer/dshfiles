@@ -1,4 +1,4 @@
-import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MarkdownText, type MarkdownLabels, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -16,6 +16,7 @@ import {
   AlarmClockIcon,
   ArrowRightLeftIcon,
   ChevronRightIcon,
+  CopyIcon,
   ExternalLinkIcon,
   FolderIcon,
   GitBranchIcon,
@@ -850,9 +851,9 @@ const LinkRow = (props: {
     queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: Number(link.target) }, { signal })),
   })
   const Icon = linkIcons[link.type]
+  const [urlOpen, setUrlOpen] = useState(false)
   const openAction = (): (() => void) | undefined => {
     if (link.type === 'thread') return () => props.openThread(link.target)
-    if (link.type === 'url') return () => void window.open(link.target, '_blank', 'noopener,noreferrer')
     return undefined
   }
   const open = openAction()
@@ -861,6 +862,38 @@ const LinkRow = (props: {
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
       {link.type === 'item' ? (
         <BacklogReferenceChip id={Number(link.target)} itemTitle={linkedItem.data?.ok === true ? linkedItem.data.value.item.title : null} />
+      ) : link.type === 'url' ? (
+        <Popover open={urlOpen} onOpenChange={setUrlOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
+              {linkLabel(link)}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="dshx-root dshx:w-48 dshx:p-1">
+            <button
+              type="button"
+              className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:hover:bg-accent"
+              onClick={() => {
+                void window.open(link.target, '_blank', 'noopener,noreferrer')
+                setUrlOpen(false)
+              }}
+            >
+              <ExternalLinkIcon aria-hidden className="dshx:size-3.5" />
+              Open in browser
+            </button>
+            <button
+              type="button"
+              className="dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:hover:bg-accent"
+              onClick={() => {
+                void writeClipboard(link.target)
+                setUrlOpen(false)
+              }}
+            >
+              <CopyIcon aria-hidden className="dshx:size-3.5" />
+              Copy URL
+            </button>
+          </PopoverContent>
+        </Popover>
       ) : open === undefined ? (
         <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
       ) : (
