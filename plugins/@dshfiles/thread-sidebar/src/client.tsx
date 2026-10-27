@@ -490,6 +490,7 @@ interface RowStyle {
   readonly density: ThreadRowDensity
   readonly project: boolean
   readonly projectColor: boolean
+  readonly projectPalette: SidebarPreferences['projectColorPalette']
   readonly title: boolean
   readonly machine: boolean
   readonly path: boolean
@@ -1176,7 +1177,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         'dshx:truncate dshx:font-medium',
-                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle),
+                        rowStyle.projectColor && props.workspaceTitle !== undefined && projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette),
                         (showMachine || showPath || props.parentTitle !== undefined) && 'dshx:max-w-[55%] dshx:shrink-0',
                       )}
                     >
@@ -3630,6 +3631,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       density: preferences.threadRowDensity,
       project: preferences.threadRowProject,
       projectColor: preferences.threadRowProjectColor,
+      projectPalette: preferences.projectColorPalette,
       title: preferences.threadRowTitle,
       machine: preferences.threadRowMachine,
       path: preferences.threadRowPath,
