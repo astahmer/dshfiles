@@ -15,6 +15,7 @@ export const revisionSchema = z.object({
   parents: z.array(z.string().regex(/^[a-f0-9]{40,64}$/)).max(16),
   bookmarks: z.array(z.string().max(256)).max(64),
   localBookmarks: z.array(z.string().max(256)).max(64),
+  remoteBookmarksText: z.string().max(32_768).default(''),
   tags: z.array(z.string().max(256)).max(64),
   workspaces: z.array(z.string().max(128)).max(32),
   workingCopy: z.boolean(),

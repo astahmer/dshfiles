@@ -2340,6 +2340,19 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   )
   const workspaceHint = (workspace: string): string =>
     revision.workingCopy ? `Working copy of workspace ${workspace} · right-click for actions` : `Workspace ${workspace} · right-click for actions`
+  const remoteBookmarkLabels = revision.remoteBookmarksText
+    .split('\n')
+    .filter(Boolean)
+    .map(bookmark => {
+      const remoteSeparator = bookmark.lastIndexOf('@')
+      return { name: bookmark.slice(0, remoteSeparator), label: bookmark, key: bookmark }
+    })
+  const bookmarks = [
+    ...revision.localBookmarks.map(name => ({ name, label: name, key: name, local: true })),
+    ...(remoteBookmarkLabels.length > 0
+      ? remoteBookmarkLabels.map(bookmark => ({ ...bookmark, local: false }))
+      : revision.bookmarks.filter(name => !revision.localBookmarks.includes(name)).map(name => ({ name, label: name, key: name, local: false }))),
+  ]
   const labels = (
     <>
       {workspaceLabels.map(workspace =>
@@ -2362,42 +2375,39 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
           </ContextMenu>
         ),
       )}
-      {revision.bookmarks.map(name => {
-        const local = revision.localBookmarks.includes(name)
-        return (
-          <ContextMenu key={name}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ContextMenuTrigger asChild>
-                  <span
-                    className={cn(
-                      'dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:font-medium',
-                      local
-                        ? 'dshx:cursor-grab dshx:border-foreground/45 dshx:text-foreground'
-                        : 'dshx:border-dashed dshx:border-muted-foreground/50 dshx:text-muted-foreground',
-                    )}
-                    draggable={local}
-                    onContextMenu={event => event.stopPropagation()}
-                    onDragStart={event => {
-                      event.stopPropagation()
-                      event.dataTransfer.setData(BOOKMARK_MIME, name)
-                      event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
-                      event.dataTransfer.effectAllowed = 'move'
-                      props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
-                    }}
-                  >
-                    {name}
-                  </span>
-                </ContextMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
-              </TooltipContent>
-            </Tooltip>
-            {props.bookmarkMenu(name, local)}
-          </ContextMenu>
-        )
-      })}
+      {bookmarks.map(({ name, label, key, local }) => (
+        <ContextMenu key={key}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ContextMenuTrigger asChild>
+                <span
+                  className={cn(
+                    'dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:truncate dshx:rounded-sm dshx:border dshx:px-1 dshx:font-mono dshx:text-[11px] dshx:leading-[14px] dshx:font-medium',
+                    local
+                      ? 'dshx:cursor-grab dshx:border-foreground/45 dshx:text-foreground'
+                      : 'dshx:border-dashed dshx:border-muted-foreground/50 dshx:text-muted-foreground',
+                  )}
+                  draggable={local}
+                  onContextMenu={event => event.stopPropagation()}
+                  onDragStart={event => {
+                    event.stopPropagation()
+                    event.dataTransfer.setData(BOOKMARK_MIME, name)
+                    event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
+                    event.dataTransfer.effectAllowed = 'move'
+                    props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
+                  }}
+                >
+                  {label}
+                </span>
+              </ContextMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${label}`}
+            </TooltipContent>
+          </Tooltip>
+          {props.bookmarkMenu(name, local)}
+        </ContextMenu>
+      ))}
       {revision.tags.map(name => (
         <Tooltip key={name}>
           <TooltipTrigger asChild>

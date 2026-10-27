@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
+import { revisionSchema } from './api.js'
+import { REVISION_TEMPLATE } from './jj-templates.js'
 import type { JjRun } from './revision-reads.js'
 
 const fixture = async () => {
@@ -57,6 +59,13 @@ test('main@origin resolves the exact fetched remote bookmark independently of lo
   const navigation = await GraphNavigationReads.readGraphNavigation(local.run)
   assert.equal(navigation.landmarks.find(item => item.kind === 'main-origin')?.revisions[0]?.commitId, remoteTip)
   assert.equal(navigation.landmarks.find(item => item.kind === 'main')?.revisions[0]?.commitId, localTip)
+  const revisions = local
+    .jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', `${localTip} | ${remoteTip}`, '--template', REVISION_TEMPLATE])
+    .trim()
+    .split('\n')
+    .map(line => revisionSchema.parse(JSON.parse(line)))
+  assert.deepEqual(revisions.find(revision => revision.commitId === localTip)?.bookmarks, ['main'])
+  assert.equal(revisions.find(revision => revision.commitId === remoteTip)?.remoteBookmarksText, 'main@origin')
 }, 30_000)
 
 test('relationships count exact ancestry, connection and both common ancestors in a criss-cross DAG', async () => {

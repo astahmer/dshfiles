@@ -13,6 +13,7 @@ const revision = (commitId: string, overrides: Partial<Revision> = {}): Revision
   authorTime: '2026-10-15T12:00:00Z',
   bookmarks: [],
   localBookmarks: [],
+  remoteBookmarksText: '',
   tags: [],
   workspaces: [],
   workingCopy: false,
