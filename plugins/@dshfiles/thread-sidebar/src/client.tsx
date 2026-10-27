@@ -43,6 +43,7 @@ import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   ContextMenu,
@@ -3668,13 +3669,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     else changePreferences({ workspaceFilter: projectFilter })
   }
 
-  const projectOptions = [
-    { id: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
-    { id: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
-    ...displayWorkspaces.map(workspace => ({ id: workspace.id, label: workspace.title })),
+  const projectOptions: readonly ComboboxOption[] = [
+    { value: ALL_PROJECTS, label: props.tSidebar('threadSidebarAllProjects') },
+    { value: UNASSIGNED_PROJECT, label: props.tSidebar('threadSidebarUnassigned') },
+    ...displayWorkspaces.map(workspace => ({ value: workspace.id, label: workspace.title })),
   ]
 
-  const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
+  const projectFilterLabel = projectOptions.find(option => option.value === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
   const showGroupControl = isBoard || threadViewSettings.showGroupControl
   const showFilterControl = isBoard || threadViewSettings.showFilterControl
 
@@ -4253,39 +4254,29 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <header className={cn('dshx:px-2 dshx:py-1', isBoard && 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-4 dshx:py-2.5')}>
           {isBoard ? <h1 className="dshx:text-base dshx:font-semibold">{props.tSidebar('threadSidebarBoardTitle')}</h1> : null}
           <div className={cn('dshx:flex dshx:items-center dshx:gap-1', isBoard && 'dshx:shrink-0')}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:px-2.5 dshx:font-medium',
-                    isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
-                  )}
-                >
-                  <span className="dshx:truncate">{projectFilterLabel}</span>
+            <Combobox
+              contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
+              emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
+              label={props.tSidebar('threadSidebarProjectFilter')}
+              onValueChange={selectProject}
+              options={projectOptions}
+              searchAbove={0}
+              searchLabel={props.tSidebar('threadSidebarProjectSearch')}
+              searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
+              triggerClassName={cn(
+                'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
+                isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
+              )}
+              triggerContent={
+                <>
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
                   <span className="dshx:inline-flex dshx:text-muted-foreground" aria-hidden="true">
                     <IconChevronDownOutlineRegular size={14} />
                   </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="dshx-root dshx:w-(--radix-dropdown-menu-trigger-width) dshx:min-w-56">
-                <DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>
-                  {projectOptions.map(option => (
-                    <DropdownMenuRadioItem key={option.id} value={option.id}>
-                      <span className="dshx:truncate">{option.label}</span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-                {isBoard ? null : (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
-                      {props.tSidebar('threadSidebarSettings')}
-                    </DropdownMenuCheckboxItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </>
+              }
+              value={projectFilterValue}
+            />
             {isBoard ? null : (
               <Button
                 type="button"
