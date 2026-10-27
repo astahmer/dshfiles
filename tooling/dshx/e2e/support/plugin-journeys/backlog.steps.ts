@@ -526,6 +526,13 @@ When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { pa
   await page.getByRole('menuitem', { name: 'Start thread…', exact: true }).click()
 })
 
+Then('backlog item b:{int} offers tweet retrieval in its feed context menu', async ({ page }: { page: Page }, id: number) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await expect(contextMenu(page).getByRole('menuitem', { name: 'Retrieve tweet content', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+})
+
 Then('backlog item b:{int} exposes all context actions in the {string} view', async ({ page }: { page: Page }, id: number, view: string) => {
   await recordAssertion(page, `backlog-item-actions-${view}`, async () => {
     const target = await contextTarget(page, id, view)

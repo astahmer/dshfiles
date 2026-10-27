@@ -14,7 +14,11 @@
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./backlog-api": {
+      "types": "./src/backlog-api.ts",
+      "default": "./dist/backlog-api.js"
+    }
   },
   "scripts": {
     "build": "dshx build",

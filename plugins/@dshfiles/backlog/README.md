@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Retrieve public tweet context into a backlog item](docs/screenshots/tweet-context-enrichment.png)
+
 ![Configure Jev triage from the Backlog panel](docs/screenshots/jev-settings.png)
 
 ![Set up a missing Jev key from chat](docs/screenshots/jev-secret-setup.png)
@@ -126,6 +128,12 @@ one opens an inline card with the item's title, kind, status, project and body. 
 thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. **Open in Backlog**
 selects that item in the panel. An item that no longer exists says so in the card instead of failing the
 conversation.
+
+## Retrieve tweet context
+
+When a new item, an edited title or description, or an explicit URL link adds a public X/Twitter status, Backlog automatically retrieves its first unimported post through Tweet Context. For an older item—or after a failed or interrupted lookup—right-click its row and choose **Retrieve tweet content**. Retrieval sends the post ID to FxEmbed. Post and thread text is appended as a clearly marked, quoted section; existing descriptions and files are preserved. Available photos and sampled video frames become item attachments within the remaining slots and an eight-image, 16 MiB import budget.
+
+Only public status links already present on the item are accepted. Private, deleted or unavailable posts leave the item unchanged; failed automatic lookups can be retried from the row menu. A successful import is recorded against the normalized post URL, so repeating it does not duplicate content.
 
 ## Starting a thread from an item
 

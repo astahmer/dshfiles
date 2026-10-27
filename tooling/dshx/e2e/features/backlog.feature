@@ -253,6 +253,13 @@ Feature: Backlog
     And the selected backlog threads are started
     Then the backlog reports that two threads were started
 
+  @scenario:backlog.tweet-context-retrieval
+  Scenario: Older tweet items offer context retrieval
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Tweet context in backlog https://x.com/someone/status/123" is captured
+    Then backlog item b:1 offers tweet retrieval in its feed context menu
+
   @scenario:backlog.item-context-actions
   Scenario: Right-click actions follow items across backlog views
     Given the isolated plugin profile "@dshfiles/backlog" is booted

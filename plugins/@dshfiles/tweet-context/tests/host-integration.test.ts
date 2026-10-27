@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import { LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { SessionStore } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -12,6 +13,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { defineApi, dshxRegistryApi, method } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
+import { tweetContextBacklogApi } from '../src/backlog-api.js'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -117,6 +119,40 @@ describe('tweet context Host integration', () => {
         if (image.type !== 'image') throw new Error('Expected an image block')
         const stored = await host.ctx.attachments.readImage(image.attachment)
         expect(stored.data.byteLength).toBeGreaterThan(0)
+      }
+      const contextResponse = await host.connection.requestApi({
+        packageId: '@dshfiles/tweet-context',
+        apiId: tweetContextBacklogApi.id,
+        method: 'retrieve',
+        version: tweetContextBacklogApi.version,
+        input: { url: 'https://x.com/fixture/status/123' },
+      })
+      const envelope = z
+        .object({
+          result: z.discriminatedUnion('ok', [
+            z.object({ ok: z.literal(true), value: z.object({ output: z.unknown() }) }),
+            z.object({ ok: z.literal(false), error: z.object({}).passthrough() }),
+          ]),
+        })
+        .parse(await contextResponse.json())
+      if (!envelope.result.ok) throw new Error(`Tweet context API retrieval failed: ${JSON.stringify(envelope.result.error)}`)
+      const outputSchema = tweetContextBacklogApi.methods.retrieve.output
+      if (outputSchema === undefined) throw new Error('The tweet context API output schema was not published.')
+      const decoded = await outputSchema['~standard'].validate(envelope.result.value.output)
+      if ('issues' in decoded) throw new Error('The tweet context API returned an invalid result.')
+      const context = decoded.value
+      expect(context.posts[0]?.text).toBe('Integration post')
+      expect(context.images.length).toBeGreaterThan(0)
+      for (const image of context.images) {
+        const stored = await host.ctx.attachments.readImage({
+          attachmentId: AttachmentId(image.attachmentId),
+          mediaType: image.mediaType,
+          bytes: image.bytes,
+          width: image.width,
+          height: image.height,
+          name: image.name,
+        })
+        expect(stored.data.byteLength).toBe(image.bytes)
       }
       const fixtureApi = defineApi({ id: 'fixture', version: 1, owner: '@test/fixture', methods: { ping: method<void, string>() } })
       await host.mount(defineHost({ apis: [fixtureApi.host({ ping: () => 'ok' })] }), { packageId: '@test/fixture' })

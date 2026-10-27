@@ -102,6 +102,13 @@ export interface BacklogStore {
     readonly actor: BacklogActor
   }): Promise<BacklogDetail>
   attachFile(input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
+  importTweetContext(input: {
+    readonly id: number
+    readonly url: string
+    readonly bodySection: string
+    readonly files: readonly BacklogFileInput[]
+    readonly actor: BacklogActor
+  }): Promise<BacklogResult<BacklogDetail>>
   readFile(input: { readonly id: number; readonly attachmentId: string }): Promise<BacklogResult<{ readonly dataUrl: string }>>
   removeFile(input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   delete(input: { readonly id: number; readonly confirm: boolean }): Promise<BacklogResult<void>>
@@ -246,6 +253,7 @@ const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = n
   project: item.project,
   tags: item.tags,
   links: item.links,
+  tweetContextUrls: item.tweetContextUrls ?? [],
   attachments: item.attachments,
   actors: item.actors,
   pinned: item.pinned,
@@ -490,6 +498,30 @@ const createBacklogStore = ({
         value: await touch(item, actor, { kind: 'edited', detail: `attached ${attachment.name}` }, { attachments: [...item.attachments, attachment] }),
       }
     },
+    importTweetContext: async ({ id, url, bodySection, files: pendingFiles, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      const imported = item.tweetContextUrls ?? []
+      if (imported.includes(url) || imported.length >= 20) return { ok: true, value: detailOf(item) }
+      const at = now()
+      const additions = await storeFiles(id, pendingFiles.slice(0, BacklogItems.maxAttachments - item.attachments.length), at)
+      const separator = item.body === '' || bodySection === '' ? '' : '\n\n'
+      const bodyRoom = Math.max(0, BacklogItems.maxBodyChars - item.body.length - separator.length)
+      const bodyAddition = bodySection.slice(0, bodyRoom)
+      const nextBody = bodyAddition === '' ? item.body : `${item.body}${separator}${bodyAddition}`
+      const change: Partial<BacklogItem> = {
+        tweetContextUrls: [...imported, url],
+        attachments: [...item.attachments, ...additions],
+      }
+      if (nextBody !== item.body) change.body = nextBody
+      const event: Pick<BacklogEvent, 'kind' | 'detail' | 'threadId' | 'attachments' | 'commentId'> = {
+        kind: 'edited',
+        detail: `retrieved tweet context from ${url}`,
+      }
+      if (additions.length !== 0) event.attachments = additions
+      const detail = await touch(item, actor, event, change)
+      return { ok: true, value: detail }
+    },
     readFile: async ({ id, attachmentId }) => {
       const item = find(id)
       if (item === undefined || attachmentOfItem(item, attachmentId) === undefined) return { ok: false, reason: 'not-found' }
@@ -544,9 +576,12 @@ const createBacklogStore = ({
       }
       if (fields.body !== undefined && fields.body !== item.body) {
         change.body = fields.body.slice(0, BacklogItems.maxBodyChars)
-        // A body edit re-reads its references, keeping links the user added by hand.
-        change.links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(fields.body)])
         recordChange('body')
+      }
+      if (change.title !== undefined || change.body !== undefined) {
+        const title = change.title ?? item.title
+        const body = change.body ?? item.body
+        change.links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(`${title}\n${body}`)])
       }
       if (fields.kind !== undefined && fields.kind !== item.kind) {
         change.kind = fields.kind

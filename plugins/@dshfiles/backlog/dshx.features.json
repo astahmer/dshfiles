@@ -1634,6 +1634,69 @@
           "source": "secret"
         }
       ]
+    },
+    {
+      "id": "tweet-context-enrichment",
+      "title": "Retrieve public tweet context into a backlog item",
+      "summary": "Capturing or editing tweet links automatically retrieves the first unimported public X post; older items can use the row-menu action. Text is quoted as untrusted content, images are saved as attachments, and repeated imports do not duplicate data.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Tweet context in backlog https://x.com/someone/status/123\"",
+        "press Enter",
+        "rightclick article \"Item b:1\"",
+        "expect menuitem \"Retrieve tweet content\""
+      ],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "configuration": [],
+      "states": ["unmatched", "retrieving", "imported", "retryable-failure"],
+      "failureModes": [
+        "Only an HTTPS X or Twitter status URL already linked to the item is accepted; private, deleted, or unavailable posts stay unchanged and can be retried from the row menu.",
+        "A fetch failure or unavailable Tweet Context plugin leaves the original description and attachments intact.",
+        "Imported text is appended as quoted untrusted data; media is bounded by the item's remaining attachment slots and the provider's eight-image, 16 MiB budget.",
+        "A repeated import of the same normalized post URL is a no-op."
+      ],
+      "externalDependencies": [
+        {
+          "id": "tweet-context-api",
+          "boundary": "Calls the Tweet Context Host API for public post text, metadata, and saved image references.",
+          "deterministicFake": "The Tweet Context Host integration test uses fixed FxEmbed-shaped responses and local photo/video fixtures; Backlog tests use only deterministic local post data."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.tweet-context-retrieval",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.tweet-context-urls",
+          "file": "plugins/@dshfiles/backlog/src/backlog-tweet-context.test.ts",
+          "testName": "normalizes public X and Twitter status links and rejects lookalike hosts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.tweet-context-import",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "imports tweet text and images once without replacing the existing description"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.tweet-context-api",
+          "file": "plugins/@dshfiles/tweet-context/tests/host-integration.test.ts",
+          "testName": "executes for a scoped Agent, saves photo and video frames, and retains plugin ownership"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "backlog tweet import",
+          "file": "plugins/@dshfiles/backlog/src/backlog-tweet-context.test.ts",
+          "testName": "records one bounded span for the import work unit"
+        }
+      ]
     }
   ],
   "kind": "bundle"

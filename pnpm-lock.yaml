@@ -1480,6 +1480,9 @@ importers:
       '@dshfiles/thread-sidebar':
         specifier: workspace:*
         version: link:../thread-sidebar
+      '@dshfiles/tweet-context':
+        specifier: workspace:*
+        version: link:../tweet-context
       '@dshfiles/usage':
         specifier: workspace:*
         version: link:../usage
@@ -1505,6 +1508,9 @@ importers:
       '@deepseek-ai/dsh-api-workspace-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(423b0975ded0003cb2a5408fd1fd6375)
+      '@deepseek-ai/dsh-attachment':
+        specifier: 0.2.1-rc.2
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-brand@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-client-connection':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))

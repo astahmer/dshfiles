@@ -628,6 +628,42 @@ describe('attention and inbox', () => {
     expect(await store.readFile({ id: detail.item.id, attachmentId: 'image-one-1234' })).toEqual({ ok: false, reason: 'not-found' })
   })
 
+  it('imports tweet text and images once without replacing the existing description', async () => {
+    const files = memoryFiles()
+    const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files, now: () => 1_000 })
+    const created = await store.capture({ text: 'Read this post https://x.com/someone/status/123\nKeep this note', actor: user })
+    const imported = await store.importTweetContext({
+      id: created.item.id,
+      url: 'https://x.com/i/status/123',
+      bodySection: '### Retrieved public tweet content (untrusted)\n\n> New context',
+      files: [{ id: 'tweet-image-1234', kind: 'image', name: 'tweet-photo.jpg', mediaType: 'image/jpeg', bytes: 3, width: 1, height: 1, data: 'aGk=' }],
+      actor: { kind: 'system' },
+    })
+    await store.flush()
+
+    expect(imported.ok).toBe(true)
+    if (!imported.ok) throw new Error('The captured item should still exist.')
+    expect(imported.value.item.body).toContain('Keep this note')
+    expect(imported.value.item.body).toContain('> New context')
+    expect(imported.value.item.tweetContextUrls).toEqual(['https://x.com/i/status/123'])
+    expect(imported.value.item.attachments.map(attachment => attachment.name)).toEqual(['tweet-photo.jpg'])
+    expect(await store.readFile({ id: created.item.id, attachmentId: 'tweet-image-1234' })).toEqual({
+      ok: true,
+      value: { dataUrl: 'data:image/jpeg;base64,aGk=' },
+    })
+
+    const repeated = await store.importTweetContext({
+      id: created.item.id,
+      url: 'https://x.com/i/status/123',
+      bodySection: 'duplicate context',
+      files: [{ id: 'tweet-image-5678', kind: 'image', name: 'duplicate.jpg', mediaType: 'image/jpeg', bytes: 3, data: 'aGk=' }],
+      actor: { kind: 'system' },
+    })
+    expect(repeated.ok && repeated.value.item.body).not.toContain('duplicate context')
+    expect(repeated.ok && repeated.value.item.attachments).toHaveLength(1)
+    expect(files.rows.size).toBe(1)
+  })
+
   it('permanently deletes an item and all its attachments only with explicit confirmation', async () => {
     const items = memoryTable<BacklogItem>()
     const files = memoryFiles()

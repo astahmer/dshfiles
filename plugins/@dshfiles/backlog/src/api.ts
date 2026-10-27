@@ -49,6 +49,7 @@ const summarySchema = z
     project: z.string().nullable(),
     tags: z.array(z.string()),
     links: z.array(BacklogItems.linkSchema),
+    tweetContextUrls: z.array(z.string().url().max(2_048)).max(20).optional(),
     attachments: z.array(BacklogItems.attachmentSchema).default([]),
     actors: BacklogItems.itemSchema.shape.actors,
     pinned: z.boolean(),
@@ -320,6 +321,12 @@ export const backlogApi = defineApi({
       input: z.object({ audioBase64: z.string().min(1).max(24_000_000) }).strict(),
       output: transcriptionSchema,
       description: 'Transcribe one browser microphone recording through the Host voice-input bundle. Not an agent tool.',
+    }),
+    enrichTweet: method({
+      input: z.object({ id: idSchema, url: z.string().url().max(2_048) }).strict(),
+      output: detailResultSchema,
+      description: `Retrieve public tweet text and media for a URL already in one backlog item. Use it when the user asked; this sends the post ID to FxEmbed and appends quoted, untrusted tweet text plus available images without replacing the existing description.`,
+      tool: { name: 'backlog_enrich_tweet', readOnly: false, render: renderDetailPreview },
     }),
     update: method({
       input: z
