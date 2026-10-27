@@ -158,5 +158,6 @@ kind and id. Read them with `contributionFailures` or
 - The native slot ledger drops `metadata`, so settings search entries travel
   through the `__dshxSettingsSearchEntriesV1` seat.
 - Contribution failures are browser-only; an agent tool would need a Host relay.
-- Ad hoc window registries (`__dshfilesCommandPaletteV1`, chat-focus,
-  draft-client) predate contracts and are candidates to migrate.
+- The command palette publishes `PaletteActions` and `CommandPalette` this way
+  (`@dshfiles/command-palette/palette-contract`). Workbench panels and regions
+  and the chat-focus mailbox still keep their own page globals.

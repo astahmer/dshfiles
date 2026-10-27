@@ -10,7 +10,7 @@ import type { CommandClaim, InputTriggerSource } from '@dshfiles/input-trigger/c
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -120,7 +120,7 @@ export default defineClient({
   name: '@dshfiles/btw',
   locales: [btwLocale],
   inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'inputTriggers', 'resources', 'sidebarRight', 'sidebarRightTabs', 'shortcuts'],
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
     const t: Translate = (key, params) => ctx.locale.bind(BTW_LOCALE_NAMESPACE)(key, params)
 
     const routeOf = (sessionId: SessionId): ModelRoute | null => {
@@ -237,21 +237,17 @@ export default defineClient({
       'dshfiles-btw: side question dialog',
     )
 
-    ctx.effect(
-      () =>
-        PaletteApi.registerAction({
-          id: '@dshfiles/btw/ask',
-          label: () => t('paletteAsk'),
-          aliases: ['btw', 'side question', 'side chat', 'ask about this thread', 'fork'],
-          icon: <MessageCircleQuestionIcon className="dshx:size-4" />,
-          group: 'action',
-          isAvailable: context => context.thread !== null && !context.thread.archived && listedThread(context.thread.id) !== undefined,
-          run: context => {
-            askAbout(context.thread?.id)
-          },
-        }),
-      'dshfiles-btw: command palette action',
-    )
+    metadata?.plugin?.add(PaletteActions, {
+      id: '@dshfiles/btw/ask',
+      label: () => t('paletteAsk'),
+      aliases: ['btw', 'side question', 'side chat', 'ask about this thread', 'fork'],
+      icon: <MessageCircleQuestionIcon className="dshx:size-4" />,
+      group: 'action',
+      isAvailable: context => context.thread !== null && !context.thread.archived && listedThread(context.thread.id) !== undefined,
+      run: context => {
+        askAbout(context.thread?.id)
+      },
+    })
 
     if (isShortcutCommandId(ASK_SHORTCUT_ID))
       ctx.effect(() => {

@@ -5070,6 +5070,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-workspace':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@dshfiles/command-palette':
+        specifier: workspace:*
+        version: link:../command-palette
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx

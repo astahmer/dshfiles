@@ -48,27 +48,25 @@ export default defineClientPlugin({
 
 The id must start with the package scope. `hidden` keeps it out of the palette (its keys still work); `enabled: false` greys it out and turns its keys off; a `run` that returns `false` from a key press lets the key through.
 
-## Register an action from a Client plugin
+## Add a palette row from a Client plugin
 
-For rows that need the palette's thread and workspace context, add `@dshfiles/command-palette` as a workspace dependency, then import `registerPaletteAction` from `@dshfiles/command-palette/api`:
+For rows that need the palette's thread and workspace context, add `@dshfiles/command-palette` as a workspace dependency and add to its `PaletteActions` registry from `@dshfiles/command-palette/palette-contract`:
 
 ```tsx
-ctx.effect(
-  () =>
-    registerPaletteAction({
-      id: '@dshfiles/example/open-panel',
-      label: () => translate('openPanel'),
-      aliases: ['panel', 'workspace'],
-      isAvailable: context => context.thread !== null,
-      run: context => openPanel(context.thread?.id),
-    }),
-  'example: command palette action',
-)
+import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
+
+api.add(PaletteActions, {
+  id: '@dshfiles/example/open-panel',
+  label: () => translate('openPanel'),
+  aliases: ['panel', 'workspace'],
+  isAvailable: context => context.thread !== null,
+  run: context => openPanel(context.thread?.id),
+})
 ```
 
-IDs must begin with the registering plugin's scope (`@scope/plugin/...`). `context` is a read-only snapshot of the active thread (ID, title, cwd, workspace ID, pinned, archived, unread), active workspace, available workspaces, and theme preference; it intentionally contains no Service objects. Labels can be functions for localization. `isAvailable` and `isSelected` receive that context. The `command` group appears under Commands; other groups appear under destinations/actions. `keys` adds keycaps. `run` may return a promise; the palette closes on success and shows an error notice on failure. Tie the registration disposer to the contributor's Client lifecycle with `ctx.effect`.
+IDs must begin with the registering plugin's scope (`@scope/plugin/...`); a row with an invalid definition or a taken id is left out with a warning. `context` is a read-only snapshot of the active thread (ID, title, cwd, workspace ID, pinned, archived, unread), active workspace, available workspaces, and theme preference; it intentionally contains no Service objects. Labels can be functions for localization. `isAvailable` and `isSelected` receive that context. The `command` group appears under Commands; other groups appear under destinations/actions. `keys` adds keycaps. `run` may return a promise; the palette closes on success and shows an error notice on failure. A row ends with the plugin scope that added it.
 
-The API uses a versioned browser-local registry, not a Cordis Client Service. Contributors don't inject or wait for the palette provider; they only depend on its public API contract. If the palette is not installed, registrations are inert.
+Rows wait in the dshx registry while the palette loads, so contributors never wait for it. To open, close or size the palette, follow its `CommandPalette` contract: `api.use(CommandPalette)` is `active` while the palette runs and offers `open(mode)`, `close()`, `setRecentLimit(n)` and its `state`.
 
 ## Build and verify
 

@@ -109,8 +109,7 @@ window.dispatchEvent(
 )
 ```
 
-`dispatchEvent` returns false when the shell took the request, the contract of `dshfiles:open-file` and
-`dshfiles:command-palette`. Settings sections receive `close`, as natively, and `target` when opened at one of their
+`dispatchEvent` returns false when the shell took the request, the contract of `dshfiles:open-file`. Settings sections receive `close`, as natively, and `target` when opened at one of their
 search entries.
 
 ## Port

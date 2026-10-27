@@ -1,42 +1,9 @@
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
-export interface PaletteWorkspace {
-  readonly id: string
-  readonly title: string
-}
+import type { PaletteAction, PaletteActionContext, PaletteMode } from './palette-contract.js'
 
-export interface PaletteThread {
-  readonly id: string
-  readonly title: string
-  readonly cwd: string
-  readonly workspaceId: string | undefined
-  readonly pinned: boolean
-  readonly archived: boolean
-}
-
-export type PaletteMode = 'all' | 'threads' | 'files' | 'backlog'
-export type PaletteThemePreference = 'light' | 'dark' | 'system'
-export const PALETTE_EVENT = 'dshfiles:command-palette'
-
-export interface PaletteActionContext {
-  readonly thread: PaletteThread | null
-  readonly workspace: PaletteWorkspace | null
-  readonly workspaces: readonly PaletteWorkspace[]
-  readonly themePreference: PaletteThemePreference
-}
-
-export interface PaletteAction {
-  readonly id: string
-  readonly label: string | (() => string)
-  readonly aliases?: readonly string[]
-  readonly keys?: readonly string[]
-  readonly icon?: ReactNode
-  readonly group?: 'destination' | 'command' | 'action'
-  readonly isAvailable?: (context: PaletteActionContext) => boolean
-  readonly isSelected?: (context: PaletteActionContext) => boolean
-  readonly run: (context: PaletteActionContext) => void | Promise<void>
-}
+export type { PaletteAction, PaletteActionContext, PaletteMode, PaletteThemePreference, PaletteThread, PaletteWorkspace } from './palette-contract.js'
 
 interface PaletteApiSnapshot {
   readonly actions: readonly PaletteAction[]
@@ -50,12 +17,6 @@ interface PaletteRegistry {
   mode: PaletteMode | null
   recentLimit: number
   snapshot?: PaletteApiSnapshot
-}
-
-declare global {
-  interface Window {
-    __dshfilesCommandPaletteV1?: PaletteRegistry
-  }
 }
 
 const isActionLabel = (value: unknown): value is string | (() => string) => typeof value === 'string' || typeof value === 'function'
@@ -79,18 +40,18 @@ const paletteActionSchema = z.object({
   run: z.custom<PaletteAction['run']>(isActionRun),
 })
 
+let paletteRegistry: PaletteRegistry | undefined
+
+/** The palette's own rows and open state; other plugins reach it through the `palette-contract` registry and contract. */
 const registry = (): PaletteRegistry => {
-  const current = window.__dshfilesCommandPaletteV1
-  if (current !== undefined) return current
-  const created: PaletteRegistry = {
+  paletteRegistry ??= {
     actions: new Map(),
     listeners: new Set(),
     mode: null,
     recentLimit: 10,
     snapshot: { actions: [], mode: null, recentLimit: 10 },
   }
-  window.__dshfilesCommandPaletteV1 = created
-  return created
+  return paletteRegistry
 }
 
 const refreshSnapshot = (current: PaletteRegistry): PaletteApiSnapshot => {

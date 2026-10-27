@@ -5,7 +5,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
-import { PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
 import { WrenchIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -24,7 +24,7 @@ export default defineClient({
   name: '@dshfiles/agent-toolkit',
   locales: [agentToolkitLocale],
   inject: ['slots', 'layout', 'sessions', 'remote', 'remote.pluginInventory'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const t = (key: AgentToolkitKey, params?: Record<string, string | number>): string => ctx.locale.bind(AGENT_TOOLKIT_LOCALE_NAMESPACE)(key, params)
 
     // The page shows the thread it was opened about: the palette's thread, else the last one the main view showed.
@@ -90,20 +90,16 @@ export default defineClient({
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 5, label: () => t('title') }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, Panel))
 
-    ctx.effect(
-      () =>
-        PaletteApi.registerAction({
-          id: '@dshfiles/agent-toolkit/open',
-          label: () => t('paletteOpen'),
-          aliases: ['agent toolkit', 'tools', 'skills', 'mcp', 'plugins', 'capabilities'],
-          icon: <WrenchIcon className="dshx:size-4" />,
-          group: 'destination',
-          run: context => {
-            if (context.thread !== null) focusedThread.set(context.thread.id)
-            openPanel(PANEL_ID)
-          },
-        }),
-      'agent-toolkit: command palette action',
-    )
+    metadata?.plugin?.add(PaletteActions, {
+      id: '@dshfiles/agent-toolkit/open',
+      label: () => t('paletteOpen'),
+      aliases: ['agent toolkit', 'tools', 'skills', 'mcp', 'plugins', 'capabilities'],
+      icon: <WrenchIcon className="dshx:size-4" />,
+      group: 'destination',
+      run: context => {
+        if (context.thread !== null) focusedThread.set(context.thread.id)
+        openPanel(PANEL_ID)
+      },
+    })
   },
 })

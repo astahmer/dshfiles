@@ -21,7 +21,8 @@ import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
 import { ContributedCommandsModel } from './contributed-commands.js'
-import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
+import { CommandPalette, PaletteActions, type CommandPaletteState } from './palette-contract.js'
+import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
@@ -285,7 +286,25 @@ export default defineClient({
   inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection', 'remote', 'remote.session'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
-    if (plugin !== undefined) plugin.keyed(plugin.list(Command), ContributedCommandsModel.list)
+    if (plugin !== undefined) {
+      plugin.keyed(plugin.list(Command), ContributedCommandsModel.list)
+      plugin.keyed(plugin.list(PaletteActions), ContributedCommandsModel.listActions)
+      let lastState: CommandPaletteState = { mode: null, recentLimit: 10 }
+      plugin.provide(CommandPalette, {
+        open: PaletteApi.open,
+        close: PaletteApi.close,
+        setRecentLimit: PaletteApi.setRecentLimit,
+        state: {
+          get: () => {
+            const snapshot = PaletteApi.getSnapshot()
+            if (snapshot.mode !== lastState.mode || snapshot.recentLimit !== lastState.recentLimit)
+              lastState = { mode: snapshot.mode, recentLimit: snapshot.recentLimit }
+            return lastState
+          },
+          subscribe: PaletteApi.subscribe,
+        },
+      })
+    }
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
     ctx.on('theme/change', snapshot => themeStore.set(snapshot))
@@ -355,18 +374,6 @@ export default defineClient({
         ),
       'command-palette: shell overlay',
     )
-    ctx.effect(() => {
-      const onRequest = (event: Event): void => {
-        const detail: unknown = event instanceof CustomEvent ? event.detail : undefined
-        const probe = typeof detail === 'object' && detail !== null && 'probe' in detail && detail.probe === true
-        const requestedMode = typeof detail === 'object' && detail !== null && 'mode' in detail ? detail.mode : undefined
-        event.preventDefault()
-        if (probe) return
-        PaletteApi.open(requestedMode === 'threads' || requestedMode === 'files' ? requestedMode : 'all')
-      }
-      window.addEventListener(PALETTE_EVENT, onRequest)
-      return () => window.removeEventListener(PALETTE_EVENT, onRequest)
-    }, 'command-palette: open request')
     const shortcutId = 'commandPalette.open'
     if (isShortcutCommandId(shortcutId))
       ctx.effect(

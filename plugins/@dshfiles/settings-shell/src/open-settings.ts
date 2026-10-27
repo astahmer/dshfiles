@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Cross-plugin entry point: any plugin opens Settings with
  * `window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail, cancelable: true }))`. The shell calls
  * `preventDefault()` when it took the request, so `dispatchEvent` returning false means handled (the same contract as
- * `dshfiles:open-file` and `dshfiles:command-palette`).
+ * `dshfiles:open-file`).
  */
 export const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 

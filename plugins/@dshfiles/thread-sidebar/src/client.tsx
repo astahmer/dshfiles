@@ -124,7 +124,8 @@ import {
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
-import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
+import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
+import { PaletteBridge } from './palette-bridge.js'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
@@ -3800,11 +3801,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   useEffect(() => {
     if (!isPrimarySurface) return
-    PaletteApi.setRecentLimit(preferences.paletteRecentLimit)
+    PaletteBridge.setRecentLimit(preferences.paletteRecentLimit)
   }, [isPrimarySurface, preferences.paletteRecentLimit])
   useEffect(() => {
     if (!isPrimarySurface) return
-    return () => PaletteApi.setRecentLimit(10)
+    return () => PaletteBridge.setRecentLimit(PaletteBridge.defaultRecentLimit)
   }, [isPrimarySurface])
   useEffect(() => {
     if (!isPrimarySurface) return
@@ -3877,8 +3878,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         },
       },
     ]
-    const disposers = actions.map(action => PaletteApi.registerAction(action))
-    return () => disposers.forEach(dispose => dispose())
+    return PaletteBridge.addActions(actions)
   }, [asideOpener, isPrimarySurface])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
   const rowActions = useMemo<RowActions>(() => {

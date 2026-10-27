@@ -23,7 +23,7 @@ import {
   type SettingsSectionSearchProps,
 } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -682,19 +682,20 @@ export default defineClient({
       return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)
     }, 'settings-shell: open-settings requests')
 
+    const addPaletteAction = (action: PaletteAction): (() => void) => metadata?.plugin?.add(PaletteActions, action) ?? (() => {})
     ctx.effect(() => {
       let registered: Array<() => void> = []
       const register = (): void => {
         registered.forEach(dispose => dispose())
         registered = [
-          PaletteApi.registerAction({
+          addPaletteAction({
             id: '@dshfiles/settings-shell/open',
             label: () => t('palette.open'),
             aliases: ['settings', 'preferences', 'options'],
             group: 'command',
             run: () => openSettings(),
           }),
-          PaletteApi.registerAction({
+          addPaletteAction({
             id: '@dshfiles/settings-shell/open-side-panel',
             label: () => t('palette.sidePanel'),
             aliases: ['settings', 'preferences', 'side panel'],
@@ -702,7 +703,7 @@ export default defineClient({
             run: () => openSidePanelSettings(),
           }),
           ...[...sections.getSnapshot(), ...pluginPages.getSnapshot().map(page => ({ id: page.pageId, label: page.title }))].map(row =>
-            PaletteApi.registerAction({
+            addPaletteAction({
               id: `@dshfiles/settings-shell/section/${row.id}`,
               label: () => t('palette.section', { section: row.label }),
               aliases: ['settings', 'preferences'],

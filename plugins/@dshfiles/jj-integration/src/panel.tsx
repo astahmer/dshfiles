@@ -2,7 +2,7 @@ import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-con
 import { relativeTime, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-session-turn-outline/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PaletteApi, type PaletteActionContext } from '@dshfiles/command-palette/api'
+import { PaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/palette-contract'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -42,7 +42,7 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { useApi, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -169,8 +169,6 @@ const groupGlyph = (category: ThreadIntegrationCategory): JSX.Element => (
 /** The thread sidebar owns restarting DSH (with its confirmation dialog) and registers it as a palette action. */
 const RESTART_ACTION_ID = '@dshfiles/thread-sidebar/action/restart-dsh'
 const NO_PALETTE_CONTEXT: PaletteActionContext = { thread: null, workspace: null, workspaces: [], themePreference: 'system' }
-const findRestartAction = () => PaletteApi.getSnapshot().actions.find(action => action.id === RESTART_ACTION_ID) ?? null
-const noRestartAction = (): null => null
 
 const describeWorkspaceSync = (t: JjIntegrationTranslate, view: WorkspaceSyncView): string => {
   const outcome = workspaceSyncOutcome(view)
@@ -189,7 +187,7 @@ const describeWorkspaceSync = (t: JjIntegrationTranslate, view: WorkspaceSyncVie
 /** What the background sync after the last rebase did to the checkout running DSH, with the restart it may need. */
 const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.Element | null => {
   const api = useApi(jjIntegrationApi)
-  const restart = useSyncExternalStore(PaletteApi.subscribe, findRestartAction, noRestartAction)
+  const restart = useRegistry(PaletteActions).find(action => action.id === RESTART_ACTION_ID) ?? null
   const sync = useQuery({
     queryKey: threadQueryKeys.workspaceSync,
     retry: false,

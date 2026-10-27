@@ -4,7 +4,6 @@ import { ContributedCommandsModel } from './contributed-commands.js'
 import { PaletteApi } from './palette-api.js'
 
 afterEach(() => {
-  delete window.__dshfilesCommandPaletteV1
   vi.restoreAllMocks()
 })
 
@@ -18,6 +17,19 @@ describe('contributed commands', () => {
     ])
     expect(PaletteApi.getSnapshot().actions.map(action => action.id)).toEqual(['@acme/plugin.open'])
     expect(PaletteApi.getSnapshot().actions[0]).toMatchObject({ label: 'Open Acme', aliases: ['acme'], keys: ['Mod+Shift+A'], group: 'command' })
+    dispose()
+    expect(PaletteApi.getSnapshot().actions).toEqual([])
+  })
+
+  it('lists registry rows and leaves out an invalid or duplicate one without dropping the rest', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const dispose = ContributedCommandsModel.listActions([
+      { id: '@acme/plugin/open', label: 'Open', run: () => {} },
+      { id: '@acme/plugin/open', label: 'Open again', run: () => {} },
+      { id: 'unscoped', label: 'Unscoped', run: () => {} },
+      { id: '@acme/plugin/close', label: 'Close', run: () => {} },
+    ])
+    expect(PaletteApi.getSnapshot().actions.map(action => action.id)).toEqual(['@acme/plugin/open', '@acme/plugin/close'])
     dispose()
     expect(PaletteApi.getSnapshot().actions).toEqual([])
   })

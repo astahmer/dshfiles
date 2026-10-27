@@ -44,7 +44,7 @@ import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
-import { PALETTE_EVENT, PaletteApi } from '@dshfiles/command-palette/api'
+import { PaletteBridge } from './palette-bridge.js'
 import './client.css'
 import { SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
@@ -136,7 +136,9 @@ export default defineClient({
     'modules',
   ],
   // Every registered component reads Settings, so each one goes through decorate.
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) ctx.effect(() => PaletteBridge.connect(plugin), 'thread-sidebar: palette bridge')
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
     const syncPanels = (): void => {
       const next = ctx.slots
@@ -213,7 +215,7 @@ export default defineClient({
             const next = store.getSnapshot().searchRequest
             if (next === handled) return
             handled = next
-            window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } }))
+            PaletteBridge.open('threads')
           })
           return
         }
@@ -857,14 +859,16 @@ export default defineClient({
     )
     ctx.effect(
       () =>
-        PaletteApi.registerAction({
-          id: '@dshfiles/thread-sidebar/open-board',
-          label: () => translate('threadSidebarBoardTitle'),
-          aliases: ['thread board', 'board', 'kanban', 'columns'],
-          icon: <LayoutGridIcon className="dshx:size-4" />,
-          group: 'destination',
-          run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
-        }),
+        PaletteBridge.addActions([
+          {
+            id: '@dshfiles/thread-sidebar/open-board',
+            label: () => translate('threadSidebarBoardTitle'),
+            aliases: ['thread board', 'board', 'kanban', 'columns'],
+            icon: <LayoutGridIcon className="dshx:size-4" />,
+            group: 'destination',
+            run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
+          },
+        ]),
       'thread-sidebar: open the thread board',
     )
 

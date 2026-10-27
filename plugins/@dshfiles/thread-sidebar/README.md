@@ -329,9 +329,8 @@ points:
 - Host `session.search` (⌥⌘K on the web, ⌘K on desktop) opens thread search:
   the native browser stays registered under this one, and its request store is
   followed through the slot ledger.
-- Any bundle can dispatch the cancelable `dshfiles:command-palette` window
-  event with `{ mode: 'all' | 'threads' }`; a `{ probe: true }` detail is only
-  acknowledged (`/goto` uses it).
+- Any bundle opens the palette through the `CommandPalette` contract of
+  `@dshfiles/command-palette/palette-contract`.
 
 **Footer** entries render on one row and never shrink or wrap. Entries that do
 not fit move into More (⋯) together with entries hidden in Customize; overflow

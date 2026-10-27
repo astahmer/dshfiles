@@ -46,7 +46,28 @@ const listContributedCommands = (commands: readonly CommandItem[]): (() => void)
   }
 }
 
+/**
+ * List every row other plugins added to the `PaletteActions` registry.
+ *
+ * A row with an invalid definition or an id another row holds is left out with a warning instead of breaking the rest.
+ * @returns a disposer removing the rows it added.
+ */
+const listContributedActions = (actions: readonly PaletteAction[]): (() => void) => {
+  const disposers = actions.flatMap(action => {
+    try {
+      return [PaletteApi.registerAction(action)]
+    } catch (error) {
+      console.warn(`command-palette: ${action.id} is not listed`, error)
+      return []
+    }
+  })
+  return () => {
+    for (const dispose of disposers) dispose()
+  }
+}
+
 export class ContributedCommandsModel {
   static readonly toPaletteAction = toPaletteAction
   static readonly list = listContributedCommands
+  static readonly listActions = listContributedActions
 }

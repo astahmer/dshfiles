@@ -6,7 +6,7 @@
   "files": [
     "dist",
     "cordis.patch.yml",
-    "src/palette-api.ts"
+    "src/palette-contract.ts"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -15,9 +15,9 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
-    "./api": {
-      "types": "./src/palette-api.ts",
-      "default": "./src/palette-api.ts"
+    "./palette-contract": {
+      "types": "./src/palette-contract.ts",
+      "default": "./dist/palette-contract.js"
     }
   },
   "scripts": {

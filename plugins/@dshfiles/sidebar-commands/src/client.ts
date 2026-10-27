@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
+import { CommandPalette } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
 import { buildGoToEntries, createDeferredNavigation, type GoToTarget } from './go-to.js'
 
@@ -16,13 +17,16 @@ export default defineClient({
   locales: [sidebarCommandsLocale],
   // Every service is read when the popup opens or a row is picked, not at setup.
   inject: ['slots', 'commandUi', 'layout', 'sessions', 'uiWorkspace', 'workspaces'],
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
     const translate = ctx.locale.bind(SIDEBAR_COMMANDS_LOCALE_NAMESPACE)
     let targets = new Map<string, SessionTarget>()
 
-    const PALETTE_EVENT = 'dshfiles:command-palette'
-    const requestPalette = (detail: { mode: 'all' | 'threads' } | { probe: true }): boolean =>
-      !window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail, cancelable: true }))
+    const palette = metadata?.plugin?.use(CommandPalette)
+    const activePalette = () => {
+      const live = palette?.get()
+      return live?.status === 'active' ? live.value : undefined
+    }
+    const paletteAvailable = (): boolean => activePalette() !== undefined
 
     const loadEntries = () => {
       const entries = buildGoToEntries({
@@ -30,7 +34,7 @@ export default defineClient({
         mainPanelKeys: new Set(ctx.slots.entriesOfSlot('main').flatMap(entry => entry.options.key ?? [])),
         sessions: ctx.sessions.list.getSnapshot(),
         archivedSessionIds: new Set(ctx.workspaces.list.getSnapshot().archivedSessionIds),
-        paletteAvailable: requestPalette({ probe: true }),
+        paletteAvailable: paletteAvailable(),
         copy: {
           actionsGroup: translate('actionsGroup'),
           actionDetail: translate('actionDetail'),
@@ -47,14 +51,14 @@ export default defineClient({
     }
 
     const isStillAvailable = (target: SessionTarget): boolean => {
-      if (target.kind === 'palette') return requestPalette({ probe: true })
+      if (target.kind === 'palette') return paletteAvailable()
       if (target.kind === 'panel') return ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === target.panelId)
       return ctx.sessions.list.getSnapshot().byId[target.sessionId] !== undefined
     }
 
     const open = (target: SessionTarget): void => {
       if (target.kind === 'palette') {
-        requestPalette({ mode: target.mode })
+        activePalette()?.open(target.mode)
         return
       }
       if (target.kind === 'panel') return ctx.layout.selectPanel(target.panelId)
