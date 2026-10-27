@@ -4,8 +4,7 @@ Port the best ideas of opencode v2's GUI plugin SDK into `@dshfiles/dshx/client`
 additively: every existing API (`defineClient`, `defineSlot`, `defineClientPlugin`,
 `uses`) keeps working.
 
-Resume here: integrate the settings-entries and dialogs workspaces, point the
-`SettingsSection` registry at the settings search seat, then run the closing checks.
+Resume here: integrate the dialogs workspace, then run the closing checks.
 
 | # | Item | Revision | Status |
 |---|------|----------|--------|
@@ -15,7 +14,7 @@ Resume here: integrate the settings-entries and dialogs workspaces, point the
 | 4 | `defineStore` global/session/project, `from` | same | done |
 | 5 | `keyed`, `signal`, `useKeyed`, `useLatest` | same | done |
 | 6 | `defineLocale` English fallback + `plural` | `feat(dshx): let locales fall back to English…` | done |
-| 7 | Settings search entries + `target` | settings-entries workspace | in progress |
+| 7 | Settings search entries + `target` | `feat(dshx): let settings sections publish search entries`, `feat(settings-shell)…`, `fix(dshx): publish SettingsSection…` | done |
 | 8 | `dshx add <pkg>` | `feat(dshx): install a plugin into a profile in one step` | done |
 | 9 | Failure isolation + Plugins page report | core + `feat(plugin-marketplace): show a plugin's failed contributions…` | done |
 | — | `Command` owners: shortcuts binds keys, palette lists | `feat(shortcuts)…`, `feat(command-palette)…` | done |
@@ -36,4 +35,5 @@ Resume here: integrate the settings-entries and dialogs workspaces, point the
 ## Follow-ups
 
 - Migrate ad hoc window globals (`__dshfilesCommandPaletteV1`, chat-focus, draft-client) to dshx contracts/registries.
+- The native slot ledger drops `metadata`: settings search entries ride the `__dshxSettingsSearchEntriesV1` seat.
 - Contribution failures are browser-only; an agent tool would need a Host relay.
