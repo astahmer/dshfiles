@@ -308,7 +308,7 @@ export default defineClient({
           void (async () => {
             let failurePhase: ThreadMentionFailureDiagnosticInput['phase'] = 'resolver-exception'
             try {
-              const result = await ctx.remote.sessionReferenceResolver.candidates(props.sessionId, targetSessionId, controller.signal)
+              const result = await ctx.remote.sessionReferenceResolver.candidates(targetSessionId, controller.signal)
               if (controller.signal.aborted) return
               if (!result.ok) {
                 console.warn(
