@@ -1,5 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ImageIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
@@ -8,6 +8,8 @@ import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi } from './api.js'
 import { InlineCompletion, type InlineToken } from './inline-completion.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { imageReferenceLabels } from './image-attachment-reference.js'
+import type { ComposerFile } from './composer-files.js'
 
 /** The thread fields an `@` row needs; the composer's `ComposerThread` satisfies it. */
 export interface MentionThread {
@@ -41,6 +43,7 @@ export const useMentionCompletion = (props: {
   readonly threads: readonly MentionThread[]
   readonly projects?: readonly string[] | undefined
   readonly tags?: readonly string[] | undefined
+  readonly files?: readonly ComposerFile[] | undefined
 }): MentionCompletion => {
   const api = useApi(backlogApi)
   const dispatch = useAgentDispatch()
@@ -127,6 +130,19 @@ export const useMentionCompletion = (props: {
       ),
       hint: 'project reference',
     }))
+    const imageRows = imageReferenceLabels(props.files ?? [])
+      .filter(label => label.toLowerCase().includes(query))
+      .map(label => ({
+        key: `image:${label}`,
+        insert: `@${label} `,
+        label: (
+          <>
+            <ImageIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+            <span>{label}</span>
+          </>
+        ),
+        hint: 'image attachment',
+      }))
     const agentRows = InlineCompletion.agents(token, agentChoices).map(row => {
       const agent = agentChoices.find(choice => choice.handle === row.handle)
       return {
@@ -141,8 +157,8 @@ export const useMentionCompletion = (props: {
         hint: `@${row.handle}`,
       }
     })
-    return [...agentRows, ...itemSuggestions, ...threadsRows, ...projectRows]
-  }, [token, tags, threads, itemSuggestions, agentChoices, props.projects])
+    return [...imageRows, ...agentRows, ...itemSuggestions, ...threadsRows, ...projectRows]
+  }, [token, tags, threads, itemSuggestions, agentChoices, props.projects, props.files])
 
   return { token, suggestions }
 }
