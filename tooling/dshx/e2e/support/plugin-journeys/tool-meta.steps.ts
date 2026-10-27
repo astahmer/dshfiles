@@ -78,8 +78,9 @@ When('a second thread waits for jobs with a timeout', async ({ page }: { page: P
   await composer.press('Enter')
 })
 
-Then('the wait tool card shows an accessible timeout progress bar', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'tool-meta-wait-tool-shows-timeout-progress', async () => {
+Then('the wait tool card names its target and shows an accessible timeout progress bar', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'tool-meta-wait-tool-names-target-and-shows-timeout-progress', async () => {
+    await expect(page.getByText('Waiting for all running background jobs to settle', { exact: true })).toBeVisible({ timeout: 30_000 })
     const progress = page.getByRole('progressbar', { name: /^Wait timeout countdown: \d+ s remaining of 12 s$/ })
     await expect(progress).toBeVisible({ timeout: 30_000 })
     const initial = Number(await progress.getAttribute('aria-valuenow'))

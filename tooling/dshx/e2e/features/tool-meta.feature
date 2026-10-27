@@ -17,7 +17,7 @@ Feature: Tool call timing
     When a Command Code account backed by a local fake provider is added
     And a long shell job starts in the workspace
     And a second thread waits for jobs with a timeout
-    Then the wait tool card shows an accessible timeout progress bar
+    Then the wait tool card names its target and shows an accessible timeout progress bar
 
   @scenario:tool-meta.settings
   Scenario: The start time reads relative, or the line hides, from the plugin settings

@@ -15,6 +15,11 @@ const templates = new Map([
   ['finishedLabel', 'Took {duration}, started {start}'],
   ['endedLabel', 'Finished {end}'],
   ['waitElapsed', 'Waiting for {duration}'],
+  ['waitingForJobOutput', 'Waiting for job output'],
+  ['waitingForAllJobs', 'Waiting for all running background jobs to settle'],
+  ['waitingForJob', 'Waiting for 1 background job to finish'],
+  ['waitingForJobs', 'Waiting for {count} background jobs to finish'],
+  ['waitingForAnyJobs', 'Waiting for any of {count} background jobs to finish'],
   ['waitRemaining', '{duration} until wait timeout'],
   ['waitProgress', 'Wait timeout countdown: {remaining} remaining of {timeout}'],
 ])
@@ -52,16 +57,24 @@ describe('waitTimerOf', () => {
       timeoutMs: 300_000,
       elapsedMs: 90_000,
       remainingMs: 210_000,
+      waitingFor: 'job-output',
     })
-    expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{"timeoutMs":120000}'), 181_000)).toEqual({
+    expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{"jobIds":["one","two"],"timeoutMs":120000}'), 181_000)).toEqual({
       timeoutMs: 120_000,
       elapsedMs: 180_000,
       remainingMs: 0,
+      waitingFor: { kind: 'jobs', count: 2, until: 'settled' },
     })
     expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{}'), 91_000)).toEqual({
       timeoutMs: undefined,
       elapsedMs: 90_000,
       remainingMs: undefined,
+      waitingFor: 'all-jobs',
+    })
+    expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{"jobIds":["one","two"],"until":"any-settled"}'), 91_000)?.waitingFor).toEqual({
+      kind: 'jobs',
+      count: 2,
+      until: 'any-settled',
     })
   })
 
@@ -70,6 +83,7 @@ describe('waitTimerOf', () => {
       timeoutMs: undefined,
       elapsedMs: 90_000,
       remainingMs: undefined,
+      waitingFor: 'job-output',
     })
     expect(ToolTimingModel.waitTimerOf(waitCall('job_output', '{"wait":false,"timeout_ms":300000}'), 91_000)).toBeUndefined()
     expect(ToolTimingModel.waitTimerOf(waitCall('background_jobs_wait', '{'), 91_000)).toBeUndefined()
