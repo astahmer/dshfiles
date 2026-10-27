@@ -34,6 +34,13 @@ Feature: Command palette
     When the palette query is ">"
     Then the registered dark-theme action is available and can run
 
+  @scenario:command-palette.contributed-command
+  Scenario: A command another plugin contributes through dshx is listed and runs
+    Given the isolated plugin composition of "@dshfiles/command-palette, @dshfiles/shortcuts" is booted
+    When the command palette is opened
+    When the palette query is "Toggle sidebar"
+    Then the contributed Toggle sidebar command is listed with its keys and runs
+
   @scenario:command-palette.recent-use-ranking
   Scenario: A recently used action ranks ahead of unused actions
     Given the isolated plugin profile "@dshfiles/command-palette" is booted

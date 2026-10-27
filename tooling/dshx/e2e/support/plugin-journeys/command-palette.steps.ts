@@ -247,6 +247,13 @@ Then('the registered dark-theme action is available and can run', async ({ page 
   await finishJourneyAssertions(page)
 })
 
+Then('the contributed Toggle sidebar command is listed with its keys and runs', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'contributed-command-is-listed', () => expect(paletteOption(page, /Toggle sidebar/)).toBeVisible())
+  await paletteOption(page, /Toggle sidebar/).click()
+  await recordAssertion(page, 'contributed-command-closes-palette', () => expect(paletteDialog(page)).not.toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
 Then('the recently used dark-theme action ranks first', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'recent-theme-action-ranks-before-other-actions', () =>
     expect(paletteDialog(page).getByRole('option').first()).toHaveAccessibleName(/Use dark theme/),
