@@ -14,7 +14,6 @@ export interface EditsOutcome {
 
 export type EditsFailure =
   | { readonly kind: 'empty-old'; readonly edit: number }
-  | { readonly kind: 'unchanged'; readonly edit: number }
   | { readonly kind: 'missing'; readonly edit: number }
   | { readonly kind: 'ambiguous'; readonly edit: number; readonly lines: readonly number[] }
 
@@ -66,7 +65,6 @@ const fuzzyMatches = ({ content, needle }: { readonly content: string; readonly 
 
 const applyOne = ({ content, edit, index }: { readonly content: string; readonly edit: PatchEdit; readonly index: number }): EditsResult => {
   if (edit.old.length === 0) return { ok: false, error: { kind: 'empty-old', edit: index } }
-  if (edit.old === edit.new) return { ok: false, error: { kind: 'unchanged', edit: index } }
   const exact = exactStarts({ content, needle: edit.old, all: true })
   if (exact.length > 1 && edit.replaceAll !== true) return { ok: false, error: { kind: 'ambiguous', edit: index, lines: matchStartLines(content, exact) } }
   if (exact.length > 0) {
@@ -108,6 +106,7 @@ export const applyEdits = ({ content, edits }: { readonly content: string; reado
     const old = normalize(edit.old)
     const replacement = normalize(edit.new)
     const normalized: PatchEdit = edit.replaceAll === undefined ? { old, new: replacement } : { old, new: replacement, replaceAll: edit.replaceAll }
+    if (old.length > 0 && old === replacement) continue
     const result = applyOne({ content: next, index, edit: normalized })
     if (!result.ok) return result
     next = result.value.content
@@ -121,8 +120,6 @@ export const describeEditsFailure = (failure: EditsFailure): string => {
   switch (failure.kind) {
     case 'empty-old':
       return `edit ${failure.edit + 1}: "old" is empty`
-    case 'unchanged':
-      return `edit ${failure.edit + 1}: "old" and "new" are identical`
     case 'missing':
       return `edit ${failure.edit + 1}: "old" was not found, even ignoring whitespace — read the file and copy a smaller anchor`
     case 'ambiguous':

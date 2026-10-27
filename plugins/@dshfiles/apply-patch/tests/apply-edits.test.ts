@@ -49,9 +49,20 @@ describe('applyEdits', () => {
     expect(result.error.kind).toBe('missing')
   })
 
-  it('rejects empty and unchanged needles before touching the file', () => {
-    expect(applyEdits({ content, edits: [{ old: '', new: 'x' }] })).toMatchObject({ ok: false, error: { kind: 'empty-old' } })
-    expect(applyEdits({ content, edits: [{ old: 'a', new: 'a' }] })).toMatchObject({ ok: false, error: { kind: 'unchanged' } })
+  it('ignores non-empty identical edits and continues with the rest of the batch', () => {
+    const result = applyEdits({
+      content,
+      edits: [
+        { old: 'not present', new: 'not present' },
+        { old: 'const b = 2', new: 'const b = 20' },
+        { old: 'const a = 1', new: 'const a = 1' },
+      ],
+    })
+    expect(result).toMatchObject({ ok: true, value: { content: 'const a = 1\nconst b = 20\nconst c = 3\n', exact: 1, fuzzy: 0 } })
+  })
+
+  it('keeps empty old needles invalid', () => {
+    expect(applyEdits({ content, edits: [{ old: '', new: '' }] })).toMatchObject({ ok: false, error: { kind: 'empty-old' } })
   })
 
   it('applies edits in order so a later anchor sees the earlier result', () => {

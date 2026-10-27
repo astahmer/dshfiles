@@ -61,13 +61,13 @@ export const createApplyPatchTool = (ctx: Context) =>
   defineTool({
     name: 'apply_patch',
     description:
-      'Edit one existing text file atomically: reads it first, applies literal replacements in order, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.',
+      'Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.',
     parameters: {
       path: { type: 'string', required: true, description: 'File to edit; relative paths resolve against the Session working directory.' },
       edits: {
         type: 'array',
         required: true,
-        description: 'Ordered replacements; each anchor must match once unless replaceAll is set.',
+        description: 'Ordered replacements; identical old/new pairs are ignored, and each other anchor must match once unless replaceAll is set.',
         items: {
           type: 'object',
           additionalProperties: false,
