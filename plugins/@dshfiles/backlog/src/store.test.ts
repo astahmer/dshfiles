@@ -687,6 +687,27 @@ describe('attention and inbox', () => {
 
     const edited = await store.editComment({ id: 1, commentId, text: 'updated reply', actor: user })
     expect(edited.ok && edited.value.item.events.some(event => event.commentId === commentId && event.detail === 'updated reply')).toBe(true)
+    expect(edited.ok && edited.value.item.events.find(event => event.commentId === commentId)?.attachments?.map(file => file.id)).toEqual(['comment-image-1'])
+
+    const replaced = await store.editComment({
+      id: 1,
+      commentId,
+      text: 'reply with a replacement image',
+      files: [{ id: 'comment-image-2', kind: 'image', name: 'replacement.png', mediaType: 'image/png', bytes: 5, data: 'aGVsbG8=' }],
+      actor: user,
+    })
+    expect(replaced.ok && replaced.value.item.events.find(event => event.commentId === commentId)?.attachments?.map(file => file.name)).toEqual([
+      'replacement.png',
+    ])
+    expect(await store.readFile({ id: 1, attachmentId: 'comment-image-1' })).toEqual({ ok: false, reason: 'not-found' })
+    expect(await store.readFile({ id: 1, attachmentId: 'comment-image-2' })).toEqual({
+      ok: true,
+      value: { dataUrl: 'data:image/png;base64,aGVsbG8=' },
+    })
+
+    const removed = await store.editComment({ id: 1, commentId, text: 'reply without an image', files: [], actor: user })
+    expect(removed.ok && removed.value.item.events.find(event => event.commentId === commentId)?.attachments).toEqual([])
+    expect(await store.readFile({ id: 1, attachmentId: 'comment-image-2' })).toEqual({ ok: false, reason: 'not-found' })
     expect(await store.editComment({ id: 1, commentId, text: 'not yours', actor: { kind: 'agent', sessionId: 'other-thread' } })).toEqual({
       ok: false,
       reason: 'not-found',

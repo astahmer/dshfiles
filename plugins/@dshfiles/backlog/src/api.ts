@@ -426,7 +426,21 @@ export const backlogApi = defineApi({
       tool: { name: 'backlog_comment', readOnly: false, render: renderDetailPreview },
     }),
     editComment: method({
-      input: z.object({ id: idSchema, commentId: z.string().min(1).max(128), text: z.string().min(1).max(BacklogItems.maxBodyChars) }).strict(),
+      input: z
+        .object({
+          id: idSchema,
+          commentId: z.string().min(1).max(128),
+          text: z.string().max(BacklogItems.maxBodyChars),
+          files: z
+            .array(fileInputSchema)
+            .max(BacklogItems.maxAttachments)
+            .optional()
+            .describe('Replacement images or files; omit to preserve the existing attachments, or pass an empty list to remove them.'),
+        })
+        .strict()
+        .refine(input => input.text.trim().length > 0 || (input.files?.length ?? 0) > 0, {
+          message: 'A reply needs text or at least one attachment.',
+        }),
       output: detailResultSchema,
       description: 'Edit one of the current user’s previous replies in the backlog panel.',
     }),

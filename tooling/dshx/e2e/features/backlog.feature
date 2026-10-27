@@ -357,7 +357,7 @@ Feature: Backlog
     And backlog item b:1 is opened
     And a reply with an image is added
     When the user reply is edited with keyboard navigation
-    Then the edited reply keeps its attachment
+    Then the edited reply has only its replacement attachment
     When the user reply is deleted after confirmation
     Then the reply and its attachment are removed from the activity
 

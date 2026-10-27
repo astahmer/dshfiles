@@ -1076,8 +1076,13 @@ When('the user reply is edited with keyboard navigation', async ({ page }: { pag
   await page.keyboard.press('Enter')
   const editor = activity.getByRole('textbox', { name: 'Edit reply', exact: true })
   await expect(editor).toBeVisible()
+  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  await activity.getByRole('button', { name: 'Remove red.png', exact: true }).click()
+  await activity.locator('input[type="file"]').setInputFiles(join(attachmentFixtures, 'blue.png'))
+  await expect(activity.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
   await editor.fill('Edited reply')
   await editor.focus()
+  await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
   const save = activity.getByRole('button', { name: 'Save reply', exact: true })
   await expect(save).toBeFocused()
@@ -1085,10 +1090,11 @@ When('the user reply is edited with keyboard navigation', async ({ page }: { pag
   await expect(activity).toContainText('Edited reply')
 })
 
-Then('the edited reply keeps its attachment', async ({ page }: { page: Page }) => {
+Then('the edited reply has only its replacement attachment', async ({ page }: { page: Page }) => {
   const activity = peek(page).getByRole('list', { name: 'Activity' })
   await expect(activity).toContainText('Edited reply')
-  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
+  await expect(activity.getByRole('button', { name: 'Open blue.png', exact: true })).toBeVisible()
+  await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toHaveCount(0)
 })
 
 When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {

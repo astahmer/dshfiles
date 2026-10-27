@@ -122,6 +122,7 @@ export interface BacklogStore {
     readonly id: number
     readonly commentId: string
     readonly text: string
+    readonly files?: readonly BacklogFileInput[] | undefined
     readonly actor: BacklogActor
   }): Promise<BacklogResult<BacklogDetail>>
   deleteComment(input: { readonly id: number; readonly commentId: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
@@ -625,7 +626,7 @@ const createBacklogStore = ({
       if (attachments.length > 0) return { ok: true, value: await touch(item, actor, { ...event, commentId: randomUUID(), attachments }, { links }) }
       return { ok: true, value: await touch(item, actor, { ...event, commentId: randomUUID() }, { links }) }
     },
-    editComment: async ({ id, commentId, text, actor }) => {
+    editComment: async ({ id, commentId, text, files: replacementFiles, actor }) => {
       const item = find(id)
       if (item === undefined) return { ok: false, reason: 'not-found' }
       if (actor.kind !== 'user') return { ok: false, reason: 'not-found' }
@@ -637,8 +638,16 @@ const createBacklogStore = ({
       )
       const comment = item.events[commentIndex]
       if (comment === undefined) return { ok: false, reason: 'not-found' }
+      const attachments = replacementFiles === undefined ? comment.attachments : await storeFiles(id, replacementFiles, now())
+      if (replacementFiles !== undefined) {
+        for (const attachment of comment.attachments ?? []) {
+          if (!replacementFiles.some(file => file.id === attachment.id)) await files.delete(fileKey(id, attachment.id))
+        }
+      }
       const events = item.events.map((event, index) =>
-        index === commentIndex ? { ...event, commentId, detail: text.slice(0, BacklogItems.maxBodyChars) } : event,
+        index === commentIndex
+          ? { ...event, commentId, detail: text.slice(0, BacklogItems.maxBodyChars), ...(attachments === undefined ? {} : { attachments }) }
+          : event,
       )
       const edited: BacklogItem = { ...item, events }
       return { ok: true, value: await touch(edited, actor, { kind: 'edited', detail: 'edited a reply' }, {}) }

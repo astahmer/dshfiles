@@ -38,7 +38,7 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import {
   useEffect,
   useRef,
@@ -56,8 +56,9 @@ import { BacklogActivityReferences } from './activity-thread-reference.js'
 import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 import { useComposerFiles } from './composer-attachments.js'
-import { fileInput } from './composer-files.js'
+import { fileInput, type ComposerFile } from './composer-files.js'
 import type { ComposerThread } from './composer.js'
+import type { BacklogAttachment } from './item.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
@@ -400,12 +401,119 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
 
 type ConversationRun = { readonly kind: 'comment'; readonly event: BacklogEvent } | { readonly kind: 'changes'; readonly events: BacklogEvent[] }
 
+const ReplyEditor = (props: {
+  readonly itemId: number
+  readonly event: BacklogEvent
+  readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
+  readonly onSave: (text: string, files: readonly ComposerFile[]) => Promise<void>
+  readonly onCancel: () => void
+}): JSX.Element => {
+  const api = useApi(backlogApi)
+  const attachments = props.event.attachments ?? []
+  const reads = useQueries({
+    queries: attachments.map(attachment => ({
+      queryKey: ['dshfiles-backlog-file', props.itemId, attachment.id],
+      queryFn: ({ signal }) => api.readFile({ id: props.itemId, attachmentId: attachment.id }, { signal }),
+      staleTime: Number.POSITIVE_INFINITY,
+    })),
+  })
+  const loading = reads.some(read => read.data === undefined && !read.isError)
+  const failedRead = reads.some(read => read.isError || read.data?.ok === false)
+  const initialFiles: ComposerFile[] = attachments.flatMap((attachment: BacklogAttachment, index) => {
+    const read = reads[index]?.data
+    if (read?.ok !== true) return []
+    const file: ComposerFile = {
+      id: attachment.id,
+      kind: attachment.kind,
+      name: attachment.name,
+      mediaType: attachment.mediaType,
+      bytes: attachment.bytes,
+      dataUrl: read.value.dataUrl,
+    }
+    if (attachment.width !== undefined && attachment.height !== undefined) {
+      return [{ ...file, width: attachment.width, height: attachment.height }]
+    }
+    return [file]
+  })
+  if (loading)
+    return (
+      <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
+        Loading reply attachments…
+      </p>
+    )
+  if (failedRead)
+    return (
+      <p role="alert" className="dshx:text-xs dshx:text-destructive">
+        A reply attachment could not be loaded.
+      </p>
+    )
+  return (
+    <ReplyComposer event={props.event} files={initialFiles} threads={props.threads} projects={props.projects} onSave={props.onSave} onCancel={props.onCancel} />
+  )
+}
+
+const ReplyComposer = (props: {
+  readonly event: BacklogEvent
+  readonly files: readonly ComposerFile[]
+  readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
+  readonly onSave: (text: string, files: readonly ComposerFile[]) => Promise<void>
+  readonly onCancel: () => void
+}): JSX.Element => {
+  const [text, setText] = useState(props.event.detail)
+  const [failed, setFailed] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const attachments = useComposerFiles({ initial: props.files, onError: setFailed })
+  const save = async (submittedText: string): Promise<void> => {
+    if ((submittedText.trim() === '' && attachments.files.length === 0) || pending) return
+    setPending(true)
+    setFailed(null)
+    try {
+      await props.onSave(submittedText, attachments.files)
+    } catch (error) {
+      setFailed(errorMessage(error, 'The reply could not be saved.'))
+    } finally {
+      setPending(false)
+    }
+  }
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+      <BacklogTextBox
+        ariaLabel="Edit reply"
+        placeholder="Reply… Markdown, b:12, jj:rev, @ items, threads, projects and agents; paste or drop an image"
+        value={text}
+        onChange={setText}
+        threads={props.threads}
+        projects={props.projects}
+        attachments={attachments}
+        variant="reply"
+        submitLabel="Save reply"
+        submitDisabled={text.trim() === '' && attachments.files.length === 0}
+        pending={pending}
+        onSubmit={submitted => void save(submitted)}
+        onCancel={props.onCancel}
+      />
+      {failed === null ? null : (
+        <p role="alert" className="dshx:text-xs dshx:text-destructive">
+          {failed}
+        </p>
+      )}
+      <Button variant="ghost" size="sm" disabled={pending} onClick={props.onCancel}>
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
 /** Comments read as messages; every other event folds into one "made N changes" line per actor run, opened on demand. */
 const Conversation = (props: {
   readonly events: readonly BacklogEvent[]
   readonly links: readonly BacklogLink[]
   readonly attention: BacklogAttention
   readonly itemId: number
+  readonly threads: readonly ComposerThread[]
+  readonly projects: readonly string[]
   readonly threadLabel: ThreadLabel
   readonly openThread: OpenThread
   readonly agentReplying: boolean
@@ -413,7 +521,6 @@ const Conversation = (props: {
   const attention = props.attention
   const actions = useBacklogActions()
   const [editingComment, setEditingComment] = useState<string | null>(null)
-  const [commentDraft, setCommentDraft] = useState('')
   const [commentFailure, setCommentFailure] = useState<string | null>(null)
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
   const [openDiffs, setOpenDiffs] = useState<ReadonlySet<string>>(new Set())
@@ -446,45 +553,24 @@ const Conversation = (props: {
                 </p>
                 <div className="dshx:group dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
                   {isEditing ? (
-                    <>
-                      <textarea
-                        aria-label="Edit reply"
-                        autoFocus
-                        className="dshx:min-h-20 dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-sm dshx:focus-visible:outline-2 dshx:focus-visible:outline-ring"
-                        value={commentDraft}
-                        onChange={event => setCommentDraft(event.target.value)}
-                        onKeyDown={event => {
-                          if (event.key === 'Escape') setEditingComment(null)
-                          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                            event.preventDefault()
-                            if (commentId !== undefined && commentDraft.trim() !== '') {
-                              void actions.editComment
-                                .mutateAsync({ id: props.itemId, commentId, text: commentDraft })
-                                .then(() => setEditingComment(null))
-                                .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be saved.')))
-                            }
-                          }
-                        }}
-                      />
-                      <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
-                        <Button
-                          size="sm"
-                          disabled={commentDraft.trim() === '' || actions.editComment.isPending}
-                          onClick={() => {
-                            if (commentId === undefined) return
-                            void actions.editComment
-                              .mutateAsync({ id: props.itemId, commentId, text: commentDraft })
-                              .then(() => setEditingComment(null))
-                              .catch(error => setCommentFailure(errorMessage(error, 'The reply could not be saved.')))
-                          }}
-                        >
-                          Save reply
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditingComment(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </>
+                    <ReplyEditor
+                      key={commentId}
+                      itemId={props.itemId}
+                      event={run.event}
+                      threads={props.threads}
+                      projects={props.projects}
+                      onSave={async (text, files) => {
+                        if (commentId === undefined) return
+                        await actions.editComment.mutateAsync({
+                          id: props.itemId,
+                          commentId,
+                          text,
+                          files: files.map(fileInput),
+                        })
+                        setEditingComment(null)
+                      }}
+                      onCancel={() => setEditingComment(null)}
+                    />
                   ) : (
                     <>
                       <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
@@ -501,7 +587,6 @@ const Conversation = (props: {
                               <DropdownMenuItem
                                 onSelect={() => {
                                   setCommentFailure(null)
-                                  setCommentDraft(run.event.detail)
                                   setEditingComment(commentId ?? null)
                                 }}
                               >
@@ -1133,6 +1218,8 @@ const PeekBody = (props: {
               links={relationshipLinks}
               attention={item.attention ?? 'none'}
               itemId={item.id}
+              threads={props.threads}
+              projects={props.projectPaths}
               threadLabel={threadLabel}
               openThread={props.openThread}
               agentReplying={agentReplying}
