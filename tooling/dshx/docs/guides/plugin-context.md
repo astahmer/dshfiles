@@ -145,3 +145,18 @@ A contribution that throws (a component render, a reactive item, a native
 mount, `setup`) renders nothing in its place and is recorded under its owner,
 kind and id. Read them with `contributionFailures` or
 `useContributionFailures()`.
+
+## Implementation notes
+
+- The broker lives on the page (`globalThis.__dshxBrokerV1`) because every plugin
+  bundles its own dshx copy. Tokens hold kind + id only.
+- React is touched lazily (the `usePlugin` context, the failure boundary): a
+  bundle evaluates before the Host hands it React.
+- The bundled `@dshfiles/dshx/client` is a hand-listed virtual module
+  (`src/compiler/client/build.ts`); `tests/client-public-exports.spec.ts` fails
+  when an entry export is missing from it.
+- The native slot ledger drops `metadata`, so settings search entries travel
+  through the `__dshxSettingsSearchEntriesV1` seat.
+- Contribution failures are browser-only; an agent tool would need a Host relay.
+- Ad hoc window registries (`__dshfilesCommandPaletteV1`, chat-focus,
+  draft-client) predate contracts and are candidates to migrate.
