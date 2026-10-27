@@ -6,10 +6,21 @@
       "id": "resume-interrupted",
       "title": "Resume the latest stopped task",
       "summary": "Resume beside the latest task a restart or a failed model request stopped, while the Host confirms it remains idle; superseded history stays read-only.",
-      "surfaces": ["client", "tool"],
+      "surfaces": [
+        "client",
+        "tool"
+      ],
       "configuration": [],
-      "states": ["stopped", "resuming", "resumed", "failed"],
-      "failureModes": ["Missing recovery owner hides the action.", "Resume failures keep a retryable action."],
+      "states": [
+        "stopped",
+        "resuming",
+        "resumed",
+        "failed"
+      ],
+      "failureModes": [
+        "Missing recovery owner hides the action.",
+        "Resume failures keep a retryable action."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -35,12 +46,24 @@
       "id": "windowed-transcript",
       "title": "Open a thread on its latest messages",
       "summary": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["thread-opened", "latest-rows-visible", "older-rows-mounted"],
-      "failureModes": ["A navigation or find target outside the mounted rows widens the window before it scrolls."],
+      "states": [
+        "thread-opened",
+        "latest-rows-visible",
+        "older-rows-mounted"
+      ],
+      "failureModes": [
+        "A navigation or find target outside the mounted rows widens the window before it scrolls.",
+        "Rows the reader scrolls past must not snap back when older rows mount: a paging anchor armed mid-gesture yields to the reader's scroll."
+      ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reach": [
+        "click button \"New session\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+      ],
       "verification": [
         {
           "kind": "unit-test",
@@ -51,6 +74,11 @@
         {
           "kind": "gherkin",
           "id": "chat.windowed-transcript",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.windowed-transcript-steady-scroll",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
         }
       ],
@@ -65,9 +93,14 @@
       "id": "image-links",
       "title": "Open image links in the gallery",
       "summary": "Opening a local or HTTP(S) image link from Chat shows it in the shared image gallery; other links keep their existing destination.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["link-idle", "gallery-open"],
+      "states": [
+        "link-idle",
+        "gallery-open"
+      ],
       "failureModes": [
         "A supported image link opens the side panel instead of the gallery.",
         "The sidebar and composer remain visually at the same layer as the gallery."
@@ -97,9 +130,16 @@
       "id": "focus-from-plugin",
       "title": "Scroll to a turn, step or tool call on request",
       "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; Turn-footer entries get the thread's View opener.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "configuration": [],
-      "states": ["focus-requested", "turn-landed", "tool-call-revealed", "fallback-to-turn"],
+      "states": [
+        "focus-requested",
+        "turn-landed",
+        "tool-call-revealed",
+        "fallback-to-turn"
+      ],
       "failureModes": [
         "A tool call or step that never appears within 4 s lands on its turn.",
         "A cross-thread request expires after 30 s when the thread never shows Chat."

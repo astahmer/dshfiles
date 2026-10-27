@@ -6,6 +6,12 @@ Feature: Chat browser journeys
     When a real thread with one hundred eighty transcript turns is opened
     Then the latest transcript rows are visible and older rows appear when scrolling up
 
+  @scenario:chat.windowed-transcript-steady-scroll
+  Scenario: Scrolling up a long transcript never jumps while older rows mount
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When a real thread with one hundred eighty transcript turns is opened
+    Then each upward wheel step moves the rows under the reader by the wheel distance
+
   @scenario:session-controller.lean-session-follow
   Scenario: A real Host follow renders history without provider replay blocks in browser frames
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
