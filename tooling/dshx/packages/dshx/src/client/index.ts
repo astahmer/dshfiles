@@ -12,6 +12,7 @@ export const defineClient = ClientContributionModel.defineClient
 export const defineSlot = ClientContributionModel.defineSlot
 export const declareLocaleNamespace = LocaleNamespaceModel.declareNamespace
 export const defineLocale = LocaleNamespaceModel.define
+export const plural = LocaleNamespaceModel.plural
 export { CLIENT_SLOT_REFERENCES, type ClientSlotReference } from 'create-dshx/slot-capabilities'
 export { findClientSlot, slotOwnerImports } from './slot-reference.js'
 export const hasHostCommandRegistry = HostCommandsModel.hasRegistry
@@ -24,6 +25,8 @@ export type {
   LocaleDefinition,
   LocaleDictionaries,
   LocaleKeyOf,
+  LocaleSourceDictionaries,
+  PluralKeyOf,
   PropsLocaleOf,
   SlotContribution,
   SlotOptions,

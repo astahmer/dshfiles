@@ -65,7 +65,37 @@ type CopyKey = LocaleKeyOf<typeof copy>; // "ready"
 type CopyProps = PropsLocaleOf<typeof copy>; // { t(key): string }
 ```
 
-Both `zh` and `en` are required, must contain exactly the same keys, and accept string values only. Pass the definition to `defineClient({ locales: [...] })` to register and dispose its dictionaries, and to `defineSlot(..., { locale: copy })` to infer the component's typed `t()` prop. Locale definitions register before Conversations, Slots, and `setup(ctx)`.
+`en` is required and complete: its keys are the namespace's key union. Every other locale id (`zh`, or a language-pack id such as `fr` or `pt-BR`) is optional and may be partial; it may not add a key `en` lacks. Values are strings only. A violation is a type error for literal dictionaries and `DSHX2402` at runtime. At registration dshx fills each locale's missing keys with the English text, so the native provider always receives complete `zh` and `en` dictionaries; other locales register through its single-locale form and appear once a language pack adds them with `ctx.locale.addLanguage()`.
+
+```ts
+const copy = defineLocale("my-plugin.status", {
+  en: { ready: "Plugin ready", retry: "Retry" },
+  zh: { ready: "插件已就绪" }, // retry shows "Retry"
+});
+```
+
+### Plurals
+
+A key with `_one` and `_other` variants (and optionally `_zero`) is a plural key. `plural(t, key, count, params?)` picks `key_zero` when `count` is 0 and that variant exists, then the `Intl.PluralRules` category of the active locale (read from `<html lang>`, which the native provider keeps in sync), then `key_other`. `{count}` and the other params interpolate through the native `t`. `PluralKeyOf<typeof copy>` is the union of plural base keys.
+
+```tsx
+import { defineLocale, plural, type PropsLocaleOf } from "@dshfiles/dshx/client";
+
+const copy = defineLocale("my-plugin.files", {
+  en: {
+    files_zero: "No files",
+    files_one: "{count} file in {folder}",
+    files_other: "{count} files in {folder}",
+  },
+  zh: { files_zero: "没有文件", files_other: "{folder} 中有 {count} 个文件" },
+});
+
+const Files = ({ t, count }: PropsLocaleOf<typeof copy> & { count: number }) => (
+  <p>{plural(t, "files", count, { folder: "src" })}</p>
+);
+```
+
+Chinese plural rules select only `other`, so `zh` needs the `_other` variant, plus `_zero` when `en` defines one (otherwise the English zero text shows). Pass the definition to `defineClient({ locales: [...] })` to register and dispose its dictionaries, and to `defineSlot(..., { locale: copy })` to infer the component's typed `t()` prop. Locale definitions register before Conversations, Slots, and `setup(ctx)`.
 
 The Client package manifest must still load the official provider:
 

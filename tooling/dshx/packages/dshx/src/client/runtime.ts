@@ -26,7 +26,7 @@ import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import type { DshCompatibility } from '../compat/types.js'
 
 const CLIENT_DEFINITION_KEYS = new Set(['name', 'inject', 'locales', 'conversations', 'slots', 'setup'])
-const LOCALE_IDS = ['zh', 'en'] as const
+const LOCALE_ID_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u
 
 /** Project identity embedded by the Client compiler. */
 export interface ClientPluginMetadata {
@@ -61,6 +61,7 @@ interface ClientConversationEventsService {
 
 interface ClientLocaleService {
   register(namespace: string, dictionaries: LocaleDictionaries): () => void
+  register(namespace: string, locale: string, dictionary: Readonly<Record<string, string>>): () => void
 }
 
 type ClientRuntimeContext = ClientContext & {
@@ -138,7 +139,7 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
       'DSHX2401',
       `Client Locale contribution at index ${index} must be an object returned by defineLocale().`,
       metadata,
-      'Use defineLocale("namespace", { zh: { ... }, en: { ... } }) inside defineClient({ locales: [...] }).',
+      'Use defineLocale("namespace", { en: { ... }, zh: { ... } }) inside defineClient({ locales: [...] }).',
     )
   }
   const { namespace, dictionaries } = LocaleNamespaceModel.parts(value)
@@ -153,23 +154,31 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
   if (typeof dictionaries !== 'object' || dictionaries === null || Array.isArray(dictionaries)) {
     fail(
       'DSHX2402',
-      `Client Locale contribution at index ${index} must provide complete zh/en dictionaries.`,
+      `Client Locale contribution at index ${index} must provide locale dictionaries.`,
       metadata,
-      'Pass { zh: { key: "..." }, en: { key: "..." } } as the second defineLocale() argument.',
+      'Pass { en: { key: "..." }, zh: { key: "..." } } as the second defineLocale() argument.',
     )
   }
-  const localeIds = Object.keys(dictionaries)
-  if (localeIds.length !== LOCALE_IDS.length || LOCALE_IDS.some(locale => !Object.hasOwn(dictionaries, locale))) {
+  const english: unknown = dictionaries.en
+  if (typeof english !== 'object' || english === null || Array.isArray(english)) {
     fail(
       'DSHX2402',
-      `Client Locale contribution at index ${index} must provide exactly the zh and en dictionaries.`,
+      `Client Locale contribution at index ${index} must provide an en dictionary.`,
       metadata,
-      'Add the missing shipped locale or remove unsupported locale ids.',
+      'Add the complete English dictionary; other locales fall back to it for missing keys.',
     )
   }
-  let expectedKeys: readonly string[] | undefined
-  for (const locale of LOCALE_IDS) {
-    const dictionary = dictionaries[locale] as unknown
+  const invalidLocaleId = Object.keys(dictionaries).find(locale => !LOCALE_ID_PATTERN.test(locale))
+  if (invalidLocaleId !== undefined) {
+    fail(
+      'DSHX2402',
+      `Client Locale contribution at index ${index} has an invalid locale id ${JSON.stringify(invalidLocaleId)}.`,
+      metadata,
+      'Use BCP 47-style locale ids such as "en", "zh" or "pt-BR".',
+    )
+  }
+  const englishKeys = new Set(Object.keys(english))
+  for (const [locale, dictionary] of Object.entries(dictionaries)) {
     if (typeof dictionary !== 'object' || dictionary === null || Array.isArray(dictionary)) {
       fail('DSHX2402', `Client Locale contribution at index ${index} has an invalid ${locale} dictionary.`, metadata, 'Use a flat key-to-string object.')
     }
@@ -182,16 +191,15 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
         'Use non-empty keys and string translation values.',
       )
     }
-    const keys = entries.map(([key]) => key).sort()
-    if (expectedKeys !== undefined && (keys.length !== expectedKeys.length || keys.some((key, keyIndex) => key !== expectedKeys?.[keyIndex]))) {
+    const extraKey = entries.find(([key]) => !englishKeys.has(key))?.[0]
+    if (extraKey !== undefined) {
       fail(
         'DSHX2402',
-        `Client Locale contribution at index ${index} must use identical keys in every dictionary.`,
+        `Client Locale contribution at index ${index} has key ${JSON.stringify(extraKey)} in ${locale} that the en dictionary lacks.`,
         metadata,
-        'Add or remove keys until the zh and en dictionaries have the same shape.',
+        'English defines the key set: add the key to en or remove it from the other locale.',
       )
     }
-    expectedKeys = keys
   }
   return value
 }
@@ -303,7 +311,11 @@ function normalizedSlotOptions(options: SlotRegistrationOptions): SlotRegistrati
 function registerLocales(client: ClientRuntimeContext, definition: ClientDefinition): void {
   for (const locale of definition.locales ?? []) {
     const { namespace, dictionaries } = LocaleNamespaceModel.parts(locale)
-    client.effect(() => client.locale.register(namespace, dictionaries))
+    const registration = LocaleNamespaceModel.registration(dictionaries)
+    client.effect(() => client.locale.register(namespace, registration.builtIn))
+    for (const { locale: localeId, dictionary } of registration.additional) {
+      client.effect(() => client.locale.register(namespace, localeId, dictionary))
+    }
   }
 }
 

@@ -35,6 +35,12 @@ export type ClientContext = Omit<Context, keyof ClientServiceMap> & ClientServic
 /** Complete set of dictionaries accepted by the official zh/en Locale provider. */
 export type LocaleDictionaries = Readonly<Record<BuiltInLocaleId, LocaleDictionary>>
 
+/**
+ * Dictionaries accepted by defineLocale(): `en` is complete and defines the key
+ * union; every other locale id may be partial and falls back to English.
+ */
+export type LocaleSourceDictionaries = { readonly en: LocaleDictionary } & { readonly [locale: string]: LocaleDictionary }
+
 /** Opaque declarative Locale contribution consumed by the Client adapter. */
 export interface LocaleDefinition<Namespace extends string = string, Key extends string = string> {
   readonly [localeDefinitionBrand]: {
@@ -45,6 +51,11 @@ export interface LocaleDefinition<Namespace extends string = string, Key extends
 
 /** Dictionary key union retained by a defineLocale() contribution. */
 export type LocaleKeyOf<Definition extends LocaleDefinition> = Definition extends LocaleDefinition<string, infer Key> ? Key : never
+
+export type PluralBaseOf<Key extends string> = Key extends `${infer Base}_other` ? Base : never
+
+/** Plural base keys of a defineLocale() contribution: every `key` with a `key_other` variant. */
+export type PluralKeyOf<Definition extends LocaleDefinition> = PluralBaseOf<LocaleKeyOf<Definition>>
 
 /** Locale prop injected by a Slot that references a defineLocale() contribution. */
 export type PropsLocaleOf<Definition extends LocaleDefinition> = {
