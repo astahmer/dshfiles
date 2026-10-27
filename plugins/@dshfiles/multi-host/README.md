@@ -8,7 +8,7 @@ one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
 
 Manage hosts on a dedicated page:
 
-![Manage hosts on a dedicated page](docs/screenshots/host-management.png)
+![Manage hosts and clone a project onto a remote machine](docs/screenshots/host-management.png)
 
 ## Using it
 
@@ -30,10 +30,14 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
   Every registered host is listed in the destination picker's order: drag a
   row or use the up/down arrows to reorder, the eye hides a host from the
   picker without deleting it (its runtimes, threads and remote data stay), and
-  reconnect, edit and remove stay on the row. **Add host** keeps the dialog,
-  with the SSH destination picker, **Find** and the stepwise **Test
-  connection**. Removing keeps remote data and the local record of threads
-  started there; they come back if the host is added again.
+  reconnect, edit and remove stay on the row. **Add folder** registers an
+  existing remote directory; **Clone project** clones an HTTPS or SSH Git URL
+  into a remote path and registers it as a workspace. Clone currently transfers
+  Git repository contents only; local ignored or uncommitted files are not
+  copied. **Add host** keeps the dialog, with the SSH destination picker,
+  **Find** and the stepwise **Test connection**. Removing keeps remote data and
+  the local record of threads started there; they come back if the host is added
+  again.
 
 With a host chosen:
 

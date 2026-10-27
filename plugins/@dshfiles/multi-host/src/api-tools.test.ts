@@ -7,6 +7,7 @@ describe('multi-host tool exposure', () => {
     expect(tools.map(tool => tool.name).sort()).toEqual([
       'multi_host_browse',
       'multi_host_checkout_sync',
+      'multi_host_clone_project',
       'multi_host_create_thread',
       'multi_host_doctor',
       'multi_host_exec',
@@ -37,6 +38,20 @@ describe('multi-host tool exposure', () => {
       'multi_host_thread_transcript',
       'multi_host_threads',
     ])
+  })
+
+  test('remote cloning accepts safe Git URLs and remote folders only', async () => {
+    const inputSchema = multiHostApi.methods.runtimeCloneProject.input
+    if (inputSchema === undefined) throw new Error('The remote clone API must define an input schema.')
+    const accepts = async (repositoryUrl: string, destinationPath: string): Promise<boolean> => {
+      const result = await inputSchema['~standard'].validate({ runtimeId: 'runtime', repositoryUrl, destinationPath })
+      return !('issues' in result)
+    }
+    expect(await accepts('https://github.com/owner/repo.git', '~/repo')).toBe(true)
+    expect(await accepts('git@github.com:owner/repo.git', '/home/user/repo')).toBe(true)
+    expect(await accepts('file:///etc/passwd', '/home/user/repo')).toBe(false)
+    expect(await accepts('https://github.com/owner/repo.git; touch /tmp/pwned', '/home/user/repo')).toBe(false)
+    expect(await accepts('https://github.com/owner/repo.git', '~/../outside')).toBe(false)
   })
 
   test('remote model results preserve reasoning choices', async () => {

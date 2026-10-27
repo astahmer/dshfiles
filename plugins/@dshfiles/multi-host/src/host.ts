@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
 import { fileUploadValueSchema, multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
 import { connectLocal } from './connectors/local.js'
-import { SshConnector } from './connectors/ssh.js'
+import { shellQuote, SshConnector } from './connectors/ssh.js'
 import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { createRemoteSessionSource } from './remote-session-source.js'
@@ -813,6 +813,41 @@ const multiHostHandlers = multiHostApi.host({
         },
       )
       return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  runtimeCloneProject: async ({ input, signal }) => {
+    try {
+      const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
+      if (runtime === undefined) return { ok: false as const, code: 'runtime-missing', message: 'That remote runtime is no longer registered.' }
+      const host = await HostDirectoryStore.findHost(runtime.hostId)
+      if (host?.connector.kind !== 'ssh') return { ok: false as const, code: 'ssh-required', message: 'Cloning requires an SSH-connected host.' }
+      const listing = await withRuntime(input.runtimeId, async gateway => directoryListingSchema.parse(await gateway.api('listDirectory', {}, signal)), {
+        mutation: false,
+      })
+      const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
+      const cloned = await RemoteExec.run({
+        sshTarget: host.connector.sshTarget,
+        command: `git clone -- ${shellQuote(input.repositoryUrl)} ${shellQuote(destinationPath)}`,
+        timeoutMs: 10 * 60_000,
+        signal,
+      })
+      if (!cloned.ok) return { ok: false as const, code: 'clone-failed', message: cloned.stderr.trim() || 'Git could not clone the repository.' }
+      try {
+        const created = await withRuntime(
+          input.runtimeId,
+          async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
+          { mutation: true },
+        )
+        return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path }
+      } catch {
+        return {
+          ok: false as const,
+          code: 'project-registration-failed',
+          message: 'Repository cloned, but project registration failed. Use Add folder to register it.',
+        }
+      }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }

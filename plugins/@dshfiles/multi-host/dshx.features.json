@@ -51,7 +51,7 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "A Hosts page lists every registered host in the destination picker's order: hide a host without deleting it, drag rows or use the arrows to reorder, and reconnect, edit or remove from the same row.",
+      "summary": "A Hosts page lists every registered host in the destination picker's order: add an existing folder or clone a Git repository as a remote project, hide a host without deleting it, drag rows or use the arrows to reorder, and reconnect, edit or remove from the same row.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["empty", "listed", "hidden", "reordered"],
@@ -60,7 +60,14 @@
         "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker."
       ],
       "externalDependencies": [],
-      "reach": ["seed multi-host-hosts", "click button \"Hosts\"", "expect heading \"Hosts\"", "expect text \"3 registered*\""],
+      "reach": [
+        "seed multi-host-hosts",
+        "click button \"Hosts\"",
+        "expect heading \"Hosts\"",
+        "expect text \"3 registered*\"",
+        "click button \"Clone project\"",
+        "expect textbox \"Git repository URL\""
+      ],
       "verification": [
         {
           "kind": "unit-test",
@@ -73,6 +80,12 @@
           "id": "multi-host.host-hidden",
           "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
           "testName": "hides a host without touching its runtimes, and a later edit keeps it hidden"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.clone-project-input",
+          "file": "plugins/@dshfiles/multi-host/src/api-tools.test.ts",
+          "testName": "remote cloning accepts safe Git URLs and remote folders only"
         },
         {
           "kind": "not-applicable",

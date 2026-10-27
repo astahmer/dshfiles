@@ -1,5 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
+import { ProjectFolderPicker, type ProjectFolderSelection } from '@dshfiles/project-folder-picker'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -23,6 +23,7 @@ import { multiHostApi, type HostSummary, type RuntimeSummary } from '../api.js'
 import { remoteDirectoryPicker } from './remote-folders.js'
 import { HostDialog, hostState, StatusDot, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
+import { CloneProjectDialog } from './clone-project-dialog.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
@@ -48,6 +49,7 @@ const HostRow = (props: {
   readonly onHide: (hidden: boolean) => void
   readonly onEdit: () => void
   readonly onAddProject: () => void
+  readonly onCloneProject: () => void
   readonly onRemove: () => void
 }) => {
   const { api, host, runtime } = props
@@ -153,10 +155,18 @@ const HostRow = (props: {
         >
           {host.hidden ? <EyeOffIcon className="dshx:size-3.5" /> : <EyeIcon className="dshx:size-3.5" />}
         </Button>
-        <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
-          <PlusIcon className="dshx:size-3.5" />
-          Add project
-        </Button>
+        {host.connector.kind === 'ssh' ? (
+          <>
+            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onAddProject}>
+              <PlusIcon className="dshx:size-3.5" />
+              Add folder
+            </Button>
+            <Button size="sm" variant="outline" disabled={runtime === undefined} onClick={props.onCloneProject}>
+              <PlusIcon className="dshx:size-3.5" />
+              Clone project
+            </Button>
+          </>
+        ) : null}
         <Button
           size="icon"
           variant="ghost"
@@ -199,6 +209,7 @@ export const HostsPage = () => {
   const [pendingOrder, setPendingOrder] = useState<readonly string[] | null>(null)
   const [form, setForm] = useState<HostDraft | null>(null)
   const [projectRuntimeId, setProjectRuntimeId] = useState<string | null>(null)
+  const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
   const projectRuntime = directory.data?.runtimes.find(runtime => runtime.id === projectRuntimeId)
   const projectHost = projectRuntime === undefined ? undefined : hosts.find(host => host.id === projectRuntime.hostId)
 
@@ -344,6 +355,7 @@ export const HostsPage = () => {
               }}
               onHide={hidden => hide.mutate({ id: host.id, hidden })}
               onAddProject={() => setProjectRuntimeId(runtimeFor(host)?.id ?? null)}
+              onCloneProject={() => setCloneRuntimeId(runtimeFor(host)?.id ?? null)}
               onEdit={() =>
                 setForm({
                   hostId: host.id,
@@ -357,6 +369,12 @@ export const HostsPage = () => {
           ))}
         </ul>
       </div>
+      <CloneProjectDialog
+        api={api}
+        runtime={directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)}
+        hostName={hosts.find(host => directory.data?.runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
+        onClose={() => setCloneRuntimeId(null)}
+      />
       {projectRuntime !== undefined && projectHost !== undefined ? (
         <ProjectFolderPicker
           projects={[]}

@@ -214,6 +214,22 @@ const remotePathSchema = z
   .min(2)
   .max(4096)
   .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/u)
+const cloneDestinationSchema = z.union([
+  remotePathSchema,
+  z
+    .string()
+    .trim()
+    .min(3)
+    .max(4096)
+    .regex(/^~\/(?!\.\.(?:\/|$))(?!.*\/\.\.(?:\/|$)).+$/u),
+])
+const repositoryUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .regex(
+    /^(?:https:\/\/[A-Za-z0-9.-]+(?::[0-9]+)?\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?|git@[A-Za-z0-9.-]+:[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*(?:\.git)?)$/u,
+  )
 
 const profileNameSchema = z
   .string()
@@ -444,6 +460,13 @@ export const multiHostApi = defineApi({
       description:
         'Register a folder on a remote runtime as a workspace, so the remote jj-integration can describe and isolate it. Call only when the user asked to open that folder there.',
       tool: { name: 'multi_host_open_folder', render: compactJson },
+    }),
+    runtimeCloneProject: method({
+      input: z.object({ runtimeId: idSchema, repositoryUrl: repositoryUrlSchema, destinationPath: cloneDestinationSchema }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), workspaceId: z.string(), path: z.string() }), failedSchema]),
+      description:
+        'Clone a Git repository to one remote host and register the clone as a project workspace. Call only when the user asked to clone that repository there.',
+      tool: { name: 'multi_host_clone_project', render: compactJson },
     }),
     runtimeBrowse: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096).optional() }).strict(),

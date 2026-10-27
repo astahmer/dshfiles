@@ -6,6 +6,7 @@ import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
+import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
@@ -22,6 +23,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   const { api } = props
   const [open, setOpen] = useState(false)
   const [dialog, setDialog] = useState<'closed' | 'add'>('closed')
+  const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
   const destination = hostDestination.useValue()
   const directory = useQuery({ ...multiHostQueries.directory(api, open ? 4_000 : 30_000), enabled: props.unavailable !== true })
   const hosts = directory.data?.hosts ?? []
@@ -36,6 +38,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
       return hosts.find(host => host.id === runtime.hostId)?.hidden !== true
     })
     .sort((left, right) => (hostOrder.get(left.hostId) ?? 0) - (hostOrder.get(right.hostId) ?? 0))
+  const cloneTargets = pickable.filter(runtime => hosts.find(host => host.id === runtime.hostId)?.connector.kind === 'ssh')
   // Reuse a recent ping for quick menu toggles, and stop probing an unavailable runtime every ten seconds.
   const pings = useQueries({
     queries: pickable.map(runtime =>
@@ -110,6 +113,29 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
                   )
                 })}
               </CommandGroup>
+              {cloneTargets.length > 0 ? (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup heading="Add project to another machine">
+                    {cloneTargets.map(runtime => {
+                      const host = hosts.find(item => item.id === runtime.hostId)
+                      return (
+                        <CommandItem
+                          key={`add-project-${runtime.id}`}
+                          value={`add-project-${runtime.id}`}
+                          onSelect={() => {
+                            setOpen(false)
+                            setCloneRuntimeId(runtime.id)
+                          }}
+                        >
+                          <PlusIcon className="dshx:size-3.5" />
+                          {host?.name ?? runtime.name}
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                </>
+              ) : null}
               <CommandSeparator />
               <CommandGroup>
                 <CommandItem
@@ -140,6 +166,12 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
           ) : null}
         </PopoverContent>
       </Popover>
+      <CloneProjectDialog
+        api={api}
+        runtime={runtimes.find(runtime => runtime.id === cloneRuntimeId)}
+        hostName={hosts.find(host => runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
+        onClose={() => setCloneRuntimeId(null)}
+      />
       <HostDialog
         api={api}
         draft={dialog === 'add' ? { name: '', sshTarget: '', remoteHome: '' } : null}
