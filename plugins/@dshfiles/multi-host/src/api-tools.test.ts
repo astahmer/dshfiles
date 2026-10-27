@@ -16,6 +16,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_forget_thread',
       'multi_host_identity',
       'multi_host_list',
+      'multi_host_local_project_files',
       'multi_host_mkdir',
       'multi_host_models',
       'multi_host_open_folder',
@@ -40,7 +41,7 @@ describe('multi-host tool exposure', () => {
     ])
   })
 
-  test('remote cloning accepts safe Git URLs and remote folders only', async () => {
+  test('remote cloning accepts safe destinations and complete local-file selections', async () => {
     const inputSchema = multiHostApi.methods.runtimeCloneProject.input
     if (inputSchema === undefined) throw new Error('The remote clone API must define an input schema.')
     const accepts = async (repositoryUrl: string, destinationPath: string): Promise<boolean> => {
@@ -52,6 +53,20 @@ describe('multi-host tool exposure', () => {
     expect(await accepts('file:///etc/passwd', '/home/user/repo')).toBe(false)
     expect(await accepts('https://github.com/owner/repo.git; touch /tmp/pwned', '/home/user/repo')).toBe(false)
     expect(await accepts('https://github.com/owner/repo.git', '~/../outside')).toBe(false)
+    const cloneInput = multiHostApi.methods.runtimeCloneProject.input
+    if (cloneInput === undefined) throw new Error('The remote clone API must define an input schema.')
+    const copyInput = {
+      runtimeId: 'runtime',
+      repositoryUrl: 'https://github.com/owner/repo.git',
+      destinationPath: '~/repo',
+      copyFromPath: '/work/project',
+      copyPaths: ['.env', 'notes.txt'],
+    }
+    expect('issues' in (await cloneInput['~standard'].validate(copyInput))).toBe(false)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: ['../outside'] }))).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: ['bad\0path'] }))).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: undefined }))).toBe(true)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyFromPath: undefined }))).toBe(true)
   })
 
   test('remote model results preserve reasoning choices', async () => {
@@ -92,6 +107,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_file_references',
       'multi_host_identity',
       'multi_host_list',
+      'multi_host_local_project_files',
       'multi_host_models',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',

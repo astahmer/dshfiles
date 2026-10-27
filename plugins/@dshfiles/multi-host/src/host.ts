@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { Buffer } from 'node:buffer'
 import type { SessionSourceRegistry } from '@dshfiles/session-source-port'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
@@ -38,6 +39,8 @@ import { reduceTranscript } from './transcript.js'
 import { RemoteThreadStore } from './thread-store.js'
 import { reserveLoopbackEndpoint } from './connectors/loopback.js'
 import { callNativeRpc } from './native-rpc.js'
+import { createLocalProjectCopyCommand } from './local-project-copy-command.js'
+import { createLocalProjectArchive, listLocalProjectFiles, LocalProjectFilesError } from './local-project-files.js'
 
 const profileSchema = z
   .string()
@@ -817,6 +820,19 @@ const multiHostHandlers = multiHostApi.host({
       return { ok: false as const, ...safeFailure(error) }
     }
   },
+  localProjectFiles: async ({ input, signal }) => {
+    try {
+      const result = await listLocalProjectFiles({ path: input.path, signal })
+      return { ok: true as const, root: result.root, files: [...result.files], truncated: result.truncated }
+    } catch (error) {
+      return {
+        ok: false as const,
+        ...(error instanceof LocalProjectFilesError
+          ? { code: error.code, message: error.message }
+          : { code: 'local-project-failed', message: 'Could not scan the local Git project.' }),
+      }
+    }
+  },
   runtimeCloneProject: async ({ input, signal }) => {
     try {
       const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
@@ -827,6 +843,18 @@ const multiHostHandlers = multiHostApi.host({
         mutation: false,
       })
       const destinationPath = input.destinationPath.startsWith('~/') ? posix.join(listing.home, input.destinationPath.slice(2)) : input.destinationPath
+      let archive: Buffer | undefined
+      if (input.copyFromPath !== undefined && input.copyPaths !== undefined && input.copyPaths.length > 0) {
+        try {
+          archive = await createLocalProjectArchive({ root: input.copyFromPath, paths: input.copyPaths, signal })
+        } catch (error) {
+          return {
+            ok: false as const,
+            code: error instanceof LocalProjectFilesError ? error.code : 'local-project-failed',
+            message: error instanceof LocalProjectFilesError ? error.message : 'Could not prepare the selected local files.',
+          }
+        }
+      }
       const cloned = await RemoteExec.run({
         sshTarget: host.connector.sshTarget,
         command: `git clone -- ${shellQuote(input.repositoryUrl)} ${shellQuote(destinationPath)}`,
@@ -834,13 +862,39 @@ const multiHostHandlers = multiHostApi.host({
         signal,
       })
       if (!cloned.ok) return { ok: false as const, code: 'clone-failed', message: cloned.stderr.trim() || 'Git could not clone the repository.' }
+      let copiedFileCount = 0
+      let copyWarning: string | undefined
+      if (archive !== undefined) {
+        try {
+          const copied = await SshConnector.run({
+            sshTarget: host.connector.sshTarget,
+            command: createLocalProjectCopyCommand({ destinationPath, paths: input.copyPaths ?? [] }),
+            stdin: archive,
+            timeoutMs: 120_000,
+            signal,
+          })
+          if (copied.code === 0 && !copied.timedOut && !copied.outputExceeded) copiedFileCount = new Set(input.copyPaths ?? []).size
+          else copyWarning = 'Repository cloned and added, but not every selected local file could be copied. Existing remote files were not overwritten.'
+        } catch {
+          copyWarning = 'Repository cloned and added, but selected local files could not be copied.'
+        }
+      }
       try {
         const created = await withRuntime(
           input.runtimeId,
           async gateway => workspaceCreatedSchema.parse(await gateway.run('workspace', 'create', { request: { path: destinationPath } })),
           { mutation: true },
         )
-        return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path }
+        if (copyWarning !== undefined) {
+          return {
+            ok: true as const,
+            workspaceId: created.workspace.workspaceId,
+            path: created.workspace.path,
+            copiedFileCount,
+            copyWarning,
+          }
+        }
+        return { ok: true as const, workspaceId: created.workspace.workspaceId, path: created.workspace.path, copiedFileCount }
       } catch {
         return {
           ok: false as const,

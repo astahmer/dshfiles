@@ -7,7 +7,7 @@
       "title": "New thread destination and workspace isolation",
       "summary": "Above a new thread's composer: pick the folder (or none), the jj bookmark it starts from, and whether it gets its own jj workspace beside the repository; unsent drafts, attachments, and structured references follow workspace changes.",
       "reach": [
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "expect button \"main\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Keep this draft\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",

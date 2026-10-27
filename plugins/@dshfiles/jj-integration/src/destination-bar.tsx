@@ -44,9 +44,9 @@ export interface DestinationBarServices {
 }
 
 /** The host chip leads the native row; `display: contents` lets each chip of the bar be an item of that row. */
-export const HostChipSlot = () => (
+export const HostChipSlot = (props: { readonly localProjectPath?: string | undefined }) => (
   <span className="dshx-root dshx:inline-flex dshx:items-center" style={{ order: -1 }}>
-    <HostChip api={useApi(multiHostApi)} />
+    <HostChip api={useApi(multiHostApi)} localProjectPath={props.localProjectPath} />
   </span>
 )
 
@@ -257,6 +257,7 @@ export const DestinationBar = (props: {
     services.pickWorkspace(current.projectWorkspaceId)
   }, [current, newThreadId, rootSelectionVisitId, services, toggle.busy, workspaceId])
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
+  const localProjectPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === projectId)?.path
   const isJj = current?.vcs === 'jj'
   const isolated = toggle.pending?.isolate ?? toggle.deferredIsolation ?? current?.isolated === true
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
@@ -280,7 +281,7 @@ export const DestinationBar = (props: {
     // display: contents makes each chip an item of the native row, so the host chip can lead it.
     <TooltipProvider>
       <div className="dshx-root dshx:contents" aria-label={t('destination')}>
-        <HostChipSlot />
+        <HostChipSlot localProjectPath={localProjectPath} />
         {toggle.busy ? (
           // Order 0 keeps it right after the native folder chip, which it stands in for until the switch lands.
           <span

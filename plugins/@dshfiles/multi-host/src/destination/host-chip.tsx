@@ -19,7 +19,7 @@ const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-me
  * its live status; "Add host…" opens the add dialog and "Manage hosts…" the dedicated Hosts page. A started thread
  * keeps its host, so the bar only appears on a blank thread.
  */
-export const HostChip = (props: { readonly api: MultiHostClient; readonly unavailable?: boolean }) => {
+export const HostChip = (props: { readonly api: MultiHostClient; readonly unavailable?: boolean; readonly localProjectPath?: string | undefined }) => {
   const { api } = props
   const [open, setOpen] = useState(false)
   const [dialog, setDialog] = useState<'closed' | 'add'>('closed')
@@ -170,6 +170,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
         api={api}
         runtime={runtimes.find(runtime => runtime.id === cloneRuntimeId)}
         hostName={hosts.find(host => runtimes.find(runtime => runtime.id === cloneRuntimeId)?.hostId === host.id)?.name}
+        localProjectPath={props.localProjectPath}
         onClose={() => setCloneRuntimeId(null)}
       />
       <HostDialog

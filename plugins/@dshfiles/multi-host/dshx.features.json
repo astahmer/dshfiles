@@ -51,13 +51,14 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "A Hosts page lists every registered host in the destination picker's order: add an existing folder or clone a Git repository as a remote project, hide a host without deleting it, drag rows or use the arrows to reorder, and reconnect, edit or remove from the same row.",
+      "summary": "A Hosts page lists every registered host in the destination picker's order: add an existing folder or clone a Git repository as a remote project, optionally copy selected ignored or untracked files, hide a host without deleting it, drag rows or use the arrows to reorder, and reconnect, edit or remove from the same row.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
-      "states": ["empty", "listed", "hidden", "reordered"],
+      "states": ["empty", "listed", "local-files-scanned", "local-files-selected", "hidden", "reordered"],
       "failureModes": [
         "A partial or duplicate order is refused and the stored order stays.",
-        "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker."
+        "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker.",
+        "A local file-copy failure leaves the cloned repository registered and reports that the selected files were not copied."
       ],
       "externalDependencies": [],
       "reach": [
@@ -66,7 +67,8 @@
         "expect heading \"Hosts\"",
         "expect text \"3 registered*\"",
         "click button \"Clone project\"",
-        "expect textbox \"Git repository URL\""
+        "expect textbox \"Git repository URL\"",
+        "expect checkbox \"Copy local ignored and untracked files\""
       ],
       "verification": [
         {
@@ -85,7 +87,19 @@
           "kind": "unit-test",
           "id": "multi-host.clone-project-input",
           "file": "plugins/@dshfiles/multi-host/src/api-tools.test.ts",
-          "testName": "remote cloning accepts safe Git URLs and remote folders only"
+          "testName": "remote cloning accepts safe destinations and complete local-file selections"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.local-project-files",
+          "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
+          "testName": "lists ignored and untracked files, filters dependencies, and archives only selected paths"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.copy-symlink-protection",
+          "file": "plugins/@dshfiles/multi-host/src/local-project-copy-command.test.ts",
+          "testName": "extracts selected files but refuses symlinked destination folders"
         },
         {
           "kind": "not-applicable",
@@ -97,6 +111,24 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "local project files scan",
+          "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
+          "testName": "lists ignored and untracked files, filters dependencies, and archives only selected paths"
+        },
+        {
+          "kind": "custom",
+          "span": "local project files archive",
+          "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
+          "testName": "lists ignored and untracked files, filters dependencies, and archives only selected paths"
+        },
+        {
+          "kind": "custom",
+          "span": "ssh command",
+          "file": "plugins/@dshfiles/multi-host/src/connectors/connector-spans.test.ts",
+          "testName": "records an ssh command span that fails on a refused target before ssh starts"
         }
       ]
     },

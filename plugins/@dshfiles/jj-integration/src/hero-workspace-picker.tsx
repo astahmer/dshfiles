@@ -58,6 +58,7 @@ export const HeroWorkspacePicker = (
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
   const directory = useQuery({ ...multiHostQueries.directory(multiHost), enabled: destination.kind === 'runtime' })
   const remote = destination.kind === 'runtime'
+  const localProjectPath = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === props.selectedId)?.path
   const projects = useQuery({
     queryKey: ['jj-integration', 'projects'],
     enabled: !remote,
@@ -72,7 +73,7 @@ export const HeroWorkspacePicker = (
     return (
       // The native project chip names a folder of this machine; while a remote host is chosen it is hidden (remoteDestinationSheet in client.tsx).
       <div className="dshx-root dshx:contents" aria-label={props.t('destination')} data-remote-destination="">
-        <HostChipSlot />
+        <HostChipSlot localProjectPath={localProjectPath} />
         <RemoteSessionBootstrap
           api={multiHost}
           runtimeId={destination.runtimeId}

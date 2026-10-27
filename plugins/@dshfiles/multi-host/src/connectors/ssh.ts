@@ -7,6 +7,7 @@ import { reserveLoopbackEndpoint } from './loopback.js'
 import { RuntimeLaunchFile, type RuntimeLaunch } from '../launch-file.js'
 
 const outputLimit = 128 * 1024
+const inputLimit = 60 * 1024 * 1024
 
 const sshTargetOf = (value: string): string => {
   const parsed = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: value })
@@ -72,10 +73,12 @@ const runSshProcess = (input: {
   readonly command: string
   readonly timeoutMs?: number | undefined
   readonly maxOutputBytes?: number | undefined
+  readonly stdin?: Uint8Array | undefined
   readonly signal?: AbortSignal | undefined
 }): Promise<SshProcessResult> =>
   withSpan('ssh command', { kind: 'client', attributes: { 'process.executable.name': 'ssh' } }, async span => {
     const result = await runUntracedSshProcess(input)
+    if (input.stdin !== undefined) span.setAttribute('dshfiles.multi_host.stdin_bytes', input.stdin.byteLength)
     span.setAttributes({
       'process.exit.code': result.code ?? -1,
       ...pluginAttributes({ plugin: 'multi-host', attributes: { timed_out: result.timedOut, output_exceeded: result.outputExceeded } }),
@@ -89,18 +92,23 @@ const runUntracedSshProcess = async ({
   command,
   timeoutMs = 12_000,
   maxOutputBytes = outputLimit,
+  stdin,
   signal,
 }: {
   readonly sshTarget: string
   readonly command: string
   readonly timeoutMs?: number | undefined
   readonly maxOutputBytes?: number | undefined
+  readonly stdin?: Uint8Array | undefined
   readonly signal?: AbortSignal | undefined
 }): Promise<SshProcessResult> => {
   if (signal?.aborted) throw new GatewayUnavailableError('cancelled', 'The SSH request was cancelled.')
+  if (stdin !== undefined && stdin.byteLength > inputLimit) throw new GatewayUnavailableError('ssh-input-too-large', 'The SSH input exceeded its limit.')
   const target = sshTargetOf(sshTarget)
   const startedAt = Date.now()
-  const child = spawn('ssh', [...sshOptions(), target, command], { stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn('ssh', [...sshOptions(), target, command], { stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] })
+  child.stdin?.on('error', () => undefined)
+  if (stdin !== undefined) child.stdin?.end(Buffer.from(stdin))
   let stdout = ''
   let stderr = ''
   let outputBytes = 0
