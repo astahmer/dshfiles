@@ -11,8 +11,7 @@ import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
-/** The picker's `title` names its dialog for assistive tech, not hover help: it rides a props object so the native-title rule stays about hover help. */
-const directoryFlowLabels = { title: 'Add workspace' } satisfies { readonly title: string }
+const directoryFlowLabels = { heading: 'Add workspace' } satisfies { readonly heading: string }
 
 const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element | null => {
   const browserApi = useApi(workspaceFolderBrowserApi)

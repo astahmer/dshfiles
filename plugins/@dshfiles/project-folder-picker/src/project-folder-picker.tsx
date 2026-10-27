@@ -2,10 +2,16 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
-import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
@@ -55,9 +61,9 @@ export interface ProjectFolderPickerProps {
    * caller that knows it rather than read here.
    */
   readonly machineName?: string
-  /** Recently chosen folders, newest first, for the Recents tab; a registered one shows as its project, another yields a directory selection. */
+  /** Recently chosen folders, newest first, for the Recents scope; a registered one shows as its project, another yields a directory selection. */
   readonly recentFolders?: readonly string[]
-  /** Tab shown on open; Projects by default, which leaves JJ thread workspaces to their own tab. */
+  /** Scope shown on open; Projects by default, which leaves JJ thread workspaces in their own scope. */
   readonly initialTab?: PickerTab
   /** Projects listed first on Everything and Projects, ahead of recents, under no heading. */
   readonly pinnedWorkspaceIds?: readonly string[]
@@ -122,6 +128,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     [props.projects, recentFolders, pinnedWorkspaceIds, query, tab],
   )
   const entries = useMemo(() => sections.flatMap(section => section.entries), [sections])
+  const entryIndices = useMemo(() => new Map(entries.map((entry, index) => [entry, index])), [entries])
   const tabs = useMemo(
     () => ProjectFolderPickerModel.availableTabs({ projects: props.projects, recentFolders, pinnedWorkspaceIds }),
     [props.projects, recentFolders, pinnedWorkspaceIds],
@@ -142,7 +149,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     pathMode && hasAbsolutePath && listing?.path !== absolutePath && (props.mode !== 'directories' || props.onUseAbsolutePath !== undefined)
   const showListingActions = listing !== null && (!ProjectFolderPickerModel.isPathQuery(query) || requestedPath === listing.path)
   const matchingFolderPaths = listing === null ? null : ProjectFolderPickerModel.matchingDirectoryPaths(listing, query)
-  const folderEntries = pathMode ? (listing?.entries.filter(entry => matchingFolderPaths === null || matchingFolderPaths.includes(entry.path)) ?? []) : []
+  const matchingFolderPathSet = matchingFolderPaths === null ? null : new Set(matchingFolderPaths)
+  const folderEntries = pathMode ? (listing?.entries.filter(entry => matchingFolderPathSet === null || matchingFolderPathSet.has(entry.path)) ?? []) : []
   const itemCount = pathMode ? folderEntries.length : entries.length
   const pickMutation = useMutation({
     mutationFn: () => {
@@ -346,6 +354,30 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               value={query}
             />
           </div>
+          {!pathMode && tabs.length > 2 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button aria-label="Filter by scope" className="dshx:shrink-0" size="sm" type="button" variant="outline">
+                  {tabLabels[tab]}
+                  <ChevronDownIcon aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="dshx-root">
+                <DropdownMenuRadioGroup
+                  onValueChange={(value: string) => {
+                    if (ProjectFolderPickerModel.isPickerTab(value)) setTab(value)
+                  }}
+                  value={tab}
+                >
+                  {tabs.map(pickerTab => (
+                    <DropdownMenuRadioItem key={pickerTab} value={pickerTab}>
+                      {tabLabels[pickerTab]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {props.showNativePicker !== false && (
             <Button disabled={busy} onClick={() => chooseWithSystemPicker()} type="button" variant="outline">
               <FolderOpenIcon aria-hidden />
@@ -429,24 +461,6 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           </>
         ) : (
           <>
-            {tabs.length > 2 && (
-              <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:px-4 dshx:pt-2">
-                <Tabs
-                  onValueChange={(value: string) => {
-                    if (ProjectFolderPickerModel.isPickerTab(value)) setTab(value)
-                  }}
-                  value={tab}
-                >
-                  <TabsList aria-label="Show" className="dshx:h-7!">
-                    {tabs.map(pickerTab => (
-                      <TabsTrigger className="dshx:px-2.5 dshx:text-xs" key={pickerTab} value={pickerTab}>
-                        {tabLabels[pickerTab]}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              </div>
-            )}
             <div aria-busy={props.loading === true} aria-label={tabLabels[tab]} className={cn(listClassName, 'dshx:pt-2')} role="listbox">
               {sections.map(section => (
                 <div aria-label={tab === 'all' ? sectionLabels[section.id] : undefined} className="dshx:contents" key={section.id} role="group">
@@ -456,7 +470,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                     </p>
                   )}
                   {section.entries.map(entry => {
-                    const index = entries.indexOf(entry)
+                    const index = entryIndices.get(entry) ?? 0
                     return (
                       <PickerEntryRow
                         active={index === selectedIndex}

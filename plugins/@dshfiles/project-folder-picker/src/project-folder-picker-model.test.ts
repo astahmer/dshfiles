@@ -101,7 +101,7 @@ describe('project and folder selection', () => {
       titles: section.entries.map(entry => (entry.kind === 'project' ? entry.project.title : entry.path)),
     }))
 
-  it('keeps JJ thread workspaces off the Projects tab and lists them on their own tab', () => {
+  it('keeps JJ thread workspaces off the Projects scope and lists them in their own scope', () => {
     expect(sectionsOn('projects', 'dshfiles')).toEqual([{ id: 'projects', titles: ['dshfiles'] }])
     expect(sectionsOn('workspaces', '')).toEqual([{ id: 'workspaces', titles: ['dshfiles · thread-07ef22'] }])
   })
@@ -148,7 +148,7 @@ describe('project and folder selection', () => {
     expect(ProjectFolderPickerModel.availableTabs({ projects: allProjects, recentFolders: [threadWorkspace.canonicalPath] })).not.toContain('recents')
   })
 
-  it('offers Recents and Workspaces tabs only when they have folders', () => {
+  it('offers Recents and Workspaces scopes only when they have folders', () => {
     expect(ProjectFolderPickerModel.availableTabs({ projects, recentFolders: [] })).toEqual(['all', 'projects'])
     expect(ProjectFolderPickerModel.availableTabs({ projects: allProjects, recentFolders })).toEqual(['all', 'projects', 'recents', 'workspaces'])
   })

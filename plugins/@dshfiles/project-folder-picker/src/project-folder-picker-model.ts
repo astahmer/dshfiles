@@ -100,8 +100,8 @@ export class ProjectFolderPickerModel {
   static readonly entryPath = (entry: PickerEntry): string => (entry.kind === 'project' ? entry.project.canonicalPath : entry.path)
 
   /**
-   * The sections one tab lists. Pinned projects lead Everything and Projects. Projects exclude JJ thread workspaces,
-   * which get their own tab. Recents keep the caller's order, show a registered folder as its project and never list a
+   * The sections one scope lists. Pinned projects lead Everything and Projects. Projects exclude JJ thread workspaces,
+   * which get their own scope. Recents keep the caller's order, show a registered folder as its project and never list a
    * JJ workspace. Everything lists pinned, recents, projects, then workspaces, each folder once; empty sections are dropped.
    */
   static readonly pickerSections = (input: {
@@ -137,7 +137,7 @@ export class ProjectFolderPickerModel {
     return sections.filter(section => section.entries.length > 0)
   }
 
-  /** Tabs worth offering: Everything and Projects always, Recents and Workspaces only when they have folders. */
+  /** Scopes worth offering: Everything and Projects always, Recents and Workspaces only when they have folders. */
   static readonly availableTabs = (input: {
     readonly projects: readonly RegisteredProject[]
     readonly recentFolders: readonly string[]

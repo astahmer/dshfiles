@@ -7,7 +7,7 @@
       "title": "Add workspaces from the folder browser",
       "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically.",
       "reach": [
-        "click button \"New thread\"",
+        "click button \"New session\"",
         "click button \"Choose workspace\"",
         "click menuitem \"Add workspace*\"",
         "expect textbox \"Enter a folder path\""

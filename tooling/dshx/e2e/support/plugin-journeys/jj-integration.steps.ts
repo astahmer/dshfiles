@@ -1001,8 +1001,8 @@ Then('the New thread picker shows its Projects and JJ workspace listings for a d
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   const projects = picker.getByRole('listbox', { name: 'Projects', exact: true })
   await expect(projects.getByRole('option', { name: /^No folder/ }).first()).toBeVisible()
-  await expect(picker.getByRole('tab', { name: 'Everything', exact: true })).toBeVisible()
-  await picker.getByRole('tab', { name: 'Everything', exact: true }).click()
+  await picker.getByRole('button', { name: 'Filter by scope', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Everything', exact: true }).click()
   await expect(picker.getByRole('group', { name: 'JJ workspaces', exact: true })).toContainText(provisionedThreadName(page))
 })
 
