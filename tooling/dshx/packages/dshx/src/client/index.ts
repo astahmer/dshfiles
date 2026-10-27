@@ -80,12 +80,15 @@ export type {
   ToastsService,
   ToastTone,
 } from './app-services.js'
-export { ComposerAction, HeaderAction, Overlay, Panel, SessionRowAccessory, SettingsSection } from './registries.js'
+export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from './registries.js'
 export type {
   ComposerActionItem,
   HeaderActionItem,
   OverlayItem,
   PanelItem,
+  PluginDetailItem,
+  PluginDetailProps,
+  PluginDetailSubject,
   SessionRowAccessoryItem,
   SettingsSearchEntry,
   SettingsSectionItem,

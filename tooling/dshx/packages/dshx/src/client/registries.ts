@@ -61,12 +61,31 @@ export interface SettingsSectionItem {
   readonly settingsTargets?: readonly string[]
 }
 
+/** The page a Settings › Plugins detail view shows: a bundle, one of its rows, or an official item. */
+export type PluginDetailSubject =
+  | { readonly kind: 'bundle'; readonly pkg: { readonly name: string; readonly version?: string } }
+  | { readonly kind: 'row'; readonly pkg: { readonly name: string; readonly version?: string }; readonly row: unknown }
+  | { readonly kind: 'item'; readonly id: string }
+
+export interface PluginDetailProps {
+  readonly subject: PluginDetailSubject
+}
+
+/** A tag beside a plugin detail page's title, or a section under its content; render null for other subjects. */
+export interface PluginDetailItem {
+  readonly id: string
+  readonly order?: number
+  readonly component: ComponentType<PluginDetailProps>
+}
+
 export const Panel = BrowserBroker.defineRegistry<PanelItem>('dshx.panel')
 export const ComposerAction = BrowserBroker.defineRegistry<ComposerActionItem>('dshx.composer-action')
 export const HeaderAction = BrowserBroker.defineRegistry<HeaderActionItem>('dshx.header-action')
 export const SessionRowAccessory = BrowserBroker.defineRegistry<SessionRowAccessoryItem>('dshx.session-row-accessory')
 export const Overlay = BrowserBroker.defineRegistry<OverlayItem>('dshx.overlay')
 export const SettingsSection = BrowserBroker.defineRegistry<SettingsSectionItem>('dshx.settings-section')
+export const PluginDetailBadge = BrowserBroker.defineRegistry<PluginDetailItem>('dshx.plugin-detail-badge')
+export const PluginDetailSection = BrowserBroker.defineRegistry<PluginDetailItem>('dshx.plugin-detail-section')
 
 const PLUGIN_ID = /^[a-z@][a-z0-9@/._-]*$/u
 
@@ -141,6 +160,26 @@ PluginContextModel.registerNativeMount(Overlay, ({ item, owner, slots, decorate 
     'shell.overlay',
     { id: item.id, order: item.order ?? 100 },
     contribution({ component: item.component, owner, id: `overlay:${item.id}`, decorate }),
+  )
+})
+
+PluginContextModel.registerNativeMount(PluginDetailBadge, ({ item, owner, slots, decorate }) => {
+  assertItemId('PluginDetailBadge', item.id)
+  return registerSlot(
+    slots,
+    'plugins.detail.badge',
+    { id: item.id, order: item.order ?? 100 },
+    contribution({ component: item.component, owner, id: `plugin-detail-badge:${item.id}`, decorate }),
+  )
+})
+
+PluginContextModel.registerNativeMount(PluginDetailSection, ({ item, owner, slots, decorate }) => {
+  assertItemId('PluginDetailSection', item.id)
+  return registerSlot(
+    slots,
+    'plugins.detail.section',
+    { id: item.id, order: item.order ?? 100 },
+    contribution({ component: item.component, owner, id: `plugin-detail-section:${item.id}`, decorate }),
   )
 })
 

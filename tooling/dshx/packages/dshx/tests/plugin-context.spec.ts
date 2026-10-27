@@ -7,7 +7,7 @@ import { AppServicesModel, Command, Dialogs, type DialogsService } from '../src/
 import { PluginHooksModel } from '../src/client/hooks.js'
 import { PluginContextModel, type NativeSlots, type PluginContext } from '../src/client/plugin-context.js'
 import { PluginRuntimeModel } from '../src/client/plugin-runtime.js'
-import { Panel, SettingsSection } from '../src/client/registries.js'
+import { Panel, PluginDetailBadge, PluginDetailSection, SettingsSection } from '../src/client/registries.js'
 import { StoreModel } from '../src/client/store.js'
 import { defineClientPlugin } from '../src/sdk/client.js'
 import { createClientPlugin } from '../src/client/runtime.js'
@@ -165,6 +165,16 @@ describe('registries', () => {
     const { plugin, host } = createPlugin('@test/settings')
     plugin.add(SettingsSection, { id: 'acme', title: 'Acme', component: () => null, entries: [{ id: 'sync', title: 'Sync' }] })
     expect(host.registered[0]?.options).toMatchObject({ name: 'settings.section', id: 'acme', registrant: '@test/settings', metadata: { searchEntries: [{ id: 'sync', title: 'Sync' }] } })
+  })
+
+  it('mounts Plugins page badges and sections into their detail slots', () => {
+    const { plugin, host } = createPlugin('@test/plugins-page')
+    plugin.add(PluginDetailBadge, { id: 'failures', component: () => null })
+    plugin.add(PluginDetailSection, { id: 'failures', order: 5, component: () => null })
+    expect(host.registered.map(entry => [entry.name, entry.options.id, entry.options.order])).toEqual([
+      ['plugins.detail.badge', 'failures', 100],
+      ['plugins.detail.section', 'failures', 5],
+    ])
   })
 
   it('reports an invalid native item instead of throwing from add', () => {

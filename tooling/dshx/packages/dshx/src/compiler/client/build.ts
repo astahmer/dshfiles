@@ -172,7 +172,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const constantSource = PluginContextModel.constant',
           'export const createSource = PluginContextModel.signal',
           `export { Command, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
-          `export { ComposerAction, HeaderAction, Overlay, Panel, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
+          `export { ComposerAction, HeaderAction, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
           `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
           'export const defineStore = StoreModel.define',
           `import { PluginHooksModel } from ${JSON.stringify(CLIENT_HOOKS_PATH)}`,

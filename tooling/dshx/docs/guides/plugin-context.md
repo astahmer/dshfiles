@@ -51,6 +51,8 @@ export default defineClientPlugin({
 | `SessionRowAccessory` | leading content of each sidebar thread row |
 | `Overlay` | frame-wide floating layer (`shell.overlay`) |
 | `SettingsSection` | a Settings section, with search `entries` |
+| `PluginDetailBadge` | a tag beside a Settings › Plugins detail title |
+| `PluginDetailSection` | a section under a Settings › Plugins detail page |
 
 ### Registries owned plugins render
 
