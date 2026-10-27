@@ -79,11 +79,17 @@ instance. So, before proposing any fix:
   [native forks](docs/native-forks.md) with a `native-fork.json`; run
   `node scripts/native-fork-diff.mjs` after touching one.
 
-Say which option you chose and why. Two rules keep the choice honest:
+Say which option you chose and why. Three rules keep the choice honest:
 
 - **Verify against the installed runtime, not the README.** Read a plugin's peer
   ranges against our DSH version, resolve the imports it uses, and read the
   Service contract it calls.
+- **Find agent-tool ownership before asking for another checkout.** For a
+  reported tool failure, search this repository for the exact tool name and
+  error text, especially under `plugins/@dshfiles/*` and tool registrations.
+  Familiar names such as `apply_patch` may be owned by a local plugin rather
+  than DSH core. If found, fix and verify that plugin in this workspace; ask for
+  another source checkout only after confirming the implementation is absent.
 - **Check the Host boundary before building UI.** A plugin cannot add a method
   to a native Service, but it may expose its own Host API and own the needed
   state/workflow when supported services (for example storage domains and
