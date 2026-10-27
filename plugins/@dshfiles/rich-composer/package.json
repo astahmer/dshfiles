@@ -16,6 +16,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./conversation-contract": {
+      "types": "./src/conversation-contract.ts",
+      "default": "./dist/conversation-contract.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

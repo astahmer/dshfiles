@@ -3,6 +3,7 @@ import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/c
 import type {} from '@deepseek-ai/dsh-client-resources/client'
 import type {} from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@dshfiles/input-trigger/client'
+import type {} from '@dshfiles/rich-composer/conversation-contract'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@dshfiles/session-controller/draft-client'
@@ -781,7 +782,11 @@ export default defineClient({
           const reference = ctx.sessions.retain(followUpSessionId, { source: 'threadSidebarFollowUp' })
           try {
             await reference.ready
-            ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: followUpPrompt(sessionId), clearPreviousDraft: true })
+            const threadLabel = ctx.sessions.list.getSnapshot().byId[sessionId]?.displayTitle ?? 'thread'
+            ctx.conversation.input.requestDraftInitialization(reference.binding, {
+              prompt: followUpPrompt(sessionId, threadLabel),
+              clearPreviousDraft: true,
+            })
           } catch (cause) {
             console.warn(`thread-sidebar: follow-up thread ${followUpSessionId} opened without its draft: ${String(cause)}`)
           } finally {
