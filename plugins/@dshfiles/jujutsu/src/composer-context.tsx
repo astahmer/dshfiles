@@ -257,8 +257,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
           </Button>
           <button
             aria-label={'Review workspace changes: ' + revisionSummary}
-            className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline disabled:dshx:cursor-default disabled:dshx:no-underline disabled:dshx:hover:text-muted-foreground"
-            disabled={(repository.revisionCounts?.ahead ?? 0) === 0}
+            className="dshx:min-w-0 dshx:truncate dshx:cursor-pointer dshx:text-muted-foreground dshx:underline-offset-2 dshx:hover:text-foreground dshx:hover:underline"
             onClick={() => props.jujutsu.openWorkspaceReview(repository.root, String(props.sessionId))}
             type="button"
           >
