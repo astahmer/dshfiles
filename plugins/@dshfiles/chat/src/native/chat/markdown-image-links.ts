@@ -9,12 +9,12 @@ export const openMarkdownFileLink = (input: {
   readonly kind: LinkIconKind
   readonly options: OpenFileOptions | undefined
   readonly resolveImage: (path: string) => string | undefined
-  readonly openImage: (image: LightboxImage) => void
+  readonly openImage: (image: LightboxImage, path: string) => void
   readonly openFile: (path: string, options: OpenFileOptions | undefined) => void
 }): void => {
   const src = input.kind === 'image' ? input.resolveImage(input.path) : undefined
   if (src !== undefined) {
-    input.openImage({ src, alt: basename(input.path) })
+    input.openImage({ src, alt: basename(input.path) }, input.path)
     return
   }
   input.openFile(input.path, input.options)

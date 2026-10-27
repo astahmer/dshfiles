@@ -213,7 +213,7 @@ Then('the browser renders the response without receiving provider replay blocks'
   await finishJourneyAssertions(page)
 })
 
-When('a chat thread with a local image link is opened', async ({ page }: { page: Page }) => {
+const openImageLinkFixture = async (page: Page): Promise<void> => {
   const profile = profileFor(page)
   await seedChatImageLinkSession({ homeRoot: profile.homeRoot })
   const fixture = page.getByRole('treeitem', { name: /Untitled|Chat image link fixture/ })
@@ -232,11 +232,72 @@ When('a chat thread with a local image link is opened', async ({ page }: { page:
     )
     .toBeGreaterThan(0)
   await fixture.first().click()
+  await page
+    .getByText(/^Completed in /)
+    .last()
+    .click()
+}
+
+When('a chat thread with a local image link is opened', async ({ page }: { page: Page }) => {
+  await openImageLinkFixture(page)
   const imageLink = page.getByRole('button', { name: 'red.png', exact: true })
   await imageLink.scrollIntoViewIfNeeded()
   const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
   await expect(backToBottom).toBeVisible()
   await imageLink.click()
+})
+
+When('a read image tool summary path is opened', async ({ page }: { page: Page }) => {
+  await openImageLinkFixture(page)
+  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
+  await page.getByRole('button', { name: 'blue.png', exact: true }).click()
+})
+
+When('thread gallery scope is selected and a read image path is opened', async ({ page }: { page: Page }) => {
+  await openImageLinkFixture(page)
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Settings/ }).click()
+  await page.getByRole('button', { name: 'Current turn', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Entire thread', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
+  await page.getByRole('button', { name: 'blue.png', exact: true }).click()
+})
+
+Then('the thread gallery includes images from other turns', async ({ page }: { page: Page }) => {
+  const lightbox = page.getByRole('dialog', { name: 'Image preview', exact: true })
+  await recordAssertion(page, 'chat-thread-gallery-includes-older-turns', async () => {
+    await expect(lightbox).toBeVisible()
+    await expect(lightbox.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 1 of 3', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 3 of 3', exact: true })).toBeVisible()
+  })
+  await lightbox.getByRole('button', { name: 'Next image', exact: true }).click()
+  await expect(lightbox.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+  const thirdThumbnail = lightbox.getByRole('button', { name: 'Image 3 of 3', exact: true })
+  await thirdThumbnail.click()
+  await expect(thirdThumbnail).toHaveAttribute('aria-current', 'true')
+  await page.keyboard.press('Escape')
+  await expect(lightbox).toBeHidden()
+  await finishJourneyAssertions(page)
+})
+
+Then('the read image tool path opens in a navigable gallery rather than a side panel', async ({ page }: { page: Page }) => {
+  const lightbox = page.getByRole('dialog', { name: 'Image preview', exact: true })
+  await recordAssertion(page, 'chat-read-image-opens-turn-gallery', async () => {
+    await expect(lightbox).toBeVisible()
+    await expect(lightbox.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 1 of 2', exact: true })).toBeVisible()
+    await expect(lightbox.getByRole('button', { name: 'Image 2 of 2', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open right sidebar', exact: true })).toBeVisible()
+  })
+  await lightbox.getByRole('button', { name: 'Next image', exact: true }).click()
+  await expect(lightbox.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+  await lightbox.getByRole('button', { name: 'Image 1 of 2', exact: true }).click()
+  await expect(lightbox.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(lightbox).toBeHidden()
+  await finishJourneyAssertions(page)
 })
 
 Then('the image link opens in the gallery rather than a side panel', async ({ page }: { page: Page }) => {

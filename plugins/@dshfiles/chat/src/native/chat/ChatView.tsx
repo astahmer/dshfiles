@@ -14,6 +14,8 @@ import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@ds
 import { endInteractionAfterPaint } from '@dshfiles/dshx/tracing/client'
 import { isAtOrOutside } from '../contract/group-tree.ts'
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
+import type { ImageGalleryNode } from './image-gallery.ts'
+import { collectChatGalleryImages, selectChatImageGallery } from './image-gallery.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
@@ -63,7 +65,7 @@ const MOTION_TAIL_MS = 800
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useChat, useConversation, useSessions, renderSlot,
+  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope,
   sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, fileMentions,
   usePresentation, useProjection, t, viewRequest, completeViewRequest, openView,
 }: ChatViewSlotProps) {
@@ -73,6 +75,7 @@ export function ChatView({
   const entries = useMemo<readonly RenderEntry[]>(() => groupedEntries
     ?? order.map(key => ({ kind: 'node', key: key as NodeKey })), [groupedEntries, order])
   const nodeStore = useChat(s => s.nodes)
+  const imageGalleryScope = useImageGalleryScope(scope => scope)
   const deferCompletedTurns = usePresentation(policy => policy.collapseTiming === 'next-input')
   const transcriptView = usePresentation(policy => policy.mode)
   // The rail's items are accumulated in the Chat snapshot, so this selector is
@@ -96,7 +99,12 @@ export function ChatView({
       dialog: t('image.dialog'), close: t('image.close'),
     },
   }), [cwd, t])
-  const [imagePreview, setImagePreview] = useState<LightboxImage | null>(null)
+  const [imagePreview, setImagePreview] = useState<{ readonly images: readonly LightboxImage[]; readonly initialIndex: number } | null>(null)
+  const imagePreviewRequest = useRef(0)
+  useEffect(() => {
+    imagePreviewRequest.current += 1
+    setImagePreview(null)
+  }, [sessionId])
   const imageLightboxLabels = useMemo<ImageLightboxLabels>(() => ({
     dialog: t('image.dialog'),
     close: t('image.close'),
@@ -105,7 +113,54 @@ export function ChatView({
     thumbnail: (position, total) => t('image.thumbnail', { position, total }),
     loading: t('image.loading'),
   }), [t])
-  const closeImagePreview = useCallback(() => { setImagePreview(null) }, [])
+  const openImagePreview = useCallback((image: LightboxImage, path?: string) => {
+    const request = ++imagePreviewRequest.current
+    const open = async (): Promise<void> => {
+      const firstTurn = railItems[0]
+      if (imageGalleryScope === 'thread' && firstTurn?.anchor.kind === 'unloaded') {
+        await loadThrough(firstTurn.anchor.seq).catch(() => {})
+      }
+      if (request !== imagePreviewRequest.current) return
+      const nodes: ImageGalleryNode[] = []
+      for (const { turn } of railItems) {
+        nodes.push(
+          ...nodeStore.turnDataSource(turn, 'assistant-step').getSnapshot().map(data => ({ kind: 'assistant-step', turn, data } satisfies ImageGalleryNode)),
+          ...nodeStore.turnDataSource(turn, 'user').getSnapshot().map(data => ({ kind: 'user', turn, data } satisfies ImageGalleryNode)),
+          ...nodeStore.turnDataSource(turn, 'steering').getSnapshot().map(data => ({ kind: 'steering', turn, data } satisfies ImageGalleryNode)),
+          ...nodeStore.turnDataSource(turn, 'context').getSnapshot().map(data => ({ kind: 'context', turn, data } satisfies ImageGalleryNode)),
+          ...nodeStore.turnDataSource(turn, 'turn-trigger').getSnapshot().map(data => ({ kind: 'turn-trigger', turn, data } satisfies ImageGalleryNode)),
+          ...nodeStore.turnDataSource(turn, 'tool-call').getSnapshot().map(data => ({ kind: 'tool-call', turn, data } satisfies ImageGalleryNode)),
+        )
+      }
+      const selection = selectChatImageGallery({
+        images: collectChatGalleryImages({ nodes, loadImage, resolveImage: fileImages.resolve }),
+        scope: imageGalleryScope,
+        ...(path === undefined ? {} : { selectedPath: path }),
+        resolvePath: imagePath => resolveWorkspacePath(cwd, imagePath),
+        fallbackImage: image,
+      })
+      const preview = { images: selection.images, initialIndex: selection.initialIndex }
+      setImagePreview(preview)
+      void Promise.all(selection.images.map((candidate, index) => {
+        if (candidate.src !== undefined) return Promise.resolve(candidate.src)
+        const load = selection.loaders[index]
+        return load === undefined ? Promise.resolve(undefined) : load().catch(() => undefined)
+      })).then(sources => {
+        setImagePreview(current => current !== preview ? current : {
+          ...preview,
+          images: preview.images.map((candidate, index) => {
+            const src = sources[index]
+            return src === undefined ? candidate : { ...candidate, src }
+          }),
+        })
+      })
+    }
+    void open()
+  }, [cwd, fileImages, imageGalleryScope, loadImage, loadThrough, nodeStore, railItems])
+  const closeImagePreview = useCallback(() => {
+    imagePreviewRequest.current += 1
+    setImagePreview(null)
+  }, [])
   const running = useSession(s => s.running)
   // Fold transitions run while a Turn is live, while an input is pending, and briefly after settling.
   const [motionTail, setMotionTail] = useState(false)
@@ -186,16 +241,16 @@ export function ChatView({
     )
   }, [openFile, t])
 
-  const requestOpenMarkdownFile = useCallback((path: string, options?: OpenFileOptions) => {
+  const requestOpenImageAwareFile = useCallback((path: string, options?: OpenFileOptions) => {
     openMarkdownFileLink({
       path,
       kind: classifyLinkPath(path),
       options,
       resolveImage: fileImages.resolve,
-      openImage: setImagePreview,
+      openImage: openImagePreview,
       openFile: requestOpenFile,
     })
-  }, [fileImages, requestOpenFile])
+  }, [fileImages, openImagePreview, requestOpenFile])
 
   const requestOpenMarkdownExternalLink = useCallback((href: string) => {
     const kind = (() => {
@@ -206,8 +261,8 @@ export function ChatView({
         return undefined
       }
     })()
-    openMarkdownExternalLink({ href, kind, openImage: setImagePreview, openExternalLink })
-  }, [openExternalLink])
+    openMarkdownExternalLink({ href, kind, openImage: image => { openImagePreview(image) }, openExternalLink })
+  }, [openExternalLink, openImagePreview])
 
   const closeFileOpenError = useCallback(() => {
     fileOpenRequest.current += 1
@@ -296,11 +351,11 @@ export function ChatView({
               <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
-            <MarkdownDelegateProvider openFile={requestOpenMarkdownFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
+            <MarkdownDelegateProvider openFile={requestOpenImageAwareFile} openExternalLink={requestOpenMarkdownExternalLink} fileImages={fileImages}>
               <ConversationViewOpenerContext.Provider value={openView}>
                 {renderSlot('conversation.chat.flow', {
                   entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
-                  cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
+                  cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, fileMentions,
                 }, { hookContext: flowContext })}
               </ConversationViewOpenerContext.Provider>
             </MarkdownDelegateProvider>
@@ -325,7 +380,7 @@ export function ChatView({
         </div>
       )}
       {imagePreview !== null && (
-        <ImageLightbox images={[imagePreview]} initialIndex={0} labels={imageLightboxLabels} onClose={closeImagePreview} />
+        <ImageLightbox images={imagePreview.images} initialIndex={imagePreview.initialIndex} labels={imageLightboxLabels} onClose={closeImagePreview} />
       )}
       {fileOpenError !== null && (
         <FileOpenErrorDialog

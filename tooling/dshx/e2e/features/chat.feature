@@ -33,3 +33,17 @@ Feature: Chat browser journeys
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
     When a chat thread with a local image link is opened
     Then the image link opens in the gallery rather than a side panel
+
+    @scenario:chat.read-image-gallery
+  Scenario: A read image tool summary opens a navigable turn gallery
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When a read image tool summary path is opened
+    Then the read image tool path opens in a navigable gallery rather than a side panel
+
+  @scenario:chat.image-gallery-thread-scope
+  Scenario: The thread gallery includes images from other turns
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When thread gallery scope is selected and a read image path is opened
+    Then the thread gallery includes images from other turns
+
+

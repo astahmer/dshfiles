@@ -44,8 +44,10 @@ import { TranscriptViewPolicy } from './transcript-view.ts'
 import { derivePresentationPolicy } from './presentation-policy.ts'
 import { CHAT_SETTINGS_NAMESPACE, DEFAULT_LINK_OPENING, DEFAULT_TRANSCRIPT_VIEW_MODE, type ChatSettings } from '../chat-settings.ts'
 import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
+import { ImageGalleryScopeRow, type ImageGalleryScopeRowInjected } from './settings/ImageGalleryScopeRow.tsx'
 import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
 import { PerformanceUsagePolicy } from './performance-usage.ts'
+import { ImageGalleryScopePolicy } from './image-gallery-scope.ts'
 import { useTurnDataValue } from './chat/use-turn-data.ts'
 import { bindDisclosure } from './chat/use-disclosure.ts'
 import { useFlowHidden, useMotionHidden } from './chat/flow-motion.ts'
@@ -169,13 +171,25 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const transcriptView = new TranscriptViewPolicy(chatSettings, 'dshDesktop' in globalThis ? 'standard' : DEFAULT_TRANSCRIPT_VIEW_MODE)
   const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming)
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
-  ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose() })
+  const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)
+  ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose(); imageGalleryScope.dispose() })
   const performanceUsage = performancePolicy.mode
   registerChatNodeRenderers(ctx, performanceUsage, presentation, decorate)
   ctx.slots.registerFactory({
     name: 'conversation.chat.user.content', scope: 'session', locale: NS,
     children: { 'conversation.chat.user.images': { kind: 'single', scope: 'session' } },
   }, UserContent)
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'image-gallery-scope',
+    order: 18,
+    locale: NS,
+    inject: (): ImageGalleryScopeRowInjected => ({
+      hooks: { imageGalleryScope: imageGalleryScope.scope },
+      setImageGalleryScope: scope => { imageGalleryScope.setScope(scope) },
+    }),
+  }, ImageGalleryScopeRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -204,7 +218,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     const chat = chatSource(binding)
     const conversation = ctx.uiConversation.binding(binding)
     return {
-      hooks: { presentation },
+      hooks: { presentation, imageGalleryScope: imageGalleryScope.scope },
       keyedHooks: {
         chatNode: key => chat.getSnapshot().nodes.source(key),
         chatNodeBottom: key => chat.getSnapshot().nodes.bottomSource(key),
@@ -221,7 +235,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     },
     inject: (sessionId: SessionId): ChatFlowDataInjected => {
       const binding = ctx.sessions.binding(sessionId)
-      if (binding === undefined) return detachedFlow(presentation)
+      if (binding === undefined) return detachedFlow(presentation, imageGalleryScope.scope)
       return nodeSources(binding)
     },
   }, ChatFlow))
@@ -239,7 +253,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       store: chatStore,
       inject: (sessionId: SessionId): ChatViewInjected => {
         const binding = ctx.sessions.binding(sessionId)
-        if (binding === undefined) return detachedView(presentation)
+        if (binding === undefined) return detachedView(presentation, imageGalleryScope.scope)
         const session = binding.session
         const chat = chatSource(binding)
         return {

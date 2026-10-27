@@ -32,7 +32,7 @@ import type {
   ChatNodeProcessSource, ChatNodeSource, ChatSnapshot, ChatTurnProcessPresentation,
 } from './snapshot.ts'
 import type { TurnProcessSpec } from './turn-process.ts'
-import type { PerformanceUsageMode } from '../../chat-settings.ts'
+import type { ImageGalleryScope, PerformanceUsageMode } from '../../chat-settings.ts'
 
 /** Selector hook over the current Conversation binding's Chat target. */
 export type UseChat = SnapshotSelectorHook<ChatSnapshot>
@@ -303,6 +303,8 @@ export interface ChatViewInjected {
   hooks: {
     /** Live presentation policy derived from the accepted work-details mode. */
     presentation: ObservableSnapshot<ChatPresentationPolicy>
+    /** Which conversation images the preview lightbox can browse. */
+    imageGalleryScope: ObservableSnapshot<ImageGalleryScope>
   }
   keyedHooks: {
     /** Resolve the stable source for one Chat Node key. */
