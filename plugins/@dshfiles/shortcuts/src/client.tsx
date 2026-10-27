@@ -39,16 +39,6 @@ export default defineClient({
     const layout = (): Layout | undefined => ctx.get('layout')
     const shortcuts: Shortcut[] = [
       {
-        id: 'shortcuts.toggleSidebar',
-        key: 'KeyB',
-        modifier: 'primary',
-        allowInEditable: true,
-        label: 'Toggle sidebar',
-        run: () => {
-          requireLayout(layout).toggleSidebar()
-        },
-      },
-      {
         id: 'shortcuts.newSession',
         key: 'KeyN',
         modifier: 'primary',
@@ -76,6 +66,15 @@ export default defineClient({
 
     const plugin = metadata?.plugin
     if (plugin === undefined) return
+    plugin.add(Command, {
+      id: '@dshfiles/shortcuts.toggle-sidebar',
+      title: 'Toggle sidebar',
+      keywords: ['sidebar', 'hide', 'show'],
+      keys: ['Mod+B'],
+      run: () => {
+        requireLayout(layout).toggleSidebar()
+      },
+    })
     plugin.keyed(plugin.list(Command), commands => installShortcuts(window, commandShortcuts(commands)))
   },
 })
