@@ -348,7 +348,7 @@
     {
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
-      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, and apply explicit price overrides without persisting provider response payloads.",
+      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads.",
       "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
         {
@@ -390,6 +390,12 @@
           "kind": "gherkin",
           "id": "ai-accounts.pricing-cost",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.turn-cost-projection",
+          "file": "plugins/@dshfiles/ai-accounts/src/cost-projection.test.ts",
+          "testName": "replaces a turn sample without losing earlier turn groups"
         },
         {
           "kind": "unit-test",
@@ -532,7 +538,7 @@
         {
           "key": "costEstimates",
           "defaultValue": "true",
-          "constraints": "Boolean; enable composer cost estimates.",
+          "constraints": "Boolean; enable composer and completed-turn cost estimates.",
           "choices": ["true", "false"],
           "coveredBy": ["ai-accounts.luna-reserve"]
         }

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { z } from 'zod'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
-import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema, type CostEstimate } from './cost-estimate.js'
+import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema } from './cost-estimate.js'
 import { fetchedAgo } from './pricing-status.js'
 import { SessionCostDisplay, sessionCostDockScope } from './session-cost-display.js'
 import { usePreferences } from './use-preferences.js'
@@ -29,8 +29,6 @@ const MATCH_LABEL = {
   fuzzy: 'models.dev, closest id',
   none: 'no price',
 }
-
-const amountText = (estimate: CostEstimate): string => `${estimate.partial ? '≥' : '≈'}${CostEstimateModel.formatUsd(estimate.cost.total)}`
 
 /**
  * The estimated session cost beside the composer's own token stats.
@@ -76,8 +74,8 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
       session === null || !session.priced
         ? undefined
         : {
-            amount: amountText(session),
-            description: `Estimated session cost ${amountText(session)}. Estimate from published API prices, not an invoice.`,
+            amount: CostEstimateModel.formatEstimate(session),
+            description: `Estimated session cost ${CostEstimateModel.formatEstimate(session)}. Estimate from published API prices, not an invoice.`,
             rows: [
               ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
                 ? [{ tokens: undefined, amount: undefined }]
@@ -117,18 +115,18 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
     <HoverCard closeDelay={80} openDelay={150}>
       <HoverCardTrigger asChild>
         <button
-          aria-label={`Estimated session cost ${amountText(session)}`}
+          aria-label={`Estimated session cost ${CostEstimateModel.formatEstimate(session)}`}
           className="dshx-root dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-full dshx:px-2 dshx:py-px dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
           type="button"
         >
           <CoinsIcon className="dshx:size-3.5 dshx:shrink-0" />
-          {amountText(session)}
+          {CostEstimateModel.formatEstimate(session)}
         </button>
       </HoverCardTrigger>
       <HoverCardContent align="center" className="dshx-root dshx:flex dshx:w-80 dshx:flex-col dshx:gap-3 dshx:p-3 dshx:text-xs" side="top">
         <header className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2">
           <span className="dshx:font-semibold">Estimated session cost</span>
-          <span className="dshx:font-semibold dshx:tabular-nums">{amountText(session)}</span>
+          <span className="dshx:font-semibold dshx:tabular-nums">{CostEstimateModel.formatEstimate(session)}</span>
         </header>
         <dl className="dshx:grid dshx:grid-cols-[1fr_auto_auto] dshx:gap-x-3 dshx:gap-y-1 dshx:tabular-nums">
           {(
@@ -151,30 +149,30 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
             <div className="dshx:contents">
               <dt className="dshx:text-muted-foreground">Last turn</dt>
               <dd />
-              <dd className="dshx:text-right">{amountText(turn)}</dd>
+              <dd className="dshx:text-right">{CostEstimateModel.formatEstimate(turn)}</dd>
             </div>
           )}
         </dl>
         <TooltipProvider delayDuration={500}>
-        <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2">
-          {session.routes.map(route => (
-            <li className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2" key={CostEstimateModel.routeKey(route)}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:min-w-0 dshx:truncate">
-                    {route.provider}/{route.model}
-                    <span className="dshx:text-muted-foreground">
-                      {' · '}
-                      {route.free ? 'free' : MATCH_LABEL[route.match]}
+          <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2">
+            {session.routes.map(route => (
+              <li className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2" key={CostEstimateModel.routeKey(route)}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:min-w-0 dshx:truncate">
+                      {route.provider}/{route.model}
+                      <span className="dshx:text-muted-foreground">
+                        {' · '}
+                        {route.free ? 'free' : MATCH_LABEL[route.match]}
+                      </span>
                     </span>
-                  </span>
-                </TooltipTrigger>
-                {route.modelsDevId === null ? null : <TooltipContent>{route.modelsDevId}</TooltipContent>}
-              </Tooltip>
-              <span className="dshx:shrink-0 dshx:tabular-nums">{route.cost === null ? '—' : CostEstimateModel.formatUsd(route.cost.total)}</span>
-            </li>
-          ))}
-        </ul>
+                  </TooltipTrigger>
+                  {route.modelsDevId === null ? null : <TooltipContent>{route.modelsDevId}</TooltipContent>}
+                </Tooltip>
+                <span className="dshx:shrink-0 dshx:tabular-nums">{route.cost === null ? '—' : CostEstimateModel.formatUsd(route.cost.total)}</span>
+              </li>
+            ))}
+          </ul>
         </TooltipProvider>
         <p className="dshx:text-muted-foreground">
           Estimate from published API prices (models.dev{fetchedAt === null ? '' : `, ${fetchedAgo(relativeTime(fetchedAt, quotesQuery.dataUpdatedAt))}`}), not

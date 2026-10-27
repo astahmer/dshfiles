@@ -5,6 +5,7 @@ export default defineConfig({
   modules: {
     'turn-error-action': 'src/turn-error-action.ts',
     'chat-focus': 'src/chat-focus.ts',
+    'turn-usage-cost': 'src/turn-usage-cost.ts',
   },
   client: {
     entry: 'src/client-entry.tsx',

@@ -1,12 +1,14 @@
 /** Chat-owned Slot declarations and composed component props. */
 // The turn-error action seat lives in its own published contract module.
 import type {} from '../../turn-error-action.ts'
+import type {} from '../../turn-usage-cost.ts'
 export type { TurnErrorActionOwnerProps } from '../../turn-error-action.ts'
+export type { TurnUsageCostOwnerProps } from '../../turn-usage-cost.ts'
 import type { ChatTurnActionExtras, ChatTurnTailExtras } from '../../chat-focus.ts'
 import type { RefObject } from 'react'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
-import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { PendingSubmission, UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type {
@@ -221,6 +223,7 @@ export interface ChatNodeOwnerProps {
   forkAt: (seq: number) => void
   /** Session-authorized image loader supplied by the Chat view. */
   loadImage: MessageImageLoader
+  useProjection: UseProjection
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process state when this Node belongs to a projected Turn. */
   turnProcess?: TurnProcessOwnerProps | undefined
@@ -336,7 +339,7 @@ export type ChatFlowDataInjected = Pick<ChatViewInjected, 'hooks' | 'keyedHooks'
 
 /** Ordered rows and reconciled local echoes rendered inside one Chat viewport. */
 export interface ChatFlowOwnerProps extends Pick<ChatNodeOwnerProps,
-  'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'loadImage' | 'fileMentions'> {
+  'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'loadImage' | 'useProjection' | 'fileMentions'> {
   readonly entries: readonly RenderEntry[]
   readonly pendingInputs: readonly (PendingSubmission | InboxState['next-step'][number])[]
   readonly lastInputTurn: number | undefined

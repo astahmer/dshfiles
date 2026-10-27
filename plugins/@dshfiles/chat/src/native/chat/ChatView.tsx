@@ -355,7 +355,7 @@ export function ChatView({
               <ConversationViewOpenerContext.Provider value={openView}>
                 {renderSlot('conversation.chat.flow', {
                   entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
-                  cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, fileMentions,
+                  cwd, openFile: requestOpenImageAwareFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
                 }, { hookContext: flowContext })}
               </ConversationViewOpenerContext.Provider>
             </MarkdownDelegateProvider>
