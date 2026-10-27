@@ -50,6 +50,8 @@ const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
 const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
+const SETTINGS_SECTION_ENTRIES_PATH = fileURLToPath(new URL('../../settings/section-entries.js', import.meta.url))
+const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const CONVERSATION_DEFINE_PATH = fileURLToPath(new URL('../../conversation/define.js', import.meta.url))
 
 /** Options for producing one DSH-compatible lazy-CJS client bundle. */
@@ -183,6 +185,10 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const useContributionFailures = PluginHooksModel.useContributionFailures',
           'export const useKeyed = PluginHooksModel.useKeyed',
           'export const useLatest = PluginHooksModel.useLatest',
+          `import { SettingsSearchEntriesModel } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_PATH)}`,
+          'export const settingsSearchEntries = SettingsSearchEntriesModel.current',
+          'export const subscribeSettingsSearchEntries = SettingsSearchEntriesModel.subscribe',
+          'export const publishSettingsSearchEntries = SettingsSearchEntriesModel.publish',
           '',
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {
@@ -215,6 +221,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
+          `export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
           '',
         ].join('\n')
       }

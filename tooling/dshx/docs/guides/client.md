@@ -146,6 +146,34 @@ defineSlot('settings.section', {
 
 Import `@deepseek-ai/dsh-client-ui-settings/client` as a type-only module so `settings.section` and its Host target props enter the typed SlotMap. The section owns how a path resolves to one of its controls; the Host owns opening the section and delivering the request.
 
+### Settings search entries
+
+A section can let a Settings search find its controls without being mounted. List them in `metadata.searchEntries`: each entry has a unique `id`, a `title`, and optional `description` and `keywords`, all matched by the search. TypeScript checks the shape, and only `settings.section` accepts `metadata`. The zod schemas `settingsSectionMetadataSchema`, `settingsSearchEntriesSchema` and `settingsSearchEntrySchema` (unique ids, non-empty titles, no unknown fields) are exported from `@dshfiles/dshx/settings`; the Client runtime itself carries no zod, so a bundle without a shared zod does not inline it, and the reader decodes what each bundle published.
+
+```tsx
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { defineSlot, type SettingsSectionSearchProps } from '@dshfiles/dshx/client'
+
+const Appearance = (props: PropsRuntime<'settings.section'> & SettingsSectionSearchProps) => {
+  useEffect(() => {
+    if (props.target === undefined) return
+    const control = document.querySelector<HTMLElement>(`[data-settings-entry="${CSS.escape(props.target)}"]`)
+    control?.scrollIntoView({ block: 'center' })
+    control?.focus()
+  }, [props.target])
+  return <select data-settings-entry="theme">…</select>
+}
+
+defineSlot('settings.section', {
+  id: 'appearance',
+  label: 'Appearance',
+  metadata: { searchEntries: [{ id: 'theme', title: 'Theme', description: 'Light, dark or system', keywords: 'color mode' }] },
+  component: Appearance,
+})
+```
+
+The native slot ledger keeps only `id`, `order`, `label` and `priority`, so dshx publishes the entries to a page-wide seat for as long as the section stays registered. A Settings shell reads it with `settingsSearchEntries()` and `subscribeSettingsSearchEntries(listener)`; a section registered imperatively through `ctx.slots.register` publishes its own with `publishSettingsSearchEntries({ sectionId, entries })` and calls the returned disposer with the registration's. When the user picks an entry, the shell opens its section with `target` set to the entry `id`; the section scrolls to and focuses that control. `@dshfiles/settings-shell` is the shell that does this, and under it `target` is that string rather than the field-target object above, which it does not route into sections; it decodes each section's entries with `settingsSearchEntriesSchema` and skips, with one console warning, a set that does not decode.
+
 ## Registration and lifecycle
 
 Client registration order is:

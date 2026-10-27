@@ -10,10 +10,13 @@ import type {
   SlotMap,
   StoreDecl,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ClientDefinition, LocaleDefinition, PropsLocaleOf, SlotContribution } from './types.js'
+import type { SettingsSectionMetadata } from '../settings/section-entries.js'
+import type { ClientDefinition, LocaleDefinition, PropsLocaleOf, SlotContribution, SlotMetadataOptions } from './types.js'
 
 export interface SlotRegistrationOptions {
+  readonly id?: unknown
   readonly locale?: unknown
+  readonly metadata?: SettingsSectionMetadata
 }
 
 export interface SlotContributionParts {
@@ -70,7 +73,8 @@ function defineSlot<
     readonly store?: H
     readonly locale: L
     readonly registrant?: string
-  } & KindOptions<K, EntryKey, M>,
+  } & KindOptions<K, EntryKey, M> &
+    SlotMetadataOptions<K>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
 function defineSlot<
   K extends keyof SlotMap & string,
@@ -95,7 +99,8 @@ function defineSlot<
     readonly inject: (...args: InjectParams<K, H>) => I
     readonly locale: L
     readonly registrant?: string
-  } & KindOptions<K, EntryKey, M>,
+  } & KindOptions<K, EntryKey, M> &
+    SlotMetadataOptions<K>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
 function defineSlot<
   K extends keyof SlotMap & string,
@@ -115,7 +120,8 @@ function defineSlot<
     readonly store?: H
     readonly locale?: N
     readonly registrant?: string
-  } & KindOptions<K, EntryKey, M>,
+  } & KindOptions<K, EntryKey, M> &
+    SlotMetadataOptions<K>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
 function defineSlot<
   K extends keyof SlotMap & string,
@@ -137,7 +143,8 @@ function defineSlot<
     readonly inject: (...args: InjectParams<K, H>) => I
     readonly locale?: N
     readonly registrant?: string
-  } & KindOptions<K, EntryKey, M>,
+  } & KindOptions<K, EntryKey, M> &
+    SlotMetadataOptions<K>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
 function defineSlot<K extends keyof SlotMap & string, const O extends { readonly component: unknown }>(
   name: K,

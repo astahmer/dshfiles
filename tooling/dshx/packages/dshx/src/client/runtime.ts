@@ -21,12 +21,14 @@ import { ApiClientLifecycle } from '../api/client.js'
 import { BrowserTraceTransportModel } from '../tracing/browser-transport.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { registerPluginPageSettings } from '../settings/plugin-page.js'
+import { SettingsSearchEntriesModel } from '../settings/section-entries.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../compat/protocol-2.js'
 import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
 import type { DshCompatibility } from '../compat/types.js'
 
 const CLIENT_DEFINITION_KEYS = new Set(['name', 'inject', 'locales', 'conversations', 'slots', 'setup'])
 const LOCALE_ID_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u
+const SETTINGS_SECTION_SLOT = 'settings.section'
 
 /** Project identity embedded by the Client compiler. */
 export interface ClientPluginMetadata {
@@ -304,8 +306,23 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
 type ComponentDecorator = ClientComponentDecorator
 
 function normalizedSlotOptions(options: SlotRegistrationOptions): SlotRegistrationOptions {
-  if (!LocaleNamespaceModel.isDefinition(options.locale)) return options
-  return { ...options, locale: LocaleNamespaceModel.parts(options.locale).namespace }
+  const { metadata: _metadata, ...registration } = options
+  if (!LocaleNamespaceModel.isDefinition(registration.locale)) return registration
+  return { ...registration, locale: LocaleNamespaceModel.parts(registration.locale).namespace }
+}
+
+/** The ledger drops registration metadata, so a section's search entries live as long as its registration in the shared seat. */
+function registerSlot(client: ClientRuntimeContext, name: string, options: SlotRegistrationOptions, component: unknown): unknown {
+  const dispose = client.slots.register({ name, ...normalizedSlotOptions(options) }, component)
+  const sectionId = options.id
+  if (name !== SETTINGS_SECTION_SLOT || typeof sectionId !== 'string') return dispose
+  const entries = options.metadata?.searchEntries
+  if (entries === undefined) return dispose
+  const unpublish = SettingsSearchEntriesModel.publish({ sectionId, entries })
+  return () => {
+    unpublish()
+    if (typeof dispose === 'function') dispose()
+  }
 }
 
 function registerLocales(client: ClientRuntimeContext, definition: ClientDefinition): void {
@@ -336,7 +353,7 @@ function registerContributions(client: ClientRuntimeContext, definition: ClientD
   for (const slot of definition.slots ?? []) {
     const { name, options, component } = ClientContributionModel.parts(slot)
     const id = slotContributionId(name, options as Record<string, unknown>)
-    client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(isolated(component, owner, id))))
+    client.slots.inject(name, () => registerSlot(client, name, options, decorate(isolated(component, owner, id))))
   }
 }
 

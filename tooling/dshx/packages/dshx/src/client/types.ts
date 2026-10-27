@@ -18,6 +18,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationContribution } from '../conversation/types.js'
 import type { PluginContext } from './plugin-context.js'
+import type { SettingsSectionMetadata } from '../settings/section-entries.js'
 
 declare const slotContributionBrand: unique symbol
 declare const localeDefinitionBrand: unique symbol
@@ -127,7 +128,11 @@ export type SlotOptions<
   readonly inject?: (...args: InjectParams<K, H>) => I
   readonly locale?: N
   readonly registrant?: string
-} & KindOptions<K, EntryKey, M>
+} & KindOptions<K, EntryKey, M> &
+  SlotMetadataOptions<K>
+
+/** Registration metadata a Slot's Host contract reads from its ledger entry; only `settings.section` declares one. */
+export type SlotMetadataOptions<K extends string> = K extends 'settings.section' ? { readonly metadata?: SettingsSectionMetadata } : unknown
 
 /** Opaque declarative Slot contribution consumed by the Client adapter. */
 export interface SlotContribution<K extends keyof SlotMap & string = keyof SlotMap & string, O extends object = object, C = unknown> {

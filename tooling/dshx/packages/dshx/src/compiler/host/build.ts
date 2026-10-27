@@ -38,6 +38,7 @@ const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
+const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
 const COMMUNICATION_TYPES_PATH = fileURLToPath(new URL('../../communication/types.js', import.meta.url))
 const PLATFORM_HOST_API_PATH = fileURLToPath(new URL('../../platform/host-api.js', import.meta.url))
@@ -141,6 +142,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         return [
           `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
           'export const defineSettings = SettingsDefinitionModel.define',
+          `export { settingsSearchEntriesSchema, settingsSearchEntrySchema, settingsSectionMetadataSchema } from ${JSON.stringify(SETTINGS_SECTION_ENTRIES_SCHEMA_PATH)}`,
           '',
         ].join('\n')
       }

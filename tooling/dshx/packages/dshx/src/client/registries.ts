@@ -1,6 +1,7 @@
 import { createElement, type ComponentType } from 'react'
 import { BrowserBroker } from './broker.js'
 import { IsolationModel } from './isolation.js'
+import type { SettingsSearchEntry } from '../settings/section-entries.js'
 import { PluginContextModel, type NativeSlots } from './plugin-context.js'
 
 /** A main view with its sidebar navigation row, sharing one id. */
@@ -39,14 +40,6 @@ export interface OverlayItem {
   readonly id: string
   readonly order?: number
   readonly component: ComponentType<never>
-}
-
-/** A searchable entry of a settings section, indexed without mounting the section. */
-export interface SettingsSearchEntry {
-  readonly id: string
-  readonly title: string
-  readonly description?: string
-  readonly keywords?: string
 }
 
 /** A section in Settings. */

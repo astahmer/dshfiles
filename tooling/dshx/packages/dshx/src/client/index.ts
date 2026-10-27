@@ -1,4 +1,5 @@
 import { SettingsPageRendererModel, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
+import { SettingsSearchEntriesModel } from '../settings/section-entries.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 import { ClientContributionModel } from './define.js'
 import { HostCommandsModel } from './host-commands.js'
@@ -90,7 +91,6 @@ export type {
   PluginDetailProps,
   PluginDetailSubject,
   SessionRowAccessoryItem,
-  SettingsSearchEntry,
   SettingsSectionItem,
 } from './registries.js'
 
@@ -108,3 +108,10 @@ export type { LatestState } from './hooks.js'
 
 export const provideSettingsPageRenderer = SettingsPageRendererModel.provide
 export type { SettingsPageRenderer, SettingsPageRendererProps }
+
+/** Search entries every live `settings.section` publishes, read by a Settings shell without mounting the sections. */
+export const settingsSearchEntries = SettingsSearchEntriesModel.current
+export const subscribeSettingsSearchEntries = SettingsSearchEntriesModel.subscribe
+/** For a section registered imperatively through `ctx.slots.register`, which the `metadata` option never reaches. */
+export const publishSettingsSearchEntries = SettingsSearchEntriesModel.publish
+export type { SettingsSearchEntriesBySection, SettingsSearchEntry, SettingsSectionMetadata, SettingsSectionSearchProps } from '../settings/section-entries.js'
