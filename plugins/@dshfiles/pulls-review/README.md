@@ -1,13 +1,14 @@
 # pulls.review
 
-Review this thread's changes the way [pulls.review](https://pulls.review) does:
+Review a project's or workspace's changes the way [pulls.review](https://pulls.review) does:
 all changed-file diffs in one vertically scrollable view, grouped by scope and
-with per-file review progress — inside DSH, for the thread's own jj workspace.
+with per-file review progress — inside DSH.
 
 ## What it does
 
-A thread works in its own jj workspace, so its changes are `jj diff --from
-<base> --to @`. The Host reads that patch and groups it with
+Choose any registered project or workspace in the panel, and optionally enter
+a base bookmark (the Host otherwise chooses `main`, `master` or `trunk`). Changes
+are read as `jj diff --from <base> --to @`. The Host reads that patch and groups it with
 [`@pulls.review/core`](https://github.com/antfu/pulls.review)'s deterministic
 rule-based adapter (MIT): no model call, no GitHub token, and the same rules the
 site uses, so a scope reads `Code` / `Tests` / `Docs` / `Config` /

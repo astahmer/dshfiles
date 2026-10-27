@@ -21,6 +21,13 @@ When('the pulls.review panel is opened from the sidebar', async ({ page }: { pag
 
 Then('the pulls.review panel reads the thread workspace against {string}', async ({ page }: { page: Page }, base: string) => {
   await recordAssertion(page, 'pulls-review-reads-thread-workspace', async () => {
+    const projectSelector = page.getByRole('combobox', { name: 'Project or workspace', exact: true })
+    await expect(projectSelector).toBeVisible()
+    await projectSelector.click()
+    await page.getByRole('option', { name: /Current thread/ }).click()
+    const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
+    await expect(baseSelector).toBeVisible()
+    await baseSelector.fill(base)
     await expect(page.getByText(`${base}..@`, { exact: true })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(/^\d+ files?$/).first()).toBeVisible({ timeout: 30_000 })
   })

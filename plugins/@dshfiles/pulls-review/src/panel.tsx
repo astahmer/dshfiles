@@ -1,7 +1,10 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { Check, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
@@ -26,6 +29,7 @@ const reviewedStore = createStoredValue({
 export interface PullsReviewPanelProps {
   readonly sessions: ISessions
   readonly focus: SessionFocus
+  readonly workspaces: IWorkspaces
 }
 
 const noBody = (): undefined => undefined
@@ -55,15 +59,24 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const subscribeSessions = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const readCwd = useCallback(() => (sessionId === undefined ? undefined : props.sessions.list.getSnapshot().byId[sessionId]?.cwd), [props.sessions, sessionId])
   const cwd = useSyncExternalStore(subscribeSessions, readCwd, noBody)
+  const subscribeWorkspaces = useCallback((listener: () => void) => props.workspaces.list.subscribe(listener), [props.workspaces])
+  const registeredWorkspaces = useSyncExternalStore(
+    subscribeWorkspaces,
+    () => props.workspaces.list.getSnapshot().items,
+    () => [],
+  )
+  const [selectedPath, setSelectedPath] = useState('')
+  const [baseRef, setBaseRef] = useState('')
+  const reviewPath = selectedPath || cwd || ''
 
   const query = useQuery({
-    queryKey: ['pulls-review', cwd ?? ''],
-    enabled: cwd !== undefined && cwd.length > 0,
+    queryKey: ['pulls-review', reviewPath, baseRef],
+    enabled: reviewPath.length > 0,
     queryFn: ({ signal }) =>
       runHostRequest({
         signal,
         timeoutMs: 60_000,
-        request: hostSignal => api.review({ path: cwd ?? '' }, { signal: hostSignal }),
+        request: hostSignal => api.review(baseRef === '' ? { path: reviewPath } : { path: reviewPath, base: baseRef }, { signal: hostSignal }),
       }),
   })
 
@@ -74,12 +87,16 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     mutationFn: () =>
       runHostRequest({
         timeoutMs: 120_000,
-        request: signal => api.summarize(sessionId === undefined ? { path: cwd ?? '' } : { path: cwd ?? '', sessionId: String(sessionId) }, { signal }),
+        request: signal =>
+          api.summarize(
+            { path: reviewPath, ...(baseRef === '' ? {} : { base: baseRef }), ...(sessionId === undefined ? {} : { sessionId: String(sessionId) }) },
+            { signal },
+          ),
       }),
   })
   const summarized = summarize.data
   const aiSummaries = summarized?.status === 'ok' ? summarized.summaries : undefined
-  const scopeKeyOf = cwd !== undefined && head !== undefined ? ReviewedMarksModel.keyOf(cwd, base ?? '', head) : undefined
+  const scopeKeyOf = head !== undefined ? ReviewedMarksModel.keyOf(reviewPath, base ?? '', head) : undefined
   const reviewedPaths = useMemo(() => {
     const paths = scopeKeyOf === undefined ? undefined : reviewed[scopeKeyOf]
     return new Set(paths ?? [])
@@ -112,7 +129,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
   useEffect(() => {
     setSelection(ListSelectionModel.empty())
-  }, [cwd, head])
+  }, [reviewPath, head])
   useEffect(() => {
     setSelection(current => {
       const next = ListSelectionModel.prune({ state: current, visibleIds: allPaths })
@@ -138,8 +155,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   }
 
   const footer = ((): ReactNode => {
-    if (sessionId === undefined) return <p className={HINT}>Open a thread to review its changes.</p>
-    if (cwd === undefined || cwd.length === 0) return <p className={HINT}>This thread has no workspace folder.</p>
+    if (reviewPath.length === 0) return <p className={HINT}>Choose a project or workspace to review.</p>
     if (query.isPending) return <p className={HINT}>Reading the workspace diff…</p>
     if (query.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(query.error, 'The workspace diff could not be read.')}</p>
     if (result === undefined) return null
@@ -164,6 +180,28 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   return (
     <section className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:p-4">
       <header className="dshx:flex dshx:flex-col dshx:gap-2">
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          <Select value={reviewPath} onValueChange={setSelectedPath}>
+            <SelectTrigger aria-label="Project or workspace" className="dshx:min-w-48 dshx:max-w-full" size="sm">
+              <SelectValue placeholder="Project or workspace" />
+            </SelectTrigger>
+            <SelectContent className="dshx-root">
+              {cwd ? <SelectItem value={cwd}>Current thread · {cwd}</SelectItem> : null}
+              {registeredWorkspaces.map(workspace => (
+                <SelectItem key={workspace.workspaceId} value={workspace.path}>
+                  {workspace.title} · {workspace.path}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            aria-label="Base branch or bookmark"
+            placeholder="Base branch (default)"
+            value={baseRef}
+            onChange={event => setBaseRef(event.target.value)}
+            className="dshx:w-48 dshx:font-mono!"
+          />
+        </div>
         <div className="dshx:flex dshx:items-center dshx:gap-2">
           <h2 className="dshx:text-sm dshx:font-semibold">pulls.review</h2>
           {result?.status === 'ok' ? (

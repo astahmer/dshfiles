@@ -4,11 +4,11 @@
   "features": [
     {
       "id": "thread-review-scopes",
-      "title": "Group a thread workspace's changes into review scopes",
-      "summary": "Read the current thread workspace's jj diff against its base bookmark, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
+      "title": "Review project and workspace changes by scope",
+      "summary": "Choose a registered project or workspace and optional base bookmark, read its jj diff, group changed files with pulls.review's deterministic rules, and show every scope's diff in one scrollable review with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
       "surfaces": ["client", "host"],
       "configuration": [],
-      "states": ["no-thread", "no-folder", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
+      "states": ["choose-project", "choose-workspace", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
