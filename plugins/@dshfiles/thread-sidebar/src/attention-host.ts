@@ -51,6 +51,8 @@ export const threadAttentionApiHost = threadSidebarAttentionApi.host({
   state: async ({ ctx }) => (await attentionFor(ctx)).snapshot(),
   acknowledge: async ({ ctx, input }) => (await attentionFor(ctx)).acknowledge(input),
   clearUnread: async ({ ctx, input }) => (await attentionFor(ctx)).clearUnread(input),
+  clearUnreadMany: async ({ ctx, input }) => (await attentionFor(ctx)).clearUnreadMany(input.entries),
   markUnread: async ({ ctx, input }) => (await attentionFor(ctx)).markUnread(input),
+  markUnreadMany: async ({ ctx, input }) => (await attentionFor(ctx)).markUnreadMany(input.sessionIds),
   migrate: async ({ ctx, input }) => (await attentionFor(ctx)).migrate(input.entries),
 })

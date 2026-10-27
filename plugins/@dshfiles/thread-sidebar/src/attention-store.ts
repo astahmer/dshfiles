@@ -75,7 +75,9 @@ export interface AttentionStore {
   recordFinish(input: { readonly sessionId: string; readonly seq: number; readonly time: number; readonly reason: AttentionFinishReason }): void
   acknowledge(input: { readonly sessionId: string; readonly version: number }): Promise<ThreadAttentionSnapshot>
   clearUnread(input: { readonly sessionId: string; readonly version: number }): Promise<ThreadAttentionSnapshot>
+  clearUnreadMany(entries: readonly { readonly sessionId: string; readonly version: number }[]): Promise<ThreadAttentionSnapshot>
   markUnread(input: { readonly sessionId: string }): Promise<ThreadAttentionSnapshot>
+  markUnreadMany(sessionIds: readonly string[]): Promise<ThreadAttentionSnapshot>
   migrate(entries: readonly ThreadAttentionMigrationEntry[]): Promise<ThreadAttentionSnapshot>
   flush(): Promise<void>
 }
@@ -160,6 +162,16 @@ export const createAttentionStore = ({
       }
       return snapshot()
     },
+    clearUnreadMany: async entries => {
+      const sessionIds = entries.flatMap(({ sessionId, version }) => {
+        const record = records.get(sessionId)
+        if (record === undefined || record.version > version) return []
+        records.delete(sessionId)
+        return [sessionId]
+      })
+      if (sessionIds.length > 0) await enqueue(() => Promise.all(sessionIds.map(sessionId => table.delete(sessionId))))
+      return snapshot()
+    },
     markUnread: async ({ sessionId }) => {
       const existing = records.get(sessionId)
       await put({
@@ -170,6 +182,25 @@ export const createAttentionStore = ({
         finishedReason: existing?.finishedReason ?? null,
         manuallyUnread: true,
       })
+      return snapshot()
+    },
+    markUnreadMany: async sessionIds => {
+      const marked = sessionIds.map(sessionId => {
+        const existing = records.get(sessionId)
+        return {
+          sessionId,
+          version: takeVersion(),
+          finishedAt: existing?.finishedAt ?? null,
+          finishedSeq: existing?.finishedSeq ?? null,
+          finishedReason: existing?.finishedReason ?? null,
+          manuallyUnread: true,
+        }
+      })
+      for (const record of marked) {
+        records.set(record.sessionId, record)
+      }
+      trim()
+      if (marked.length > 0) await enqueue(() => Promise.all(marked.map(record => table.put(record.sessionId, record))))
       return snapshot()
     },
     migrate: async entries => {

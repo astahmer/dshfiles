@@ -13,7 +13,9 @@ export interface ThreadAttentionState {
   readonly views: readonly ThreadAttentionView[]
   readonly acknowledge: (sessionId: string, version: number) => void
   readonly clearUnread: (sessionId: string, version: number) => void
+  readonly clearUnreadMany: (entries: readonly { readonly sessionId: string; readonly version: number }[]) => void
   readonly markUnread: (sessionId: string) => void
+  readonly markUnreadMany: (sessionIds: readonly string[]) => void
   /** Resolves once the Host stored the records; rejects so a caller can keep its own copy for a retry. */
   readonly migrate: (entries: readonly ThreadAttentionMigrationEntry[]) => Promise<void>
   readonly refresh: () => void
@@ -47,9 +49,21 @@ export const useThreadAttention = (options: { readonly enabled: boolean }): Thre
     },
     [store],
   )
+  const clearUnreadMany = useCallback(
+    (entries: readonly { readonly sessionId: string; readonly version: number }[]) => {
+      void store.clearUnreadMany(entries).catch(() => undefined)
+    },
+    [store],
+  )
   const markUnread = useCallback(
     (sessionId: string) => {
       void store.markUnread(sessionId).catch(() => undefined)
+    },
+    [store],
+  )
+  const markUnreadMany = useCallback(
+    (sessionIds: readonly string[]) => {
+      void store.markUnreadMany(sessionIds).catch(() => undefined)
     },
     [store],
   )
@@ -60,5 +74,17 @@ export const useThreadAttention = (options: { readonly enabled: boolean }): Thre
 
   const views = useMemo(() => threadAttentionViews(state.snapshot), [state.snapshot])
   const records = useMemo(() => new Map(views.map(view => [view.sessionId, view])), [views])
-  return { available: state.snapshot !== null, ownerMissing: state.ownerMissing, records, views, acknowledge, clearUnread, markUnread, migrate, refresh }
+  return {
+    available: state.snapshot !== null,
+    ownerMissing: state.ownerMissing,
+    records,
+    views,
+    acknowledge,
+    clearUnread,
+    clearUnreadMany,
+    markUnread,
+    markUnreadMany,
+    migrate,
+    refresh,
+  }
 }

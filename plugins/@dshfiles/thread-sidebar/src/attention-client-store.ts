@@ -12,7 +12,12 @@ export interface AttentionApi {
     input: { readonly sessionId: string; readonly version: number },
     options?: { readonly signal?: AbortSignal },
   ) => Promise<ThreadAttentionSnapshot>
+  readonly clearUnreadMany: (
+    input: { readonly entries: { readonly sessionId: string; readonly version: number }[] },
+    options?: { readonly signal?: AbortSignal },
+  ) => Promise<ThreadAttentionSnapshot>
   readonly markUnread: (input: { readonly sessionId: string }, options?: { readonly signal?: AbortSignal }) => Promise<ThreadAttentionSnapshot>
+  readonly markUnreadMany: (input: { readonly sessionIds: string[] }, options?: { readonly signal?: AbortSignal }) => Promise<ThreadAttentionSnapshot>
   readonly migrate: (
     input: { readonly entries: ThreadAttentionMigrationEntry[] },
     options?: { readonly signal?: AbortSignal },
@@ -42,7 +47,9 @@ export interface ThreadAttentionStore {
   refresh(): Promise<void>
   acknowledge(sessionId: string, version: number): Promise<void>
   clearUnread(sessionId: string, version: number): Promise<void>
+  clearUnreadMany(entries: readonly { readonly sessionId: string; readonly version: number }[]): Promise<void>
   markUnread(sessionId: string): Promise<void>
+  markUnreadMany(sessionIds: readonly string[]): Promise<void>
   migrate(entries: readonly ThreadAttentionMigrationEntry[]): Promise<void>
   /** Drop cached state so a test starts from a clean page. */
   reset(): void
@@ -156,7 +163,9 @@ const createStore = (): ThreadAttentionStore => {
     refresh: read,
     acknowledge: (sessionId, version) => mutate(() => requireApi().acknowledge({ sessionId, version })),
     clearUnread: (sessionId, version) => mutate(() => requireApi().clearUnread({ sessionId, version })),
+    clearUnreadMany: entries => mutate(() => requireApi().clearUnreadMany({ entries: [...entries] })),
     markUnread: sessionId => mutate(() => requireApi().markUnread({ sessionId })),
+    markUnreadMany: sessionIds => mutate(() => requireApi().markUnreadMany({ sessionIds: [...sessionIds] })),
     migrate: entries => mutate(() => requireApi().migrate({ entries: [...entries] })),
     reset: () => {
       listeners.clear()

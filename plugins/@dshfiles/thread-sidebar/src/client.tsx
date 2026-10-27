@@ -4305,15 +4305,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
                 .map(entry => entry.thread.id)
               const clearViewUnread = (): void => {
-                for (const sessionId of matchingThreadIds) {
+                const entries = matchingThreadIds.flatMap(sessionId => {
                   const record = attention.records.get(sessionId)
-                  if (record !== undefined) attention.clearUnread(sessionId, record.version)
-                }
+                  return record === undefined ? [] : [{ sessionId, version: record.version }]
+                })
+                if (entries.length > 0) attention.clearUnreadMany(entries)
               }
               const markViewUnread = (): void => {
-                for (const sessionId of matchingThreadIds) {
-                  if (!attention.records.has(sessionId)) attention.markUnread(sessionId)
-                }
+                const sessionIds = matchingThreadIds.filter(sessionId => !attention.records.has(sessionId))
+                if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
               }
               const countSuffix = visibleCount === null ? '' : ` (${visibleCount})`
               const accessibleLabel =
