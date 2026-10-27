@@ -1,6 +1,20 @@
-import { createContext, createElement, useContext, useEffect, useRef, useState, useSyncExternalStore, type ComponentType, type Context, type ReactNode } from 'react'
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+  type Context,
+  type ReactNode,
+} from 'react'
 import { BrowserBroker, type ContractToken, type ContributionFailure, type Live, type RegistryToken, type Subscribable } from './broker.js'
 import type { PluginContext } from './plugin-context.js'
+
+/** Whatever props the wrapped component takes; the wrapper forwards them untouched. */
+type ProvidedProps = Readonly<Record<string, unknown>>
 
 let pluginReactContext: Context<PluginContext | undefined> | undefined
 
@@ -20,8 +34,8 @@ const providePlugin = <Component>(component: Component, plugin: PluginContext): 
   const existing = byComponent.get(component)
   // Wrappers are cached per component, so the cached one keeps its type.
   if (existing !== undefined) return existing as Component
-  const Inner = component as ComponentType<object>
-  const Provided = (props: object): ReactNode => createElement(reactContext().Provider, { value: plugin }, createElement(Inner, props))
+  const Inner = component as ComponentType<ProvidedProps>
+  const Provided = (props: ProvidedProps): ReactNode => createElement(reactContext().Provider, { value: plugin }, createElement(Inner, props))
   Provided.displayName = `WithPlugin(${Inner.displayName ?? Inner.name ?? 'Component'})`
   byComponent.set(component, Provided)
   return Provided as Component

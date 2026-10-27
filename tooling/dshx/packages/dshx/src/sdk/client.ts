@@ -78,7 +78,9 @@ export interface ClientCapabilities {
 
 export type ClientCapability = keyof ClientCapabilities
 /** `add`, `list`, `provide`, `use`, `keyed`, dialogs, toasts, commands and layout come with every plugin. */
-export type ClientPluginApi<Uses extends readonly ClientCapability[] = readonly []> = BasePluginApi<ClientContext> & PluginContext & Pick<ClientCapabilities, Uses[number]>
+export type ClientPluginApi<Uses extends readonly ClientCapability[] = readonly []> = BasePluginApi<ClientContext> &
+  PluginContext &
+  Pick<ClientCapabilities, Uses[number]>
 
 export interface ClientPluginDefinition<Uses extends readonly ClientCapability[] = readonly []> extends Omit<ClientDefinition, 'name' | 'setup'> {
   readonly id: string

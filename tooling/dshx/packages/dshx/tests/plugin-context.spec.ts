@@ -47,7 +47,10 @@ const services = {
   layout: AppServicesModel.createLayout(() => undefined),
 }
 
-const createPlugin = (owner: string, host: FakeHost = fakeSlots()): { readonly plugin: PluginContext; readonly dispose: () => void; readonly host: FakeHost } => {
+const createPlugin = (
+  owner: string,
+  host: FakeHost = fakeSlots(),
+): { readonly plugin: PluginContext; readonly dispose: () => void; readonly host: FakeHost } => {
   const scope = PluginContextModel.createScope()
   const plugin = PluginContextModel.create({ owner, scope, slots: () => host.slots, decorate: component => component, services })
   return { plugin, dispose: () => scope.dispose(), host }
@@ -148,8 +151,15 @@ describe('registries', () => {
     plugin.add(Exporters, { id: 'steady', title: 'Steady' })
     broken.set(true)
     await flush()
-    expect(plugin.list(Exporters).get().map(item => item.id)).toEqual(['steady'])
-    expect(BrowserBroker.failures.get()).toEqual([expect.objectContaining({ owner: '@test/owner', kind: 'registry', id: 'test.exporter', message: 'item broke' })])
+    expect(
+      plugin
+        .list(Exporters)
+        .get()
+        .map(item => item.id),
+    ).toEqual(['steady'])
+    expect(BrowserBroker.failures.get()).toEqual([
+      expect.objectContaining({ owner: '@test/owner', kind: 'registry', id: 'test.exporter', message: 'item broke' }),
+    ])
   })
 
   it('mounts a Panel into the main and sidebar slots and removes both on dispose', () => {
@@ -202,7 +212,12 @@ describe('keyed', () => {
     })
     expect(plugin.list(Exporters).get()).toEqual([])
     provider.plugin.provide(CounterContract, { count: () => 1 })
-    expect(plugin.list(Exporters).get().map(item => item.id)).toEqual(['gen-1'])
+    expect(
+      plugin
+        .list(Exporters)
+        .get()
+        .map(item => item.id),
+    ).toEqual(['gen-1'])
     provider.dispose()
     expect(plugin.list(Exporters).get()).toEqual([])
     expect(cleanups).toEqual(['gen-1'])
@@ -265,7 +280,13 @@ describe('stores', () => {
 
   it('imports a value from an earlier key once', () => {
     memory.set('dshx:@test/old', JSON.stringify({ enabled: false }))
-    const prefs = StoreModel.define({ key: '@test/new', scope: 'global', schema: z.object({ enabled: z.boolean() }), initial: { enabled: true }, from: ['dshx:@test/old'] })
+    const prefs = StoreModel.define({
+      key: '@test/new',
+      scope: 'global',
+      schema: z.object({ enabled: z.boolean() }),
+      initial: { enabled: true },
+      from: ['dshx:@test/old'],
+    })
     expect(prefs.get()).toEqual({ enabled: false })
   })
 })
@@ -277,7 +298,6 @@ describe('React', () => {
     const Bound = plugin.bind(PluginHooksModel.provide(Label, plugin))
     expect(renderToStaticMarkup(createElement(Bound))).toBe('<span>@test/owner</span>')
   })
-
 })
 
 describe('plugin entry points', () => {
@@ -286,7 +306,18 @@ describe('plugin entry points', () => {
     const definition = defineClientPlugin({ id: 'acme', setup })
     const created = createClientPlugin(definition, { packageId: '@test/acme' })
     const host = fakeSlots()
-    const ctx = { effect: (execute: () => () => void) => execute, get: (name: string) => (name === 'slots' ? host.slots : undefined), on: vi.fn(), once: vi.fn(), emit: vi.fn(), parallel: vi.fn(), serial: vi.fn(), bail: vi.fn(), waterfall: vi.fn(), locale: { register: () => () => {} } }
+    const ctx = {
+      effect: (execute: () => () => void) => execute,
+      get: (name: string) => (name === 'slots' ? host.slots : undefined),
+      on: vi.fn(),
+      once: vi.fn(),
+      emit: vi.fn(),
+      parallel: vi.fn(),
+      serial: vi.fn(),
+      bail: vi.fn(),
+      waterfall: vi.fn(),
+      locale: { register: () => () => {} },
+    }
     created.apply(ctx as never)
     const api = setup.mock.calls[0]?.[0] as { readonly id: string; readonly add: unknown }
     expect(api.id).toBe('@test/acme')

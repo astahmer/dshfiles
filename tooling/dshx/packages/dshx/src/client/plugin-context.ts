@@ -63,7 +63,11 @@ export interface PluginContext extends PluginServices {
   /** Follow a contract another plugin provides; the same object for every call. */
   use<T>(contract: ContractToken<T>): Subscribable<Live<T>>
   /** Run fn in a fresh scope for each value of source; its registrations end when the value changes. */
-  keyed<K>(source: Subscribable<K>, fn: (key: K, scope: PluginContext) => void | (() => void), options?: { readonly equals?: (left: K, right: K) => boolean }): () => void
+  keyed<K>(
+    source: Subscribable<K>,
+    fn: (key: K, scope: PluginContext) => void | (() => void),
+    options?: { readonly equals?: (left: K, right: K) => boolean },
+  ): () => void
   /** Wrap a component provided to other plugins so its hooks read this plugin's context. */
   bind<Component>(component: Component): Component
   /** Run cleanup when this scope ends. */

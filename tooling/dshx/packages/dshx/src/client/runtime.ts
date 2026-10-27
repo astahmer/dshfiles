@@ -342,7 +342,7 @@ const slotContributionId = (name: string, options: Record<string, unknown>): str
 }
 
 const isolated = (component: unknown, owner: string, id: string): unknown =>
-  typeof component === 'function' ? IsolationModel.isolate(component as (props: object) => null, { owner, id }) : component
+  typeof component === 'function' ? IsolationModel.isolate(component as (props: Readonly<Record<string, unknown>>) => null, { owner, id }) : component
 
 function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator, owner: string): void {
   for (const conversation of definition.conversations ?? []) {

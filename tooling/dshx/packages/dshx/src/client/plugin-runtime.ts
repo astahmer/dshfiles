@@ -11,7 +11,12 @@ interface RuntimeHostContext {
 }
 
 const isNativeSlots = (value: unknown): value is NativeSlots =>
-  typeof value === 'object' && value !== null && 'inject' in value && typeof value.inject === 'function' && 'register' in value && typeof value.register === 'function'
+  typeof value === 'object' &&
+  value !== null &&
+  'inject' in value &&
+  typeof value.inject === 'function' &&
+  'register' in value &&
+  typeof value.register === 'function'
 
 /**
  * Build the plugin context behind `add`, `provide`, `use` and `usePlugin`,

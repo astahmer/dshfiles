@@ -30,7 +30,8 @@ const listContributedCommands = (commands: readonly CommandItem[]): (() => void)
   const disposers = commands.flatMap(command => {
     const action = toPaletteAction(command)
     if (action === undefined) {
-      if (command.hidden !== true) console.warn(`command-palette: ${command.id} is not listed; command ids start with the package scope, e.g. @acme/plugin.open.`)
+      if (command.hidden !== true)
+        console.warn(`command-palette: ${command.id} is not listed; command ids start with the package scope, e.g. @acme/plugin.open.`)
       return []
     }
     try {

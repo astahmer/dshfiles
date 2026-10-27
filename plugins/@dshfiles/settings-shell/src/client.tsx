@@ -622,12 +622,10 @@ export default defineClient({
         if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
         return
       }
-      actor.send({
-        type: 'open',
-        surface: requested,
-        ...(request.section === undefined ? {} : { sectionId: request.section }),
-        ...(request.target === undefined ? {} : { target: request.target }),
-      })
+      const openEvent: { type: 'open'; surface: typeof requested; sectionId?: string; target?: string } = { type: 'open', surface: requested }
+      if (request.section !== undefined) openEvent.sectionId = request.section
+      if (request.target !== undefined) openEvent.target = request.target
+      actor.send(openEvent)
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
 

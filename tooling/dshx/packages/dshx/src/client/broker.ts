@@ -141,11 +141,9 @@ const defineRegistry = <T, const Id extends string = string>(id: Id): RegistryTo
 }
 
 const provide = <T>(token: ContractToken<T>, value: T, owner: string): (() => void) => {
-  if (token.owner !== undefined && token.owner !== owner)
-    throw new Error(`dshx contract ${token.id} belongs to ${token.owner}; ${owner} cannot provide it.`)
+  if (token.owner !== undefined && token.owner !== owner) throw new Error(`dshx contract ${token.id} belongs to ${token.owner}; ${owner} cannot provide it.`)
   const state = contractState(token.id)
-  if (state.live.status === 'active' && state.live.owner !== owner)
-    throw new Error(`dshx contract ${token.id} is already provided by ${state.live.owner}.`)
+  if (state.live.status === 'active' && state.live.owner !== owner) throw new Error(`dshx contract ${token.id} is already provided by ${state.live.owner}.`)
   state.generation += 1
   const generation = state.generation
   const active: Live<T> = Object.freeze({ status: 'active', value, generation, owner })

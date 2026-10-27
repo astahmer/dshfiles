@@ -13,7 +13,13 @@ const virtualClientExports = async (): Promise<Set<string>> => {
   const names = new Set<string>()
   for (const match of block.matchAll(/export const (\w+)/gu)) names.add(match[1] ?? '')
   for (const match of block.matchAll(/export \{ ([^}]+) \}/gu))
-    for (const name of (match[1] ?? '').split(',')) names.add(name.trim().split(/\s+as\s+/u).at(-1) ?? '')
+    for (const name of (match[1] ?? '').split(','))
+      names.add(
+        name
+          .trim()
+          .split(/\s+as\s+/u)
+          .at(-1) ?? '',
+      )
   return names
 }
 
