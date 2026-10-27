@@ -287,7 +287,7 @@ function validateDefinition(value: unknown, metadata: HostPluginMetadata): HostD
   if (source.tools !== undefined && !Array.isArray(source.tools)) {
     fail(
       'DSHX2002',
-      'Host definition tools must be an array of official ToolDefinition values.',
+      'Host definition tools must be an array of official ToolDefinition values or Host-context factories.',
       metadata,
       'Use tools: [tool] or remove tools when this Host registers no tools.',
     )
@@ -390,7 +390,8 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
     apply(ctx, config) {
       if ((definition.tools?.length ?? 0) > 0) {
         const owners = (apiRegistry(ctx).toolOwners ??= new WeakMap())
-        for (const tool of definition.tools ?? []) {
+        for (const contribution of definition.tools ?? []) {
+          const tool = typeof contribution === 'function' ? contribution(ctx) : contribution
           ctx.tools.register(tool)
           owners.set(tool, metadata.packageId)
         }

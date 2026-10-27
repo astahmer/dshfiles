@@ -10,7 +10,7 @@ import { HostApiClientModel } from '../api/host-client.js'
 export const createHostApiClient = HostApiClientModel.create
 export const isApiServed = HostApiClientModel.isServed
 export const listApis = HostApiClientModel.list
-export type { HostDefinition, PromptContextContribution, PromptContribution, PromptSectionContribution } from './types.js'
+export type { HostDefinition, HostToolContribution, PromptContextContribution, PromptContribution, PromptSectionContribution } from './types.js'
 export type { CommandDefinition, CommandInvocation } from '@deepseek-ai/dsh-commands'
 export type { CommandResult } from '@deepseek-ai/dsh-commands/types'
 export type { AssembleContext, PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
