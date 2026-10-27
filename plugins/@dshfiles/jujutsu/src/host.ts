@@ -543,6 +543,16 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
           '\nThe current workspace and its working files remain in place.',
       }
     }
+    case 'workspace-edit': {
+      const destination = findRevision(revisions, action.commitId)
+      if (workspacePath === undefined) throw new Error('Workspace destination was not validated.')
+      return {
+        title: 'Move workspace',
+        summary: 'Move workspace ' + action.name + ' to ' + destination.shortestChangeId,
+        detail:
+          'Workspace: ' + action.name + '\nFolder: ' + workspacePath + '\nDestination: ' + destination.shortestChangeId + ' (' + destination.commitId + ')\n\nOnly this workspace’s working copy moves; its uncommitted files are snapshotted by Jujutsu first.',
+      }
+    }
     case 'workspace-forget': {
       return {
         title: 'Remove workspace',
@@ -668,11 +678,12 @@ const prepareMutation = async (
     workspacePath = destination.path
     workspaceParentIdentity = destination.parentIdentity
   }
-  if (action.kind === 'workspace-forget') {
+  if (action.kind === 'workspace-forget' || action.kind === 'workspace-edit') {
     const workspaces = await readWorkspaces(ctx, repo, signal)
     const target = workspaces.find(workspace => workspace.name === action.name)
     if (target === undefined) throw new Error('Workspace is no longer present. Refresh and try again.')
-    if (workspaces.length <= 1) throw new Error('Workspace removal refused: this is the repository’s only workspace.')
+    if (action.kind === 'workspace-forget' && workspaces.length <= 1)
+      throw new Error('Workspace removal refused: this is the repository’s only workspace.')
     workspaceRoot = target.path
     workspacePath = target.path
   }
@@ -870,7 +881,16 @@ const jujutsuHostApi = jujutsuApi.host({
       workspacePath = destination.path
     }
     if (prepared.action.kind === 'workspace-forget') await snapshotWorkspace(ctx, prepared.workspaceRoot, signal)
-    const result = await runAt(ctx, repo.root, repo.identity, prepared.argv, signal, {
+    const workspaceAction = prepared.action.kind === 'workspace-edit' ? prepared.action : undefined
+    if (workspaceAction !== undefined) {
+      const workspaces = await readWorkspaces(ctx, repo, signal)
+      const target = workspaces.find(workspace => workspace.name === workspaceAction.name)
+      if (target?.path !== prepared.workspaceRoot) throw new Error('Workspace changed after preview. Refresh and prepare the move again.')
+    }
+    const commandRoot = workspaceAction === undefined ? repo.root : prepared.workspaceRoot
+    const expectedIdentity = workspaceAction === undefined ? repo.identity : undefined
+    if (commandRoot === undefined) throw new Error('Workspace destination was not validated.')
+    const result = await runAt(ctx, commandRoot, expectedIdentity, prepared.argv, signal, {
       timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
     })
     await assertRepoIdentity(repo)

@@ -108,6 +108,9 @@ const buildMutationArgv = (action: Mutation): readonly string[] => {
       if (!workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name.')
       if (action.name === 'default') throw new Error('Workspace default cannot be removed; it is the repository main workspace.')
       return ['workspace', 'forget', action.name]
+    case 'workspace-edit':
+      if (!workspaceNameSchema.safeParse(action.name).success) throw new Error('Choose a valid workspace name.')
+      return ['edit', checkedCommitId(action.commitId)]
     case 'edit':
       return ['edit', checkedCommitId(action.commitId)]
     case 'new':

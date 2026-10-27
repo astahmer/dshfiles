@@ -67,6 +67,7 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('push'), remote: remoteNameSchema, bookmark: bookmarkNameSchema }),
   z.object({ kind: z.literal('workspace-add'), parentPath: z.string().min(1).max(2048), name: workspaceNameSchema, commitId: commitIdSchema }),
   z.object({ kind: z.literal('workspace-forget'), name: workspaceNameSchema }),
+  z.object({ kind: z.literal('workspace-edit'), name: workspaceNameSchema, commitId: commitIdSchema }),
   z.object({ kind: z.literal('edit'), commitId: commitIdSchema }),
   z.object({ kind: z.literal('new'), commitId: commitIdSchema }),
   z.object({ kind: z.literal('commit'), commitId: commitIdSchema, message: z.string().min(1).max(4000) }),
@@ -90,6 +91,7 @@ export const previewSchema = z.object({
     'push',
     'workspace-add',
     'workspace-forget',
+    'workspace-edit',
     'edit',
     'new',
     'commit',
@@ -360,7 +362,7 @@ export const jujutsuApi = defineApi({
       input: z.object({ repoId: repoIdSchema, action: mutationSchema }),
       output: previewSchema,
       description:
-        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, edit, new, commit, duplicate, abandon, revert, restore.',
+        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore.',
       tool: {
         name: 'jj_prepare_action',
         render: output => `${output.title} · ${output.summary}\n${output.detail}\npreviewId ${output.id} (expires ${new Date(output.expiresAt).toISOString()})`,

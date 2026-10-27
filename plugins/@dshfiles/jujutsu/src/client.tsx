@@ -76,7 +76,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
-import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
+import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, resolveWorkspaceDrop, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
 import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell, type GraphMetrics } from './revision-graph-cell.js'
@@ -642,6 +642,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const dropPreviewAt = (destination: Revision): JSX.Element | null => {
     if (dropPresentation === null) return null
     const source = revisionsByCommitId.get(dropPresentation.sourceId)
+    const sourceLabel =
+      dropPresentation.kind === 'workspace-move'
+        ? `workspace ${dropPresentation.workspace} · ${source?.shortestChangeId ?? dropPresentation.sourceId.slice(0, 12)}`
+        : source === undefined
+          ? dropPresentation.sourceId.slice(0, 12)
+          : `${source.shortestChangeId} · ${firstLine(source.description)}`
     return (
       <InlineDropPreview
         branch={dropPresentation.kind === 'rebase' ? previewBranch : []}
@@ -651,7 +657,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         onConfirm={confirmPreview}
         presentation={dropPresentation}
         preview={preview}
-        sourceLabel={source === undefined ? dropPresentation.sourceId.slice(0, 12) : `${source.shortestChangeId} · ${firstLine(source.description)}`}
+        sourceLabel={sourceLabel}
       />
     )
   }
@@ -1047,6 +1053,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const dropResolution = (event: DragEvent, target: Revision) => {
     const revisions = state?.revisions ?? []
+    const workspace = event.dataTransfer.getData(WORKSPACE_MIME)
+    if (workspace.length > 0) return resolveWorkspaceDrop({ workspace, target, revisions })
     const bookmark = event.dataTransfer.getData(BOOKMARK_MIME)
     if (bookmark.length > 0) {
       return resolveBookmarkDrop({
@@ -1690,7 +1698,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       revisionDate={preferences.revisionDate}
                       menu={revisionMenu(item.revision)}
                       onDragEnter={event => {
-                        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME))
+                        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME) || hasDragType(event, WORKSPACE_MIME))
                           sendAction({ type: 'drag.enter', targetId: item.revision.commitId })
                       }}
                       onDragLeave={() => sendAction({ type: 'drag.leave', targetId: item.revision.commitId })}
@@ -2254,12 +2262,16 @@ interface InlineDropPreviewProps {
 
 const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
   <section
-    aria-label={props.presentation.kind === 'rebase' ? 'Preview branch rebase' : 'Preview bookmark move'}
+    aria-label={props.presentation.kind === 'rebase' ? 'Preview branch rebase' : props.presentation.kind === 'workspace-move' ? 'Preview workspace move' : 'Preview bookmark move'}
     className="dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-primary/40 dshx:bg-primary/5 dshx:p-3"
     role="group"
   >
     <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-1.5 dshx:text-xs">
-      <strong>{props.presentation.kind === 'rebase' ? 'Rebase branch' : `Move bookmark “${props.presentation.bookmark}”`}</strong>
+      <strong>      {props.presentation.kind === 'rebase'
+        ? 'Rebase branch'
+        : props.presentation.kind === 'workspace-move'
+          ? `Move workspace “${props.presentation.workspace}”`
+          : `Move bookmark “${props.presentation.bookmark}”`}</strong>
       <span className="dshx:text-muted-foreground">from</span>
       <code className="dshx:font-mono!">{props.sourceLabel}</code>
       <span className="dshx:text-muted-foreground">onto</span>
@@ -2288,7 +2300,7 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
         Cancel
       </Button>
       <Button disabled={props.preview === undefined || props.busy} onClick={props.onConfirm} size="sm" type="button">
-        {props.presentation.kind === 'rebase' ? 'Rebase revision' : 'Move bookmark'}
+        {props.presentation.kind === 'rebase' ? 'Rebase revision' : props.presentation.kind === 'workspace-move' ? 'Move workspace' : 'Move bookmark'}
       </Button>
     </div>
   </section>
@@ -2329,17 +2341,26 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const workspaceLabel = (workspace: string): JSX.Element => (
     <span
       className={cn(
-        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:text-background',
+        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-[11px] dshx:font-medium dshx:text-background',
         revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
       )}
+      draggable
       onContextMenu={event => event.stopPropagation()}
+      onDragStart={event => {
+        event.stopPropagation()
+        event.dataTransfer.setData(WORKSPACE_MIME, workspace)
+        event.dataTransfer.effectAllowed = 'move'
+        props.onDragStart({ kind: 'workspace', sourceId: revision.commitId, workspace })
+      }}
     >
       <MonitorIcon aria-hidden className="dshx:size-3 dshx:flex-none" />
       <span className="dshx:truncate">{workspace}</span>
     </span>
   )
   const workspaceHint = (workspace: string): string =>
-    revision.workingCopy ? `Working copy of workspace ${workspace} · right-click for actions` : `Workspace ${workspace} · right-click for actions`
+    revision.workingCopy
+      ? `Working copy of workspace ${workspace} · drag onto a revision to move this workspace · right-click for actions`
+      : `Workspace ${workspace} · drag onto a revision to move this workspace · right-click for actions`
   const remoteBookmarkLabels = revision.remoteBookmarksText
     .split('\n')
     .filter(Boolean)
@@ -2444,7 +2465,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) props.onDragLeave()
       }}
       onDragOver={event => {
-        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME)) {
+        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME) || hasDragType(event, WORKSPACE_MIME)) {
           event.preventDefault()
           event.dataTransfer.dropEffect = 'move'
         }

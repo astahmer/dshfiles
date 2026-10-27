@@ -18,10 +18,12 @@ interface RevisionActionClient {
 export type DragOrigin =
   | { readonly kind: 'revision'; readonly sourceId: string }
   | { readonly kind: 'bookmark'; readonly sourceId: string; readonly bookmark: string }
+  | { readonly kind: 'workspace'; readonly sourceId: string; readonly workspace: string }
 
 export type DropPresentation =
   | { readonly kind: 'rebase'; readonly sourceId: string; readonly destinationId: string }
   | { readonly kind: 'bookmark-move'; readonly sourceId: string; readonly destinationId: string; readonly bookmark: string }
+  | { readonly kind: 'workspace-move'; readonly sourceId: string; readonly destinationId: string; readonly workspace: string }
 
 interface RevisionActionContext {
   readonly client: RevisionActionClient
