@@ -3,6 +3,10 @@ import { ApiRuntimeModel } from '../api/runtime.js'
 import { ClientContributionModel } from './define.js'
 import { HostCommandsModel } from './host-commands.js'
 import { LocaleNamespaceModel } from './locale.js'
+import { BrowserBroker } from './broker.js'
+import { PluginHooksModel } from './hooks.js'
+import { PluginContextModel } from './plugin-context.js'
+import { StoreModel } from './store.js'
 
 export const defineClient = ClientContributionModel.defineClient
 export const defineSlot = ClientContributionModel.defineSlot
@@ -48,6 +52,53 @@ export type {
   PanelProps,
   PanelIconProps,
 } from '../sdk/client.js'
+
+export const defineContract = BrowserBroker.defineContract
+export const defineRegistry = BrowserBroker.defineRegistry
+/** Contributions that threw, for a diagnostics view; `useContributionFailures` reads it in React. */
+export const contributionFailures = BrowserBroker.failures
+export type { ContractToken, ContributionFailure, Live, RegistryToken, Subscribable } from './broker.js'
+export type { ItemSource, PluginContext, PluginServices, Track } from './plugin-context.js'
+export const constantSource = PluginContextModel.constant
+export const createSource = PluginContextModel.signal
+
+export { Command, Dialogs, Toasts } from './app-services.js'
+export type {
+  AlertInput,
+  CommandItem,
+  CommandsService,
+  ConfirmInput,
+  DialogsService,
+  LayoutService,
+  PromptInput,
+  SelectInput,
+  SelectOption,
+  ToastInput,
+  ToastsService,
+  ToastTone,
+} from './app-services.js'
+export { ComposerAction, HeaderAction, Overlay, Panel, SessionRowAccessory, SettingsSection } from './registries.js'
+export type {
+  ComposerActionItem,
+  HeaderActionItem,
+  OverlayItem,
+  PanelItem,
+  SessionRowAccessoryItem,
+  SettingsSearchEntry,
+  SettingsSectionItem,
+} from './registries.js'
+
+export const defineStore = StoreModel.define
+export type { DefinedStore, PersistedStore, StoreDefinition, StoreScope } from './store.js'
+
+export const usePlugin = PluginHooksModel.usePlugin
+export const useSubscribable = PluginHooksModel.useSubscribable
+export const useContract = PluginHooksModel.useContract
+export const useRegistry = PluginHooksModel.useRegistry
+export const useContributionFailures = PluginHooksModel.useContributionFailures
+export const useKeyed = PluginHooksModel.useKeyed
+export const useLatest = PluginHooksModel.useLatest
+export type { LatestState } from './hooks.js'
 
 export const provideSettingsPageRenderer = SettingsPageRendererModel.provide
 export type { SettingsPageRenderer, SettingsPageRendererProps }

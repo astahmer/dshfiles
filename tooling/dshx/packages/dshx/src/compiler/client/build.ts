@@ -38,6 +38,12 @@ const CLIENT_SDK_PATH = fileURLToPath(new URL('../../sdk/client.js', import.meta
 const CLIENT_LOCALE_PATH = fileURLToPath(new URL('../../client/locale.js', import.meta.url))
 const CLIENT_HOST_COMMANDS_PATH = fileURLToPath(new URL('../../client/host-commands.js', import.meta.url))
 const CLIENT_API_PATH = fileURLToPath(new URL('../../api/client.js', import.meta.url))
+const CLIENT_BROKER_PATH = fileURLToPath(new URL('../../client/broker.js', import.meta.url))
+const CLIENT_APP_SERVICES_PATH = fileURLToPath(new URL('../../client/app-services.js', import.meta.url))
+const CLIENT_REGISTRIES_PATH = fileURLToPath(new URL('../../client/registries.js', import.meta.url))
+const CLIENT_STORE_PATH = fileURLToPath(new URL('../../client/store.js', import.meta.url))
+const CLIENT_HOOKS_PATH = fileURLToPath(new URL('../../client/hooks.js', import.meta.url))
+const CLIENT_PLUGIN_CONTEXT_PATH = fileURLToPath(new URL('../../client/plugin-context.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
@@ -157,6 +163,25 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
           `import { SettingsPageRendererModel } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           'export const provideSettingsPageRenderer = SettingsPageRendererModel.provide',
+          `import { BrowserBroker } from ${JSON.stringify(CLIENT_BROKER_PATH)}`,
+          'export const defineContract = BrowserBroker.defineContract',
+          'export const defineRegistry = BrowserBroker.defineRegistry',
+          'export const contributionFailures = BrowserBroker.failures',
+          `import { PluginContextModel } from ${JSON.stringify(CLIENT_PLUGIN_CONTEXT_PATH)}`,
+          'export const constantSource = PluginContextModel.constant',
+          'export const createSource = PluginContextModel.signal',
+          `export { Command, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
+          `export { ComposerAction, HeaderAction, Overlay, Panel, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
+          `import { StoreModel } from ${JSON.stringify(CLIENT_STORE_PATH)}`,
+          'export const defineStore = StoreModel.define',
+          `import { PluginHooksModel } from ${JSON.stringify(CLIENT_HOOKS_PATH)}`,
+          'export const usePlugin = PluginHooksModel.usePlugin',
+          'export const useSubscribable = PluginHooksModel.useSubscribable',
+          'export const useContract = PluginHooksModel.useContract',
+          'export const useRegistry = PluginHooksModel.useRegistry',
+          'export const useContributionFailures = PluginHooksModel.useContributionFailures',
+          'export const useKeyed = PluginHooksModel.useKeyed',
+          'export const useLatest = PluginHooksModel.useLatest',
           '',
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {

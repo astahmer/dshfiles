@@ -6524,6 +6524,9 @@ importers:
       '@types/write-file-atomic':
         specifier: 4.0.3
         version: 4.0.3
+      jsdom:
+        specifier: 'catalog:'
+        version: 26.1.0
       react:
         specifier: 'catalog:'
         version: 18.3.1

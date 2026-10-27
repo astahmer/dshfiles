@@ -139,6 +139,7 @@ describe('Client runtime adapter', () => {
       packageId: '@test/plugin',
       logicalName: 'logical-client',
       sourceFile: '/project/src/client.tsx',
+      plugin: expect.objectContaining({ id: '@test/plugin', add: expect.any(Function), provide: expect.any(Function) }),
     })
   })
 
@@ -234,7 +235,8 @@ describe('Client runtime adapter', () => {
     expect(effect.mock.invocationCallOrder[0]).toBeLessThan(registerLocale.mock.invocationCallOrder[0] ?? 0)
     expect(calls).toEqual(['locale:test.copy', 'inject:test.slot', 'slot:test.copy', 'setup'])
     expect(registered[0]).toEqual({ namespace: 'test.copy', dictionaries: LocaleNamespaceModel.parts(copy).dictionaries })
-    expect(registered[1]).toEqual({ options: { name: 'test.slot', id: 'localized', locale: 'test.copy' }, component })
+    expect(registered[1]).toEqual({ options: { name: 'test.slot', id: 'localized', locale: 'test.copy' }, component: expect.any(Function) })
+    expect(registered[1]).toHaveProperty('component.displayName', 'WithPlugin(Isolated(component))')
     expect(dispose).not.toHaveBeenCalled()
   })
 
@@ -247,7 +249,8 @@ describe('Client runtime adapter', () => {
     const ctx = new Context()
     ctx.provide('slots', { inject: (_name: string, apply: () => unknown) => apply(), register })
     plugin.apply(ctx)
-    expect(register).toHaveBeenCalledWith({ name: 'test.slot', id: 'native', locale: 'test.native' }, component)
+    expect(register).toHaveBeenCalledWith({ name: 'test.slot', id: 'native', locale: 'test.native' }, expect.any(Function))
+    expect(register.mock.calls[0]?.[1]).toHaveProperty('displayName', 'WithPlugin(Isolated(component))')
   })
 
   it('does not inject or register an empty Slot list', () => {

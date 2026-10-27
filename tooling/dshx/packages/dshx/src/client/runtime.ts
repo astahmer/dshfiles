@@ -1,6 +1,10 @@
 import { SdkSetupRuntime } from '../sdk/setup.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { DshxError } from '../diagnostics.js'
+import { BrowserBroker } from './broker.js'
+import { IsolationModel } from './isolation.js'
+import type { PluginContext } from './plugin-context.js'
+import { PluginRuntimeModel } from './plugin-runtime.js'
 import type {
   ClientComponentDecorator,
   ClientConversationContribution,
@@ -303,7 +307,15 @@ function registerLocales(client: ClientRuntimeContext, definition: ClientDefinit
   }
 }
 
-function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator): void {
+const slotContributionId = (name: string, options: Record<string, unknown>): string => {
+  const key = typeof options.id === 'string' ? options.id : typeof options.key === 'string' ? options.key : undefined
+  return key === undefined ? name : `${name}:${key}`
+}
+
+const isolated = (component: unknown, owner: string, id: string): unknown =>
+  typeof component === 'function' ? IsolationModel.isolate(component as (props: object) => null, { owner, id }) : component
+
+function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator, owner: string): void {
   for (const conversation of definition.conversations ?? []) {
     const { definition: conversationDefinition, renderer } = ConversationContributionModel.parts(conversation)
     client.conversationEvents.register(conversationDefinition)
@@ -311,7 +323,23 @@ function registerContributions(client: ClientRuntimeContext, definition: ClientD
   }
   for (const slot of definition.slots ?? []) {
     const { name, options, component } = ClientContributionModel.parts(slot)
-    client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(component)))
+    const id = slotContributionId(name, options as Record<string, unknown>)
+    client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(isolated(component, owner, id))))
+  }
+}
+
+const invokeSetup = (
+  definition: ClientDefinition,
+  client: ClientRuntimeContext,
+  decorate: ComponentDecorator,
+  metadata: ClientPluginMetadata,
+  plugin: PluginContext,
+): ReturnType<typeof SdkSetupRuntime.invokeClient> => {
+  try {
+    return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, { ...metadata, plugin })
+  } catch (error) {
+    BrowserBroker.reportFailure({ owner: metadata.packageId, kind: 'setup', id: 'setup', error })
+    throw error
   }
 }
 
@@ -364,10 +392,11 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
       registerLocales(client, definition)
       const settings = metadata.settingsCapability === true ? createSettingsClientRuntime(ctx) : undefined
       if (!hasApiCapability) {
-        const decorate = ((component: unknown): unknown =>
+        const baseDecorate = ((component: unknown): unknown =>
           settings === undefined ? component : provideSettingsContext(component as any, settings)) as ComponentDecorator
-        registerContributions(client, definition, decorate)
-        return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
+        const runtime = PluginRuntimeModel.create({ ctx: client, packageId: metadata.packageId, decorate: baseDecorate })
+        registerContributions(client, definition, runtime.decorate, metadata.packageId)
+        return invokeSetup(definition, client, runtime.decorate, metadata, runtime.plugin)
       }
       const apiClient = ApiClientLifecycle.create(ctx, metadata.packageId)
       if (typeof client.effect === 'function') client.effect(() => BrowserTraceTransportModel.connect(client))
@@ -375,12 +404,13 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
       // function type than the component it wraps. The contract callers rely on
       // is "renders the same component", so the wrapper is asserted once here
       // rather than leaking provider props into every registration site.
-      const decorate = ((component: unknown): unknown => {
+      const baseDecorate = ((component: unknown): unknown => {
         const apiComponent = ApiClientLifecycle.provide(component as any, apiClient)
         return settings === undefined ? apiComponent : provideSettingsContext(apiComponent, settings)
       }) as ComponentDecorator
-      registerContributions(client, definition, decorate)
-      return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
+      const runtime = PluginRuntimeModel.create({ ctx: client, packageId: metadata.packageId, decorate: baseDecorate })
+      registerContributions(client, definition, runtime.decorate, metadata.packageId)
+      return invokeSetup(definition, client, runtime.decorate, metadata, runtime.plugin)
     },
   }
 }

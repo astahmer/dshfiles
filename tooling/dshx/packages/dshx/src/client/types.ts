@@ -17,6 +17,7 @@ import type {
   Translate,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationContribution } from '../conversation/types.js'
+import type { PluginContext } from './plugin-context.js'
 
 declare const slotContributionBrand: unique symbol
 declare const localeDefinitionBrand: unique symbol
@@ -73,7 +74,12 @@ export interface ClientDefinition {
   readonly locales?: readonly LocaleDefinition[]
   readonly conversations?: readonly ClientConversationContribution[]
   readonly slots?: readonly SlotContribution[]
-  readonly setup?: (ctx: ClientContext, decorate: ClientComponentDecorator, metadata?: { readonly packageId: string }) => void | Effect<void>
+  /** `metadata.plugin` is this plugin's context: `add`, `provide`, `use`, dialogs, toasts, commands and layout. */
+  readonly setup?: (
+    ctx: ClientContext,
+    decorate: ClientComponentDecorator,
+    metadata?: { readonly packageId: string; readonly plugin?: PluginContext },
+  ) => void | Effect<void>
 }
 
 type RendersCheck<C, D> = [keyof D & keyof SlotMap & string] extends [never]

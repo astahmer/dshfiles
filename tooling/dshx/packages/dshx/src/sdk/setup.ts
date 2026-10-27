@@ -1,11 +1,13 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
+import type { PluginContext } from '../client/plugin-context.js'
 import type { ClientContext, ClientDefinition } from '../client/types.js'
 
 type Setup = (ctx: Context, config: unknown) => void | Effect<void>
 type Metadata = { readonly packageId: string }
+type ClientMetadata = Metadata & { readonly plugin?: PluginContext }
 type HostSetup = (ctx: Context, config: unknown, metadata: Metadata) => void | Effect<void>
 type ComponentDecorator = <Component>(component: Component) => Component
-type ClientSetup = (ctx: ClientContext, decorate: ComponentDecorator, metadata: Metadata) => void | Effect<void>
+type ClientSetup = (ctx: ClientContext, decorate: ComponentDecorator, metadata: ClientMetadata) => void | Effect<void>
 // A defineClient({ setup }) handler receives the component decorator second and metadata third.
 type ClientDefinitionSetup = NonNullable<ClientDefinition['setup']>
 // Definition metadata only. Cordis still owns activation, identity, and cleanup.
@@ -49,7 +51,7 @@ const invokeClientSetup = (
   setup: ClientDefinitionSetup | undefined,
   ctx: ClientContext,
   decorate: ComponentDecorator,
-  metadata: Metadata,
+  metadata: ClientMetadata,
 ): void | Effect<void> => {
   if (setup === undefined) return undefined
   const adapted = clients.get(setup)

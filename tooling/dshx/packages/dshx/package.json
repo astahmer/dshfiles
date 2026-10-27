@@ -162,6 +162,7 @@
     "@types/react": "catalog:",
     "@types/semver": "catalog:",
     "@types/write-file-atomic": "4.0.3",
+    "jsdom": "catalog:",
     "playwright": "1.56.1",
     "react": "catalog:",
     "vitest": "catalog:"
