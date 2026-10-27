@@ -4,22 +4,28 @@
   "features": [
     {
       "id": "public-post-context",
-      "title": "Fetch public X post text and sampled video frames",
-      "summary": "Give an agent a public X/Twitter post's text and author, plus up to six bounded image samples from a video post.",
+      "title": "Fetch public X post text, photos and sampled video frames",
+      "summary": "Give an agent a public X/Twitter post and quoted post, including photos and duration-aware video samples with a shared frame budget.",
       "surfaces": ["host", "integration"],
       "configuration": [],
       "states": ["input-validation", "post-fetch", "video-download", "frame-sampling", "attachment-save", "ready", "failed"],
       "failureModes": [
         "Only HTTPS x.com and twitter.com status URLs are accepted; private, deleted, or unavailable posts cannot be retrieved.",
-        "The third-party FxEmbed API and video.twimg.com may be unavailable or return unsupported data.",
-        "Video downloads are capped at 25 MB and 10 minutes; ffmpeg must be on the DSH Host PATH, with frames capped at 16 million pixels and single allocations at 128 MB.",
-        "Only sampled still images are returned; audio and continuous motion are unavailable."
+        "The third-party FxEmbed API, pbs.twimg.com and video.twimg.com may be unavailable or return unsupported data; failed media is reported alongside available context.",
+        "At most eight media items are processed within 100 seconds; photos are capped at 10 MB and video downloads at 25 MB and 10 minutes.",
+        "Video frames scale with duration to a shared maximum of 24; ffmpeg must be on the DSH Host PATH, with frames capped at 16 million pixels and single allocations at 128 MB.",
+        "Only sampled still images are returned; frame times are approximate and audio and continuous motion are unavailable."
       ],
       "externalDependencies": [
         {
           "id": "fxembed-public-api",
-          "boundary": "The public numeric post ID is sent to api.fxtwitter.com; the response supplies post text, author metadata, and video URLs.",
+          "boundary": "The public numeric post ID is sent to api.fxtwitter.com; the response supplies post and quote text, author metadata, and media URLs.",
           "deterministicFake": "The host test injects a fetcher that serves a fixed FxEmbed-shaped response from a local HTTP fixture; it never calls a public post API."
+        },
+        {
+          "id": "x-image-cdn",
+          "boundary": "Photos are downloaded from pbs.twimg.com and saved as image attachments.",
+          "deterministicFake": "The media tests provide photo responses using a controlled fetch seam and verify host and redirect restrictions."
         },
         {
           "id": "x-video-cdn",
@@ -32,6 +38,12 @@
           "kind": "gherkin",
           "id": "tweet-context.tool-catalog",
           "featureFile": "tooling/dshx/e2e/features/tweet-context.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.photos-and-quotes",
+          "file": "plugins/@dshfiles/tweet-context/tests/media.spec.ts",
+          "testName": "returns photo attachments and quoted post while deduplicating media.all"
         },
         {
           "kind": "unit-test",

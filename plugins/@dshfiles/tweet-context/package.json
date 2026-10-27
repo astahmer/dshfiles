@@ -2,7 +2,7 @@
   "name": "@dshfiles/tweet-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Agent tool for public X post text and sampled video frames.",
+  "description": "Agent tool for public X post text, photos, quotes and sampled video frames.",
   "license": "MIT",
   "files": [
     "dist",
@@ -35,8 +35,14 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-agent": "catalog:",
+    "@deepseek-ai/dsh-agent-loop": "0.2.1-rc.2",
     "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-attachment-local": "0.2.1-rc.2",
     "@deepseek-ai/dsh-llm": "catalog:",
+    "@deepseek-ai/dsh-session": "catalog:",
+    "@deepseek-ai/dsh-session-projection": "catalog:",
+    "@deepseek-ai/dsh-token-meter": "0.2.1-rc.2",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
