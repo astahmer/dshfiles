@@ -95,10 +95,11 @@ Then('the long message previews as one truncated line', async ({ page }: { page:
   await recordAssertion(page, 'queue-reorder-preview-is-one-bounded-line', async () => {
     const preview = queuedRows(page).filter({ hasText: 'third queued' }).locator('span[title]')
     const text = (await preview.textContent()) ?? ''
+    const title = (await preview.getAttribute('title')) ?? ''
     expect(text.startsWith('third queued line xxx')).toBe(true)
     expect(text).not.toContain('\n')
-    expect([...text].length).toBeLessThanOrEqual(201)
-    expect(text.length).toBeLessThan(`third queued line ${LONG_TAIL}`.length)
+    expect([...title].length).toBeLessThanOrEqual(201)
+    expect(title.length).toBeLessThan(`third queued line ${LONG_TAIL}`.length)
   })
 })
 
@@ -147,8 +148,8 @@ Then('the queue starts collapsed and previews at most 40 characters', async ({ p
   })
   await queueDock(page).getByRole('button').first().click()
   await recordAssertion(page, 'queue-reorder-preview-length-applies', async () => {
-    const text = (await queuedRows(page).filter({ hasText: 'third queued' }).locator('span[title]').textContent()) ?? ''
-    expect([...text].length).toBeLessThanOrEqual(41)
+    const title = (await queuedRows(page).filter({ hasText: 'third queued' }).locator('span[title]').getAttribute('title')) ?? ''
+    expect([...title].length).toBeLessThanOrEqual(41)
   })
   await finishJourneyAssertions(page)
 })

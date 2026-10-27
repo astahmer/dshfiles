@@ -11,7 +11,7 @@ import { useMutation } from '@dshfiles/plugin-ui/query'
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type CSSProperties } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
-import { attachmentPreviews, messagePreview } from './message-preview.js'
+import { attachmentPreviews, messagePreview, messageText } from './message-preview.js'
 import { QueuedAttachments, type ReadQueuedImage } from './queued-attachments.js'
 import { QueueEditModel, type QueueEditor, type QueueEditView, type QueuedRow } from './queue-edit.js'
 import { useQueueClientForEditing } from './session-queue-editor.js'
@@ -63,6 +63,8 @@ interface SessionState {
 }
 
 type Direction = 'up' | 'down'
+
+const QUEUE_TEXT_FACTS = { collapseWhitespace: true, trimWhitespace: true }
 
 const attachmentsOf = (content: QueuedRow['content']): string | null => {
   const files = content.filter(block => block.type !== 'text')
@@ -249,6 +251,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     const rowId = MessageId(row.id)
     const isBusy = busy === rowId
     const preview = messagePreview(row.content, previewLength)
+    const text = messageText(row.content)
     const previews = attachmentPreviews(row.blocks)
     return (
       <li
@@ -297,7 +300,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           <GripVerticalIcon className="dshx:size-3.5" />
         </span>
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={preview || undefined}>
-          {preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))}
+          {text !== ''
+            ? props.renderFactorySlot('conversation.user.text', { text, facts: QUEUE_TEXT_FACTS, interactive: false, ellipsis: true })
+            : preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))}
         </span>
         {showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}
         {queueMutable ? (

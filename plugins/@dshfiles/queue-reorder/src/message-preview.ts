@@ -1,5 +1,11 @@
 import type { QueuedBlock, QueuedImageAttachment } from './queue-edit.js'
 
+export const messageText = (content: readonly { readonly type: string; readonly text?: string | undefined }[]): string =>
+  content
+    .filter(block => block.type === 'text')
+    .map(block => block.text ?? '')
+    .join('')
+
 export const messagePreview = (content: readonly { readonly type: string; readonly text?: string | undefined }[], limit: number): string => {
   const flat = content
     .filter(block => block.type !== 'image' && block.type !== 'file')
