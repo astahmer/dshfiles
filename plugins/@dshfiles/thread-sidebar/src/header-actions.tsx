@@ -48,8 +48,8 @@ const muteUntilNow = (option: ThreadMuteOption): number | null => ThreadMuteMode
 
 // Room the native title cluster keeps for the breadcrumb before Pin folds into the menu.
 const TITLE_MIN_WIDTH = 160
-// Pin's icon button plus the utilities gap; the hysteresis keeps Pin from flickering at the edge.
-const PIN_SLOT_WIDTH = 40
+// Copy-link and pin buttons plus the utilities gap; the hysteresis keeps them from flickering at the edge.
+const PIN_SLOT_WIDTH = 76
 
 // The native header row is the ancestor that holds the corner seat; its first child is the title cluster.
 const findTitleCluster = (bar: HTMLElement): HTMLElement | null => {
@@ -178,6 +178,8 @@ export const HeaderThreadActions = ({
     }
   }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
+  const copyLinkLabel = t('threadSidebarCopyLink')
+  const copyLink = (): void => void copy(ThreadUrlModel.buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')
   const pinLabel = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
   const pinIcon = pinned ? <PinOffIcon aria-hidden="true" /> : <PinIcon aria-hidden="true" />
   const moreLabel = t('threadSidebarMoreThreadActions')
@@ -187,6 +189,16 @@ export const HeaderThreadActions = ({
   return (
     <TooltipProvider delayDuration={300}>
       <div ref={setBar} className="dshx-root dshx:flex dshx:items-center dshx:gap-1" role="group" aria-label={t('threadSidebarThreadActions')}>
+        {!crowded ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={copyLinkLabel} onClick={copyLink}>
+                <CopyIcon aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{copyLinkLabel}</TooltipContent>
+          </Tooltip>
+        ) : null}
         {showPinButton ? (
           <Tooltip>
             <TooltipTrigger asChild>
