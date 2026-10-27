@@ -36,9 +36,9 @@ test('an agent comment starts on the agent preset, route and instructions', () =
   assert.equal(request.provider, null)
   assert.equal(request.model, null)
   assert.equal(request.open, false)
-  // The Host prepends the agent's identity and instructions to this text, so the request carries the task alone.
-  assert.match(request.message, /^Work on b:12: Fix the flaky test/u)
-  assert.match(request.message, /look at b:12$/u)
+  // The comment is already part of the mandatory item context, so don't echo it as a separate task.
+  assert.equal(request.message, 'Work on b:12: Fix the flaky test\n\nreason: race')
+  assert.doesNotMatch(request.message, /look at b:12/u)
 })
 
 test('an agent comment opens the thread when the backlog setting opts in', () => {
@@ -46,9 +46,10 @@ test('an agent comment opens the thread when the backlog setting opts in', () =>
   assert.equal(request.open, true)
 })
 
-test('an agent comment with no task still names the item it came from', () => {
-  const request = AgentComments.request({ items: [item], agent: agent(), task: '', target: { kind: 'default' } })
-  assert.match(request.message, /Work on b:12: Fix the flaky test\n\nreason: race$/u)
+test('an agent comment does not duplicate its reply in the opening message', () => {
+  const request = AgentComments.request({ items: [item], agent: agent(), task: 'fix the flaky test', target: { kind: 'default' } })
+  assert.equal(request.message, 'Work on b:12: Fix the flaky test\n\nreason: race')
+  assert.doesNotMatch(request.message, /look at b:12/u)
 })
 
 test('a chosen agent composes its identity, instructions and task', () => {
