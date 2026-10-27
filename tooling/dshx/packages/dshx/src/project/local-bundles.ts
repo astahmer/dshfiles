@@ -43,12 +43,13 @@ export interface LocalBootBundle extends BootProfileBundle {
 }
 
 /** Owned Cordis bundles under plugins/@dshfiles, sorted by package id. */
-const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
-  const entries = await readdir(pluginsRoot, { withFileTypes: true })
+const listLocalBootBundles = async (options: { readonly pluginsRoot?: string } = {}): Promise<LocalBootBundle[]> => {
+  const root = options.pluginsRoot ?? pluginsRoot
+  const entries = await readdir(root, { withFileTypes: true })
   const bundles: LocalBootBundle[] = []
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const projectRoot = join(pluginsRoot, entry.name)
+    const projectRoot = join(root, entry.name)
     const source = await readFile(join(projectRoot, 'package.json'), 'utf8').catch(() => undefined)
     if (source === undefined) continue
     let rawManifest: JsonValue

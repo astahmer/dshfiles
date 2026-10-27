@@ -297,7 +297,7 @@ export const cliCommandMetadata = {
   dev: 'Run a compatibility-aware DSH development session; dev up|doctor|open|shot|down drive a scratch DSH (dshx dev up --help).',
   checkout: 'Bring the jj checkout that runs DSH onto main, then reinstall and rebuild what changed (dshx checkout sync --help).',
   inspect: 'Inspect Slots, Tools, Services, or Events.',
-  add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
+  add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution; or install a plugin into a profile (dshx add <package> --help).',
   status: 'Report the running local DSH: process, launch revision, plugin activation, and bundles.',
   info: 'Show local DSHX and Node runtime information.',
   doctor: 'Diagnose local DSHX and reachable DSH APIs.',
@@ -978,5 +978,6 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 export class CliOptionMetadata {
   static readonly commandMetadata = cliCommandMetadata
   static readonly argsForContext = cliArgsForContext
+  static readonly isAddTarget = isCliAddTarget
   static readonly commonArgsToContexts = cliArgsCommonToContexts
 }

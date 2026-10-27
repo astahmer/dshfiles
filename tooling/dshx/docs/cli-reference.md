@@ -88,7 +88,22 @@ dshx add command --name <name> [--description <text>]
 dshx add hook --event <event>
 ```
 
-All add commands accept `--file`, `--dry-run`, and `--json`. They generate source transactionally and roll back on validation failure. They do not install packages, change Profiles, or start DSH. There are no `add settings`, `add prompt`, or `add conversation` commands.
+All scaffold targets accept `--file`, `--dry-run`, and `--json`. They generate source transactionally and roll back on validation failure. They do not install packages, change Profiles, or start DSH. There are no `add settings`, `add prompt`, or `add conversation` commands.
+
+### `dshx add <package>`: install a plugin into a profile
+
+```bash
+dshx add <package|path> [--profile <name>] [--option key=value ...] [--home <dir>] [--dry-run] [--json]
+```
+
+Any operand that is not a scaffold target installs one plugin into a DSH profile in one step:
+
+- An owned bundle (`@dshfiles/<name>`, or a path to `plugins/@dshfiles/<name>`) is linked and installed with `scripts/profile-sync.ts --bundle <name>`, the same path as `pnpm profile:sync --bundle`. A registry package goes through `dsh plugin --profile <name> add <package>`. Either step is skipped when the profile already lists the package.
+- Each `--option key=value` (value parsed as a YAML scalar) merges into the plugin's Loader row config in the profile's `cordis.patch.yml`. The row id is read from the bundle's own `cordis.patch.yml` insert (the scope-kept slug, e.g. `dshfiles-shortcuts`). A patch entry replaces the row's whole `config`, so a new override starts from the bundle's row config; an existing override keeps its other keys. Comments and `!!js` values elsewhere in the patch are preserved.
+- Options are validated against the `Config` the plugin's built Host entry exports (Standard Schema, or a callable Schemastery schema) before anything is installed. When the entry is not built or exports none, options pass through with a warning.
+- Client `dsh.client.inject` edges come from the bundle's own manifest; the plan lists them.
+
+The plan names every command and file. Running it twice changes nothing and reports `up to date`. Any change needs **Restart the DSH host process**, which `dshx add` never does. `--profile` defaults to `probe`; `web` is only touched when named explicitly. A missing profile, an unknown `@dshfiles/*` package and options the schema rejects exit 1; usage errors exit 2.
 
 ## Shared options
 

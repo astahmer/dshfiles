@@ -41,7 +41,7 @@ import type { AddToolOptions, AddToolResult } from '../scaffold/tool.js'
 import type { AddUiOptions, AddUiResult } from '../scaffold/ui.js'
 import { assessProjectCompatibility, detectInstalledDshVersion, projectCompatibilityDiagnostics } from '../compat/index.js'
 import type { DshProjectCompatibilityAssessment } from '../compat/types.js'
-import { CliUsageError, parseCliArgs, type CliArgs } from './args.js'
+import { CliOptionMetadata, CliUsageError, parseCliArgs, type CliArgs } from './args.js'
 import { renderCliUsage } from './usage.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
@@ -49,6 +49,7 @@ import type { ConnectDshPlatformClientOptions, DshPlatformClient } from '../plat
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runPlatformCli } from './platform.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
+import { runAddPluginCli } from './add-plugin.js'
 import { runCheckoutCli } from './checkout.js'
 import { SCRATCH_ACTIONS, runScratchCli } from './scratch.js'
 
@@ -1525,6 +1526,8 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   }
   if (argv[0] === 'dev' && SCRATCH_ACTIONS.has(argv[1] ?? '')) return runScratchCli(argv.slice(1), io)
   if (argv[0] === 'checkout') return runCheckoutCli(argv.slice(1), io)
+  const addOperand = argv[0] === 'add' ? argv[1] : undefined
+  if (addOperand !== undefined && !addOperand.startsWith('-') && !CliOptionMetadata.isAddTarget(addOperand)) return runAddPluginCli(argv.slice(1), io)
   if (argv[0] === 'dev' && argv.length === 2 && (argv[1] === '--help' || argv[1] === '-h')) return runScratchCli(['', '--help'], io)
   let args: CliArgs
   try {
