@@ -264,6 +264,69 @@
       ]
     },
     {
+      "id": "settings-search-entries",
+      "title": "Search section controls and open them at the control",
+      "summary": "Controls that live Settings sections publish as search entries (dshx settings.section metadata.searchEntries) are found while their sections stay unmounted, listed under their section; picking one opens that section with target set to the entry id, and the section scrolls to and focuses it. General publishes its coding-view switch. The read-only settings_list tool searches the same entries for the Agent.",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: General\"",
+        "click option \"Settings: General*\"",
+        "fill searchbox \"Search settings\" \"coding view\"",
+        "expect text \"1 Setting Found\"",
+        "click button \"Show coding view*\"",
+        "expect switch \"Show coding view\""
+      ],
+      "surfaces": ["client", "settings", "tool"],
+      "configuration": [],
+      "states": ["entry-results", "section-opened-at-target", "invalid-entries-skipped"],
+      "failureModes": [
+        "A section whose published entries do not decode is skipped with one console warning.",
+        "A section registered imperatively must publish its own entries with publishSettingsSearchEntries."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.search-section-entries",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.search-unit-section-entries",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-search.test.ts",
+          "testName": "indexes every live section’s published entries by title, description, keywords and section name"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.search-unit-entry-target",
+          "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
+          "testName": "reveals a section entry from search, clearing the query, and drops the target on the next navigation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.search-unit-entry-view",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "lists matching entries under their section and reveals the picked one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.search-unit-agent-entries",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-tools.test.ts",
+          "testName": "searches the section entries the browser last published, only for a query"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
       "id": "plugin-settings-controls",
       "title": "Plugin settings with real controls",
       "summary": "Every plugin's settings render from its schema with titles, descriptions, grouping and a control per type (switch, segments or select, bounded number with unit, list and key/value editors, JSON only as a fallback), in Settings and on its Plugins page.",

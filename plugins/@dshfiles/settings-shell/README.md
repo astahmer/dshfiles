@@ -38,6 +38,14 @@ query before it closes the dialog. Leaving the Settings tab for another tab keep
 restores its results and the text in the field. Native sections draw their own rows, so a match on a section's name
 offers to open it; the namespaces behind native rows (theme, language, …) are searchable under _More settings_.
 
+A section can also publish the controls it draws as search entries (dshx `settings.section` `metadata.searchEntries`,
+see the dshx [client guide](../../../tooling/dshx/docs/guides/client.md#settings-search-entries)). The shell indexes
+every live section's entries without mounting it, matching their title, description, keywords and section name; results
+list them under their section (a section whose entries do not decode is skipped with one console warning), and picking one opens that section with `target` set to the entry id, so the section
+scrolls to and focuses that control. General publishes its _Show coding view_ switch this way. The same entries reach
+the Agent: each page reports them to this plugin's Host, and a `query` to the read-only `settings_list` tool returns the
+matching ones with their section and entry ids.
+
 This replaces `@dshfiles/settings-search`, which was **folded** in: its popup under the navigation and its separate
 search section are gone, and the schema walking and ranking it did now live in `src/schema-form/schema-model.ts` and
 `src/settings-search.ts`.
@@ -95,14 +103,15 @@ canonicalized). Until the document exists only the path can be copied. Remote br
 ```ts
 window.dispatchEvent(
   new CustomEvent('dshfiles:open-settings', {
-    detail: { section: 'models' }, // or { setting: { entryId, fieldPath } }, { query }, plus an optional surface: 'modal' | 'tab'
+    detail: { section: 'models' }, // or { section, target: entryId }, { setting: { entryId, fieldPath } }, { query }, plus an optional surface: 'modal' | 'tab'
     cancelable: true,
   }),
 )
 ```
 
 `dispatchEvent` returns false when the shell took the request, the contract of `dshfiles:open-file` and
-`dshfiles:command-palette`. Settings sections receive `close`, as natively.
+`dshfiles:command-palette`. Settings sections receive `close`, as natively, and `target` when opened at one of their
+search entries.
 
 ## Port
 

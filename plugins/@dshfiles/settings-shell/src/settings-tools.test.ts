@@ -1,5 +1,6 @@
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { describe, expect, test } from 'vitest'
+import type { SectionEntryRow } from './settings-search.js'
 import { createSettingsTools, type SettingsRow, type SettingsSurface, type SettingsUnsetOp } from './settings-tools.js'
 
 const row = (ns: string, value: SettingsRow['value'], overrides: Partial<SettingsRow> = {}): SettingsRow => ({
@@ -18,7 +19,8 @@ const createSurface = (overrides: Partial<SettingsSurface> = {}): SettingsSurfac
   ...overrides,
 })
 
-const tools = (surface: SettingsSurface) => createSettingsTools(() => surface)
+const noEntries = { read: () => [], replace: () => {} }
+const tools = (surface: SettingsSurface) => createSettingsTools({ settings: () => surface, searchEntries: noEntries })
 
 describe('settings tools: list', () => {
   test('lists namespaces without their values and adds one on request', () => {
@@ -43,6 +45,19 @@ describe('settings tools: list', () => {
         .namespaces.map(entry => entry.namespace),
     ).toEqual(['ui-theme'])
     expect(() => tools(surface).list({ input: { namespace: 'nope' } })).toThrow(/Known namespaces include agent-loop, ui-theme/)
+  })
+
+  test('searches the section entries the browser last published, only for a query', () => {
+    let published: readonly SectionEntryRow[] = []
+    const searchEntries = { read: () => published, replace: (entries: readonly SectionEntryRow[]) => (published = entries) }
+    const withEntries = createSettingsTools({ settings: () => createSurface(), searchEntries })
+    const developerTools = { sectionId: 'general', sectionLabel: 'General', id: 'developer-tools', title: 'Show coding view', keywords: 'devtools' }
+    expect(withEntries.publishSearchEntries({ input: { entries: [developerTools] } })).toEqual({ count: 1 })
+    expect(withEntries.list({ input: { query: 'DEVTOOLS' } })).toEqual({ writable: true, namespaces: [], entries: [developerTools] })
+    expect(withEntries.list({ input: {} }).entries).toBeUndefined()
+    expect(withEntries.list({ input: { query: 'theme' } }).entries).toBeUndefined()
+    withEntries.publishSearchEntries({ input: { entries: [] } })
+    expect(withEntries.list({ input: { query: 'devtools' } }).entries).toBeUndefined()
   })
 
   test('omits a value too large for the model and reports it', () => {

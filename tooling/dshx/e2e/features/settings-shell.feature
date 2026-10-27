@@ -51,6 +51,15 @@ Feature: Settings shell
     When Escape is pressed in the search field
     Then the query is cleared and the General section shows again
 
+  @scenario:settings-shell.search-section-entries
+  Scenario: Search finds a section control while the section is unmounted and opens the section at it
+    Given the isolated plugin profile "@dshfiles/settings-shell" is booted
+    When Settings is opened from the sidebar
+    And Settings are searched for "coding view"
+    Then the coding view switch is listed under General
+    When that search entry is picked
+    Then the General section shows with the coding view switch focused
+
   @scenario:settings-shell.plugin-controls
   Scenario: Plugin settings render with real controls in Settings and on the Plugins page
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted

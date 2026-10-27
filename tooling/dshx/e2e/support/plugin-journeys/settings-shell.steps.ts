@@ -154,6 +154,28 @@ Then('the query is cleared and the General section shows again', async ({ page }
   await finishJourneyAssertions(page)
 })
 
+const codingViewEntry = (page: Page) => page.locator('[data-settings-results] [data-settings-result-entry="developer-tools"]')
+
+Then('the coding view switch is listed under General', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-search-lists-section-entries', async () => {
+    await expect(page.locator('[data-settings-results]').getByRole('region', { name: 'General', exact: true })).toBeVisible()
+    await expect(codingViewEntry(page)).toContainText('Show coding view')
+    await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toHaveCount(0)
+  })
+})
+
+When('that search entry is picked', async ({ page }: { page: Page }) => {
+  await codingViewEntry(page).click()
+})
+
+Then('the General section shows with the coding view switch focused', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-search-entry-opens-at-its-control', async () => {
+    await expect(searchField(page)).toHaveValue('')
+    await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeFocused()
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the Main tabs page is opened in Settings', async ({ page }: { page: Page }) => {
   await openSettings(page)
   await page.getByRole('group', { name: 'Plugins' }).getByRole('button', { name: 'Main tabs', exact: true }).click()
