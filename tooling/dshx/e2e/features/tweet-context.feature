@@ -5,7 +5,7 @@ Feature: Tweet context
   @scenario:tweet-context.tool-catalog
   @smoke
   Scenario: The Agent toolkit exposes the tweet context tool
-    Given the isolated plugin composition of "@dshfiles/agent-toolkit, @dshfiles/memory, @dshfiles/mcp-servers, @dshfiles/thread-sidebar, @dshfiles/tweet-context" is booted
+    Given the isolated plugin composition of "@dshfiles/agent-toolkit, @dshfiles/memory, @dshfiles/mcp-servers, @dshfiles/session-controller, @dshfiles/thread-sidebar, @dshfiles/tweet-context" is booted
     When a thread "Tweet context thread" is started from the composer
     And the Agent toolkit is opened from the sidebar
     And the Agent toolkit shows only "Plugins" matching "tweet_context"
