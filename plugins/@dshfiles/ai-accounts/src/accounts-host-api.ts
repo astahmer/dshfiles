@@ -16,6 +16,7 @@ import {
   type QuotaRecoveryModelSelection,
 } from './api.js'
 import { AccountStoreModel, accountStoreService } from './account-store.js'
+import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
@@ -129,6 +130,15 @@ export const accountsHostApi = aiAccountsApi.host({
     accountRuntime(ctx)?.usageCache?.invalidate()
     await refreshRoutes(ctx)
     return accountsFile(ctx)
+  },
+  removeCustomModel: async ({ input, ctx }) => {
+    const account = (await accountStoreService.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
+    if (account === undefined) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
+    const patch = ModelCurationModel.removeAdditionalModel({ account, modelId: input.modelId })
+    if (patch === null) return { removed: false, instanceId: input.instanceId, modelId: input.modelId }
+    await accountStoreService.upsertAccount({ ...account, ...patch })
+    await refreshRoutes(ctx)
+    return { removed: true, instanceId: input.instanceId, modelId: input.modelId }
   },
   moveAccount: async ({ input, ctx }) => {
     await accountStoreService.moveAccount(input.instanceId, input.direction)

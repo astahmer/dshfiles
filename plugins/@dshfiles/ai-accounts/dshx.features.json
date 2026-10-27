@@ -56,7 +56,7 @@
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
@@ -92,7 +92,8 @@
         "A provider rate limit cools the account that served the request and may rebind its retry.",
         "All eligible accounts are cooling down and no route can be selected.",
         "Distribution never mixes provider kinds or models with incompatible request capabilities.",
-        "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts."
+        "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts.",
+        "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned."
       ],
       "externalDependencies": [
         {
@@ -105,6 +106,11 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.model-curation",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.custom-model-removal",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {

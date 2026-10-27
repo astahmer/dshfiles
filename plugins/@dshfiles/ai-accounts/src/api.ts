@@ -159,6 +159,22 @@ export const accountProfileSchema = z.object({
 })
 
 /** What the page may write: identity and health are observed, never authored. */
+export const removeCustomModelInputSchema = z.object({
+  instanceId: z.string().min(1).max(64),
+  modelId: z
+    .string()
+    .min(1)
+    .max(120)
+    .regex(/^[^\s\p{C}]+$/u),
+  confirm: z.literal(true),
+})
+
+export const removeCustomModelOutputSchema = z.object({
+  removed: z.boolean(),
+  instanceId: z.string().min(1).max(64),
+  modelId: z.string().min(1).max(120),
+})
+
 export const accountDraftSchema = accountProfileSchema.pick({
   instanceId: true,
   kind: true,
@@ -372,6 +388,20 @@ export const aiAccountsApi = defineApi({
     remove: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: accountsFileSchema,
+    }),
+    /** Remove one manually added model from an account's saved picker curation. */
+    removeCustomModel: method({
+      input: removeCustomModelInputSchema,
+      output: removeCustomModelOutputSchema,
+      description:
+        'Remove one manually added model from an AI Accounts profile and clear its picker curation. Provider catalog models are not removed. Call only when the user asked for it and confirm is true.',
+      tool: {
+        name: 'ai_accounts_remove_custom_model',
+        render: output =>
+          output.removed
+            ? `Removed manually added model ${output.modelId} from ${output.instanceId}. Provider catalog models are unchanged.`
+            : `No manually added model ${output.modelId} was found for ${output.instanceId}.`,
+      },
     }),
     /** Reorder one account within its provider group. */
     moveAccount: method({

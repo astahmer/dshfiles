@@ -38,6 +38,30 @@ export class ModelCurationModel {
     return { favoriteModelIds, hiddenModelIds: input.hiddenModelIds.filter(id => id !== input.modelId), modelOrder }
   }
 
+  static removeAdditionalModel = (input: {
+    readonly modelId: string
+    readonly account: Pick<AccountDraft, 'additionalModelIds' | 'hiddenModelIds' | 'favoriteModelIds' | 'modelOrder' | 'reasoningDefaults'>
+  }): Pick<AccountDraft, 'additionalModelIds' | 'hiddenModelIds' | 'favoriteModelIds' | 'modelOrder' | 'reasoningDefaults'> | null => {
+    if (!input.account.additionalModelIds.includes(input.modelId)) return null
+    const reasoningDefaults = { ...input.account.reasoningDefaults }
+    delete reasoningDefaults[input.modelId]
+    return {
+      additionalModelIds: input.account.additionalModelIds.filter(id => id !== input.modelId),
+      hiddenModelIds: input.account.hiddenModelIds.filter(id => id !== input.modelId),
+      favoriteModelIds: input.account.favoriteModelIds.filter(id => id !== input.modelId),
+      modelOrder: input.account.modelOrder.filter(id => id !== input.modelId),
+      reasoningDefaults,
+    }
+  }
+
+  static removableAdditionalModelIds = (input: {
+    readonly catalog: readonly CatalogModel[]
+    readonly additionalModelIds: readonly string[]
+  }): ReadonlySet<string> => {
+    const providerModelIds = new Set(input.catalog.map(model => model.id))
+    return new Set(input.additionalModelIds.filter(id => !providerModelIds.has(id)))
+  }
+
   static catalogForCuration = (input: {
     readonly catalog: readonly CatalogModel[]
     readonly additionalModelIds: readonly string[]

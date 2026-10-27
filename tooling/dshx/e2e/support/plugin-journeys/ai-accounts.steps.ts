@@ -4,6 +4,7 @@ import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '..
 import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '../fake-command-code.js'
 
 const providerAccounts = (page: Page) => page.getByRole('complementary', { name: 'Provider accounts' })
+const CUSTOM_MODEL_ID = 'e2e-custom-model'
 
 const addCommandCodeAccount = async (page: Page, input: { readonly name: string; readonly key: string }): Promise<void> => {
   await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
@@ -245,6 +246,26 @@ Then('the AI Accounts list on the Models page can be hidden and restored', async
     await expect(restoredAccountList).toBeChecked()
     await settings.getByRole('button', { name: 'Models', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'AI Accounts', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a Codex account with a manually added model is configured', async ({ page }: { page: Page }) => {
+  await openAccountsPanel(page)
+  await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+  await page.getByRole('textbox', { name: 'Additional model ID', exact: true }).fill(CUSTOM_MODEL_ID)
+  await page.getByRole('button', { name: 'Add model', exact: true }).click()
+  await expect(page.getByRole('button', { name: `Delete custom model ${CUSTOM_MODEL_ID}`, exact: true })).toBeVisible()
+})
+
+Then('the custom model can be removed from its picker list', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-custom-model-removal', async () => {
+    await page.getByRole('button', { name: `Delete custom model ${CUSTOM_MODEL_ID}`, exact: true }).click()
+    await expect(page.getByRole('button', { name: `Delete custom model ${CUSTOM_MODEL_ID}`, exact: true })).toHaveCount(0)
+    await expect(page.getByText(CUSTOM_MODEL_ID, { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('status').filter({ hasText: /^Saved$/u })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

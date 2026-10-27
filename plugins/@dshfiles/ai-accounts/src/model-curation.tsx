@@ -3,7 +3,7 @@ import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, ChevronUpIcon, PlusIcon, StarIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import type { AccountDraft, AccountsCatalog } from './api.js'
@@ -32,6 +32,7 @@ export const ModelCuration = (props: {
   const [modelIdInput, setModelIdInput] = useState({ instanceId: props.account.instanceId, value: '' })
   const modelIdValue = modelIdInput.instanceId === props.account.instanceId ? modelIdInput.value : ''
   const catalog = ModelCurationModel.catalogForCuration({ catalog: props.catalog, additionalModelIds, hiddenModelIds })
+  const removableAdditionalModelIds = ModelCurationModel.removableAdditionalModelIds({ catalog: props.catalog, additionalModelIds })
   const customModelId = ModelCurationModel.parseAdditionalModelId(modelIdValue, props.account)
   const duplicateModelId = customModelId !== null && catalog.some(model => model.id === customModelId)
   const listed = modelOrder.filter(id => catalog.some(model => model.id === id))
@@ -50,6 +51,12 @@ export const ModelCuration = (props: {
     if (customModelId === null || duplicateModelId) return
     props.onChange({ additionalModelIds: [...new Set([...additionalModelIds, customModelId])] })
     setModelIdInput({ instanceId: props.account.instanceId, value: '' })
+  }
+
+  const removeAdditionalModel = (modelId: string): void => {
+    const patch = ModelCurationModel.removeAdditionalModel({ modelId, account: props.account })
+    if (patch === null) return
+    props.onChange(patch)
   }
 
   const move = (id: string, delta: number): void => {
@@ -176,6 +183,23 @@ export const ModelCuration = (props: {
             >
               {isHidden ? 'Show' : 'Hide'}
             </Button>
+            {removableAdditionalModelIds.has(model.id) ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={`Delete custom model ${model.name}`}
+                    className="dshx:text-muted-foreground dshx:hover:text-destructive"
+                    onClick={() => removeAdditionalModel(model.id)}
+                    size="icon-xs"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete custom model</TooltipContent>
+              </Tooltip>
+            ) : null}
           </span>
         </li>
       )
@@ -189,52 +213,52 @@ export const ModelCuration = (props: {
 
   return (
     <TooltipProvider delayDuration={500}>
-    <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-2">
-      <form
-        className="dshx:flex dshx:gap-2"
-        onSubmit={event => {
-          event.preventDefault()
-          addModel()
-        }}
-      >
-        <Input
-          aria-label="Additional model ID"
-          className="dshx:h-8 dshx:flex-1 dshx:font-mono dshx:text-xs"
-          maxLength={120}
-          onChange={event => setModelIdInput({ instanceId: props.account.instanceId, value: event.target.value })}
-          placeholder={props.account.kind === 'opencode-go' ? 'opencode-go/step-5-preview-free' : 'provider/model-id'}
-          value={modelIdValue}
-        />
-        <Button disabled={customModelId === null || duplicateModelId} size="sm" type="submit" variant="outline">
-          <PlusIcon />
-          Add model
-        </Button>
-      </form>
-      <p className="dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground">
-        Add an ID the provider catalog does not return. The account/provider prefix is optional.
-      </p>
-      <div className="dshx:flex dshx:items-center dshx:gap-2.5 dshx:px-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">
-        <span className="dshx:flex-1">
-          {ordered.length} models · {favoriteModels.length} favorites · {hiddenModels.length} hidden
-        </span>
-        <Button onClick={toggleAll} size="xs" type="button" variant="outline">
-          {allHidden ? 'Enable all' : 'Disable all'}
-        </Button>
+      <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-2">
+        <form
+          className="dshx:flex dshx:gap-2"
+          onSubmit={event => {
+            event.preventDefault()
+            addModel()
+          }}
+        >
+          <Input
+            aria-label="Additional model ID"
+            className="dshx:h-8 dshx:flex-1 dshx:font-mono dshx:text-xs"
+            maxLength={120}
+            onChange={event => setModelIdInput({ instanceId: props.account.instanceId, value: event.target.value })}
+            placeholder={props.account.kind === 'opencode-go' ? 'opencode-go/step-5-preview-free' : 'provider/model-id'}
+            value={modelIdValue}
+          />
+          <Button disabled={customModelId === null || duplicateModelId} size="sm" type="submit" variant="outline">
+            <PlusIcon />
+            Add model
+          </Button>
+        </form>
+        <p className="dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground">
+          Add an ID the provider catalog does not return. The account/provider prefix is optional.
+        </p>
+        <div className="dshx:flex dshx:items-center dshx:gap-2.5 dshx:px-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">
+          <span className="dshx:flex-1">
+            {ordered.length} models · {favoriteModels.length} favorites · {hiddenModels.length} hidden
+          </span>
+          <Button onClick={toggleAll} size="xs" type="button" variant="outline">
+            {allHidden ? 'Enable all' : 'Disable all'}
+          </Button>
+        </div>
+        {ordered.length === 0 ? (
+          <Empty className="dshx:gap-2 dshx:p-4 dshx:md:p-4">
+            <EmptyDescription className="dshx:text-xs">No models returned yet. Sign in, then refresh the provider catalog.</EmptyDescription>
+          </Empty>
+        ) : null}
+        {groups.map(group =>
+          group.models.length === 0 ? null : (
+            <section key={group.title}>
+              <h4 className="dshx:px-1.5 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{group.title}</h4>
+              <ul>{rows(group.models)}</ul>
+            </section>
+          ),
+        )}
       </div>
-      {ordered.length === 0 ? (
-        <Empty className="dshx:gap-2 dshx:p-4 dshx:md:p-4">
-          <EmptyDescription className="dshx:text-xs">No models returned yet. Sign in, then refresh the provider catalog.</EmptyDescription>
-        </Empty>
-      ) : null}
-      {groups.map(group =>
-        group.models.length === 0 ? null : (
-          <section key={group.title}>
-            <h4 className="dshx:px-1.5 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{group.title}</h4>
-            <ul>{rows(group.models)}</ul>
-          </section>
-        ),
-      )}
-    </div>
     </TooltipProvider>
   )
 }

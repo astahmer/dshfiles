@@ -35,6 +35,51 @@ describe('model curation catalog', () => {
     expect(models.at(-1)).toEqual({ id: 'hidden-model', name: 'hidden-model', efforts: [], defaultEffort: null })
   })
 
+  it('removes only a manually added model and clears its curation state', () => {
+    expect(
+      ModelCurationModel.removeAdditionalModel({
+        modelId: 'custom-model',
+        account: {
+          additionalModelIds: ['custom-model', 'other-custom-model'],
+          hiddenModelIds: ['custom-model', 'provider-model'],
+          favoriteModelIds: ['custom-model', 'provider-model'],
+          modelOrder: ['custom-model', 'provider-model', 'other-custom-model'],
+          reasoningDefaults: { 'custom-model': 'high', 'provider-model': 'low' },
+        },
+      }),
+    ).toEqual({
+      additionalModelIds: ['other-custom-model'],
+      hiddenModelIds: ['provider-model'],
+      favoriteModelIds: ['provider-model'],
+      modelOrder: ['provider-model', 'other-custom-model'],
+      reasoningDefaults: { 'provider-model': 'low' },
+    })
+  })
+
+  it('does not remove a model that was not manually added', () => {
+    expect(
+      ModelCurationModel.removeAdditionalModel({
+        modelId: 'provider-model',
+        account: {
+          additionalModelIds: [],
+          hiddenModelIds: ['provider-model'],
+          favoriteModelIds: [],
+          modelOrder: ['provider-model'],
+          reasoningDefaults: {},
+        },
+      }),
+    ).toBeNull()
+  })
+
+  it('marks only additional IDs absent from the provider catalog as removable', () => {
+    expect(
+      ModelCurationModel.removableAdditionalModelIds({
+        catalog: [{ id: 'provider-model', name: 'Provider model', efforts: [], defaultEffort: null }],
+        additionalModelIds: ['custom-model', 'provider-model'],
+      }),
+    ).toEqual(new Set(['custom-model']))
+  })
+
   it('normalizes an optional OpenCode Go or account route prefix', () => {
     expect(ModelCurationModel.parseAdditionalModelId('opencode-go/step-5-preview-free', { instanceId: 'opencode-go-alex', kind: 'opencode-go' })).toBe(
       'step-5-preview-free',

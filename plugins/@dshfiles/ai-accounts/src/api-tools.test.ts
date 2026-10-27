@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { aiAccountsApi } from './api.js'
+import { aiAccountsApi, removeCustomModelInputSchema } from './api.js'
 
 describe('ai-accounts tool exposure', () => {
   test('every account and quota action a human can take is a named tool', () => {
@@ -18,12 +18,19 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_quota',
       'ai_accounts_refresh_pricing',
       'ai_accounts_refresh_quota',
+      'ai_accounts_remove_custom_model',
       'ai_accounts_resume_continuation',
       'ai_accounts_set_auto_retry',
       'ai_accounts_set_distribution',
       'ai_accounts_set_native_provider',
       'ai_accounts_snooze_continuation',
     ])
+  })
+
+  test('custom-model removal requires explicit confirmation', () => {
+    const input = { instanceId: 'codex-main', modelId: 'custom-model' }
+    expect(removeCustomModelInputSchema.safeParse({ ...input, confirm: true }).success).toBe(true)
+    expect(removeCustomModelInputSchema.safeParse({ ...input, confirm: false }).success).toBe(false)
   })
 
   test('inspection stays read-only and every tool explains itself', () => {
