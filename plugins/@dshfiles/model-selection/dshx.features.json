@@ -5,7 +5,7 @@
     {
       "id": "draft-model-selection",
       "title": "Choose a model before typing in a new conversation",
-      "summary": "The full native model directory, reasoning menu and /model popup share one selection owner. Client-only blanks stage their selection without creating a Host Session; existing Sessions preflight every route change against validated context pressure before submitting the shared selection RPC.",
+      "summary": "The full native model directory, reasoning menu and /model popup share one selection owner. Client-only blanks and existing Host blanks stage model choice until first send; nonblank Sessions preflight every route change against validated context pressure before submitting the shared selection RPC.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -21,7 +21,7 @@
       "failureModes": [
         "Catalog failures retain the native retry and provider failure surfaces.",
         "A reconnect reloads the catalog without erasing the draft owner's staged selection.",
-        "Real Host Sessions continue to surface writer-held and other selectModel failures.",
+        "Nonblank Host Sessions continue to surface writer-held and other selectModel failures.",
         "A handoff compacts only when both route capacities are known, the target is smaller, context pressure matches the current route, and projected tokens reach 80% of the target window.",
         "Unknown capacity, unavailable route-capacity API, or stale pressure skips extra compaction so DSH's normal pre-request compaction remains the fallback.",
         "A failed manual compaction leaves the current model/account selected."
