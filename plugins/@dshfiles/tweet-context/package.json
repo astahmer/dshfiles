@@ -2,7 +2,7 @@
   "name": "@dshfiles/tweet-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Agent tool for public X post text, photos, quotes and sampled video frames.",
+  "description": "Agent tool for public X posts, photos, quotes, same-author threads, and content-aware video frames.",
   "license": "MIT",
   "files": [
     "dist",

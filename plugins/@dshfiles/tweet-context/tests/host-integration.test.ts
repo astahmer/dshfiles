@@ -165,7 +165,9 @@ describe('tweet context Host integration', () => {
         expect(text).toContain('Now in dark mode')
         expect(text).toContain('Generative UI #2')
         expect(text).not.toContain('Media warning:')
-        expect(result.content.filter(block => block.type === 'image').length).toBeGreaterThan(6)
+        const imageCount = result.content.filter(block => block.type === 'image').length
+        expect(imageCount).toBeGreaterThan(0)
+        expect(imageCount).toBeLessThanOrEqual(12)
       } finally {
         await disposeAgent?.()
         await host.dispose()
