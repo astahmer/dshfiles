@@ -41,7 +41,8 @@ export interface Shortcut {
   readonly allowInEditable?: boolean
   /** Human label for menus and help. */
   readonly label: string
-  readonly run: (event: KeyboardEvent) => void
+  /** Returning false declines the key: the event goes on to its target as if nothing matched. */
+  readonly run: (event: KeyboardEvent) => void | false
 }
 
 const EDITABLE_SELECTOR =
@@ -61,7 +62,48 @@ const isPrimaryHeld = (event: KeyboardEvent, mac: boolean): boolean => (mac ? ev
 const extraModifiers = (event: KeyboardEvent, mac: boolean): number =>
   (event.ctrlKey ? 1 : 0) + (event.metaKey ? 1 : 0) + (event.altKey ? 1 : 0) + (event.shiftKey ? 1 : 0) - (isPrimaryHeld(event, mac) ? 1 : 0)
 
+const NAMED_KEYS: Readonly<Record<string, string>> = {
+  ',': 'Comma',
+  '.': 'Period',
+  '/': 'Slash',
+  ';': 'Semicolon',
+  "'": 'Quote',
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
+  '\\': 'Backslash',
+  '`': 'Backquote',
+  '-': 'Minus',
+  '=': 'Equal',
+  enter: 'Enter',
+  escape: 'Escape',
+  space: 'Space',
+  tab: 'Tab',
+}
+
+const PRIMARY_NAMES = new Set(['mod', 'primary', 'cmd', 'ctrl'])
+
+/**
+ * Read a chord such as `Mod+Shift+K` into the physical key and modifiers it needs.
+ *
+ * Only chords held with the primary modifier can be claimed, so anything else
+ * returns undefined and the caller leaves it unbound.
+ */
+const parseChord = (chord: string): { readonly key: string; readonly alsoShift: boolean } | undefined => {
+  const parts = chord.split('+').map(part => part.trim().toLowerCase())
+  const keyName = parts.at(-1)
+  const modifiers = new Set(parts.slice(0, -1))
+  if (keyName === undefined || keyName === '') return undefined
+  if (![...modifiers].some(modifier => PRIMARY_NAMES.has(modifier))) return undefined
+  const unsupported = [...modifiers].filter(modifier => !PRIMARY_NAMES.has(modifier) && modifier !== 'shift')
+  if (unsupported.length > 0) return undefined
+  const key = /^[a-z]$/u.test(keyName) ? `Key${keyName.toUpperCase()}` : /^\d$/u.test(keyName) ? `Digit${keyName}` : NAMED_KEYS[keyName]
+  if (key === undefined) return undefined
+  return { key, alsoShift: modifiers.has('shift') }
+}
+
 export class ShortcutKeyboardModel {
+  static readonly parseChord = parseChord
+
   static readonly isMacPlatform = (platform: string): boolean => platform === 'MacIntel' || platform === 'macOS' || platform.startsWith('Mac')
 
   /** Whether the event landed somewhere that consumes plain character keys. */
@@ -108,12 +150,12 @@ export const installShortcuts = (target: Window, shortcuts: readonly Shortcut[])
     for (const shortcut of shortcuts) {
       if (!ShortcutKeyboardModel.matchesShortcut(event, shortcut, mac)) continue
       if (inEditable && shortcut.allowInEditable !== true) continue
+      if (shortcut.run(event) === false) continue
 
       // Both calls are needed: preventDefault stops the browser's own binding,
       // stopPropagation keeps the Host's runtime from also dispatching it.
       event.preventDefault()
       event.stopPropagation()
-      shortcut.run(event)
       return
     }
   }

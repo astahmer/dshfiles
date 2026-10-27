@@ -1,7 +1,7 @@
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient } from '@dshfiles/dshx/client'
-import { installShortcuts, type Shortcut } from './keyboard.js'
+import { Command, defineClient, type CommandItem } from '@dshfiles/dshx/client'
+import { installShortcuts, ShortcutKeyboardModel, type Shortcut } from './keyboard.js'
 
 /**
  * The layout service surface this plugin drives.
@@ -30,7 +30,7 @@ type Layout = ILayout
  */
 export default defineClient({
   name: '@dshfiles/shortcuts',
-  setup(ctx) {
+  setup(ctx, _decorate, metadata) {
     // Resolved per key press rather than once at setup. The layout service is
     // registered by another client entry, so reading it during setup can observe
     // an empty context — and `layout?.toggleSidebar()` then no-ops behind optional
@@ -73,8 +73,45 @@ export default defineClient({
     ]
 
     ctx.effect(() => installShortcuts(window, shortcuts), 'shortcuts: keyboard')
+
+    const plugin = metadata?.plugin
+    if (plugin === undefined) return
+    plugin.keyed(plugin.list(Command), commands => installShortcuts(window, commandShortcuts(commands)))
   },
 })
+
+/**
+ * Bind the default keys of every contributed command.
+ *
+ * A command's keys stay unbound when they need a modifier other than primary
+ * and shift, because only those chords can be claimed safely.
+ */
+const commandShortcuts = (commands: readonly CommandItem[]): Shortcut[] =>
+  commands.flatMap(command =>
+    (command.keys ?? []).flatMap(chord => {
+      const parsed = ShortcutKeyboardModel.parseChord(chord)
+      if (parsed === undefined) {
+        console.warn(`shortcuts: ${command.id} keeps ${chord} unbound; only primary (+ shift) chords can be claimed.`)
+        return []
+      }
+      return [
+        {
+          id: command.id,
+          key: parsed.key,
+          modifier: 'primary' as const,
+          alsoShift: parsed.alsoShift,
+          allowInEditable: true,
+          label: command.title,
+          run: () => {
+            if (command.enabled === false) return false
+            const result = command.run()
+            if (result === false) return false
+            if (result instanceof Promise) result.catch((error: unknown) => console.error(`shortcuts: ${command.id} failed`, error))
+          },
+        },
+      ]
+    }),
+  )
 
 /**
  * The layout service, or a loud failure.
