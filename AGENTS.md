@@ -21,7 +21,7 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `dsh-plugin-verify` — after changing a plugin, before saying it works.
 - `live-performance-audit` — before planning any performance work, and to prove a fix with before/after numbers.
 - `verify-dsh` — launch, drive and screenshot a scratch DSH (`dshx dev up|doctor|open|shot|down`).
-- `maintain-verify-dsh` — after changing how DSH is launched, seeded, driven or verified (e2e support, `dshx dev`, catalog schema, profile seeding, a feature's UI path).
+- `maintain-verify-dsh` — after DSH launch, seed, verification, or UI changes (`dshx dev`, e2e support, catalog schema, profile seeding).
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
 - `complete-plan` — when a plan's last task is done and verified: move its durable content into docs and delete it.
 - `traces-first` — when something is slow or failing: read the stored traces (`traces_*` tools) before reading code.
