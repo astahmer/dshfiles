@@ -7,6 +7,7 @@ import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonValue } from '../json.js'
 import type { Page } from 'playwright'
 import { z } from 'zod'
+import type { DialogsService, ToastsService } from '../client/app-services.js'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { FAKE_COMMAND_CODE_MODEL, FAKE_COMMAND_CODE_MODEL_ID } from './fake-command-code.js'
@@ -1073,6 +1074,26 @@ const seedOtlpSampleTrace = async (state: ScratchState, page: Page, timeoutMs: n
   }
 }
 
+/** Open one danger confirm and one sticky toast through the page's Dialogs and Toasts providers, as another plugin's call does. */
+const seedAppDialogSample = async (page: Page, timeoutMs: number): Promise<void> => {
+  await page.waitForFunction(
+    () => ['dshx.dialogs', 'dshx.toasts'].every(id => globalThis.__dshxBrokerV1?.contracts.get(id)?.live.status === 'active'),
+    undefined,
+    { timeout: timeoutMs },
+  )
+  await page.evaluate(() => {
+    const toastsLive = globalThis.__dshxBrokerV1?.contracts.get('dshx.toasts')?.live
+    const dialogsLive = globalThis.__dshxBrokerV1?.contracts.get('dshx.dialogs')?.live
+    if (toastsLive?.status !== 'active' || dialogsLive?.status !== 'active') throw new Error('dshx.dialogs and dshx.toasts are not provided')
+    // SAFETY: the broker stores contract values untyped; `dshx.toasts` is only ever provided with a ToastsService.
+    const toasts = toastsLive.value as ToastsService
+    // SAFETY: likewise, `dshx.dialogs` is only ever provided with a DialogsService.
+    const dialogs = dialogsLive.value as DialogsService
+    toasts.show({ title: 'Draft saved', description: 'Old draft moved to the archive.', tone: 'success', duration: 0 })
+    void dialogs.confirm({ title: 'Delete Old draft?', description: 'This removes the draft and its attachments.', confirm: 'Delete', danger: true })
+  })
+}
+
 /** Apply one seed: the checkout file it changed and the process it started, if any. */
 const applySeed = async (input: {
   readonly state: ScratchState
@@ -1099,6 +1120,10 @@ const applySeed = async (input: {
   }
   if (input.seed === 'otlp-session-turns') {
     await seedOtlpSessionTurns(input.state, input.page, input.timeoutMs)
+    return {}
+  }
+  if (input.seed === 'app-dialog-sample') {
+    await seedAppDialogSample(input.page, input.timeoutMs)
     return {}
   }
   if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }

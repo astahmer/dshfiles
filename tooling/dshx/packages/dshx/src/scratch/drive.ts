@@ -152,7 +152,13 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         if (parsed.action === 'seed') {
           const alreadySeeded = seeded.some(applied => applied.seed === parsed.seed)
           // Thread-scoped state can drift between reaches, so these seeds recreate and select a fresh target each time.
-          if (!alreadySeeded || parsed.seed === 'tool-call-thread' || parsed.seed === 'rebase-ready-thread' || parsed.seed === 'otlp-session-turns') {
+          if (
+            !alreadySeeded ||
+            parsed.seed === 'tool-call-thread' ||
+            parsed.seed === 'rebase-ready-thread' ||
+            parsed.seed === 'otlp-session-turns' ||
+            parsed.seed === 'app-dialog-sample'
+          ) {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
             const outcome = await ScratchSeedRuntime.applySeed({ state, seed: parsed.seed, page, timeoutMs })
             if (outcome.changedFile !== undefined) applied.changedFile = outcome.changedFile
@@ -162,7 +168,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
             if (fakeProvider !== undefined) next.fakeProvider = fakeProvider
             await ScratchStateRuntime.write(next)
           }
-          if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
+          // A page seed lives in this page (an open dialog), so reloading the root after it would discard it.
+          const pageSeed = parsed.seed === 'app-dialog-sample'
+          if (!pageSeed && feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
         } else if (parsed.action === 'attach')
           await ScratchDriveRuntime.composerFileInput(page).setInputFiles(repositoryFile(parsed.file), { timeout: timeoutMs })
         else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))

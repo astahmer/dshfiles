@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "app-dialogs",
+      "title": "App dialogs for every plugin",
+      "reach": ["seed app-dialog-sample", "expect alertdialog \"Delete Old draft?\""],
+      "summary": "Provide the dshx Dialogs contract: confirm and alert open a plugin-ui alert dialog, prompt a dialog with one field, select a searchable grouped list; one request is open at a time and the rest wait in order.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["idle", "confirm-open", "alert-open", "prompt-open", "select-open", "queued"],
+      "failureModes": [
+        "While this plugin is absent or disabled, dshx falls back to the browser's own confirm, alert and prompt dialogs.",
+        "Disposing the plugin answers every open and waiting request as cancelled, so no caller waits forever."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "dialogs.confirm",
+          "featureFile": "tooling/dshx/e2e/features/dialogs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-dialogs-unit-confirm",
+          "file": "plugins/@dshfiles/dialogs/src/dialog-host.test.tsx",
+          "testName": "resolves true from the confirm button"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-dialogs-unit-escape",
+          "file": "plugins/@dshfiles/dialogs/src/dialog-host.test.tsx",
+          "testName": "resolves false on Escape"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-dialogs-unit-prompt-empty",
+          "file": "plugins/@dshfiles/dialogs/src/dialog-host.test.tsx",
+          "testName": "ignores an empty submit and resolves the typed value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-dialogs-unit-select",
+          "file": "plugins/@dshfiles/dialogs/src/dialog-host.test.tsx",
+          "testName": "groups options, marks the current one and resolves the picked value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-dialogs-unit-queue",
+          "file": "plugins/@dshfiles/dialogs/src/dialog-host.test.tsx",
+          "testName": "opens one request at a time, in arrival order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-dialogs-unit-provider",
+          "file": "plugins/@dshfiles/dialogs/src/client.test.ts",
+          "testName": "makes Dialogs and Toasts active while mounted and withdraws them on dispose"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: App dialogs for every plugin renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "app-toasts",
+      "title": "App toasts for every plugin",
+      "reach": ["seed app-dialog-sample", "expect text \"Draft saved\""],
+      "summary": "Provide the dshx Toasts contract: a bottom-right stack with tone colors, an optional action, auto-dismiss after the duration (5 s by default, 0 keeps it) and a dismiss function.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["empty", "showing", "sticky"],
+      "failureModes": ["While this plugin is absent or disabled, dshx logs each toast to the console instead."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "dialogs.toast",
+          "featureFile": "tooling/dshx/e2e/features/dialogs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-toasts-unit-auto-dismiss",
+          "file": "plugins/@dshfiles/dialogs/src/toast-view.test.tsx",
+          "testName": "closes on its own after the default 5 s"
+        },
+        {
+          "kind": "unit-test",
+          "id": "dialogs.app-toasts-unit-manual-dismiss",
+          "file": "plugins/@dshfiles/dialogs/src/toast-view.test.tsx",
+          "testName": "dismisses through the returned function and the close button"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: App toasts for every plugin renders browser state and starts no Host work of its own."
+        }
+      ]
+    }
+  ]
+}
