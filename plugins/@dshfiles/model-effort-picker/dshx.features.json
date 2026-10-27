@@ -5,28 +5,48 @@
     {
       "id": "model-selection",
       "title": "Search and select provider models",
-      "summary": "Search provider-grouped model catalogs in the composer and expose reasoning controls only when the selected model advertises effort levels.",
-      "surfaces": ["client", "integration"],
+      "summary": "Search provider-grouped model catalogs in the composer, expose supported reasoning controls, and delegate context-aware route handoff to the shared selection directory.",
+      "surfaces": ["client", "host", "api", "integration"],
       "configuration": [],
-      "states": ["closed", "open", "searching", "empty"],
+      "states": ["closed", "open", "searching", "empty", "handoff-check", "compacting"],
       "failureModes": [
         "A search with no catalog match shows an explicit empty state without clearing the current model or reasoning effort.",
-        "Reasoning controls stay unavailable until a model is selected."
+        "Reasoning controls stay unavailable until a model is selected.",
+        "A handoff compacts only when both route capacities are known, the target is smaller, and the current projected pressure reaches 80% of the target window.",
+        "Unknown or stale context measurements skip the handoff compaction; DSH's normal pre-request compaction remains responsible for the next request.",
+        "A failed manual compaction leaves the current model/account selected."
       ],
-      "externalDependencies": [],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-token-meter",
+          "boundary": "The session projection provides provider-anchored but approximate next-request context pressure.",
+          "deterministicFake": "Pure threshold tests cover stale, unknown, equal, larger, and smaller route measurements."
+        },
+        {
+          "id": "@dshfiles/model-selection",
+          "boundary": "The shared selection directory calls the registered route-capacity API and owns /compact preflight for every model-selection surface.",
+          "deterministicFake": "The model-selection directory tests exercise threshold decisions, compaction ordering and failure handling."
+        },
+        {
+          "id": "@deepseek-ai/dsh-command-compact",
+          "boundary": "The existing /compact command performs an idle-session compaction and reports whether compaction failed.",
+          "deterministicFake": "The shared directory tests exercise the manual compaction contract; the real profile owns command execution."
+        }
+      ],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.handoff-context-api",
+          "file": "plugins/@dshfiles/model-effort-picker/tests/host.spec.ts",
+          "testName": "returns known and unknown context capacity and rejects invalid route input"
+        },
         {
           "kind": "gherkin",
           "id": "model-effort-picker.search-empty-catalog",
           "featureFile": "tooling/dshx/e2e/features/model-effort-picker.feature"
         }
       ],
-      "telemetry": [
-        {
-          "kind": "not-applicable",
-          "reason": "Client-only: Search and select provider models renders browser state and starts no Host work of its own."
-        }
-      ]
+      "telemetry": [{ "kind": "automatic", "source": "api-dispatch" }]
     },
     {
       "id": "fast-mode",

@@ -2,6 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ModelCatalog, ModelSelection, ModelSelectionProjection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ContextPressureProjection } from '@deepseek-ai/dsh-token-meter/client'
 import { RemoteError, type TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -49,6 +50,7 @@ function fixture(local = true) {
   const disposeRemote = ctx.provide('remote', { session: { modelCatalog } })
   const catalog = new ModelCatalogDirectory(ctx)
   const projected = createSnapshotStore<ModelSelectionProjection | undefined>(undefined)
+  const pressure = createSnapshotStore<ContextPressureProjection | undefined>(undefined)
   const list = createSnapshotStore<Readonly<Record<string, SessionDraft>>>({
     [sessionId]: { sessionId, local, preview: '' },
   })
@@ -71,14 +73,28 @@ function fixture(local = true) {
     whenCreated: async () => {},
     retry: async () => sessionId,
   }
-  const selectModel = vi.fn<TypertClientRemote['session']['selectModel']>(async selection => ({ ok: true, value: { selected: selection } }))
+  const operations: string[] = []
+  const resolveContextWindow = vi.fn(async (route: Pick<ModelSelection, 'provider' | 'model'>): Promise<number | null> =>
+    route.model === 'first' ? 1_000_000 : 128_000,
+  )
+  const compact = vi.fn(async () => {
+    operations.push('compact')
+    return true
+  })
+  const selectModel = vi.fn<TypertClientRemote['session']['selectModel']>(async selection => {
+    operations.push('select')
+    return { ok: true, value: { selected: selection } }
+  })
   const directory = new ModelDirectory(
     { selectModel },
     sessionId,
     () => true,
     catalog,
     projected,
+    pressure,
     () => true,
+    resolveContextWindow,
+    compact,
     undefined,
     drafts,
   )
@@ -86,10 +102,10 @@ function fixture(local = true) {
     directory.dispose()
     disposeRemote()
   })
-  return { catalog, directory, drafts, list, modelCatalog, projected, selectModel, stageModel }
+  return { catalog, compact, directory, drafts, list, modelCatalog, operations, pressure, projected, resolveContextWindow, selectModel, stageModel }
 }
 
-describe('shared model directory for local drafts', () => {
+describe('shared model directory', () => {
   it('loads the default without a Host projection and stages model plus effort without an RPC', async () => {
     const { directory, list, selectModel, stageModel } = fixture()
     expect((await directory.load()).current).toEqual(initial)
@@ -134,6 +150,62 @@ describe('shared model directory for local drafts', () => {
     expect(directory.store.getSnapshot().current).toEqual(initial)
     projected.set({ lastUsed: null, next: chosen })
     expect(directory.store.getSnapshot().current).toEqual(chosen)
+  })
+
+  it('compacts before selecting when a smaller target is near the projected pressure', async () => {
+    const { compact, directory, operations, pressure, projected, resolveContextWindow, selectModel } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    pressure.set({ contextWindow: 1_000_000, projectedTokens: 110_000 })
+
+    await directory.select(chosen)
+
+    expect(resolveContextWindow).toHaveBeenNthCalledWith(1, { provider: 'provider', model: 'first' })
+    expect(resolveContextWindow).toHaveBeenNthCalledWith(2, { provider: 'provider', model: 'second' })
+    expect(compact).toHaveBeenCalledExactlyOnceWith()
+    expect(operations).toEqual(['compact', 'select'])
+    expect(selectModel).toHaveBeenCalledExactlyOnceWith({ sessionId, ...chosen })
+  })
+
+  it.each([
+    ['below the target threshold', { contextWindow: 1_000_000, projectedTokens: 102_399 }],
+    ['stale route pressure', { contextWindow: 128_000, projectedTokens: 110_000 }],
+  ])('skips handoff compaction for %s', async (_reason, pressureValue) => {
+    const { compact, directory, operations, pressure, projected } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    pressure.set(pressureValue)
+
+    await directory.select(chosen)
+
+    expect(compact).not.toHaveBeenCalled()
+    expect(operations).toEqual(['select'])
+  })
+
+  it('keeps native selection behavior when route capacity is unknown', async () => {
+    const { compact, directory, operations, pressure, projected, resolveContextWindow } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    pressure.set({ contextWindow: 1_000_000, projectedTokens: 110_000 })
+    resolveContextWindow.mockResolvedValue(null)
+
+    await directory.select(chosen)
+
+    expect(compact).not.toHaveBeenCalled()
+    expect(operations).toEqual(['select'])
+  })
+
+  it('leaves the route unchanged when manual compaction fails', async () => {
+    const { compact, directory, pressure, projected, selectModel } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    pressure.set({ contextWindow: 1_000_000, projectedTokens: 110_000 })
+    compact.mockRejectedValueOnce(new Error('Compaction failed'))
+
+    await expect(directory.select(chosen)).rejects.toThrow('Compaction failed')
+
+    expect(selectModel).not.toHaveBeenCalled()
+    expect(directory.store.getSnapshot()).toMatchObject({ current: initial, status: 'error', pending: null, error: 'Compaction failed' })
   })
 
   it('preserves real Host selection failures without changing the projection', async () => {
