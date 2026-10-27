@@ -400,6 +400,10 @@ with nothing running.
 | The user             | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you    |
 | Thread questions     | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                              |
 
+## Warnings and errors
+
+Every user-facing warning or error must include an actionable recovery path: tell the user what they can change or do next, and offer a direct control or exact command when available. If no safe recovery exists, explain the limitation and the next practical alternative; never leave the user with a dead-end message.
+
 ## Definition of done
 
 Before claiming completion, run the narrowest check and say what it proves:
