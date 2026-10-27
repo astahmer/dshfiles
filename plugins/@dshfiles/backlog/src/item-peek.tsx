@@ -64,6 +64,7 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { AttachmentMedia, ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogText } from './item-text.js'
+import { markdownImageReferences } from './image-attachment-reference.js'
 import { submitReply } from './reply-submission.js'
 import { ItemPickers } from './item-pickers.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
@@ -267,7 +268,8 @@ const BodyField = (props: {
     setFailed(null)
     const pending = [...attachments.files]
     attachments.clear()
-    if (body !== props.body) actions.update.mutate({ id: props.id, body })
+    const submittedBody = markdownImageReferences(body, pending)
+    if (submittedBody !== props.body) actions.update.mutate({ id: props.id, body: submittedBody })
     for (const file of pending) {
       try {
         await actions.attachFile.mutateAsync({ id: props.id, file: fileInput(file) })
@@ -470,7 +472,7 @@ const ReplyComposer = (props: {
     setPending(true)
     setFailed(null)
     try {
-      await props.onSave(submittedText, attachments.files)
+      await props.onSave(markdownImageReferences(submittedText, attachments.files), attachments.files)
     } catch (error) {
       setFailed(errorMessage(error, 'The reply could not be saved.'))
     } finally {
@@ -737,14 +739,13 @@ const CommentBox = (props: {
     setPending(true)
     setFailed(null)
     try {
+      const text = markdownImageReferences(submittedText, files)
       await submitReply({
-        text: submittedText,
+        text,
         files,
         save: async saved => {
           const payload = saved.map(fileInput)
-          await actions.comment.mutateAsync(
-            payload.length === 0 ? { id: props.item.id, text: submittedText } : { id: props.item.id, text: submittedText, files: payload },
-          )
+          await actions.comment.mutateAsync(payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload })
         },
         dispatch:
           dispatch === null

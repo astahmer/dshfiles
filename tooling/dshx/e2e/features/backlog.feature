@@ -342,8 +342,8 @@ Feature: Backlog
     Given the isolated plugin profile "@dshfiles/backlog" is booted
     When the Backlog panel is opened
     And two images are attached to the capture
-    And "Capture screenshots with the issue" is captured
-    Then the captured backlog item keeps both image attachments
+    And the image references are submitted with the capture
+    Then the captured backlog item keeps both image attachments inline
 
   @scenario:backlog.rich-item-text
   Scenario: Save a Markdown description and reply

@@ -8,6 +8,19 @@ export interface ImageReferenceInsert {
 export const imageReferenceLabels = (files: readonly ComposerFile[]): readonly string[] =>
   files.filter(file => file.kind === 'image').map((_, index) => `Image ${index + 1}`)
 
+const markdownLabel = (name: string): string => name.replaceAll('\\', '\\\\').replaceAll(']', '\\]')
+
+/** Persist composer-only image mentions as links Markdown can render after the attachment is saved. */
+export const markdownImageReferences = (text: string, files: readonly ComposerFile[]): string => {
+  const images = files.filter(file => file.kind === 'image')
+  return text.replace(/(?<![\w@])@Image (\d+)(?!\w)/gu, (reference, number: string) => {
+    const image = images[Number(number) - 1]
+    if (image === undefined) return reference
+    const id = image.id.startsWith('image_') ? image.id : `image_${image.id}`
+    return `![${markdownLabel(image.name)}](t3-context://v1/image/${id})`
+  })
+}
+
 export const insertImageReferences = (input: {
   readonly text: string
   readonly start: number

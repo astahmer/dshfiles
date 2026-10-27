@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { imageReferenceLabels, insertImageReferences } from './image-attachment-reference.js'
+import { imageReferenceLabels, insertImageReferences, markdownImageReferences } from './image-attachment-reference.js'
 import type { ComposerFile } from './composer-files.js'
 
 const image = (id: string): ComposerFile => ({
@@ -43,5 +43,17 @@ describe('backlog image references', () => {
       text: 'notes',
       caret: 5,
     })
+  })
+
+  it('turns image mentions into rendered Markdown context references on submit', () => {
+    expect(markdownImageReferences('Compare @Image 1 with @Image 2.', [image('one'), file, image('two')])).toBe(
+      'Compare ![one.png](t3-context://v1/image/image_one) with ![two.png](t3-context://v1/image/image_two).',
+    )
+  })
+
+  it('leaves unresolved image mentions unchanged and escapes Markdown labels', () => {
+    expect(markdownImageReferences('@Image 1 @Image 2', [{ ...image('abc123'), name: 'a]b.png' }])).toBe(
+      '![a\\]b.png](t3-context://v1/image/image_abc123) @Image 2',
+    )
   })
 })

@@ -166,6 +166,12 @@ Then('the Jev settings show a successful save', async ({ page }: { page: Page })
   await expect(page.getByRole('textbox', { name: 'TypeSafe API key reference' })).toHaveValue('secret:DSH_TEST_JEV')
 })
 
+When('the image references are submitted with the capture', async ({ page }: { page: Page }) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  await capture.fill('Capture screenshots with the issue\n\n@Image 1 @Image 2')
+  await capture.press('Enter')
+})
+
 When('two images are attached to the capture', async ({ page }: { page: Page }) => {
   const captureForm = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'Capture', exact: true }) })
   const contentRegion = page.locator('[data-backlog-content-region]')
@@ -1029,11 +1035,13 @@ Then('the backfill dialog explains that it runs Jev and the configured triage mo
   await finishJourneyAssertions(page)
 })
 
-Then('the captured backlog item keeps both image attachments', async ({ page }: { page: Page }) => {
+Then('the captured backlog item keeps both image attachments inline', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-rich-capture-images', async () => {
     await row(page, 'Capture screenshots with the issue').click()
-    await expect(peek(page).getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
-    await expect(peek(page).getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    const detail = peek(page)
+    await expect(detail.getByRole('img', { name: 'red.png', exact: true })).toBeVisible()
+    await expect(detail.getByRole('img', { name: 'blue.png', exact: true })).toBeVisible()
+    await expect(detail).not.toContainText('@Image')
   })
   await finishJourneyAssertions(page)
 })
