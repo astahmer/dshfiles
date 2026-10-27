@@ -31,9 +31,26 @@ The quick chat runs the default Agent preset: it answers about DSH itself and op
 thread already has, and the normal composer carries follow-up questions. Prefixes are plain text inside the ask
 bar, and recent asks are ordinary threads (searchable with `thread:`).
 
+## Contribute a command
+
+The simplest way: add a dshx `Command` from any Client plugin, with no dependency on this package. The palette lists it under Commands and `@dshfiles/shortcuts` binds its `keys`:
+
+```ts
+import { Command, defineClientPlugin } from '@dshfiles/dshx/client'
+
+export default defineClientPlugin({
+  id: 'example',
+  setup(api) {
+    api.add(Command, { id: '@dshfiles/example.open', title: 'Open example', keys: ['Mod+Shift+E'], run: () => openExample() })
+  },
+})
+```
+
+The id must start with the package scope. `hidden` keeps it out of the palette (its keys still work); `enabled: false` greys it out and turns its keys off; a `run` that returns `false` from a key press lets the key through.
+
 ## Register an action from a Client plugin
 
-Add `@dshfiles/command-palette` as a workspace dependency, then import `registerPaletteAction` from `@dshfiles/command-palette/api`:
+For rows that need the palette's thread and workspace context, add `@dshfiles/command-palette` as a workspace dependency, then import `registerPaletteAction` from `@dshfiles/command-palette/api`:
 
 ```tsx
 ctx.effect(

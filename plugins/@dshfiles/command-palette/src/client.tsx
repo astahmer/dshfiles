@@ -10,7 +10,7 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PaletteRules } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
@@ -20,6 +20,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
+import { ContributedCommandsModel } from './contributed-commands.js'
 import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
@@ -282,7 +283,9 @@ export default defineClient({
   name: '@dshfiles/command-palette',
   locales: [commandPaletteLocale],
   inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection', 'remote', 'remote.session'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) plugin.keyed(plugin.list(Command), ContributedCommandsModel.list)
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
     ctx.on('theme/change', snapshot => themeStore.set(snapshot))

@@ -1,0 +1,35 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ContributedCommandsModel } from './contributed-commands.js'
+import { PaletteApi } from './palette-api.js'
+
+afterEach(() => {
+  delete window.__dshfilesCommandPaletteV1
+  vi.restoreAllMocks()
+})
+
+describe('contributed commands', () => {
+  it('lists scoped, visible commands and withdraws them together', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const dispose = ContributedCommandsModel.list([
+      { id: '@acme/plugin.open', title: 'Open Acme', keywords: ['acme'], keys: ['Mod+Shift+A'], run: () => {} },
+      { id: '@acme/plugin.secret', title: 'Secret', hidden: true, run: () => {} },
+      { id: 'unscoped.open', title: 'Unscoped', run: () => {} },
+    ])
+    expect(PaletteApi.getSnapshot().actions.map(action => action.id)).toEqual(['@acme/plugin.open'])
+    expect(PaletteApi.getSnapshot().actions[0]).toMatchObject({ label: 'Open Acme', aliases: ['acme'], keys: ['Mod+Shift+A'], group: 'command' })
+    dispose()
+    expect(PaletteApi.getSnapshot().actions).toEqual([])
+  })
+
+  it('marks a disabled command unavailable and runs an enabled one', async () => {
+    const run = vi.fn()
+    const disabled = ContributedCommandsModel.toPaletteAction({ id: '@acme/plugin.off', title: 'Off', enabled: false, run })
+    const enabled = ContributedCommandsModel.toPaletteAction({ id: '@acme/plugin.on', title: 'On', run })
+    const context = { thread: null, workspace: null, workspaces: [], themePreference: 'system' as const }
+    expect(disabled?.isAvailable?.(context)).toBe(false)
+    expect(enabled?.isAvailable?.(context)).toBe(true)
+    await enabled?.run(context)
+    expect(run).toHaveBeenCalledOnce()
+  })
+})
