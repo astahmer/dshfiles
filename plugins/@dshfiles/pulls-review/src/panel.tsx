@@ -3,9 +3,8 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
-import { Check, ChevronLeft, ChevronRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
+import { Check, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -86,23 +85,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     return new Set(paths ?? [])
   }, [reviewed, scopeKeyOf])
 
-  const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
-  const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
-  useEffect(() => {
-    setSelectedKey(undefined)
-    setSelection(ListSelectionModel.empty())
-  }, [cwd, head])
-
-  const scopes = result?.status === 'ok' ? result.scopes : []
-  const scope = scopes.find(candidate => candidate.key === selectedKey) ?? scopes[0]
-  const scopeIndex = scope === undefined ? -1 : scopes.indexOf(scope)
-  const scopePaths = useMemo(() => scope?.filePaths ?? [], [scope])
-  useEffect(() => {
-    setSelection(current => {
-      const next = ListSelectionModel.prune({ state: current, visibleIds: scopePaths })
-      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
-    })
-  }, [scopePaths])
+  const scopes = useMemo(() => (result?.status === 'ok' ? result.scopes : []), [result])
 
   const resetSummarize = summarize.reset
   useEffect(() => {
@@ -110,13 +93,33 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   }, [head, resetSummarize])
 
   const parsed = useMemo(() => (result?.status === 'ok' && result.patch.length > 0 ? parsePatchFiles(result.patch).flatMap(file => file.files) : []), [result])
-  const scopeFiles = useMemo(() => {
-    if (scope === undefined) return []
-    const wanted = new Set(scope.filePaths)
-    return parsed.filter(file => wanted.has(file.name))
-  }, [parsed, scope])
-
-  const statsByPath = useMemo(() => new Map((result?.status === 'ok' ? result.files : []).map(file => [file.path, file])), [result])
+  const reviewFiles = useMemo(
+    () =>
+      scopes.flatMap(scope => {
+        const paths = new Set(scope.filePaths)
+        return parsed.filter(file => paths.has(file.name))
+      }),
+    [parsed, scopes],
+  )
+  const scopeByPath = useMemo(() => {
+    const result = new Map<string, (typeof scopes)[number]>()
+    for (const scope of scopes) {
+      for (const path of scope.filePaths) result.set(path, scope)
+    }
+    return result
+  }, [scopes])
+  const allPaths = useMemo(() => reviewFiles.map(file => file.name), [reviewFiles])
+  const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
+  useEffect(() => {
+    setSelection(ListSelectionModel.empty())
+  }, [cwd, head])
+  useEffect(() => {
+    setSelection(current => {
+      const next = ListSelectionModel.prune({ state: current, visibleIds: allPaths })
+      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
+    })
+  }, [allPaths])
+  const selectedPaths = useMemo(() => new Set(selection.ids), [selection.ids])
 
   const totalReviewed =
     result?.status === 'ok' ? result.scopes.reduce((total, item) => total + item.filePaths.filter(path => reviewedPaths.has(path)).length, 0) : 0
@@ -126,22 +129,12 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     if (scopeKeyOf === undefined) return
     reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, ReviewedMarksModel.toggle(reviewed[scopeKeyOf] ?? [], path)))
   }
-
-  const selectedPaths = useMemo(() => new Set(selection.ids), [selection.ids])
-  const clearSelection = (): void => setSelection(ListSelectionModel.empty())
-  const togglePath = (path: string): void => setSelection(current => ListSelectionModel.toggle({ state: current, id: path }))
-  const extendPath = (path: string): void => setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: scopePaths, id: path }))
   const applyReviewed = (nextReviewed: boolean): void => {
     if (scopeKeyOf === undefined || selection.ids.length === 0) return
     const current = reviewed[scopeKeyOf] ?? []
     const next = nextReviewed ? ReviewedMarksModel.mark(current, selection.ids) : ReviewedMarksModel.unmark(current, selection.ids)
     reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, next))
-    clearSelection()
-  }
-
-  const selectScope = (next: number): void => {
-    const target = scopes[next]
-    if (target !== undefined) setSelectedKey(target.key)
+    setSelection(ListSelectionModel.empty())
   }
 
   const footer = ((): ReactNode => {
@@ -207,148 +200,72 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
 
       {result?.status === 'ok' && result.fileCount === 0 ? <p className={HINT}>This thread has no changes since {result.base} yet.</p> : null}
 
+      {allPaths.length > 0 ? (
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px]">
+          <label className="dshx:flex dshx:items-center dshx:gap-1">
+            <input
+              type="checkbox"
+              aria-label="Select all files in this review"
+              checked={ListSelectionModel.isComplete({ state: selection, orderedIds: allPaths })}
+              onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: allPaths }))}
+              className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+            />
+            Select all files
+          </label>
+          {selection.ids.length === 0 ? null : (
+            <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+              <span className="dshx:mr-1 dshx:tabular-nums">{selection.ids.length} selected</span>
+              <Button size="xs" variant="secondary" onClick={() => applyReviewed(true)}>
+                Mark selected reviewed
+              </Button>
+              <Button size="xs" variant="ghost" onClick={() => applyReviewed(false)}>
+                Mark selected unreviewed
+              </Button>
+              <Button size="xs" variant="ghost" onClick={() => setSelection(ListSelectionModel.empty())}>
+                Clear
+              </Button>
+            </span>
+          )}
+        </div>
+      ) : null}
+
       {scopes.length > 0 ? (
-        <>
-          <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
-            {scopes.map(item => {
-              const itemReviewed = item.filePaths.filter(path => reviewedPaths.has(path)).length
-              const active = item.key === scope?.key
+        <div data-testid="pulls-review-diffs" className={cn(SURFACE, 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden')}>
+          <PatchView
+            files={reviewFiles}
+            className="dshx:flex-1"
+            empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
+            renderHeaderPrefix={file => {
+              const scope = scopeByPath.get(file.name)
+              if (scope === undefined) return null
               return (
-                <TooltipProvider delayDuration={500} key={item.key}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={active ? 'secondary' : 'ghost'}
-                        size="sm"
-                        onClick={() => setSelectedKey(item.key)}
-                        className={cn('dshx:gap-1.5 dshx:font-normal', !active && 'dshx:text-muted-foreground')}
-                      >
-                        {item.label}
-                        <span className="dshx:font-mono dshx:text-[11px] dshx:opacity-70">
-                          {itemReviewed}/{item.filePaths.length}
-                        </span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{item.summary}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )
-            })}
-          </div>
-
-          {scope !== undefined ? (
-            <div className={cn(SURFACE, 'dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3')}>
-              <div className="dshx:flex dshx:items-start dshx:gap-2">
-                <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-                  <span className="dshx:text-xs dshx:font-medium">{scope.label}</span>
-                  <span className={HINT}>{aiSummaries?.[scope.key] ?? scope.summary}</span>
-                </div>
-                <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-                  <Button variant="ghost" size="icon" aria-label="Previous scope" disabled={scopeIndex <= 0} onClick={() => selectScope(scopeIndex - 1)}>
-                    <ChevronLeft aria-hidden />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Next scope"
-                    disabled={scopeIndex >= scopes.length - 1}
-                    onClick={() => selectScope(scopeIndex + 1)}
-                  >
-                    <ChevronRight aria-hidden />
-                  </Button>
+                <span className="dshx:mr-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                  <Badge variant="secondary" className="dshx:text-[10px]">
+                    {scope.label}
+                  </Badge>
+                  <span className={cn(HINT, 'dshx:truncate')}>{aiSummaries?.[scope.key] ?? scope.summary}</span>
                 </span>
-              </div>
-
-              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px]">
-                <label className="dshx:flex dshx:items-center dshx:gap-1">
+              )
+            }}
+            renderHeaderMetadata={file => {
+              const isReviewed = reviewedPaths.has(file.name)
+              const isSelected = selectedPaths.has(file.name)
+              return (
+                <span className="dshx:flex dshx:items-center dshx:gap-1">
                   <input
                     type="checkbox"
-                    aria-label="Select all files in this scope"
-                    checked={ListSelectionModel.isComplete({ state: selection, orderedIds: scopePaths })}
-                    onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: scopePaths }))}
+                    aria-label={`Select ${file.name} for batch review`}
+                    checked={isSelected}
+                    onChange={event => {
+                      const click = event.nativeEvent instanceof MouseEvent ? event.nativeEvent : undefined
+                      if (click?.shiftKey) {
+                        setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: allPaths, id: file.name }))
+                        return
+                      }
+                      setSelection(current => ListSelectionModel.toggle({ state: current, id: file.name }))
+                    }}
                     className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
                   />
-                  Select all
-                </label>
-                <span className="dshx:text-muted-foreground">Shift-click extends, Cmd/Ctrl-click toggles</span>
-                {selection.ids.length === 0 ? null : (
-                  <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-                    <span className="dshx:mr-1 dshx:tabular-nums">{selection.ids.length} selected</span>
-                    <Button size="xs" variant="secondary" onClick={() => applyReviewed(true)}>
-                      Mark selected reviewed
-                    </Button>
-                    <Button size="xs" variant="ghost" onClick={() => applyReviewed(false)}>
-                      Mark selected unreviewed
-                    </Button>
-                    <Button size="xs" variant="ghost" onClick={clearSelection}>
-                      Clear
-                    </Button>
-                  </span>
-                )}
-              </div>
-
-              <ul className="dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-0.5 dshx:overflow-auto">
-                {scope.filePaths.map(path => {
-                  const file = statsByPath.get(path)
-                  const isReviewed = reviewedPaths.has(path)
-                  const isSelected = selectedPaths.has(path)
-                  return (
-                    <li key={path} className={cn(isSelected && 'dshx:rounded-md dshx:bg-info/8')}>
-                      <TooltipProvider delayDuration={500}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-mono dshx:text-[11px]"
-                              onClick={event => {
-                                if (event.shiftKey) {
-                                  extendPath(path)
-                                  return
-                                }
-                                if (event.metaKey || event.ctrlKey) {
-                                  togglePath(path)
-                                  return
-                                }
-                                markReviewed(path)
-                              }}
-                            >
-                              <span
-                                aria-hidden
-                                className={cn(
-                                  'dshx:flex dshx:size-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-border',
-                                  isReviewed && 'dshx:border-primary dshx:bg-primary dshx:text-primary-foreground',
-                                )}
-                              >
-                                {isReviewed ? <Check className="dshx:size-3" aria-hidden /> : null}
-                              </span>
-                              <span className="dshx:min-w-0 dshx:truncate">{path}</span>
-                              {file === undefined ? null : (
-                                <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:gap-1">
-                                  <Stat label={`+${file.additions}`} tone="add" />
-                                  <Stat label={`−${file.deletions}`} tone="del" />
-                                </span>
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Click to mark reviewed; Shift-click selects a range; Cmd/Ctrl-click toggles the selection</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ) : null}
-
-          <div className={cn(SURFACE, 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-hidden')}>
-            <PatchView
-              files={scopeFiles}
-              className="dshx:flex-1"
-              empty={<p className={cn(HINT, 'dshx:p-3')}>This scope renders no diff hunks.</p>}
-              renderHeaderMetadata={file => {
-                const isReviewed = reviewedPaths.has(file.name)
-                return (
                   <Button
                     variant={isReviewed ? 'secondary' : 'ghost'}
                     size="sm"
@@ -358,11 +275,11 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
                     <Check aria-hidden className="dshx:size-3" />
                     {isReviewed ? 'Reviewed' : 'Mark reviewed'}
                   </Button>
-                )
-              }}
-            />
-          </div>
-        </>
+                </span>
+              )
+            }}
+          />
+        </div>
       ) : null}
     </section>
   )

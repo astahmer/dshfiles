@@ -2,7 +2,7 @@
   "name": "@dshfiles/pulls-review",
   "version": "0.1.0",
   "private": true,
-  "description": "Review this thread's changes the pulls.review way: changed files grouped into scopes, reviewed one scope at a time.",
+  "description": "Review this thread's changes in one scrollable diff, grouped and marked by pulls.review scopes.",
   "license": "MIT",
   "files": [
     "dist",
