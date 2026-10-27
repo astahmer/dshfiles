@@ -1,7 +1,7 @@
 import { createElement, type ComponentType } from 'react'
 import { BrowserBroker } from './broker.js'
 import { IsolationModel } from './isolation.js'
-import type { SettingsSearchEntry } from '../settings/section-entries.js'
+import { SettingsSearchEntriesModel, type SettingsSearchEntry } from '../settings/section-entries.js'
 import { PluginContextModel, type NativeSlots } from './plugin-context.js'
 
 /** A main view with its sidebar navigation row, sharing one id. */
@@ -50,8 +50,6 @@ export interface SettingsSectionItem {
   readonly component: ComponentType<never>
   /** Search metadata; picking one opens the section with its id as `target`. */
   readonly entries?: readonly SettingsSearchEntry[]
-  /** Native ConfigForm entry ids whose field targets this section handles. */
-  readonly settingsTargets?: readonly string[]
 }
 
 /** The page a Settings › Plugins detail view shows: a bundle, one of its rows, or an official item. */
@@ -179,14 +177,16 @@ PluginContextModel.registerNativeMount(PluginDetailSection, ({ item, owner, slot
 PluginContextModel.registerNativeMount(SettingsSection, ({ item, owner, slots, decorate }) => {
   assertItemId('SettingsSection', item.id)
   if (item.title.trim() === '') throw new TypeError('SettingsSection title must be non-empty.')
-  const metadata = {
-    ...(item.settingsTargets !== undefined && { settingsTargets: item.settingsTargets }),
-    ...(item.entries !== undefined && { searchEntries: item.entries }),
-  }
-  return registerSlot(
+  const disposeSlot = registerSlot(
     slots,
     'settings.section',
-    { id: item.id, order: item.order ?? 100, label: () => item.title, registrant: owner, ...(Object.keys(metadata).length > 0 && { metadata }) },
+    { id: item.id, order: item.order ?? 100, label: () => item.title, registrant: owner },
     contribution({ component: item.component, owner, id: `settings:${item.id}`, decorate }),
   )
+  // The native slot ledger drops `metadata`, so search entries reach the Settings shell through the dshx seat.
+  const unpublish = item.entries === undefined ? () => {} : SettingsSearchEntriesModel.publish({ sectionId: item.id, entries: item.entries })
+  return () => {
+    unpublish()
+    disposeSlot()
+  }
 })

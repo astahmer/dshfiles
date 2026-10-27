@@ -9,6 +9,7 @@ import { PluginContextModel, type NativeSlots, type PluginContext } from '../src
 import { PluginRuntimeModel } from '../src/client/plugin-runtime.js'
 import { Panel, PluginDetailBadge, PluginDetailSection, SettingsSection } from '../src/client/registries.js'
 import { StoreModel } from '../src/client/store.js'
+import { SettingsSearchEntriesModel } from '../src/settings/section-entries.js'
 import { defineClientPlugin } from '../src/sdk/client.js'
 import { createClientPlugin } from '../src/client/runtime.js'
 
@@ -162,9 +163,12 @@ describe('registries', () => {
   })
 
   it('publishes settings search entries as section metadata', () => {
-    const { plugin, host } = createPlugin('@test/settings')
+    const { plugin, host, dispose } = createPlugin('@test/settings')
     plugin.add(SettingsSection, { id: 'acme', title: 'Acme', component: () => null, entries: [{ id: 'sync', title: 'Sync' }] })
-    expect(host.registered[0]?.options).toMatchObject({ name: 'settings.section', id: 'acme', registrant: '@test/settings', metadata: { searchEntries: [{ id: 'sync', title: 'Sync' }] } })
+    expect(host.registered[0]?.options).toMatchObject({ name: 'settings.section', id: 'acme', registrant: '@test/settings' })
+    expect(SettingsSearchEntriesModel.current().get('acme')).toEqual([{ id: 'sync', title: 'Sync' }])
+    dispose()
+    expect(SettingsSearchEntriesModel.current().has('acme')).toBe(false)
   })
 
   it('mounts Plugins page badges and sections into their detail slots', () => {
