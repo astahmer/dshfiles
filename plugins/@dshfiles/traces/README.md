@@ -112,8 +112,8 @@ it), a severity, and three switches: enabled, announce, mark threads.
 - **Built-in rules**, seeded once when `alerts.db` is created (edits and deletions stick), enabled with conservative
   thresholds: model call error rate (`chat *`) over 20% in 10 min with at least 5 calls, marking threads; jj p95
   (`jj *`) over 5 s in 15 min with at least 5 runs; an agent turn (`invoke_agent*`) over 15 min, marking its thread
-  (only finished turns export a span); and, off by default, plugin API error rate (`rpc.system=dshx`) over 20% with at
-  least 20 calls.
+  (only currently running sessions qualify; turn spans are exported when they finish); and, off by default, plugin API
+  error rate (`rpc.system=dshx`) over 20% with at least 20 calls.
 - **Storage.** `$DSH_HOME/plugins/traces/alerts.db`, apart from the span store so alert changes never migrate it. At
   most 50 rules; an evaluation samples the newest 20,000 matching spans per rule.
 - **Its own telemetry.** Each evaluation is a `traces alerts evaluate` span with `dshx.traces.rules`, `.transitions`

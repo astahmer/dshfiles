@@ -29,6 +29,7 @@ export const createAlertEngine = (options: {
   readonly samples: SampleSource
   readonly alerts: AlertStore
   readonly markThread: MarkThread
+  readonly runningSessionIds: () => ReadonlySet<string>
   readonly now?: () => number
 }) => {
   const now = options.now ?? Date.now
@@ -44,7 +45,10 @@ export const createAlertEngine = (options: {
       attribute: rule.filter.attribute,
       limit: MAX_SAMPLES_PER_RULE,
     })
-    return AlertEvaluator.measure(rule, samples)
+    if (rule.kind !== 'duration' || rule.filter.operation?.startsWith('invoke_agent') !== true) return AlertEvaluator.measure(rule, samples)
+    const runningSessionIds = options.runningSessionIds()
+    const runningSamples = samples.filter(sample => sample.sessionId !== null && runningSessionIds.has(sample.sessionId))
+    return AlertEvaluator.measure(rule, runningSamples)
   }
 
   const deliver = async (
