@@ -2,9 +2,11 @@
 import { memo, useMemo } from 'react'
 import { DisclosureRow, IconThinkOutlineRegular, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ReasoningBlockTiming } from '../contract/chat-nodes.ts'
 import type { ChatViewSlotProps, UseDisclosure, UsePresentation } from '../contract/slots.ts'
 import a11yCss from './accessibility.module.css'
 import css from './ReasoningRow.module.css'
+import { ReasoningTiming } from './ReasoningTiming.tsx'
 
 const THINK_ICON = <IconThinkOutlineRegular size={14} />
 
@@ -45,9 +47,10 @@ function latestCompletedParagraphFirstLine(text: string): string {
  * @param props.t - conversation locale seat for the disclosure and running status.
  * @returns the reasoning disclosure.
  */
-export const ReasoningRow = memo(function ReasoningRow({ text, running, usePresentation, useDisclosure, renderSlot, t }: {
+export const ReasoningRow = memo(function ReasoningRow({ text, running, timing, usePresentation, useDisclosure, renderSlot, t }: {
   text: string
   running: boolean
+  timing: ReasoningBlockTiming | undefined
   useDisclosure: UseDisclosure
   usePresentation: UsePresentation
   t: ChatViewSlotProps['t']
@@ -82,6 +85,7 @@ export const ReasoningRow = memo(function ReasoningRow({ text, running, usePrese
       data-preview={preview || undefined}
     >
       {running && <span className={a11yCss.visuallyHidden}>{t('row.running')}</span>}
+      <ReasoningTiming timing={timing} t={t} />
       <DisclosureRow
         rowClassName={css.row}
         leadingClassName={css.leading}
