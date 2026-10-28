@@ -49,17 +49,6 @@ Feature: Prompt stash
     And the recent messages tab is opened
     Then the recent list explains that no sent text prompts are loaded
 
-  @scenario:prompt-stash.draft-limits
-  Scenario: Save and restore a text-only draft without sending it
-    Given the isolated plugin profile "@dshfiles/prompt-stash" is booted
-    When the empty draft panel is opened
-    Then saving is disabled for an empty draft and sent history is empty
-    And the empty draft panel is closed
-    When the composer text "Draft body to keep" is saved as "Planning prompt"
-    Then saving leaves the current composer text unchanged
-    When the composer is cleared and the saved draft "Planning prompt" is restored
-    Then the draft is restored without sending and can be removed
-
   @scenario:prompt-stash.draft-attachments-survive-back
   Scenario: Draft attachments survive leaving the thread and coming back
     Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/thread-sidebar, @dshfiles/ai-accounts" is booted

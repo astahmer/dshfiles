@@ -6,7 +6,6 @@ import { defineClientPlugin, type ComposerActionProps } from '@dshfiles/dshx/cli
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createDraftAttachmentKeeper } from './draft-attachment-retention.js'
 import PromptLibraryAction from './prompt-stash-action.js'
-import { PromptStashAction as PromptDraftsAction } from './prompt-stash.js'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -33,21 +32,12 @@ export default defineClientPlugin({
     })
     api.lifecycle.onDispose(attachmentKeeper.dispose)
     api.composer.registerAction({
-      id: 'prompt-stash-drafts',
-      placement: 'left',
-      component: props => (
-        <PluginQueryProvider>
-          <PromptDraftsAction {...props} attachmentKeeper={attachmentKeeper} />
-        </PluginQueryProvider>
-      ),
-    })
-    api.composer.registerAction({
       id: 'prompt-stash-action',
       placement: 'right',
       order: 60,
       component: props => (
         <PluginQueryProvider>
-          <PromptLibraryAction {...props} />
+          <PromptLibraryAction {...props} attachmentKeeper={attachmentKeeper} />
         </PluginQueryProvider>
       ),
     })

@@ -5,6 +5,7 @@
       "id": "prompt-library",
       "title": "Manage reusable prompt snippets",
       "summary": "Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.",
+      "reach": ["click button \"Prompts\"", "expect heading \"Saved prompts\""],
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["empty", "saved", "editing", "conflicted", "save-as-copy"],
@@ -135,62 +136,6 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: Browse recent text-only user messages renders browser state and starts no Host work of its own."
-        }
-      ]
-    },
-    {
-      "id": "draft-and-sent-history",
-      "title": "Save and restore composer drafts",
-      "summary": "Save bounded plain-text drafts to the Host-owned stash every browser shares, and restore sent text without submitting or converting attachments and references.",
-      "surfaces": ["client", "host", "storage"],
-      "configuration": [],
-      "states": ["draft", "saved", "restored", "sent-history"],
-      "failureModes": [
-        "Busy, empty, oversized, or reference-bearing input disables draft save.",
-        "Invalid storage falls back without overwriting the stored bytes."
-      ],
-      "externalDependencies": [],
-      "verification": [
-        {
-          "kind": "gherkin",
-          "id": "prompt-stash.draft-limits",
-          "featureFile": "tooling/dshx/e2e/features/prompt-stash.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "prompt-stash.draft-and-sent-history-unit-draft-input-guard",
-          "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
-          "testName": "rejects a draft when the composer is busy, empty, too large, or contains non-text data"
-        },
-        {
-          "kind": "unit-test",
-          "id": "prompt-stash.draft-and-sent-history-unit-draft-storage-bounds",
-          "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
-          "testName": "ignores malformed, oversized, duplicate-id, and over-capacity stores"
-        },
-        {
-          "kind": "unit-test",
-          "id": "prompt-stash.draft-and-sent-history-unit-sent-history-projection",
-          "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
-          "testName": "reads only bounded plain-text user messages"
-        },
-        {
-          "kind": "host-test",
-          "id": "prompt-stash.draft-and-sent-history-host-store",
-          "file": "plugins/@dshfiles/prompt-stash/src/store.test.ts",
-          "testName": "saves drafts, rejects a duplicate id, and removes one"
-        },
-        {
-          "kind": "host-test",
-          "id": "prompt-stash.draft-and-sent-history-host-wiring",
-          "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
-          "testName": "serves saved drafts through the same Host store"
-        }
-      ],
-      "telemetry": [
-        {
-          "kind": "automatic",
-          "source": "api-dispatch"
         }
       ]
     },

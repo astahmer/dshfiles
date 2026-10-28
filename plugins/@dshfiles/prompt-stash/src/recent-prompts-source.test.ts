@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { areSentPromptsEqual, selectRecentPrompts, selectSentPrompts } from './recent-prompts-source.js'
+import { selectRecentPrompts } from './recent-prompts-source.js'
 
 const userNode = (seq: number, text: string, extra: readonly unknown[] = []) => ({
   id: `node-${seq}`,
@@ -16,7 +16,7 @@ const userNode = (seq: number, text: string, extra: readonly unknown[] = []) => 
 })
 
 describe('Chat source selectors', () => {
-  it('projects sent prompts without a live Chat hook', () => {
+  it('projects recent prompts without a live Chat hook', () => {
     const chat = {
       order: ['first', 'second'],
       nodes: new Map([
@@ -25,10 +25,6 @@ describe('Chat source selectors', () => {
       ]),
     }
 
-    expect(selectSentPrompts(chat)).toEqual([
-      { id: 2, text: 'second prompt' },
-      { id: 1, text: 'first prompt' },
-    ])
     expect(selectRecentPrompts(chat).map(prompt => prompt.text)).toEqual(['second prompt', 'first prompt'])
   })
 
@@ -42,12 +38,6 @@ describe('Chat source selectors', () => {
       ]),
     }
 
-    expect(selectSentPrompts(chat)).toEqual([{ id: 3, text: 'usable' }])
-  })
-
-  it('compares projected sent prompts by identity and text', () => {
-    expect(areSentPromptsEqual([{ id: 1, text: 'same' }], [{ id: 1, text: 'same' }])).toBe(true)
-    expect(areSentPromptsEqual([{ id: 1, text: 'same' }], [{ id: 1, text: 'changed' }])).toBe(false)
-    expect(areSentPromptsEqual([{ id: 1, text: 'same' }], [])).toBe(false)
+    expect(selectRecentPrompts(chat).map(prompt => prompt.text)).toEqual(['usable'])
   })
 })

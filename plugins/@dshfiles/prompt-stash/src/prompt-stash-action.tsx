@@ -12,10 +12,11 @@ import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, type SavedPrompt } from './library
 import { usePromptLibrary, type PromptLibraryClient } from './library-client.js'
 import { PromptEditorForm, type PromptEditorSubmission } from './prompt-editor-form.js'
 import { promptLibraryMachine, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
-import { PromptDrafts } from './draft-store.js'
+import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
 
-const PromptStashAction = (props: PromptActionProps): JSX.Element => {
+const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<PromptActionProps['sessionId']> }): JSX.Element => {
   const input = props.useInput(state => state)
+  useDraftAttachmentRetention({ keeper: props.attachmentKeeper, sessionId: props.sessionId, count: input.attachmentIds.length })
   const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
   const libraryClientRef = useRef<PromptLibraryClient | null>(null)
   const inputActionsRef = useRef(props.inputActions)
@@ -59,13 +60,13 @@ const PromptStashAction = (props: PromptActionProps): JSX.Element => {
     editorTarget !== null &&
     editorTarget.id !== null &&
     prompts.find(prompt => prompt.id === editorTarget.id)?.revision !== editorTarget.expectedRevision
-  const currentDraftBlock = PromptDrafts.saveBlock({
-    phase: input.phase,
-    text: input.draft,
-    attachmentCount: input.attachmentIds.length,
-    referenceCount: input.occurrences.length,
-  })
-  const currentPromptSaveDisabled = currentDraftBlock !== null || input.draft.length > MAX_PROMPT_TEXT_LENGTH || prompts.length >= MAX_PROMPTS
+  const currentPromptSaveDisabled =
+    input.phase !== 'plain' ||
+    input.attachmentIds.length > 0 ||
+    input.occurrences.length > 0 ||
+    input.draft.trim().length === 0 ||
+    input.draft.length > MAX_PROMPT_TEXT_LENGTH ||
+    prompts.length >= MAX_PROMPTS
   const [recentPrompts, setRecentPrompts] = useState<readonly RecentPrompt[]>([])
   const triggerId = useId()
 
