@@ -54,9 +54,9 @@ export const backlogSettings = defineSettings({
         'Open threads started from a backlog item as soon as they exist, including threads started by an @agent comment. Off leaves you where you were and the report offers to open the thread; the dialog checkbox overrides this setting for one thread.',
       ),
     smartThreadRouting: Schema.boolean()
-      .default(true)
+      .default(false)
       .description(
-        'Classify plain item replies as discussion or work requests. Work requests start a linked @dsh thread; other messages remain replies. Uses Jev when enabled and conservative keyword matching otherwise.',
+        'When enabled, classify plain item replies as discussion or work requests. Work requests start a linked @dsh thread; other messages remain replies. Uses Jev when enabled and conservative keyword matching otherwise. Off keeps every plain reply as context; @agent remains an explicit dispatch.',
       ),
     threadStartNotifications: Schema.union([Schema.const('off'), Schema.const('in-app'), Schema.const('system'), Schema.const('both')])
       .default('in-app')
