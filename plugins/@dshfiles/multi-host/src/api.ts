@@ -13,7 +13,13 @@ const sessionIdSchema = z.string().min(1).max(256)
 const brandedSessionIdSchema = z.custom<SessionId>(value => typeof value === 'string' && value.length > 0 && value.length <= 256)
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
-export type LocalProjectFileCandidate = { readonly path: string; readonly bytes: number; readonly ignored: boolean; readonly copyable: boolean }
+export type LocalProjectFileCandidate = {
+  readonly path: string
+  readonly bytes: number
+  readonly ignored: boolean
+  readonly copyable: boolean
+  readonly copyReason?: 'potential-secret' | 'too-large' | undefined
+}
 
 export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
@@ -281,11 +287,15 @@ const cloneProjectInputSchema = z
     destinationPath: cloneDestinationSchema,
     copyFromPath: localProjectPathSchema.optional(),
     copyPaths: z.array(localProjectFilePathSchema).max(128).optional(),
+    includeIgnored: z.boolean().optional(),
   })
   .strict()
   .superRefine((input, context) => {
     if ((input.copyFromPath === undefined) !== (input.copyPaths === undefined)) {
       context.addIssue({ code: 'custom', message: 'Local source folder and selected file list must be supplied together.' })
+    }
+    if (input.includeIgnored === true && input.copyFromPath === undefined) {
+      context.addIssue({ code: 'custom', message: 'Scanning ignored files requires an explicit local source folder.' })
     }
   })
 
@@ -532,17 +542,29 @@ export const multiHostApi = defineApi({
       tool: { name: 'multi_host_open_folder', render: compactJson },
     }),
     localProjectFiles: method({
-      input: z.object({ path: localProjectPathSchema }).strict(),
+      input: z.object({ path: localProjectPathSchema, includeIgnored: z.boolean().optional() }).strict(),
       output: z.discriminatedUnion('ok', [
         z.object({
           ok: z.literal(true),
           root: z.string(),
-          files: z.array(z.object({ path: z.string(), bytes: z.number().int().nonnegative(), ignored: z.boolean(), copyable: z.boolean() }).strict()),
+          files: z.array(
+            z
+              .object({
+                path: z.string(),
+                bytes: z.number().int().nonnegative(),
+                ignored: z.boolean(),
+                copyable: z.boolean(),
+                copyReason: z.enum(['potential-secret', 'too-large']).optional(),
+              })
+              .strict(),
+          ),
           truncated: z.boolean(),
         }),
         failedSchema,
       ]),
-      description: 'List untracked and ignored files under one local Git project, without reading file contents. Read-only.',
+      description:
+        'List untracked files under one local Git project without reading contents. Ignored files appear only when includeIgnored is explicitly true; credential-like paths are marked non-copyable. Read-only.',
+
       tool: { name: 'multi_host_local_project_files', readOnly: true, render: compactJson },
     }),
     runtimeCloneProject: method({
@@ -558,7 +580,7 @@ export const multiHostApi = defineApi({
         failedSchema,
       ]),
       description:
-        'Clone a Git repository to one remote host and register the clone as a project workspace. Optionally copy user-selected local untracked or ignored files from a Git project. Call only when the user asked to clone there.',
+        'Clone a Git repository to one remote host and register the clone as a project workspace. Optionally copy individually selected local files; ignored files require includeIgnored: true, no file is selected automatically, and credential-like paths are blocked. Call only when the user asked to clone there.',
       tool: { name: 'multi_host_clone_project', render: compactJson },
     }),
     runtimeBrowse: method({

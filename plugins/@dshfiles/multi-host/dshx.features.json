@@ -51,7 +51,7 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "The Hosts page lists registered machines, shows live one-minute load and memory use, and lets users manage remote projects. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
+      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users add existing folders or clone Git repositories with optional individually selected local-file copying. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": [
@@ -68,7 +68,8 @@
       "failureModes": [
         "A partial or duplicate order is refused and the stored order stays.",
         "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker.",
-        "A local file-copy failure leaves the cloned repository registered and reports that the selected files were not copied."
+        "A local file-copy failure leaves the cloned repository registered and reports that the selected files were not copied.",
+        "Ignored files are not scanned unless explicitly requested; candidates are never selected automatically, and credential-like paths are blocked."
       ],
       "externalDependencies": [],
       "reach": [
@@ -78,7 +79,13 @@
         "expect text \"3 registered*\"",
         "click button \"Clone project\"",
         "expect textbox \"Git repository URL\"",
-        "expect checkbox \"Copy local ignored and untracked files\""
+        "fill textbox \"Git repository URL\" \"git@github.com:owner/repo.git\"",
+        "expect checkbox \"Copy selected local files\"",
+        "click textbox \"Folder on Build box\"",
+        "press Tab",
+        "press Space",
+        "expect checkbox \"Also scan ignored files\"",
+        "expect text \"Files are never selected automatically. Credential-like names are blocked; review each other file.\""
       ],
       "verification": [
         {
@@ -103,7 +110,7 @@
           "kind": "unit-test",
           "id": "multi-host.local-project-files",
           "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
-          "testName": "lists ignored and untracked files, filters dependencies, and archives only selected paths"
+          "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
         },
         {
           "kind": "unit-test",
@@ -126,13 +133,13 @@
           "kind": "custom",
           "span": "local project files scan",
           "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
-          "testName": "lists ignored and untracked files, filters dependencies, and archives only selected paths"
+          "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
         },
         {
           "kind": "custom",
           "span": "local project files archive",
           "file": "plugins/@dshfiles/multi-host/src/local-project-files.test.ts",
-          "testName": "lists ignored and untracked files, filters dependencies, and archives only selected paths"
+          "testName": "scans untracked files by default, explicitly includes ignored files, blocks credential-like paths, and archives only selected files"
         },
         {
           "kind": "custom",

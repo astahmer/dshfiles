@@ -905,7 +905,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   localProjectFiles: async ({ input, signal }) => {
     try {
-      const result = await listLocalProjectFiles({ path: input.path, signal })
+      const result = await listLocalProjectFiles({ path: input.path, includeIgnored: input.includeIgnored, signal })
       return { ok: true as const, root: result.root, files: [...result.files], truncated: result.truncated }
     } catch (error) {
       return {
@@ -929,7 +929,12 @@ const multiHostHandlers = multiHostApi.host({
       let archive: Buffer | undefined
       if (input.copyFromPath !== undefined && input.copyPaths !== undefined && input.copyPaths.length > 0) {
         try {
-          archive = await createLocalProjectArchive({ root: input.copyFromPath, paths: input.copyPaths, signal })
+          archive = await createLocalProjectArchive({
+            root: input.copyFromPath,
+            paths: input.copyPaths,
+            includeIgnored: input.includeIgnored,
+            signal,
+          })
         } catch (error) {
           return {
             ok: false as const,

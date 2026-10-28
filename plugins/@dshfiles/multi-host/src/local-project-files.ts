@@ -65,6 +65,22 @@ const safeRelativePath = (value: string): boolean => {
 
 const pathIsCopyable = (value: string): boolean => !value.split('/').includes('node_modules')
 
+const isPotentialSecretPath = (value: string): boolean => {
+  const path = value.toLowerCase()
+  const filename = posix.basename(path)
+  if (/^\.env\.(?:example|sample|template|dist)$/u.test(filename)) return false
+  return (
+    /(^|\/)\.env(?:rc)?(?:\.[^/]+)?$/u.test(path) ||
+    /(^|\/)(?:\.npmrc|\.pypirc|\.netrc|\.aws|\.ssh)(?:\/|$)/u.test(path) ||
+    /(^|\/)(?:\.?(?:secrets?|credentials?|tokens?))(?:\/|$)/u.test(path) ||
+    /(^|[._-])(?:secret|credentials?|token|private[-_.]?key)(?:[._-]|$)/u.test(filename) ||
+    /(^|\/)(?:id_(?:rsa|dsa|ecdsa|ed25519)|authorized_keys|known_hosts|application_default_credentials\.json|service[-_]?account(?:_[^/]+)?\.json)$/u.test(
+      path,
+    ) ||
+    /\.(?:pem|key|p12|pfx|jks|keystore|tfstate)$/u.test(path)
+  )
+}
+
 const resolveRepositoryRoot = async (path: string, signal: AbortSignal | undefined): Promise<string> => {
   if (!isAbsolute(path)) throw new LocalProjectFilesError('local-path-not-absolute', 'Choose an absolute local project folder path.')
   let canonicalPath: string
@@ -83,14 +99,20 @@ const resolveRepositoryRoot = async (path: string, signal: AbortSignal | undefin
   const root = output.toString('utf8').trim()
   if (root.length === 0) throw new LocalProjectFilesError('not-a-git-project', 'The selected local folder is not inside a Git project.')
   try {
-    return await realpath(root)
-  } catch {
+    const projectRoot = await realpath(root)
+    if (canonicalPath !== projectRoot) {
+      throw new LocalProjectFilesError('local-path-not-project-root', 'Choose the root folder of the local Git project.')
+    }
+    return projectRoot
+  } catch (error) {
+    if (error instanceof LocalProjectFilesError) throw error
     throw new LocalProjectFilesError('local-path-unavailable', 'The local Git project folder is not available on this machine.')
   }
 }
 
 export const listLocalProjectFiles = async (input: {
   readonly path: string
+  readonly includeIgnored?: boolean | undefined
   readonly signal?: AbortSignal | undefined
 }): Promise<{ readonly root: string; readonly files: readonly LocalProjectFileCandidate[]; readonly truncated: boolean }> =>
   withSpan('local project files scan', { kind: 'internal' }, async span => {
@@ -103,13 +125,15 @@ export const listLocalProjectFiles = async (input: {
         signal: input.signal,
         maxBuffer: maxScanOutputBytes,
       }),
-      runBufferProcess({
-        executable: 'git',
-        args: ['ls-files', '--others', '--ignored', '--exclude-standard', '-z'],
-        cwd: root,
-        signal: input.signal,
-        maxBuffer: maxScanOutputBytes,
-      }),
+      input.includeIgnored === true
+        ? runBufferProcess({
+            executable: 'git',
+            args: ['ls-files', '--others', '--ignored', '--exclude-standard', '-z'],
+            cwd: root,
+            signal: input.signal,
+            maxBuffer: maxScanOutputBytes,
+          })
+        : Promise.resolve(Buffer.alloc(0)),
     ])
     const ignored = new Set(decodePathList(ignoredOutput))
     const paths = [...new Set([...decodePathList(untrackedOutput), ...ignored])]
@@ -120,7 +144,14 @@ export const listLocalProjectFiles = async (input: {
       try {
         const entry = await lstat(join(root, path))
         if (!entry.isFile()) continue
-        candidates.push({ path, bytes: entry.size, ignored: ignored.has(path), copyable: entry.size <= maxCopiedBytes })
+        const copyReason = isPotentialSecretPath(path) ? 'potential-secret' : entry.size > maxCopiedBytes ? 'too-large' : undefined
+        candidates.push({
+          path,
+          bytes: entry.size,
+          ignored: ignored.has(path),
+          copyable: copyReason === undefined,
+          ...(copyReason === undefined ? {} : { copyReason }),
+        })
       } catch {
         continue
       }
@@ -132,6 +163,7 @@ export const listLocalProjectFiles = async (input: {
 export const createLocalProjectArchive = async (input: {
   readonly root: string
   readonly paths: readonly string[]
+  readonly includeIgnored?: boolean | undefined
   readonly signal?: AbortSignal | undefined
 }): Promise<Buffer> =>
   withSpan('local project files archive', { kind: 'internal' }, async span => {
@@ -139,13 +171,16 @@ export const createLocalProjectArchive = async (input: {
     if (input.paths.some(path => !safeRelativePath(path) || !pathIsCopyable(path))) {
       throw new LocalProjectFilesError('invalid-file-path', 'One or more selected local file paths are invalid.')
     }
-    const scan = await listLocalProjectFiles({ path: input.root, signal: input.signal })
+    const scan = await listLocalProjectFiles({ path: input.root, includeIgnored: input.includeIgnored, signal: input.signal })
     const candidates = new Map(scan.files.map(file => [file.path, file]))
     const selected = [...new Set(input.paths)].sort((left, right) => left.localeCompare(right))
     let totalBytes = 0
     for (const path of selected) {
       const file = candidates.get(path)
       if (file === undefined) throw new LocalProjectFilesError('file-not-copyable', 'A selected local file is no longer available to copy.')
+      if (file.copyReason === 'potential-secret') {
+        throw new LocalProjectFilesError('credential-like-file', 'A selected local file has a credential-like name and cannot be copied.')
+      }
       if (!file.copyable) throw new LocalProjectFilesError('file-too-large', 'A selected local file is too large to copy.')
       totalBytes += file.bytes
       if (totalBytes > maxCopiedBytes) throw new LocalProjectFilesError('copy-size-limit', 'Selected local files exceed the 50 MB copy limit.')

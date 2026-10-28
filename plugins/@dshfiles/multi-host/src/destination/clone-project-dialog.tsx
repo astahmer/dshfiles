@@ -18,6 +18,7 @@ const cloneDialogFormSchema = z.object({
   destinationPath: z.string().trim(),
   copyLocalFiles: z.boolean(),
   copyFromPath: z.string().trim(),
+  includeIgnored: z.boolean(),
 })
 
 export const CloneProjectDialog = (props: {
@@ -38,6 +39,7 @@ export const CloneProjectDialog = (props: {
       destinationPath: '',
       copyLocalFiles: false,
       copyFromPath: props.localProjectPath ?? '',
+      includeIgnored: false,
     },
     validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
     validators: { onDynamic: cloneDialogFormSchema },
@@ -57,7 +59,12 @@ export const CloneProjectDialog = (props: {
           }`,
       }
       if (value.copyLocalFiles) {
-        clone.mutate({ ...input, copyFromPath: value.copyFromPath, copyPaths: selectedPaths })
+        clone.mutate({
+          ...input,
+          copyFromPath: value.copyFromPath,
+          copyPaths: selectedPaths,
+          includeIgnored: value.includeIgnored,
+        })
         return
       }
       clone.mutate(input)
@@ -67,17 +74,17 @@ export const CloneProjectDialog = (props: {
     if (props.runtime === undefined) form.setFieldValue('copyFromPath', props.localProjectPath ?? '')
   }, [form, props.localProjectPath, props.runtime])
   const scan = useMutation({
-    mutationFn: async (path: string) => {
+    mutationFn: async (input: { readonly path: string; readonly includeIgnored: boolean }) => {
       scanController.current?.abort()
       const controller = new AbortController()
       scanController.current = controller
-      const result = await props.api.localProjectFiles({ path }, { signal: controller.signal })
+      const result = await props.api.localProjectFiles(input, { signal: controller.signal })
       if (!result.ok) throw new Error(result.message)
       return result
     },
     onSuccess: result => {
       setFiles(result.files)
-      setSelectedPaths(result.files.filter(file => file.copyable).map(file => file.path))
+      setSelectedPaths([])
     },
   })
   const clone = useMutation({
@@ -87,6 +94,7 @@ export const CloneProjectDialog = (props: {
       readonly destinationPath: string
       readonly copyFromPath?: string
       readonly copyPaths?: string[]
+      readonly includeIgnored?: boolean
     }) => {
       const result = await props.api.runtimeCloneProject(input)
       if (!result.ok) throw new Error(result.message)
@@ -117,7 +125,7 @@ export const CloneProjectDialog = (props: {
     if (path.length === 0) return
     setFiles([])
     setSelectedPaths([])
-    scan.mutate(path)
+    scan.mutate({ path, includeIgnored: form.getFieldValue('includeIgnored') })
   }
   const toggleFile = (path: string, checked: boolean): void => {
     setSelectedPaths(current => (checked ? [...new Set([...current, path])] : current.filter(selected => selected !== path)))
@@ -146,11 +154,30 @@ export const CloneProjectDialog = (props: {
           <form.AppField name="destinationPath">
             {field => <field.TextField label={`Folder on ${props.hostName ?? 'remote host'}`} monospace placeholder="~/project-name" />}
           </form.AppField>
-          <form.AppField name="copyLocalFiles">{field => <field.CheckboxField label="Copy local ignored and untracked files" />}</form.AppField>
+          <form.Field name="copyLocalFiles">
+            {field => (
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
+                <Checkbox
+                  checked={field.state.value}
+                  onCheckedChange={checked => {
+                    field.handleChange(checked === true)
+                    if (checked === true) return
+                    scanController.current?.abort()
+                    scanController.current = null
+                    setFiles([])
+                    setSelectedPaths([])
+                    scan.reset()
+                  }}
+                />
+                Copy selected local files
+              </label>
+            )}
+          </form.Field>
           <form.Subscribe
             selector={state => ({
               enabled: state.values.copyLocalFiles,
               copyFromPath: state.values.copyFromPath,
+              includeIgnored: state.values.includeIgnored,
             })}
           >
             {state =>
@@ -180,6 +207,27 @@ export const CloneProjectDialog = (props: {
                       )}
                     </form.Field>
                   </label>
+                  <form.Field name="includeIgnored">
+                    {field => (
+                      <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
+                        <Checkbox
+                          checked={field.state.value}
+                          onCheckedChange={checked => {
+                            field.handleChange(checked === true)
+                            scanController.current?.abort()
+                            scanController.current = null
+                            setFiles([])
+                            setSelectedPaths([])
+                            scan.reset()
+                          }}
+                        />
+                        Also scan ignored files
+                      </label>
+                    )}
+                  </form.Field>
+                  <p className="dshx:text-xs dshx:text-muted-foreground">
+                    Files are never selected automatically. Credential-like names are blocked; review each other file.
+                  </p>
                   <Button disabled={scan.isPending || state.copyFromPath.trim().length === 0} type="button" variant="outline" onClick={scanFiles}>
                     {scan.isPending ? 'Scanning…' : 'Find files'}
                   </Button>
@@ -190,7 +238,11 @@ export const CloneProjectDialog = (props: {
                   ) : null}
                   {scan.data !== undefined ? (
                     <div className="dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:p-2">
-                      {files.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">No local files to copy.</p> : null}
+                      {files.length === 0 ? (
+                        <p className="dshx:text-sm dshx:text-muted-foreground">
+                          {state.includeIgnored ? 'No local files to copy.' : 'No untracked files. Turn on “Also scan ignored files” to find ignored files.'}
+                        </p>
+                      ) : null}
                       {files.map(file => (
                         <label key={file.path} className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-sm">
                           <Checkbox
@@ -200,7 +252,12 @@ export const CloneProjectDialog = (props: {
                           />
                           <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono!">{file.path}</span>
                           <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">
-                            {file.ignored ? 'ignored' : 'untracked'} · {file.bytes} B
+                            {file.ignored ? 'ignored' : 'untracked'} ·{' '}
+                            {file.copyReason === 'potential-secret'
+                              ? 'possible credential; blocked'
+                              : file.copyReason === 'too-large'
+                                ? 'too large to copy'
+                                : `${file.bytes} B`}
                           </span>
                         </label>
                       ))}

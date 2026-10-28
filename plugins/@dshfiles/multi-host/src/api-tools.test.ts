@@ -62,13 +62,28 @@ describe('multi-host tool exposure', () => {
       repositoryUrl: 'https://github.com/owner/repo.git',
       destinationPath: '~/repo',
       copyFromPath: '/work/project',
-      copyPaths: ['.env', 'notes.txt'],
+      copyPaths: ['.env.example', 'notes.txt'],
     }
     expect('issues' in (await cloneInput['~standard'].validate(copyInput))).toBe(false)
+    expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, includeIgnored: true }))).toBe(false)
+    expect(
+      'issues' in
+        (await cloneInput['~standard'].validate({
+          runtimeId: 'runtime',
+          repositoryUrl: copyInput.repositoryUrl,
+          destinationPath: '~/repo',
+          includeIgnored: true,
+        })),
+    ).toBe(true)
     expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: ['../outside'] }))).toBe(true)
     expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: ['bad\0path'] }))).toBe(true)
     expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyPaths: undefined }))).toBe(true)
     expect('issues' in (await cloneInput['~standard'].validate({ ...copyInput, copyFromPath: undefined }))).toBe(true)
+    const scanInput = multiHostApi.methods.localProjectFiles.input
+    if (scanInput === undefined) throw new Error('The local project file scan must define an input schema.')
+    expect('issues' in (await scanInput['~standard'].validate({ path: '/work/project' }))).toBe(false)
+    expect('issues' in (await scanInput['~standard'].validate({ path: '/work/project', includeIgnored: true }))).toBe(false)
+    expect('issues' in (await scanInput['~standard'].validate({ path: '/work/project', includeIgnored: 'yes' }))).toBe(true)
   })
 
   test('remote model results preserve reasoning choices', async () => {

@@ -34,11 +34,14 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
   picker without deleting it (its runtimes, threads and remote data stay), and
   reconnect, edit and remove stay on the row. **Add folder** registers an
   existing remote directory; **Clone project** clones an HTTPS or SSH Git URL
-  into a remote path and registers it as a workspace. Clone can also preview
-  and copy selected local ignored or untracked files; it stays opt-in, excludes
-  `node_modules`, and caps the transfer at 128 files / 50 MB. Existing remote
-  files are never overwritten; symlinked destination paths refuse the copy
-  without undoing the clone. The Run on menu
+  into a remote path and registers it as a workspace. Local-file copying is an explicit second
+  step: scan untracked files, optionally opt in to scanning ignored files, then
+  select each file individually. Nothing is preselected; common credential-like
+  filenames are blocked and `node_modules` is excluded. Review the remaining
+  names before selecting them, since file contents are not inspected. Transfers
+  cap at 128 files / 50 MB. Existing remote files are never overwritten;
+  symlinked destination paths refuse the copy without undoing the clone.
+  The Run on menu
 
   pre-fills the current project path; the Hosts page accepts a local path too.
   **Add host** keeps the dialog, with the SSH destination picker,
