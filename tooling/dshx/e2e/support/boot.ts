@@ -10,6 +10,7 @@ import { resolveDshExecutable } from '../../packages/dshx/src/project/dsh-execut
 import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scratch-processes.mjs'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
+import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-accounts-workspace.js'
 
 // Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
 // Turbo result) depends only on the repository.
@@ -71,7 +72,7 @@ export interface BootedProfile {
   close(): Promise<void>
 }
 
-type LocalBootBundle = Awaited<ReturnType<typeof listLocalBootBundles>>[number]
+type LocalBootBundle = Awaited<ReturnType<typeof LocalBundleModel.listLocalBootBundles>>[number]
 
 const requireNonEmptyBundles = (bundles: readonly LocalBootBundle[], message: string): [LocalBootBundle, ...LocalBootBundle[]] => {
   const [firstBundle, ...remainingBundles] = bundles
@@ -226,6 +227,8 @@ interface ComposedBootRequest {
   readonly timeoutMs: number
   readonly additionalBundleIds: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
+  /** Stable recipe identity permits prewarming; each sibling still runs seedHome in its own new home. */
+  readonly seedKey?: string
   readonly cordisPatch?: string
   /** Extra environment for the Host process, e.g. a plugin's verification switch. */
   readonly hostEnv?: Readonly<Record<string, string>>
@@ -259,14 +262,14 @@ const killPrewarmedHostsOnExit = (): void => {
 process.once('exit', killPrewarmedHostsOnExit)
 
 const compositionKeyOf = (request: ComposedBootRequest): string | undefined => {
-  if (request.seedHome !== undefined) return undefined
+  if (request.seedHome !== undefined && request.seedKey === undefined) return undefined
   const hash = createHash('sha256')
   const env = Object.entries(request.hostEnv ?? {})
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => `${key}=${value}`)
     .join('&')
   hash.update(
-    `${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}\0${env}\0${request.executable}`,
+    `${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}\0${request.executable}\0${request.seedKey ?? ''}\0${env}`,
   )
   return hash.digest('hex')
 }
@@ -342,20 +345,26 @@ export const bootComposedPluginProfile = async (request: {
   readonly timeoutMs?: number
   readonly additionalBundleIds?: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
+  /** Stable recipe identity permits prewarming; each sibling still runs seedHome in its own new home. */
+  readonly seedKey?: string
   readonly cordisPatch?: string
   /** Extra environment for the Host process, e.g. a plugin's verification switch. */
   readonly hostEnv?: Readonly<Record<string, string>>
 }): Promise<BootedProfile> => {
+  if (request.seedKey !== undefined && (request.seedHome === undefined || request.seedKey.trim() === '')) {
+    throw new Error('A non-empty seedKey requires a deterministic seedHome recipe.')
+  }
   const composed: ComposedBootRequest = {
     executable: await resolveDshExecutable(),
     packageIds: request.packageIds,
     profileLabel: request.profileLabel,
     timeoutMs: request.timeoutMs ?? 90_000,
     additionalBundleIds: request.additionalBundleIds ?? [],
+    ...(request.seedHome === undefined ? {} : { seedHome: request.seedHome }),
+    ...(request.seedKey === undefined ? {} : { seedKey: request.seedKey }),
+    ...(request.cordisPatch === undefined ? {} : { cordisPatch: request.cordisPatch }),
+    ...(request.hostEnv === undefined ? {} : { hostEnv: request.hostEnv }),
   }
-  if (request.seedHome !== undefined) composed.seedHome = request.seedHome
-  if (request.cordisPatch !== undefined) composed.cordisPatch = request.cordisPatch
-  if (request.hostEnv !== undefined) composed.hostEnv = request.hostEnv
   const compositionKey = compositionKeyOf(composed)
   if (compositionKey !== undefined) {
     const slot = prewarmSlots.get(compositionKey)
@@ -379,4 +388,9 @@ export const bootComposedPluginProfile = async (request: {
 }
 
 export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> =>
-  bootComposedPluginProfile({ packageIds: [packageId], profileLabel: packageId, timeoutMs })
+  bootComposedPluginProfile({
+    packageIds: [packageId],
+    profileLabel: packageId,
+    timeoutMs,
+    ...(packageId === '@dshfiles/ai-accounts' ? { seedHome: seedAiAccountsWorkspace, seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY } : {}),
+  })

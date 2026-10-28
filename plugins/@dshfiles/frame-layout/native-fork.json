@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Local delta includes observable shell.main centre ownership, delegated keyed-main rendering with native fallback, the stable main-tabs anchor, a frame-lifetime dock action registry, retained hidden dock views and a hidden native resource carrier throughout Workbench mode, and full-height right geometry with the bottom row confined to left plus centre. Update it with every upstream bump or delta change.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-layout",
@@ -16,6 +16,7 @@
   "delta": [
     "src/native/client/index.ts",
     "src/native/client/stores.ts",
+    "src/native/client/service.ts",
     "src/native/client/AppFrame.tsx",
     "src/native/client/AppFrame.module.css",
     "src/native/client/columns.ts"

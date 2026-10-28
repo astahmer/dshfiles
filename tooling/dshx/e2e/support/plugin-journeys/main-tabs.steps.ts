@@ -1,16 +1,18 @@
 import { expect, type Page } from '@playwright/test'
-import { Then, When } from '../bdd.js'
+import { rm } from 'node:fs/promises'
+import { basename } from 'node:path'
+import { After, Then, When } from '../bdd.js'
+import { globalPanelLink as globalPanel, reusableViewName } from '../plugin-view-names.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
-import { sendMessage } from '../threads.js'
+import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
 
 const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 
 const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', exact: true })
-const tab = (page: Page, name: string) => strip(page).getByRole('tab', { name, exact: true })
-const globalPanel = (page: Page, name: string) =>
-  page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name, exact: true })
-
+// Native core page titles stay original outside Workbench; owned producer labels are qualified.
+const nativeTabName = (name: string): string => (name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : reusableViewName(name))
+const tab = (page: Page, name: string) => strip(page).getByRole('tab', { name: nativeTabName(name), exact: true })
 /** Each tab as "<name>" plus "*" when active, "(preview)" and "(pinned)" markers, in strip order. */
 const tabSummary = (page: Page): Promise<readonly string[]> =>
   strip(page)
@@ -29,6 +31,8 @@ const tabSummary = (page: Page): Promise<readonly string[]> =>
 const openKept = async (page: Page, name: string): Promise<void> => {
   await globalPanel(page, name).click()
   await expect(tab(page, name)).toHaveAttribute('aria-selected', 'true')
+  // Installed ui-plugin-manager registers keyed main `plugins` (not an owned Editor main page).
+  if (name === 'Plugins') await expect(tab(page, name)).toHaveAttribute('data-tab-id', 'panel:plugins')
   await tab(page, name).dblclick()
   await expect(tab(page, name)).not.toHaveAttribute('data-preview')
 }
@@ -58,49 +62,108 @@ const stripPlacement = (page: Page) =>
 
 const expectedPlacement = { hosts: 1, anchoredBeforeMainOutlet: true, aboveMainPanel: true, sameColumn: true }
 
-const primary = (): string => (process.platform === 'darwin' ? 'Meta' : 'Control')
+/** This feature's @platform-macos visitor owns the shortcuts, not the Linux process running Playwright. */
+const primary = (): string => 'Meta'
 const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads', exact: true })
 const sidebarThreadRow = (page: Page, sessionId: string) => threadSidebar(page).locator(`article[data-thread-id="${sessionId}"]`)
 const threadTab = (page: Page, sessionId: string) => strip(page).locator(`[data-tab-id="thread:${sessionId}"]`)
 
-const startSidebarThread = async (page: Page, prompt: string): Promise<string> => {
-  const currentThreadId = (): string | null => new URL(page.url()).searchParams.get('thread')
-  let sessionId = currentThreadId()
-  if (sessionId === null || (await sidebarThreadRow(page, sessionId).count()) > 0) {
-    const previousSessionId = sessionId
-    await page.getByRole('button', { name: 'New thread', exact: true }).click()
-    await expect.poll(currentThreadId, { timeout: 15_000 }).not.toBe(previousSessionId)
-    sessionId = currentThreadId()
-  }
-  // Scratch startup can prewarm the blank Session; the URL is the active destination, unlike an unrelated create response.
-  if (sessionId === null) throw new Error('The active New thread has no Session ID in the URL.')
-  await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
+const nativeWorkspaceRoots = new WeakMap<Page, string>()
+const nativePanelMoves = new WeakMap<Page, string>()
+const newThreadButton = (page: Page) =>
+  page
+    .getByRole('button', { name: 'New thread', exact: true })
+    .or(page.getByRole('button', { name: 'New session', exact: true }))
+    .first()
+
+When('the standalone native tab strip is ready', async ({ page }: { page: Page }) => {
+  await expect(page.locator('[data-main-surface="native"]')).toBeVisible()
+  await expect(page.locator('[data-slot="shell.main"]')).toHaveCount(0)
+  await expect(page.locator('[data-workbench-region]')).toHaveCount(0)
+  // A fresh strip's tablist has no tabs and legitimately occupies zero pixels.
+  // Its visible New tab action proves the fallback mounted without inventing a tab.
+  await expect(strip(page)).toBeAttached()
+  await expect(newTabButton(page)).toBeVisible()
+})
+
+When('a disposable native-tabs workspace is selected', async ({ page }: { page: Page }) => {
+  await expect(page.locator('[data-main-surface="native"]')).toBeVisible()
+  await expect(page.locator('[data-workbench-region]')).toHaveCount(0)
+  const root = await createScratchDirectory('dshx-main-tabs-e2e-')
+  nativeWorkspaceRoots.set(page, root)
+  await newThreadButton(page).click()
   await StartupDialogs.dismissProviderSetupIfShown(page)
-  await sendMessage(page, prompt)
+  const addWorkspace = page.getByRole('button', { name: 'Add workspace', exact: true })
+  if (await addWorkspace.isVisible()) await registerWorkspaceFolder(page, root)
+  else {
+    // Owned sidebar profiles use the composer's public project picker rather than the native Add workspace button.
+    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+    await expect(picker).toBeVisible()
+    await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(root)
+    await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
+    await expect(picker).toBeHidden()
+  }
+  await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(basename(root))
+})
+
+const startNativeThread = async (page: Page, prompt: string): Promise<string> => {
+  const root = nativeWorkspaceRoots.get(page)
+  if (root === undefined) throw new Error("Select this scenario's disposable native-tabs workspace before creating threads.")
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  // Workspace setup can already own a visible blank draft. Starting another native Session here is asynchronous
+  // and can replace that composer after fill; reuse it rather than racing an unnecessary navigation.
+  if (!(await composer.isVisible())) await newThreadButton(page).click()
+  await StartupDialogs.dismissProviderSetupIfShown(page)
+  await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(basename(root))
+  await composer.fill(prompt)
+  const send = page.getByRole('button', { name: 'Send message', exact: true })
+  await expect(send).toBeEnabled()
+  await send.click()
+  // The stock sidebar can reuse its empty prewarmed Session. Read the actual
+  // submitted actor tab instead of requiring a different id from that blank draft.
+  const submitted = tab(page, prompt)
+  await expect(submitted).toHaveAttribute('aria-selected', 'true')
+  const tabId = await submitted.getAttribute('data-tab-id')
+  if (tabId === null || !tabId.startsWith('thread:')) throw new Error('Submitted native thread has no actor identity.')
+  return tabId.slice('thread:'.length)
+}
+
+const startSidebarThread = async (page: Page, prompt: string): Promise<string> => {
+  const sessionId = await startNativeThread(page, prompt)
+  await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(sessionId)
   await expect(sidebarThreadRow(page, sessionId)).toBeVisible()
   return sessionId
 }
 
-When('the Workbench and then Jujutsu are opened from the sidebar', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Workbench').click()
-  await expect(tab(page, 'Workbench')).toBeVisible()
+After(async ({ page }: { page: Page }) => {
+  const root = nativeWorkspaceRoots.get(page)
+  if (root === undefined) return
+  nativeWorkspaceRoots.delete(page)
+  // Only remove the exact real temporary directory created and retained by this scenario.
+  if (!/^\/.*\/dshx-main-tabs-e2e-[^/]+$/u.test(root)) throw new Error(`Refusing unexpected native-tabs fixture directory: ${root}`)
+  await rm(root, { recursive: true, force: true })
+})
+
+When('the Plugins and then Jujutsu are opened from the sidebar', async ({ page }: { page: Page }) => {
+  await globalPanel(page, 'Plugins').click()
+  await expect(tab(page, 'Plugins')).toBeVisible()
   await globalPanel(page, 'Jujutsu').click()
 })
 
-Then('Jujutsu replaced the Workbench preview tab', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'main-tabs-preview-tab-is-replaced', () => expect.poll(() => tabSummary(page)).toEqual(['Jujutsu* (preview)']))
+Then('Jujutsu replaced the Plugins preview tab', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-preview-tab-is-replaced', () => expect.poll(() => tabSummary(page)).toEqual(['Jujutsu: Revision graph* (preview)']))
 })
 
-When('the Jujutsu tab is kept, the Workbench is opened again and a thread is started', async ({ page }: { page: Page }) => {
+When('the Jujutsu tab is kept, the Plugins page is opened again and a thread is started', async ({ page }: { page: Page }) => {
   await tab(page, 'Jujutsu').dblclick()
-  await openKept(page, 'Workbench')
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await sendMessage(page, 'tabs thread')
+  await openKept(page, 'Plugins')
+  await startNativeThread(page, 'tabs thread')
 })
 
 Then('each of them has its own tab and the thread tab is active', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-panels-and-threads-get-tabs', () =>
-    expect.poll(() => tabSummary(page)).toEqual(['Jujutsu', 'Workbench', 'tabs thread* (preview)']),
+    expect.poll(() => tabSummary(page)).toEqual(['Jujutsu: Revision graph', 'Plugins', 'tabs thread* (preview)']),
   )
   await tab(page, 'tabs thread').dblclick()
 })
@@ -144,14 +207,16 @@ Then('that menu reports an unavailable side panel while no plugin offers one', a
   })
 })
 
-When('the Workbench tab is pinned and the thread tab is dragged before Jujutsu', async ({ page }: { page: Page }) => {
-  await tab(page, 'Workbench').click({ button: 'right' })
+When('the Plugins tab is pinned and the thread tab is dragged before Jujutsu', async ({ page }: { page: Page }) => {
+  await tab(page, 'Plugins').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Pin tab', exact: true }).click()
   await tab(page, 'tabs thread').dragTo(tab(page, 'Jujutsu'), { targetPosition: { x: 4, y: 10 } })
 })
 
 Then('the pinned tab leads and the thread tab moved', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'main-tabs-pin-and-reorder', () => expect.poll(() => tabSummary(page)).toEqual(['Workbench (pinned)', 'tabs thread*', 'Jujutsu']))
+  await recordAssertion(page, 'main-tabs-pin-and-reorder', () =>
+    expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*', 'Jujutsu: Revision graph']),
+  )
 })
 
 When('the Jujutsu tab is closed with a middle click and other tabs are closed from the thread tab', async ({ page }: { page: Page }) => {
@@ -162,28 +227,27 @@ When('the Jujutsu tab is closed with a middle click and other tabs are closed fr
   await page.getByRole('menuitem', { name: 'Close other tabs', exact: true }).click()
 })
 
-Then('only the pinned Workbench and the thread remain', async ({ page }: { page: Page }) => {
+Then('only the pinned Plugins and the thread remain', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-close-others-keeps-pinned', async () => {
-    await expect.poll(() => tabSummary(page)).toEqual(['Workbench (pinned)', 'tabs thread*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'tabs thread*'])
     await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
-When('the Workbench is opened as a tab', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Workbench').click()
-  await expect(tab(page, 'Workbench')).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible()
+When('the Plugins page is opened as a tab', async ({ page }: { page: Page }) => {
+  await globalPanel(page, 'Plugins').click()
+  await expect(tab(page, 'Plugins')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible()
 })
 
 Then('the tab strip sits directly above the main panel, anchored before the main slot outlet', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-strip-mounts-above-main-panel', () => expect.poll(() => stripPlacement(page)).toEqual(expectedPlacement))
 })
 
-When('a thread is started beside the Workbench tab', async ({ page }: { page: Page }) => {
-  await tab(page, 'Workbench').dblclick()
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await sendMessage(page, 'mount thread')
+When('a thread is started beside the Plugins tab', async ({ page }: { page: Page }) => {
+  await tab(page, 'Plugins').dblclick()
+  await startNativeThread(page, 'mount thread')
   await expect(tab(page, 'mount thread')).toHaveAttribute('aria-selected', 'true')
 })
 
@@ -195,30 +259,30 @@ Then('the tab strip still sits directly above the main panel', async ({ page }: 
   await finishJourneyAssertions(page)
 })
 
-When('the Workbench and Jujutsu are opened and kept as tabs', async ({ page }: { page: Page }) => {
-  await openKept(page, 'Workbench')
+When('the Plugins and Jujutsu are opened and kept as tabs', async ({ page }: { page: Page }) => {
+  await openKept(page, 'Plugins')
   await openKept(page, 'Jujutsu')
 })
 
 Then('the tab shortcuts jump to the first and last tab and cycle between them', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-keyboard-jump-and-cycle', async () => {
     await page.keyboard.press(`${primary()}+Alt+Digit1`)
-    await expect(tab(page, 'Workbench')).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible()
+    await expect(tab(page, 'Plugins')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible()
     await page.keyboard.press(`${primary()}+Alt+Digit9`)
     await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press(`${primary()}+Alt+BracketRight`)
-    await expect(tab(page, 'Workbench')).toHaveAttribute('aria-selected', 'true')
+    await expect(tab(page, 'Plugins')).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press(`${primary()}+Alt+BracketLeft`)
     await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
   })
   await finishJourneyAssertions(page)
 })
 
-When('the Workbench tab is pinned and the page is reloaded', async ({ page }: { page: Page }) => {
-  await tab(page, 'Workbench').click({ button: 'right' })
+When('the Plugins tab is pinned and the page is reloaded', async ({ page }: { page: Page }) => {
+  await tab(page, 'Plugins').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Pin tab', exact: true }).click()
-  await expect(tab(page, 'Workbench')).toHaveAttribute('data-pinned', 'true')
+  await expect(tab(page, 'Plugins')).toHaveAttribute('data-pinned', 'true')
   await page.reload()
 })
 
@@ -262,7 +326,15 @@ Then('the side panel hosts that thread beside the main view', async ({ page }: {
 When('a kept thread tab is present while text is typed into Backlog', async ({ page }: { page: Page }) => {
   const sessionId = await startSidebarThread(page, 'Backlog capture typing')
   await threadTab(page, sessionId).dblclick()
-  await page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: 'Backlog', exact: true }).click()
+  const navigation = page.getByRole('navigation', { name: 'Sidebar navigation', exact: true })
+  const destination = navigation.getByRole('button', { name: 'Backlog: Items', exact: true })
+  if (await destination.isVisible()) await destination.click()
+  else {
+    // Backlog contributes sidebar.panellist, which the owned sidebar hosts in
+    // its footer overflow, not the separate sidebar.header destination menu.
+    await page.getByRole('button', { name: 'More', exact: true }).click()
+    await page.getByRole('button', { name: 'Backlog: Items', exact: true }).click()
+  }
   await expect(tab(page, 'Backlog')).toHaveAttribute('aria-selected', 'true')
   const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
   await capture.pressSequentially('Keyboard capture from Backlog')
@@ -315,13 +387,15 @@ Then('the thread is a main tab again and the side panel dropped its tab', async 
 })
 
 When('the Jujutsu panel tab is dragged onto the side panel', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  const threadTab = strip(page).locator('[data-tab-id^="thread:"]').first()
+  const sessionId = await startNativeThread(page, 'panel move host thread')
+  nativePanelMoves.set(page, sessionId)
+  const threadTab = strip(page).locator(`[data-tab-id="thread:${sessionId}"]`)
   await expect(threadTab).toBeVisible()
   await threadTab.dblclick()
   await expect(threadTab).not.toHaveAttribute('data-preview')
+  // Keep the real native guide as the drop target; no Workbench renderer is installed.
   await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
-  await page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: 'Workbench' }).click()
+  await expect(page.locator('[data-slot="rightbar"] [data-dockkit-surface]').first()).toBeVisible()
   await globalPanel(page, 'Jujutsu').click()
   await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
   await threadTab.click()
@@ -331,8 +405,15 @@ When('the Jujutsu panel tab is dragged onto the side panel', async ({ page }: { 
 
 Then('the side panel hosts Jujutsu and its main tab is gone', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-drag-panel-into-side-panel', async () => {
+    const sessionId = nativePanelMoves.get(page)
+    if (sessionId === undefined) throw new Error('Native panel move has no source thread.')
+    const rightbar = page.locator('[data-slot="rightbar"]')
     await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'Jujutsu' })).toHaveCount(1)
+    await expect(rightbar.locator('[data-dockkit-tab]').filter({ hasText: 'Plugins' })).toHaveCount(0)
     await expect(tab(page, 'Jujutsu')).toHaveCount(0)
+    await expect(tab(page, 'Plugins')).toHaveCount(0)
+    await expect(threadTab(page, sessionId)).toHaveAttribute('aria-selected', 'true')
+    await expect(threadTab(page, sessionId)).not.toHaveAttribute('data-preview')
   })
 })
 
@@ -343,15 +424,20 @@ When("the moved aside Jujutsu tab's menu moves it to the main area", async ({ pa
 
 Then('Jujutsu is a main tab again and the side panel dropped its tab', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-move-panel-aside-back-to-main', async () => {
+    const sessionId = nativePanelMoves.get(page)
+    if (sessionId === undefined) throw new Error('Native panel move has no source thread.')
     await expect(tab(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
     await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'Jujutsu' })).toHaveCount(0)
+    await expect(page.locator('[data-slot="rightbar"] [data-dockkit-tab]').filter({ hasText: 'Plugins' })).toHaveCount(0)
+    await expect(tab(page, 'Plugins')).toHaveCount(0)
+    await expect(threadTab(page, sessionId)).not.toHaveAttribute('data-preview')
   })
   await finishJourneyAssertions(page)
 })
 
 Then('the tabs come back with the pin and the Jujutsu tab is active again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-restore-after-reload', async () => {
-    await expect.poll(() => tabSummary(page)).toEqual(['Workbench (pinned)', 'Jujutsu*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins (pinned)', 'Jujutsu: Revision graph*'])
     await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
   })
 })
@@ -359,11 +445,11 @@ Then('the tabs come back with the pin and the Jujutsu tab is active again', asyn
 When('the saved tabs are corrupted and the page is reloaded', async ({ page }: { page: Page }) => {
   await page.evaluate(key => localStorage.setItem(key, '{"sets":"truncated'), STORAGE_KEY)
   await page.reload()
-  await globalPanel(page, 'Workbench').click()
+  await globalPanel(page, 'Plugins').click()
 })
 
 Then('the strip starts over from what the main view shows', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'main-tabs-malformed-storage-starts-over', () => expect.poll(() => tabSummary(page)).toEqual(['Workbench* (preview)']))
+  await recordAssertion(page, 'main-tabs-malformed-storage-starts-over', () => expect.poll(() => tabSummary(page)).toEqual(['Plugins* (preview)']))
   await finishJourneyAssertions(page)
 })
 
@@ -392,12 +478,11 @@ const MAIN_TAB = '[role="tablist"][aria-label="Open views"] [role="tab"]'
 const DOCK_TAB = '[data-dockkit-tab]'
 
 When('a thread is started and the right panel is opened beside it', async ({ page }: { page: Page }) => {
-  await globalPanel(page, 'Workbench').click()
-  await tab(page, 'Workbench').dblclick()
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await sendMessage(page, 'look thread')
+  await globalPanel(page, 'Plugins').click()
+  await tab(page, 'Plugins').dblclick()
+  await startNativeThread(page, 'look thread')
   await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
-  await page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: 'Workbench' }).click()
+  await page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: 'Editor' }).click()
   await page.locator('[data-dockkit-add-tab]').click()
   await expect(page.locator(`${DOCK_TAB}[aria-selected="true"]`)).toBeVisible()
   await page.mouse.move(0, 0)
@@ -414,26 +499,27 @@ Then("the active and inactive main tabs share the right panel tabs' metrics and 
 const newTabButton = (page: Page) => strip(page).locator('xpath=..').getByRole('button', { name: 'New tab', exact: true })
 const startPage = (page: Page) => page.getByRole('listbox', { name: 'Open in this tab', exact: true })
 const startPageColumnCount = (page: Page) => startPage(page).evaluate(element => getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/u).length)
-const suggestion = (page: Page, name: string) => startPage(page).getByRole('option', { name, exact: true })
+const suggestion = (page: Page, name: string) => startPage(page).getByRole('option', { name: nativeTabName(name), exact: true })
 const suggestionNames = (page: Page): Promise<readonly string[]> =>
   startPage(page)
     .getByRole('option')
     .evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label') ?? ''))
 
-When('the Workbench is kept as a tab and "+" is pressed', async ({ page }: { page: Page }) => {
-  await openKept(page, 'Workbench')
+When('the Plugins page is kept as a tab and "+" is pressed', async ({ page }: { page: Page }) => {
+  await openKept(page, 'Plugins')
   await newTabButton(page).click()
 })
 
 Then(
-  'a Start tab follows the Workbench with its search input focused and suggestions for a new thread, panels and Settings',
+  'a Start tab follows the Plugins with its search input focused and suggestions for a new thread, panels and Settings',
   async ({ page }: { page: Page }) => {
     await recordAssertion(page, 'main-tabs-plus-opens-start-page', async () => {
-      await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Start*'])
-      await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeHidden()
+      await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'Start*'])
+      await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeHidden()
       const names = await suggestionNames(page)
       expect(names[0]).toBe('New thread')
-      expect(names).toEqual(expect.arrayContaining(['Plugins', 'Jujutsu', 'Workbench']))
+      expect(names).toEqual(expect.arrayContaining(['Plugins', 'Jujutsu: Revision graph']))
+      expect(names).not.toContain('Workbench')
       expect(names.at(-1)).toBe('Settings')
       await expect(suggestion(page, 'New thread')).toHaveAttribute('aria-keyshortcuts', /.+/)
       await expect(suggestion(page, 'Settings')).toHaveAttribute('aria-keyshortcuts', /.+/)
@@ -459,7 +545,7 @@ When('Jujutsu is typed into the Start search and Enter picks it', async ({ page 
 
 Then('Jujutsu replaced the Start tab', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-start-page-pick-replaces-tab', async () => {
-    await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Jujutsu*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'Jujutsu: Revision graph*'])
     await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
   })
 })
@@ -475,7 +561,7 @@ When('a new tab is opened from the keyboard and Settings is picked', async ({ pa
 Then('Settings opens and the Start tab is gone', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-start-page-opens-settings', async () => {
     await expect(page.getByRole('dialog').getByText('Keyboard shortcuts', { exact: true })).toBeVisible()
-    await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Jujutsu*'])
+    await expect.poll(() => tabSummary(page)).toEqual(['Plugins', 'Jujutsu: Revision graph*'])
   })
   await finishJourneyAssertions(page)
 })

@@ -44,6 +44,18 @@ describe('fake Command Code provider', () => {
     }
   })
 
+  it('returns Markdown links and newlines verbatim inside an answer directive', async () => {
+    const fake = await startFakeCommandCode()
+    try {
+      const answer = 'Open [preview.txt](preview.txt).\nKeep [another](alpha.txt) link.'
+      const response = await requestCompletion(fake.baseUrl, `[[answer ${answer}]]`)
+      const chunks = await readCompletionChunks(response)
+      expect(chunks.flatMap(chunk => chunk.choices.map(choice => choice.delta.content ?? '')).join('')).toBe(answer)
+    } finally {
+      await fake.close()
+    }
+  })
+
   it('uses distinct completion IDs and emits bounded word-sized chunks', async () => {
     const fake = await startFakeCommandCode()
     try {

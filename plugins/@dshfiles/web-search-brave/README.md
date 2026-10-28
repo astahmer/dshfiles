@@ -1,42 +1,41 @@
 # @dshfiles/web-search-brave
 
-A Brave Web Search backend for `ctx.web`, selected by the `web` row in the
-profile seed (`searchProvider: brave`). The key is **never** stored here: the
-setting holds a Secret Catalog reference and the Host resolves it per search, so
-a rotated key reaches the next call without a restart.
+A Brave Web Search backend for `ctx.web`. Select it through the profile's `web`
+row (`searchProvider: brave`). Credentials are not stored in shared source: the
+setting holds an optional Secret Catalog reference, resolved by the Host per
+search, or uses `BRAVE_API_KEY` from the Host environment.
 
 ## Set it up
 
-1. Create a key in the Brave dashboard (`Data for AI` → API keys), free tier.
-2. Store it, prompting hidden, in the global scope so every thread and project
-   sees the same alias:
+1. Create a key in the [Brave dashboard](https://api-dashboard.search.brave.com/app/keys).
+2. Choose your own alias in the Secret Catalog and store the value in an
+   appropriate local/global scope. No alias is preselected by the shared default.
+3. In **Settings → Plugins → Web search (Brave)**, select that alias in the
+   **API key reference** field (`secret:ALIAS` or `secret:ALIAS@env`). Alternatively,
+   leave the field empty and configure `BRAVE_API_KEY` in the Host environment.
+   Never commit a resolved value or personal alias mapping.
+4. Install the selected bundle into the intended profile, preserving unrelated
+   bundle selection. For an existing custom profile, use a scoped sync rather
+   than selecting every owned plugin:
 
    ```sh
-   secret set brave-api-key --global --source https://api-dashboard.search.brave.com/app/keys
-   secret print global | grep brave-api-key   # alias exists, no value printed
+   pnpm profile:sync --profile <name> --bundle @dshfiles/web-search-brave
    ```
 
-3. The setting defaults to `secret:brave-api-key`, so nothing else is needed. To
-   bind a different alias, open **Settings → Plugins → Web search (Brave)** and use
-   the key picker on the _API key reference_ field (it lists the global aliases).
-   An empty field falls back to `BRAVE_API_KEY` from the Host environment.
-4. Install the bundle in the profile and let the Host restart load it:
+   The `web` row must carry `searchProvider: brave`; otherwise the base
+   composition can use its own provider and credential requirements. Do not
+   assume anything about the current machine's installed credentials.
 
-   ```sh
-   pnpm profile:sync --profile web   # adds the dependency and the patch row
-   ```
-
-   The `web` row must carry `searchProvider: brave`; without it the base
-   composition keeps `deepseek-official`, which needs a `DEEPSEEK_API_KEY` that this
-   machine does not have.
+5. Let the user choose any required Host restart. Existing saved references stay
+   local; changing shared defaults does not clear them.
 
 ## Settings
 
-| Field        | Default                | Meaning                                                                |
-| ------------ | ---------------------- | ---------------------------------------------------------------------- |
-| `apiKey`     | `secret:brave-api-key` | Secret reference (`secret:ALIAS` or `secret:ALIAS@env`); never a value |
-| `count`      | `5`                    | Results requested per search, 1–20; the tool still bounds the result   |
-| `safesearch` | `moderate`             | Brave safesearch level: `off`, `moderate`, `strict`                    |
+| Field        | Default    | Meaning                                                              |
+| ------------ | ---------- | -------------------------------------------------------------------- |
+| `apiKey`     | empty      | Optional user-selected secret reference; empty uses `BRAVE_API_KEY`  |
+| `count`      | `5`        | Results requested per search, 1–20; the tool still bounds the result |
+| `safesearch` | `moderate` | Brave safesearch level: `off`, `moderate`, `strict`                  |
 
 ## Behaviour
 
@@ -54,5 +53,6 @@ a rotated key reaches the next call without a restart.
 
 `node --run test` covers mapping, markup stripping, dedupe, an unexpected
 payload, a rejected key, an empty result set and caller abort with an injected
-`fetch`. Live search needs the key and a restarted Host; verify with a real query
-through `web_search` and check the sources come from Brave.
+`fetch`. Live search needs an explicitly configured credential and an activated
+bundle; verify with an authorized real query through `web_search` and inspect its
+sources. Unit fixtures are not proof of current provider acceptance.

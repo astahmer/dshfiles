@@ -16,6 +16,20 @@ const serializedSchema = zod.object({
   uid: zod.union([zod.string(), zod.number()]),
   refs: zod.record(zod.string(), zod.looseObject({ type: zod.unknown().optional(), meta: zod.looseObject({ role: zod.unknown().optional() }).optional() })),
 })
+const referenceSchema = zod.union([zod.string(), zod.number()])
+const referenceListSchema = zod.array(zod.unknown()).transform(values =>
+  values.flatMap(value => {
+    const reference = referenceSchema.safeParse(value)
+    return reference.success ? [String(reference.data)] : []
+  }),
+)
+const referenceMapSchema = zod.record(zod.string(), zod.unknown()).transform(values =>
+  Object.values(values).flatMap(value => {
+    const reference = referenceSchema.safeParse(value)
+    return reference.success ? [String(reference.data)] : []
+  }),
+)
+const schemaLinks = zod.union([referenceSchema.transform(value => [String(value)]), referenceListSchema, referenceMapSchema])
 const SAFE_SECRET_CONTAINERS = new Set(['object', 'dict', 'array'])
 
 function secretAnalysis(schema: z<any, object>): { readonly contains: boolean; readonly unsafe: boolean } {
@@ -35,13 +49,8 @@ function secretAnalysis(schema: z<any, object>): { readonly contains: boolean; r
     const links: string[] = []
     for (const [key, value] of Object.entries(node)) {
       if (key === 'uid' || key === 'meta' || key === 'callback' || key === 'type') continue
-      if ((typeof value === 'string' || typeof value === 'number') && refs[String(value)] !== undefined) links.push(String(value))
-      else if (Array.isArray(value)) {
-        for (const item of value) if ((typeof item === 'string' || typeof item === 'number') && refs[String(item)] !== undefined) links.push(String(item))
-      } else if (typeof value === 'object' && value !== null) {
-        for (const item of Object.values(value))
-          if ((typeof item === 'string' || typeof item === 'number') && refs[String(item)] !== undefined) links.push(String(item))
-      }
+      const references = schemaLinks.safeParse(value)
+      if (references.success) links.push(...references.data.filter(reference => refs[reference] !== undefined))
     }
     const children = links.map(visit)
     const contains = direct || children.some(child => child.contains)
@@ -111,13 +120,15 @@ function defineSettings<const Schema extends z<any, object>>(definition: any): S
   if (!NAMESPACE_PATTERN.test(definition.namespace)) {
     throw new TypeError(`Settings namespace ${JSON.stringify(definition.namespace)} must match ${String(NAMESPACE_PATTERN)}.`)
   }
-  if (typeof definition.schema !== 'function' || typeof definition.schema.toJSON !== 'function') {
+  if (!zod.function().safeParse(definition.schema).success || !zod.function().safeParse(definition.schema.toJSON).success) {
     throw new TypeError(`Settings ${JSON.stringify(definition.namespace)} schema must be an official Schemastery schema.`)
   }
-  if (definition.client !== undefined && typeof definition.client.decode !== 'function') {
+  if (definition.client !== undefined && !zod.function().safeParse(definition.client.decode).success) {
     throw new TypeError(`Settings ${JSON.stringify(definition.namespace)} client.decode must be a function.`)
   }
-  const contract: SettingsContract<Schema, any> = {
+  // SAFETY: this module is the sole Settings contract constructor. The exact schema and host
+  // methods below form the contract; the private WeakSet supplies its unforgeable runtime brand.
+  const contract = {
     namespace: definition.namespace,
     schema: definition.schema,
     applies: definition.applies ?? 'live',
@@ -133,6 +144,8 @@ function defineSettings<const Schema extends z<any, object>>(definition: any): S
           },
         }),
     host(options: SettingsHostOptions<SettingsValue<Schema>>): SettingsHostContribution<Schema, any> {
+      // SAFETY: this opaque token is registered in settingsHostContributions before it escapes;
+      // authenticity and payload access use that WeakMap, never properties on the token.
       const contribution = {} as SettingsHostContribution<Schema, any>
       settingsHostContributions.set(contribution, {
         contract,

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "local-properties",
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ],
+      "title": "Typed packs on referenced resources",
+      "summary": "Register resources and attach reusable typed property packs, without modifying native content or running agents.",
+      "reach": ["click button \"Resource Packs: Resources\"", "expect heading \"Resources\""],
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["empty", "resources", "editing", "conflict", "detached"],
+      "failureModes": ["A stale write is refused.", "Unknown or incompatible schema changes are refused.", "References do not grant native resource access."],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "resource-packs.browser-journey", "featureFile": "tooling/dshx/e2e/features/resource-packs.feature" },
+        { "kind": "gherkin", "id": "resource-packs.custom-pack", "featureFile": "tooling/dshx/e2e/features/resource-packs.feature" }
+      ]
+    }
+  ]
+}

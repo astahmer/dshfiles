@@ -4,6 +4,9 @@ This directory holds repository-wide operational guidance. Product and API docum
 
 | Document                                                     | Purpose                                                                                                                                                 |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Fork maintenance](fork-maintenance.md)                      | Upstream sync, selective plugin PRs, ownership policy, sanitized publication history, and the separate deployment boundary.                             |
+| [Personal configuration](personal-configuration.md)          | Machine-local launcher choices, private paths and deployment settings.                                                                                  |
+| [25 October upstream sync](upstream-sync-20261025.md)        | Isolated candidate, deliberate conflict resolutions, verification evidence and deployment caveats.                                                      |
 | [Recovering a broken DSH](recovery.md)                       | Start the last known good DSH, find what broke, refresh the snapshot, and upgrade DSH through the gate.                                                 |
 | [`profile-installs.md`](profile-installs.md)                 | Local profile installs, pnpm behavior, peer dependencies, and composition.                                                                              |
 | [`e2e-testing.md`](e2e-testing.md)                           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                                                                          |

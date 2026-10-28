@@ -1,13 +1,14 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type TestInfo } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
-const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+import { materializeNonblankThread } from '../thread-composer.js'
 const toolkit = (page: Page) => page.getByTestId('agent-toolkit')
 const section = (page: Page, name: RegExp) => toolkit(page).getByRole('region', { name })
 
 When('the Agent toolkit is opened from the sidebar', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Agent toolkit', exact: true }).click()
+  await globalPanelLink(page, 'Agent Toolkit: Capabilities').click()
   await expect(toolkit(page).getByRole('heading', { name: 'Agent toolkit', exact: true })).toBeVisible()
 })
 
@@ -70,11 +71,8 @@ Then('only the agent toolkit plugin, its API and no tool remain', async ({ page 
   await finishJourneyAssertions(page)
 })
 
-When('a thread {string} is started from the composer', async ({ page }: { page: Page }, text: string) => {
-  await page.getByRole('button', { name: 'New thread', exact: true }).click()
-  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
-  await composer.fill(text)
-  await composer.press('Enter')
+When('a thread {string} is started from the composer', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }, text: string) => {
+  await materializeNonblankThread(page, text, $testInfo)
   await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
 })
 

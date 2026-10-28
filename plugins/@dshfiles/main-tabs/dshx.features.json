@@ -3,9 +3,117 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "workbench-semantics-provider",
+      "title": "One tab semantics provider for Workbench and standalone fallback",
+      "reach": ["seed tool-call-thread", "click button \"Collapse sidebar\"", "click button \"New tab\"", "expect region \"Choose a view\""],
+      "summary": "The declared main-tabs/workbench-tabs public module re-exports the canonical workbench/tabs page-global snapshot/subscribe/actions bridge. Workbench adopts the existing actor's current set, computed status/unread/preview/pin/title/availability and scoped targets without opening tabs again. User actions drive that same actor; workbench aside moves preserve the actor tab and only accepted native independent-pane moves close the source. The owned stack always uses Workbench pane chrome, with no native-layout opt-out; its conversation actor stays enabled despite a legacy disabled standalone-strip preference. Normal sidebar opens keep separate Session-bound conversation tabs without a disposable preview, while panel opening modes remain configurable. The fullheight right pane retains its tabs while collapsed. The native strip and mount observer are removed without hiding shell.main; their original route remains only for absent-Workbench deployments. Semantic Start shows the same Choose a view / Search views chooser as a group's New tab, including one Settings Shell: Settings hub and qualified plugin views, but no separate Rich Composer/current-conversation clone. The thread list explicitly opens or focuses fixed Session-bound chat-and-editor tabs, including same-native-current reopen after closing all tabs; standalone fallback Start suggestions remain unchanged.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["provider-absent", "provider-connected", "native-strip", "workbench-chrome", "workbench-window-scope", "provider-replaced"],
+      "failureModes": [
+        "An absent or disabled provider has an empty/disabled snapshot; stale tab actions do not navigate.",
+        "A declined aside move retains its main tab.",
+        "A stale bundle disposer must not disconnect a replacement provider.",
+        "Snapshot adoption is read-only: renderer reconciliation must not call open or activate.",
+        "Selecting a conversation from another project must not select that project's saved scene or remove an unrelated chooser; the Workbench scene anchor and native Host project metadata have separate meanings."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "main-tabs.workbench-tab-semantics", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "main-tabs.cross-project-chooser", "featureFile": "tooling/dshx/e2e/features/workbench-scope.feature" },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.workbench-scope-anchor",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-scope.test.ts",
+          "testName": "keeps order pins targets and inactive ActorStart through cross-project existing-tab selection and ACK cycles"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.workbench-scope-reload",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-scope.test.ts",
+          "testName": "reloads the saved anchor when native current belongs to another project without merging dormant sets"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.authoritative-current-session",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "publishes the authoritative current Session independently of the active semantic tool without changing actor tabs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-page-global",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "shares the page channel across duplicated module imports without creating an actor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-metadata",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "publishes the current set and live metadata without navigating during adoption"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-actor-parity",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "keeps preview, pin, close-neighbour and scoped panel semantics on the existing actor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-aside",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "moves aside only after acceptance and ignores stale, start and disabled actions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-disposal",
+          "file": "plugins/@dshfiles/main-tabs/src/workbench-tabs.test.ts",
+          "testName": "keeps the replacement provider when an old bundle disposes and unsubscribes on removal"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-selection-attention",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-attention.test.ts",
+          "testName": "clears only the rendered record version and refreshes after Host acceptance"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-selection-attention-unavailable",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-attention.test.ts",
+          "testName": "leaves the displayed record intact if the Host refuses the acknowledgement"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-native-replaced-column",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "leaves a detached column and follows the replacement native outlet"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-native-fallback",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "keeps the native fallback without a frame seat"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-strip-retirement",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "removes only the native strip in workbench mode and restores it when native returns"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.bridge-no-mount-warning",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "does not mount or warn when workbench has no native main outlet"
+        }
+      ],
+      "telemetry": [
+        { "kind": "not-applicable", "reason": "Client-only projection and event adapter over the existing actor; no new Host work, persistence or execution." }
+      ]
+    },
+    {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with \u00d7 or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel \u2014 through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it \u2014 and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, their menu's Edit title edits the title in place, and their menu can insert that thread into the active composer as a native @mention; Copy groups copy actions, and Change status groups status actions such as settling through thread-sidebar. A thread tab dragged onto a composer mentions it there instead of reordering: the tab drag carries the thread-mention type rather than plain text, so the editor never receives a stray title. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open. A panel plugin that shows different subjects can keep one tab per subject: it asks for a tab with `dshfiles:open-panel-tab` (`{ panelId, scope, title? }`), the strip announces `dshfiles:panel-scope` before navigating so the plugin swaps what it shows, and a live `dshfiles:panel-tab-title` renames the tab. Scope and title are saved with the tab, so a reload restores the same tab on the same subject.",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with \u00d7 or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel \u2014 through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it \u2014 and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, their menu's Edit title edits the title in place, and their menu can insert that thread into the active composer as a native @mention; Copy groups copy actions, and Change status groups status actions such as settling through thread-sidebar. A thread tab dragged onto a composer mentions it there instead of reordering: the tab drag carries the thread-mention type rather than plain text, so the editor never receives a stray title. Panel openings and standalone conversation tabs use a VS Code-style preview by default; Workbench conversations are kept in separate Session-bound tabs after normal sidebar clicks, independently of the legacy standalone-strip toggle. A panel plugin that shows different subjects can keep one tab per subject: it asks for a tab with `dshfiles:open-panel-tab` (`{ panelId, scope, title? }`), the strip announces `dshfiles:panel-scope` before navigating so the plugin swaps what it shows, and a live `dshfiles:panel-tab-title` renames the tab. Scope and title are saved with the tab, so a reload restores the same tab on the same subject.",
       "reach": [
         "seed tool-call-thread",
         "rightclick tab \"*\"",
@@ -30,9 +138,13 @@
         {
           "key": "enabled",
           "defaultValue": "true",
-          "constraints": "Boolean; show the tab strip and follow the main view.",
+          "constraints": "Boolean; enable the standalone compatibility strip. Workbench always enables the shared semantic owner, including when an old profile saved false; saved settings are not overwritten.",
           "choices": ["true", "false"],
-          "coveredBy": ["main-tabs.machine-unit-enable-toggle"]
+          "coveredBy": [
+            "main-tabs.machine-unit-enable-toggle",
+            "main-tabs.workbench-effective-preferences",
+            "main-tabs.workbench-legacy-disabled-conversation-tabs"
+          ]
         },
         {
           "key": "maxTabs",
@@ -43,9 +155,15 @@
         {
           "key": "openMode",
           "defaultValue": "preview",
-          "constraints": "What opening from outside the strip does: preview tab, new tab, or replace the current tab.",
+          "constraints": "Panels and standalone conversations use preview, new or replace. Workbench conversations are kept independently even with a saved preview or replace mode; panel previews are unchanged.",
           "choices": ["preview", "new", "replace"],
-          "coveredBy": ["main-tabs.panels-and-threads", "main-tabs.machine-unit-preview", "main-tabs.machine-unit-replace"]
+          "coveredBy": [
+            "main-tabs.panels-and-threads",
+            "main-tabs.machine-unit-preview",
+            "main-tabs.machine-unit-replace",
+            "main-tabs.workbench-panel-preview",
+            "main-tabs.workbench-legacy-disabled-conversation-tabs"
+          ]
         }
       ],
       "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted", "side-panel-unavailable", "renaming", "mention-drop"],
@@ -61,6 +179,19 @@
       ],
       "externalDependencies": [],
       "verification": [
+        { "kind": "gherkin", "id": "main-tabs.workbench-legacy-disabled-conversation-tabs", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.workbench-effective-preferences",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-preferences-policy.test.ts",
+          "testName": "enables Workbench conversation retention without mutating saved native preferences"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.workbench-panel-preview",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-preferences-policy.test.ts",
+          "testName": "keeps Workbench conversations while preserving panel preview replacement"
+        },
         {
           "kind": "gherkin",
           "id": "main-tabs.panels-and-threads",
@@ -340,9 +471,8 @@
     {
       "id": "new-tab-page",
       "title": "Open a new tab with suggestions of what to show",
-      "summary": "\"+\" at the end of the strip (or Mod+T on Desktop, Mod+Alt+T on the Web) opens a Start tab with a focused command-palette search. Typing filters New thread, the five most recent threads (running ones first), main panels and Settings by title or description; Arrow keys and Enter pick a result. The picked thread or panel takes the Start tab's place, while New thread and Settings close it.",
+      "summary": "In the standalone fallback (unchanged), \"+\" at the end of the strip (or Mod+T on Desktop, Mod+Alt+T on the Web) opens a Start tab with a focused command-palette search. Typing filters New thread, the five most recent threads (running ones first), main panels and Settings by title or description; Arrow keys and Enter pick a result. The picked thread or panel takes the Start tab's place, while New thread and Settings close it.",
       "reach": [
-        "click button \"Workbench\"",
         "press ControlOrMeta+Alt+KeyT",
         "expect tab \"Start\"",
         "expect option \"New thread\"",
@@ -456,30 +586,30 @@
         }
       ],
       "reach": [
-        "click button \"Workbench\"",
-        "rightclick tab \"Workbench\"",
+        "click button \"Plugins\"",
+        "rightclick tab \"Plugins\"",
         "click menuitem \"Keep open\"",
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "expect heading \"Jujutsu\"",
         "press ControlOrMeta+Alt+Digit1",
-        "expect heading \"Workbench\""
+        "expect tab \"Plugins\""
       ]
     },
     {
       "id": "tab-persistence",
       "title": "Keep tabs across reloads, per project or globally",
-      "summary": "The tab set, order, pins, preview flag, active tab, and each scoped panel tab's scope and title survive a reload; each project keeps its own set unless the persistence setting shares one set across projects. A reload that lands on the New thread screen reopens the saved active tab.",
+      "summary": "The tab set, order, pins, preview flag, active tab, and each scoped panel tab's scope and title survive a reload. Native fallback follows per-project sets unless the persistence setting shares one set; Workbench holds the adopted window scene while selecting conversations across projects, without merging dormant sets or rewriting preferences. An explicit persistence change can still select another scene. A reload that lands on the New thread screen reopens the saved active tab.",
       "surfaces": ["client", "storage", "settings"],
       "configuration": [
         {
           "key": "persistence",
           "defaultValue": "project",
-          "constraints": "project keeps a tab set per project (jj thread workspaces count as their project); global shares one.",
+          "constraints": "Native project mode follows each project's saved set; global shares one. Workbench holds the adopted window scene during subject navigation; an explicit preference change can still select another scene.",
           "choices": ["project", "global"],
           "coveredBy": ["main-tabs.machine-unit-per-project", "main-tabs.machine-unit-global"]
         }
       ],
-      "states": ["restored", "per-project", "global"],
+      "states": ["restored", "per-project", "global", "workbench-window-anchor"],
       "failureModes": ["A malformed saved document is ignored and tabs start empty."],
       "externalDependencies": [],
       "verification": [
@@ -528,15 +658,15 @@
         "seed tool-call-thread",
         "rightclick tab \"*\"",
         "click menuitem \"Keep open\"",
-        "click button \"Backlog\"",
-        "expect tab \"Backlog*\"",
+        "click button \"Backlog: Items\"",
+        "expect tab \"Backlog: Items*\"",
         "click textbox \"Capture\"",
         "press a",
         "press b",
         "press c",
-        "expect tab \"Backlog*\"",
+        "expect tab \"Backlog: Items*\"",
         "press Enter",
-        "expect tab \"Backlog*\""
+        "expect tab \"Backlog: Items*\""
       ],
       "surfaces": ["client", "integration"],
       "configuration": [],

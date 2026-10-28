@@ -4,17 +4,21 @@
 
 ![Native Settings shell, ported](docs/screenshots/settings-shell-port.png)
 
+![One Settings hub inside the tabbed workspace](docs/screenshots/settings-workbench-panels.png)
+
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
 
 ## Use
 
 - **Open**: the sidebar gear, `Mod+,` (Desktop) / `Mod+Alt+,` (Web), the command palette (_Open Settings_, or
   _Settings: <section>_ for each section), or another plugin (below).
-- **Tab or dialog**: with `@dshfiles/main-tabs` loaded, Settings fills the main view and gets a tab like any other
-  panel; without it, it opens as the native dialog. `openIn` overrides that choice.
-- **Side panel**: the right side panel's guide offers a _Settings_ card beside Files, Jujutsu and the other cards, and
-  `openIn: 'sidebar'` sends the gear, the palette and `Mod+,` there too. The Settings main tab dragged onto the open
-  panel moves there, and the side tab's _Move to main area_ row moves it back. Settings then fills a tab in that panel,
+- **Workbench tab or Settings dialog**: the owned stack always uses Workbench pane chrome; Settings opens in a tab
+  through `@dshfiles/main-tabs`. Without that package it opens as the native Settings dialog. `openIn` chooses only the
+  Settings presentation, not a native-layout opt-out; it does not replace Workbench's centre or right-pane tab host.
+- **Side panel**: open **Settings Shell: Settings** from the Workbench **New tab** chooser or move its tab to the right pane through **Pane options › Move tab to**.
+  Without Workbench, the native guide still offers a _Settings_ card; `openIn: 'sidebar'` sends the gear, palette and
+  `Mod+,` through that original aside path. The Settings main tab dragged onto the open panel moves there, and the side
+  tab's _Move to main area_ row moves it back. Settings then fills a tab in that panel,
   listing every section and plugin page; a narrow panel shows that list and one section at a time with a back button,
   while a wide one keeps the dialog's two columns. The panel owns its tab, so closing it leaves Settings closed.
 - **Narrow windows**: dialogs and main-view tabs replace the wide section list with a searchable section picker. Header actions keep accessible names while collapsing to icons; the thread side panel keeps its existing drill/back behavior.
@@ -22,6 +26,16 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
   into the main view, keeping the section.
 - Picking the Settings tab, or a reload that lands on it, reopens Settings there; leaving the panel closes it. With no
   other tab left, main-tabs keeps showing Settings (it cannot show an empty main view).
+
+### Dockable settings pages
+
+Workbench's **New tab** chooser offers one **Settings Shell: Settings** hub, not a list of Settings leaf sections. That hub contains the actual section navigation, search and native/plugin forms. The shell remains the authorized `settings.section` renderer with genuine owner props and the shared ConfigForm; it invents no `settings.page` slot. Leaf registrations remain available for saved layouts and explicit deep links, but are hidden from primary chooser suggestions. Workbench tab hosts are mandatory in the owned stack, with no native layout switch. The full-height right pane preserves mounted Settings tabs while hidden. Separate Settings dialog/tab/side-panel presentations remain compatible.
+
+Panel identities are `dshfiles-settings.section/<UTF-8 hex section id>` and
+`dshfiles-settings.page/<UTF-8 hex pageId>`. Labels update with the live sources/locale without replacing the panel's
+component. Removed sources unregister; an already-open removed source renders no unrelated fallback section.
+Section `close()` closes its own workbench occurrence, and section navigation opens the matching settings panel.
+These are presentation-only panel registrations; setting reads/writes retain the existing settings tools.
 
 ### DSH release notices
 

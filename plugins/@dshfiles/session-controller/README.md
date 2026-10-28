@@ -25,6 +25,16 @@ its `cordis.patch.yml` disables `session-controller` and inserts `dshfiles-sessi
 declare `dsh.client.inject` on the stock package keep loading: the browser module table still serves the stock
 `/client` module, and `ctx.sessions` comes from this row.
 
+### Thread-local model selection
+
+The published `thread-model-api` dshx module adds `snapshot` and `select` for local model intent. Unlike ordinary native `selectModel`, the guarded selection does not save a global default, enqueue input or wake a stopped Agent. It validates the advertised model and effort, then rechecks queued input and the expected model revision inside native serialized admission before synchronously appending selection plus a supported namespaced plugin-record annotation. Archived and runtime-owned subagent targets are refused, including persisted cold subagents. Reading a cold snapshot does not create an Agent.
+
+The `threadModelPolicy` projection retains explicit provider preference across request headers and replay/fork checkpoints. Only an annotation immediately adjacent to the exact native selection can grant it; ordinary picker/automatic recovery selections clear it. It accepts native model identifiers without imposing a shorter UI limit. The public Agent tools are `thread_local_model_state` and `thread_select_local_model`; Agent callers are self-only, and client/Host callers must explicitly identify the thread. Writes require a user request.
+
+AI Accounts consumes this contract for its sidebar handoff. Its request-policy capture follows native `system-prompt/assemble` timing, and automatic follow/restore writes use commit-time revision checks so a late old request cannot overwrite newer user intent. Live in-flight requests retain their assembled selection; following requests use the new one. The original native picker still persists deployment defaults as before.
+
+The dshx exact Fetch carrier is owner-only in pinned DSH0.2.1-rc.2. Native `remoteAccess.allows` outside a native Remote invocation is not an independent HTTP authorization check; preserve the carrier restriction and Agent self-scope when adding transports.
+
 ### Local delta
 
 Every other vendored file is byte-identical to the pinned revision.
@@ -32,7 +42,10 @@ Every other vendored file is byte-identical to the pinned revision.
 | File                                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/history.ts`                 | `entryFor` sends `BrowserEvent.of(event)`: history pages and live follow events reach the browser without per-block provider replay state; opening a cold Session resumes its Agent only when the log stops inside a turn (crash closers), otherwise the first command does                                                                                                                                                     |
-| `src/native/index.ts`                   | `modelCatalog` shares one build with callers within 5 s for the same default model (a page load asked 12 times, up to 2.7 s each); `list` passes the request's projection selector to the row builder; `list`, `follow`, `page`, `prompt`, `cancel`, `updateQueue` and `projections` first offer the request to a registered Session source (see below) and keep their own implementation as the fallback                       |
+| [src/native/index.ts](./src/native/index.ts) | Registers guarded local model-policy read/select methods and the durable preference projection; `modelCatalog` delegates to the coherent shared catalog below (a page load asked 12 times, up to 2.7 s each); `list` passes the request's projection selector to the row builder; `list`, `follow`, `page`, `prompt`, `cancel`, `updateQueue` and `projections` first offer the request to a registered Session source (see below) and keep their own implementation as the fallback. |
+| [src/native/catalog.ts](./src/native/catalog.ts) | Owns catalog construction and one `SessionModelCatalog` wrapper; adapter, settings and credential updates synchronously invalidate its single shared build coordinator without eagerly reading partially committed routes. |
+| [src/model-catalog-build.ts](./src/model-catalog-build.ts) | Shares pending builds across TTL intervals, reuses completed snapshots for 5 s while the default and input generation match, and forwards obsolete completions or failures to the latest generation. |
+| [src/native/commands.ts](./src/native/commands.ts) | Shares supported model validation; local selection rechecks revision, archive/subagent ownership and queued input at the serialized commit, without saving the global default. Ordinary native selection retains its existing default-save behavior. |
 | `src/native/types.ts`                   | `SessionListRequest.projections` is an optional allowlist: omitted reads every column, `[]` reads none, unknown keys are ignored                                                                                                                                                                                                                                                                                                |
 | `src/native/client/sessions/manager.ts` | the list pull asks for the eight columns the list surface consumes, falling back to the full request when an older Host rejects the unknown field                                                                                                                                                                                                                                                                               |
 | `src/tail-log.ts`                       | new: decodes only the last frames of a cold Session's zstd log and folds the cached projection checkpoint over them (`sessionProjections.restore`); `follow` opens a cold, unforked Session over 1 MB from it and `page` serves its older pages from the same kept tail (3 kept, 2 min, re-validated by file identity); live, forked, torn, migrating or mid-turn logs keep the full read. `paginate` takes the tail's base seq |
@@ -52,6 +65,21 @@ the action; a deterministic request id makes retries idempotent. A message that
 arrived after the interruption but never started a turn does not invalidate it:
 a restart can persist the message and leave no turn to run it, so the stopped
 task still offers Resume.
+
+### Live model catalog
+
+The Host cache listens to the same inputs as the native model picker: `llm/adapters-updated`,
+`settings/document-updated`, `credentials/record-updated` and `credentials/reference-updated`.
+Invalidation is lazy. A credential/settings notification may precede publication of an account route;
+the later adapter commit invalidates any intervening read again. The single coordinator shares pending builds
+even across TTL intervals and reuses completed snapshots for five seconds after completion. A read or failure
+from an obsolete input/default generation forwards to the latest build, so already-waiting readers cannot
+receive a pre-commit catalog. This preserves coalescing without hiding a newly connected, renamed or removed
+provider until a reload.
+
+[Catalog regressions](./tests/host/model-catalog-cache.test.ts) use the installed `LlmRuntime` and real adapter
+registration/replacement, including same-id catalog changes and a stale in-flight read settling after commit.
+Run `./node_modules/.bin/vitest run tests/host/model-catalog-cache.test.ts` from this package.
 
 ### Local unsent drafts
 
@@ -80,6 +108,16 @@ materialization enables background history. Other operation references keep real
 `using()` waits for local creation before acquiring a reference, so speculative command-catalog warmup cannot
 keep an abandoned empty view alive; caller cancellation and Controller disposal cancel that unretained wait.
 `ctx.sessions.create` and `createOptimistic` retain their native real-creation semantics for agent and JJ flows.
+
+Before retrying a submitted draft, the composer re-admits its captured outgoing text/attachment presence through
+`update`. Attachment-only sends and asynchronous reference serialization can clear the editor before the sink runs;
+using the now-empty editor snapshot would prevent retry. This admission updates bounded discovery metadata, not the
+editor or another text buffer. Regression tests cover real composer clear ordering and owner recovery without
+creating a second Host identity after a selection failure.
+
+The cohesive project-header and typed-draft lifecycle was accepted in [upstream PR #1](https://github.com/astahmer/dshfiles/pull/1).
+Both native model/preset companions are required alongside the updated controller, navigation, composer and sidebar;
+profile activation is a coordinated, user-controlled restart rather than an arbitrary mix of old/new clients.
 
 ### Session sources (remote Sessions)
 

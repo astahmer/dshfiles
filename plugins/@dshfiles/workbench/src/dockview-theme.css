@@ -44,3 +44,42 @@
   --dv-paneview-header-border-color: var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-primary);
 }
+
+/* Only a root region's immediate native Dockview owns window-wide floats.
+ * Nested surfaces keep native local bounds inside their paint-contained panel.
+ * Dockview writes this host's geometry inline on layout. Override those four
+ * values, not the DOM owner: its rect is the viewport used by native drag/resize.
+ * Keep the host absolute (not fixed/a stacking context), so native per-window
+ * z-order can interleave chrome with its separate always-rendered content. */
+[data-workbench-window-floats] > div > .dv-shell > .dv-floating-overlay-host {
+  left: calc(0px - var(--dshfiles-workbench-root-x, 0px)) !important;
+  top: calc(0px - var(--dshfiles-workbench-root-y, 0px)) !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+[data-workbench-window-floats] > div > .dv-shell > .dv-floating-overlay-host > .dv-resize-container {
+  position: fixed;
+}
+
+/* Native always-rendered content is a shell child, not a floating-chrome child.
+ * Its inline offsets stay shell-relative; owned mount offsets compensate while
+ * fixed positioning lets it escape the frame column's ordinary overflow clip.
+ * Preserve native transforms, paint containment and chrome/body interleaving. */
+[data-workbench-window-floats] > div > .dv-shell > .dv-render-overlay-float {
+  position: fixed;
+  margin-left: var(--dshfiles-workbench-root-x, 0px);
+  margin-top: var(--dshfiles-workbench-root-y, 0px);
+}
+
+/* Dockview's module-global aria ordering only raises a group on local activation.
+ * Separate region APIs can both already be active. This document-local, compact
+ * presentation rank raises the actual clicked window (not every float in its
+ * source API), without changing native aria-level, inline z-index or focus state. */
+[data-workbench-window-floats] > div > .dv-shell > .dv-floating-overlay-host > .dv-resize-container[data-workbench-window-layer='chrome'] {
+  z-index: calc(var(--dv-overlay-z-index, 999) + var(--dshfiles-workbench-window-rank) * 2) !important;
+}
+
+[data-workbench-window-floats] > div > .dv-shell > .dv-render-overlay[data-workbench-window-layer='body'] {
+  z-index: calc(var(--dv-overlay-z-index, 999) + var(--dshfiles-workbench-window-rank) * 2 + 1) !important;
+}

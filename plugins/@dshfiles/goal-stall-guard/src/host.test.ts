@@ -13,10 +13,17 @@ import { describe, expect, it, vi } from 'vitest'
 
 const roundPrompt = (round: number): string => `<goal_round>\nObjective: "restyle the sidebar"\nRound: ${round}/256\n\nContinue working toward the objective.`
 
+interface RecordedSessionEvent {
+  readonly type: string
+  readonly data?: unknown
+}
+
+type SessionEventListener = (session: { readonly id: string }, event: RecordedSessionEvent) => void
+
 interface Harness {
   readonly pause: ReturnType<typeof vi.fn>
   readonly registeredToolNames: string[]
-  readonly dispatch: (event: { type: string; data?: unknown }) => void
+  readonly dispatch: (event: RecordedSessionEvent) => void
 }
 
 /**
@@ -38,8 +45,8 @@ const loadPlugin = async (): Promise<BuiltPlugin> => import(builtEntry)
  * `createBaseApi` binds cordis's whole event surface when it builds the plugin
  * api, so a stub context that only declares `on` throws before the plugin runs.
  */
-const bindableContext = (listeners: Map<string, (session: unknown, event: unknown) => void>): Record<string, unknown> => {
-  const on = (event: string, handler: (session: unknown, event: unknown) => void): void => {
+const bindableContext = (listeners: Map<string, SessionEventListener>): Record<string, unknown> => {
+  const on = (event: string, handler: SessionEventListener): void => {
     listeners.set(event, handler)
   }
   // `get` is what dshx's optional inspect bridge probes; without it the bridge
@@ -55,7 +62,7 @@ const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {})
   })
   const agent = { id: 'agent-1', session: { id: 'session-1' } }
   const goal = { id: 'goal-1', revision: 4, phase: 'active' as const }
-  const listeners = new Map<string, (session: unknown, event: unknown) => void>()
+  const listeners = new Map<string, SessionEventListener>()
   const registeredToolNames: string[] = []
 
   const ctx = {
@@ -71,7 +78,7 @@ const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {})
   }
 
   plugin.apply(ctx, config)
-  const dispatch = (event: { type: string; data?: unknown }): void => {
+  const dispatch = (event: RecordedSessionEvent): void => {
     const handler = listeners.get('session/event')
     if (handler === undefined) throw new Error('plugin registered no session/event listener')
     publishing = true
@@ -210,7 +217,7 @@ describe('goal-stall-guard wiring', () => {
     const plugin = await loadPlugin()
     const pause = vi.fn()
     const agent = { id: 'agent-1', session: { id: 'session-1' } }
-    const listeners = new Map<string, (session: unknown, event: unknown) => void>()
+    const listeners = new Map<string, SessionEventListener>()
     const ctx = {
       ...bindableContext(listeners),
       agents: { get: () => agent },
@@ -234,7 +241,7 @@ describe('goal-stall-guard wiring', () => {
     const plugin = await loadPlugin()
     const pause = vi.fn()
     const agent = { id: 'agent-1', session: { id: 'session-1' } }
-    const listeners = new Map<string, (session: unknown, event: unknown) => void>()
+    const listeners = new Map<string, SessionEventListener>()
     const ctx = {
       ...bindableContext(listeners),
       agents: { get: () => agent },
@@ -258,7 +265,7 @@ describe('goal-stall-guard wiring', () => {
     const plugin = await loadPlugin()
     const agent = { id: 'agent-1', session: { id: 'session-1' } }
     const warn = vi.fn()
-    const listeners = new Map<string, (session: unknown, event: unknown) => void>()
+    const listeners = new Map<string, SessionEventListener>()
     const ctx = {
       ...bindableContext(listeners),
       agents: { get: () => agent },

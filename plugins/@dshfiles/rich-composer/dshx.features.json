@@ -3,6 +3,77 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "workbench-conversation-views",
+      "title": "Dock an independently bound Conversation view",
+      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["source-available", "panel-open", "session-unavailable", "panel-closed", "restored"],
+      "failureModes": [
+        "Failed acquisition displays an error instead of another thread.",
+        "Removed views or deleted threads retire their source; Workbench keeps its standard unavailable-panel recovery."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/workbench",
+          "boundary": "Public panel source registry and persisted Dockview arrangements.",
+          "deterministicFake": "Typed registry and retained-reference fixture; real public content Factory in scratch."
+        }
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "rich-composer.workbench-header", "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature" },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.header-single-declarer",
+          "file": "plugins/@dshfiles/rich-composer/src/conversation-header.test.tsx",
+          "testName": "declares the original header once through the real public SlotCore"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.header-host-clearance",
+          "file": "plugins/@dshfiles/rich-composer/src/conversation-header.test.tsx",
+          "testName": "reserves only the host recovery corner while keeping native callers and original header actions unchanged"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.native-view-editor-continuity",
+          "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
+          "testName": "selects native child views independently in two fixed Sessions without replacing either editor"
+        },
+        { "kind": "gherkin", "id": "rich-composer.workbench-conversation-views", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.canonical-editor-return",
+          "file": "plugins/@dshfiles/rich-composer/src/composer-editor-ownership.test.tsx",
+          "testName": "returns the same live editor and draft to the canonical view when its newer legacy duplicate retires"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.complete-fixed-conversation",
+          "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
+          "testName": "contains exactly one real chat and InputBar per bound Session, independently of global selected view"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.editor-root-ownership",
+          "file": "plugins/@dshfiles/rich-composer/src/composer-editor-ownership.test.tsx",
+          "testName": "a retired view cannot detach a newer view of the same live editor or erase its rendered draft"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.workbench-view-reload",
+          "file": "plugins/@dshfiles/rich-composer/src/workbench-views.test.tsx",
+          "testName": "rehydrates old view panels before any main conversation mounted and binds split Sessions independently"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Browser presentation over the existing Session controller's acquisition lifecycle; this feature adds no Host workflow or I/O owner."
+        }
+      ]
+    },
+    {
       "id": "paste-session-mentions",
       "title": "Paste session mentions as reference chips",
       "summary": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",

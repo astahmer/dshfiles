@@ -6,7 +6,7 @@
       "title": "Capture anything and let it sort itself",
       "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
         "click button \"Items\"",
         "expect textbox \"Capture\"",
@@ -72,7 +72,7 @@
       "title": "Configure Jev from the Backlog panel",
       "summary": "Configure the backlog's Jev switch, automatic triage and TypeSafe secret reference in a dedicated panel tab; the same settings remain available in DSH Settings.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "click button \"Backlog settings\"",
         "expect text \"Jev triage\"",
         "expect checkbox \"Enable Jev\"",
@@ -123,7 +123,7 @@
       "title": "Feed ordered by activity, with idle items sinking",
       "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"Feed item to close\"",
         "press Enter",
         "fill textbox \"Capture\" \"Feed item to drop\"",
@@ -229,7 +229,7 @@
       "title": "Board, links, backlinks and history",
       "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; agent actors show their configured name and open the thread they worked in when that thread is available; fields the user set are recorded as theirs.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org\"",
         "press Enter",
         "expect link \"guide\"",
@@ -287,7 +287,7 @@
       "id": "board-column-preferences",
       "title": "Customize Backlog board columns",
       "summary": "Reorder or hide status columns on the board without changing item states; the preference stays in this browser across Host restarts, and the Items view still contains every item.",
-      "reach": ["click button \"Backlog\"", "click button \"Board\"", "click button \"Configure board columns\"", "expect button \"Configure board columns\""],
+      "reach": ["click button \"Backlog: Items\"", "click button \"Board\"", "click button \"Configure board columns\"", "expect button \"Configure board columns\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["default-order", "custom-order", "hidden-column"],
@@ -317,7 +317,7 @@
       "title": "Select items in ranges and batch-edit them",
       "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"First selection item\"",
         "press Enter",
         "expect text \"First selection item\"",
@@ -425,7 +425,7 @@
       "title": "Apply every context-menu action to the selection",
       "summary": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links, status, kind, attention, project, pin, triage and permanent deletion, which confirms with the count and the item references. Cmd/Ctrl- or Shift-clicking while an item is open includes the open item.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"First menu selection item\"",
         "press Enter",
         "expect text \"First menu selection item\"",
@@ -595,7 +595,7 @@
       "configuration": [],
       "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
         "click button \"Backfill triage\"",
         "expect text \"Runs Jev and the configured triage model*\""
@@ -871,7 +871,7 @@
       "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
         "fill textbox \"Capture\" \"Ship the backlog reference preview\nRemember where the link goes.\"",
@@ -1021,7 +1021,7 @@
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
       "failureModes": ["Without thread-sidebar's attention API the Inbox shows backlog items only."],
-      "reach": ["click button \"Backlog\"", "click button \"Inbox\"", "expect text \"Needs you\""],
+      "reach": ["click button \"Backlog: Items\"", "click button \"Inbox\"", "expect text \"Needs you\""],
       "externalDependencies": [
         {
           "id": "@dshfiles/thread-sidebar",
@@ -1125,7 +1125,7 @@
       "title": "A chat-sized capture box with files, properties and references",
       "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count; clicking any image opens the same keyboard-navigable gallery as the thread composer, both for pending attachments and for the images kept with an item.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
         "expect button \"Dictate\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
@@ -1200,7 +1200,7 @@
       "title": "Write descriptions and replies like a capture",
       "summary": "The description and reply editor share mentions, Markdown, images and files; descriptions keep files and project references, and reply images stay on their comment. Smart routing uses Jev to send work to linked threads and generate AI answers for text-only discussion; answer authors and thread-start notices are configurable.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"Describe me with a screenshot\"",
         "press Enter",
         "click text \"Describe me with a screenshot\"",
@@ -1326,7 +1326,7 @@
       "title": "File and scope items by project",
       "summary": "The searchable project filter selects several projects at once and presets the capture box when exactly one project is selected; project paths under a home directory display as `~/...`. The same single-project picker sets the project on the capture chip, on the item's details line, and in each right-click menu; every feed entry, Inbox row, Items row, board card and search result labels the item project. A capture remembers the project it just used unless reuseCaptureProject is off, `/project` picks one inline, and isolated thread workspaces are left out of the candidates.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
         "expect combobox \"Filter by project\"",
         "expect combobox \"Project of the new item\"",
@@ -1445,7 +1445,7 @@
       "title": "Start a thread from an item",
       "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID or its clickable `b:<id>` reference; change status, kind, attention or project; pin or unpin; run triage when Jev or a triage model is configured; or open the item. Starting a thread picks the item project, account/model and effort, and an opening message; the row selected in the Items table starts a thread for the whole selection, every item is linked and named in the opening message, and the thread is created in its own jj workspace of that project, named and linked. The Host adds every full item description and current reply in order, with every item and reply attachment; missing, unreadable or oversized context fails rather than silently omitting it, and upload or prompt failure reports the created Session id. The dialog closes as soon as it hands the request over, so the panel never waits for the workspace; the banner says the work is under way, the thread opens only when the startThreadOpensCreated setting asks for it, or when the dialog's open box overrides it for one thread; an @agent comment follows the same setting, and the report carries an Open action otherwise. The Host verb behind it is the tool `backlog_start_thread`, which does not navigate the calling thread.",
       "reach": [
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "expect textbox \"Capture\"",
         "click button \"Feed\"",
         "click button \"All statuses*\"",

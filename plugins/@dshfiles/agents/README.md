@@ -51,6 +51,8 @@ where a thread starts.
 - **One Host contract.** `@dshfiles/agents/contract` exports the schemas, mention parsing and
   dispatch composition so the backlog links a thread with the same rules instead of restating them.
 
+The reusable directory view is **Agents: Directory** in navigation and the Workbench chooser.
+
 ## Surfaces
 
 | Surface              | Behavior                                                                                                                                          |

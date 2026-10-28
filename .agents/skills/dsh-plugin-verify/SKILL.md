@@ -5,8 +5,8 @@ description: Build and verify an owned DSH plugin without touching the live inst
 
 # Verifying a DSH plugin
 
-Never restart or kill the live `web` DSH on `127.0.0.1:3080` (see AGENTS.md). Verify in `probe` or a throwaway
-scratch profile.
+Never restart or kill the live DSH (see AGENTS.md). Discover its actual URL/profile from current runtime context;
+verify in a disposable home/profile, not a hardcoded machine deployment.
 
 ## 0. Workspace preflight
 
@@ -44,9 +44,9 @@ build` rejects a catalog without `telemetry`. Rules: `docs/observability.md#the-
 
 ## 2. HMR or restart?
 
-| Change | Reaches the running DSH |
-|---|---|
-| `dist/client.js` (client code, CSS) | HMR within ~500 ms, no restart |
+| Change                                                                                                 | Reaches the running DSH          |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| `dist/client.js` (client code, CSS)                                                                    | HMR within ~500 ms, no restart   |
 | `dist/index.js` host code, `package.json`, `cordis.patch.yml`, settings namespace, profile composition | only after the **user** restarts |
 
 So the live DSH keeps running the **old host** while new clients hot-reload. Clients must tolerate it:
@@ -65,8 +65,8 @@ which row applies to each.
   the first render throws "unavailable outside a DSHX Client Slot component".
 - One Host entry cannot declare both native `Config` and dshx `settings` — split the entry.
 - `defineSettings.namespace` must equal the Loader row id in `cordis.patch.yml` (new plugins: `dshfiles-<plugin>`).
-- Editing a profile's `cordis.patch.yml` by hand is fine only **outside** the Nix-managed marked block
-  (`~/.config/nixfiles/modules/dsh.nix` reconciles that block on apply).
+- Edit a profile's `cordis.patch.yml` by hand only **outside** its managed marked block.
+  Identify the actual local reconciler before editing; do not assume a particular machine's Nix configuration.
 
 ### Capabilities other plugins and the agent use
 

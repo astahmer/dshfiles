@@ -28,7 +28,7 @@ scope: `credential-port`, `optmem-core`, `plugin-ui` (kit), `shared-runtime`,
 
 ## Capture
 
-Screenshots come from a scratch DSH, never from the live one on `:3080`
+Screenshots come from a scratch DSH, never from a live personal installation
 ([verify-dsh](../.agents/skills/verify-dsh/SKILL.md)):
 
 ```sh
@@ -80,9 +80,16 @@ UI moved.
 
 - A feature with no `reach` steps has no screenshot path. Add the steps (skill
   `maintain-verify-dsh`), do not hand-crop a screenshot of an unverified screen.
-- A capture shows the scratch seed (the `sample` project, a seeded thread), so a
-  screenshot never contains the user's threads, tokens or folders. Re-check a
-  capture that shows real-looking data before committing it.
+- Use synthetic scratch seeds (for example the `sample` project and a seeded
+  thread), not the user's accounts, threads or folders. Isolation alone does not
+  guarantee privacy: environment-derived usernames, hostnames, shell prompts and
+  paths can still appear. Inspect every capture before publication.
+- Public capture privacy note: identifier regions in selected retained captures
+  are opaquely redacted for publication; private originals are retained. These
+  are not unaltered captures, and the redaction is not product-behavior proof.
+  Keep at least one verified synthetic UI capture per UI plugin. The three raw
+  account-dashboard design references are omitted, not described as sanitized
+  screenshots. Do not redact controls/results to fabricate a passing journey.
 - The screenshot is evidence of the recorded path, not of every state: states
   that need an account, a quota block or a failure use the seeds `dshx dev` and
   the [e2e harness](e2e-testing.md) already provide.

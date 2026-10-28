@@ -1,3 +1,4 @@
+@platform-macos
 Feature: Workspace editor
 
   The editor browses, opens and saves files of the thread's workspace through

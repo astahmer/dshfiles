@@ -17,21 +17,21 @@ dsh --profile web --dump-config-schema   # JSON Schema for entries and patches
 
 The `web` profile seed lives in this repo: `profiles/web/package.json` and
 `profiles/web/cordis.patch.yml`. `scripts/profile-sync.ts` is the one
-reconciler for it, and three callers run it:
+reconciler for it. Invoke `pnpm profile:sync` explicitly, or configure a local
+launcher to run it before startup. `dshx checkout sync` can also invoke it when
+the moved range touches `profiles/`; it reports a required restart rather than
+restarting the Host. A machine's external supervisor or Home Manager activation
+is not a repository-wide deployment contract.
 
-- the nixfiles `dsh web` supervisor, before every start and every restart
-  (the thread sidebar's Restart included), from `$DSHFILES_DIR`;
-- `dshx checkout sync` (by hand or after Rebase), when the moved range touched
-  `profiles/`; it then reports "restart to apply". It skips when
-  `DSHFILES_DIR` names another checkout, so the profile never flips between two;
-- the nixfiles Home Manager activation, on `nixapply`.
+Promoting or dropping a shared seed bundle changes only source until the selected
+profile is explicitly reconciled. Do not apply the shared seed to a custom live
+profile merely to make it match source; see
+[personal configuration](personal-configuration.md). A seeded run:
 
-Promoting or dropping a bundle means editing the seed; the next restart applies
-it. No nixfiles change and no `nixapply` is needed. A run:
-
-- copies missing seed files (`package.json`, `cordis.patch.yml`,
-  `pnpm-workspace.yaml`, and `ai-accounts.json` to
-  `$DSH_HOME/plugins/ai-accounts/accounts.json`); existing files are not replaced;
+- copies missing public profile seed files (`package.json`, `cordis.patch.yml`
+  and `pnpm-workspace.yaml`); existing files are not replaced. Account identities,
+  credentials and personal routes belong in machine-local state, never a shared
+  seed;
 - applies the seed's dependencies with relative `link:` paths resolved to the
   checkout running it, and its bundle list, keeping the profile's bundle order;
 - removes entries a previous run managed and the seed dropped, unless the user
@@ -58,13 +58,14 @@ and starts DSH with the previous profile.
 Preview a run against any home with `--dry-run`, and test against a scratch
 home and seed with `--home <dir> --seed <dir>`.
 
-### Migrating from the Nix copy
+### External configuration managers
 
-Until nixfiles carried this change, its activation ran its own copy of the
-reconciler, so seed changes needed `nixapply`. Run `nixapply` once after
-updating nixfiles: it installs the supervisor that syncs before each start,
-and `dsh-web` with `DSHFILES_DIR` defaulting to the `dsh.dshfilesCheckout`
-option. Restart DSH once afterwards; from then on Restart is enough.
+If a local Nix/Home Manager setup or another supervisor runs a separate copy of
+the reconciler, inspect and update that integration independently. Do not assume
+a particular machine's module path, checkout option, shell alias or activation
+command. Keep local selection outside public source, and let the user choose any
+required restart. The historical managed-region markers and legacy state-file
+name above are compatibility identifiers, not instructions to adopt Nix.
 
 ## `pnpm add <path>` is blocked; `pnpm install` is not
 
@@ -128,23 +129,9 @@ The profile's `node_modules` records the store it was built with
 disagrees, every install fails with `ERR_PNPM_UNEXPECTED_STORE` — which reads
 like a permissions problem and is not one.
 
-Corepack picks the pnpm version from the nearest `packageManager` field, then
-`~/.cache/node/corepack/lastKnownGood.json`. Our profile was built by **pnpm 12**
-(store `v11`); the fnm corepack shim resolves **10.34.5** (store `v10`) by
-default. `lastKnownGood` is the supported fix and needs no PATH surgery:
-
-```sh
-python3 - <<'EOF'
-import json, pathlib
-p = pathlib.Path.home() / ".cache/node/corepack/lastKnownGood.json"
-d = json.loads(p.read_text()); d["pnpm"] = "12.0.0"
-p.write_text(json.dumps(d, indent=2) + "\n")
-EOF
-```
-
-Check what the Host will resolve before changing anything:
-
-```sh
-head -3 ~/.dsh/profiles/web/node_modules/.modules.yaml   # storeDir + packageManager
-which -a pnpm                                            # what the Host finds first
-```
+Use the exact package-manager version declared by the selected repository and
+profile. Check the selected profile's `.modules.yaml` and what `pnpm` the Host
+actually resolves before changing anything. Do not copy a historical operator's
+Corepack cache or globally pin a different version to repair an unrelated
+profile. Updating global package-manager preferences is a separate local
+configuration decision, not a shared-source default.

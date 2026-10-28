@@ -22,6 +22,8 @@ Catalog shows global aliases and prompts for a folder to include project or
 machine-local aliases. Selecting a folder retains its canonical path and,
 when it is registered, its workspace id.
 
+Open the reusable **Secret Catalog: Secrets** view from navigation or the Workbench chooser.
+
 ## Value actions and mutations
 
 - Reveal calls the Host only when the exact row's masked value is clicked;

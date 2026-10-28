@@ -52,16 +52,17 @@ export const createThreadWorkspaceResolver = (input: {
 }
 
 /**
- * What the main view shows: a global panel, the Conversation of the Session the main view retains, or nothing (the
- * New thread screen). Threads carry the project they belong to, following subagents up to their parent.
+ * What the main view shows: a global panel, the exact current Session binding, or nothing (the
+ * New thread screen). Retain counts do not select a Session. Threads carry their owning project.
  */
 export const readHostView = (input: {
   readonly activePanelId: string | null
+  readonly currentSessionId: string | undefined
   readonly sessions: readonly SessionRow[]
   readonly workspaces: readonly WorkspaceRow[]
 }): HostView => {
   if (input.activePanelId !== null) return { target: { kind: 'panel', panelId: input.activePanelId }, projectId: null }
-  const current = input.sessions.find(session => (session.retainedBy.mainView ?? 0) > 0)
+  const current = input.sessions.find(session => session.id === input.currentSessionId)
   if (current === undefined) return { target: null, projectId: null }
   const projectId = createThreadWorkspaceResolver({ sessions: input.sessions, workspaces: input.workspaces })(current.id) ?? null
   return { target: { kind: 'thread', sessionId: current.id }, projectId }

@@ -164,7 +164,7 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   if (directiveText.includes('[[empty]]')) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
   if (directiveText.includes('[[hold]]')) return { kind: 'held' }
 
-  const answer = /\[\[answer ([^\]]+)\]\]/.exec(directiveText)
+  const answer = /\[\[answer ([\s\S]+?)\]\]/.exec(directiveText)
   if (answer?.[1] !== undefined) return streamAnswer({ content: answer[1] }, streamDelayMs)
 
   const calls = [...directiveText.matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {

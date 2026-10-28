@@ -36,6 +36,24 @@ describe('the editor draft following the selection', () => {
   const original = AccountDraftModel.newAccountDraft({ kind: 'commandcode', existing: [] })
   const renamed = { ...original, instanceId: 'fake_route', apiKeyEnv: 'FAKE_ROUTE_API_KEY', apiBaseUrl: 'http://127.0.0.1:4000' }
 
+  it.each(['cli', 'reference'] as const)('preserves %s credential ownership across normal draft edit/save round trips', authSource => {
+    const profile = stored({ ...original, authSource })
+    const draft = AccountDraftModel.toDraft(profile)
+    expect(draft.authSource).toBe(authSource)
+    expect(AccountDraftModel.sameDraft(draft, { ...draft, authSource: authSource === 'cli' ? 'reference' : 'cli' })).toBe(false)
+    expect(AccountDraftModel.toDraft(stored({ ...draft, enabled: false, hiddenModelIds: ['model'] })).authSource).toBe(authSource)
+  })
+
+  it('preserves optional model defaults without emitting own undefined wire fields', () => {
+    const legacy = AccountDraftModel.toDraft(stored(original))
+    expect(Object.hasOwn(legacy, 'inheritModelSettings')).toBe(false)
+    expect(Object.hasOwn(legacy, 'defaultReasoningEffort')).toBe(false)
+    const configured = AccountDraftModel.toDraft(stored({ ...original, inheritModelSettings: true, defaultReasoningEffort: 'low' }))
+    expect(configured).toMatchObject({ inheritModelSettings: true, defaultReasoningEffort: 'low' })
+    expect(AccountDraftModel.sameDraft(configured, { ...configured, inheritModelSettings: false })).toBe(false)
+    expect(AccountDraftModel.sameDraft(configured, { ...configured, defaultReasoningEffort: null })).toBe(false)
+  })
+
   it('keeps fields typed while a rename lands, through the moment the selection names no stored account', () => {
     const missing = AccountDraftModel.followSelection({ current: renamed, selected: null, selectedId: 'fake_route', followedId: original.instanceId })
     expect(missing).toBe(renamed)
@@ -46,6 +64,30 @@ describe('the editor draft following the selection', () => {
       followedId: original.instanceId,
     })
     expect(landed).toBe(renamed)
+  })
+
+  it('follows external availability changes without dropping unrelated unsaved edits', () => {
+    const disabled = { ...original, enabled: false }
+    const enabled = stored({ ...original, enabled: true })
+    expect(
+      AccountDraftModel.followSelection({
+        current: disabled,
+        previousSelected: stored(disabled),
+        selected: enabled,
+        selectedId: original.instanceId,
+        followedId: original.instanceId,
+      }),
+    ).toEqual(AccountDraftModel.toDraft(enabled))
+    const typing = { ...disabled, displayName: 'Still typing' }
+    expect(
+      AccountDraftModel.followSelection({
+        current: typing,
+        previousSelected: stored(disabled),
+        selected: enabled,
+        selectedId: original.instanceId,
+        followedId: original.instanceId,
+      }),
+    ).toEqual({ ...typing, enabled: true })
   })
 
   it('keeps a half-typed slug when the store is read again for the same account', () => {

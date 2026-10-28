@@ -12,6 +12,8 @@ into `main`. Internally, jj rebases the thread revisions onto current `main`,
 then advances the bookmark to the new tip; existing `main` ancestry stays intact.
 Works on stock DSH 0.2.0-rc.2; no core patch.
 
+Open the reusable **JJ Integration: Thread integration** view from navigation or the Workbench chooser.
+
 ## Starting a thread
 
 A blank thread shows a destination bar above its composer:
@@ -23,8 +25,12 @@ A blank thread shows a destination bar above its composer:
   composer starts the thread there; see the multi-host README.
 - **Folder**: a registered project, **No folder** (a scratch directory,
   `~/.dsh/no-folder`), or **Open folder…**.
-- **Bookmark** (jj repositories): the bookmark the thread starts from. Picking
-  one starts the thread in its own workspace at that bookmark.
+- **Bookmark** (jj repositories): the bookmark the thread starts from. With
+  default isolation enabled, this is the configured `bookmark` (`main` by default),
+  independently of the project checkout's current bookmark. Picking another
+  starts the thread in its own workspace at that bookmark. Existing isolated
+  destinations keep their selected bookmark; with isolation off the chip describes
+  the shared checkout instead.
 - **workspace** toggle: run the thread in its own jj workspace,
   `<repository>-threads/thread-<id>`, created with `jj workspace add -r <bookmark>`.
 

@@ -46,3 +46,5 @@ Persisted schema versions 1, 2, and 3 migrate to version 4, which records `inten
 When a second DSH instance shares the same `DSH_HOME`, only one process can own the local CLI/MCP socket bridge. The other instance logs a warning, keeps its in-process Agent tools, and does not fail activation.
 
 A report or activity-history gap is not proof of non-use. The Host bridge only reports Agents registered with DSH. Host source changes require a user-controlled restart; do not restart the live web profile as part of plugin development. See the [full communication design and activation guide](../../../tooling/dshx/docs/agent-communication.md).
+
+Open the reusable **Agent Communication: Messages** view from navigation or the Workbench chooser.

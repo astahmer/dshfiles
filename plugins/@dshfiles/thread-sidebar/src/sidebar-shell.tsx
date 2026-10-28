@@ -10,7 +10,6 @@ import {
   IconPinOutlineRegular,
   IconSearchOutlineRegular,
   IconSettingsOutlineRegular,
-  IconSlidersTwoOutlineRegular,
   IconUnarchiveOutlineRegular,
   rankByName,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -55,6 +54,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -63,6 +63,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type Ref,
 } from 'react'
 import {
   SidebarOrganization,
@@ -85,6 +86,8 @@ import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { useRestartMachine } from './use-restart-machine.js'
 import type { sidebarChildren } from './sidebar-contract.js'
+import { SidebarContentSeat, SidebarPreviewFallback } from './sidebar-content-seat.js'
+import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
 
 interface FooterRegistration {
   id: string
@@ -98,6 +101,11 @@ export interface FooterSnapshot {
 }
 
 interface SidebarShellExtras {
+  /** Actual public shell.left registration presence, not whether a renderer returned a nonempty element. */
+  contentOverridden: boolean
+  /** Plugin-local bridge: Root remains the sole editor/controller owner. */
+  customizationTarget: HTMLElement | null
+  customizationActionRef: Ref<() => void>
   readFooterSnapshot: () => FooterSnapshot
   subscribeFooterSnapshot: (listener: () => void) => () => void
   /** Stable key of the client bundle revisions this page runs; drives the reload banner. */
@@ -991,9 +999,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   )
 
   const openCustomize = useCallback(() => {
-    if (collapsed) toggleSidebar()
+    // A visible Threads panel can live on the right while the native left column is collapsed.
+    if (props.customizationTarget === null && collapsed) toggleSidebar()
     setCustomizeOpen(true)
-  }, [collapsed, toggleSidebar])
+  }, [collapsed, toggleSidebar, props.customizationTarget])
+  useImperativeHandle(props.customizationActionRef, () => openCustomize, [openCustomize])
 
   const navigationItems: NavigationItem[] = visibleHeaderEntries.map(entry => ({
     id: entry.id,
@@ -1357,133 +1367,165 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               >
                 <CommandIcon className="dshx:size-4" aria-hidden="true" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="dshx:text-muted-foreground"
-                aria-label={text(props.t, 'threadSidebarCustomize')}
-                aria-expanded={customizeOpen}
-                title={text(props.t, 'threadSidebarCustomize')}
+              <SidebarCustomizationFallback
+                contentOverridden={props.contentOverridden}
+                label={text(props.t, 'threadSidebarSettings')}
+                expanded={customizeOpen}
                 onClick={() => setCustomizeOpen(value => !value)}
-              >
-                <IconSlidersTwoOutlineRegular size={16} />
-              </Button>
+              />
             </div>
           ) : null}
           {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
 
-        <div
-          ref={headerRegionRef}
-          className={cn(
-            'dshx:w-full dshx:min-h-0',
-            props.collapsed
-              ? 'dshx:shrink dshx:overflow-y-auto dshx:[scrollbar-width:none]'
-              : iconRow
-                ? 'dshx:shrink-0'
-                : 'dshx:shrink dshx:overflow-y-auto dshx:overscroll-contain dshx:[scrollbar-width:thin]',
-          )}
-          id={headerRegionId}
-          style={
-            wide && !iconRow && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` } : undefined
-          }
-        >
-          {props.collapsed ? (
-            <nav className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:pb-2" aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
-              {navigationItems.map(item => (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className={cn(
-                        'dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground',
-                        item.active && 'dshx:bg-accent dshx:text-foreground',
-                      )}
-                      aria-label={item.label}
-                      aria-current={item.active ? 'page' : undefined}
-                      onClick={item.run}
-                    >
-                      {item.icon}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
-                </Tooltip>
-              ))}
-            </nav>
-          ) : iconRow ? (
-            <nav aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
-              <NavigationIconRow
-                items={navigationItems}
-                overflow={preferences.navigationOverflow}
-                onCustomize={openCustomize}
-                settings={
-                  footerSnapshot.settingsId === null
-                    ? null
-                    : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
-                }
-                dragHint={text(props.t, 'threadSidebarDragToReorder')}
-                onReorder={(fromIndex, toIndex) =>
-                  updatePreferences({
-                    headerOrder: SidebarOrganization.reorderVisibleEntry({
-                      orderedIds: orderedHeaderEntries.map(entry => entry.id),
-                      visibleIds: visibleHeaderEntries.map(entry => entry.id),
-                      fromVisible: fromIndex,
-                      toVisible: toIndex,
-                    }),
-                  })
-                }
-                labels={{
-                  more: text(props.t, 'threadSidebarMoreDestinations'),
-                  filter: text(props.t, 'threadSidebarFilterDestinations'),
-                  empty: text(props.t, 'threadSidebarNoDestinations'),
-                  customize: text(props.t, 'threadSidebarCustomize'),
-                  navigation: text(props.t, 'threadSidebarHeaderNavigation'),
-                }}
-              />
-            </nav>
-          ) : (
-            <nav
-              className={cn('dshx:flex dshx:flex-col dshx:px-2 dshx:pb-2', preferences.navigationDensity === 'compact' ? 'dshx:gap-0.5' : 'dshx:gap-1')}
-              aria-label={text(props.t, 'threadSidebarHeaderNavigation')}
-            >
-              {navigationItems.map(item => (
+        <SidebarContentSeat renderSlot={props.renderSlot} collapsed={props.collapsed}>
+          <div
+            ref={headerRegionRef}
+            className={cn(
+              'dshx:w-full dshx:min-h-0',
+              props.collapsed
+                ? 'dshx:shrink dshx:overflow-y-auto dshx:[scrollbar-width:none]'
+                : iconRow
+                  ? 'dshx:shrink-0'
+                  : 'dshx:shrink dshx:overflow-y-auto dshx:overscroll-contain dshx:[scrollbar-width:thin]',
+            )}
+            id={headerRegionId}
+            style={
+              wide && !iconRow && effectiveHeaderHeight !== null ? { height: `${effectiveHeaderHeight}px`, flex: `0 0 ${effectiveHeaderHeight}px` } : undefined
+            }
+          >
+            {props.collapsed ? (
+              <nav className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:pb-2" aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
+                {navigationItems.map(item => (
+                  <Tooltip key={item.id}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          'dshx:size-8 dshx:shrink-0 dshx:p-0 dshx:text-muted-foreground dshx:hover:text-foreground',
+                          item.active && 'dshx:bg-accent dshx:text-foreground',
+                        )}
+                        aria-label={item.label}
+                        aria-current={item.active ? 'page' : undefined}
+                        onClick={item.run}
+                      >
+                        {item.icon}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{item.label}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </nav>
+            ) : iconRow ? (
+              <nav aria-label={text(props.t, 'threadSidebarHeaderNavigation')}>
+                <NavigationIconRow
+                  items={navigationItems}
+                  overflow={preferences.navigationOverflow}
+                  onCustomize={openCustomize}
+                  settings={
+                    footerSnapshot.settingsId === null
+                      ? null
+                      : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
+                  }
+                  dragHint={text(props.t, 'threadSidebarDragToReorder')}
+                  onReorder={(fromIndex, toIndex) =>
+                    updatePreferences({
+                      headerOrder: SidebarOrganization.reorderVisibleEntry({
+                        orderedIds: orderedHeaderEntries.map(entry => entry.id),
+                        visibleIds: visibleHeaderEntries.map(entry => entry.id),
+                        fromVisible: fromIndex,
+                        toVisible: toIndex,
+                      }),
+                    })
+                  }
+                  labels={{
+                    more: text(props.t, 'threadSidebarMoreDestinations'),
+                    filter: text(props.t, 'threadSidebarFilterDestinations'),
+                    empty: text(props.t, 'threadSidebarNoDestinations'),
+                    customize: text(props.t, 'threadSidebarCustomize'),
+                    navigation: text(props.t, 'threadSidebarHeaderNavigation'),
+                  }}
+                />
+              </nav>
+            ) : (
+              <nav
+                className={cn('dshx:flex dshx:flex-col dshx:px-2 dshx:pb-2', preferences.navigationDensity === 'compact' ? 'dshx:gap-0.5' : 'dshx:gap-1')}
+                aria-label={text(props.t, 'threadSidebarHeaderNavigation')}
+              >
+                {navigationItems.map(item => (
+                  <Button
+                    key={item.id}
+                    variant="ghost"
+                    className={cn(
+                      'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+                      expandedRowClass[preferences.navigationDensity],
+                      preferences.navigationDensity === 'compact' ? 'dshx:text-sm' : 'dshx:text-base',
+                      item.active && 'dshx:bg-accent dshx:text-foreground',
+                    )}
+                    aria-label={item.label}
+                    aria-current={item.active ? 'page' : undefined}
+                    onClick={item.run}
+                  >
+                    {item.icon}
+                    <span className="dshx:truncate">{item.label}</span>
+                  </Button>
+                ))}
                 <Button
-                  key={item.id}
                   variant="ghost"
                   className={cn(
-                    'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+                    'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
                     expandedRowClass[preferences.navigationDensity],
-                    preferences.navigationDensity === 'compact' ? 'dshx:text-sm' : 'dshx:text-base',
-                    item.active && 'dshx:bg-accent dshx:text-foreground',
                   )}
-                  aria-label={item.label}
-                  aria-current={item.active ? 'page' : undefined}
-                  onClick={item.run}
+                  onClick={openCustomize}
                 >
-                  {item.icon}
-                  <span className="dshx:truncate">{item.label}</span>
+                  <SlidersHorizontalIcon className="dshx:size-4" aria-hidden="true" />
+                  {text(props.t, 'threadSidebarCustomize')}
                 </Button>
-              ))}
-              <Button
-                variant="ghost"
-                className={cn(
-                  'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
-                  expandedRowClass[preferences.navigationDensity],
-                )}
-                onClick={openCustomize}
-              >
-                <SlidersHorizontalIcon className="dshx:size-4" aria-hidden="true" />
-                {text(props.t, 'threadSidebarCustomize')}
-              </Button>
-            </nav>
-          )}
-        </div>
+              </nav>
+            )}
+          </div>
 
-        {customizeOpen && wide ? (
-          <section
-            className="dshx:absolute dshx:inset-x-2 dshx:top-12 dshx:bottom-14 dshx:z-20 dshx:flex dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:rounded-lg dshx:border dshx:bg-card dshx:p-2 dshx:shadow-lg"
-            aria-label={text(props.t, 'threadSidebarCustomize')}
+          {wide ? (
+            <button
+              ref={splitterRef}
+              type="button"
+              className="dshx:relative dshx:h-3 dshx:w-full dshx:shrink-0 dshx:cursor-row-resize dshx:touch-none dshx:select-none dshx:outline-none dshx:before:absolute dshx:before:top-1/2 dshx:before:left-1/2 dshx:before:h-0.5 dshx:before:w-7 dshx:before:-translate-x-1/2 dshx:before:-translate-y-1/2 dshx:before:rounded-full dshx:before:bg-muted-foreground/50 dshx:hover:before:bg-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:focus-visible:before:bg-foreground"
+              role="separator"
+              aria-label={text(props.t, 'threadSidebarResize')}
+              aria-orientation="horizontal"
+              aria-controls={`${headerRegionId} ${threadRegionId}`}
+              aria-valuemin={splitBounds.minimum}
+              aria-valuemax={splitBounds.maximum}
+              aria-valuenow={previewHeaderHeight === null ? splitBounds.value : Math.round(previewHeaderHeight)}
+              title={text(props.t, 'threadSidebarResizeHint')}
+              onPointerDown={startSplitterDrag}
+              onPointerMove={moveSplitter}
+              onPointerUp={finishSplitterDrag}
+              onPointerCancel={cancelSplitterDrag}
+              onLostPointerCapture={cancelSplitterDrag}
+              onKeyDown={resizeSplitterFromKeyboard}
+              onDoubleClick={resetSplit}
+            />
+          ) : null}
+
+          <div
+            className={cn(
+              'dshx:w-full dshx:min-h-[120px] dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0',
+              props.collapsed ? 'dshx:hidden' : 'dshx:flex',
+            )}
+            id={threadRegionId}
           >
+            {props.renderSlot('sidebar.workspaces', {
+              wide,
+              expandSidebar: () => {
+                if (props.collapsed) props.toggleSidebar()
+              },
+            })}
+          </div>
+        </SidebarContentSeat>
+
+        {customizeOpen && (wide || props.customizationTarget !== null) ? (
+          <SidebarCustomizationSeat target={props.customizationTarget} label={text(props.t, 'threadSidebarCustomize')}>
             <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:justify-between dshx:pl-2">
               <h2 className="dshx:text-sm dshx:font-medium dshx:text-muted-foreground">{text(props.t, 'threadSidebarCustomize')}</h2>
               <Button variant="ghost" size="sm" className="dshx:font-semibold" onClick={() => setCustomizeOpen(false)}>
@@ -1618,46 +1660,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 )}
               </div>
             </section>
-          </section>
+          </SidebarCustomizationSeat>
         ) : null}
-
-        {wide ? (
-          <button
-            ref={splitterRef}
-            type="button"
-            className="dshx:relative dshx:h-3 dshx:w-full dshx:shrink-0 dshx:cursor-row-resize dshx:touch-none dshx:select-none dshx:outline-none dshx:before:absolute dshx:before:top-1/2 dshx:before:left-1/2 dshx:before:h-0.5 dshx:before:w-7 dshx:before:-translate-x-1/2 dshx:before:-translate-y-1/2 dshx:before:rounded-full dshx:before:bg-muted-foreground/50 dshx:hover:before:bg-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:focus-visible:before:bg-foreground"
-            role="separator"
-            aria-label={text(props.t, 'threadSidebarResize')}
-            aria-orientation="horizontal"
-            aria-controls={`${headerRegionId} ${threadRegionId}`}
-            aria-valuemin={splitBounds.minimum}
-            aria-valuemax={splitBounds.maximum}
-            aria-valuenow={previewHeaderHeight === null ? splitBounds.value : Math.round(previewHeaderHeight)}
-            title={text(props.t, 'threadSidebarResizeHint')}
-            onPointerDown={startSplitterDrag}
-            onPointerMove={moveSplitter}
-            onPointerUp={finishSplitterDrag}
-            onPointerCancel={cancelSplitterDrag}
-            onLostPointerCapture={cancelSplitterDrag}
-            onKeyDown={resizeSplitterFromKeyboard}
-            onDoubleClick={resetSplit}
-          />
-        ) : null}
-
-        <div
-          className={cn(
-            'dshx:w-full dshx:min-h-[120px] dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0',
-            props.collapsed ? 'dshx:hidden' : 'dshx:flex',
-          )}
-          id={threadRegionId}
-        >
-          {props.renderSlot('sidebar.workspaces', {
-            wide,
-            expandSidebar: () => {
-              if (props.collapsed) props.toggleSidebar()
-            },
-          })}
-        </div>
 
         {wide ? (
           <div ref={footerAboveRef} className="dshx:flex dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:empty:hidden">
@@ -1714,7 +1718,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            {props.renderSlot('sidebar.footer.above', {})}
+            <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={props.contentOverridden} />
           </div>
         ) : null}
 

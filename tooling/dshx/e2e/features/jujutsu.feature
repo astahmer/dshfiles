@@ -1,7 +1,15 @@
 Feature: Jujutsu revision interactions
 
-  These journeys use a disposable local JJ repository and the real isolated
-  plugin profile. Mutation previews are cancelled before any repository change.
+  These journeys use disposable local repositories and the real isolated
+  plugin profile. Opening a Git-only checkout initializes JJ; mutation previews
+  in the drag/drop journey are cancelled before any repository change.
+
+  @scenario:jujutsu.git-auto-init
+  Scenario: Opening a dirty Git-only checkout initializes JJ once and preserves Git history and file bytes
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable dirty Git-only checkout is opened through the Jujutsu repository picker
+    Then the imported Git commit is visible and JJ metadata exists without changing Git history or dirty file bytes
+    And reselecting and reopening the Git checkout does not initialize JJ again
 
   @scenario:jujutsu.graph-navigation
   Scenario: Landmarks, exact relationships and reversible graph views

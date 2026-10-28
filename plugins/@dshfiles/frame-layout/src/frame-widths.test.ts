@@ -76,6 +76,65 @@ describe('frame width persistence', () => {
     expect(reloaded.getSnapshot().layoutInfo.sidebar).toBe(360)
   })
 
+  it('shows a collapsed wide sidebar repeatedly without changing width preferences', () => {
+    const instance = openStore()
+    instance.actions.setViewportWidth(1400)
+    instance.actions.setSidebar(384)
+    instance.actions.setRightbar(460)
+    instance.actions.toggleSidebar()
+    const dispose = FrameWidthsModel.persist(instance)
+    expect(instance.getSnapshot().layoutInfo.sidebar).toBe(0)
+
+    instance.actions.showSidebar()
+    instance.actions.showSidebar()
+
+    expect(instance.getSnapshot().layoutInfo.sidebar).toBe(384)
+    expect(instance.getSnapshot().layoutInfo.sidebarLastOpen).toBe(384)
+    expect(FrameWidthsModel.read()).toEqual({ sidebar: 384, rightbar: 460, collapsed: false })
+    dispose()
+  })
+
+  it('shows an auto-collapsed narrow sidebar repeatedly and preserves its wide preference', () => {
+    const instance = openStore()
+    instance.actions.setViewportWidth(1400)
+    instance.actions.setSidebar(360)
+    instance.actions.toggleSidebar()
+    instance.actions.setViewportWidth(900)
+    const dispose = FrameWidthsModel.persist(instance)
+    expect(instance.getSnapshot().layoutInfo.narrowExpanded).toBe(false)
+
+    instance.actions.showSidebar()
+    instance.actions.showSidebar()
+
+    expect(instance.getSnapshot().layoutInfo.narrowExpanded).toBe(true)
+    expect(instance.getSnapshot().layoutInfo.sidebar).toBe(0)
+    expect(instance.getSnapshot().layoutInfo.sidebarLastOpen).toBe(360)
+    expect(FrameWidthsModel.read()).toEqual({ sidebar: 360, rightbar: null, collapsed: true })
+    instance.actions.setViewportWidth(1400)
+    expect(instance.getSnapshot().layoutInfo.sidebar).toBe(0)
+    instance.actions.showSidebar()
+    instance.actions.showSidebar()
+    expect(instance.getSnapshot().layoutInfo.sidebar).toBe(360)
+    expect(FrameWidthsModel.read()).toEqual({ sidebar: 360, rightbar: null, collapsed: false })
+    dispose()
+  })
+
+  it('keeps an already-open sidebar open on repeated show in either viewport', () => {
+    const instance = openStore()
+    instance.actions.setViewportWidth(1400)
+    instance.actions.setSidebar(320)
+    instance.actions.showSidebar()
+    instance.actions.showSidebar()
+    expect(instance.getSnapshot().layoutInfo.sidebar).toBe(320)
+    instance.actions.setViewportWidth(900)
+    instance.actions.toggleSidebar()
+    expect(instance.getSnapshot().layoutInfo.narrowExpanded).toBe(true)
+    instance.actions.showSidebar()
+    instance.actions.showSidebar()
+    expect(instance.getSnapshot().layoutInfo.narrowExpanded).toBe(true)
+    expect(instance.getSnapshot().layoutInfo.sidebarLastOpen).toBe(320)
+  })
+
   it('accepts a record written before the collapsed flag and boots open', () => {
     seed({ sidebar: 300, rightbar: null })
     expect(FrameWidthsModel.read()?.collapsed).toBe(false)

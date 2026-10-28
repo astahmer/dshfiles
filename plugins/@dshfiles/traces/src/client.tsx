@@ -53,7 +53,10 @@ export default defineClient({
       unavailable: () => translate('threadUnavailable'),
     })
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label, locale: TRACES_LOCALE_NAMESPACE }, PanelGlyph),
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: () => `Traces: ${translate('viewExplorer')}`, locale: TRACES_LOCALE_NAMESPACE },
+        PanelGlyph,
+      ),
     )
     // A conversation view tab after the native Trajectory view (order 10); Chat is 0.
     ctx.slots.inject('conversation.view', () =>

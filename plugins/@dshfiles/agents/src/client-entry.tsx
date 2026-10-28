@@ -124,7 +124,9 @@ export default defineClient({
       </PluginQueryProvider>
     )
 
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: 'Agents' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: 'Agents: Directory' }, PanelGlyph),
+    )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-agents-reference-preview', order: 122 }, decorate(ReferenceOverlay)),

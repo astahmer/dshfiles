@@ -44,6 +44,7 @@
     "oxlint": "catalog:",
     "turbo": "2.11.8",
     "typescript": "catalog:",
+    "yaml": "catalog:",
     "zod": "catalog:"
   },
   "packageManager": "pnpm@12.5.1"

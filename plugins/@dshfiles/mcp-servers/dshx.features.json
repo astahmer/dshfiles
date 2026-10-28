@@ -5,7 +5,7 @@
       "id": "server-configuration",
       "title": "Manage local and remote MCP server definitions",
       "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references.",
-      "reach": ["click button \"MCP servers\"", "expect heading \"Global MCP servers\"", "expect combobox \"Transport\""],
+      "reach": ["click button \"MCP Servers: Servers\"", "expect heading \"Global MCP servers\"", "expect combobox \"Transport\""],
       "surfaces": ["client", "host", "settings", "tool", "integration"],
       "configuration": [
         {
@@ -122,7 +122,7 @@
       "title": "Reference configured MCP servers and tools in the composer",
       "summary": "Search enabled MCP server namespaces and the current Session's registered MCP tools from @ autocomplete; selection inserts a structured prompt reference without directly executing tools.",
       "reach": [
-        "click button \"MCP servers\"",
+        "click button \"MCP Servers: Servers\"",
         "click combobox \"Transport\"",
         "click option \"Local command (stdio)\"",
         "fill textbox \"Display name\" \"Echo server\"",
@@ -340,7 +340,7 @@
           "reason": "Client-only: Batch enable, disable and remove MCP servers renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"MCP servers\"", "expect checkbox \"Select all servers\""]
+      "reach": ["click button \"MCP Servers: Servers\"", "expect checkbox \"Select all servers\""]
     }
   ],
   "kind": "bundle",

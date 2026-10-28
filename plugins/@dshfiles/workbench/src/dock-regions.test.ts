@@ -42,6 +42,17 @@ describe('workbench region registry', () => {
     expect(registry.holds('editor.main')).toBe(false)
   })
 
+  it('orders root surfaces first and arbitrary nested paths after them', () => {
+    const registry = registryFor()
+    registry.set('nested/main/z/deep', surface(['deep']))
+    registry.set('nested/main/a', surface(['a']))
+    registry.set('bottom', surface([]))
+    registry.set('right', surface([]))
+    registry.set('main', surface([]))
+    expect(registry.entries().map(([region]) => region)).toEqual(['main', 'right', 'bottom', 'nested/main/a', 'nested/main/z/deep'])
+    expect(registry.holds('deep')).toBe(true)
+  })
+
   it('lists the mounted regions in a stable order and skips the rest', () => {
     const registry = registryFor()
     const bottom = surface([])

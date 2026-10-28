@@ -10,6 +10,8 @@ Manage hosts on a dedicated page:
 
 ![Manage hosts on a dedicated page](docs/screenshots/host-management.png)
 
+The dedicated reusable hosts page is **Multi-host: Hosts** in navigation and the Workbench chooser.
+
 ## Using it
 
 The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the

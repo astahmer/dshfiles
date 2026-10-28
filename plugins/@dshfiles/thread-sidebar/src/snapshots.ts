@@ -120,6 +120,9 @@ const createStableSelector = <Snapshot extends object>(stabilize: (previous: Sna
 const selectStableStatusMap = createStableSelector(stabilizeStatusMap)
 
 export class HostSnapshotsModel {
+  /** Main-view identity belongs to uiSession's current binding, never to retain-list ordering. */
+  static readonly currentSessionOf = (sessions: readonly SessionSummary[], currentSessionId: string | undefined): SessionSummary | undefined =>
+    sessions.find(session => session.id === currentSessionId)
   static readonly sameJsonValue = sameJsonValue
   static readonly sameSessionSummary = sameSessionSummary
   static readonly stabilizeSessionListState = stabilizeSessionListState

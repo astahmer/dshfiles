@@ -12,7 +12,9 @@
       "failureModes": [
         "An ambiguous or missing anchor fails before writing and names the candidate lines.",
         "An empty or unchanged needle is rejected before the file is touched.",
-        "Without a working directory, or for a file that does not exist, the tool refuses instead of creating one."
+        "Without a working directory, or for a file that does not exist, the tool refuses instead of creating one.",
+        "Read-only Sessions and workspace-write escapes retain FS_SANDBOX_DENIED; the Session policy is resolved per call instead of falling back to the deployment policy.",
+        "A confining filesystem without the shared policy resolver refuses before any write."
       ],
       "externalDependencies": [],
       "verification": [
@@ -51,6 +53,24 @@
           "id": "apply-patch.crlf",
           "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
           "testName": "preserves CRLF line endings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.session-full-access",
+          "file": "plugins/@dshfiles/apply-patch/tests/sandbox-policy.test.ts",
+          "testName": "honors Full access despite a workspace-write deployment default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.session-read-only",
+          "file": "plugins/@dshfiles/apply-patch/tests/sandbox-policy.test.ts",
+          "testName": "retains read-only denial even when the deployment default is Full access"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.workspace-containment",
+          "file": "plugins/@dshfiles/apply-patch/tests/sandbox-policy.test.ts",
+          "testName": "rejects outside and symlink-escape writes under workspace-write"
         },
         {
           "kind": "not-applicable",

@@ -1,3 +1,4 @@
+@platform-macos
 Feature: Command palette
 
   The palette searches live Host data, routes prefixed queries, and invokes

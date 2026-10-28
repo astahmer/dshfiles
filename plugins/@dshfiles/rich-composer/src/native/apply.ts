@@ -40,7 +40,10 @@ import { queueDockEntry } from './queue/QueueDock.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
+import { registerConversationHeaderSurface } from '../conversation-header.js'
 import { ConversationContent } from './skeleton/ConversationContent.tsx'
+import { createConversationContentSurface, ConversationWorkbenchSources, ConversationWorkbenchView, WORKBENCH_VIEW_CHILDREN, WORKBENCH_VIEW_SLOT, type ConversationWorkbenchSession } from '../workbench-views.js'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { ConversationPanel } from './skeleton/ConversationPanel.tsx'
 import { ConversationHeader } from './skeleton/ConversationHeader.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
@@ -262,6 +265,24 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     activateView(sessionId, readConversationViewPreference(sessionId))
   }
   const conversationViews = createSnapshotStore<readonly ViewTab[]>(viewTabs())
+  ctx.effect(() => {
+    const catalog = createSnapshotStore<readonly ConversationWorkbenchSession[]>([])
+    const refreshCatalog = (): void => {
+      const list = sessions.list.getSnapshot()
+      catalog.set(list.ids.map(id => ({ id, title: list.byId[id]?.displayTitle ?? id })))
+    }
+    const offCatalog = sessions.list.subscribe(refreshCatalog)
+    refreshCatalog()
+    const panels = ConversationWorkbenchSources.create({
+      registry: workbenchPanels(), sessions: catalog, views: conversationViews,
+      retain: sessionId => sessions.retain(sessionId, { source: 'conversationWorkbenchView' }),
+    })
+    const offRoot = slots.inject('shell.overlay', () => slots.register({
+      name: 'shell.overlay', id: 'dshfiles-conversation-workbench-views', children: WORKBENCH_VIEW_CHILDREN,
+    }, panels.Root))
+    const offView = slots.inject(WORKBENCH_VIEW_SLOT, () => slots.register({ name: WORKBENCH_VIEW_SLOT }, ConversationWorkbenchView))
+    return () => { offView(); offRoot(); panels.dispose(); offCatalog() }
+  }, 'ui-conversation: workbench view sources')
   const bindings = new Set<SessionBinding>()
   const trackedBindings = new WeakSet<SessionBinding>()
   const trackBinding = (binding: SessionBinding): void => {
@@ -370,9 +391,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
 
   const registerConversationRoot = () => slots.register({
     name: 'main.conversation',
-    children: {
-      'conversation.header': { kind: 'single', scope: 'session-maybe' },
-    },
   }, ConversationRoot)
 
   const registerConversationContent = () => slots.registerFactory({
@@ -424,7 +442,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         if (handoff === 'kept') from.notify('info', t('workspace.draftTransferRefused'))
       }),
     }),
-  }, ConversationContent)
+  }, createConversationContentSurface(ConversationContent))
 
   const registerConversationSession = () => slots.register({
     name: 'conversation.session',
@@ -642,6 +660,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       children: { 'main.conversation': { kind: 'single', scope: 'session-maybe' } },
     }, ConversationPanel)
     yield registerConversationRoot()
+    yield registerConversationHeaderSurface(slots)
     yield registerConversationContent()
     yield registerConversationSession()
     yield registerHeader()

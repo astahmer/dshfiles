@@ -8,8 +8,9 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type {} from '@dshfiles/session-controller/draft-client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
@@ -20,12 +21,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
 import { threadActionsApi } from './thread-actions-api.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { SettledThreadDock } from './settled-thread-dock.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { SidebarStateProvider } from './sidebar-state.js'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { registerSidebarWorkbenchPanels } from './workbench-panels.js'
 import { ThreadAsideOpenProvider, ThreadSidebar, type ThreadSidebarStandardProps } from './client.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
@@ -36,7 +39,7 @@ import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
 import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, threadAsideAddress, threadAsideSessionId } from './thread-aside.js'
 import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
-import { requestThreadMainTab } from './main-tab-request.js'
+import { openThreadInMain, requestThreadMainTab } from './main-tab-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { HoverPrefetch } from './hover-prefetch.js'
@@ -122,6 +125,7 @@ export default defineClient({
     'uiWorkspace',
     'workspaces',
     'sessions',
+    'uiSession',
     'sessionDrafts',
     'conversation',
     'sidebarRight',
@@ -578,7 +582,7 @@ export default defineClient({
     const shortcuts = ctx.shortcuts
     const runCommand = hasHostCommandRegistry(shortcuts) ? (commandId: string): boolean => runHostCommand(shortcuts, commandId) : null
 
-    const openThread = (sessionId: SessionSummary['id']): void => ctx.uiWorkspace.openSession(sessionId)
+    const openThread = (sessionId: SessionSummary['id']): void => openThreadInMain(sessionId, id => ctx.uiWorkspace.openSession(id))
 
     /**
      * Navigation history can point at a thread archived since the visit. Restore it before opening:
@@ -595,17 +599,64 @@ export default defineClient({
       )
     }
 
-    const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => (
-      <SidebarRoot
-        {...props}
-        readFooterSnapshot={readFooterSnapshot}
-        subscribeFooterSnapshot={subscribeFooterSnapshot}
-        readClientRevisionKey={readClientRevisionKey}
-        subscribeClientRevisions={subscribeClientRevisions}
-        openSession={openSessionRestoringArchived}
-        runCommand={runCommand}
-      />
-    )
+    const subscribeLeftContent = (listener: () => void): (() => void) => ctx.slots.subscribe('shell.left', listener)
+    const leftContentOverridden = (): boolean => ctx.slots.entriesOfSlot('shell.left').length > 0
+    const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => {
+      const contentOverridden = useSyncExternalStore(subscribeLeftContent, leftContentOverridden)
+      const [customizationTarget, setCustomizationTarget] = useState<HTMLElement | null>(null)
+      const customizationActionRef = useRef<(() => void) | null>(null)
+      const registerCustomizationHost = useCallback((host: HTMLElement): (() => void) => {
+        setCustomizationTarget(host)
+        // A moved occurrence may mount before its previous seat is released.
+        return () => setCustomizationTarget(current => (current === host ? null : current))
+      }, [])
+      const current = useRef(props)
+      current.current = props
+      useEffect(
+        () =>
+          registerSidebarWorkbenchPanels(workbenchPanels(), {
+            renderSlot: (...args) => current.current.renderSlot(...args),
+            footerTitles: slot => ctx.slots.entriesOfSlot(slot).map(entry => resolveSlotLabel(entry.options.label) ?? ''),
+            subscribeFooterTitles: listener => {
+              const unsubscribe = [
+                ctx.slots.subscribe('sidebar.footer.above', listener),
+                ctx.slots.subscribe('sidebar.footer.action', listener),
+                ctx.locale.subscribe(listener),
+              ]
+              return () => unsubscribe.forEach(dispose => dispose())
+            },
+            panels,
+            panelInfo: ctx.layout.panelInfo,
+            selectPanel: id => current.current.selectPanel(id),
+            expandSidebar: () => {
+              if (current.current.collapsed) current.current.toggleSidebar()
+            },
+            startSession: () => current.current.startSession(),
+            searchThreads: () => window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } })),
+            newThreadLabel: translate('threadSidebarNewThread'),
+            searchThreadsLabel: translate('threadSidebarSearch'),
+            sidebarSettingsLabel: translate('threadSidebarSettings'),
+            customizeSidebar: () => customizationActionRef.current?.(),
+            registerCustomizationHost,
+            decorate,
+          }),
+        [registerCustomizationHost],
+      )
+      return (
+        <SidebarRoot
+          {...props}
+          contentOverridden={contentOverridden}
+          customizationTarget={contentOverridden ? customizationTarget : null}
+          customizationActionRef={customizationActionRef}
+          readFooterSnapshot={readFooterSnapshot}
+          subscribeFooterSnapshot={subscribeFooterSnapshot}
+          readClientRevisionKey={readClientRevisionKey}
+          subscribeClientRevisions={subscribeClientRevisions}
+          openSession={openSessionRestoringArchived}
+          runCommand={runCommand}
+        />
+      )
+    }
 
     ctx.slots.inject('conversation.input.overlay', () =>
       ctx.slots.register(
@@ -792,8 +843,15 @@ export default defineClient({
       })()
     }
 
+    // A live projection of the public root source, not another stored selection.
+    const currentSessionId: ObservableSnapshot<string | undefined> = {
+      getSnapshot: () => ctx.uiSession.adapter.current.getSnapshot().key,
+      subscribe: listener => ctx.uiSession.adapter.current.subscribe(listener),
+    }
+
     /** The Host verbs both thread-list surfaces drive: the sidebar list and the full-page board. */
     const threadSidebarActions = () => ({
+      currentSessionId,
       tSidebar: ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE),
       archiveSession: (sessionId: SessionSummary['id']) =>
         SidebarOrganization.archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
@@ -819,7 +877,9 @@ export default defineClient({
       open: openThread,
       openLinkedSession: (sessionId: SessionSummary['id']) => {
         const activePanelId = ctx.layout.panelInfo.getSnapshot().activePanelId
-        openThread(sessionId)
+        // Page-load links preserve the restored tool selection; only explicit
+        // sidebar opens must announce tab intent even for the native current id.
+        ctx.uiWorkspace.openSession(sessionId)
         if (activePanelId !== null) ctx.layout.selectPanel(activePanelId)
       },
       openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
@@ -851,7 +911,13 @@ export default defineClient({
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: BOARD_PANEL_ID, inject: threadSidebarActions }, decorate(ThreadBoardPanel)))
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
-        { name: 'sidebar.panellist', id: BOARD_PANEL_ID, order: 2, label: () => translate('threadSidebarBoardTitle'), locale: THREAD_SIDEBAR_LOCALE_NAMESPACE },
+        {
+          name: 'sidebar.panellist',
+          id: BOARD_PANEL_ID,
+          order: 2,
+          label: () => translate('threadSidebarBoardViewLabel'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        },
         BoardPanelGlyph,
       ),
     )

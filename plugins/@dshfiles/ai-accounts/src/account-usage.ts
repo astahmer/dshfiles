@@ -18,6 +18,8 @@ export const readAccountUsage = async (input: {
   /** The file's shadow root: an account with no explicit shadow home reads the one its route uses. */
   readonly shadowRoot: string
   readonly signal?: AbortSignal | undefined
+  /** Private per-read evidence; never inferred from a card or replayed from cache. */
+  readonly onAuthenticated?: (() => void) | undefined
   readonly resolveCredential?: CredentialValueResolver | undefined
   /** The Copilot account's stored OAuth grant. */
   readonly readCopilotCredential?: ((instanceId: string) => Promise<OAuthCredential | undefined>) | undefined
@@ -31,19 +33,28 @@ export const readAccountUsage = async (input: {
       } catch (cause) {
         return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'The Codex home is invalid.')
       }
-      return readCodexUsage(home, signal)
+      return readCodexUsage(home, signal, input.onAuthenticated)
     }
     case 'claude':
-      return claudeAccountService.readUsage(ClaudeAccountModel.resolveClaudeConfigDir(account.homePath), signal)
+      return claudeAccountService.readUsage(ClaudeAccountModel.resolveClaudeConfigDir(account.homePath), signal, input.onAuthenticated)
     case 'commandcode':
-      return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl, resolveCredential: input.resolveCredential }, signal)
+      return readCommandCodeUsage(
+        {
+          keyEnv: account.apiKeyEnv,
+          apiBaseUrl: account.apiBaseUrl,
+          resolveCredential: input.resolveCredential,
+          onAuthenticated: input.onAuthenticated,
+          authSource: account.authSource,
+        },
+        signal,
+      )
     case 'github-copilot':
-      return readCopilotUsage({ credential: await input.readCopilotCredential?.(account.instanceId), signal })
+      return readCopilotUsage({ credential: await input.readCopilotCredential?.(account.instanceId), signal, onAuthenticated: input.onAuthenticated })
     case 'cursor':
-      return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential)
+      return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential, input.onAuthenticated, account.authSource)
     case 'opencode-go': {
       const key = input.resolveCredential === undefined ? CredentialModel.readKeyFromEnv(account.apiKeyEnv) : await input.resolveCredential(account.apiKeyEnv)
-      return readOpenCodeUsage(key, signal)
+      return readOpenCodeUsage(key, signal, input.onAuthenticated)
     }
   }
 }
@@ -57,12 +68,15 @@ export const createUsageCache = <Value>(input: { readonly ttlMs: number; readonl
   const now = input.now ?? Date.now
   let cached: { readonly at: number; readonly value: Value } | undefined
   let inFlight: Promise<Value> | undefined
+  let generation = 0
   const refresh = (): Promise<Value> => {
     if (inFlight !== undefined) return inFlight
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- Capture the generation before async I/O; this snapshot must not follow later invalidations.
+    const started = generation
     const pending = input
       .read()
       .then(value => {
-        cached = { at: now(), value }
+        if (started === generation) cached = { at: now(), value }
         return value
       })
       .finally(() => {
@@ -75,7 +89,9 @@ export const createUsageCache = <Value>(input: { readonly ttlMs: number; readonl
     /** The last sweep, however old, without starting a new one. */
     latest: (): Value | undefined => cached?.value,
     invalidate: (): void => {
+      generation += 1
       cached = undefined
+      inFlight = undefined
     },
     get: (): Promise<Value> => (cached !== undefined && now() - cached.at < input.ttlMs ? Promise.resolve(cached.value) : refresh()),
     refresh,

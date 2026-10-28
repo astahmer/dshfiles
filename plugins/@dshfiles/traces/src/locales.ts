@@ -5,6 +5,7 @@ export const TRACES_LOCALE_NAMESPACE = 'dshfiles.traces'
 
 const en = {
   title: 'Traces',
+  viewExplorer: 'Explorer',
   subtitle: 'OpenTelemetry traces, logs and metrics any OTLP/HTTP exporter sends here, stored locally.',
   refresh: 'Refresh',
   clear: 'Clear stored traces',
@@ -179,6 +180,7 @@ const en = {
 
 const zh = {
   title: '追踪',
+  viewExplorer: '浏览器',
   subtitle: '任何 OTLP/HTTP 导出器发送到此处的 OpenTelemetry 追踪、日志与指标，存储在本地。',
   refresh: '刷新',
   clear: '清除已存储的追踪',

@@ -19,7 +19,7 @@ const PathField = (props: {
   readonly onChange: (value: string) => void
   readonly onBlur?: () => void
 }): JSX.Element => (
-  <div className="dshx:grid dshx:grid-cols-1 dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-[minmax(170px,0.48fr)_minmax(0,1fr)] dshx:md:gap-3.5">
+  <div className="dshx:grid dshx:min-w-0 dshx:grid-cols-[minmax(140px,0.48fr)_minmax(0,1fr)] dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:@max-pane-narrow:grid-cols-1">
     <span className="dshx:flex dshx:flex-col dshx:gap-1">
       <span className="dshx:text-sm dshx:font-medium">{props.label}</span>
       <small className="dshx:text-xs dshx:text-muted-foreground">{props.hint}</small>
@@ -112,7 +112,6 @@ export const RuntimePathsSection = (props: {
         )
       }
       description="Absolute path on this host"
-      index="02"
       title="Runtime paths"
     >
       {draft.kind === 'codex' ? (

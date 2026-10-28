@@ -5,7 +5,7 @@
 ![Request log](docs/screenshots/usage-request-log.png)
 ![Jev API usage card](docs/screenshots/usage-jev-card.png)
 
-A **Usage analytics** main panel (sidebar) with a model request log, usage charts,
+A **Usage: Analytics** reusable view (sidebar) with a model request log, usage charts,
 and a local tool/Jev activity report, built from DSH session logs and bounded Host-side
 call observations. Observation only.
 

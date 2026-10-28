@@ -21,13 +21,17 @@ describe('createThreadWorkspaceResolver', () => {
 
 describe('readHostView', () => {
   it('reports a selected global panel without a project', () => {
-    expect(readHostView({ activePanelId: 'jujutsu', sessions: [], workspaces })).toEqual({ target: { kind: 'panel', panelId: 'jujutsu' }, projectId: null })
+    expect(readHostView({ activePanelId: 'jujutsu', currentSessionId: undefined, sessions: [], workspaces })).toEqual({
+      target: { kind: 'panel', panelId: 'jujutsu' },
+      projectId: null,
+    })
   })
 
   it('keeps a selected panel ahead of a retained thread', () => {
     expect(
       readHostView({
         activePanelId: 'backlog',
+        currentSessionId: 'thread',
         sessions: [{ id: 'thread', retainedBy: { mainView: 1 } }],
         workspaces,
       }),
@@ -35,7 +39,10 @@ describe('readHostView', () => {
   })
 
   it('reports nothing on the New thread screen', () => {
-    expect(readHostView({ activePanelId: null, sessions: [{ id: 'main', retainedBy: {} }], workspaces })).toEqual({ target: null, projectId: null })
+    expect(readHostView({ activePanelId: null, currentSessionId: undefined, sessions: [{ id: 'main', retainedBy: {} }], workspaces })).toEqual({
+      target: null,
+      projectId: null,
+    })
   })
 
   it('files a jj thread workspace and a subagent under the project they belong to', () => {
@@ -43,6 +50,46 @@ describe('readHostView', () => {
       { id: 'jj-thread', retainedBy: {} },
       { id: 'sub', parentId: 'jj-thread', retainedBy: { mainView: 1 } },
     ]
-    expect(readHostView({ activePanelId: null, sessions, workspaces })).toEqual({ target: { kind: 'thread', sessionId: 'sub' }, projectId: 'w-sample' })
+    expect(readHostView({ activePanelId: null, currentSessionId: 'sub', sessions, workspaces })).toEqual({
+      target: { kind: 'thread', sessionId: 'sub' },
+      projectId: 'w-sample',
+    })
+  })
+
+  it.each([false, true])('uses the exact current binding and project during overlapping main retains, reverse list=%s', reverse => {
+    const sessions = [
+      { id: 'old', retainedBy: { mainView: 1 } },
+      { id: 'current', retainedBy: { mainView: 1 } },
+    ]
+    const input = {
+      activePanelId: null,
+      currentSessionId: 'current',
+      sessions: reverse ? sessions.toReversed() : sessions,
+      workspaces: [
+        { workspaceId: 'old-project', path: '/old', sessionIds: ['old'] },
+        { workspaceId: 'current-project', path: '/current', sessionIds: ['current'] },
+      ],
+    }
+    expect(readHostView(input)).toEqual({ target: { kind: 'thread', sessionId: 'current' }, projectId: 'current-project' })
+  })
+
+  it('treats an absent current binding as absence even when an older main reference remains retained', () => {
+    const input = {
+      activePanelId: null,
+      currentSessionId: undefined,
+      sessions: [{ id: 'main', retainedBy: { mainView: 1 } }],
+      workspaces,
+    }
+    expect(readHostView(input)).toEqual({ target: null, projectId: null })
+  })
+
+  it('does not substitute a retained Session when the exact current binding is not listed yet', () => {
+    const input = {
+      activePanelId: null,
+      currentSessionId: 'not-listed-yet',
+      sessions: [{ id: 'main', retainedBy: { mainView: 1 } }],
+      workspaces,
+    }
+    expect(readHostView(input)).toEqual({ target: null, projectId: null })
   })
 })

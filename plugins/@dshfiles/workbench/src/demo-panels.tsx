@@ -72,6 +72,6 @@ const Ticker = (props: WorkbenchPanelProps & { readonly t: WorkbenchTranslate })
 }
 
 export const demoPanels = (t: WorkbenchTranslate): readonly WorkbenchPanelDefinition[] => [
-  { id: 'dshfiles-workbench.scratchpad', title: t('scratchpadTitle'), component: props => <Scratchpad {...props} t={t} /> },
-  { id: 'dshfiles-workbench.ticker', title: t('tickerTitle'), component: props => <Ticker {...props} t={t} /> },
+  { id: 'dshfiles-workbench.scratchpad', title: `Workbench: ${t('scratchpadTitle')}`, component: props => <Scratchpad {...props} t={t} /> },
+  { id: 'dshfiles-workbench.ticker', title: `Workbench: ${t('tickerTitle')}`, component: props => <Ticker {...props} t={t} /> },
 ]

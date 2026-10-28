@@ -62,6 +62,8 @@ bindings or HTTP headers.
 Resolved values are redacted from strings, errors, and plain objects passed to
 the native client's scoped Cordis logger.
 
+Open the reusable **MCP Servers: Servers** view from navigation or the Workbench chooser.
+
 ## OAuth sign-in
 
 `dsh-mcp-client@0.2.0-rc.2` accepts only static headers, so this bundle runs

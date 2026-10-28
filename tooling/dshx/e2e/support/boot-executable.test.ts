@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { startScratchProfile, type BootedProfile } from './boot.js'
+import { bootComposedPluginProfile, startScratchProfile, type BootedProfile } from './boot.js'
 import type { PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 
 const roots: string[] = []
@@ -12,6 +12,14 @@ afterEach(async () => {
 })
 
 describe('E2E installed core selection', () => {
+  it('rejects invalid stable seed keys before provisioning or launching a profile', async () => {
+    const request = { packageIds: ['@test/plugin'] as const, profileLabel: 'fixture' }
+    await expect(bootComposedPluginProfile({ ...request, seedKey: 'workspace-v1' })).rejects.toThrow('seedKey requires a deterministic seedHome')
+    await expect(bootComposedPluginProfile({ ...request, seedKey: '  ', seedHome: async () => undefined })).rejects.toThrow(
+      'seedKey requires a deterministic seedHome',
+    )
+  })
+
   it('pins the selected executable across fixture restart and revalidates composition when the executable changes', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dshx-e2e-executable-'))
     roots.push(root)

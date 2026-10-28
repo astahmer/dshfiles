@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "upstreamRepository": "astahmer/dshfiles",
+  "forkRepository": "neolectron/dshfiles",
+  "plugins": {
+    "credential-port": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Runtime ESM packaging accepted in https://github.com/astahmer/dshfiles/pull/3 (7e053e01). The synchronized shared implementation also includes expectedScope credential protections required by account management; preserve these rejection boundaries."
+    },
+    "secret-catalog": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Managed secret-process failure containment accepted in https://github.com/astahmer/dshfiles/pull/4 (04a99cf4); use the shared runner and regressions rather than a separate fork patch."
+    },
+    "annotations": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Upstream plugin adopted as shared source at 04d6c5ee. Installation into an existing writable profile remains an explicit user choice; synchronization does not deploy personal profiles."
+    },
+    "goal-tool": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Upstream native tool-goal replacement adopted at 04d6c5ee with its official provenance. Existing writable-profile activation remains separate from repository synchronization."
+    },
+    "loopback-access": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Portable authenticated LAN/localhost and Network access Settings accepted in https://github.com/astahmer/dshfiles/pull/10 (92d0f010). Preserve the shared implementation, telemetry, native lifecycle tests and license. Launcher locations and profile selection belong to machine-local configuration, not checked-in personal defaults."
+    },
+    "model-selection": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Native model-selection companion accepted with typed drafts in https://github.com/astahmer/dshfiles/pull/1 (9c772b67). The implementation is shared; no fork-local source delta or new profile activation."
+    },
+    "agent-preset": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Native agent-preset companion accepted with typed drafts in https://github.com/astahmer/dshfiles/pull/1 (9c772b67). The implementation is shared; no fork-local source delta or new profile activation."
+    },
+    "resource-packs": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Only the existing metadata/property-pack baseline is included in the explicitly authorized sanitized two-main synchronization. That baseline becomes shared source when this revision is published to both repositories; it is not the private CRM/Resources/Automation project. Newer Effect/store/editor/conversation-picker and Automation work remains on isolated private topics, excluded from public ancestry and requiring a new integration decision. Existing profile activation is not implied."
+    },
+    "ai-accounts": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "The user explicitly authorized full, sanitized source synchronization of both main branches. The shared publication includes safe setup/sign-in, subscription/CLI/reference choices, serialized state, canonical ordering, serving-account attribution, dashboard/model management, credential-home concurrency/sign-out protections and thread-local account handoff. PR #16 was withdrawn as a superseded snapshot, not merged; compare the synchronized source rather than interpreting the closed PR as missing functionality. Historical superseded drafts #9 and #12–15 remain closed. Personal account identities, homes, selections, credential references and live authentication/quota observations are excluded from shared defaults and publication evidence. A source synchronization is not a live-profile deployment or real-provider acceptance proof."
+    },
+    "thread-sidebar": {
+      "ownership": "shared",
+      "upstreamIntent": "accepted",
+      "reason": "Project-header and typed-draft lifecycle accepted in https://github.com/astahmer/dshfiles/pull/1 (9c772b67). Use the shared source, tests and screenshots. The existing saved-view implementation is identical; retain unrelated fork-only sidebar/account integration where present."
+    }
+  },
+  "forkOnlyPaths": [
+    "fork-policy.json",
+    "docs/fork-maintenance.md",
+    ".agents/skills/dsh-upstream-sync/",
+    ".agents/skills/dsh-upstream-pr/",
+    "scripts/fork-audit.mjs",
+    "scripts/fork-audit.test.mjs",
+    "scripts/dsh-launcher",
+    "scripts/supervise-dsh.mjs",
+    "scripts/supervise-dsh.test.mjs",
+    "scripts/supervise-dsh.UPSTREAM.md",
+    "scripts/prepare-manuel-source.mjs",
+    "scripts/prepare-manuel-source.test.mjs",
+    "scripts/verify-manuel-candidate.mjs"
+  ]
+}

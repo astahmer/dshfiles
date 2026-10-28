@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MainTabsTranslate } from './locales.js'
 import { StartPage, type StartSection } from './start-page.js'
@@ -11,7 +11,10 @@ const t: MainTabsTranslate = key => {
   return key
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 const makeSections = (picks: { readonly thread: () => void; readonly panel: () => void }): StartSection[] => [
   {
@@ -43,6 +46,58 @@ describe('StartPage', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(pickPanel).toHaveBeenCalledOnce()
     expect(pickThread).not.toHaveBeenCalled()
+  })
+
+  it('focuses only after its connected Dockview-style overlay is revealed and keeps later user focus', async () => {
+    const overlay = document.createElement('div')
+    overlay.style.visibility = 'hidden'
+    document.body.append(overlay)
+    const view = render(<StartPage sections={makeSections({ thread: vi.fn(), panel: vi.fn() })} t={t} />, { container: overlay })
+    const input = view.container.querySelector('input')
+    if (input === null) throw new Error('Start search is missing')
+    expect(document.activeElement).not.toBe(input)
+    overlay.style.visibility = ''
+    await waitFor(() => expect(document.activeElement).toBe(input))
+    const elsewhere = document.createElement('button')
+    document.body.append(elsewhere)
+    elsewhere.focus()
+    overlay.className = 'metadata-update'
+    await new Promise<void>(resolve => queueMicrotask(resolve))
+    expect(document.activeElement).toBe(elsewhere)
+    elsewhere.remove()
+  })
+
+  it('waits for detached renderer attachment and focuses again when a retained Start panel is revealed', async () => {
+    const overlay = document.createElement('div')
+    const view = render(<StartPage sections={makeSections({ thread: vi.fn(), panel: vi.fn() })} t={t} />, { container: overlay })
+    const input = view.container.querySelector('input')
+    document.body.append(overlay)
+    await waitFor(() => expect(document.activeElement).toBe(input))
+    overlay.style.visibility = 'hidden'
+    await new Promise<void>(resolve => queueMicrotask(resolve))
+    const elsewhere = document.createElement('button')
+    document.body.append(elsewhere)
+    elsewhere.focus()
+    overlay.style.visibility = ''
+    await waitFor(() => expect(document.activeElement).toBe(input))
+    elsewhere.remove()
+  })
+
+  it('disposes a pending reveal watcher when Start unmounts', async () => {
+    const overlay = document.createElement('div')
+    overlay.style.visibility = 'hidden'
+    document.body.append(overlay)
+    const view = render(<StartPage sections={makeSections({ thread: vi.fn(), panel: vi.fn() })} t={t} />, { container: overlay })
+    const input = view.container.querySelector('input')
+    if (input === null) throw new Error('Start search is missing')
+    const focus = vi.spyOn(input, 'focus')
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+    disconnect.mockClear()
+    view.unmount()
+    expect(disconnect).toHaveBeenCalledTimes(1)
+    overlay.style.visibility = ''
+    await new Promise<void>(resolve => queueMicrotask(resolve))
+    expect(focus).not.toHaveBeenCalled()
   })
 
   it('reports when the filter has no matches', () => {

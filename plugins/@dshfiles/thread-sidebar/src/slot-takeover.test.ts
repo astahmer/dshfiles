@@ -69,6 +69,15 @@ test('composition disables native declarations before the full sidebar can own t
   assert.equal(workspacesWinner?.options.priority, -1000)
 })
 
+test('fixed sidebar chrome keeps its native toolbar but leaves previews to the regular Workbench view', async () => {
+  const source = await readFile(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
+  assert.match(source, /renderSlot\('sidebar\.brand\.mark'/)
+  assert.match(source, /renderSlot\('sidebar\.brand\.name'/)
+  assert.match(source, /renderSlot\('sidebar\.settings'/)
+  assert.match(source, /renderSlot\('sidebar\.footer\.action'/)
+  assert.equal(/renderSlot\(\s*['"]sidebar\.footer\.above['"]/.test(source), false)
+})
+
 test('the seat above the foot exists only once this sidebar declares it', () => {
   const slots = new SlotCore()
   slots.register({ name: 'root', children: { sidebar: { kind: 'single', scope: 'root' } } }, childSlotOwner())

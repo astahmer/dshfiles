@@ -2,10 +2,207 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "disabled-account-preview",
+      "title": "Keep disabled accounts visible and toggle routing from the usage popover",
+      "summary": "Disabled saved accounts keep their measured quota percentage and reset time in muted grey, with a compact OFF label beneath the name, without increasing the preview row height. Clicking still opens the usage popover, where each account has an Enable account toggle using the same Switch component as Settings and sharing the existing saved-account operation. Explicit Hide is separate. Disabled accounts cannot be selected for thread routing or counted as the most critical enabled account. Missing measurements remain unavailable rather than invented; pending and failed saves stay visible without optimistic routing changes.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["enabled", "disabled", "saving", "failed", "explicitly-hidden"],
+      "failureModes": [
+        "Failed saves leave the committed toggle state unchanged and permit retry.",
+        "Missing account settings disable the toggle rather than saving an incomplete profile.",
+        "A disabled account remains clickable for management, not selectable for new thread routing."
+      ],
+      "externalDependencies": [],
+      "reach": ["seed tool-call-thread", "click button \"Command Code 1:*\"", "expect switch \"Enable Command Code 1\""],
+      "verification": [
+        { "kind": "gherkin", "id": "ai-accounts.disabled-account-preview", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.disabled-preview-visible",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "keeps disabled accounts visible and dimmed while explicitly hidden accounts stay hidden"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.disabled-quota-preserved",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "keeps disabled quota and reset data visible with a compact OFF label and muted meter"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.popover-availability-save",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "saves the requested availability using fresh account settings and updates every surface without closing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.popover-availability-failure",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "keeps failed changes visible, preserves committed state and permits a retry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.external-availability-dirty-editor",
+          "file": "plugins/@dshfiles/ai-accounts/src/use-accounts-panel-state.test.tsx",
+          "testName": "keeps an unrelated pending local edit without saving a stale enabled flag"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ]
+    },
+    {
+      "id": "thread-account-switch",
+      "title": "Use a sidebar account for this thread without reselecting its model",
+      "summary": "Right-click a sidebar account to preview a thread-only selection. Keep the exact model when offered, otherwise use the deployment default if offered or the target's preferred available model, shown explicitly. Preserve compatible reasoning effort, the active request and the global default. A durable provider preference takes precedence over distribution without changing global order; normal failure recovery remains available. Suggest optional compaction only from a measured context estimate, with cost/detail-loss/cache caveats; never compact or send a message automatically.",
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["preview", "same-model", "default-model", "preferred-model", "confirmed", "stale", "unavailable", "compaction-suggested"],
+      "failureModes": [
+        "A failed or cached-stale preview cannot be confirmed.",
+        "Changing threads discards the dialog; a stale model revision is rejected by the Host.",
+        "Account selection never wakes or resumes a stopped thread, changes global defaults, or silently summarizes history.",
+        "An old in-flight retry cannot overwrite a newer explicit choice; releasing its wait does not cancel the Agent.",
+        "Missing optional metering omits advice without inventing context size; a missing updated Session-controller API reports unavailable."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "rightclick button \"Command Code 1:*\"",
+        "click menuitem \"Use this account for this thread\"",
+        "expect dialog \"Use account for this thread\""
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "ai-accounts.thread-account-switch", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.thread-model-retained",
+          "file": "plugins/@dshfiles/ai-accounts/src/thread-account-model.test.ts",
+          "testName": "retains the exact advertised model before considering a default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.thread-default-model",
+          "file": "plugins/@dshfiles/ai-accounts/src/thread-account-model.test.ts",
+          "testName": "uses the configured deployment default when the destination offers it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.thread-preferred-model",
+          "file": "plugins/@dshfiles/ai-accounts/src/thread-account-model.test.ts",
+          "testName": "honestly distinguishes adapter/account preference from a configured default"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ]
+    },
+    {
+      "id": "quick-account-setup",
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        { "kind": "automatic", "source": "secret" },
+        {
+          "kind": "custom",
+          "span": "ai-accounts provider request",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-connection-verification.test.ts",
+          "testName": "records Claude connection verification through the provider helper without token or request content"
+        },
+        {
+          "kind": "custom",
+          "span": "codex login",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-login-process.test.ts",
+          "testName": "records a codex login span until process close without device output, homes or credentials"
+        },
+        {
+          "kind": "custom",
+          "span": "claude auth status",
+          "file": "plugins/@dshfiles/ai-accounts/src/claude-auth-status.test.ts",
+          "testName": "records a claude auth status span until the subprocess callback without configuration or output"
+        }
+      ],
+      "title": "Connect an account without leaving the chat",
+      "summary": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and model routes until verification. Claude subscriptions use official CLI configuration status, not remote token validation.",
+      "reach": ["click button \"Add AI account\"", "expect dialog \"Add account\""],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["choosing", "preparing", "connecting", "waiting-for-provider", "staging-key", "verifying", "cancelled", "expired", "error", "connected"],
+      "failureModes": [
+        "Old Hosts without provisional connection APIs fail closed and never fall back to eager account creation.",
+        "Cancellation, expiry and failed verification discard the provisional connection without adding an account; existing accounts are preserved.",
+        "Accepted verified commits cannot be rolled back; a native-key write followed by account-file failure may leave an unreferenced private key, not an account entry.",
+        "Provider metadata checks require fresh authenticated evidence, not key presence or displayable quota. Claude native CLI status is authenticated configuration, not remote validity.",
+        "Claude token checks use the official free token-count endpoint; actual setup-token endpoint permissions remain unverified and a denied probe is never bypassed.",
+        "Explicit CLI/reference choices remain pinned after settings edits; unsupported methods and unsafe Codex overlay paths are rejected before adoption.",
+        "Name edits are trimmed and validated, preserve staged keys and active login, and never publish a draft. Escape inside the name editor cancels only that edit; unsupported old Hosts cannot silently report a rename success."
+      ],
+      "externalDependencies": [
+        {
+          "id": "provider-approval",
+          "boundary": "Official Codex/Claude CLI authentication, GitHub device OAuth, read-only provider metadata verification and native DSH credential storage.",
+          "deterministicFake": "Inject subprocess/provider fixtures in unit tests; browser journeys do not start real sign-in."
+        }
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "ai-accounts.sidebar-add", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        { "kind": "gherkin", "id": "ai-accounts.login-methods", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        { "kind": "gherkin", "id": "ai-accounts.existing-login-sources", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.setup-lifecycle",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-setup.test.ts",
+          "testName": "does not enable or close a newer setup after a delayed old key write"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.setup-admission",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-setup-service.test.ts",
+          "testName": "reproduces and prevents the old eager-store publication on prepare/read/usage inputs"
+        }
+      ]
+    },
+    {
+      "id": "active-chat-account",
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        { "kind": "automatic", "source": "model-stream" }
+      ],
+      "title": "See which account serves the active chat",
+      "summary": "Sidebar meters highlight actual wire-account metadata for the foreground chat, following distribution and failover. Idle chats show the last successful account; unknown sources are never inferred from model selection.",
+      "reach": ["seed tool-call-thread", "expect group \"AI accounts usage*\""],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["unknown", "attempting", "succeeded", "failed", "last-successful"],
+      "failureModes": [
+        "Old Hosts and native/non-account routes show no false current-account highlight.",
+        "Side requests and delayed previous-chat results cannot overwrite foreground attribution."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "ai-accounts.active-chat-account", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        { "kind": "gherkin", "id": "ai-accounts.active-chat-switch", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.serving-account",
+          "file": "plugins/@dshfiles/ai-accounts/src/serving-account.test.ts",
+          "testName": "separates failed attempts from last successful, follows failover, and preserves only success across restart"
+        }
+      ]
+    },
+    {
       "id": "account-lifecycle",
       "title": "Manage provider account drafts",
-      "summary": "Add, edit, enable, and persist account profiles; confirm removals, keep canceled profiles, and retry failed removals.",
-      "reach": ["click button \"AI Accounts\"", "expect complementary \"Provider accounts\""],
+      "summary": "Edit and persist saved account settings; confirm removals, preserve an existing profile when removal is cancelled, and retry failed writes. New accounts use provisional setup and are saved only after connection succeeds.",
+      "reach": [
+        "click button \"AI Accounts: Accounts\"",
+        "expect searchbox \"Search accounts and known models\"",
+        "expect complementary \"Provider accounts\""
+      ],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
@@ -54,9 +251,43 @@
       ]
     },
     {
+      "id": "reference-dashboard",
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "account sign out",
+          "file": "plugins/@dshfiles/ai-accounts/src/account-session-service.test.ts",
+          "testName": "records account sign out through credential completion without account names, homes or credentials"
+        }
+      ],
+      "title": "Manage account Models, Settings and Usage",
+      "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics.",
+      "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\""],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["models", "settings", "usage", "inherited", "customized", "empty", "unavailable", "sign-out-confirmation"],
+      "failureModes": [
+        "Stored credentials never imply provider-verified token validity; unknown identity, checks and usage remain explicit.",
+        "Exact provider attribution is enforced before aggregation and confirmed in API responses; older Hosts cannot display unscoped analytics as account data.",
+        "Inherited account customizations are retained but paused; model-specific reasoning overrides win over supported account defaults when customization is active.",
+        "Sign-out requires explicit confirmation and fails closed for shared, global or externally owned credentials; profiles and model preferences remain saved."
+      ],
+      "externalDependencies": [
+        {
+          "id": "usage-ledger",
+          "boundary": "Optional Usage plugin exact-provider charts and request APIs.",
+          "deterministicFake": "Synthetic session records ingested through the real ledger; no provider traffic."
+        }
+      ],
+      "verification": [{ "kind": "gherkin", "id": "ai-accounts.dashboard-reference", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" }]
+    },
+    {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
       "summary": "Curate provider model lists and reasoning defaults, then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "reach": ["seed tool-call-thread", "click button \"AI Accounts: Accounts\"", "expect tab \"Models\"", "expect searchbox \"Search models\""],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
@@ -147,6 +378,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "ai-accounts.priority-sidebar-sync",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "ai-accounts.github-copilot",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts-copilot.feature"
         },
@@ -177,7 +413,7 @@
     {
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Render account quota windows, reset times, status indicators, and configurable footer or edge meters with hidden and ordered accounts. Each strip meter carries the account's picker tag (\"CA\", \"EM\"), names it when its limit is reached, shows name, every window and the next reset on hover, and keeps its last good value through a failed poll.",
+      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
       "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
       "surfaces": ["client", "host", "settings"],
       "configuration": [
@@ -244,7 +480,9 @@
       "failureModes": [
         "A quota provider failure is displayed without persisting a fake success.",
         "Missing or stale accounts do not crash the quota strip.",
-        "A failed or unreadable poll keeps each account's last good quota instead of dropping it from the strip."
+        "A transient failed poll retains the last good quota. Rejected or unavailable quota without a usable measurement keeps the account visible with a status, never a fabricated percentage.",
+        "The accounts page reports saved credentials separately from provider quota authorization; a local credential alone does not prove remote validity.",
+        "Signed-out cards offer Reauthenticate for that existing account, closing the popover before shared setup opens. Merely opening or cancelling it never starts provider login or replaces credentials."
       ],
       "externalDependencies": [
         {
@@ -261,6 +499,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "ai-accounts.unavailable-accounts",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "ai-accounts.usage-popover-resize",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
@@ -268,6 +511,18 @@
           "kind": "gherkin",
           "id": "ai-accounts.usage-window-layout",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.sidebar-settings-shortcut",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "closes the quota popover and opens AI Accounts without reconnecting"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.uniform-sidebar-card-surfaces",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "paints active and exhausted states on the same full-height button, not a shorter inner badge"
         },
         {
           "kind": "unit-test",
@@ -414,8 +669,8 @@
     {
       "id": "quota-forecast",
       "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
-      "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
-      "reach": ["click button \"Quota forecast\"", "expect tab \"Forecast\"", "click tab \"Hand-off\"", "expect text \"Work on\""],
+      "summary": "The AI Accounts: Quota forecast view projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
+      "reach": ["click button \"AI Accounts: Quota forecast\"", "expect tab \"Forecast\"", "click tab \"Hand-off\"", "expect text \"Work on\""],
       "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
         {

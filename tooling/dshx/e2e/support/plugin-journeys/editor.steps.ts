@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
@@ -80,7 +81,7 @@ When('{string} is opened with Go to file', async ({ page }: { page: Page }, file
 })
 
 When('the editor placement is set to {string} in the plugin settings', async ({ page }: { page: Page }, placement: string) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/editor', exact: true }).click()
   await page.getByRole('combobox', { name: 'Editor placement', exact: true }).selectOption({ label: placement })
   await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -140,14 +141,22 @@ Then('Go to file lists workspace sources but not dependency or version-control f
 
 Then('{string} opens in the {string} editor with its disk content', async ({ page }: { page: Page }, fileName: string, placement: string) => {
   await recordAssertion(page, `editor-opens-in-the-${placement.replaceAll(' ', '-')}`, async () => {
-    const workbenchEditor = page.getByRole('region', { name: 'Editor', exact: true })
+    const workbenchEditor = page.getByRole('region', { name: 'Editor: Files', exact: true })
     if (placement === 'workbench') {
-      await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible()
-      await expect(workbenchEditor.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true')
-      // The Editor's own tree is the file browser; the workbench offers no second Explorer panel.
-      await page.getByRole('button', { name: 'Add panel' }).click()
-      await expect(page.getByRole('menuitem', { name: 'Explorer', exact: true })).toHaveCount(0)
-      await page.keyboard.press('Escape')
+      const pane = page.locator('[data-workbench-region="main"]').first()
+      await expect(pane).toBeVisible()
+      await expect(workbenchEditor.getByRole('tab', { name: 'Editor: Files', exact: true })).toHaveAttribute('aria-selected', 'true')
+      // File browsing belongs to Editor; the shared chooser offers no duplicate Explorer.
+      await pane.getByRole('button', { name: 'New tab', exact: true }).first().click()
+      const chooser = pane.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
+      await expect(chooser).toBeVisible()
+      await expect(chooser.getByRole('button', { name: 'Explorer', exact: true })).toHaveCount(0)
+      await pane
+        .getByRole('tab', { name: 'New tab', exact: true })
+        .filter({ has: page.locator('[aria-label="Close New tab"]') })
+        .last()
+        .getByRole('button', { name: 'Close New tab', exact: true })
+        .click()
       return
     }
     await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread')

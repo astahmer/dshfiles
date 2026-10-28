@@ -3,6 +3,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Component, useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { MainTabsTranslate } from './locales.js'
+import { watchStartSearchFocus } from './start-search-focus.js'
 
 export interface StartSuggestion {
   readonly id: string
@@ -89,7 +90,7 @@ export const StartPage = (props: StartPageProps): ReactElement => {
   const [activeIndex, setActiveIndex] = useState(0)
 
   useEffect(() => {
-    input.current?.focus({ preventScroll: true })
+    if (input.current !== null) return watchStartSearchFocus(input.current)
   }, [])
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {

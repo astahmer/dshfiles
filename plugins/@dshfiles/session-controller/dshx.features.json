@@ -3,6 +3,82 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "live-model-catalog",
+      "title": "The model picker follows connected account changes",
+      "summary": "Session model catalogs share a bounded Host cache, invalidated immediately by adapter, settings and credential changes instead of retaining a pre-account snapshot.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["shared-snapshot", "input-invalidated", "registry-committed"],
+      "failureModes": ["A stale in-flight result cannot repopulate the cache after a later registry commit."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-controller.model-catalog-coherence",
+          "file": "plugins/@dshfiles/session-controller/tests/host/model-catalog-cache.test.ts",
+          "testName": "immediately advertises a newly registered account and its renamed route"
+        },
+        {
+          "kind": "gherkin",
+          "id": "session-controller.live-model-catalog",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        }
+      ],
+      "telemetry": [{ "kind": "automatic", "source": "api-dispatch" }]
+    },
+    {
+      "id": "thread-local-model",
+      "title": "Guarded thread-local model selection",
+      "summary": "Expose one supported Host/client/Agent contract for reading and changing local model intent without saving global defaults or enqueuing input. Validate the target, recheck the native selection revision and queued work at commit, and synchronously persist selection plus provider-preference annotation. Capture request intent at the native assembly boundary so stale automatic recovery cannot overwrite a newer choice. Ordinary model-picker behavior remains unchanged.",
+      "surfaces": ["host", "storage"],
+      "configuration": [],
+      "states": ["read", "selected", "stale", "queued-input", "archived", "subagent", "foreign-session"],
+      "failureModes": [
+        "Agents may access only their own thread; UI/Host callers must name a thread.",
+        "Archived and runtime-owned subagent threads are refused, including cold persisted subagents.",
+        "A stale revision or pending waking input refuses the write without changing selection or defaults.",
+        "Native model identifiers remain compatible with the installed runtime; unrelated plugin records cannot grant preference."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "session-controller.thread-local-model", "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature" },
+        {
+          "kind": "unit-test",
+          "id": "session-controller.thread-local-no-default",
+          "file": "plugins/@dshfiles/session-controller/tests/host/thread-model-commands.test.ts",
+          "testName": "thread-local selection commits adjacent durable intent without saving the global default or waking input"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-controller.thread-local-cas",
+          "file": "plugins/@dshfiles/session-controller/tests/host/thread-model-commands.test.ts",
+          "testName": "rechecks CAS after model resolution awaits rather than overwriting an intervening picker selection"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-controller.thread-local-native-model-ids",
+          "file": "plugins/@dshfiles/session-controller/tests/host/thread-model-policy.test.ts",
+          "testName": "does not reject valid native model identifiers merely because they exceed a handoff UI length"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-controller.thread-local-public-record",
+          "file": "plugins/@dshfiles/session-controller/tests/host/thread-model-policy.test.ts",
+          "testName": "grants preference only through the immediately adjacent public plugin record"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-controller.thread-catalog-freshness",
+          "file": "plugins/@dshfiles/session-controller/tests/host/model-catalog-build.test.ts",
+          "testName": "public LlmRuntime registration, same-route replacement, disposal and directory updates invalidate the bound catalog synchronously"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ]
+    },
+    {
       "id": "lean-session-follow",
       "title": "Send the browser only what a thread renders",
       "summary": "Opening and following a thread sends its events without provider replay state, which only the Host needs to continue a conversation.",

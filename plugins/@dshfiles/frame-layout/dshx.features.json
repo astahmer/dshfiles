@@ -5,23 +5,56 @@
     {
       "id": "panel-seats",
       "title": "Hand the frame's regions to plugin surfaces",
-      "summary": "The frame renders the native per-session right sidebar in its right column, or the global dock a plugin registered into the shell.dock seat and asked for through ctx.rightPanel, and it renders a full-width bottom row below the columns when a plugin opens it through ctx.frameBottom. Swapping a surface keeps the region, its size, resize handle and collapse behaviour, while each occupant reports its own presentation.",
+      "summary": "The owned stack always gives shell.main to Workbench tabs, without a user-selectable native layout. The frame supplies its authorized keyed-main renderer, recursion guard and an absent-occupant native fallback. shell.dock owns a fullheight right pane across both grid rows; collapsing it hides persistent mounted tabs and a separate native resource carrier, never reveals native chrome. Registered DockPaneActions serve the main Pane options Open right pane item (closed only), pane-local Close pane icons and original keyboard control; the centre never offers Close right pane. Workbench owns quiet group chrome and real split groups; the frame adds no toolbar. ctx.frameBottom opens only the left/centre bottom row, preserving right-pane geometry.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": ["native", "dock", "bottom-hidden", "bottom-open", "bottom-resized"],
+      "states": ["native", "main-workbench", "main-empty-seat-fallback", "dock", "bottom-hidden", "bottom-open", "bottom-resized"],
       "failureModes": [
         "A frame that offers no seat leaves ctx.rightPanel absent, so a dock plugin stays inert instead of failing.",
-        "The column keeps one owner at a time: taking it back restores the native surface."
+        "Closing the Workbench right pane must hide its mounted shell.dock tabs and native resource carrier, not expose a second native surface or accept stale native geometry reports.",
+        "An empty shell.main seat falls back to the selected native main panel.",
+        "The delegated keyed renderer returns null for dshfiles-workbench rather than recursively mounting the workbench inside itself.",
+        "A stock frame leaves ctx.mainSurface absent; consumers must check the optional face."
       ],
       "externalDependencies": [
         {
           "id": "@deepseek-ai/dsh-client-ui-sidebar-right",
-          "boundary": "The native right sidebar is the column's default occupant; it reports its own presentation through ctx.layout.openRightbar and closeRightbar, exactly as the dock does.",
-          "deterministicFake": "The seat's store and mode action are exercised directly in src/right-panel.test.ts; the scratch journey swaps the surface in the browser."
+          "boundary": "The genuine native sidebar remains a hidden Session/resource carrier under Workbench. It reports presentation through ctx.layout only in absent-Workbench compatibility deployments; Workbench alone reports visible right-pane geometry.",
+          "deterministicFake": "The seat's store, internal compatibility tokens and action registration are exercised directly in src/right-panel.test.ts; scratch journeys exercise the real Workbench right pane."
         }
       ],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.main-surface-mode",
+          "file": "plugins/@dshfiles/frame-layout/src/main-surface.test.ts",
+          "testName": "defaults to native and observes reversible mode changes only"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.main-surface-native",
+          "file": "plugins/@dshfiles/frame-layout/src/main-surface.test.ts",
+          "testName": "does not mount the shell seat in native mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.main-surface-fallback",
+          "file": "plugins/@dshfiles/frame-layout/src/main-surface.test.ts",
+          "testName": "passes the native fallback and authorized renderer to the shell occupant"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.main-surface-occupied",
+          "file": "plugins/@dshfiles/frame-layout/src/main-surface.test.ts",
+          "testName": "uses the occupied shell surface instead of rendering the native fallback"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.main-surface-recursion",
+          "file": "plugins/@dshfiles/frame-layout/src/main-surface.test.ts",
+          "testName": "delegates keyed main rendering but stops the legacy workbench recursion boundary"
+        },
         {
           "kind": "gherkin",
           "id": "frame-layout.global-dock",
@@ -67,7 +100,7 @@
     {
       "id": "panel-width-persistence",
       "title": "Persist the frame's dragged panel widths",
-      "summary": "The layout bundle keeps the dragged sidebar and right-panel widths in the browser, so a reload reopens the sidebar at its last open width and the right panel keeps its px preference while still booting hidden.",
+      "summary": "The layout bundle keeps dragged sidebar and right-panel widths in the browser, so a reload restores the sidebar's last open width and the right panel's px preference. Workbench separately owns visibility of its persistent fullheight right-pane tabs; frame geometry does not select native chrome.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "storage"],
       "configuration": [],
@@ -112,7 +145,7 @@
     {
       "id": "collapsed-state-persistence",
       "title": "Persist the collapsed sidebar",
-      "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default.",
+      "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default. The owned frameSidebar.show presentation port reveals it idempotently from live frame state, so repeated Reset layout calls cannot toggle it closed again.",
       "reach": ["expect button \"New session\""],
       "surfaces": ["client", "storage"],
       "configuration": [],
@@ -127,6 +160,18 @@
           "kind": "gherkin",
           "id": "frame-layout.collapsed-state-persistence",
           "featureFile": "tooling/dshx/e2e/features/frame-layout.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.sidebar-idempotent-show",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "shows a collapsed wide sidebar repeatedly without changing width preferences"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.sidebar-narrow-show",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "shows an auto-collapsed narrow sidebar repeatedly and preserves its wide preference"
         },
         {
           "kind": "unit-test",

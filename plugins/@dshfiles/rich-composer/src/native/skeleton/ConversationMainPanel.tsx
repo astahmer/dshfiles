@@ -11,7 +11,7 @@ const CONTENT_SLOTS = { widthControls: ConversationWidthControls }
  * @returns the unchanged root, Header, content, and width-control subtree.
  */
 export function ConversationMainPanel(props: ConversationSlotProps) {
-  const { sessionId, useSession, useSessions, useConversation, renderSlot, renderFactorySlot } = props
+  const { sessionId, useSession, useSessions, useConversation, renderFactorySlot } = props
   const session = useSession(s => s)
   const conversation = useConversation(s => s)
   const shellPhase = session === undefined || conversation === undefined
@@ -44,7 +44,7 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
 
   return (
     <div className={css.root} data-phase={phase}>
-      {renderSlot('conversation.header', {})}
+      {renderFactorySlot('dshfiles.workbench.conversation-header', {})}
       {renderFactorySlot('conversation.content', {
         variant: 'main',
         phase,

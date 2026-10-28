@@ -242,8 +242,8 @@ export const DestinationBar = (props: {
   }, [arrive, isolateByDefault, newThreadId, newThreadSessionId, ownsThreadWorkspace, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return
-    resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId }))
-  }, [destination.data, newThreadId, resolved, workspaceId])
+    resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId, defaultBookmark: settings?.bookmark }))
+  }, [destination.data, newThreadId, resolved, settings?.bookmark, workspaceId])
 
   const current = destination.data ?? (toggle.busy ? lastDestination.current : undefined)
   const rootSelectionHandledFor = useRef<string | null>(null)
@@ -258,6 +258,8 @@ export const DestinationBar = (props: {
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const isJj = current?.vcs === 'jj'
   const isolated = toggle.pending?.isolate ?? toggle.deferredIsolation ?? current?.isolated === true
+  const defaultBookmark = settings?.bookmark
+  const bookmark = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated, defaultBookmark })
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
@@ -298,7 +300,7 @@ export const DestinationBar = (props: {
             <PopoverTrigger asChild>
               <Button variant="ghost" className={chip} disabled={toggle.busy} title={isolated ? undefined : t('bookmarkIsolates')}>
                 <GitBranchIcon className="dshx:size-3.5" />
-                {current?.bookmark ?? '—'}
+                {bookmark ?? '—'}
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="dshx:w-72 dshx:p-0">
@@ -316,7 +318,7 @@ export const DestinationBar = (props: {
                       }}
                     >
                       <span className="dshx:flex-1 dshx:truncate">{name}</span>
-                      {name === current?.bookmark ? <CheckIcon className="dshx:size-3.5" /> : null}
+                      {name === bookmark ? <CheckIcon className="dshx:size-3.5" /> : null}
                     </CommandItem>
                   ))}
                 </CommandList>
@@ -329,11 +331,8 @@ export const DestinationBar = (props: {
               disabled={toggle.busy}
               onCheckedChange={checked => {
                 const isolate = checked === true
-                if (current === undefined || current.bookmark === null) {
-                  move({ isolate })
-                  return
-                }
-                move({ isolate, base: current.bookmark })
+                const base = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated: isolate, defaultBookmark })
+                move(base === null ? { isolate } : { isolate, base })
               }}
             />
             {t('workspace')}

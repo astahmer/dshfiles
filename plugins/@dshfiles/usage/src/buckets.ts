@@ -13,6 +13,15 @@ export class UsageBucketsModel {
     return starts
   }
 
+  /** Identity is the actual instant, never localized text (DST can repeat an hour). */
+  static bucketKey(start: number): string {
+    return String(start)
+  }
+
+  static bucketKeyLabel(key: string, bucket: ChartBucket, spansDays: boolean): string {
+    return UsageBucketsModel.bucketLabel(Number(key), bucket, spansDays)
+  }
+
   static bucketLabel(start: number, bucket: ChartBucket, spansDays: boolean): string {
     const date = new Date(start)
     if (bucket === 'day') return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })

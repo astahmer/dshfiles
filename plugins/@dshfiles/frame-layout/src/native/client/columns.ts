@@ -1,7 +1,7 @@
 /**
  * Normal column geometry: the right column shrinks, then loses its track,
- * before the center drops below its minimum. The sidebar never concedes here;
- * AppFrame supplies its effective preference after responsive collapse.
+ * before the center drops below its minimum. A revealed sidebar uses at most
+ * half the viewport so recovery never hides the centre; saved widths stay intact.
  */
 
 /** Resolved widths for one frame. */
@@ -18,7 +18,7 @@ export const SIDEBAR_DEFAULT = 280
 /** Closed-sidebar rail: a 24px icon column between 16px horizontal paddings. */
 export const SIDEBAR_COLLAPSED = 56
 /** Viewport width below which the sidebar auto-collapses to the rail (deepsuite
- * LG breakpoint); a manual toggle below it re-expands over the squeezed center
+ * LG breakpoint); a manual toggle below it re-expands beside the squeezed center
  * (stores.ts narrowExpanded). */
 export const SIDEBAR_AUTO_COLLAPSE = 1024
 /** Right column drag clamp floor. */
@@ -52,11 +52,12 @@ export function clampWidth(px: number, min: number, max: number): number {
  * @param rightbar - requested right panel width in px (0 = no track).
  * @param collapsedWidth - track width of the closed sidebar; the default keeps
  *   the icon rail, 0 hides the column entirely (macOS desktop).
- * @returns actual widths after shrinking or removing the right track; only
- *   without that track may the center fall below its minimum, down to zero.
+ * @returns actual widths after shrinking or removing the right track and
+ *   capping the sidebar to half the viewport; preferences are never rewritten.
  */
 export function computeColumns(viewport: number, sidebar: number, rightbar: number, collapsedWidth = SIDEBAR_COLLAPSED): Columns {
-  const s = sidebar === 0 ? collapsedWidth : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
+  const preferredSidebar = sidebar === 0 ? collapsedWidth : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
+  const s = Math.min(preferredSidebar, Math.max(0, viewport / 2))
   const available = viewport - s - CENTER_MIN
   const r = rightbar === 0 || available < RIGHTBAR_MIN
     ? 0

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -6,6 +7,7 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder } from '../threads.js'
+import { materializeNonblankThread } from '../thread-composer.js'
 
 const createdSessionResponseSchema = z.object({
   result: z.object({
@@ -50,12 +52,12 @@ const threadBoard = (page: Page) => page.getByRole('region', { name: 'Thread boa
 /** The board is a page of its own, opened from the sidebar's panel list; a reload comes back to the thread view. */
 const openThreadBoard = async (page: Page): Promise<void> => {
   if (await threadBoard(page).isVisible()) return
-  await page.getByRole('button', { name: 'Thread board', exact: true }).click()
+  await globalPanelLink(page, 'Thread Sidebar: Board').click()
   await expect(threadBoard(page)).toBeVisible()
 }
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
 const customizeSidebar = (page: Page) => page.getByRole('region', { name: 'Customize sidebar' })
-const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Sidebar settings' })
+const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Thread list settings' })
 const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
 const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const currentThreadId = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
@@ -142,7 +144,7 @@ const startBlankThread = async (page: Page): Promise<string> => {
 }
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
@@ -309,7 +311,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await expect(undoEnabled).toBeChecked()
   await undoDuration.fill('2')
   await expect(undoDuration).toHaveValue('2')
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
 
   await startBlankThread(page)
   const timedPrompt = 'thread sidebar archive duration e2e'
@@ -327,7 +329,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await openSidebarSettings(page)
   await undoEnabled.uncheck()
   await expect(undoEnabled).not.toBeChecked()
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
 
   await startBlankThread(page)
   const disabledPrompt = 'thread sidebar archive disabled e2e'
@@ -569,7 +571,7 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     await expect(separateRemoteThreads).not.toBeChecked()
     await separateRemoteThreads.check()
     await expect.poll(headerNames).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)', 'Remote(0)'])
-    await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+    await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
   })
   await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
     await dragHeaderToTop(2)
@@ -585,7 +587,7 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     const separateRemoteThreads = sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' })
     await expect(separateRemoteThreads).toBeChecked()
     await separateRemoteThreads.uncheck()
-    await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+    await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
     await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
   })
   await finishJourneyAssertions(page)
@@ -600,7 +602,7 @@ const selectSettledArchiveDelay = async (page: Page, value: string): Promise<voi
   await delayGroup.getByRole('button').click()
   await page.getByRole('menuitemradio', { name: value, exact: true }).click()
   await expect(delayGroup.getByRole('button', { name: value, exact: true })).toBeVisible()
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
 }
 
 When('a thread is settled with a one-week settled-archive delay', async ({ page }: { page: Page }) => {
@@ -649,7 +651,7 @@ When('separate remote threads are enabled and the thread board page is opened', 
   await showThreadsByStatus(page)
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show remote threads in a separate group' }).check()
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
   await expect(threadSidebar(page).locator('[data-remote-threads]')).toHaveCount(1)
   await openThreadBoard(page)
 })
@@ -695,13 +697,8 @@ Then('the board shows only columns, grouped and filtered independently from the 
 
 let parkedThreadId: string | null = null
 
-When('a nonblank Host thread is parked from its context menu', async ({ page }: { page: Page }) => {
-  if (currentThreadId(page) === null) await startBlankThread(page)
-  const composer = page.getByRole('textbox').first()
-  await composer.fill('thread sidebar park e2e target')
-  await composer.press('Enter')
-  const threadId = currentThreadId(page)
-  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+When('a nonblank Host thread is parked from its context menu', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }) => {
+  const threadId = await materializeNonblankThread(page, 'thread sidebar park e2e target', $testInfo)
   parkedThreadId = threadId
   await showThreadsByStatus(page)
   const targetRow = threadRow(page, threadId)
@@ -734,6 +731,7 @@ Then('the Host thread stays parked after reload without an attention error', asy
 
 Then('dragging its row onto the Active header unparks it and survives a reload', async ({ page }: { page: Page }) => {
   if (parkedThreadId === null) throw new Error('No thread was parked.')
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot this scenario's mutable parked-thread ID across both assertion closures and reload awaits.
   const threadId = parkedThreadId
   const targetRow = threadRow(page, threadId)
   const activeHeader = sectionOfSidebar(page, 'active').locator('[data-thread-section-header]')
@@ -776,13 +774,8 @@ When('a nonblank Host thread is pinned from its session header', async ({ page }
   await expect(page.getByRole('alert').filter({ hasText: 'could not update' })).toHaveCount(0)
 })
 
-When('a nonblank Host thread is pinned from its sidebar row', async ({ page }: { page: Page }) => {
-  if (currentThreadId(page) === null) await startBlankThread(page)
-  const composer = page.getByRole('textbox').first()
-  await composer.fill('thread sidebar row pin e2e target')
-  await composer.press('Enter')
-  const threadId = currentThreadId(page)
-  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+When('a nonblank Host thread is pinned from its sidebar row', async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }) => {
+  const threadId = await materializeNonblankThread(page, 'thread sidebar row pin e2e target', $testInfo)
   pinnedThreadId = threadId
   await showThreadsByStatus(page)
   const targetRow = threadRow(page, threadId)
@@ -1215,7 +1208,7 @@ When('auto-settle is enabled for one thread while global auto-settle stays off',
   await expect(targetRow).toHaveCount(1)
   await openSidebarSettings(page)
   await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
   const enableForThread = page.getByRole('menuitemradio', { name: 'Settle after idle threshold', exact: true })
@@ -1232,7 +1225,7 @@ Then('the per-thread override survives reload without changing the global settin
   await recordAssertion(page, 'thread-sidebar-global-auto-settle-remains-off', async () => {
     await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
   })
-  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-per-thread-auto-settle-survives-reload', async () => {
@@ -1241,7 +1234,7 @@ Then('the per-thread override survives reload without changing the global settin
   await finishJourneyAssertions(page)
 })
 
-When('an attention status color is changed in Sidebar settings', async ({ page }: { page: Page }) => {
+When('an attention status color is changed in Thread list settings', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Warning', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Danger', exact: true }).click()
@@ -1371,7 +1364,7 @@ Then('the notification settings survive a browser reload', async ({ page }: { pa
 })
 
 When('the header is expanded, reordered, and one destination is hidden', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
   await customize.getByRole('radio', { name: 'Expanded labels', exact: true }).click()
@@ -1384,7 +1377,7 @@ When('the header is expanded, reordered, and one destination is hidden', async (
   await customize.getByRole('button', { name: 'Done', exact: true }).click()
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
-  await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
 })
 
 Then('the custom layout survives a browser reload', async ({ page }: { page: Page }) => {
@@ -1495,7 +1488,7 @@ When('two nonblank Host threads are listed in the sidebar', async ({ page }: { p
 
 const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
   const sidebar = threadSidebar(page)
-  await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await sidebar.getByRole('button', { name: 'Thread list settings', exact: true }).click()
   await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
   const viewManager = page.getByRole('dialog')
   // The non-All built-in views all become plain lists, so every tab in the row holds the same two rows.
@@ -1509,7 +1502,7 @@ const prepareKeyboardNavigationViews = async (page: Page): Promise<void> => {
   await viewManager.getByRole('checkbox', { name: 'All threads', exact: true }).check()
   await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
   await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
-  await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await sidebar.getByRole('button', { name: 'Thread list settings', exact: true }).click()
 }
 
 Then('arrow keys move focus and Shift+ArrowDown selects a range of threads', async ({ page }: { page: Page }) => {
@@ -1810,7 +1803,7 @@ Then('the side panel hosts that thread again', async ({ page }: { page: Page }) 
 })
 
 When('the side-panel hover action is switched off in Customize sidebar', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
   await customize.getByRole('checkbox', { name: 'Open in side panel', exact: true }).click()
@@ -1832,7 +1825,7 @@ Then('the thread row keeps the context-menu action but drops the hover one', asy
 })
 
 When('the settle hover action is moved to the front in Customize sidebar', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).first().click()
   const customize = customizeSidebar(page)
   await expect(customize).toBeVisible()
   const moveUp = customize.getByRole('button', { name: 'Move up: Settle', exact: true })

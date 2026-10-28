@@ -1,8 +1,14 @@
 # @dshfiles/rich-composer
 
+![The original header and child-view navigation hosted inside fixed Workbench conversations](docs/screenshots/conversation-header.png)
+
 ![Paste session mentions as reference chips](docs/screenshots/paste-session-mentions.png)
 
 Owned fork of DSH's native Conversation client plugin. It preserves the full native shell, services, Slots and composer, while recognizing canonical session-reference wire text on paste and inserting it as a structured reference chip. Plain text is preferred; when only HTML is available, session-link anchors are converted to canonical mention text and other markup is reduced to safe text.
+
+## Conversation header in Workbench
+
+The original Header/SessionHeader and every contributed action render inside each fixed conversation's existing SessionProvider through the public Workbench conversation-header Factory contract. Rich Composer is its sole implementation and the sole declarer of the native header child. Native MainPanel calls the same Factory; Workbench no longer forces the Chat view, so the native per-session view store drives the existing body without replacing its editor. The Workbench-only host-corner clearance keeps tab-row recovery off the toolbar; native callers retain the original bare header. [Ownership and browser proof](../workbench/docs/conversation-header.md).
 
 ## Upstream and license
 
@@ -20,18 +26,20 @@ Every other vendored file is byte-identical to the pinned revision, so an upstre
 
 | File                                               | Change                                                                                                                                                                                                      |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/contract/slots.ts`                     | `ComposerBarInjected` gains `insertReference`; `ConversationSessionHeaderInjected` gains `rename`                                                                                                           |
-| `src/native/apply.ts`                              | injects those actions; workspace switch hands the draft over through `transferComposerDraft` without ever blocking navigation; renames through `remote.session.rename`                                      |
+| `src/native/contract/slots.ts`                     | `ComposerBarInjected` gains `insertReference`; `ConversationSessionHeaderInjected` gains `rename`; native MainPanel uses the public header Factory instead of claiming a header child                                                                                                           |
+| `src/native/apply.ts`                              | injects those actions; workspace switch hands the draft over through `transferComposerDraft` without ever blocking navigation; renames through `remote.session.rename`; registers Workbench view sources, the owned view-only wrapper and the sole reusable header Factory; the main entry no longer claims the header child                                      |
 | `src/native/locales.ts`                            | `workspace.draftTransferRefused` notice when a handoff keeps the draft in the previous thread; title-edit labels and failure copy                                                                           |
 | `src/native/skeleton/InputBar.tsx`                 | paste converts canonical mentions into reference chips, falling back to text                                                                                                                                |
 | `src/native/input/editor/keymap.ts`                | reads `text/html` when the clipboard has no plain text                                                                                                                                                      |
 | `src/native/input/editor/view-binding.ts`          | routes the paste handler through the bar's live handler                                                                                                                                                     |
+| `src/native/input/editor/ComposerContentEditable.tsx` | DOM-root leases preserve the shell's editor/draft across legacy duplicate retirement; cleanup returns attachment and the editable gate to the last connected host, never detaching a newer owner. |
 | `src/native/input/editor/runtime.ts`               | logs the Lexical error stack before rethrowing; reuses the content half of the projection while no commit dirtied the document (selection-only commits skip the walk)                                       |
 | `src/native/input/editor/projection.ts`            | splits `$projectComposer` into a content half (`$composerProjectionContent`) and a selection half (`$composerSelection`) so the reusable half can be recomputed independently                               |
 | `src/native/user-text/session-reference-rule.ts`   | imports and augments `../index.ts` instead of the package's own `/client` self-reference                                                                                                                    |
 | `src/native/conversation/location-index.ts`        | `import type` instead of inline `type` specifiers, so the bundle no longer requires the stock Session client module, which the browser does not serve once `@dshfiles/session-controller` replaces that row |
 | `src/native/input/hub.ts`                          | publishes semantic draft changes to `sessionDrafts` before first-edit warmup; only content creates a local New chat on the Host, using existing composer text persistence                                   |
 | `src/session-draft-tracking.ts`                    | new: observes text/attachment changes, ignores caret-only updates, and forwards restored content to the draft identity owner                                                                                |
+| `src/native/skeleton/ConversationMainPanel.tsx` | Calls the reusable owned header Factory; its original authorized header child is declared once by that Factory rather than by this main entry. |
 | `src/native/skeleton/ConversationContent.tsx`      | reads the local draft's project before Host workspace attachment, so a blank new chat has an enabled composer and the correct project chip                                                                  |
 | `src/native/skeleton/ConversationSession.tsx`      | the current Session title is a click-to-edit input; Enter or blur renames through the injected `rename`, Escape cancels                                                                                     |
 | `src/native/skeleton/ConversationRoot.module.css`  | styles for that in-place title editor and its failure message                                                                                                                                               |
@@ -45,6 +53,12 @@ Every other vendored file is byte-identical to the pinned revision, so an upstre
 `src/native` is excluded from Oxlint, Oxfmt and ast-grep (see [native plugin overrides](../../../docs/native-plugin-overrides.md)); the files above that live outside it are linted normally.
 
 The native `conversation.composer.bar` slot requires package-private injection state (`ComposerBarInjected`) to provide its keyboard, uploads, notices, hooks and session input actions. That callback is created inside the native plugin and is not exposed as a reusable public service. A separate slot occupant cannot safely rebuild those props, so this fork replaces the whole `ui-conversation` Loader row while retaining its complete shell and service implementation. The stock row is disabled in this package's patch; other DSH core packages remain unchanged. Its composer Slot still registers at priority 0, so the higher-priority remote-composer takeover at -100 keeps its existing behavior.
+
+## Workbench Conversation views
+
+In Workbench mode, **Add panel** offers each registered non-chat view for known threads (for example, **Trajectory — thread title**). Each mounted panel retains its own explicit Session and releases it when closed. Renaming only changes the label, not the component identity. A failed acquisition shows an error rather than borrowing the active thread.
+
+The root assembly declares only its own session-scoped child. That child calls the public `conversation.content` Factory with a fixed-view local component. The original `conversation.session` still renders `conversation.view` with its genuine store, hooks and owner props. An owned context wrapper renders just the Factory's Views in these panels, with no hidden composer or bootstrap conversation. Sources exist before any conversation mounts, so restored layouts do not depend on a previously captured renderer. The normal native Conversation Factory is unchanged outside this explicit wrapper context.
 
 ## Paste behavior
 

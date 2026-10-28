@@ -7,7 +7,7 @@
       "title": "Manage persistent agents",
       "summary": "Create, edit, enable and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
       "reach": [
-        "click button \"Agents\"",
+        "click button \"Agents: Directory\"",
         "expect textbox \"Name\"",
         "click text \"@dsh\"",
         "expect combobox \"Thread workspace\"",
@@ -244,11 +244,11 @@
         }
       ],
       "reach": [
-        "click button \"Agents\"",
+        "click button \"Agents: Directory\"",
         "fill textbox \"Name\" \"Luna\"",
         "click button \"Save\"",
         "expect text \"@luna\"",
-        "click button \"Backlog\"",
+        "click button \"Backlog: Items\"",
         "fill textbox \"Capture\" \"Preview the agent mention\"",
         "press Enter",
         "click text \"Preview the agent mention\"",

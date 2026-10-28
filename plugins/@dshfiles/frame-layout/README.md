@@ -13,11 +13,21 @@ DSH's three-column AppFrame, forked so the frame's dragged panel widths and coll
   reload reopens the sidebar at its **last open width and last state** and keeps the right panel's px preference.
 - **Collapse is remembered**: closing the sidebar boots back closed, and reopening restores the last open width instead of
   the 280px contract default. A narrow frame (<1024px) keeps its own responsive auto-collapse rather than restoring a stored
-  wide-frame override. The right panel still boots hidden, and stores only its width.
+  wide-frame override. The frame stores the right panel's width; Workbench owns whether its persistent right-pane tabs are shown.
+- **Recovery reveal**: the owned `ctx.frameSidebar.show()` presentation port opens the left sidebar idempotently from live frame state. Repeated synchronous Reset layout calls cannot toggle it closed again; remembered widths and the prior wide-frame preference survive narrow expansion. The resolved sidebar track takes at most half the frame, so reopening a remembered 420px sidebar on a 360px frame leaves both left and centre at 180px instead of hiding the conversation. The right track still concedes first, and wider frames restore the saved width. This does not add a method to native `ILayout`.
 - **Storage failure degrades to upstream behavior**: a blocked or full store (private mode, quota) leaves the geometry
   in-memory, exactly as the native package.
-- **Right-column seat**: the column renders the native per-thread right sidebar, or the global dock a plugin registers into
-  `shell.dock` and asks for through `ctx.rightPanel.setMode('dock')` — see [the right-column seat](#the-right-column-seat).
+- **Left-content seat**: the public `shell.left` contract is declared/rendered by the owned thread sidebar, not by AppFrame.
+  Its single root occupant receives `{ collapsed: boolean }`; only the flexible middle is delegated. The sidebar retains
+  fixed brand/history/customize and account/settings/footer chrome, plus the native navigation/thread fallback. Keep the
+  docking occupant mounted while collapsed so another region never loses its registered destination.
+- **Main-surface seat**: `shell.main` hosts Workbench with the frame-authorized keyed-main renderer. The owned stack always
+  uses Workbench tabs; there is no native-layout opt-out. `ctx.mainSurface` reports ownership for cooperating packages.
+  Native rendering and the main-tabs portal anchor remain compatibility paths for deployments without Workbench or an empty seat.
+- **Right-column seat**: Workbench owns the visible right pane through `shell.dock`, with shared real open/close/toggle
+  actions registered through `ctx.rightPanel.registerDock`. The main group's **Pane options** offers **Open right pane** only while closed; **Close pane** sits at the right pane's own right edge, not in the centre. The right region spans the full frame height; opening the
+  bottom row affects only left and centre. Without Workbench, the native per-thread sidebar remains a compatibility
+  fallback — not a selectable Workbench surface. See [the right-column seat](#the-right-column-seat).
 
 ## Port
 
@@ -44,14 +54,16 @@ whole delta is:
 
 | File                                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/client/index.ts`            | the `apply` context type comes from `@dshfiles/dshx/client` (`ClientContext`); the Host `Context.sessions` augmentation is in scope in this program, so the dshx client-program context is the one the entry contract hands over. Also restores the stored geometry on the freshly created instance, declares the `shell.dock` child slot, and provides `ctx.rightPanel` and `ctx.frameBottom`, disposing them on teardown |
-| `src/native/client/stores.ts`           | `layoutInfo.sidebarLastOpen` remembers the last non-zero width; `setSidebar` writes it and `toggleSidebar` reopens at it instead of `SIDEBAR_DEFAULT`, so a remembered collapse can reopen where the user left it. `layoutInfo.rightPanelMode` plus its `setMode` action record which surface fills the right column                                                                                                       |
-| `src/native/client/AppFrame.tsx`        | renders `rightbar` or the `shell.dock` seat in the right column according to `layoutInfo.rightPanelMode`, passing both the same resolved geometry. Upstream always renders the `shell.bottom` row at its content height; here the row renders only while `layoutInfo.bottomShown`, at the stored, clamped height, with a vertical drag handle                                                                              |
-| `src/native/client/AppFrame.module.css` | `.bottomRow` clips its occupant and draws a top border; the bottom resize handle (`.handle[data-side='bottom']`) rides `--dsh-bottom-height` against the whole frame instead of the columns' grid area                                                                                                                                                                                                                     |
-| `src/native/client/columns.ts`          | `BOTTOM_MIN`, `BOTTOM_DEFAULT` and `BOTTOM_MAX_RATIO` for the bottom row's height clamp                                                                                                                                                                                                                                                                                                                                    |
+| `src/native/client/index.ts`            | the `apply` context type comes from `@dshfiles/dshx/client` (`ClientContext`); the Host `Context.sessions` augmentation is in scope in this program, so the dshx client-program context is the one the entry contract hands over. Also restores the stored geometry on the freshly created instance, declares the `shell.dock` and `shell.main` child slots, and provides `ctx.rightPanel` with its frame-lifetime dock action registry, observable `ctx.mainSurface` and `ctx.frameBottom`, disposing them on teardown |
+| `src/native/client/stores.ts`           | `layoutInfo.sidebarLastOpen` remembers the last non-zero width; `setSidebar` writes it and `toggleSidebar` reopens at it instead of `SIDEBAR_DEFAULT`, so a remembered collapse can reopen where the user left it. `layoutInfo.rightPanelMode` plus its `setMode` action retain internal right-column compatibility state; `mainSurfaceMode` and `setMainSurfaceMode` retain centre-ownership compatibility state. Workbench claims the centre unconditionally in the owned stack; neither mode is a user-selectable layout preference                                                                                                       |
+| `src/native/client/AppFrame.tsx`        | keeps a stable main-tabs centre anchor around native `main` or `shell.main`, delegates guarded keyed-main rendering and supplies the native empty-seat fallback. Keeps `shell.dock` mounted throughout Workbench mode, passing resolved geometry plus `shown`; its carrier hides while closed. Keeps the authorized native `rightbar` resource carrier mounted but hidden throughout Workbench mode, even while the dock is closed. Upstream always renders the `shell.bottom` row at its content height; here the row renders only while `layoutInfo.bottomShown`, at the stored, clamped height, with a vertical drag handle                                                                              |
+| `src/native/client/AppFrame.module.css` | explicit grid cells keep the right column and its resize handle full-height across both rows; bottom content and its resize handle occupy only columns 1–2. `.bottomRow` clips its occupant and draws a top border                                                                                                                                                                                                                     |
+| `src/native/client/columns.ts`          | `BOTTOM_MIN`, `BOTTOM_DEFAULT` and `BOTTOM_MAX_RATIO` for the bottom row's height clamp; resolved sidebar width capped to half the frame so narrow recovery keeps the centre reachable without changing saved preferences                                                                                                                                                                                                                                                                                                                                    |
 | `src/frame-widths.ts`                   | new: the browser-local geometry record (schema, read, write) and the store restore/write-back helpers                                                                                                                                                                                                                                                                                                                      |
 | `src/panel-retention.ts`                | new: keeps the active `main` panel selected for `PANEL_REREGISTER_GRACE_MS` after its entry disappears, so a plugin hot reload (which unregisters the entry before the rebuilt bundle registers it again) no longer throws the user back to the thread; `index.ts` routes upstream's `retainMainPanels` through it |
-| `src/regions.ts`                        | new: the panel seat contracts — `RightPanelSeat` and `FrameBottomSeat`, the `ctx.rightPanel` and `ctx.frameBottom` augmentations a plugin calls, and the `shell.dock` slot declaration a dock registers into                                                                                                                                                                                                               |
+| `src/main-surface.ts`                   | new: adapts the frame store to the observable main-surface seat; delegates frame-authorized keyed-main rendering with a legacy-workbench recursion guard and the installed renderer's native fallback |
+| `src/right-panel.ts`                    | new: frame-lifetime dock action registration; latest live registration wins, independent disposers preserve other registrations, teardown clears all actions |
+| `src/regions.ts`                        | new: the public `MainSurfaceSeat`, `MainSurfaceOwnerProps`, `RightPanelSeat`, `DockPaneActions`, `DockPaneOwnerProps` and `FrameBottomSeat` contracts, their Context augmentations, and `shell.main`/`shell.dock` declarations                                                                                                                                                                                                               |
 
 `src/native/index.ts` stays upstream's no-op Host body, re-exported by `src/host.ts` because the dshx Host entry lives at
 that path.
@@ -60,24 +72,75 @@ that path.
 
 The frame owns the whole geometry and exposes one seat per region to plugins:
 
-- **Right column** — `ctx.rightPanel.setMode('dock' | 'native')` hands the column to the plugin that
-  registered into `shell.dock`, or back to the native per-session right sidebar. Both receive the same
-  resolved geometry (`RightbarOwnerProps`) and report their presentation through `ctx.layout`.
-- **Bottom row** — `ctx.frameBottom.open(height?)` shows the full-width row below the columns and
+- **Centre** — the owned Workbench claims `shell.main`; [the main-surface seat](#the-main-surface-seat)
+  documents its guarded renderer and ownership observable. Native centre rendering is absent-Workbench compatibility only.
+- **Right column** — `shell.dock` owns the fullheight Workbench right pane. Closing hides its mounted tab region,
+  preserving views and resource sessions. The `ctx.rightPanel` dock-action registry serves the main Pane options opener, pane-local Close pane icon
+  and original sidebar shortcut; internal `dock`/`native` tokens are not user-selectable presentation modes.
+- **Bottom row** — `ctx.frameBottom.open(height?)` shows the row below left and centre only and
   `ctx.frameBottom.close()` hides it; the frame stores and clamps the height (`BOTTOM_MIN` …
   `BOTTOM_MAX_RATIO` of the window) and publishes it as `--dsh-bottom-height`, so the row's resize
   handle rides its top edge and a reload reopens it where the user left it. `ctx.frameBottom.height()`
   reports the rendered height (0 while hidden). The occupant registers into the layout contract's own
-  `shell.bottom` slot and fills the row it is given.
+  `shell.bottom` slot and fills the row it is given. Workbench opens an empty row with the same New tab chooser as other panes; its own far-right Close pane icon hides it.
+
+### The main-surface seat
+
+Import `MainSurfaceOwnerProps` and the `shell.main` slot/Context augmentations from
+`@dshfiles/frame-layout/regions` (a declared dshx module, not the private native entry).
+The frame declares this single, root-scoped seat alongside keyed `main` and retains its render authorization.
+An occupant receives `renderMain(entryKey: string): ReactNode`, which can render `conversation` or any registered
+keyed main panel. It returns `null` for `dshfiles-workbench`: the legacy global workbench entry must never be
+mounted recursively inside the workbench. It grants no authority over other slots.
+
+Read the optional `ctx.get('mainSurface')` face for presentation ownership. Workbench calls `setMode('workbench')`
+unconditionally; there is no user-facing native choice. `mode()` reads ownership, and `subscribe(listener)` notifies
+only when it changes and returns an unsubscribe function. React consumers can use
+`useSyncExternalStore(seat.subscribe, seat.mode)`. Internal `setMode('native')` and teardown behavior remain for
+package compatibility, not as an owned-stack opt-out. With no registered occupant, the installed slot renderer receives
+the native panel as its empty-seat fallback even if the requested mode is workbench.
+
+The stable `[data-main-column] > [data-slot="main"]` wrapper stays mounted across both modes. Main-tabs may portal
+its strip immediately before that wrapper; nested keyed main outlets inside panels are not the strip target.
+`data-main-surface="native" | "workbench"` reports the requested mode on that wrapper.
 
 ### The right-column seat
 
-The right column has one owner at a time. A plugin that wants to keep panels on screen across threads registers into the
-`shell.dock` slot and calls `ctx.rightPanel.setMode('dock')`; the frame then renders that seat instead of the native
-per-session right sidebar, with the same width, drag handle, collapse and fullscreen behaviour, and hands it the same
-resolved geometry (`RightbarOwnerProps`). `setMode('native')` — what a plugin does when its setting turns the dock off, and
-what it does on teardown — gives the column back. A frame without this seat (the stock package) is a different layout owner
-altogether, so `ctx.rightPanel` is simply absent; read it through `ctx.get('rightPanel')` rather than injecting it.
+In Workbench main mode, the native rightbar outlet stays mounted inside a hidden
+`[data-native-rightbar-carrier]` wrapper, including while the Workbench right pane is closed. Its authorized session
+owner keeps native resource stores and portal renderers alive without drawing another column. The owned rightbar must
+suppress its frame-geometry reports throughout this carrier mode. Native visibility returns only outside Workbench main
+mode with native right-column ownership.
+
+The `shell.dock` occupant also stays mounted throughout Workbench mode. The frame hides its
+`[data-shell-dock-carrier]` wrapper while closed and supplies `DockPaneOwnerProps`: resolved `RightbarOwnerProps` geometry
+plus optional `shown`. This frame always passes `shown: true | false`; older frames may omit it. The occupant reports
+open or closed geometry through `ctx.layout` from that share, without losing its live views/drafts on close.
+
+Import the cooperating controls from `@dshfiles/frame-layout/regions`:
+
+```ts
+interface DockPaneActions {
+  isOpen(): boolean
+  open(): void
+  close(): void
+  toggle(): void
+  subscribe(listener: () => void): () => void
+}
+```
+
+Workbench registers its real actions with `ctx.get('rightPanel')?.registerDock?.(actions)` and disposes that registration
+on teardown. Existing sidebar controls read `ctx.get('rightPanel')?.dock?.()` at action time, including while the pane
+is closed. The latest live registration wins; each disposer removes only its registration, and frame teardown clears the
+registry. The frame neither mirrors pane state nor subscribes on the occupant's behalf.
+
+`RightPanelSeat.setMode('dock' | 'native')` and `mode()` remain internal compatibility controls, not a user-facing surface
+choice. Workbench requests `dock` while shown and uses the legacy `native` token while closed only to release the visible
+track; this does not reveal native chrome or unmount Workbench tabs and the native resource carrier.
+Outside Workbench mode the native per-session right sidebar remains the fallback for deployments without Workbench.
+A stock frame has no `ctx.rightPanel`; use optional reads rather than injecting it. Historical Workbench `mainSurface`,
+`rightPanel` and `headerToggle` schema fields are hidden decode-only migration inputs; they expose no new public
+configuration and cannot opt the owned stack out of Workbench.
 
 ### Updating to a new DSH release
 

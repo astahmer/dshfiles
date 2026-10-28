@@ -27,7 +27,7 @@
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
         "press Enter",
         "expect text \"pulls.review \u00b7 main..@*\"",
-        "click button \"pulls.review\"",
+        "click button \"pulls.review: Reviews\"",
         "expect heading \"pulls.review\"",
         "expect text \"main..@\"",
         "expect text \"1 file\"",
@@ -113,7 +113,7 @@
       ],
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"pulls.review\"",
+        "click button \"pulls.review: Reviews\"",
         "expect button \"Summarize\"",
         "click button \"Summarize\"",
         "expect text \"The model call failed*\""
@@ -191,7 +191,7 @@
           "reason": "Client-only: Mark a selection of scope files reviewed renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"pulls.review\"", "expect checkbox \"Select all files in this scope\""]
+      "reach": ["click button \"pulls.review: Reviews\"", "expect checkbox \"Select all files in this scope\""]
     }
   ]
 }

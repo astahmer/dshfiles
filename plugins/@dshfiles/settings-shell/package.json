@@ -30,6 +30,7 @@
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/workbench": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

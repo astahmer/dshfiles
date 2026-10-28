@@ -2,23 +2,512 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "conversation-header",
+      "title": "Keep the original conversation toolbar and child views inside each thread",
+      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. Native selected views drive the existing content/composer instead of a forced Chat view. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners.",
+      "reach": ["seed tool-call-thread", "expect button \"More thread actions\"", "expect tab \"Chat\"", "expect tab \"Trajectory\""],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": [
+        "fixed-session",
+        "populated-header",
+        "native-blank-hero",
+        "child-view-selected",
+        "retained-editor",
+        "moved-panel",
+        "hidden-outer-row",
+        "restored"
+      ],
+      "failureModes": [
+        "Optional header utilities and child-view tabs appear only when their original owners are installed and the original session phase allows them.",
+        "Header actions address the panel's retained Session, never whichever other conversation happens to be globally selected."
+      ],
+      "externalDependencies": [],
+      "verification": [{ "kind": "gherkin", "id": "workbench.conversation-header", "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature" }],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only composition of original authorized header/body renderers and existing dock actions. All original settings, session actions and resource I/O remain delegated to their existing providers; no new Host work."
+        }
+      ]
+    },
+    {
+      "id": "last-right-tab-close",
+      "title": "Close the right pane when its final tab closes",
+      "summary": "Closing the final actual right-pane tab, including its empty chooser, closes the existing browser-owned right pane instead of replacing it with a chooser. Other tabs and right-owned floating windows keep it open. Explicit manual reopen supplies one chooser; an explicit resource/view open can adopt directly. Reload retains closed visibility. Completed native mutation observation avoids transient-zero close during moves and layout restoration; the permanent main grid keeps its separate chooser policy.",
+      "reach": [
+        "click button \"Search threads\"",
+        "click tab \"Everything\"",
+        "fill combobox \"Search the command palette\" \"Toggle the right pane\"",
+        "click option \"Toggle the right pane*\"",
+        "expect tab \"New tab\"",
+        "click button \"Close New tab\"",
+        "click button \"Search threads\"",
+        "click tab \"Everything\"",
+        "fill combobox \"Search the command palette\" \"Toggle the right pane\"",
+        "click option \"Toggle the right pane*\"",
+        "expect region \"Choose a view\""
+      ],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["populated", "other-tab-remains", "last-closed", "reopened-empty", "view-adopted", "restored-hidden", "floating-owned"],
+      "failureModes": [
+        "Only the right-region empty close policy changes; the main grid stays permanent and left/bottom behavior is unchanged.",
+        "Floating panels still belong to their source API, so an empty grid with a live float does not hide that source pane."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.last-right-tab-close", "featureFile": "tooling/dshx/e2e/features/workbench-right-close.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.right-final-native-close",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "closes the right pane after its last tab is removed without creating a chooser"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.right-transient-zero-safe",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "does not close the right pane at a native intra-API move transient zero"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.right-empty-reopen",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "reopens an auto-closed empty right pane with one chooser using the same API without reset or handoff replay"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only native panel-count/visibility lifecycle using the existing right-pane owner and layout store; no new Host work."
+        }
+      ]
+    },
+    {
+      "id": "single-tab-rows",
+      "title": "Hide a single tab row without hiding its view",
+      "summary": "Right-click the sole tab or blank row space and choose Hide tab row. Its original docked content and input stay mounted; a hover/keyboard Show tab row control and the global Workbench: Show tab rows command recover it. Native hideHeader persists in the existing layout JSON. A second tab added or dropped into the content reveals the row and clears the hidden preference; returning to one tab does not automatically hide it. Multiple-tab groups cannot be hidden.",
+      "reach": [
+        "rightclick tab \"Thread Sidebar: Threads\"",
+        "click menuitem \"Hide tab row\"",
+        "hover button \"Search threads\"",
+        "expect button \"Show tab row\"",
+        "click button \"Show tab row\"",
+        "expect tab \"Thread Sidebar: Threads\""
+      ],
+      "surfaces": ["client", "storage", "integration"],
+      "configuration": [],
+      "states": ["single-shown", "single-hidden", "restored-hidden", "multi-shown", "single-again-shown", "explicitly-recovered"],
+      "failureModes": [
+        "The native edge-shell variant does not restore hideHeader and is not offered this action; owned root/nested Workbenches use ordinary grid groups.",
+        "Content context menus are not intercepted; the tab/blank row, local content control and global command are the presentation entry points."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.single-tab-row", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.single-tab-native-json",
+          "file": "plugins/@dshfiles/workbench/src/tab-row-visibility.test.ts",
+          "testName": "restores native hideHeader and forgets it when a second panel arrives, even after returning to one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.single-tab-native-drop",
+          "file": "plugins/@dshfiles/workbench/src/tab-row-visibility.test.ts",
+          "testName": "takes a real native center drop into hidden content and reveals the merged group"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.single-tab-centre-recovery",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "preserves an intentional single-tab hidden centre, offers recovery and keeps the last grid unclosable"
+        }
+      ],
+      "telemetry": [
+        { "kind": "not-applicable", "reason": "Client-only native group-header presentation in the existing layout serializer; no Host I/O or execution." }
+      ]
+    },
+    {
+      "id": "sidebar-preview-tab",
+      "title": "Account Preview is a regular movable docked view",
+      "summary": "The existing footer.above assembly is seated once as an ordinary left Workbench tab, preserving the real account preview owner and actions. Existing saved placements in any root/nested region win; moving or explicitly closing it never creates a duplicate or resurrects it on reload. Reset layout can restore the default. Native brand/account toolbar and update notices remain fixed; a standalone Sidebar without the Workbench override retains its old preview fallback.",
+      "reach": [
+        "expect tab \"AI Accounts: Preview\"",
+        "rightclick tab \"AI Accounts: Preview\"",
+        "click menuitem \"Hide tab row\"",
+        "expect button \"Add AI account\""
+      ],
+      "surfaces": ["client", "storage", "integration"],
+      "configuration": [],
+      "states": ["legacy-fixed", "ordinary-left-group", "content-only", "moved", "closed", "explicitly-reopened", "standalone-fallback"],
+      "failureModes": [
+        "Mixed or unnamed preview contributors use the existing truthful Thread Sidebar: Plugin previews label, not a guessed account-specific owner.",
+        "The one-time browser migration marker only controls initial seating; native layout JSON remains the actual placement and tab-row owner."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.sidebar-preview-tab", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        { "kind": "gherkin", "id": "workbench.sidebar-preview-legacy-migration", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.preview-once-seating",
+          "file": "plugins/@dshfiles/workbench/src/sidebar-preview-migration.test.ts",
+          "testName": "seats an old fixed preview once and does not resurrect an explicitly closed regular view"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.preview-existing-placement",
+          "file": "plugins/@dshfiles/workbench/src/sidebar-preview-migration.test.ts",
+          "testName": "respects an existing placement in any current or saved root or nested layout"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Presentation-only adoption of an existing slot/view owner; account Host operations retain their existing API spans."
+        }
+      ]
+    },
+    {
+      "id": "window-floating",
+      "title": "Root-pane windows float across the application",
+      "summary": "Float panel and native Shift-float keep the same pane API, panel and renderer but move native chrome and persistent content through window coordinates. Main, left, right and bottom floats can leave their source pane, overlap with native chrome/body interleaving and per-window focus order, resize and reload, and their tabs can dock through the existing cross-region owner. Nested paint-contained surfaces remain local. Hiding a source pane retains native descendant visibility semantics rather than inventing another floating resource owner.",
+      "reach": ["rightclick tab \"Thread Sidebar: Threads\"", "click menuitem \"Float panel\"", "expect button \"Search threads\""],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["docked", "window-floating", "overlapping", "resized", "restored", "redocked", "nested-local"],
+      "failureModes": [
+        "Only root Dockviews escape ordinary frame-column overflow; registered nested content keeps its paint containment.",
+        "Legacy local float coordinates may shift on first use of window space, but native viewport bounds keep the window reachable without resetting the layout."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workbench.window-float-cross-api-focus",
+          "file": "plugins/@dshfiles/workbench/src/window-float-layers.test.ts",
+          "testName": "raises an already-locally-active older window across APIs on its real titlebar or focused body without mutating native order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.window-float-single-window-order",
+          "file": "plugins/@dshfiles/workbench/src/window-float-layers.test.ts",
+          "testName": "promotes only the clicked window, not unrelated floats from its API, with compact bounded ranks"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.window-wide-floating",
+          "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature"
+        },
+        { "kind": "gherkin", "id": "workbench.floating-overlap-order", "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature" },
+        { "kind": "gherkin", "id": "workbench.floating-source-offset", "featureFile": "tooling/dshx/e2e/features/workbench-floating.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.window-float-native-draft",
+          "file": "plugins/@dshfiles/workbench/src/window-floating.test.tsx",
+          "testName": "preserves the genuine React draft element, component instance and native panel through root floating"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.window-float-scope",
+          "file": "plugins/@dshfiles/workbench/src/window-floating.test.tsx",
+          "testName": "scopes native fixed chrome and content to the exact root Dockview, not a nested surface"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.window-float-resize",
+          "file": "plugins/@dshfiles/workbench/src/window-floating.test.tsx",
+          "testName": "clamps existing floats on viewport resize through the unchanged source API"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Presentation-only native floating geometry; no new Host I/O, execution or durable resource owner." }]
+    },
+    {
+      "id": "main-conversation",
+      "title": "Workbench as the main conversation surface",
+      "summary": "One fixed Session-bound conversation tab contains both native chat history and the real text-input editor. Sidebar clicks open a closed conversation as a new kept tab or focus its existing tab; other tabs never follow global selection. Closing all tabs leaves the docked chooser, not a resurrected global conversation. Legacy global-following aliases retire without changing fixed tab identity. Genuinely empty fixed Sessions use the native centered welcome, workspace/model controls and original composer; unsent drafts do not turn them into active transcripts. Loading history settles without a false welcome, and the first real turn becomes normal scrollable chat without replacing the editor.",
+      "reach": ["seed tool-call-thread", "click button \"New thread\"", "expect text \"Into the Unknown\""],
+      "surfaces": ["client", "integration", "settings"],
+      "configuration": [
+        {
+          "key": "mainSurface",
+          "defaultValue": "workbench",
+          "constraints": "Hidden legacy decode-only field; explicit native values no longer select a renderer. The centre always uses the Workbench.",
+          "choices": ["native", "workbench"],
+          "coveredBy": ["workbench.main-hosts-the-conversation", "workbench.default-main-surface"]
+        }
+      ],
+      "states": ["workbench", "thread-selected", "empty-welcome", "history-settling", "active-chat", "legacy-preference-migrated"],
+      "failureModes": ["The owned frame is required; the surface never re-declares main or recursively hosts its legacy workbench key."],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.main-hosts-the-conversation", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.fixed-conversation-lifecycle", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.long-conversation-scroll", "featureFile": "tooling/dshx/e2e/features/workbench-scroll.feature" },
+        { "kind": "gherkin", "id": "workbench.empty-thread-welcome", "featureFile": "tooling/dshx/e2e/features/workbench-welcome.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.fixed-welcome-editor-owner",
+          "file": "plugins/@dshfiles/workbench/src/thread-panel.test.tsx",
+          "testName": "keeps both native Factories resident across draft, first turn, switch and reload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.thread-flex-host",
+          "file": "plugins/@dshfiles/workbench/src/thread-panel.test.tsx",
+          "testName": "gives the embedded flex conversation a viewport-sized flex containing block"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.no-focus-echo-navigation",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "ignores a real Dockview user-origin focus echo when actual DOM focus remains in an outside Sidebar control"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.no-closed-chat-resurrection",
+          "file": "plugins/@dshfiles/workbench/src/conversation-panels.test.ts",
+          "testName": "does not resurrect the closed last conversation from the retained native default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.no-global-chat-clones",
+          "file": "plugins/@dshfiles/workbench/src/conversation-panels.test.ts",
+          "testName": "retires all legacy global-following clones without changing a fixed conversation identity"
+        },
+        { "kind": "gherkin", "id": "workbench.legacy-disabled-conversation-tabs", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.responsive-main", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.default-main-surface", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.switch-performance", "featureFile": "tooling/dshx/e2e/features/workbench-performance.feature" }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only frame rendering and existing Session reference ownership; no new Host I/O." }]
+    },
+    {
+      "id": "main-panel-sources",
+      "title": "Choose plugin views and one Settings hub",
+      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use producer-declared Plugin: View names, including Settings Shell: Settings and AI Accounts: Preview. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
+      "reach": ["click button \"New tab\"", "expect region \"Choose a view\""],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["available", "open", "closed", "source-removed"],
+      "failureModes": [
+        "Foreign child slots remain in their original assemblies unless their declarer opts in; unavailable sources are not reconstructed from private props."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.add-a-main-panel", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.new-tab-chooser", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.plugin-view-names", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.qualified-chooser-names",
+          "file": "plugins/@dshfiles/workbench/src/new-view-chooser.test.tsx",
+          "testName": "shows and searches producer-qualified names with stable special-view ordering"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.qualified-restored-names",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "refreshes restored reusable view names without changing identity or remounting state"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.qualified-semantic-names",
+          "file": "plugins/@dshfiles/workbench/src/tab-panels.test.tsx",
+          "testName": "projects canonical plugin view names while preserving conversation and scoped titles"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.native-template-names",
+          "file": "plugins/@dshfiles/workbench/src/panel-sources.test.ts",
+          "testName": "qualifies stock native templates and preserves producer-declared names"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.repeat-plugin-view",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "opens repeated plugin view occurrences and restores their source identity"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.semantic-start-chooser",
+          "file": "plugins/@dshfiles/workbench/src/tab-panels.test.tsx",
+          "testName": "projects keyboard Start tabs into the same New tab chooser without changing actor identity"
+        },
+        { "kind": "gherkin", "id": "workbench.reusable-view-picker", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.every-pane-views", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.plus-after-tabs",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "places the plus immediately after tabs before the flexible row spacer"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only source projection; existing ConfigForm writes keep their Host spans." }]
+    },
+    {
+      "id": "all-region-drag",
+      "title": "Drag panels across centre right and bottom",
+      "summary": "Real tab drags move one owned panel across all root regions, including an empty target, and each region restores its persisted arrangement.",
+      "reach": ["click button \"Collapse sidebar\"", "click button \"Pane options\"", "expect menuitem \"Toggle the bottom panel\""],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["centre", "right", "bottom", "reloaded"],
+      "failureModes": ["Cross-instance targets require embedder adoption and empty-target handling; a source copy must not survive a successful move."],
+      "externalDependencies": [],
+      "verification": [{ "kind": "gherkin", "id": "workbench.drag-across-all-regions", "featureFile": "tooling/dshx/e2e/features/workbench.feature" }],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Browser presentation-only drag and local layout persistence." }]
+    },
+    {
+      "id": "main-tab-parity",
+      "title": "Keep preview pin unread and close semantics in Dockview tabs",
+      "summary": "Dockview tabs consume main-tabs' existing semantics provider: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears.",
+      "reach": ["seed tool-call-thread", "expect button \"New tab\""],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["preview", "kept", "pinned", "unread", "closed"],
+      "failureModes": ["The renderer must not become a second navigation actor or remount a thread whenever status changes."],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.tab-semantics", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.repeated-close-navigation", "featureFile": "tooling/dshx/e2e/features/workbench-close.feature" },
+        { "kind": "gherkin", "id": "workbench.cross-project-chooser", "featureFile": "tooling/dshx/e2e/features/workbench-scope.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.window-chooser-identity",
+          "file": "plugins/@dshfiles/workbench/src/scope-lifecycle.test.ts",
+          "testName": "keeps the exact unrelated chooser and conversation instances when native current changes within the window scope"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.current-layout-hydration",
+          "file": "plugins/@dshfiles/workbench/src/scope-lifecycle.test.ts",
+          "testName": "does not resurrect a closed ordinary chooser from an older scope cache during window hydration"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.single-close-owner",
+          "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
+          "testName": "closes through the semantic owner without closing its already-retired Dockview presentation again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.container-selection-owner",
+          "file": "plugins/@dshfiles/workbench/src/tab-panels.test.tsx",
+          "testName": "adopts the canonical container selection during a stale panel-flag notification"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only projection of actor-owned tab semantics and existing thread attention." }]
+    },
+    {
+      "id": "terminal-pages",
+      "title": "Open native terminals from any pane's view chooser",
+      "summary": "Terminal: Terminal explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"New tab\"",
+        "fill textbox \"Search views\" \"Terminal\"",
+        "click button \"Terminal: Terminal\"",
+        "expect tab \"Terminal*\""
+      ],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["available", "opened", "moved", "hidden", "restored", "closed", "session-unavailable"],
+      "failureModes": [
+        "The native terminal provider and a conversation/workspace context are required; an unavailable provider shows guidance rather than inventing a Session or PTY.",
+        "Cancelled unseated launch intents close only their exact newly created native occurrence and never open another pane.",
+        "A restored bound terminal does not silently spawn a replacement after its Host lifetime ends."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.terminal-picker-lifecycle", "featureFile": "tooling/dshx/e2e/features/workbench-terminal.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.terminal-exact-admission",
+          "file": "plugins/@dshfiles/workbench/src/terminal-source.test.tsx",
+          "testName": "admits two exact native identities synchronously into the requested groups and closes only their chooser"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.terminal-passive-restore",
+          "file": "plugins/@dshfiles/workbench/src/terminal-source.test.tsx",
+          "testName": "keeps registration, passive fallback mount and layout restore free of terminal allocation"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only explicit presentation admission. PTY creation, streaming, retained bindings and cleanup are delegated to the existing native terminal providers; no new Host I/O or command API."
+        }
+      ]
+    },
+    {
+      "id": "native-resource-panels",
+      "title": "Host native preview diff and terminal resources as panels",
+      "summary": "The owned sidebar-right declarer supplies addressable real tab occurrences, retaining their Session resource lifecycle while their presentation docks in the workbench.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Search threads\"",
+        "click tab \"Everything\"",
+        "fill combobox \"Search the command palette\" \"New terminal\"",
+        "click option \"New terminal*\"",
+        "expect tab \"Terminal*\""
+      ],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["preview", "review", "terminal", "hidden", "restored"],
+      "failureModes": [
+        "Without the owned sidebar-right cooperation native resources retain their original native surface; the workbench never fakes a tab occurrence or terminal lifecycle."
+      ],
+      "externalDependencies": [],
+      "verification": [{ "kind": "gherkin", "id": "workbench.slots-stay-compatible", "featureFile": "tooling/dshx/e2e/features/workbench.feature" }],
+      "telemetry": [
+        { "kind": "not-applicable", "reason": "Client-only presentation bridge; resource loading and terminal work remain in their existing providers." }
+      ]
+    },
+    {
+      "id": "nested-surfaces",
+      "title": "Split panes into Dockview groups and restore legacy layouts",
+      "summary": "Pane options Split right and Split down create actual Dockview groups with chooser tabs. Existing nested-container layouts remain restorable, movable and resettable, but no control creates new nested containers.",
+      "reach": ["click button \"Pane options\"", "click menuitem \"Split right\"", "expect region \"Choose a view\""],
+      "surfaces": ["client", "integration", "storage"],
+      "configuration": [],
+      "states": ["chooser", "split-right", "split-down", "legacy-nested-restored", "moved-out", "restored"],
+      "failureModes": [
+        "Container cycles are rejected; every child surface needs an independent stable path and named-layout capture rather than relying on the parent's Dockview JSON."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.nested-surfaces", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.nested-capture-ownership",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "lets the deepest surface split an internal drag before an outer capture target can claim its overlay"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Browser-only split groups, legacy nested layout identity and local persistence; no new Host work." }]
+    },
+    {
       "id": "dockable-panel-layouts",
       "title": "Arrange plugin panels in independent layouts",
-      "summary": "Opens on the Editor alone, then adds panels and arranges tab, split, float, move, close, and reset operations independently in the main workbench and right-side pane. The Scratchpad and Ticker docking fixtures appear only behind a developer setting.",
-      "reach": ["click button \"Workbench\"", "expect heading \"Workbench\"", "expect region \"Editor\""],
+      "summary": "Quiet group chrome has New tab after tabs and Pane options at the far right, without a Workbench heading or persistent toolbar. Pane options groups Split right/down, Layouts, Move tab to, Reset layout and bottom toggling. Splits are Dockview groups; saved layouts win. Scratchpad and Ticker remain developer fixtures.",
+      "reach": ["click button \"Collapse sidebar\"", "click button \"Pane options\"", "click menuitem \"Layouts\"", "expect dialog \"Saved layouts\""],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
         {
           "key": "headerToggle",
           "defaultValue": "false",
-          "constraints": "Boolean; show the workbench header toggle.",
+          "constraints": "Hidden legacy decode-only field; the main Pane options opener is offered only while the right pane is closed.",
           "choices": ["true", "false"],
           "coveredBy": ["workbench.surface-layouts"]
         },
         {
           "key": "demoPanels",
           "defaultValue": "false",
-          "constraints": "Boolean; offer the Scratchpad and Ticker developer fixtures in Add panel.",
+          "constraints": "Boolean; offer the Scratchpad and Ticker developer fixtures in the New tab chooser.",
           "choices": ["true", "false"],
           "coveredBy": ["workbench.default-layout"]
         }
@@ -49,6 +538,32 @@
           "kind": "gherkin",
           "id": "workbench.surface-layouts",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        { "kind": "gherkin", "id": "workbench.quiet-pane-chrome", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.last-root-safety", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.centre-float-survival",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "keeps a populated centre grid when its last panel floats without remounting its draft"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.centre-grid-protection",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "cannot close the last centre grid into a floating neighbor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.centre-header-recovery",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "preserves an intentional single-tab hidden centre, offers recovery and keeps the last grid unclosable"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.group-pane-options",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "keeps pane controls inside compact group chrome and splits into a chooser"
         },
         {
           "kind": "unit-test",
@@ -97,36 +612,36 @@
     {
       "id": "global-dock",
       "title": "Keep one docking surface in the right column and a bottom panel",
-      "summary": "With the right column set to the global dock, the workbench renders its Dockview in the frame's own right-column seat instead of a session's right sidebar, and it opens a full-width bottom row from the same header. Panels can be moved between the two regions and the main workbench from each surface's Move menu; one named layout captures every region at once and brings the arrangement back later. Jujutsu marks itself as the dock's default panel.",
+      "summary": "Only main Pane options offers Open right pane while closed; the original sidebar shortcut drives that same full-height pane. Right/bottom panes have their own far-right Close pane icons; no centre Close right pane action exists. Hidden panes retain views and drafts. Empty right/bottom panes use the New tab chooser. Named layouts restore every region; native resource lifetimes stay with their declarer.",
       "reach": [
-        "click button \"Plugins\"",
-        "click button \"View @dshfiles/workbench\"",
-        "expect text \"Right panel\"",
-        "expect heading \"Panels\"",
-        "expect region \"Jujutsu\""
+        "click button \"Collapse sidebar\"",
+        "click button \"Pane options\"",
+        "click menuitem \"Open right pane\"",
+        "click button \"Expand sidebar\"",
+        "expect button \"Close pane\""
       ],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
         {
           "key": "rightPanel",
           "defaultValue": "native",
-          "constraints": "One of native or dock; applies live and chooses which surface fills the frame's right column.",
+          "constraints": "Hidden legacy migration input: dock initializes an open pane and native a closed pane once. It never selects native chrome or overrides subsequent browser-local visibility.",
           "choices": ["native", "dock"],
           "coveredBy": ["workbench.global-dock"]
         },
         {
           "key": "bottomPanel",
           "defaultValue": "hidden",
-          "constraints": "One of hidden or shown; applies live and opens or closes the frame's full-width bottom row.",
+          "constraints": "One of hidden or shown; applies live to the bottom row below left and centre, never underneath the full-height right pane.",
           "choices": ["hidden", "shown"],
           "coveredBy": ["workbench.bottom-panel"]
         }
       ],
-      "states": ["native", "dock", "bottom-open", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
+      "states": ["closed", "dock", "bottom-open", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
       "failureModes": [
-        "On a frame without the seats the registration is inert and the settings change nothing.",
-        "A saved dock layout that Dockview rejects falls back to the dock's default panel.",
-        "While the on-screen Session has a native tab open, the column goes back to the native surface so the resource stays visible."
+        "The owned frame must supply the main, right and bottom seats before this plugin activates.",
+        "A rejected saved dock layout falls back to an empty tabbed pane; reusable views remain available from its picker.",
+        "Resource providers retain their actual Session lifetimes in an authorized hidden carrier; opening them reveals the tabbed pane, never native chrome."
       ],
       "externalDependencies": [
         {
@@ -141,6 +656,8 @@
           "id": "workbench.global-dock",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
+        { "kind": "gherkin", "id": "workbench.unified-surfaces", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.right-pane-toggle", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
         {
           "kind": "gherkin",
           "id": "workbench.bottom-panel",
@@ -160,7 +677,7 @@
           "kind": "unit-test",
           "id": "workbench.global-dock-unit-default-panel",
           "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
-          "testName": "leads the dock default layout with the dock panel, the main one with the Editor, and opens the bottom row empty"
+          "testName": "opens new right and bottom panes with chooser tabs while retaining the main default"
         },
         {
           "kind": "unit-test",
@@ -172,7 +689,7 @@
           "kind": "unit-test",
           "id": "workbench.global-dock-unit-native-fallback",
           "file": "plugins/@dshfiles/workbench/src/right-panel-mode.test.ts",
-          "testName": "gives the column back to the native surface while the on-screen session has an open tab"
+          "testName": "migrates legacy native to a closed tabbed pane, not an alternate native renderer"
         },
         {
           "kind": "unit-test",
@@ -205,6 +722,30 @@
           "reason": "Client-only: Keep one docking surface in the right column and a bottom panel renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "layout-recovery",
+      "title": "Recover all panes and semantic tabs",
+      "summary": "Reset always reveals the left chat list and selects the authorized current-conversation view in a docked centre group, even when a tool was active or views were floating, moved or absent. Root, nested and project-scoped layouts reset together without changing chat tabs, drafts, pins or named layouts. A global command-palette recovery remains available independently of centre controls.",
+      "surfaces": ["client", "storage"],
+      "reach": ["click button \"Pane options\"", "click menuitem \"Reset layout\"", "expect button \"New tab\""],
+      "configuration": [],
+      "states": ["moved", "reset", "reloaded"],
+      "failureModes": [
+        "Per-pane defaults cannot recover cross-pane semantic placements; reset cancels pending handoffs before rebuilding main and left defaults."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "workbench.layout-recovery", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        { "kind": "gherkin", "id": "workbench.reset-visible-current-chat", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "workbench.reset-docked-conversation",
+          "file": "plugins/@dshfiles/workbench/src/reset-layout.test.ts",
+          "testName": "never lets a floating active group capture the reset conversation"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Browser-only presentation reset; existing Session and semantic tab owners are unchanged." }]
     },
     {
       "id": "early-panel-registration",

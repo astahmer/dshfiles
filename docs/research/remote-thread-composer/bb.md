@@ -263,7 +263,7 @@ Local artifacts:
     `MachineRenameDialog`, `ProjectMachineSetupDialog`, `BranchPicker`, `ModelReasoningMenu`,
     `machine-provider-queries`, `machine-server-access`, `host-mutations`, `thread-runtime-mutations`,
     `environment-workspace-display`, `workspace-checkout-display`, `ThreadPendingInteractionBanner`, …)
-- `/Users/astahmer/dev/bb-plugins/plugins/jujutsu/{package.json,host.ts,app.tsx}` and the SDK type bundle
+- The locally inspected `bb-plugins` source at `plugins/jujutsu/{package.json,host.ts,app.tsx}` and the SDK type bundle
   `…/node_modules/@get-bb/plugin-sdk/bundled-types/bb-plugin-sdk-app.d.ts` (host commands are `hostId`-scoped).
 
 Upstream (`https://github.com/get-bb/bb/blob/main/<path>`, read at that path):

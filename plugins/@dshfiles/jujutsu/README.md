@@ -16,6 +16,8 @@ A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
 
+The reusable graph view is **Jujutsu: Revision graph** in navigation and the Workbench chooser. Repository-scoped tabs keep their repository titles.
+
 ## What it provides
 
 - A revision graph laid out like VisualJJ: the trunk (`main`/`master`/`trunk`
@@ -85,6 +87,15 @@ contracts.
   longer retargets every side panel to the last repository picked anywhere.
 - Repository selection through the shared project/folder command palette
   (registered DSH projects, recent repositories, `/` folder browsing).
+  Opening a Git-only checkout automatically enables colocated Jujutsu at its
+  Git root, including when a subfolder was selected. Git commits, branches and
+  working files stay in place; no fetch or push runs. Plain folders and bare
+  repositories are not initialized, and existing/broken JJ metadata is never
+  replaced. Initialization temporarily disables auto-tracking of untracked files;
+  later JJ working-copy snapshots follow normal JJ staging/tracking behavior.
+  Merely listing projects, looking up chat references, or recovering an expired
+  registration does not initialize anything. Agents use `jj_open_repository`
+  only on request; `jj_register_repository` remains read-only.
 - Dragging a local bookmark or revision onto a revision (main page and side
   panel) prepares a move/rebase preview while the moving branch is dimmed.
   Every mutation, fetch, and push needs a second explicit confirmation.

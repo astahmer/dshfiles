@@ -78,6 +78,7 @@ import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from '.
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
 import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
+import { openGraphRepository } from './repository-opening.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell, type GraphMetrics } from './revision-graph-cell.js'
 import { ANCESTOR_COUNT_OPTIONS, usePreferences, type RevisionDate } from './preferences.js'
@@ -400,7 +401,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const launchMutation = useMutation({ mutationFn: (cwd: string) => props.launchSession(cwd) })
 
   const registerMutation = useMutation({
-    mutationFn: (repositoryPath: string) => api.registerRepository({ path: repositoryPath }),
+    mutationFn: (input: { readonly path: string; readonly readOnly?: boolean }) =>
+      input.readOnly === true ? api.registerRepository({ path: input.path }) : openGraphRepository(api, input.path),
     onSuccess: registered => {
       repositoryRootsById.current.set(registered.repoId, registered.root)
       while (repositoryRootsById.current.size > REPOSITORY_ID_LIMIT) {
@@ -448,7 +450,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
     recoveredRepositoryPath.current = path
     registerMutation.reset()
-    registerMutation.mutate(path)
+    registerMutation.mutate({ path, readOnly: true })
   }, [path, registerMutation.mutate, registerMutation.reset, repoId, stateQuery.error])
   useEffect(() => {
     if (state !== undefined) recoveredRepositoryPath.current = null
@@ -564,7 +566,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       if (requested.reference !== undefined) setPendingReferenceRequest(requested.reference)
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
       autoRegisterPath.current = requested.path
-      registerMutation.mutate(requested.path)
+      registerMutation.mutate({ path: requested.path })
     })
   }, [sidePanel, registerMutation.mutate])
 
@@ -572,7 +574,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const selectedPath = path.trim()
     if (repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
     autoRegisterPath.current = selectedPath
-    registerMutation.mutate(selectedPath)
+    registerMutation.mutate({ path: selectedPath })
   }, [path, repoId, registerMutation.mutate])
 
   useEffect(() => {
@@ -2015,7 +2017,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               autoRegisterPath.current = selected.canonicalPath
               setRepoId(null)
               setPath(selected.canonicalPath)
-              registerMutation.mutate(selected.canonicalPath)
+              registerMutation.mutate({ path: selected.canonicalPath })
             }}
             projects={props.projects}
             recentFolders={repoHistory}

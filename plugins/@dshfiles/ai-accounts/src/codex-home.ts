@@ -1,6 +1,7 @@
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { userInfo } from 'node:os'
 import { join, resolve, sep } from 'node:path'
+import { AccountCredentialHomeWork } from './account-credential-home-work.js'
 
 /**
  * Codex home layout, ported from T3 Code's `CodexHomeLayout.ts`.
@@ -123,7 +124,7 @@ const ensurePrivateAuth = async (sharedHomePath: string, effectiveHomePath: stri
  * Create or repair the overlay. Idempotent, so an overlay interrupted during a
  * login heals on the next request instead of needing manual cleanup.
  */
-export const materializeCodexShadowHome = async (layout: CodexHomeLayout): Promise<CodexHomeLayout> => {
+const materializeCodexShadowHomeUnlocked = async (layout: CodexHomeLayout): Promise<CodexHomeLayout> => {
   if (layout.mode !== 'authOverlay') return layout
   const { sharedHomePath, effectiveHomePath } = layout
   await mkdir(effectiveHomePath, { recursive: true })
@@ -151,8 +152,14 @@ export const materializeCodexShadowHome = async (layout: CodexHomeLayout): Promi
   return layout
 }
 
+/** Every materializer caller (including identity/store reads) shares sign-out and refresh exclusion by canonical home. */
+export const materializeCodexShadowHome = (layout: CodexHomeLayout): Promise<CodexHomeLayout> =>
+  layout.mode === 'authOverlay'
+    ? AccountCredentialHomeWork.access(layout.effectiveHomePath, () => materializeCodexShadowHomeUnlocked(layout))
+    : Promise.resolve(layout)
+
 /** The command that writes the next login for this instance. */
-const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME="${layout.effectiveHomePath}" codex login`
+const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME='${layout.effectiveHomePath.replaceAll("'", "'\\''")}' codex login`
 
 const authJsonPath = (layout: CodexHomeLayout): string => join(layout.effectiveHomePath, 'auth.json')
 

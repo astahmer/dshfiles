@@ -197,6 +197,30 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toContain('thread:c')
   })
 
+  it.each(['tab.open', 'tab.select'] as const)('reasserts explicit %s until the Host acknowledges the requested target, then remains idempotent', eventType => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    try {
+      tabs.enable()
+      tabs.host(thread('a'))
+      tabs.actor.send({ type: 'tab.open', target: thread('b'), newTab: true })
+      expect(tabs.navigated).toEqual([thread('b')])
+      // Navigation acceptance is not an acknowledgement: the native main view
+      // can still report A while the semantic B tab renders its own fixed body.
+      tabs.host(thread('a'))
+      const requestB = (): void =>
+        tabs.actor.send(eventType === 'tab.open' ? { type: 'tab.open', target: thread('b'), newTab: false } : { type: 'tab.select', tabId: 'thread:b' })
+      requestB()
+      expect(tabs.navigated).toEqual([thread('b'), thread('b')])
+      expect(tabs.actor.getSnapshot().context.pendingTarget).toEqual(thread('b'))
+      tabs.host(thread('b'))
+      requestB()
+      expect(tabs.navigated).toEqual([thread('b'), thread('b')])
+      expect(tabs.actor.getSnapshot().context.pendingTarget).toBeNull()
+    } finally {
+      tabs.actor.stop()
+    }
+  })
+
   it('stops waiting for a navigation the Host never finishes', () => {
     vi.useFakeTimers()
     const tabs = start({ preferences: { openMode: 'new' } })

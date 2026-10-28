@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
-import type { FrameBottomSeat, RightPanelSeat } from '../../regions.ts'
+import type { FrameBottomSeat, FrameSidebarSeat } from '../../regions.ts'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
@@ -24,6 +24,8 @@ import { ThemePresenter } from './theme-presenter.ts'
 // Local delta (see README "Local delta"): upstream keeps every width in memory.
 import { FrameWidthsModel } from '../../frame-widths.ts'
 import { PanelRetentionModel } from '../../panel-retention.ts'
+import { createMainSurfaceSeat } from '../../main-surface.ts'
+import { createRightPanelSeat } from '../../right-panel.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -90,8 +92,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'rightbar': { kind: 'single'; scope: 'root'; owner: RightbarOwnerProps }
     /**
-     * Full-width bottom content below all three columns. Its rendered height
-     * reduces the columns' available height; empty content reserves no space.
+     * Bottom content below the left and centre columns only. The right column
+     * spans both rows, so opening the bottom never shortens the right pane.
      * The occupant owns its height, visibility, and controls. It receives no
      * Session binding and remains mounted across main-panel navigation.
      */
@@ -179,13 +181,11 @@ export function apply(ctx: ClientContext): void {
       },
     })
     const retainMainPanels = (): void => panelRetention.check()
-    // The right column's seat: a plugin reports which surface fills it (local
-    // delta; see README "Local delta"). The frame only needs that choice, never
-    // the dock's own state.
-    const rightPanel: RightPanelSeat = {
-      setMode: mode => instance.actions.setMode(mode),
-      mode: () => instance.getSnapshot().layoutInfo.rightPanelMode,
-    }
+    // Workbench owns pane state/actions; the frame owns the cooperating port's
+    // lifetime, independently of whether the right pane is currently visible.
+    const rightPanel = createRightPanelSeat(instance)
+    // Show reads the owned store, never a caller's potentially stale render props.
+    const frameSidebar: FrameSidebarSeat = { show: () => instance.actions.showSidebar() }
     // The bottom row's seat: a plugin opens the row and the frame sizes it, so
     // the height survives a reload and one occupant cannot outlive the row.
     const frameBottom: FrameBottomSeat = {
@@ -200,12 +200,20 @@ export function apply(ctx: ClientContext): void {
       getSnapshot: () => instance.getSnapshot().panelInfo,
       subscribe: listener => instance.subscribe(listener),
     }
+    const panelRequests = new Set<(panelId: string | null) => void>()
     const layout = new LayoutController(instance.actions, id =>
-      ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo)
+      ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo, panelId => {
+        for (const listener of panelRequests) listener(panelId)
+      })
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRightPanel = ctx.reflect.provide('rightPanel', rightPanel)
+    const disposeMainSurface = ctx.reflect.provide('mainSurface', createMainSurfaceSeat(instance, listener => {
+      panelRequests.add(listener)
+      return () => { panelRequests.delete(listener) }
+    }))
     const disposeFrameBottom = ctx.reflect.provide('frameBottom', frameBottom)
+    const disposeFrameSidebar = ctx.reflect.provide('frameSidebar', frameSidebar)
     const disposeRegistration = ctx.slots.register({
       name: 'root',
       locale: 'common',
@@ -214,6 +222,7 @@ export function apply(ctx: ClientContext): void {
         'main': { kind: 'keyed', scope: 'root' },
         'rightbar': { kind: 'single', scope: 'root' },
         'shell.dock': { kind: 'single', scope: 'root' },
+        'shell.main': { kind: 'single', scope: 'root' },
         'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.leading': { kind: 'single', scope: 'root' },
@@ -235,6 +244,7 @@ export function apply(ctx: ClientContext): void {
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
     return () => {
+      rightPanel.dispose()
       disposeShortcut()
       disposeFrameWidths()
       layout.dispose()
@@ -245,7 +255,9 @@ export function apply(ctx: ClientContext): void {
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()
       void disposeRightPanel()
+      void disposeMainSurface()
       void disposeFrameBottom()
+      void disposeFrameSidebar()
     }
   }, 'ui-layout: service + root registration')
 

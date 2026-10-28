@@ -6,7 +6,7 @@ export const braveSearchSettings = defineSettings({
   schema: Schema.object({
     apiKey: Schema.string()
       .role('secret-ref')
-      .default('secret:brave-api-key')
+      .default('')
       .description(
         'Secret Catalog alias holding the Brave Search API key, written as secret:ALIAS or secret:ALIAS@env. The value never leaves the Host; an empty value falls back to BRAVE_API_KEY.',
       ),

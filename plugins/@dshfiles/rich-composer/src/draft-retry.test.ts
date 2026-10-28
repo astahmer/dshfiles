@@ -84,6 +84,25 @@ function fixture() {
 }
 
 describe('draft retry after the real composer clears its outgoing content', () => {
+  it('retains the session through both draft creation and send admission', async () => {
+    const { drafts, send, shell, outcome, release } = fixture()
+    const created = Promise.withResolvers<void>()
+    const admitted = Promise.withResolvers<{ kind: 'success' }>()
+    vi.mocked(drafts.whenCreated).mockReturnValue(created.promise)
+    send.mockReturnValue(admitted.promise)
+    shell.setDraft({ text: 'Pending first send', references: [] })
+    shell.submit()
+    expect(drafts.whenCreated).toHaveBeenCalledOnce()
+    expect(send).not.toHaveBeenCalled()
+    expect(release).not.toHaveBeenCalled()
+    created.resolve()
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce())
+    expect(release).not.toHaveBeenCalled()
+    admitted.resolve({ kind: 'success' })
+    await expect(outcome.promise).resolves.toEqual({ kind: 'success' })
+    expect(release).toHaveBeenCalledOnce()
+  })
+
   it('re-admits attachment-only content before retrying failed creation', async () => {
     const { session, update, retry, send, shell, outcome, retain, release, readiness } = fixture()
     // SAFETY: a synthetic draft attachment identity; no upload or attachment bytes are needed by this routing test.

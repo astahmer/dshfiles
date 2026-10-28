@@ -1,6 +1,10 @@
 /** Session commands whose activation policy is explicit at each Remote method. */
 
 import { modelAvailable } from './catalog.ts'
+import { PluginApiError } from '@dshfiles/dshx/api'
+import { annotateThreadModel } from '../thread-model-policy.ts'
+import type { ThreadModelSelect, ThreadModelSnapshot } from '../thread-model-api.ts'
+import { underArchivedSession } from './archived-session-gate.ts'
 import { latestInterruptedTurn } from '../interrupted-turn.ts'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
@@ -158,6 +162,44 @@ export class SessionCommandController {
    * @returns the normalized selection installed for the Session, without waiting for default persistence.
    */
   async selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
+    return this.withValidatedModel(request, (agent, selected) => {
+      this.agents.selectForNextRequest(agent, selected)
+      void this.ctx.agentDefaultModel.saveSelection(selected).catch((error: unknown) => {
+        this.ctx.logger.warn(`session-controller: model selection changed for the Session but the default was not saved: ${String(error)}`)
+      })
+      return { selected: { ...selected } }
+    })
+  }
+
+  /** Thread-only selection: compare intent after every validation await, then commit without yielding. */
+  async selectThreadModel(request: ThreadModelSelect & { sessionId: SessionId }): Promise<ThreadModelSnapshot> {
+    if (this.ctx.workspaceRegistry.archivedSessionIds.includes(request.sessionId)) {
+      throw new PluginApiError('Restore the archived thread before changing its model.', { code: 'thread-model-archived' })
+    }
+    return this.withValidatedModel({ sessionId: request.sessionId, ...request.selection }, (agent, selected) => {
+      if (!this.ctx.remoteAccess.allows({ kind: 'session', id: agent.id })) {
+        throw new PluginApiError('No thread with that id exists.', { code: 'thread-not-found' })
+      }
+      if (underArchivedSession(this.ctx, agent)) {
+        throw new PluginApiError('Restore the archived thread before changing its model.', { code: 'thread-model-archived' })
+      }
+      if (hasApiSessionSubagentOwner(this.ctx, agent.session, agent)) throw apiSessionSubagentOwnershipError(agent.id)
+      if (agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) {
+        throw new PluginApiError('Let the thread’s queued input settle before changing its account.', { code: 'thread-model-busy' })
+      }
+      const policy = this.ctx.sessionProjections.stateOf(agent.session, 'threadModelPolicy')
+      if (policy === undefined) throw new PluginApiError('Thread model policy is unavailable.', { code: 'thread-model-unavailable' })
+      if (policy.revision !== request.expectedRevision) {
+        throw new PluginApiError('The thread model changed. Read its current state and confirm again.', { code: 'thread-model-stale' })
+      }
+      this.agents.selectForNextRequest(agent, selected)
+      const revision = agent.session.seq
+      annotateThreadModel(agent.session, { revision, selection: selected, preferSelectedProvider: request.preferSelectedProvider })
+      return { sessionId: agent.id, selection: { ...selected }, revision, running: agent.status !== 'idle', preferSelectedProvider: request.preferSelectedProvider }
+    })
+  }
+
+  private async withValidatedModel<Value>(request: SessionSelectModelRequest, commit: (agent: Agent, selected: AgentModelSelection) => Value): Promise<Value> {
     const agent = await this.resolveAgent(request.sessionId)
     return this.agents.serializeImageAdmission(agent, async () => {
       try {
@@ -176,15 +218,9 @@ export class SessionCommandController {
             ? {}
             : { reasoningEffort: resolved.reasoningEffort }),
         }
-        this.agents.selectForNextRequest(agent, selected)
-        void this.ctx.agentDefaultModel.saveSelection(selected).catch((error: unknown) => {
-          this.ctx.logger.warn(
-            `session-controller: model selection changed for the Session but the default was not saved: ${String(error)}`,
-          )
-        })
-        return { selected: { ...selected } }
+        return commit(agent, selected)
       } catch (error) {
-        if (remoteErrorOf(error) !== undefined) throw error
+        if (remoteErrorOf(error) !== undefined || error instanceof PluginApiError) throw error
         throw new RemoteError(
           'session/model-unavailable',
           error instanceof Error ? error.message : String(error),

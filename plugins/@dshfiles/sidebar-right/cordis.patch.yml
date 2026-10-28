@@ -1,0 +1,6 @@
+# One declarer and one navigation owner. Stock providers keep their original slots and services.
+- id: ui-sidebar-right
+  disabled: true
+- insert:
+    - id: dshfiles-sidebar-right
+      name: '@dshfiles/sidebar-right'

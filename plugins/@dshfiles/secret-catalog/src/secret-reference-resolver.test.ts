@@ -43,6 +43,34 @@ describe('secret reference resolution', () => {
     expect(fixture.calls).toEqual([{ alias: 'TOKEN', scope: 'project', cwd: '/tmp/project', environment: 'dev' }])
   })
 
+  it('advertises exact-scope enforcement and reveals only the selected scope', async () => {
+    const fixture = valuesWith([row({ scope: 'project' })])
+    expect(fixture.values.supportsExpectedScope).toBe(true)
+    await fixture.values.resolve({ reference: { alias: 'TOKEN', environment: 'prod' }, cwd: '/tmp/project', expectedScope: 'project' })
+    expect(fixture.calls).toEqual([{ alias: 'TOKEN', scope: 'project', cwd: '/tmp/project', environment: 'prod' }])
+  })
+
+  it('rejects a scope replacement between metadata selection and resolution before reading any value', async () => {
+    let rows = [row({ scope: 'project' })]
+    let reveals = 0
+    const values = createSecretCatalogValues({
+      operations: {
+        list: async () => rows,
+        reveal: async () => {
+          reveals += 1
+          return 'fixture-value-not-to-be-read'
+        },
+      },
+    })
+    const selectedScope = rows[0]?.scope
+    expect(selectedScope).toBe('project')
+    rows = [row({ scope: 'global' })]
+    await expect(values.resolve({ reference: { alias: 'TOKEN', environment: 'prod' }, cwd: '/tmp/project', expectedScope: 'project' })).rejects.toThrow(
+      'scope changed',
+    )
+    expect(reveals).toBe(0)
+  })
+
   it('names the alias and environment when nothing matches, without revealing', async () => {
     const fixture = valuesWith([row({ environment: 'prod' })])
     await expect(fixture.values.resolve({ reference: { alias: 'TOKEN', environment: 'dev' }, cwd: null })).rejects.toThrow(

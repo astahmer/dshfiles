@@ -1,6 +1,6 @@
 import type { SerializedDockview } from 'dockview-react'
 import { describe, expect, it } from 'vitest'
-import { layoutSchema } from './layout-store.js'
+import { createNestedLayoutStores, layoutSchema } from './layout-store.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 
 /** Test double: built through the store's own schema, so it is exactly what storage accepts. */
@@ -11,6 +11,46 @@ const arrangement = (panelId: string): SerializedDockview =>
   })
 
 describe('saved layouts', () => {
+  it('round-trips explicit empty roots and saved region presentation alongside legacy snapshots', () => {
+    savedLayouts.remove()
+    expect(
+      savedLayouts.set({
+        full: { main: null, dock: arrangement('dock'), bottom: null, presentation: { bottomShown: false, rightMode: 'native' } },
+        legacy: { main: arrangement('main') },
+      }),
+    ).toBe(true)
+    savedLayouts.reload()
+    expect(savedLayouts.get().full).toEqual({ main: null, dock: arrangement('dock'), bottom: null, presentation: { bottomShown: false, rightMode: 'native' } })
+    expect(savedLayouts.get().legacy).toEqual({ main: arrangement('main') })
+    savedLayouts.remove()
+  })
+
+  it('captures and restores unmounted nested stores while preserving legacy named regions', () => {
+    const values = new Map<string, string>()
+    const storage = () => ({
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+      removeItem: (key: string) => void values.delete(key),
+    })
+    const stores = createNestedLayoutStores({ storage })
+    stores.store('nested/main/outer').set(arrangement('inner-container'))
+    stores.store('nested/main/outer/inner').set(arrangement('editor'))
+    const root = { main: arrangement('outer-container') }
+    const captured = SavedLayouts.captureNested(root, stores)
+    savedLayouts.remove()
+    expect(savedLayouts.set({ nested: captured, legacy: root })).toBe(true)
+    const roundTripped = savedLayouts.get().nested
+    if (roundTripped === undefined) throw new Error('Nested snapshot was not retained')
+    const freshStores = createNestedLayoutStores({ storage })
+    freshStores.store('nested/main/outer/inner').remove()
+    SavedLayouts.restoreNested(roundTripped, freshStores)
+    expect(freshStores.store('nested/main/outer/inner').get()?.panels).toHaveProperty('editor')
+    expect(roundTripped.main).toEqual(root.main)
+    SavedLayouts.restoreNested(root, freshStores)
+    expect(freshStores.store('nested/main/outer/inner').get()?.panels).toHaveProperty('editor')
+    savedLayouts.remove()
+  })
+
   it('round-trips through browser storage', () => {
     savedLayouts.remove()
     const saved = savedLayouts.set(SavedLayouts.with({}, 'bottom jujutsu', { bottom: arrangement('jujutsu') }))

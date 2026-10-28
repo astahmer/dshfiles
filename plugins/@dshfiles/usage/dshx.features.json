@@ -107,12 +107,12 @@
     {
       "id": "usage-request-log",
       "title": "Request log",
-      "summary": "A Usage analytics main panel with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request.",
+      "summary": "The Usage: Analytics reusable view with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
         "press Enter",
-        "click button \"Usage analytics\"",
+        "click button \"Usage: Analytics\"",
         "click button \"Re-index session logs\"",
         "click tab \"Request log\"",
         "expect heading \"Request log\""
@@ -149,7 +149,7 @@
       "id": "usage-charts",
       "title": "Usage charts",
       "summary": "Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), cost over time stacked by model, provider, project or purpose, cost per model, provider and project (selecting one filters the log), tokens split into input, cache read, cache write and output, cache hit ratio, requests and failures, TTFT and duration percentiles, and the top threads by cost, grouped hourly or daily. Grouping by purpose answers where tokens went: agent, subagent, compaction, title, memory summary or another side call. Cache savings are the difference between the input rate and the cache-read rate on cached prompt tokens, per list price.",
-      "reach": ["click button \"Usage analytics\"", "click tab \"Charts\"", "expect text \"Cost over time\"", "expect text \"Cache savings (estimate)\""],
+      "reach": ["click button \"Usage: Analytics\"", "click tab \"Charts\"", "expect text \"Cost over time\"", "expect text \"Cache savings (estimate)\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["empty", "hourly", "daily", "custom-range", "grouped", "grouped-by-purpose", "unpriced-route"],
@@ -184,7 +184,7 @@
       "title": "Jev API usage card",
       "summary": "The Charts tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Bars compare each label's input-token volume with the busiest label this month; they do not represent quota remaining. Labels are local, not provider-verified identity, and usage excludes calls outside DSH.",
       "reach": [
-        "click button \"Usage analytics\"",
+        "click button \"Usage: Analytics\"",
         "click tab \"Charts\"",
         "expect text \"Jev API usage\"",
         "expect text \"Usage by API key · calendar month to date\""
@@ -255,7 +255,7 @@
       "title": "Tool and skill analytics",
       "summary": "Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles for calls, success rate, interruptions, wall time, returned tokens and the busiest category, plus the per-tool table with outcomes, latency and returned tokens, the top normalized command and test-runner wall-clock distributions, Jev request totals per calling plugin, and recent tool/Jev events. Returned tokens are a characters / 4 estimate of tool result text: only the text length is stored, never the text, and rows indexed before this measurement show as unmeasured. Grouping by category covers skills, plugin API, plugin, MCP, DSH and other tools. Command arguments, paths, outputs, prompts and secrets are never stored; compound or ambiguous shell commands are omitted.",
       "reach": [
-        "click button \"Usage analytics\"",
+        "click button \"Usage: Analytics\"",
         "click tab \"Tools & Jev\"",
         "expect text \"Tool calls over time\"",
         "expect text \"Most-used tools\"",

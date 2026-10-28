@@ -15,7 +15,7 @@ import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { keepPreviousData, PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
-import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { workbenchPanels, NativeAsideOwners } from '@dshfiles/workbench/registry'
 import { requestWorkspaceReview } from '@dshfiles/pulls-review/review-page-context'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { z } from 'zod'
@@ -108,8 +108,11 @@ export default defineClient({
       return panel('side-panel', target.scope, target.defaultPath)
     })
     const DockSurfacePanel = decorate(() => panel('dock', DOCK_PANEL_SCOPE, null))
+    const ScopedWorkbenchPanel = decorate((props: { readonly scope: string }) => panel('main', props.scope, null))
     ctx.effect(() => PanelScopes.listen(), 'dshfiles-jujutsu: the scope each main tab shows')
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: 'Jujutsu: Revision graph' }, PanelGlyph),
+    )
     ctx.effect(
       () =>
         ctx.sidebarRightTabs.register({
@@ -241,13 +244,18 @@ export default defineClient({
     // The graph is one panel with two homes: a main tab and a right-pane tab. Moving between them is this plugin's
     // business, so it answers the strip's request and offers the reverse row on its own right-pane tab.
     const isMainPanel = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
+    const openNativeAside = (): boolean => {
+      if (ctx.sidebarRight.mounted.getSnapshot() === undefined) return false
+      ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+      return true
+    }
+    ctx.effect(() => NativeAsideOwners.register(PANEL_ID, openNativeAside), 'dshfiles-jujutsu: native aside authority')
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
-        if (!(event instanceof CustomEvent)) return
+        if (!(event instanceof CustomEvent) || event.defaultPrevented) return
         const request = panelAsideRequestSchema.safeParse(event.detail)
-        if (!request.success || request.data.panelId !== PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
-        event.preventDefault()
-        ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+        if (!request.success || request.data.panelId !== PANEL_ID) return
+        if (openNativeAside()) event.preventDefault()
       }
       window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
       return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
@@ -285,11 +293,12 @@ export default defineClient({
       () =>
         workbenchPanels().register({
           id: DOCK_PANEL_ID,
-          title: 'Jujutsu',
+          title: 'Jujutsu: Revision graph',
           dockDefault: true,
           // The same feature's full main-view page, so the workbench offers "Move to main view" for the panel.
           mainPanelId: PANEL_ID,
           component: DockSurfacePanel,
+          scopedComponent: ScopedWorkbenchPanel,
         }),
       'dshfiles-jujutsu: dock panel',
     )

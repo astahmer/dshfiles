@@ -14,6 +14,7 @@ const rangeShape = {
   from: z.number().int().min(0).describe('Range start, Unix milliseconds.'),
   to: z.number().int().min(0).describe('Range end, Unix milliseconds.'),
   purposes: z.array(purposeSchema).max(UsageFoldModel.REQUEST_PURPOSES.length).optional(),
+  provider: z.string().min(1).max(256).optional().describe('Exact, case-sensitive recorded provider route id (including the account instance id).'),
 }
 
 export const SORT_COLUMNS = ['startedAt', 'cost', 'input', 'cacheRead', 'output', 'durationMs', 'ttftMs'] as const
@@ -67,6 +68,8 @@ export type RequestView = z.infer<typeof requestViewSchema>
 const countsSchema = z.record(z.string(), z.number().int().min(0))
 
 export const requestPageSchema = z.object({
+  /** Echoed only after the Host applies the exact provider filter. Older Hosts omit it. */
+  appliedProvider: z.string().optional(),
   rows: z.array(requestViewSchema).max(500),
   /** Requests matching every filter except the status chip. */
   total: z.number().int().min(0),
@@ -97,9 +100,17 @@ const tokenTotals = {
   output: z.number().min(0),
 }
 
-const breakdownSchema = z.object({ key: z.string(), cost: z.number(), requests: z.number().int(), tokens: z.number() })
+const completenessShape = {
+  /** Requests without token counts; aggregate token/cost sums are only known subtotals. */
+  missingUsage: z.number().int().min(0).optional(),
+  /** Requests with token counts but no applicable catalog price. */
+  unpriced: z.number().int().min(0).optional(),
+}
+const breakdownSchema = z.object({ key: z.string(), cost: z.number(), requests: z.number().int(), tokens: z.number(), ...completenessShape })
 
 export const chartViewSchema = z.object({
+  /** Echoed only after the Host applies the exact provider filter. Older Hosts omit it. */
+  appliedProvider: z.string().optional(),
   summary: z.object({
     cost: z.number(),
     requests: z.number().int(),
@@ -108,6 +119,9 @@ export const chartViewSchema = z.object({
     ...tokenTotals,
     /** Requests whose route has no catalog price, so `cost` is a lower bound. */
     unpriced: z.number().int(),
+    missingUsage: z.number().int().min(0).optional(),
+    /** Mean of all completed request durations, not a mean of bucket percentiles. */
+    averageDurationMs: z.number().min(0).nullable().optional().default(null),
     /** USD the cache-read traffic would have cost at the uncached input rate, per list price. */
     cacheSavings: z.number().default(0),
     /** Distinct thread turns that made a request, for cost per turn. */
@@ -116,6 +130,8 @@ export const chartViewSchema = z.object({
       cost: z.number(),
       requests: z.number().int(),
       tokens: z.number(),
+      ...completenessShape,
+      averageDurationMs: z.number().min(0).nullable().optional().default(null),
       cacheSavings: z.number().default(0),
       turns: z.number().int().nonnegative().default(0),
     }),
@@ -130,6 +146,7 @@ export const chartViewSchema = z.object({
       requests: z.number().int(),
       failed: z.number().int(),
       ...tokenTotals,
+      ...completenessShape,
     }),
   ),
   breakdown: z.object({ model: z.array(breakdownSchema), provider: z.array(breakdownSchema), project: z.array(breakdownSchema) }),
@@ -406,14 +423,15 @@ export const usageApi = defineApi({
     requests: method({
       input: requestQuerySchema,
       output: requestPageSchema,
-      description: 'Page through recorded LLM requests between two Unix-ms timestamps: model, provider, tokens, cache, latency and list-price cost. Read-only.',
+      description:
+        'Page through recorded LLM requests between two Unix-ms timestamps: model, provider, tokens, cache, latency and list-price cost. Optional provider is an exact, case-sensitive account route filter applied before counting and limiting. Read-only.',
       tool: { name: 'usage_requests', readOnly: true, render: output => JSON.stringify(output) },
     }),
     charts: method({
       input: chartQuerySchema,
       output: chartViewSchema,
       description:
-        'Cost, token, cache and latency totals between two Unix-ms timestamps, bucketed by hour or day, with breakdowns by model, provider and project, the costliest sessions, estimated cache savings and turn count. Grouping by purpose shows where tokens went (agent, subagent, compaction, title, memory, other). Costs are list-price estimates. Read-only.',
+        'Cost, token, cache and latency totals between two Unix-ms timestamps, bucketed by hour or day, with breakdowns by model, provider and project, the costliest sessions, estimated cache savings and turn count. Grouping by purpose shows where tokens went (agent, subagent, compaction, title, memory, other). Optional provider scopes all aggregates and previous-period comparisons to that exact, case-sensitive account route. Costs are list-price estimates. Read-only.',
       tool: { name: 'usage_report', readOnly: true, render: output => JSON.stringify(output) },
     }),
     status: method({

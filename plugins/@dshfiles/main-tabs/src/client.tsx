@@ -6,8 +6,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, runHostCommand, useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, runHostCommand, useApi, useApiQuery, useSettings } from '@dshfiles/dshx/client'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
+import type { MainSurfaceSeat } from '@dshfiles/frame-layout/regions'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
@@ -21,10 +22,18 @@ import { mainTabsSettings } from './settings.js'
 import { PanelIcon, StartPage, type StartSection } from './start-page.js'
 import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-tabs.js'
 import { panelShortcut, recentThreads } from './start-suggestions.js'
+import { TabMenuItems } from './tab-menu-items.js'
+import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type HostTarget, type TabPreferences, type TabsEvent } from './tabs-machine.js'
-import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, mountStripHost, stripSitsAbovePanel } from './strip-mount.js'
+import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, StripMount } from './strip-mount.js'
+import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
+import { createWorkbenchTabsActions } from './workbench-tab-actions.js'
+import { createWorkbenchTabsPublication } from './workbench-tabs-publication.js'
+import { requestThreadAside } from './thread-aside.js'
+import { requestPanelAside } from './panel-aside.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
+import { clearTabAttention } from './tab-attention.js'
 import './client.css'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
@@ -54,7 +63,7 @@ const SETTINGS_COMMAND_ID = 'settings.open'
 const useHiddenMainPanel = (host: HTMLElement | null, hidden: boolean): void => {
   useLayoutEffect(() => {
     const outlet = host?.nextElementSibling
-    if (!hidden || !(outlet instanceof HTMLElement)) return
+    if (!hidden || !(outlet instanceof HTMLElement) || !outlet.matches('[data-slot="main"]')) return
     const display = outlet.style.display
     outlet.style.display = 'none'
     return () => {
@@ -64,11 +73,12 @@ const useHiddenMainPanel = (host: HTMLElement | null, hidden: boolean): void => 
 }
 
 /** The strip's host node before the `main` outlet, with the startup self-check warning when it cannot mount. */
-const useStripHost = (): HTMLElement | null => {
+const useStripHost = (seat: MainSurfaceSeat | undefined): HTMLElement | null => {
   const [host, setHost] = useState<HTMLElement | null>(null)
   useEffect(
-    () => mountStripHost({ document, onHost: setHost, onMissing: () => console.warn(STRIP_MISSING_WARNING), missingAfterMs: STRIP_MISSING_AFTER_MS }),
-    [],
+    () =>
+      StripMount.nativeHost({ document, onHost: setHost, onMissing: () => console.warn(STRIP_MISSING_WARNING), missingAfterMs: STRIP_MISSING_AFTER_MS }, seat),
+    [seat],
   )
   return host
 }
@@ -80,7 +90,7 @@ const usePlacementCheck = (host: HTMLElement | null, rendered: boolean): void =>
     if (host === null || !rendered || checked.current === host) return
     const frame = requestAnimationFrame(() => {
       checked.current = host
-      if (!stripSitsAbovePanel(host)) console.warn(STRIP_MISPLACED_WARNING)
+      if (!StripMount.sitsAbovePanel(host)) console.warn(STRIP_MISPLACED_WARNING)
     })
     return () => cancelAnimationFrame(frame)
   }, [host, rendered])
@@ -98,9 +108,10 @@ const replaceThreadTabRequestSchema = z.object({ sourceSessionId: z.string().min
 export default defineClient({
   name: '@dshfiles/main-tabs',
   locales: [mainTabsLocale],
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace', 'shortcuts', 'remote', 'remote.session'],
+  inject: ['slots', 'layout', 'sessions', 'uiSession', 'workspaces', 'uiWorkspace', 'shortcuts', 'remote', 'remote.session'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(MAIN_TABS_LOCALE_NAMESPACE)
+    const mainSurface = ctx.get('mainSurface')
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
@@ -203,6 +214,7 @@ export default defineClient({
         if (sessions.phase !== 'ready') return
         const view = readHostView({
           activePanelId: ctx.layout.panelInfo.getSnapshot().activePanelId,
+          currentSessionId: ctx.uiSession.adapter.current.getSnapshot().key,
           sessions: sessions.ids.flatMap(id => sessions.byId[id] ?? []),
           workspaces: ctx.workspaces.list.getSnapshot().items,
         })
@@ -223,11 +235,69 @@ export default defineClient({
           .flatMap(tab => (tab.target.kind === 'thread' && !known.has(tab.target.sessionId) ? [tab.target.sessionId] : []))
         if (missing.length > 0) actor.send({ type: 'threads.missing', sessionIds: [...new Set(missing)] })
       }
-      const disposers = [ctx.layout.panelInfo.subscribe(report), ctx.sessions.list.subscribe(report), ctx.workspaces.list.subscribe(report)]
+      const disposers = [
+        ctx.layout.panelInfo.subscribe(report),
+        ctx.sessions.list.subscribe(report),
+        ctx.workspaces.list.subscribe(report),
+        ctx.uiSession.adapter.current.subscribe(report),
+      ]
       report()
       return () => disposers.forEach(dispose => dispose())
     }, 'main-tabs: follow the main view')
 
+    let focusThreadInSidebar = true
+    let clearSelectedAttention: ((sessionId: string) => void) | undefined
+    const selectThreadTab = (tabId: string): void => {
+      const snapshot = actor.getSnapshot()
+      const selected = snapshot.context.sets[snapshot.context.scopeKey]?.tabs.find(tab => tab.id === tabId)
+      if (selected?.target.kind !== 'thread') return
+      clearSelectedAttention?.(selected.target.sessionId)
+      if (focusThreadInSidebar) window.dispatchEvent(new CustomEvent(THREAD_TAB_FOCUS_EVENT, { detail: { sessionId: selected.target.sessionId } }))
+    }
+    const sendStripEvent = (event: TabsEvent): void => {
+      if (event.type === 'tab.new') ctx.layout.beginNavigation()
+      actor.send(event)
+      if (event.type === 'tab.select') selectThreadTab(event.tabId)
+    }
+    const workbenchActions = createWorkbenchTabsActions({
+      enabled: () => actor.getSnapshot().matches('on'),
+      currentSet: () => {
+        const snapshot = actor.getSnapshot()
+        return snapshot.context.sets[snapshot.context.scopeKey]
+      },
+      send: sendStripEvent,
+      reselect: selectThreadTab,
+      dockAside: WorkbenchTabDocking.request,
+      threadAside: requestThreadAside,
+      panelAside: requestPanelAside,
+      renameThread,
+    })
+    const publication = createWorkbenchTabsPublication(
+      workbenchActions,
+      {
+        label: (key, title) => (key === 'closeTab' && title !== undefined ? translate('close', { title }) : translate(key)),
+        renderTabMenu: (tabId, onRename, onStatus) => {
+          const snapshot = publication.provider.getSnapshot()
+          const tab = snapshot.tabs.find(candidate => candidate.id === tabId)
+          return tab === undefined ? null : (
+            <TabMenuItems
+              tab={tab}
+              tabs={snapshot.tabs}
+              send={sendStripEvent}
+              t={translate}
+              onRename={onRename}
+              onStatus={onStatus}
+              moveAside={workbenchActions.moveAside}
+            />
+          )
+        },
+      },
+      () => ctx.uiSession.adapter.current.getSnapshot().key,
+    )
+    ctx.effect(() => connectWorkbenchTabs(publication.provider), 'main-tabs: workbench semantics provider')
+
+    const subscribeMainSurface = (listener: () => void): (() => void) => mainSurface?.subscribe(listener) ?? (() => undefined)
+    const mainSurfaceMode = () => mainSurface?.mode() ?? 'native'
     const subscribeActor = (listener: () => void): (() => void) => {
       const subscription = actor.subscribe(listener)
       return () => subscription.unsubscribe()
@@ -245,16 +315,21 @@ export default defineClient({
         { name: 'shell.overlay', id: 'dshfiles-main-tabs', order: 10, locale: MAIN_TABS_LOCALE_NAMESPACE },
         decorate(props => {
           const settings = useSettings(mainTabsSettings)
-          const preferences: TabPreferences | null =
+          const savedPreferences: TabPreferences | null =
             settings.value !== undefined ? settings.value : settings.status === 'loading' && settings.error === null ? null : DEFAULT_TAB_PREFERENCES
-          const focusThreadInSidebar = settings.value?.focusThreadInSidebar ?? true
+          const mode = useSyncExternalStore(subscribeMainSurface, mainSurfaceMode)
+          const preferences = useMemo(() => (savedPreferences === null ? null : effectiveTabPreferences(savedPreferences, mode)), [savedPreferences, mode])
           useEffect(() => {
+            focusThreadInSidebar = settings.value?.focusThreadInSidebar ?? true
             if (preferences !== null) actor.send({ type: 'preferences.changed', preferences })
-          }, [preferences])
+          }, [preferences, settings.value?.focusThreadInSidebar])
 
           const snapshot = useSyncExternalStore(subscribeActor, () => actor.getSnapshot())
+          // Observe the same default binding the native Conversation renders,
+          // even while a tool is the active semantic tab. No selection is inferred.
+          useSyncExternalStore(ctx.uiSession.adapter.current.subscribe, () => ctx.uiSession.adapter.current.getSnapshot().key)
           // Re-render when panels register or the locale changes; the ledger reads below are cheap.
-          useSyncExternalStore(subscribePanels, panelsVersion)
+          const panelVersion = useSyncExternalStore(subscribePanels, panelsVersion)
           const registeredPanels = new Set(ctx.slots.entriesOfSlot('main').flatMap(entry => entry.options.key ?? []))
           const panelLabels = new Map(
             ctx.slots.entriesOfSlot('sidebar.panellist').flatMap(entry => {
@@ -272,7 +347,16 @@ export default defineClient({
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges.
           const attention = useApiQuery(threadSidebarAttentionApi, 'state')
+          const attentionApi = useApi(threadSidebarAttentionApi)
           const attentionRefresh = attention.refetch
+          useLayoutEffect(() => {
+            clearSelectedAttention = sessionId => {
+              void clearTabAttention(sessionId, attention.data, attentionApi.clearUnread, attentionRefresh).catch(() => undefined)
+            }
+            return () => {
+              clearSelectedAttention = undefined
+            }
+          }, [attention.data, attentionApi, attentionRefresh])
           useEffect(() => {
             const refresh = (): void => attentionRefresh()
             const onVisibility = (): void => {
@@ -291,11 +375,12 @@ export default defineClient({
           }, [attentionRefresh])
           const attentionSessionIds = useMemo(() => new Set((attention.data?.sessions ?? []).map(record => record.sessionId)), [attention.data])
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
-          const host = useStripHost()
+          const startContentVersion = useMemo(() => ({ byId, statuses, catalog, panelVersion }), [byId, statuses, catalog, panelVersion])
+          const host = useStripHost(mainSurface)
 
           const set = snapshot.context.sets[snapshot.context.scopeKey]
-          const tabs = (set?.tabs ?? []).map((tab): TabView => {
-            const base = { id: tab.id, active: tab.id === set?.activeTabId, pinned: tab.pinned, preview: tab.preview }
+          const tabs = (set?.tabs ?? []).map((tab): WorkbenchTab => {
+            const base = { id: tab.id, target: tab.target, active: tab.id === set?.activeTabId, pinned: tab.pinned, preview: tab.preview }
             if (tab.target.kind === 'start') return { ...base, kind: 'start', title: translate('startTab'), available: true, status: null }
             if (tab.target.kind === 'panel') {
               const panelId = tab.target.panelId
@@ -333,7 +418,6 @@ export default defineClient({
           const startShown = showStrip && set?.activeTabId === START_TAB_ID
           usePlacementCheck(host, showStrip && !startShown)
           useHiddenMainPanel(host, startShown)
-          if (host === null || !showStrip) return null
 
           const shortcutOf = (commandId: string) => catalog.find(entry => entry.id === commandId)
           const pick = (target: HostTarget | null): void => actor.send({ type: 'start.pick', target })
@@ -418,16 +502,14 @@ export default defineClient({
             return sections.filter(section => section.suggestions.length > 0)
           }
 
-          const sendStripEvent = (event: TabsEvent): void => {
-            // Opening the Start page is a view choice of its own: a New thread still being created must not replace it
-            // when the Host answers, so that pending navigation is cancelled here rather than landing over the page.
-            if (event.type === 'tab.new') ctx.layout.beginNavigation()
-            actor.send(event)
-            if (event.type !== 'tab.select' || !focusThreadInSidebar) return
-            const selected = set?.tabs.find(tab => tab.id === event.tabId)
-            if (selected?.target.kind !== 'thread') return
-            window.dispatchEvent(new CustomEvent(THREAD_TAB_FOCUS_EVENT, { detail: { sessionId: selected.target.sessionId } }))
-          }
+          useLayoutEffect(() => {
+            publication.update(
+              { enabled: snapshot.matches('on'), scopeKey: snapshot.context.scopeKey, activeTabId: set?.activeTabId ?? null, tabs },
+              () => <StartPage sections={startSections()} t={props.t} />,
+              startContentVersion,
+            )
+          })
+          if (host === null || !showStrip) return null
 
           return createPortal(
             <>

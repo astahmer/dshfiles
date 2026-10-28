@@ -46,6 +46,7 @@ import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSet
 import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefresh } from './turn-end-status-refresh.js'
+import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
@@ -116,7 +117,7 @@ export default defineClient({
     })
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
-        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
+        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => `JJ Integration: ${translate('title')}`, locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
         PanelGlyph,
       ),
     )
@@ -171,13 +172,18 @@ export default defineClient({
     // One panel with two homes: a main tab and a right-pane tab. Moving between them is this plugin's business, so it
     // answers the strip's request and offers the reverse row on its own right-pane tab.
     const isMainPanel = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
+    const openNativeAside = (): boolean => {
+      if (ctx.sidebarRight.mounted.getSnapshot() === undefined) return false
+      ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+      return true
+    }
+    ctx.effect(() => NativeAsideOwners.register(PANEL_ID, openNativeAside), 'jj-integration: native aside authority')
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
-        if (!(event instanceof CustomEvent)) return
+        if (!(event instanceof CustomEvent) || event.defaultPrevented) return
         const request = panelAsideRequestSchema.safeParse(event.detail)
-        if (!request.success || request.data.panelId !== PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
-        event.preventDefault()
-        ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
+        if (!request.success || request.data.panelId !== PANEL_ID) return
+        if (openNativeAside()) event.preventDefault()
       }
       window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
       return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
@@ -687,8 +693,9 @@ export default defineClient({
         timeoutMs: 30_000,
         request: hostSignal => jjThreads.destination({ workspaceId: move.workspaceId, sessionId: move.sessionId }, { signal: hostSignal }),
       })
-      if (options.force) return WorkspaceToggle.isolatingMove({ destination, workspaceId: move.workspaceId })
-      return ownsIsolatedThreadWorkspace(destination) ? null : WorkspaceToggle.defaultDestinationMove({ destination, workspaceId: move.workspaceId })
+      const input = { destination, workspaceId: move.workspaceId, defaultBookmark: move.request?.base }
+      if (options.force) return WorkspaceToggle.isolatingMove(input)
+      return ownsIsolatedThreadWorkspace(destination) ? null : WorkspaceToggle.defaultDestinationMove(input)
     }
     /**
      * The last line of defence against two threads sharing one jj thread workspace: whatever the toggle remembers, a
@@ -762,6 +769,7 @@ export default defineClient({
     const prepareWarm = (sessionId: SessionSummary['id'], move: DeferredMove): void => {
       /** Record a prepared workspace as this project's spare under the name the Host actually gave it. */
       const keepAsSpare = (input: { readonly workspaceId: string; readonly name: string; readonly request: ToggleRequest }): void => {
+        if (input.request.base === undefined) return
         // Reusing a client spare skips the Host rename, so the requested name is not always the folder's: read it back.
         const listed = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)
         const name = listed?.path.split('/').at(-1) ?? input.name

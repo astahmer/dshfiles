@@ -1,5 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-fs'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import { defineTool } from '@dshfiles/dshx/host'
 import { z } from 'zod'
@@ -86,6 +87,13 @@ export const createApplyPatchTool = (ctx: Context) =>
     execute: async (args, execution) => {
       const input = inputSchema.parse(args)
       const agent = execution.agent
+      const policy = ctx.get('sandboxPolicy')
+      if (ctx.fs.sandboxMode !== undefined && policy === undefined) {
+        throw new Error('apply_patch: the mounted filesystem confines but ctx.sandboxPolicy is missing')
+      }
+      // Match native file tools: resolve the caller's standing mode and original
+      // workspace boundary per call, never from the deployment or mutable cwd.
+      const sandboxPolicy = policy?.resolve(agent === undefined ? {} : { session: agent.session })
       const cwd = agent === undefined ? undefined : await ctx.workingDirectory.ensure(agent, execution.signal)
       const resolveOptions: { readonly cwd?: string; readonly signal: AbortSignal } =
         cwd === undefined ? { signal: execution.signal } : { cwd, signal: execution.signal }
@@ -103,7 +111,7 @@ export const createApplyPatchTool = (ctx: Context) =>
       )
       const result = applyEdits({ content: before, edits })
       if (!result.ok) throw new Error(`cannot patch "${target.displayPath}": ${describeEditsFailure(result.error)}`)
-      const outcome = await ctx.fs.writeText(target, result.value.content, undefined, execution.signal)
+      const outcome = await ctx.fs.writeText(target, result.value.content, undefined, execution.signal, sandboxPolicy)
       ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, execution)
       return {
         path: ctx.fs.processPath(target),

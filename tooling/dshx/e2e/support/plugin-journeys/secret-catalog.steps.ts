@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { rmSync } from 'node:fs'
 import { chmod, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join } from 'node:path'
@@ -101,12 +102,12 @@ const aliasRows = (page: Page) => catalog(page).getByRole('rowgroup').nth(1).get
 const rowFor = (page: Page, alias: string, environment: string) => aliasRows(page).filter({ hasText: new RegExp(`${alias} · \\w+ · ${environment} ·`) })
 
 const openCatalog = async (page: Page): Promise<void> => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Secret Catalog', exact: true }).click()
+  await globalPanelLink(page, 'Secret Catalog: Secrets').click()
   await expect(catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true })).toBeVisible()
 }
 
 const openBacklogSettings = async (page: Page): Promise<void> => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
   await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"]')).toBeVisible()
 }
@@ -221,7 +222,7 @@ When('the Jev API key {string} is entered and saved', async ({ page }: { page: P
   await expect(jevRow.locator('input[data-secret-input="reference"]')).toHaveValue('secret:jev-api-key-optmem')
   await expect(setup).toHaveCount(0)
   await page.reload()
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
   await expect(page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="jevSecret"] input[data-secret-input="reference"]')).toHaveValue(
     'secret:jev-api-key-optmem',
@@ -409,7 +410,7 @@ When('the fake secret CLI store is unreadable', async ({ page }: { page: Page })
 })
 
 When('the Secret Catalog reveals values for {int} seconds', async ({ page }: { page: Page }, seconds: number) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/secret-catalog', exact: true }).click()
   await page.getByRole('textbox', { name: 'Reveal seconds', exact: true }).fill(String(seconds))
   await page.getByRole('button', { name: 'Save', exact: true }).click()

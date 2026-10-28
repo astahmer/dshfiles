@@ -74,6 +74,36 @@ describe('host boot against the account store', () => {
     expect(routes.get('claude_work')?.kind).toBe('claude')
   })
 
+  it('persists account reasoning defaults and paused curation across ordinary saves', async () => {
+    const { accountStoreService } = await import('./account-store.js')
+    const before = await accountStoreService.readAccountFile()
+    const account = before.accounts.find(candidate => candidate.instanceId === 'commandcode_a')
+    if (account === undefined) throw new Error('Expected the keyed test account')
+    await accountStoreService.upsertAccount({
+      ...account,
+      defaultReasoningEffort: 'low',
+      inheritModelSettings: true,
+      reasoningDefaults: { model: 'high' },
+      hiddenModelIds: ['model'],
+      additionalModelIds: ['custom'],
+    })
+    const stored = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === account.instanceId)
+    expect(stored).toMatchObject({
+      defaultReasoningEffort: 'low',
+      inheritModelSettings: true,
+      reasoningDefaults: { model: 'high' },
+      hiddenModelIds: ['model'],
+      additionalModelIds: ['custom'],
+    })
+    if (stored === undefined) throw new Error('Expected the saved account')
+    await accountStoreService.upsertAccount({ ...stored, displayName: 'Renamed', inheritModelSettings: false })
+    expect((await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === account.instanceId)).toMatchObject({
+      defaultReasoningEffort: 'low',
+      inheritModelSettings: false,
+      reasoningDefaults: { model: 'high' },
+    })
+  })
+
   it('renames an account in place instead of leaving the old slug behind', async () => {
     const { accountStoreService } = await import('./account-store.js')
     const before = await accountStoreService.readAccountFile()

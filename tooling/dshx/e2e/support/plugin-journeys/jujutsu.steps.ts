@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -138,7 +139,7 @@ const dispatchDrop = async (
 const selectRepository = async (page: Page, fixture: JujutsuFixture): Promise<void> => {
   await page.evaluate(({ key, path }) => localStorage.setItem(key, JSON.stringify(path)), { key: 'dshfiles.jujutsu.selected', path: fixture.repositoryPath })
   await page.reload()
-  await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
+  await globalPanelLink(page, 'Jujutsu: Revision graph').first().click()
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible({ timeout: 30_000 })
   await expect(revisionRow(page, fixture.targetDescription)).toBeVisible({ timeout: 30_000 })
 }
@@ -160,7 +161,11 @@ Then('removing the selected repository offers a way to choose another', async ({
   await rm(fixture.repositoryPath, { recursive: true, force: true })
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(page.getByText('Registered repository path is unavailable. Select it again.', { exact: true })).toBeVisible({ timeout: 10_000 })
-  await page.getByRole('button', { name: 'Choose another repository', exact: true }).click()
+  await page
+    .getByRole('alert')
+    .filter({ hasText: 'Registered repository path is unavailable. Select it again.' })
+    .getByRole('button', { name: 'Choose another repository', exact: true })
+    .click()
   await expect(page.getByRole('dialog', { name: 'Choose a Jujutsu repository', exact: true })).toBeVisible()
 })
 

@@ -7,6 +7,8 @@ opt-in — the ones that already finished. Rows are classified deterministically
 from the job kind and its label, so "when did we last run the e2e suite", "which
 jj history commands ran today" and "what is still building" are one filter away.
 
+Open the reusable **Background Jobs: Jobs** view from navigation or the Workbench chooser.
+
 ## Where the rows come from
 
 ```

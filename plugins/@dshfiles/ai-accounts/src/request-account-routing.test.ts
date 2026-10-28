@@ -142,6 +142,51 @@ describe('request account routing', () => {
   })
 })
 
+describe('explicit per-thread account selection', () => {
+  it('protects only a later explicit selection from an older request’s automatic retry', () => {
+    const current = { revision: 8, preferSelectedProvider: true }
+    expect(RequestAccountRouting.hasNewPreferredSelection({ requestRevision: 7, current })).toBe(true)
+    expect(RequestAccountRouting.hasNewPreferredSelection({ requestRevision: 8, current })).toBe(false)
+    expect(RequestAccountRouting.hasNewPreferredSelection({ requestRevision: undefined, current })).toBe(false)
+    expect(RequestAccountRouting.hasNewPreferredSelection({ requestRevision: 7, current: null })).toBe(false)
+    expect(RequestAccountRouting.hasNewPreferredSelection({ requestRevision: 7, current: { ...current, preferSelectedProvider: false } })).toBe(false)
+  })
+  it.each(['sticky', 'priority', 'round-robin', 'balanced'] as const)(
+    'honors a healthy explicitly selected account under %s without changing other threads',
+    distribution => {
+      const pool = poolFor(distribution)
+      const input = { provider: 'codex-personal', model: 'gpt-6', conversationKey: 'chosen-thread', routes, pool, modelsCompatible, chainWalking: false }
+      const accountId = RequestAccountRouting.selectTurnAccount({ ...input, preferSelectedProvider: true })
+      expect(accountId).toBe('codex-personal')
+      expect(RequestAccountRouting.wireAccountFor({ ...input, purpose: undefined, active: { provider: input.provider, model: input.model, accountId } })).toBe(
+        'codex-personal',
+      )
+      expect(pool.distribution()).toBe(distribution)
+      if (distribution === 'priority' || distribution === 'round-robin') {
+        expect(RequestAccountRouting.selectTurnAccount({ ...input, conversationKey: 'unaffected-thread' })).toBe('codex-work')
+      }
+    },
+  )
+
+  it('retains normal compatible failover when the chosen account is cooling', () => {
+    const pool = poolFor('priority')
+    pool.noteRateLimited('codex-personal', 60_000, 1_000)
+    expect(
+      RequestAccountRouting.selectTurnAccount({
+        provider: 'codex-personal',
+        model: 'gpt-6',
+        conversationKey: 'chosen-thread',
+        routes,
+        pool,
+        modelsCompatible,
+        chainWalking: false,
+        preferSelectedProvider: true,
+        now: 2_000,
+      }),
+    ).toBe('codex-work')
+  })
+})
+
 describe('fallback grouping', () => {
   it('keeps a Claude account out of fail-over as source and as target', () => {
     const claudeRoutes = new Map(routes)

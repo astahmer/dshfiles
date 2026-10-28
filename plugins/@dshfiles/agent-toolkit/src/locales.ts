@@ -4,6 +4,7 @@ export const AGENT_TOOLKIT_LOCALE_NAMESPACE = 'dshfiles.agent-toolkit'
 
 const en = {
   title: 'Agent toolkit',
+  viewCapabilities: 'Capabilities',
   subtitle: 'Everything the agent can use in this thread: tools, plugins, MCP servers, skills and memory.',
   paletteOpen: 'Open the agent toolkit',
   thread: 'Thread',
@@ -80,6 +81,7 @@ const en = {
 
 const zh = {
   title: '智能体工具箱',
+  viewCapabilities: '能力',
   subtitle: '此对话中智能体可用的一切：工具、插件、MCP 服务器、技能与记忆。',
   paletteOpen: '打开智能体工具箱',
   thread: '对话',

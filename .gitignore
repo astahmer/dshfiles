@@ -27,5 +27,10 @@ playwright-report/
 .jj-gates/
 .DS_Store
 
+# Machine-local vault overrides and rendered dotenv credentials; shared aliases stay tracked.
+.secret.local.json
+.env
+.env.local
+
 # The global gitignore drops .envrc; this repo's flake shell needs it.
 !.envrc

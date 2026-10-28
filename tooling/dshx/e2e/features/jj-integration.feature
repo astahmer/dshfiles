@@ -11,6 +11,26 @@ Feature: jj thread workspaces
     When a disposable jj repository is chosen as the New thread project
     Then the destination bar offers the main bookmark in the shared checkout
 
+  @scenario:jj-integration.configured-base-browser-journey
+  Scenario: New chat uses configured main instead of the project checkout feature bookmark
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    When a Command Code account backed by a local fake provider is added
+    And New thread is clicked in the sidebar
+    And new threads start in the shared checkout by default
+    And a disposable jj checkout based on "feature/fix" is chosen as the New thread project
+    And a first message is sent from the shared checkout
+    And the existing shared-checkout thread is remembered
+    And new threads start in their own jj workspace by default
+    And New thread is clicked in the sidebar
+    Then the untouched New chat offers configured main with workspace checked
+    When a message is submitted before the new thread workspace is ready
+    Then the submitted workspace starts from configured main instead of the checkout feature
+    When New thread is clicked in the sidebar
+    And the "feature/fix" bookmark is picked in the destination bar
+    And a message is submitted before the new thread workspace is ready
+    Then the submitted workspace starts from the explicitly picked feature bookmark
+    And existing threads and the feature checkout are unchanged
+
   @scenario:jj-integration.home-relative-project-path
   Scenario: Browse and select a New thread project by its home-relative path
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

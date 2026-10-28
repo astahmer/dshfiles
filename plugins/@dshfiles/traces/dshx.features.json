@@ -6,7 +6,7 @@
       "id": "otlp-receiver",
       "title": "Local OTLP/HTTP receiver",
       "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether this receiver owns the port and whether it forwards to an external viewer. In plugin and both modes the receiver publishes its bound address in-process, so this Host's dshx spans and usage metrics arrive without OTEL_EXPORTER_OTLP_ENDPOINT; traces_status and the panel carry a diagnosis of why nothing arrives (exporter elsewhere or off, port held, external mode).",
-      "reach": ["click button \"Traces\"", "expect heading \"Traces\""],
+      "reach": ["click button \"Traces: Explorer\"", "expect heading \"Traces\""],
       "surfaces": ["host", "storage", "tool", "client", "integration"],
       "configuration": [
         {
@@ -186,7 +186,7 @@
       "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible span waterfall on a time axis, colored by service with errors in red, and a side panel with the selected span's attributes, events and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
       "reach": [
         "seed otlp-sample-trace",
-        "click button \"Traces\"",
+        "click button \"Traces: Explorer\"",
         "click tab \"Traces\"",
         "click row \"dshx-sample POST /orders*\"",
         "click treeitem \"charge card*\"",
@@ -323,7 +323,7 @@
       "id": "log-explorer",
       "title": "Log search with trace correlation",
       "summary": "The receiver also accepts POST /v1/logs (JSON or protobuf); the Logs tab searches stored records newest first by text, service, minimum severity and one attribute value, a record with a trace id opens its trace, and a span or trace opens only its own logs. GenAI content events keep only their body size unless redaction is turned off.",
-      "reach": ["seed otlp-sample-trace", "click button \"Traces\"", "click tab \"Logs\"", "expect list \"Logs\""],
+      "reach": ["seed otlp-sample-trace", "click button \"Traces: Explorer\"", "click tab \"Logs\"", "expect list \"Logs\""],
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [
         {
@@ -392,7 +392,7 @@
       "id": "trace-insights",
       "title": "Service and operation overview, error groups",
       "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",
-      "reach": ["click button \"Traces\"", "click tab \"Operations\"", "expect combobox \"Window\""],
+      "reach": ["click button \"Traces: Explorer\"", "click tab \"Operations\"", "expect combobox \"Window\""],
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
       "states": ["empty-window", "summarized", "errors-grouped"],
@@ -447,7 +447,7 @@
       "id": "service-map",
       "title": "Service dependency map",
       "summary": "A Service map tab draws every service seen in the window as a box with span count, error rate and p95, and every cross-service parent/child call as an arrow with call count and p50, red when a call failed; picking a service filters the trace list by it.",
-      "reach": ["seed otlp-sample-trace", "click button \"Traces\"", "click tab \"Service map\"", "expect img \"Service map\""],
+      "reach": ["seed otlp-sample-trace", "click button \"Traces: Explorer\"", "click tab \"Service map\"", "expect img \"Service map\""],
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
       "states": ["empty", "services-only", "edges", "failing-edge", "cycle"],
@@ -493,7 +493,7 @@
       "id": "metric-charts",
       "title": "Metric list with one chart per metric",
       "summary": "The receiver stores POST /v1/metrics (JSON or protobuf): gauges, sums, histograms, exponential histograms and summaries. The Metrics tab lists every metric per service with type, series count and last value, and charts the selected one per attribute set: gauges and sums as their value, cumulative counters as their increase between exports, distributions as their mean.",
-      "reach": ["seed otlp-sample-trace", "click button \"Traces\"", "click tab \"Metrics\"", "expect img \"Chart of*\""],
+      "reach": ["seed otlp-sample-trace", "click button \"Traces: Explorer\"", "click tab \"Metrics\"", "expect img \"Chart of*\""],
       "surfaces": ["client", "host", "tool", "storage"],
       "configuration": [
         {
@@ -552,7 +552,7 @@
       "summary": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule is ok or firing, resolves after two clear evaluations so a flapping signal fires once, and keeps a bounded history. A firing rule shows in the Alerts tab with its value, sample trace and threads, marks the Alerts tab and the panel with a red count and a banner, announces itself in an in-app banner (and a browser notification when allowed) wherever the user is, and marks the threads its spans carry unread through thread-sidebar. Rules can be created, edited, enabled, muted and deleted (with confirmation) in the tab or by agent tools. Four built-in rules ship with conservative thresholds.",
       "reach": [
         "seed otlp-sample-trace",
-        "click button \"Traces\"",
+        "click button \"Traces: Explorer\"",
         "click tab \"Alerts*\"",
         "click button \"New rule\"",
         "fill label \"Rule name*\" \"Sample order errors\"",
@@ -709,7 +709,7 @@
       "summary": "A Boards tab breaks the window's spans down with built-in boards: slow tools (execute_tool by gen_ai.tool.name), failing plugins (dshx API dispatch by dshx.plugin.package), model latency by provider (chat spans with time to first token), jobs (by dsh.job.kind) and jj commands, each row with count, error rate and percentiles; a row opens the trace list filtered to its spans. A Views menu opens any board and saves or reapplies named views of the panel (tab, trace filters, log filters, window). traces_breakdown gives agents the same breakdowns. Not a dashboard builder.",
       "reach": [
         "seed otlp-sample-trace",
-        "click button \"Traces\"",
+        "click button \"Traces: Explorer\"",
         "click tab \"Boards\"",
         "click radio \"Slow tools\"",
         "expect text \"execute_tool spans by gen_ai.tool.name, slowest p95 first.\""
@@ -782,7 +782,7 @@
         "press Enter",
         "expect text \"Second thread for a switch*\"",
         "click text \"Seeded thread to rebase\" at 12,8",
-        "click button \"Traces\"",
+        "click button \"Traces: Explorer\"",
         "expect heading \"Traces\"",
         "fill textbox \"Search traces\" \"thread switch\"",
         "click row \"dshfiles-web thread switch\"",

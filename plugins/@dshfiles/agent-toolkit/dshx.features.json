@@ -5,9 +5,9 @@
     {
       "id": "agent-toolkit-page",
       "title": "Agent toolkit page",
-      "summary": "A main panel (sidebar → Agent toolkit; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and settings links; MCP servers with status and tools; skills with Host-reported origin, provider and invocation mode; and Memory's start block and note counts. Search and source filters narrow every section. Skill origin is never inferred from filesystem paths, and Host paths are not sent to the browser. It replaces the Tools tab of Settings › Built-in plugins.",
+      "summary": "A main panel (sidebar → Agent Toolkit: Capabilities; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and settings links; MCP servers with status and tools; skills with Host-reported origin, provider and invocation mode; and Memory's start block and note counts. Search and source filters narrow every section. Skill origin is never inferred from filesystem paths, and Host paths are not sent to the browser. It replaces the Tools tab of Settings › Built-in plugins.",
       "reach": [
-        "click button \"Agent toolkit\"",
+        "click button \"Agent Toolkit: Capabilities\"",
         "expect heading \"Agent toolkit\"",
         "expect region \"Tools (*\"",
         "click radio \"Plugins\"",

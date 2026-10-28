@@ -32,9 +32,14 @@ export const CURSOR_LOGIN_HINT = 'cursor-agent login'
 
 const fileAuthSchema = z.object({ accessToken: z.string().min(1) })
 
-export const readCursorToken = async (keyEnv: string, resolveCredential?: CredentialValueResolver): Promise<string | undefined> => {
-  const named = resolveCredential === undefined ? CredentialModel.readKeyFromEnv(keyEnv) : await resolveCredential(keyEnv)
+export const readCursorToken = async (
+  keyEnv: string,
+  resolveCredential?: CredentialValueResolver,
+  authSource?: 'cli' | 'reference',
+): Promise<string | undefined> => {
+  const named = authSource === 'cli' ? '' : resolveCredential === undefined ? CredentialModel.readKeyFromEnv(keyEnv) : await resolveCredential(keyEnv)
   if (named.length > 0) return named
+  if (authSource === 'reference') return undefined
   const fromKeychain = await readKeychainSecret({ service: 'cursor-access-token', account: 'cursor-user' })
   if (fromKeychain !== undefined) return fromKeychain
   try {
@@ -55,7 +60,7 @@ const planSchema = z.object({
 const cursorUsageSchema = z.object({
   billingCycleEnd: z.string().optional(),
   membershipType: z.string().optional(),
-  individualUsage: z.object({ plan: planSchema.optional() }).optional(),
+  individualUsage: z.object({ plan: planSchema.nullish() }).nullish(),
 })
 
 export class CursorAccountModel {
@@ -95,9 +100,15 @@ export class CursorAccountModel {
   }
 }
 
-export const readCursorUsage = async (keyEnv: string, signal?: AbortSignal, resolveCredential?: CredentialValueResolver): Promise<UsageCard> => {
+export const readCursorUsage = async (
+  keyEnv: string,
+  signal?: AbortSignal,
+  resolveCredential?: CredentialValueResolver,
+  onAuthenticated?: () => void,
+  authSource?: 'cli' | 'reference',
+): Promise<UsageCard> => {
   if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
-  const token = await readCursorToken(keyEnv, resolveCredential)
+  const token = await readCursorToken(keyEnv, resolveCredential, authSource)
   if (token === undefined) return ProviderUsageModel.emptyUsage('unauthenticated', `Sign in with ${CURSOR_LOGIN_HINT}.`)
   const cookie = CursorAccountModel.cursorSessionCookie(token)
   if (cookie === undefined)
@@ -112,7 +123,19 @@ export const readCursorUsage = async (keyEnv: string, signal?: AbortSignal, reso
     if (response.status === 401 || response.status === 403)
       return ProviderUsageModel.emptyUsage('unauthenticated', `Cursor rejected this login; run ${CURSOR_LOGIN_HINT}.`)
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Cursor returned ${String(response.status)} for usage.`)
-    return CursorAccountModel.parseCursorUsage(await response.json())
+    const raw: JsonValue = await response.json()
+    const parsed = cursorUsageSchema.safeParse(raw)
+    if (parsed.success) {
+      const plan = parsed.data.individualUsage?.plan
+      const positive =
+        parsed.data.membershipType?.trim() ||
+        plan === null ||
+        plan?.enabled !== undefined ||
+        plan?.totalPercentUsed !== undefined ||
+        (plan?.used !== undefined && plan.limit !== undefined)
+      if (positive && !signal?.aborted) onAuthenticated?.()
+    }
+    return CursorAccountModel.parseCursorUsage(raw)
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Cursor usage could not be read.')
   }

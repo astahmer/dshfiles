@@ -5,9 +5,11 @@ import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import { FastModeService } from './codex-fast-mode.js'
 import { createCommandCodeProvider } from './commandcode-provider.js'
-import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
+import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
+import { AccountModelSettingsModel, type AccountModelSettings } from './account-model-settings.js'
+import { AccountDraftModel } from './account-draft.js'
 
-const modelsFor = (profile: ReturnType<typeof buildProfile>) => {
+const modelsFor = (profile: ReturnType<typeof ProviderProfileModel.buildProfile>) => {
   if (profile.piProvider === undefined) throw new Error('The resolved profile must expose its provider.')
   return profile.piProvider.getModels()
 }
@@ -15,8 +17,16 @@ const modelsFor = (profile: ReturnType<typeof buildProfile>) => {
 const disabledFastMode = new FastModeService({ isAvailable: () => false, isLiveSession: () => true, isEnabledByDefault: () => false })
 
 describe('account provider profiles', () => {
+  it('retains native provenance when an account has a redundant additional ID', () => {
+    const upstream = openaiCodexProvider()
+    const native = upstream.getModels()[0]
+    if (native === undefined) throw new Error('Expected native catalog')
+    const profile = ProviderProfileModel.buildProfile({ upstream, provider: 'test', displayName: 'Test', additionalModelIds: [native.id, 'custom-only'] })
+    expect(ProviderProfileModel.nativeModelIdsForProfile(profile).has(native.id)).toBe(true)
+    expect(ProviderProfileModel.nativeModelIdsForProfile(profile).has('custom-only')).toBe(false)
+  })
   it.each(['gpt-6.1-sol', 'gpt-6.1-luna', 'gpt-6.1'])('inherits matching GPT family capabilities for %s instead of Spark', async modelId => {
-    const profile = buildProfile({
+    const profile = ProviderProfileModel.buildProfile({
       upstream: openaiCodexProvider(),
       provider: 'codex-emialex',
       displayName: 'CodexEmiAlex',
@@ -48,13 +58,13 @@ describe('account provider profiles', () => {
   })
 
   it('bounds a silent OpenCode Go route sooner than a silently reasoning Codex route', () => {
-    const opencodeGo = buildProfile({
+    const opencodeGo = ProviderProfileModel.buildProfile({
       upstream: opencodeGoProvider(),
       provider: 'opencode-go-alex',
       displayName: 'OpenCode Go Alex',
       additionalModelIds: [],
     })
-    const codex = buildProfile({
+    const codex = ProviderProfileModel.buildProfile({
       upstream: openaiCodexProvider(),
       provider: 'codex-alex2',
       displayName: 'Codex Alex2',
@@ -70,7 +80,7 @@ describe('account provider profiles', () => {
     const profiles = new Map([
       [
         'codex-alex2',
-        buildProfile({
+        ProviderProfileModel.buildProfile({
           upstream: openaiCodexProvider(),
           provider: 'codex-alex2',
           displayName: 'Codex Alex2',
@@ -80,7 +90,7 @@ describe('account provider profiles', () => {
       ],
       [
         'codex-emialex',
-        buildProfile({
+        ProviderProfileModel.buildProfile({
           upstream: openaiCodexProvider(),
           provider: 'codex-emialex',
           displayName: 'CodexEmiAlex',
@@ -117,7 +127,7 @@ describe('account provider profiles', () => {
   })
 
   it('uses GitHub Copilot model metadata for each account route', () => {
-    const profile = buildProfile({
+    const profile = ProviderProfileModel.buildProfile({
       upstream: githubCopilotProvider(),
       provider: 'github-copilot-work',
       displayName: 'GitHub Copilot Work',
@@ -130,7 +140,7 @@ describe('account provider profiles', () => {
   })
 
   it('offers a custom OpenCode Go model the catalog already knows and keeps non-favorites available', () => {
-    const profile = buildProfile({
+    const profile = ProviderProfileModel.buildProfile({
       upstream: opencodeGoProvider(),
       provider: 'opencode-go-alex',
       displayName: 'OpenCode Go Alex',
@@ -150,7 +160,7 @@ describe('account provider profiles', () => {
   })
 
   it('builds a discovered Command Code model from its own capabilities, not a neighbour', () => {
-    const profile = buildProfile({
+    const profile = ProviderProfileModel.buildProfile({
       upstream: createCommandCodeProvider(),
       provider: 'commandcode-work',
       displayName: 'Command Code Work',
@@ -163,7 +173,7 @@ describe('account provider profiles', () => {
   })
 
   it('retries a content-free settlement instead of ending the turn', () => {
-    const profile = buildProfile({
+    const profile = ProviderProfileModel.buildProfile({
       upstream: createCommandCodeProvider(),
       provider: 'commandcode-work',
       displayName: 'Command Code Work',
@@ -173,7 +183,7 @@ describe('account provider profiles', () => {
   })
 
   it('removes hidden models from routes while UI fallback retains IDs for recovery', () => {
-    const profile = buildProfile({
+    const profile = ProviderProfileModel.buildProfile({
       upstream: opencodeGoProvider(),
       provider: 'opencode-go-alex',
       displayName: 'OpenCode Go Alex',
@@ -191,7 +201,12 @@ describe('Codex upstream replay overflow', () => {
   const fakeCodexToken = `e30.${claims}.sig`
 
   const finishOf = async (body: string, status: number) => {
-    const profile = buildProfile({ upstream: openaiCodexProvider(), provider: 'codex-test', displayName: 'Codex Test', additionalModelIds: [] })
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'codex-test',
+      displayName: 'Codex Test',
+      additionalModelIds: [],
+    })
     const model = modelsFor(profile)[0]
     if (model === undefined) throw new Error('The Codex profile must offer a model.')
     const adapter = new EffortPinnedAdapter(
@@ -243,8 +258,19 @@ describe('Codex upstream replay overflow', () => {
 })
 
 describe('OpenCode Go DeepSeek thinking', () => {
-  const wireBody = async (model: string, reasoningEffort?: string, upstream = opencodeGoProvider()): Promise<Record<string, unknown>> => {
-    const profile = buildProfile({ upstream, provider: 'opencode-go-test', displayName: 'OpenCode Go Test', additionalModelIds: [] })
+  const wireBody = async (
+    model: string,
+    reasoningEffort?: string,
+    upstream = opencodeGoProvider(),
+    settings: Partial<AccountModelSettings> = {},
+  ): Promise<Record<string, unknown>> => {
+    const account = { ...AccountDraftModel.newAccountDraft({ kind: 'opencode-go', existing: [] }), ...settings }
+    const profile = ProviderProfileModel.buildProfile({
+      upstream,
+      provider: 'opencode-go-test',
+      displayName: 'OpenCode Go Test',
+      ...AccountModelSettingsModel.effectiveModelSettings(account),
+    })
     const adapter = new EffortPinnedAdapter(
       {
         profiles: () => new Map([['opencode-go-test', profile]]),
@@ -254,7 +280,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
           authContext: { env: async () => undefined, fileExists: async () => false },
         },
       },
-      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
+      { reasoningDefaults: new Map([['opencode-go-test', ProviderProfileModel.reasoningDefaultsForProfile(profile)]]), fastMode: disabledFastMode },
     )
     const originalFetch = globalThis.fetch
     let body: Record<string, unknown> = {}
@@ -278,7 +304,12 @@ describe('OpenCode Go DeepSeek thinking', () => {
   }
 
   it('offers off on DeepSeek V4.1 Flash with high as its default effort', async () => {
-    const profile = buildProfile({ upstream: opencodeGoProvider(), provider: 'opencode-go-test', displayName: 'OpenCode Go Test', additionalModelIds: [] })
+    const profile = ProviderProfileModel.buildProfile({
+      upstream: opencodeGoProvider(),
+      provider: 'opencode-go-test',
+      displayName: 'OpenCode Go Test',
+      additionalModelIds: [],
+    })
     const adapter = new EffortPinnedAdapter(
       {
         profiles: () => new Map([['opencode-go-test', profile]]),
@@ -299,6 +330,53 @@ describe('OpenCode Go DeepSeek thinking', () => {
     expect(await wireBody('deepseek-v4.1-flash', 'off')).toMatchObject({ thinking: { type: 'disabled' } })
     const omitted = await wireBody('deepseek-v4.1-flash')
     expect(omitted).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'high' })
+  })
+
+  it('applies account default, then model override, while an explicit request still wins on the wire', async () => {
+    expect(await wireBody('deepseek-v4.1-flash', undefined, opencodeGoProvider(), { defaultReasoningEffort: 'low' })).toMatchObject({ reasoning_effort: 'low' })
+    const overrides = { defaultReasoningEffort: 'low', reasoningDefaults: { 'deepseek-v4.1-flash': 'high' } }
+    expect(await wireBody('deepseek-v4.1-flash', undefined, opencodeGoProvider(), overrides)).toMatchObject({ reasoning_effort: 'high' })
+    expect(await wireBody('deepseek-v4.1-flash', 'off', opencodeGoProvider(), overrides)).toMatchObject({ thinking: { type: 'disabled' } })
+    expect(await wireBody('deepseek-v4.1-flash', undefined, opencodeGoProvider(), { ...overrides, inheritModelSettings: true })).toMatchObject({
+      reasoning_effort: 'high',
+    })
+    expect(await wireBody('deepseek-v4.1-flash', undefined, opencodeGoProvider(), { defaultReasoningEffort: 'invalid' })).toMatchObject({
+      reasoning_effort: 'high',
+    })
+  })
+
+  it('never publishes unsupported pins and keeps native catalog settings when inheriting', () => {
+    const account = {
+      ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
+      defaultReasoningEffort: 'max',
+      reasoningDefaults: { 'gpt-5.3-codex-spark': 'invented' },
+      hiddenModelIds: ['gpt-5.3-codex-spark'],
+    }
+    const customized = ProviderProfileModel.buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'test',
+      displayName: 'Test',
+      ...AccountModelSettingsModel.effectiveModelSettings(account),
+    })
+    expect(ProviderProfileModel.reasoningDefaultsForProfile(customized)['gpt-5.3-codex-spark']).toBeUndefined()
+    const inherited = ProviderProfileModel.buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'test',
+      displayName: 'Test',
+      ...AccountModelSettingsModel.effectiveModelSettings({ ...account, inheritModelSettings: true }),
+    })
+    expect(ProviderProfileModel.reasoningDefaultsForProfile(inherited)).toEqual({})
+    expect(modelsFor(inherited).some(model => model.id === 'gpt-5.3-codex-spark')).toBe(true)
+    const invalid = ProviderProfileModel.buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'test',
+      displayName: 'Test',
+      additionalModelIds: [],
+      reasoningDefaults: { 'gpt-5.3-codex-spark': 'invented' },
+      defaultReasoningEffort: 'invented',
+    })
+    expect(ProviderProfileModel.reasoningDefaultsForProfile(invalid)).toEqual({})
+    expect(invalid.modelOverrides).toBeUndefined()
   })
 
   it('leaves a DeepSeek model whose catalog already offered off unchanged', async () => {

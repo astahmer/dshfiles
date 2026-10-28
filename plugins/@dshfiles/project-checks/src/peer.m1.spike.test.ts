@@ -5,9 +5,6 @@ import { PeerSnapshotModel, type PeerShellRunner } from './remote.js'
 
 const spike = process.env.DSH_PEER_SPIKE === '1'
 const repoCwd = process.cwd()
-const peerHost = process.env.DSH_PEER_SSH ?? 'm1-perso'
-const peerWorkspace = process.env.DSH_PEER_WORKSPACE ?? '/Users/astahmer/dev/dshfiles-check'
-const peerGitRemote = process.env.DSH_PEER_GIT_REMOTE ?? 'm1'
 const runPeerSnapshot = PeerSnapshotModel.run
 
 const jj = async (args: readonly string[]): Promise<string> => (await runProcess({ file: 'jj', args, cwd: repoCwd, timeoutMs: 60_000 })).stdout.trim()
@@ -17,26 +14,30 @@ const jj = async (args: readonly string[]): Promise<string> => (await runProcess
  * DSH_PEER_GIT_REMOTE after the peer's bare repository and checker workspace exist.
  */
 describe.skipIf(!spike)('peer host spike', () => {
-  const remote = remoteHostSchema.parse({
-    id: 'peer',
-    sshTarget: peerHost,
-    gitRemote: peerGitRemote,
-    peerRemote: 'origin',
-    workspace: peerWorkspace,
-    toolchain: ['mise', 'exec', 'node@22.23.3', '--'],
-    install: {
-      command: ['pnpm', 'install', '--frozen-lockfile'],
-      whenPaths: ['pnpm-lock.yaml', 'pnpm-workspace.yaml'],
-      timeoutMs: 900_000,
-    },
-  })
+  // Parse only when an opted-in test runs. Every remote target must be supplied
+  // explicitly; collecting this skipped suite must not select a maintainer's host.
+  const configuredPeer = () =>
+    remoteHostSchema.parse({
+      id: 'peer',
+      sshTarget: process.env.DSH_PEER_SSH,
+      gitRemote: process.env.DSH_PEER_GIT_REMOTE,
+      peerRemote: 'origin',
+      workspace: process.env.DSH_PEER_WORKSPACE,
+      toolchain: ['mise', 'exec', 'node@22.23.3', '--'],
+      install: {
+        command: ['pnpm', 'install', '--frozen-lockfile'],
+        whenPaths: ['pnpm-lock.yaml', 'pnpm-workspace.yaml'],
+        timeoutMs: 900_000,
+      },
+    })
 
   const runLocalGit = async ({ args, timeoutMs }: { readonly args: readonly string[]; readonly timeoutMs: number }) =>
     runProcess({ file: 'jj', args, cwd: repoCwd, timeoutMs })
   const runPeerShell: PeerShellRunner = async ({ command, timeoutMs }) =>
-    runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, remote.sshTarget, command], cwd: repoCwd, timeoutMs })
+    runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, configuredPeer().sshTarget, command], cwd: repoCwd, timeoutMs })
 
   it('runs the real repo check on M1 and keeps the revision identity', async () => {
+    const remote = configuredPeer()
     const revision = await jj(['log', '--no-graph', '-r', '@', '--template', 'commit_id'])
     const changeId = await jj(['log', '--no-graph', '-r', '@', '--template', 'change_id'])
     const startedAt = Date.now()
@@ -67,6 +68,7 @@ describe.skipIf(!spike)('peer host spike', () => {
   }, 1_800_000)
 
   it('reports a real failing action exit code from M1', async () => {
+    const remote = configuredPeer()
     const outcome = await runPeerSnapshot({
       remote,
       revision: await jj(['log', '--no-graph', '-r', '@', '--template', 'commit_id']),
@@ -79,6 +81,7 @@ describe.skipIf(!spike)('peer host spike', () => {
   }, 600_000)
 
   it('surfaces an unreachable peer as a protocol failure', async () => {
+    const remote = configuredPeer()
     const missingHost: PeerShellRunner = async ({ command, timeoutMs }) =>
       runProcess({ file: 'ssh', args: [...PeerSnapshotModel.sshOptions, 'dsh-peer.invalid', command], cwd: repoCwd, timeoutMs })
     const outcome = await runPeerSnapshot({

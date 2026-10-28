@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { sendMessage } from '../threads.js'
@@ -38,7 +39,7 @@ When('the AI Accounts plugin is disabled from another tab', async ({ page }: { p
   } finally {
     await otherTab.close()
   }
-  await expect(page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'AI Accounts', exact: true })).toHaveCount(0)
+  await expect(globalPanelLink(page, 'AI Accounts: Accounts')).toHaveCount(0)
 })
 
 Then('\\/goto offers palette actions, registered panels and only the nonblank recent thread {string}', async ({ page }: { page: Page }, title: string) => {
@@ -46,7 +47,13 @@ Then('\\/goto offers palette actions, registered panels and only the nonblank re
     await expect(goToGroup(page, 'Actions').getByRole('option')).toHaveText([/^Open command palette/, /^Search threads/])
   })
   await recordAssertion(page, 'sidebar-commands-panels-follow-registered-panels', async () => {
-    await expect(goToGroup(page, 'Panels').getByRole('option')).toHaveText([/^AI Accounts/, /^Automation tasks/, /^Plugins/, /^Quota forecast/, /^Usage history/])
+    await expect(goToGroup(page, 'Panels').getByRole('option')).toHaveText([
+      /^AI Accounts: Accounts/,
+      /^AI Accounts: Quota forecast/,
+      /^AI Accounts: Usage history/,
+      /^Automation tasks/,
+      /^Plugins/,
+    ])
   })
   await recordAssertion(page, 'sidebar-commands-recent-sessions-skip-blank-threads', async () => {
     await expect(goToGroup(page, 'Sessions').getByRole('option')).toHaveCount(1)
@@ -90,7 +97,7 @@ Then('\\/goto offers no palette actions', async ({ page }: { page: Page }) => {
 
 Then('picking the AI Accounts row reports a stale panel and stays put', async ({ page }: { page: Page }) => {
   await goToGroup(page, 'Panels')
-    .getByRole('option', { name: /^AI Accounts/ })
+    .getByRole('option', { name: /^AI Accounts: Accounts/ })
     .click()
   await recordAssertion(page, 'sidebar-commands-stale-panel-is-reported', async () => {
     await expect(page.getByRole('alert').filter({ hasText: 'That panel is no longer registered.' })).toBeVisible()

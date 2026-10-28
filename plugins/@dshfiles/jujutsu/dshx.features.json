@@ -6,7 +6,7 @@
       "title": "Locate landmarks and compare revision ancestry",
       "summary": "Jump to Current, main@origin, main or Default in one click; compare from toolbar or revision menu only when needed, then highlight the path, show changes since target, or open an ancestry view.",
       "reach": [
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -61,7 +61,7 @@
       "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed boundary at the selected bookmark's remote-tracking revision; search descriptions, IDs and revision labels, and filter by author, mine, immutability, or date.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "click tab \"Workspaces\"",
         "expect text \"JJ workspace\"",
@@ -159,6 +159,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "jujutsu.git-auto-init",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "jujutsu.stale-repository-recovery",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
@@ -191,7 +196,7 @@
       "title": "Inspect revisions and changed files",
       "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change; the Host stores review progress so every browser and CLI shares it.",
       "reach": [
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -334,7 +339,7 @@
       "title": "Preview and confirm repository mutations",
       "summary": "Create, squash, duplicate, revert, rebase, set bookmarks, restore, split, and abandon changes only after a single-use preview bound to exact repository state.",
       "reach": [
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -394,7 +399,7 @@
       "title": "Create a workspace at a revision",
       "summary": "Right-click a revision and choose New workspace here\u2026 to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -549,7 +554,7 @@
       "title": "Clean up idle JJ workspaces",
       "summary": "The repository menu's Clean up JJ workspaces dialog accepts 1-, 6-, and 24-hour presets or a custom whole-hour inactivity threshold, previews what qualifies, then starts a background removal job that survives closing the panel: a trail under the panel header reports scanning, each removed or kept workspace, the empty revisions it abandons, and keeps the last result until dismissed. Other JJ workspaces are manual-only and unchecked by default; checking them runs normal jj status to detect unsnapshotted changes, which it snapshots into the working-copy revision while preserving the files.",
       "reach": [
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -608,7 +613,7 @@
       "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace\u2026: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folder, files and commits.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -664,7 +669,7 @@
       "title": "Keep one repository per Jujutsu tab, thread and dock",
       "summary": "Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The page header's copy-plus button opens the repository on screen in another main tab through @dshfiles/main-tabs, named after that repository and renamed after whichever one the tab shows later; picking another tab restores its own state. A thread's right-panel Jujutsu page opens on that thread's project instead of the last repository picked anywhere, and the global dock keeps its own.",
       "reach": [
-        "click button \"Jujutsu\"",
+        "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -674,7 +679,7 @@
         "expect tab \"Jujutsu \u00b7 sample*\"",
         "click tab \"Source Control\"",
         "expect textbox \"Working copy description\"",
-        "click tab \"Jujutsu\"",
+        "click tab \"Jujutsu: Revision graph\"",
         "expect button \"Locate Current\"",
         "click tab \"Jujutsu \u00b7 sample*\"",
         "expect textbox \"Working copy description\"",

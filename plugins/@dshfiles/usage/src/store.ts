@@ -202,9 +202,18 @@ const bucketRowSchema = z.object({
   cache_read: z.number(),
   cache_write: z.number(),
   output: z.number(),
+  missing_usage: z.number(),
+  unpriced: z.number(),
 })
 
-const breakdownRowSchema = z.object({ key: z.string().nullable(), cost: z.number(), requests: z.number(), tokens: z.number() })
+const breakdownRowSchema = z.object({
+  key: z.string().nullable(),
+  cost: z.number(),
+  requests: z.number(),
+  tokens: z.number(),
+  missing_usage: z.number(),
+  unpriced: z.number(),
+})
 const latencyRowSchema = z.object({ start: z.number(), ttft_ms: numberColumn, duration_ms: numberColumn })
 const threadRowSchema = z.object({ session_id: z.string(), title: textColumn, project: textColumn, cost: z.number(), requests: z.number() })
 const toolRowSchema = z.object({
@@ -345,6 +354,8 @@ const summaryRowSchema = z.object({
   cache_write: z.number(),
   output: z.number(),
   unpriced: z.number(),
+  missing_usage: z.number(),
+  average_duration_ms: numberColumn,
   cacheSavings: z.number(),
   turns: z.number().int(),
 })
@@ -636,9 +647,18 @@ export const openUsageStore = (path: string) => {
     prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(key, value)
   }
 
-  const rangeFilter = (query: { readonly from: number; readonly to: number; readonly purposes?: readonly string[] | undefined }) => {
+  const rangeFilter = (query: {
+    readonly from: number
+    readonly to: number
+    readonly purposes?: readonly string[] | undefined
+    readonly provider?: string | undefined
+  }) => {
     const clauses = [VISIBLE_SQL, 'r.started_at >= ?', 'r.started_at < ?']
     const params: SQLInputValue[] = [query.from, query.to]
+    if (query.provider !== undefined) {
+      clauses.push('r.provider = ? COLLATE BINARY')
+      params.push(query.provider)
+    }
     if (query.purposes !== undefined && query.purposes.length > 0) {
       clauses.push(`r.purpose IN (${query.purposes.map(() => '?').join(', ')})`)
       params.push(...query.purposes)
@@ -647,7 +667,7 @@ export const openUsageStore = (path: string) => {
   }
 
   const requestFilter = (query: RequestQuery, withPurposes: boolean) => {
-    const filter = rangeFilter(withPurposes ? query : { from: query.from, to: query.to })
+    const filter = rangeFilter(withPurposes ? query : { from: query.from, to: query.to, provider: query.provider })
     if (query.search !== undefined) {
       const like = `%${query.search.toLowerCase().replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
       filter.clauses.push(
@@ -685,6 +705,7 @@ export const openUsageStore = (path: string) => {
     )
     const total = statusCounts.reduce((sum, row) => sum + row.count, 0)
     return {
+      ...(query.provider === undefined ? {} : { appliedProvider: query.provider }),
       rows: rows.map((row): RequestView => ({
         id: row.id,
         sessionId: row.session_id,
@@ -725,6 +746,8 @@ export const openUsageStore = (path: string) => {
            COALESCE(SUM(r.input), 0) AS input, COALESCE(SUM(r.cache_read), 0) AS cache_read,
            COALESCE(SUM(r.cache_write), 0) AS cache_write, COALESCE(SUM(r.output), 0) AS output,
            COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced,
+           COALESCE(SUM(r.input IS NULL OR r.output IS NULL OR r.cache_read IS NULL OR r.cache_write IS NULL), 0) AS missing_usage,
+           AVG(CASE WHEN r.ended_at >= r.started_at THEN r.ended_at - r.started_at END) AS average_duration_ms,
            COALESCE(SUM(${CACHE_SAVINGS_SQL}), 0) AS cacheSavings, ${TURNS_SQL} AS turns
          FROM ${FROM_SQL} WHERE ${filter.clauses.join(' AND ')}`,
       ).get(...filter.params),
@@ -743,11 +766,20 @@ export const openUsageStore = (path: string) => {
         .array(breakdownRowSchema)
         .parse(
           prepare(
-            `SELECT ${dimensionSql[dimension]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens
+            `SELECT ${dimensionSql[dimension]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens,
+               COALESCE(SUM(r.input IS NULL OR r.output IS NULL OR r.cache_read IS NULL OR r.cache_write IS NULL), 0) AS missing_usage,
+               COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
              FROM ${FROM_SQL} WHERE ${where} GROUP BY key ORDER BY cost DESC, requests DESC`,
           ).all(...filter.params),
         )
-        .map(row => ({ key: row.key ?? '(none)', cost: row.cost, requests: row.requests, tokens: row.tokens }))
+        .map(row => ({
+          key: row.key ?? '(none)',
+          cost: row.cost,
+          requests: row.requests,
+          tokens: row.tokens,
+          missingUsage: row.missing_usage,
+          unpriced: row.unpriced,
+        }))
 
     const byDimension = { model: breakdown('model'), provider: breakdown('provider'), project: breakdown('project') }
     const ranked = query.groupBy === 'purpose' ? breakdown('purpose') : byDimension[query.groupBy]
@@ -758,7 +790,9 @@ export const openUsageStore = (path: string) => {
       prepare(
         `SELECT ${bucketSql} AS start, ${dimensionSql[query.groupBy]} AS key, COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests,
            COALESCE(SUM(r.status = 'failed'), 0) AS failed, COALESCE(SUM(r.input), 0) AS input, COALESCE(SUM(r.cache_read), 0) AS cache_read,
-           COALESCE(SUM(r.cache_write), 0) AS cache_write, COALESCE(SUM(r.output), 0) AS output
+           COALESCE(SUM(r.cache_write), 0) AS cache_write, COALESCE(SUM(r.output), 0) AS output,
+            COALESCE(SUM(r.input IS NULL OR r.output IS NULL OR r.cache_read IS NULL OR r.cache_write IS NULL), 0) AS missing_usage,
+            COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
          FROM ${FROM_SQL} WHERE ${where} GROUP BY start, key ORDER BY start`,
       ).all(...filter.params),
     )
@@ -777,6 +811,8 @@ export const openUsageStore = (path: string) => {
         cacheRead: (previous?.cacheRead ?? 0) + row.cache_read,
         cacheWrite: (previous?.cacheWrite ?? 0) + row.cache_write,
         output: (previous?.output ?? 0) + row.output,
+        missingUsage: (previous?.missingUsage ?? 0) + row.missing_usage,
+        unpriced: (previous?.unpriced ?? 0) + row.unpriced,
       })
     }
 
@@ -817,8 +853,9 @@ export const openUsageStore = (path: string) => {
 
     const current = summaryOf(filter)
     const span = query.to - query.from
-    const previous = summaryOf(rangeFilter({ from: query.from - span, to: query.from, purposes: query.purposes }))
+    const previous = summaryOf(rangeFilter({ from: query.from - span, to: query.from, purposes: query.purposes, provider: query.provider }))
     return {
+      ...(query.provider === undefined ? {} : { appliedProvider: query.provider }),
       summary: {
         cost: current.cost,
         requests: current.requests,
@@ -829,9 +866,14 @@ export const openUsageStore = (path: string) => {
         cacheWrite: current.cache_write,
         output: current.output,
         unpriced: current.unpriced,
+        missingUsage: current.missing_usage,
+        averageDurationMs: current.average_duration_ms,
         cacheSavings: current.cacheSavings,
         turns: current.turns,
         previous: {
+          missingUsage: previous.missing_usage,
+          unpriced: previous.unpriced,
+          averageDurationMs: previous.average_duration_ms,
           cost: previous.cost,
           requests: previous.requests,
           tokens: previous.input + previous.cache_read + previous.cache_write + previous.output,

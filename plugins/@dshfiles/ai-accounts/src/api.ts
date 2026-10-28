@@ -18,10 +18,22 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
 
 export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
 
+export const createSetupAccountInputSchema = z.object({ kind: accountKindSchema, requestId: z.uuid() })
+export type CreateSetupAccountInput = z.infer<typeof createSetupAccountInputSchema>
+
 /** Model-facing text for a structured result the tools below return. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
 export const accountOrderDirectionSchema = z.enum(['earlier', 'later'])
+
+export const accountReorderSchema = z.object({
+  instanceId: z.string().min(1).max(64),
+  targetInstanceId: z.string().min(1).max(64),
+  placement: z.enum(['before', 'after']),
+  /** Optional same-provider snapshot: reject a stale drag rather than overwrite a concurrent priority change. */
+  expectedOrder: z.array(z.string().min(1).max(64)).max(64).optional(),
+})
+export type AccountReorder = z.infer<typeof accountReorderSchema>
 
 export const accountModeSchema = z.enum(['direct', 'authOverlay'])
 
@@ -128,6 +140,8 @@ export const accountProfileSchema = z.object({
   shadowHomePath: homePathSchema,
   /** Keyed accounts name an environment variable instead of carrying a value. */
   apiKeyEnv: apiKeyEnvSchema,
+  /** Explicit credential ownership; absent preserves legacy environment/CLI discovery precedence. */
+  authSource: z.enum(['cli', 'reference']).optional(),
   /** Command Code accounts may point at a different API base. */
   apiBaseUrl: apiBaseUrlSchema,
   badge: z.string().max(32),
@@ -147,6 +161,10 @@ export const accountProfileSchema = z.object({
    * default, so an account only lists the models it wants to pin.
    */
   reasoningDefaults: z.record(z.string().max(160), z.string().max(32)).default({}),
+  /** Missing preserves legacy curation; true suspends local settings without deleting them. */
+  inheritModelSettings: z.boolean().optional(),
+  /** Used only on models supporting this effort, after a per-model override. Null/absent means provider default. */
+  defaultReasoningEffort: z.string().min(1).max(32).nullable().optional(),
   /** Model ids this account never shows, so the picker stays short. */
   hiddenModelIds: z.array(z.string().max(160)).max(500).default([]),
   /** Model ids to surface first. */
@@ -167,16 +185,46 @@ export const accountDraftSchema = accountProfileSchema.pick({
   homePath: true,
   shadowHomePath: true,
   apiKeyEnv: true,
+  authSource: true,
   apiBaseUrl: true,
   badge: true,
   accentColor: true,
   providerIcon: true,
   additionalModelIds: true,
   reasoningDefaults: true,
+  inheritModelSettings: true,
+  defaultReasoningEffort: true,
   hiddenModelIds: true,
   favoriteModelIds: true,
   modelOrder: true,
 })
+
+export const accountConnectionMethodSchema = z.enum(['device', 'subscription', 'key', 'cli', 'reference'])
+export type AccountConnectionMethod = z.infer<typeof accountConnectionMethodSchema>
+export const prepareAccountConnectionInputSchema = createSetupAccountInputSchema.extend({
+  mode: accountConnectionMethodSchema.optional(),
+  existingInstanceId: z.string().min(1).max(64).optional(),
+})
+export type PrepareAccountConnectionInput = z.infer<typeof prepareAccountConnectionInputSchema>
+export const accountConnectionSnapshotSchema = z.object({
+  operationId: z.uuid(),
+  instanceId: z.string().min(1).max(64),
+  status: z.enum(['pending', 'verifying', 'complete', 'discarded']),
+  method: accountConnectionMethodSchema,
+  expiresAt: z.number(),
+  account: accountProfileSchema.nullable(),
+})
+export type AccountConnectionSnapshot = z.infer<typeof accountConnectionSnapshotSchema>
+const connectionIdentitySchema = z.object({ operationId: z.uuid().transform(value => value.toLowerCase()) })
+export const configureAccountConnectionInputSchema = connectionIdentitySchema.extend({
+  displayName: z.string().trim().pipe(accountDraftSchema.shape.displayName).optional(),
+  mode: accountConnectionMethodSchema.optional(),
+  homePath: homePathSchema.optional(),
+  shadowHomePath: homePathSchema.optional(),
+  apiKeyEnv: apiKeyEnvSchema.optional(),
+  apiBaseUrl: apiBaseUrlSchema.optional(),
+})
+export type ConfigureAccountConnectionInput = z.infer<typeof configureAccountConnectionInputSchema>
 
 export const accountsFileSchema = z.object({
   distribution: z.enum(['sticky', 'priority', 'round-robin', 'balanced']),
@@ -230,6 +278,8 @@ export const accountsCatalogSchema = z.object({
       name: z.string().max(200),
       efforts: z.array(z.object({ id: z.string().max(64), name: z.string().max(80) })).max(12),
       defaultEffort: z.string().max(32).nullable(),
+      /** True only for an account-added ID absent from native and discovered provider catalogs. */
+      accountAdditional: z.boolean().optional(),
     }),
   ),
   warning: z.string().max(200).optional(),
@@ -347,6 +397,65 @@ export const aiAccountsApi = defineApi({
       }),
       output: z.object({ imported: z.literal(true), apiKeyEnv: z.string().max(128) }),
     }),
+    prepareAccountConnection: method({
+      input: prepareAccountConnectionInputSchema,
+      output: accountConnectionSnapshotSchema,
+      description:
+        'Prepare a private provisional account connection without saving it or registering routes. Call only when the user asked to connect an account.',
+      tool: { name: 'ai_accounts_prepare_connection', render: compactJson },
+    }),
+    getAccountConnection: method({
+      input: connectionIdentitySchema,
+      output: accountConnectionSnapshotSchema,
+      description: 'Read a provisional account connection; contains metadata only, never credentials. Read-only.',
+      tool: { name: 'ai_accounts_connection', readOnly: true, render: compactJson },
+    }),
+    configureAccountConnection: method({
+      input: configureAccountConnectionInputSchema,
+      output: accountConnectionSnapshotSchema,
+      description:
+        'Configure a pending connection, including an optional display name for a new account, references and base URL, without saving or publishing routes. Name-only edits do not restart sign-in; rename saved accounts in settings. Call only when the user asked to configure that connection.',
+      tool: { name: 'ai_accounts_configure_connection', render: compactJson },
+    }),
+    // Raw secret entry is browser-only. Agents use the value-free catalog import capability below.
+    stageAccountConnectionKey: method({
+      input: connectionIdentitySchema.extend({ value: z.string().min(1).max(65_536) }),
+      output: accountConnectionSnapshotSchema,
+    }),
+    importAccountConnectionKey: method({
+      input: connectionIdentitySchema.extend({
+        alias: z.string().min(1).max(128),
+        environment: z.string().min(1).max(256),
+        scope: z.enum(['global', 'project', 'local']),
+        cwd: z.string().max(4096).nullable(),
+      }),
+      output: accountConnectionSnapshotSchema,
+      description:
+        'Stage a selected Secret Catalog alias on a pending connection, without publishing an account or revealing the key. Call only when the user asked to import that credential.',
+      tool: { name: 'ai_accounts_import_connection_key', render: compactJson },
+    }),
+    completeAccountConnection: method({
+      input: connectionIdentitySchema,
+      output: accountConnectionSnapshotSchema,
+      description:
+        'Verify account authentication and atomically save a successful connection. Call only when the user asked to finish connecting that account.',
+      tool: { name: 'ai_accounts_complete_connection', render: compactJson },
+    }),
+    discardAccountConnection: method({
+      input: connectionIdentitySchema.extend({ confirm: z.literal(true) }),
+      output: z.object({ discarded: z.literal(true) }),
+      description:
+        'Discard a provisional connection and its owned temporary credentials; existing accounts are preserved. Explicit confirm:true is required. Call only when the user asked to cancel that connection.',
+      tool: { name: 'ai_accounts_discard_connection', render: () => 'Account connection discarded.' },
+    }),
+    /** Legacy clients must fail closed instead of eagerly persisting an unconnected account. */
+    createSetupAccount: method({
+      input: createSetupAccountInputSchema,
+      output: z.object({ instanceId: z.string().min(1).max(64), file: accountsFileSchema }),
+      description:
+        'Retired eager setup endpoint; it refuses without saving an account. Use ai_accounts_prepare_connection followed by verified completion instead. Call only when the user asked to add that account.',
+      tool: { name: 'ai_accounts_create_setup_account', render: output => `Account ${output.instanceId} is ready for setup.` },
+    }),
     /** Create or update one account by its instance id. */
     save: method({
       input: z.object({
@@ -355,6 +464,9 @@ export const aiAccountsApi = defineApi({
         previousInstanceId: z.string().min(1).max(64).optional(),
       }),
       output: accountsFileSchema,
+      description:
+        'Save an account profile or change its enabled/model settings. Stores references and metadata only, never credential values. Call only when the user asked to edit that account.',
+      tool: { name: 'ai_accounts_save_account', render: output => `Saved account settings (${String(output.accounts.length)} account(s)).` },
     }),
     /** Remove one account. */
     remove: method({
@@ -369,6 +481,17 @@ export const aiAccountsApi = defineApi({
       tool: {
         name: 'ai_accounts_move_account',
         render: output => `Account order updated (${String(output.accounts.length)} account(s)).`,
+      },
+    }),
+    /** Atomically place an account before or after another account of the same provider. */
+    reorderAccount: method({
+      input: accountReorderSchema,
+      output: accountsFileSchema,
+      description:
+        'Atomically change true account priority by placing an account before or after a same-provider target. Other provider groups are unchanged. Call only when the user asked for that order.',
+      tool: {
+        name: 'ai_accounts_reorder_account',
+        render: output => `Account priority updated (${String(output.accounts.length)} account(s)).`,
       },
     }),
     /** Change how requests are spread across compatible account routes. */
@@ -395,18 +518,38 @@ export const aiAccountsApi = defineApi({
     }),
     /** Start the GitHub device-code flow for one saved Copilot account. */
     beginCopilotLogin: method({
-      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      input: z.object({
+        instanceId: z.string().min(1).max(64),
+        operationId: z
+          .uuid()
+          .transform(value => value.toLowerCase())
+          .optional(),
+      }),
       output: copilotLoginStateSchema,
+      description:
+        'Start GitHub Copilot device sign-in for a saved account. The user approves in the Web GUI; agent responses omit device codes and URLs. Call only when the user asked to sign in with GitHub.',
+      tool: { name: 'ai_accounts_begin_copilot_login', render: output => compactJson({ ...output, userCode: null, verificationUri: null }) },
     }),
     /** Read the current non-secret state of a Copilot sign-in flow. */
     copilotLoginStatus: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: copilotLoginStateSchema,
+      description: 'Read GitHub Copilot sign-in status without device codes or URLs for agent callers. Read-only.',
+      tool: { name: 'ai_accounts_copilot_login_status', readOnly: true, render: output => compactJson({ ...output, userCode: null, verificationUri: null }) },
     }),
     /** Cancel a device-code flow that has not completed. */
     cancelCopilotLogin: method({
-      input: z.object({ instanceId: z.string().min(1).max(64) }),
+      input: z.object({
+        instanceId: z.string().min(1).max(64),
+        confirm: z.literal(true),
+        operationId: z
+          .uuid()
+          .transform(value => value.toLowerCase())
+          .optional(),
+      }),
       output: z.object({ cancelled: z.literal(true) }),
+      description: 'Cancel a pending GitHub Copilot sign-in. Explicit confirm: true is required. Call only when the user asked to cancel sign-in.',
+      tool: { name: 'ai_accounts_cancel_copilot_login', render: () => 'GitHub Copilot sign-in cancelled.' },
     }),
     /** Remove one Copilot account's stored OAuth grant. */
     signOutCopilot: method({

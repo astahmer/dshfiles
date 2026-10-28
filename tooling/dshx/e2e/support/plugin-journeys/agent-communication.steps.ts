@@ -1,8 +1,9 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
-const communicationPanelButton = (page: Page) => page.getByRole('button', { name: 'Communication', exact: true })
+const communicationPanelButton = (page: Page) => globalPanelLink(page, 'Agent Communication: Messages')
 
 When('the Agent communication panel is opened', async ({ page }: { page: Page }) => {
   await expect(communicationPanelButton(page)).toBeVisible()

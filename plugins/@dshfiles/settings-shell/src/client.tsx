@@ -14,10 +14,11 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime } from '@dee
 import { createApiClient, defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteApi } from '@dshfiles/command-palette/api'
+import { workbenchPanels, NativeAsideOwners } from '@dshfiles/workbench/registry'
 import { SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 import type { ConfigForm, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
@@ -42,6 +43,7 @@ import { preferredSurface, type SettingsSurface } from './settings-preference.js
 import { SettingsDialog, SettingsSidePanel, SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
+import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId } from './workbench-panels.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
@@ -210,15 +212,20 @@ export default defineClient({
       actor.send(sectionId === undefined ? { type: 'open', surface: next } : { type: 'open', surface: next, sectionId })
     }
 
+    const openNativeAside = (): boolean => {
+      if (ctx.sidebarRight.mounted.getSnapshot() === undefined) return false
+      openSidePanelSettings()
+      return true
+    }
+    ctx.effect(() => NativeAsideOwners.register(SETTINGS_PANEL_ID, openNativeAside), 'settings-shell: native aside authority')
     // Settings has a main page and a side-panel tab. Moving between them is this plugin's business, so it answers the
     // strip's request and offers the reverse row on its own side-panel tab.
     ctx.effect(() => {
       const onMovePanelAside = (event: Event): void => {
-        if (!(event instanceof CustomEvent)) return
+        if (!(event instanceof CustomEvent) || event.defaultPrevented) return
         const request = panelAsideRequestSchema.safeParse(event.detail)
-        if (!request.success || request.data.panelId !== SETTINGS_PANEL_ID || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
-        event.preventDefault()
-        openSidePanelSettings()
+        if (!request.success || request.data.panelId !== SETTINGS_PANEL_ID) return
+        if (openNativeAside()) event.preventDefault()
       }
       window.addEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
       return () => window.removeEventListener(PANEL_ASIDE_EVENT, onMovePanelAside)
@@ -250,9 +257,9 @@ export default defineClient({
       'settings-shell: move the side-panel settings to the main view',
     )
 
-    // Bundle manifests title each namespace ("Thread Sidebar" for `thread-sidebar`); read once Settings first opens.
+    // Bundle manifests title each namespace ("Thread Sidebar" for `thread-sidebar`). The workbench lists pages even
+    // while Settings is closed, so resolve this one label snapshot when the provider becomes available.
     const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())
-    let labelsRequested = false
     ctx.inject(['remote.pluginManager'], scoped => {
       const load = (): void => {
         void scoped.remote.pluginManager.listBundles().then(result => {
@@ -273,12 +280,7 @@ export default defineClient({
           labels.set(next)
         })
       }
-      const dispose = subscribeActor(() => {
-        if (labelsRequested || !settingsOpen.getSnapshot()) return
-        labelsRequested = true
-        load()
-      })
-      scoped.effect(() => dispose, 'settings-shell: bundle labels')
+      load()
     })
 
     const describe = ctx.configForms.describe()
@@ -359,8 +361,12 @@ export default defineClient({
     const sections = ledgerProjection<readonly SectionRow[]>(
       () =>
         ctx.slots
-          .entries('settings.section')
-          .map(entry => ({ id: entry.options.id ?? '', order: entry.options.order ?? 0, label: resolveSlotLabel(entry.options.label) ?? '' }))
+          .entriesOfSlot('settings.section')
+          .map(entry => ({
+            id: entry.options.id ?? '',
+            order: entry.options.order ?? 0,
+            label: resolveSlotLabel(entry.options.label) ?? entry.options.id ?? '',
+          }))
           .sort((left, right) => left.order - right.order),
       () => `${ctx.slots.getVersion('settings.section')}:${ctx.locale.getSnapshot().revision}`,
       listener => {
@@ -493,6 +499,65 @@ export default defineClient({
       )
     }
 
+    // The sidebar.settings entry remains the only settings.section declarer. Panels borrow its renderer; they never
+    // register another settings slot or copy a native section implementation. The source exists even while closed.
+    const WorkbenchSources = (props: { readonly renderSlot: ShellRenderSlot }): null => {
+      const renderSlot = useRef(props.renderSlot)
+      renderSlot.current = props.renderSlot
+      useEffect(() => {
+        const registry = workbenchPanels()
+        const openSource = (id: string): void => {
+          if (pluginPages.getSnapshot().some(page => page.pageId === id)) registry.open(settingsWorkbenchPanelId('page', id))
+          else if (sections.getSnapshot().some(row => row.id === id)) registry.open(settingsWorkbenchPanelId('section', id))
+          else openSettings(id)
+        }
+        return registerSettingsWorkbenchPanels(registry, {
+          hub: {
+            title: `Settings Shell: ${t('title')}`,
+            component: createSettingsWorkbenchHub({
+              sections,
+              pages: pluginPages,
+              closeSettings: deps.closeSettings,
+              view: input => settingsViewProps({ ...input, renderSlot: (...args) => renderSlot.current(...args), t }),
+            }),
+          },
+          sections,
+          pages: pluginPages,
+          renderSlot: (...args) => renderSlot.current(...args),
+          renderPage: page => <WorkbenchPluginPage page={page} />,
+          owner: close => ({
+            ...sectionOwner,
+            close,
+            openSection: openSource,
+            openSettingsTarget: (target: { readonly entryId: string; readonly fieldPath: readonly string[] }) => {
+              const page = pluginPages.getSnapshot().find(candidate => candidate.ns === target.entryId)
+              if (page === undefined) return false
+              actor.send({ type: 'focus', field: { sectionId: page.pageId, fieldPath: target.fieldPath } })
+              registry.open(settingsWorkbenchPanelId('page', page.pageId))
+              return true
+            },
+          }),
+          title: label => t('palette.section', { section: label }),
+          closeSettings: deps.closeSettings,
+          decorate,
+        })
+      }, [])
+      return null
+    }
+    const WorkbenchPluginPage = (props: { readonly page: PluginSettingsPage }): JSX.Element => {
+      const field = useObservable(fieldTarget)
+      return (
+        <PluginQueryProvider>
+          <PluginSettingsPageView
+            form={formFor(props.page.ns)}
+            page={props.page}
+            t={t}
+            {...(field?.sectionId === props.page.pageId ? { focusPath: field.fieldPath } : {})}
+          />
+        </PluginQueryProvider>
+      )
+    }
+
     ctx.slots.inject('sidebar.settings', () => {
       const disposeCommand = ctx.shortcuts.register({
         id: openSettingsCommand,
@@ -524,7 +589,16 @@ export default defineClient({
       const disposeSlot = ctx.slots.register(
         { name: 'sidebar.settings', locale: SHELL_LOCALE_NAMESPACE, children: SHELL_CHILDREN },
         decorate((props: { readonly wide: boolean; readonly t: ShellTranslate; readonly renderSlot: ShellRenderSlot }) => (
-          <ShellRoot deps={deps} renderSlot={props.renderSlot} surface={<Surface renderSlot={props.renderSlot} t={props.t} />} t={props.t} wide={props.wide} />
+          <>
+            <WorkbenchSources renderSlot={props.renderSlot} />
+            <ShellRoot
+              deps={deps}
+              renderSlot={props.renderSlot}
+              surface={<Surface renderSlot={props.renderSlot} t={props.t} />}
+              t={props.t}
+              wide={props.wide}
+            />
+          </>
         )),
       )
       return () => {

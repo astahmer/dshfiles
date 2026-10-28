@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
@@ -48,7 +49,7 @@ Then('the item links the @{word} thread {string}', async ({ page }: { page: Page
 })
 
 const openAgentsPanel = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Agents', exact: true }).click()
+  await globalPanelLink(page, 'Agents: Directory').click()
   await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible()
 }
 

@@ -1,7 +1,8 @@
 import type { DockviewApi } from 'dockview-react'
 
 /** The docking regions a panel can live in. */
-export type WorkbenchRegionId = 'main' | 'right' | 'bottom'
+export type NestedSurfacePath = `nested/${string}`
+export type WorkbenchRegionId = 'main' | 'left' | 'right' | 'bottom' | NestedSurfacePath
 
 /** What the registry needs from a surface: which panels it holds. */
 export type WorkbenchRegionSurface = { readonly getPanel: (panelId: string) => object | undefined }
@@ -16,7 +17,7 @@ export interface WorkbenchRegionRegistry<Surface extends WorkbenchRegionSurface 
   readonly holds: (panelId: string) => boolean
 }
 
-const REGION_ORDER: readonly WorkbenchRegionId[] = ['main', 'right', 'bottom']
+const REGION_ORDER: readonly WorkbenchRegionId[] = ['main', 'left', 'right', 'bottom']
 
 export const createWorkbenchRegionRegistry = <Surface extends WorkbenchRegionSurface = DockviewApi>(): WorkbenchRegionRegistry<Surface> => {
   // Each registration carries its own token: a surface that remounts with the
@@ -32,11 +33,13 @@ export const createWorkbenchRegionRegistry = <Surface extends WorkbenchRegionSur
       }
     },
     get: region => slots.get(region)?.api,
-    entries: () =>
-      REGION_ORDER.flatMap(region => {
+    entries: () => {
+      const ordered = [...REGION_ORDER, ...[...slots.keys()].filter(region => region.startsWith('nested/')).sort()]
+      return ordered.flatMap(region => {
         const slot = slots.get(region)
         return slot === undefined ? [] : [[region, slot.api] as const]
-      }),
+      })
+    },
     holds: panelId => [...slots.values()].some(slot => slot.api.getPanel(panelId) !== undefined),
   }
 }

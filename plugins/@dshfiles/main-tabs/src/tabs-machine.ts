@@ -4,12 +4,8 @@ import { and, assign, raise, setup } from '@dshfiles/plugin-ui/machine'
  * What the Host's main view can show. A panel target may also name a scope: the same panel key showing a different
  * subject (Jujutsu on two repositories) in two tabs; the Host only ever sees the panel id.
  */
-export type HostTarget =
-  | { readonly kind: 'panel'; readonly panelId: string; readonly scope?: string | undefined }
-  | { readonly kind: 'thread'; readonly sessionId: string }
-
-/** A tab shows a Host target, or the new-tab page (suggestions of what to open), which only the strip renders. */
-export type TabTarget = HostTarget | { readonly kind: 'start' }
+export type { HostTarget, TabTarget } from '@dshfiles/workbench/tabs'
+import type { HostTarget, TabTarget } from '@dshfiles/workbench/tabs'
 
 export interface Tab {
   readonly id: string
@@ -36,6 +32,10 @@ export interface TabPreferences {
   readonly maxTabs: number
   readonly openMode: OpenMode
   readonly persistence: TabPersistence
+  /** Derived surface policy: Workbench conversations stay open independently of panel previews. */
+  readonly keepConversations?: boolean
+  /** Derived surface policy: Session navigation cannot replace the adopted Workbench scene scope. */
+  readonly keepScope?: boolean
 }
 
 /** A saved tab always shows a Host target: the new-tab page is a moment, not a place, and is never saved. */
@@ -159,13 +159,15 @@ const openTarget = (set: TabSet, target: TabTarget, preferences: TabPreferences,
   if (set.tabs.some(tab => tab.id === id)) {
     return { tabs: set.tabs.map(tab => (tab.id === id ? (title === undefined ? { ...tab, usedAt } : { ...tab, usedAt, title }) : tab)), activeTabId: id }
   }
-  const candidate: Tab = { id, target, pinned: false, preview: preferences.openMode === 'preview', usedAt }
+  const openMode = target.kind === 'thread' && preferences.keepConversations ? 'new' : preferences.openMode
+  const candidate: Tab = { id, target, pinned: false, preview: openMode === 'preview', usedAt }
   const opened: Tab = title === undefined ? candidate : { ...candidate, title }
+  const canReplace = (tab: Tab): boolean => !tab.pinned && !(preferences.keepConversations && tab.target.kind === 'thread')
   const replaced =
-    preferences.openMode === 'preview'
-      ? set.tabs.find(tab => tab.preview && !tab.pinned)
-      : preferences.openMode === 'replace'
-        ? set.tabs.find(tab => tab.id === set.activeTabId && !tab.pinned)
+    openMode === 'preview'
+      ? set.tabs.find(tab => tab.preview && canReplace(tab))
+      : openMode === 'replace'
+        ? set.tabs.find(tab => tab.id === set.activeTabId && canReplace(tab))
         : undefined
   if (replaced !== undefined) {
     return evictPastLimit({ tabs: set.tabs.map(tab => (tab.id === replaced.id ? opened : tab)), activeTabId: id }, preferences.maxTabs)
@@ -286,13 +288,18 @@ export const tabsMachine = setup({
       const target = activeTarget(context)
       if (target === null || target.kind === 'start') return { pendingTarget: null }
       const tabId = tabIdOf(target)
-      if (tabId === context.shownTabId) return { pendingTarget: null }
+      // shownTabId is optimistic until the native source acknowledges it. A
+      // repeated explicit request must retry rather than settle a stale Host.
+      if (tabId === context.shownTabId && sameTarget(context.hostTarget, target)) return { pendingTarget: null }
       return context.ports.navigate(target) ? { pendingTarget: target, shownTabId: tabId } : { pendingTarget: null }
     }),
     followHost: assign(({ context, event }) => {
       if (event.type !== 'host.navigated') return {}
-      const projectChanged = event.projectId !== null && projectKeyOf(event.projectId) !== context.lastProjectKey
-      const lastProjectKey = event.projectId === null ? context.lastProjectKey : projectKeyOf(event.projectId)
+      // Session ownership describes the selected subject, not an explicit scene
+      // switch. Workbench keeps its adopted set/layout key, including a fresh
+      // project:none anchor; native tabs still follow the Host's project.
+      const lastProjectKey = context.preferences.keepScope || event.projectId === null ? context.lastProjectKey : projectKeyOf(event.projectId)
+      const projectChanged = lastProjectKey !== context.lastProjectKey
       const scopeKey = scopeKeyFor(context.preferences, lastProjectKey)
       const scoped = {
         ...context,

@@ -10,7 +10,29 @@ import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
 
-const clientPluginShape = z.object({ name: z.string(), inject: z.array(z.string()), apply: z.function({ input: [z.unknown()], output: z.unknown() }) })
+const clientPluginShape = z.object({
+  name: z.string(),
+  inject: z.array(z.string()),
+  Config: z.unknown().optional(),
+  apply: z.function({ input: [z.unknown(), z.unknown().optional()], output: z.unknown() }),
+})
+const clientRegistrationShape = z.object({
+  factory: z.function({ input: [z.function({ input: [z.string()], output: z.unknown() })], output: z.unknown() }),
+})
+
+function evaluateClientRegistration(code: string) {
+  let registration: unknown
+  vm.runInNewContext(code, {
+    window: {
+      __ModuleLoader__: {
+        load: (value: unknown) => {
+          registration = value
+        },
+      },
+    },
+  })
+  return clientRegistrationShape.parse(registration)
+}
 const isClientPlugin = (value: unknown): value is z.infer<typeof clientPluginShape> => clientPluginShape.safeParse(value).success
 
 async function temporaryProject(): Promise<string> {
@@ -71,10 +93,9 @@ describe('client compiler', () => {
     })
 
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const map = JSON.parse(await readFile(resolve(root, 'dist/client.js.map'), 'utf8')) as {
-      sources: string[]
-      sourcesContent?: Array<string | null>
-    }
+    const map = z
+      .object({ sources: z.array(z.string()), sourcesContent: z.array(z.string().nullable()).optional() })
+      .parse(JSON.parse(await readFile(resolve(root, 'dist/client.js.map'), 'utf8')))
     expect(code).toMatch(/window\.__ModuleLoader__\.load\(\{\s*id: "@dshx\/fixture-plugin"/)
     expect(code).not.toContain(JSON.stringify(root))
     expect(JSON.stringify(map)).not.toContain(root)
@@ -202,20 +223,8 @@ describe('client compiler', () => {
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     expect(code).not.toMatch(/(?:from|require)\(["']dshx\/client/)
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    const plugin = registration.factory(() => ({})) as {
-      name: string
-      inject: string[]
-    }
+    const registration = evaluateClientRegistration(code)
+    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
     expect(plugin.name).toBe('explicit-client')
     expect(plugin.inject).toEqual(['remote'])
   })
@@ -279,17 +288,8 @@ describe('client compiler', () => {
       inject: ['@deepseek-ai/dsh-client-locale'],
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    expect((registration.factory(() => ({})) as { inject: string[] }).inject).toEqual(['locale', 'slots'])
+    const registration = evaluateClientRegistration(code)
+    expect(clientPluginShape.parse(registration.factory(() => ({}))).inject).toEqual(['locale', 'slots'])
   })
 
   it('builds declarative locales through the virtual Client API without a duplicate service injection', async () => {
@@ -326,20 +326,8 @@ describe('client compiler', () => {
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
     expect(code).not.toContain("require('@deepseek-ai/dsh-client-locale")
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    const plugin = registration.factory(() => ({})) as {
-      inject: string[]
-      apply(ctx: unknown): unknown
-    }
+    const registration = evaluateClientRegistration(code)
+    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
     expect(plugin.inject).toEqual(['locale', 'slots'])
     const register = vi.fn(() => vi.fn())
     const bind = vi.fn()
@@ -552,13 +540,8 @@ describe('client compiler', () => {
       outDir: 'dist',
       inject: ['@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation'],
     })
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(await readFile(resolve(root, 'dist/client.js'), 'utf8'), {
-      window: { __ModuleLoader__: { load: (value: typeof registration) => Object.assign(registration, value) } },
-    })
-    expect((registration.factory(() => ({})) as { inject: string[] }).inject).toEqual(['slots', 'sessions'])
+    const registration = evaluateClientRegistration(await readFile(resolve(root, 'dist/client.js'), 'utf8'))
+    expect(clientPluginShape.parse(registration.factory(() => ({}))).inject).toEqual(['slots', 'sessions'])
   })
 
   it('applies the same setup-service validation to the dev watcher', async () => {
@@ -722,16 +705,7 @@ describe('client compiler', () => {
       outDir: 'dist',
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
+    const registration = evaluateClientRegistration(code)
     expect(() => registration.factory(() => ({}))).toThrow('Invalid API id')
     expect(code).not.toContain('@dshfiles/dshx/api')
   })
@@ -782,24 +756,10 @@ describe('client compiler', () => {
       outDir: 'dist',
     })
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    const plugin = registration.factory(() => ({})) as {
-      name: string
-      inject: string[]
-      Config: unknown
-      apply: (ctx: { received?: unknown }, config: unknown) => void
-    }
-    const context: { received?: unknown } = {}
+    const registration = evaluateClientRegistration(code)
+    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
     const config = { enabled: true }
+    const context = { received: undefined }
     plugin.apply(context, config)
     expect(plugin.name).toBe('native-client')
     expect(plugin.inject).toEqual(['slots'])
@@ -876,21 +836,14 @@ describe('client compiler', () => {
     expect(code).toContain('settingsCapability: true')
     expect(code).not.toContain('@dshfiles/dshx/settings')
 
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    const plugin = registration.factory(id => {
-      if (id === 'react') return {}
-      if (id === 'react/jsx-runtime') return {}
-      throw new Error(`unexpected require: ${id}`)
-    }) as { inject: string[] }
+    const registration = evaluateClientRegistration(code)
+    const plugin = clientPluginShape.parse(
+      registration.factory(id => {
+        if (id === 'react') return {}
+        if (id === 'react/jsx-runtime') return {}
+        throw new Error(`unexpected require: ${id}`)
+      }),
+    )
     expect(plugin.inject).toEqual(['slots', 'configForms'])
   })
 
@@ -1000,17 +953,8 @@ describe('client compiler', () => {
     expect(code).not.toContain('@dshfiles/dshx/client')
     expect(code).not.toMatch(/require\(["']@deepseek-ai\/dsh-client-connection(?:\/client)?["']\)/)
 
-    const registration: {
-      factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-    } = {} as never
-    vm.runInNewContext(code, {
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => Object.assign(registration, value),
-        },
-      },
-    })
-    const plugin = registration.factory(() => ({})) as { inject: string[] }
+    const registration = evaluateClientRegistration(code)
+    const plugin = clientPluginShape.parse(registration.factory(() => ({})))
     expect(plugin.inject).toEqual(['slots', 'connection'])
   })
 

@@ -2,7 +2,7 @@
 
 ![Agent toolkit page](docs/screenshots/agent-toolkit-page.png)
 
-An **Agent toolkit** main panel (sidebar, or the command palette's _Open the agent toolkit_) showing what the agent
+An **Agent Toolkit: Capabilities** reusable view (sidebar, or the command palette's _Open the agent toolkit_) showing what the agent
 can use in one thread. With `@dshfiles/main-tabs` it opens as a tab like any panel. It replaces the Tools tab that
 `@dshfiles/plugin-marketplace` drew under Settings › Built-in plugins.
 

@@ -19,4 +19,13 @@ describe('conversation service registration order', () => {
     expect(slots).toBeGreaterThan(-1)
     expect(controller).toBeLessThan(slots)
   })
+
+  it('keeps native main on the reusable header Factory without a second child claim', () => {
+    const apply = readFileSync(fileURLToPath(new URL('./native/apply.ts', import.meta.url)), 'utf8')
+    const main = readFileSync(fileURLToPath(new URL('./native/skeleton/ConversationMainPanel.tsx', import.meta.url)), 'utf8')
+    expect(apply).toContain('yield registerConversationHeaderSurface(slots)')
+    expect(apply).not.toContain("'conversation.header': { kind: 'single', scope: 'session-maybe' }")
+    expect(main).toContain("renderFactorySlot('dshfiles.workbench.conversation-header', {})")
+    expect(main).not.toContain("renderSlot('conversation.header'")
+  })
 })

@@ -21,10 +21,7 @@ const resolveUserPlugins = async (options: readonly PluginOption[] | undefined, 
   return resolveVitePlugins(options, watch)
 }
 
-function sameOutputValue(actual: unknown, expected: unknown): boolean {
-  if (typeof expected === 'function') return actual === expected
-  return actual === expected
-}
+type ViteBuildResult = Awaited<ReturnType<(typeof import('vite'))['build']>>
 
 function outputRecord(config: ResolvedConfig): Rollup.OutputOptions {
   const output = config.build.rollupOptions.output
@@ -44,7 +41,7 @@ const kernelBoundaryPlugin = (boundary: KernelBoundary): Plugin => {
   const assertOutput = (output: Rollup.OutputOptions): void => {
     const actual = new Map<string, unknown>(Object.entries(output))
     for (const [field, expected] of Object.entries(boundary.output)) {
-      if (!sameOutputValue(actual.get(field), expected)) fail(`build.rollupOptions.output.${field}`)
+      if (actual.get(field) !== expected) fail(`build.rollupOptions.output.${field}`)
     }
     if (output.manualChunks !== undefined) fail('build.rollupOptions.output.manualChunks')
   }
@@ -99,23 +96,26 @@ const artifactDeclarationPlugin = (face: 'host' | 'client', outDir: string, enab
   }
 }
 
-interface CompletedOutput {
-  readonly output: ReadonlyArray<{ readonly fileName: string; readonly type: 'asset' | 'chunk' }>
-}
-
-function rollupOutput(result: unknown, code: string): CompletedOutput {
-  if (Array.isArray(result)) {
-    if (result.length === 1 && result[0] !== undefined) return result[0] as CompletedOutput
+function rollupOutput(result: ViteBuildResult, code: string) {
+  if (Array.isArray(result) && result.length !== 1) {
     throw new DshxError(code, `Expected one build output, received ${result.length}.`)
   }
-  if (typeof result !== 'object' || result === null || !Array.isArray((result as CompletedOutput).output)) {
+  const completed = Array.isArray(result) ? result[0] : result
+  if (typeof completed !== 'object' || completed === null || !('output' in completed) || !Array.isArray(completed.output)) {
     throw new DshxError(code, 'Expected one completed build output.')
   }
-  return result as CompletedOutput
+  return completed
 }
 
 /** Convert Vite/Rolldown output to the stable DSHX report surface. */
-const buildReport = (result: unknown, face: 'host' | 'client', entryFile: string, outDir: string, declarations: boolean, errorCode: string): BuildReport => {
+const buildReport = (
+  result: ViteBuildResult,
+  face: 'host' | 'client',
+  entryFile: string,
+  outDir: string,
+  declarations: boolean,
+  errorCode: string,
+): BuildReport => {
   const built = rollupOutput(result, errorCode)
   const output: BuildArtifact[] = built.output.map(item => ({
     fileName: item.fileName,
@@ -126,14 +126,21 @@ const buildReport = (result: unknown, face: 'host' | 'client', entryFile: string
 }
 
 /** Validate the structural Vite watcher once at the compiler boundary. */
-const buildWatcher = (result: unknown, face: 'host' | 'client', errorCode: string): BuildWatcher => {
-  const candidate = result as { on?: unknown; close?: unknown }
-  if (Array.isArray(result) || typeof result !== 'object' || result === null || typeof candidate.on !== 'function' || typeof candidate.close !== 'function') {
+const buildWatcher = (result: ViteBuildResult, face: 'host' | 'client', errorCode: string): BuildWatcher => {
+  if (
+    Array.isArray(result) ||
+    typeof result !== 'object' ||
+    result === null ||
+    !('on' in result) ||
+    typeof result.on !== 'function' ||
+    !('close' in result) ||
+    typeof result.close !== 'function'
+  ) {
     throw new DshxError(errorCode, `Expected one ${face} watcher result.`, {
       hint: 'Restart the dev session after updating the DSHX compiler.',
     })
   }
-  return result as BuildWatcher
+  return result
 }
 
 /**

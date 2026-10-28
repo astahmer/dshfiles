@@ -1,8 +1,7 @@
 import { mkdir, readFile, rename, writeFile, chmod } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
+import { readFileSync, renameSync } from 'node:fs'
 import { z } from 'zod'
-import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import { CodexHomeModel, describeCodexAuth, materializeCodexShadowHome, CodexHomeError } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
@@ -12,6 +11,11 @@ import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
+import { AccountWriteQueue } from './account-write-queue.js'
+import { AccountOrderModel } from './account-order-model.js'
+import { createSetupAccountInputSchema, type AccountReorder, type CreateSetupAccountInput } from './api.js'
+import { AccountDraftModel } from './account-draft.js'
+import { AccountHomePolicy } from './account-home-policy.js'
 
 /**
  * Account profiles on disk.
@@ -23,7 +27,7 @@ import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
  * which stays inside each Codex home where its owner put it.
  */
 
-const STORE_PATH = resolve(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'plugins', 'ai-accounts', 'accounts.json')
+const STORE_PATH = AccountHomePolicy.filePath()
 
 const DEFAULT_SHADOW_ROOT = join(CodexHomeModel.accountHome(), '.codex-dshx')
 
@@ -48,12 +52,10 @@ const storeFileSchema = accountsFileSchema.extend({
 })
 
 export class AccountStoreModel {
-  static readonly filePath = (): string => STORE_PATH
-  static readonly codexLayoutFor = (profile: Pick<AccountDraft, 'homePath' | 'shadowHomePath' | 'instanceId'>, shadowRoot: string) =>
-    CodexHomeModel.resolveLayout({
-      homePath: profile.homePath,
-      shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(shadowRoot.replace(/\/$/u, ''), profile.instanceId),
-    })
+  static readonly filePath = AccountHomePolicy.filePath
+  static readonly isManagedSetupHome = AccountHomePolicy.isManagedSetupHome
+  static readonly codexLayoutFor = AccountHomePolicy.codexLayoutFor
+  static readonly containsConfiguredHome = AccountHomePolicy.containsConfiguredHome
 }
 
 const parseJson = (raw: string): unknown => {
@@ -70,6 +72,7 @@ interface AccountStoreFileSystem {
   makeDirectory(path: string): Promise<void>
   writeText(path: string, content: string): Promise<void>
   rename(source: string, target: string): Promise<void>
+  renameSync(source: string, target: string): void
   chmod(path: string, mode: number): Promise<void>
 }
 
@@ -81,6 +84,7 @@ const nodeAccountStoreFileSystem: AccountStoreFileSystem = {
   },
   writeText: (path, content) => writeFile(path, content, 'utf8'),
   rename,
+  renameSync,
   chmod,
 }
 
@@ -138,7 +142,7 @@ const observe = async (
     })
   }
   if (draft.kind === 'commandcode') {
-    const hasKey = (await readCommandCodeKey(draft.apiKeyEnv, resolveCredential)).length > 0
+    const hasKey = (await readCommandCodeKey(draft.apiKeyEnv, resolveCredential, draft.authSource)).length > 0
     return observed(draft, {
       cooling,
       signedIn: hasKey,
@@ -172,7 +176,7 @@ const observe = async (
     })
   }
   if (draft.kind === 'cursor') {
-    const token = await readCursorToken(draft.apiKeyEnv, resolveCredential)
+    const token = await readCursorToken(draft.apiKeyEnv, resolveCredential, draft.authSource)
     return observed(draft, {
       cooling: false,
       signedIn: token !== undefined,
@@ -214,13 +218,15 @@ const observe = async (
     identity: auth.identity ?? null,
     plan: auth.plan ?? null,
     state: profileState({ enabled: draft.enabled, cooling, signedIn: auth.signedIn }),
-    loginHint: `CODEX_HOME="${layout.effectiveHomePath}" codex login`,
+    loginHint: CodexHomeModel.loginHint(layout),
     detail: auth.error ?? null,
   }
 }
 
 const createAccountStoreService = (dependencies: { readonly filePath: string; readonly fileSystem: AccountStoreFileSystem }) => {
   let cachedRaw: string | undefined
+  // Serialize the entire read-modify-write, not just rename: all Host callers share this store.
+  const mutate = AccountWriteQueue.create()
 
   /** Load the file into the cache so activation can read it synchronously. */
   const primeAccountFile = (): AccountStoreFile => {
@@ -256,15 +262,24 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
   }
 
   /** Replace the stored profiles atomically and private to this user. */
-  const writeAccountFile = async (next: AccountStoreFile): Promise<AccountStoreFile> => {
+  const persistAccountFile = async (next: AccountStoreFile, claimCommit?: () => boolean, didCommit?: () => void): Promise<AccountStoreFile> => {
     const validated = storeFileSchema.parse(next)
     await dependencies.fileSystem.makeDirectory(dirname(dependencies.filePath))
     const temporary = `${dependencies.filePath}.${process.pid}.tmp`
     await dependencies.fileSystem.writeText(temporary, `${JSON.stringify(validated, null, 2)}\n`)
-    await dependencies.fileSystem.rename(temporary, dependencies.filePath)
-    await dependencies.fileSystem.chmod(dependencies.filePath, 0o600)
+    await dependencies.fileSystem.chmod(temporary, 0o600)
+    if (claimCommit === undefined) await dependencies.fileSystem.rename(temporary, dependencies.filePath)
+    else {
+      // Cancellation cannot interleave between the final operation fence and publication.
+      if (!claimCommit()) throw new Error('This account connection is no longer active.')
+      dependencies.fileSystem.renameSync(temporary, dependencies.filePath)
+      didCommit?.()
+    }
+    cachedRaw = `${JSON.stringify(validated, null, 2)}\n`
     return validated
   }
+
+  const writeAccountFile = (next: AccountStoreFile): Promise<AccountStoreFile> => mutate(() => persistAccountFile(next))
 
   /** The page and tool share profiles joined with live health and login state. */
   const buildAccountsFile = async (
@@ -282,50 +297,133 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
     ),
   })
 
+  /** Allocate metadata only. The Host lifecycle, not the durable store, owns unconnected candidates. */
+  const createSetupAccount = async (
+    input: CreateSetupAccountInput,
+  ): Promise<{ readonly instanceId: string; readonly draft: AccountDraft; readonly file: AccountStoreFile }> => {
+    const request = createSetupAccountInputSchema.parse(input)
+    const instanceId = `${request.kind}_work_${request.requestId.replaceAll('-', '').toLowerCase()}`
+    const file = await readAccountFile()
+    if (file.accounts.some(account => account.instanceId === instanceId)) throw new Error('This account identity is already saved.')
+    const generated = AccountDraftModel.newAccountDraft({ kind: request.kind, existing: file.accounts })
+    const privateHome = join(dirname(dependencies.filePath), 'homes', instanceId)
+    const draft: AccountDraft = {
+      ...generated,
+      instanceId,
+      enabled: false,
+      homePath: request.kind === 'codex' || request.kind === 'claude' ? privateHome : generated.homePath,
+      shadowHomePath: request.kind === 'codex' ? privateHome : generated.shadowHomePath,
+      apiKeyEnv: generated.apiKeyEnv === '' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+    }
+    return { instanceId, draft, file }
+  }
+
+  /** Reuse the established home rules without materializing, copying or reading authentication. */
+  const connectionMetadata = (draft: AccountDraft, shadowRoot: string): Pick<AccountProfile, 'mode' | 'loginHint'> => {
+    if (draft.kind === 'codex') {
+      const layout = AccountStoreModel.codexLayoutFor(draft, shadowRoot)
+      return { mode: layout.mode, loginHint: CodexHomeModel.loginHint(layout) }
+    }
+    if (draft.kind === 'claude')
+      return { mode: 'direct', loginHint: ClaudeAccountModel.claudeLoginHint(ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)) }
+    return { mode: 'direct', loginHint: draft.kind === 'commandcode' ? 'cmd login' : draft.kind === 'cursor' ? CURSOR_LOGIN_HINT : '' }
+  }
+
+  /** Publish a verified operation once, under the same queue as every settings write. */
+  const commitConnection = (input: {
+    readonly draft: AccountDraft
+    readonly existing: AccountDraft | undefined
+    readonly claimCommit: () => boolean
+    readonly didCommit: () => void
+    readonly beforeCommit?: () => Promise<void>
+  }): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      const current = file.accounts.find(account => account.instanceId === input.draft.instanceId)
+      if (input.existing === undefined) {
+        if (current !== undefined) throw new Error('This account identity is already saved.')
+        await input.beforeCommit?.()
+        return persistAccountFile({ ...file, accounts: [...file.accounts, { ...input.draft, enabled: true }] }, input.claimCommit, input.didCommit)
+      }
+      if (current === undefined) throw new Error('This saved account was removed.')
+      if (
+        current.kind !== input.existing.kind ||
+        current.homePath !== input.existing.homePath ||
+        current.shadowHomePath !== input.existing.shadowHomePath ||
+        current.apiKeyEnv !== input.existing.apiKeyEnv ||
+        current.authSource !== input.existing.authSource ||
+        current.apiBaseUrl !== input.existing.apiBaseUrl
+      )
+        throw new Error('The saved account connection settings changed. Start again.')
+      const next: AccountDraft = {
+        ...current,
+        enabled: true,
+        homePath: input.draft.homePath,
+        shadowHomePath: input.draft.shadowHomePath,
+        apiKeyEnv: input.draft.apiKeyEnv,
+        authSource: input.draft.authSource,
+        apiBaseUrl: input.draft.apiBaseUrl,
+      }
+      // Optional ownership must be absent, not an own undefined: the committed
+      // profile is returned over the strict JSON API before any disk round-trip.
+      if (next.authSource === undefined) delete next.authSource
+      await input.beforeCommit?.()
+      return persistAccountFile({ ...file, accounts: file.accounts.map(account => (account === current ? next : account)) }, input.claimCommit, input.didCommit)
+    })
+
   /** Create or update a profile; a rename replaces the previous id in place. */
-  const upsertAccount = async (draft: AccountDraft, previousInstanceId?: string): Promise<AccountStoreFile> => {
-    const file = await readAccountFile()
-    const replaced = previousInstanceId ?? draft.instanceId
-    if (replaced !== draft.instanceId && file.accounts.some(existing => existing.instanceId === draft.instanceId)) {
-      throw new Error(`An account named '${draft.instanceId}' already exists.`)
-    }
-    const position = file.accounts.findIndex(existing => existing.instanceId === replaced)
-    const normalized: AccountDraft = { ...draft, displayName: defaultName(draft) }
-    if (normalized.kind === 'codex') {
-      await materializeCodexShadowHome(layoutFor(normalized, file)).catch(() => undefined)
-    }
-    const accounts = position === -1 ? [...file.accounts, normalized] : file.accounts.map((existing, index) => (index === position ? normalized : existing))
-    return writeAccountFile({ ...file, accounts })
-  }
+  const upsertAccount = (draft: AccountDraft, previousInstanceId?: string, requireExisting = false): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      const replaced = previousInstanceId ?? draft.instanceId
+      if (replaced !== draft.instanceId && file.accounts.some(existing => existing.instanceId === draft.instanceId)) {
+        throw new Error(`An account named '${draft.instanceId}' already exists.`)
+      }
+      const position = file.accounts.findIndex(existing => existing.instanceId === replaced)
+      if (requireExisting && position === -1) throw new Error('Connect a new account before saving its settings; this saved account no longer exists.')
+      const normalized: AccountDraft = { ...draft, displayName: defaultName(draft) }
+      if (normalized.kind === 'codex') {
+        await materializeCodexShadowHome(layoutFor(normalized, file)).catch(() => undefined)
+      }
+      const accounts = position === -1 ? [...file.accounts, normalized] : file.accounts.map((existing, index) => (index === position ? normalized : existing))
+      return persistAccountFile({ ...file, accounts })
+    })
 
-  const removeAccount = async (instanceId: string): Promise<AccountStoreFile> => {
-    const file = await readAccountFile()
-    return writeAccountFile({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) })
-  }
+  const removeAccount = (instanceId: string): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      return persistAccountFile({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) })
+    })
 
-  const moveAccount = async (instanceId: string, direction: AccountOrderDirection): Promise<AccountStoreFile> => {
-    const file = await readAccountFile()
-    const currentIndex = file.accounts.findIndex(account => account.instanceId === instanceId)
-    const current = file.accounts[currentIndex]
-    if (current === undefined) throw new Error(`Account '${instanceId}' is no longer available.`)
+  const reorderAccount = (input: AccountReorder): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      const accounts = AccountOrderModel.reorder(file.accounts, input)
+      if (accounts.every((account, index) => account === file.accounts[index])) return file
+      return persistAccountFile({ ...file, accounts })
+    })
 
-    const indexesInGroup = file.accounts.flatMap((account, index) => (account.kind === current.kind ? [index] : []))
-    const positionInGroup = indexesInGroup.indexOf(currentIndex)
-    const nextIndex = indexesInGroup[positionInGroup + (direction === 'earlier' ? -1 : 1)]
-    if (nextIndex === undefined) return file
-    const next = file.accounts[nextIndex]
-    if (next === undefined) return file
+  const moveAccount = (instanceId: string, direction: AccountOrderDirection): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      const current = file.accounts.find(account => account.instanceId === instanceId)
+      if (current === undefined) throw new Error(`Account '${instanceId}' is no longer available.`)
+      const group = file.accounts.filter(account => account.kind === current.kind)
+      const target = group[group.indexOf(current) + (direction === 'earlier' ? -1 : 1)]
+      if (target === undefined) return file
+      const accounts = AccountOrderModel.reorder(file.accounts, {
+        instanceId,
+        targetInstanceId: target.instanceId,
+        placement: direction === 'earlier' ? 'before' : 'after',
+      })
+      return persistAccountFile({ ...file, accounts })
+    })
 
-    const accounts = [...file.accounts]
-    accounts[currentIndex] = next
-    accounts[nextIndex] = current
-    return writeAccountFile({ ...file, accounts })
-  }
-
-  const setDistribution = async (distribution: AccountsFile['distribution']): Promise<AccountStoreFile> => {
-    const file = await readAccountFile()
-    return writeAccountFile({ ...file, distribution })
-  }
+  const setDistribution = (distribution: AccountsFile['distribution']): Promise<AccountStoreFile> =>
+    mutate(async () => {
+      const file = await readAccountFile()
+      return persistAccountFile({ ...file, distribution })
+    })
 
   /**
    * Creating the shadow home first lets Codex write auth data into the home
@@ -361,9 +459,13 @@ const createAccountStoreService = (dependencies: { readonly filePath: string; re
     readAccountFile,
     writeAccountFile,
     buildAccountsFile,
+    createSetupAccount,
+    connectionMetadata,
+    commitConnection,
     upsertAccount,
     removeAccount,
     moveAccount,
+    reorderAccount,
     setDistribution,
     readAccountIdentity,
   }

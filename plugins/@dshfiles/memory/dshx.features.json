@@ -372,7 +372,7 @@
           "testName": "classifies saved-note durability with the relevance question"
         }
       ],
-      "reach": ["click button \"Memory\"", "expect tab \"Notes\""]
+      "reach": ["click button \"Memory: Browser\"", "expect tab \"Notes\""]
     },
     {
       "id": "memory-reference-preview",
@@ -471,7 +471,7 @@
           "reason": "Client-only: Show what memory costs and whether it holds up renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""]
+      "reach": ["click button \"Memory: Browser\"", "click tab \"Analytics\"", "expect text \"Recall\""]
     },
     {
       "id": "batch-forget-notes",
@@ -504,7 +504,7 @@
           "reason": "Client-only: Forget a selection of notes renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"Memory\"", "click button \"Select notes\"", "expect checkbox \"Select all visible notes\""]
+      "reach": ["click button \"Memory: Browser\"", "click button \"Select notes\"", "expect checkbox \"Select all visible notes\""]
     }
   ]
 }

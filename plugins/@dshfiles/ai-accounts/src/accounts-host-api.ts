@@ -1,7 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { ApiCaller } from '@dshfiles/dshx/api'
+import type { CopilotLoginState } from './api.js'
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
-import type { SecretCatalogCredentialBridge } from '@dshfiles/credential-port'
-import { accountRuntime } from './account-runtime.js'
+import type { SecretCatalogCredentialBridge, SecretCatalogValues } from '@dshfiles/credential-port'
+import { accountRuntime, AccountLoginIntentModel, AccountSessionWorkModel } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
 import {
@@ -14,6 +16,7 @@ import {
   type QuotaRecoveryModelSelection,
 } from './api.js'
 import { AccountStoreModel, accountStoreService } from './account-store.js'
+import { accountSessionRelatedIds } from './account-session-host.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
@@ -77,6 +80,12 @@ const quotaContinuationServiceFor = (ctx: Context) => {
 
 const secretCatalogBridgeFor = (ctx: Context): SecretCatalogCredentialBridge | undefined => ctx.get('secretCatalogCredentials')
 
+const setupFor = (ctx: Context) => {
+  const service = accountRuntime(ctx)?.accountSetup
+  if (service === undefined) throw new Error('Account connection setup requires the updated Host. Restart when idle before connecting an account.')
+  return service
+}
+
 const copilotLoginFor = (ctx: Context) => {
   const service = accountRuntime(ctx)?.copilotLogin
   if (service === undefined) throw new Error('GitHub Copilot sign-in is unavailable.')
@@ -99,37 +108,102 @@ export const accountsHostApi = aiAccountsApi.host({
       return { available: false, items: [] }
     }
   },
-  importSecretCatalogKey: async ({ input, ctx }) => {
-    const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
-    if (account === undefined || account.kind === 'codex') throw new Error('This keyed account is no longer available.')
-    if (!isKeyEnvName(account.apiKeyEnv)) throw new Error('Save a valid API-key variable ending in _API_KEY first.')
+  importSecretCatalogKey: ({ input, ctx }) =>
+    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+      const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
+      if (account === undefined || account.kind === 'codex') throw new Error('This keyed account is no longer available.')
+      if (!isKeyEnvName(account.apiKeyEnv)) throw new Error('Save a valid API-key variable ending in _API_KEY first.')
+      const bridge = secretCatalogBridgeFor(ctx)
+      if (bridge === undefined) throw new Error('Secret Catalog is not active.')
+      await bridge.importKey({
+        alias: input.alias,
+        environment: input.environment,
+        scope: input.scope,
+        cwd: input.cwd,
+        targetRef: account.apiKeyEnv,
+        replaceExisting: input.replaceExisting,
+      })
+      accountRuntime(ctx)?.usageCache?.invalidate()
+      return { imported: true, apiKeyEnv: account.apiKeyEnv }
+    }),
+  createSetupAccount: () => {
+    throw new Error('This account setup method is retired. Use prepareAccountConnection on an updated client; no account was saved.')
+  },
+  prepareAccountConnection: ({ input, ctx }) =>
+    AccountSessionWorkModel.run(ctx, input.existingInstanceId === undefined ? [] : [input.existingInstanceId], () => setupFor(ctx).prepare(input)),
+  getAccountConnection: ({ input, ctx }) => setupFor(ctx).get(input.operationId),
+  configureAccountConnection: ({ input, ctx }) => {
+    const { operationId, ...configuration } = input
+    const account = setupFor(ctx).get(operationId).account
+    const ids =
+      account === null
+        ? []
+        : [
+            ...accountSessionRelatedIds(account),
+            ...accountSessionRelatedIds({
+              ...account,
+              homePath: configuration.homePath ?? account.homePath,
+              shadowHomePath: configuration.shadowHomePath ?? account.shadowHomePath,
+              apiKeyEnv: configuration.apiKeyEnv ?? account.apiKeyEnv,
+            }),
+          ]
+    return AccountSessionWorkModel.run(ctx, ids, () => setupFor(ctx).configure(operationId, configuration))
+  },
+  stageAccountConnectionKey: ({ input, ctx, caller }) => {
+    if (caller.kind !== 'client') throw new Error('Raw credential entry is browser-only. Use Secret Catalog import instead.')
+    return setupFor(ctx).stageKey(input.operationId, input.value)
+  },
+  importAccountConnectionKey: async ({ input, ctx }) => {
+    const setup = setupFor(ctx)
+    setup.get(input.operationId)
     const bridge = secretCatalogBridgeFor(ctx)
+    const values = AccountsHostApiModel.scopedCatalogValues(ctx.get('secretCatalogValues'))
     if (bridge === undefined) throw new Error('Secret Catalog is not active.')
-    await bridge.importKey({
-      alias: input.alias,
-      environment: input.environment,
-      scope: input.scope,
-      cwd: input.cwd,
-      targetRef: account.apiKeyEnv,
-      replaceExisting: input.replaceExisting,
-    })
-    accountRuntime(ctx)?.usageCache?.invalidate()
-    return { imported: true, apiKeyEnv: account.apiKeyEnv }
+    const cwd = input.scope === 'global' ? null : input.cwd
+    if (input.scope !== 'global' && cwd === null) throw new Error('Choose a folder for that credential scope.')
+    const rows = (await bridge.listKeys(cwd)).filter(row => row.alias === input.alias && row.environment === input.environment)
+    if (rows.length !== 1 || rows[0]?.scope !== input.scope) throw new Error('That Secret Catalog entry is unavailable or ambiguous.')
+    let value: string
+    try {
+      value = await values.resolve({ reference: { alias: input.alias, environment: input.environment }, cwd, expectedScope: input.scope })
+    } catch {
+      throw new Error('The selected Secret Catalog entry could not be read.')
+    }
+    return setup.stageKey(input.operationId, value)
   },
-  save: async ({ input, ctx }) => {
-    await accountStoreService.upsertAccount(input.draft, input.previousInstanceId)
-    accountRuntime(ctx)?.usageCache?.invalidate()
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
+  completeAccountConnection: ({ input, ctx }) => {
+    const account = setupFor(ctx).get(input.operationId).account
+    return AccountSessionWorkModel.run(ctx, account === null ? [] : accountSessionRelatedIds(account), () => setupFor(ctx).complete(input.operationId))
   },
-  remove: async ({ input, ctx }) => {
-    await accountStoreService.removeAccount(input.instanceId)
-    accountRuntime(ctx)?.usageCache?.invalidate()
-    await refreshRoutes(ctx)
-    return accountsFile(ctx)
+  discardAccountConnection: async ({ input, ctx }) => {
+    await setupFor(ctx).discard(input.operationId)
+    return { discarded: true }
   },
+  save: ({ input, ctx }) =>
+    AccountSessionWorkModel.run(
+      ctx,
+      [...accountSessionRelatedIds(input.draft), ...(input.previousInstanceId === undefined ? [] : [input.previousInstanceId])],
+      async () => {
+        await accountStoreService.upsertAccount(input.draft, input.previousInstanceId, true)
+        accountRuntime(ctx)?.usageCache?.invalidate()
+        await refreshRoutes(ctx)
+        return accountsFile(ctx)
+      },
+    ),
+  remove: ({ input, ctx }) =>
+    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+      await accountStoreService.removeAccount(input.instanceId)
+      accountRuntime(ctx)?.usageCache?.invalidate()
+      await refreshRoutes(ctx)
+      return accountsFile(ctx)
+    }),
   moveAccount: async ({ input, ctx }) => {
     await accountStoreService.moveAccount(input.instanceId, input.direction)
+    await refreshRoutes(ctx)
+    return accountsFile(ctx)
+  },
+  reorderAccount: async ({ input, ctx }) => {
+    await accountStoreService.reorderAccount(input)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
@@ -139,17 +213,31 @@ export const accountsHostApi = aiAccountsApi.host({
     return accountsFile(ctx)
   },
   identity: async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId),
-  beginCopilotLogin: async ({ input, ctx }) => copilotLoginFor(ctx).begin(input.instanceId),
-  copilotLoginStatus: async ({ input, ctx }) => copilotLoginFor(ctx).state(input.instanceId),
+  beginCopilotLogin: ({ input, ctx, caller }) =>
+    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+      if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId)) throw new Error('This account sign-in intent is no longer active.')
+      return AccountsHostApiModel.copilotForCaller(await copilotLoginFor(ctx).begin(input.instanceId), caller)
+    }),
+  copilotLoginStatus: async ({ input, ctx, caller }) => AccountsHostApiModel.copilotForCaller(copilotLoginFor(ctx).state(input.instanceId), caller),
   cancelCopilotLogin: async ({ input, ctx }) => {
-    copilotLoginFor(ctx).cancel(input.instanceId)
+    if (!AccountLoginIntentModel.owns(ctx, input.instanceId, input.operationId, true)) return { cancelled: true }
+    if (input.operationId !== undefined) await setupFor(ctx).discard(input.operationId)
+    else copilotLoginFor(ctx).cancel(input.instanceId)
     return { cancelled: true }
   },
-  signOutCopilot: async ({ input, ctx }) => {
-    await copilotLoginFor(ctx).signOut(input.instanceId)
-    accountRuntime(ctx)?.usageCache?.invalidate()
-    return { signedOut: true }
-  },
+  signOutCopilot: ({ input, ctx }) =>
+    AccountSessionWorkModel.run(ctx, [input.instanceId], async () => {
+      const login = copilotLoginFor(ctx)
+      if (
+        !AccountLoginIntentModel.owns(ctx, input.instanceId) ||
+        ['starting', 'waiting'].includes(login.state(input.instanceId).status) ||
+        login.readPending(input.instanceId) !== undefined
+      )
+        throw new Error('Close the active account connection or sign-in before signing this account out.')
+      await login.signOut(input.instanceId)
+      accountRuntime(ctx)?.usageCache?.invalidate()
+      return { signedOut: true }
+    }),
   catalog: async ({ input, ctx }) => {
     await refreshRoutes(ctx)
     const llm = ctx.get('llm')
@@ -160,21 +248,19 @@ export const accountsHostApi = aiAccountsApi.host({
     } catch {
       warning = 'Live catalog refresh failed; showing the last-known model list.'
     }
-    const models = await llm.listModels(input.instanceId)
-    const resolved = await Promise.all(
-      models.map(async model => {
-        const info = await llm.resolveModelInfo(input.instanceId, model.id)
-        return {
-          id: model.id,
-          name: baseModelName(input.instanceId, model.name),
-          efforts: (info.reasoning?.efforts ?? []).map(effort => ({
-            id: effort.id,
-            name: effort.name,
-          })),
-          defaultEffort: info.reasoning?.defaultEffort ?? null,
-        }
-      }),
-    )
+    // The editor needs the native catalog, not the already hidden/ordered/pinned routing projection.
+    const editingCatalog = accountRuntime(ctx)?.modelCatalogForEditing
+    const models =
+      editingCatalog === undefined
+        ? await Promise.all((await llm.listModels(input.instanceId)).map(model => llm.resolveModelInfo(input.instanceId, model.id)))
+        : await editingCatalog(input.instanceId)
+    const resolved = models.map(model => ({
+      id: model.id,
+      name: baseModelName(input.instanceId, model.name),
+      efforts: (model.reasoning?.efforts ?? []).map(effort => ({ id: effort.id, name: effort.name })),
+      defaultEffort: model.reasoning?.defaultEffort ?? null,
+      ...('accountAdditional' in model && typeof model.accountAdditional === 'boolean' ? { accountAdditional: model.accountAdditional } : {}),
+    }))
     const catalog = { instanceId: input.instanceId, models: resolved }
     if (warning === undefined) return catalog
     return { ...catalog, warning }
@@ -307,6 +393,16 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
 }
 
 export class AccountsHostApiModel {
+  static scopedCatalogValues(values: SecretCatalogValues | undefined): SecretCatalogValues {
+    if (values?.supportsExpectedScope !== true)
+      throw new Error('Pending credential import requires an updated Secret Catalog Host with exact-scope resolution.')
+    return values
+  }
+
+  static copilotForCaller(state: CopilotLoginState, caller: ApiCaller): CopilotLoginState {
+    return caller.kind === 'client' ? state : { ...state, userCode: null, verificationUri: null }
+  }
+
   static readonly accountsFile = accountsFile
   static readonly readAccountsUsage = readAccountsUsage
   static readonly readQuotaResetAt = readQuotaResetAt

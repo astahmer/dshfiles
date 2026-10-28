@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
@@ -8,8 +9,7 @@ import { threadWorkspacePathFor } from './jj-integration.steps.js'
 const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 const THREAD_CHANGE = 'batch-review.md'
 
-const panelButton = (page: Page) =>
-  page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'pulls.review', exact: true })
+const panelButton = (page: Page) => globalPanelLink(page, 'pulls.review: Reviews')
 
 When('the pulls.review panel is opened from the sidebar', async ({ page }: { page: Page }) => {
   await panelButton(page).click()

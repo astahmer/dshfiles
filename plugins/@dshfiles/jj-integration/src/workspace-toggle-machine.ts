@@ -145,7 +145,14 @@ export const defersIsolationToSend = (move: DeferredMove | null | undefined): bo
  * Where a blank New-thread Session should start: in its own workspace when isolation is the default, or in the
  * project checkout when it inherited another thread's workspace and isolation is off.
  */
-const defaultDestinationMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
+interface DefaultDestinationInput {
+  readonly destination: DestinationView
+  readonly workspaceId: string
+  /** Omit while settings are loading: provision then uses the Host's configured bookmark, never the checkout's. */
+  readonly defaultBookmark?: string | undefined
+}
+
+const defaultDestinationMove = (input: DefaultDestinationInput): ToggleRequest | null => {
   const { destination } = input
   if (destination.vcs !== 'jj') return null
   if (destination.isolateByDefault) return ownsIsolatedThreadWorkspace(destination) ? null : isolatingMove(input)
@@ -154,18 +161,19 @@ const defaultDestinationMove = (input: { readonly destination: DestinationView; 
 }
 
 /** A move into a fresh thread workspace of the same project, never back into the workspace the Session leaves. */
-const isolatingMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
+const isolatingMove = (input: DefaultDestinationInput): ToggleRequest | null => {
   const { destination } = input
   if (destination.vcs !== 'jj') return null
   const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
   let move: ToggleRequest = { projectWorkspaceId, leaving: null, leavingBase: null, isolate: true }
   if (input.workspaceId !== projectWorkspaceId) move = { ...move, excludeSpareWorkspaceId: input.workspaceId }
-  if (destination.bookmark === null) return move
-  return { ...move, base: destination.bookmark }
+  if (input.defaultBookmark === undefined) return move
+  return { ...move, base: input.defaultBookmark }
 }
 
 const pendingFor = (client: WorkspaceToggleClient, request: ToggleRequest, name: string | null): PendingDestination => {
-  const candidate = request.isolate ? client.findSpare(spareKey(request.projectWorkspaceId, request.base)) : undefined
+  // An omitted base means the Host's current setting, not a stable bookmark identity a client spare can be keyed by.
+  const candidate = request.isolate && request.base !== undefined ? client.findSpare(spareKey(request.projectWorkspaceId, request.base)) : undefined
   const spare = candidate?.workspaceId === request.excludeSpareWorkspaceId ? null : (candidate ?? null)
   return { isolate: request.isolate, spare, name: request.isolate ? (spare?.name ?? name ?? client.generateName()) : null }
 }
@@ -628,6 +636,12 @@ const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; r
   })
 
 export class WorkspaceToggle {
+  /** A deferred New thread advertises its configured base, not the nearest bookmark of the checkout it will leave. */
+  static readonly startingBookmark = (input: {
+    readonly destination: DestinationView
+    readonly isolated: boolean
+    readonly defaultBookmark: string | undefined
+  }): string | null => (input.isolated && !ownsIsolatedThreadWorkspace(input.destination) ? (input.defaultBookmark ?? null) : input.destination.bookmark)
   static readonly defaultDestinationMove = defaultDestinationMove
   static readonly isolatingMove = isolatingMove
   static readonly hostConfirmedOwnThreadWorkspace = (input: {

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
@@ -139,7 +140,7 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
 When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   // A loaded machine can raise the provider-setup modal after the boot step stopped waiting; it hides the panel from role queries.
   await StartupDialogs.registerProviderSetupDismissal(page)
-  await page.getByRole('button', { name: 'Backlog', exact: true }).click()
+  await globalPanelLink(page, 'Backlog: Items').click()
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
 })
 
@@ -460,7 +461,7 @@ When('the customized Board view is opened', async ({ page }: { page: Page }) => 
 
 When('the scratch Host is restarted in the browser', async ({ page }: { page: Page }) => {
   await restartScratchProfileInBrowser(page)
-  await expect(page.getByRole('button', { name: 'Backlog', exact: true })).toBeVisible()
+  await expect(globalPanelLink(page, 'Backlog: Items')).toBeVisible()
 })
 
 Then('the Items view lists both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
@@ -704,7 +705,7 @@ Then('the thread composer is open for it', async ({ page }: { page: Page }) => {
 })
 
 When('the Backlog panel is opened again', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Backlog', exact: true }).click()
+  await globalPanelLink(page, 'Backlog: Items').click()
   await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
 })
 
@@ -1138,7 +1139,7 @@ Then('the Inbox lists {string} under {string}', async ({ page }: { page: Page },
 })
 
 When('Backlog smart thread routing is enabled', async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
   const routing = page.locator('[data-settings-namespace="dshfiles-backlog"] [data-setting-path="smartThreadRouting"]')
   const enabled = routing.getByRole('switch')
@@ -1181,7 +1182,7 @@ When('Backlog AI reply answers are enabled', async ({ page }: { page: Page }) =>
 })
 
 When('Backlog uses a configured fake-model agent for replies', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Agents', exact: true }).click()
+  await globalPanelLink(page, 'Agents: Directory').click()
   await page.getByRole('button', { name: 'New agent', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('reply-helper')
   await page.getByRole('textbox', { name: /^Instructions/u }).fill('Answer briefly and directly.')
@@ -1215,7 +1216,7 @@ Then('the discussion reply gets an AI answer without starting another thread', a
 })
 
 When('Backlog automatic triage is configured to use the local fake model', async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/backlog', exact: true }).click()
   const settings = page.locator('[data-settings-namespace="dshfiles-backlog"]')
   await expect(settings.locator('[data-setting-path="jevSecret"]')).toBeVisible()

@@ -127,9 +127,14 @@ export const UsageCharts = (props: {
 
   const series = useMemo(() => {
     const keyOf = (key: string): string => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)
-    const starts = UsageBucketsModel.bucketStarts({ from: props.range.from, to: props.range.to, bucket: props.bucket, offsetMs: tzOffsetMinutes * 60_000 })
-    const spansDays = props.range.to - props.range.from > DAY_MS
-    const labels = starts.map(start => UsageBucketsModel.bucketLabel(start, props.bucket, spansDays))
+    const starts = [
+      ...new Set([
+        ...UsageBucketsModel.bucketStarts({ from: props.range.from, to: props.range.to, bucket: props.bucket, offsetMs: tzOffsetMinutes * 60_000 }),
+        ...(view?.buckets ?? []).map(row => row.start),
+        ...(view?.latency ?? []).map(row => row.start),
+      ]),
+    ].sort((left, right) => left - right)
+    const labels = starts.map(start => UsageBucketsModel.bucketKey(start))
     const labelOf = new Map(starts.map((start, index) => [start, labels[index] ?? '']))
     const buckets = view?.buckets ?? []
     // Band scales take their domain from the rows, so every bucket gets a zero row and empty days keep their slot.
@@ -187,16 +192,30 @@ export const UsageCharts = (props: {
   const xAxis = useMemo(
     () => ({
       scale: () => scaleBand<string>().domain(series.labels).padding(0.2),
-      axis: { ticks: { format: UsageBucketsModel.sparseTickFormat(series.labels) } },
+      axis: {
+        ticks: {
+          format: (value: string) =>
+            UsageBucketsModel.sparseTickFormat(series.labels)(value) === ''
+              ? ''
+              : UsageBucketsModel.bucketKeyLabel(value, props.bucket, props.range.to - props.range.from > DAY_MS),
+        },
+      },
     }),
-    [series.labels],
+    [series.labels, props.bucket, props.range.from, props.range.to],
   )
   const pointAxis = useMemo(
     () => ({
       scale: () => scalePoint<string>().domain(series.labels).padding(0.5),
-      axis: { ticks: { format: UsageBucketsModel.sparseTickFormat(series.labels) } },
+      axis: {
+        ticks: {
+          format: (value: string) =>
+            UsageBucketsModel.sparseTickFormat(series.labels)(value) === ''
+              ? ''
+              : UsageBucketsModel.bucketKeyLabel(value, props.bucket, props.range.to - props.range.from > DAY_MS),
+        },
+      },
     }),
-    [series.labels],
+    [series.labels, props.bucket, props.range.from, props.range.to],
   )
 
   const costChart = useMemo(
@@ -211,9 +230,13 @@ export const UsageCharts = (props: {
           domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
           legend: colorLegend({ placement: 'bottom' }),
         },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.key}: ${UsageFormattingModel.formatCost(point.datum.cost)}` },
+        tooltip: {
+          use: tooltip,
+          format: point =>
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.key}: ${UsageFormattingModel.formatCost(point.datum.cost)}`,
+        },
       }),
-    [series.cost, xAxis, view?.keys, props.groupBy],
+    [series.cost, xAxis, view?.keys, props.groupBy, props.bucket, props.range.from, props.range.to],
   )
   const tokenChart = useMemo(
     () =>
@@ -224,18 +247,26 @@ export const UsageCharts = (props: {
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
         },
         color: { domain: [...TOKEN_KINDS], legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.kind}: ${UsageFormattingModel.formatCount(point.datum.tokens)}` },
+        tooltip: {
+          use: tooltip,
+          format: point =>
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.kind}: ${UsageFormattingModel.formatCount(point.datum.tokens)}`,
+        },
       }),
-    [series.tokens, xAxis],
+    [series.tokens, xAxis, props.bucket, props.range.from, props.range.to],
   )
   const cacheChart = useMemo(
     () =>
       defineChart({
         marks: [lineY(series.cache, { x: 'label', y: 'percent', points: true, strokeWidth: 1.5 })],
         scales: { x: pointAxis, y: { scale: scaleLinear().domain([0, 100]), grid: true, axis: { ticks: { count: 5, format: value => `${String(value)}%` } } } },
-        tooltip: { use: tooltip, format: point => `${point.datum.label}: ${String(point.datum.percent)}% of prompt tokens from cache` },
+        tooltip: {
+          use: tooltip,
+          format: point =>
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)}: ${String(point.datum.percent)}% of prompt tokens from cache`,
+        },
       }),
-    [series.cache, pointAxis],
+    [series.cache, pointAxis, props.bucket, props.range.from, props.range.to],
   )
   const requestChart = useMemo(
     () =>
@@ -243,9 +274,13 @@ export const UsageCharts = (props: {
         marks: [barY(series.requests, { x: 'label', y: 'count', color: 'outcome' })],
         scales: { x: xAxis, y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4 } } } },
         color: { domain: ['Succeeded or aborted', 'Failed'], range: ['var(--ts-chart-1)', 'var(--ts-chart-4)'], legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.outcome}: ${String(point.datum.count)}` },
+        tooltip: {
+          use: tooltip,
+          format: point =>
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.outcome}: ${String(point.datum.count)}`,
+        },
       }),
-    [series.requests, xAxis],
+    [series.requests, xAxis, props.bucket, props.range.from, props.range.to],
   )
   const latencyChart = useMemo(
     () =>
@@ -256,9 +291,13 @@ export const UsageCharts = (props: {
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
         },
         color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.metric}: ${UsageFormattingModel.formatDuration(point.datum.ms)}` },
+        tooltip: {
+          use: tooltip,
+          format: point =>
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.metric}: ${UsageFormattingModel.formatDuration(point.datum.ms)}`,
+        },
       }),
-    [series.latency, pointAxis],
+    [series.latency, pointAxis, props.bucket, props.range.from, props.range.to],
   )
 
   if (charts.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(charts.error, 'Charts could not be loaded.')}</p>

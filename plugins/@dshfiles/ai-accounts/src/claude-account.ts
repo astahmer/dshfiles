@@ -142,8 +142,9 @@ export class ClaudeAccountModel {
   static claudeKeychainService = (configDir: string): string =>
     configDir === DEFAULT_CONFIG_DIR ? 'Claude Code-credentials' : `Claude Code-credentials-${createHash('sha256').update(configDir).digest('hex').slice(0, 8)}`
 
-  static claudeLoginHint = (configDir: string): string =>
-    configDir === DEFAULT_CONFIG_DIR ? 'claude auth login' : `CLAUDE_CONFIG_DIR="${configDir}" claude auth login`
+  static shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
+
+  static claudeLoginHint = (configDir: string): string => `CLAUDE_CONFIG_DIR=${ClaudeAccountModel.shellQuote(configDir)} claude auth login`
 
   /** `utilization` is percent used; a window the plan does not meter arrives as null. */
   static parseClaudeUsage = (raw: JsonValue, plan: string | undefined): UsageCard => {
@@ -186,7 +187,12 @@ const staleOrLimited = (entry: UsageEntry, now: number): UsageCard => {
   return { ...entry.card, message: `Reading from ${String(minutes)} min ago; Claude asked to wait before the next one.` }
 }
 
-const fetchUsage = async (configDir: string, dependencies: ClaudeAccountServiceDependencies, signal: AbortSignal | undefined): Promise<UsageRead> => {
+const fetchUsage = async (
+  configDir: string,
+  dependencies: ClaudeAccountServiceDependencies,
+  signal: AbortSignal | undefined,
+  onAuthenticated?: () => void,
+): Promise<UsageRead> => {
   if (signal?.aborted) return { card: ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.') }
   const login = await readClaudeLogin(configDir, dependencies)
   if (login.kind === 'signed-out') return { card: ProviderUsageModel.emptyUsage('unauthenticated', signedOutMessage(configDir)) }
@@ -216,7 +222,10 @@ const fetchUsage = async (configDir: string, dependencies: ClaudeAccountServiceD
         retryAfterMs: retryAfterMs(response.headers.get('retry-after')),
       }
     if (!response.ok) return { card: ProviderUsageModel.emptyUsage('error', `Claude returned ${String(response.status)} for usage.`) }
-    return { card: ClaudeAccountModel.parseClaudeUsage(await response.json(), credential.plan) }
+    const raw: JsonValue = await response.json()
+    const parsed = claudeUsageSchema.safeParse(raw)
+    if (parsed.success && CLAUDE_WINDOWS.some(([key]) => parsed.data[key] !== undefined) && !signal?.aborted) onAuthenticated?.()
+    return { card: ClaudeAccountModel.parseClaudeUsage(raw, credential.plan) }
   } catch (cause) {
     return { card: ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Claude usage could not be read.') }
   }
@@ -225,6 +234,9 @@ const fetchUsage = async (configDir: string, dependencies: ClaudeAccountServiceD
 export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDependencies) => {
   const usageReads = new Map<string, UsageEntry>()
   return {
+    invalidateUsage: (configDir: string): void => {
+      usageReads.delete(configDir)
+    },
     describeAuth: async (input: {
       readonly configDir: string
       readonly keyEnv: string
@@ -263,7 +275,9 @@ export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDep
       return credential.accessToken
     },
 
-    readUsage: async (configDir: string, signal?: AbortSignal): Promise<UsageCard> => {
+    readUsage: async (configDir: string, signal?: AbortSignal, onAuthenticated?: () => void): Promise<UsageCard> => {
+      // Admission evidence is attempt-local: bypass cached and shared requests without disturbing the UI cache.
+      if (onAuthenticated !== undefined) return (await fetchUsage(configDir, dependencies, signal, onAuthenticated)).card
       // The page, the footer, the history recorder and quota continuations all read here; Anthropic rate-limits this
       // endpoint after a few calls a minute, so one reading serves them all for a while and a 429 backs off.
       const now = dependencies.now()
@@ -272,6 +286,7 @@ export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDep
       if (known !== undefined && now < known.backoffUntil) return staleOrLimited(known, now)
       if (known?.inFlight !== undefined) return known.inFlight
       const inFlight = fetchUsage(configDir, dependencies, signal).then(read => {
+        if (usageReads.get(configDir)?.inFlight !== inFlight) return read.card
         const entry = usageReads.get(configDir) ?? { at: 0, backoffUntil: 0 }
         entry.inFlight = undefined
         usageReads.set(configDir, entry)

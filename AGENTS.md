@@ -1,6 +1,6 @@
 # dshfiles
 
-Personal DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and
+Shared DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and
 plugins we own. The repository runs on stock DSH 0.2.1-rc.2; it carries no
 core patches. Never patch DSH core from this repository. Prefer an adopted or
 forked official plugin when it fits; otherwise an owned plugin may implement a
@@ -16,6 +16,8 @@ source checkout only when the human explicitly redirects the task there.
 
 Load the matching skill from `.agents/skills/` before the work it covers:
 
+- `dsh-upstream-sync` — review or sync Astahmer's dshfiles into this fork; preserve owned plugins and shared-plugin deltas.
+- `dsh-upstream-pr` — prepare or publish a selected plugin change to Astahmer without unrelated fork changes.
 - `plugin-ui` — any plugin UI or styling; adding shadcn components to the kit.
 - `plugin-state` — Query / Form / xstate / localStorage in plugin clients.
 - `dsh-plugin-verify` — after changing a plugin, before saying it works.
@@ -47,7 +49,7 @@ recomposing the profile per Session event, 42k DOM nodes from hidden collapsed
 groups, `warm()` catalogs on every composer mount) only showed up on the live
 instance. So, before proposing any fix:
 
-1. Run the `live-performance-audit` probes on :3080: Host lag, per-click switch
+1. Run the `live-performance-audit` probes against the actual current runtime: Host lag, per-click switch
    probe (DOM, long tasks, bytes, requests), and a CPU profile of the running
    Host. Attribute every interaction over 250 ms to Host stall, browser queue,
    payload or rendering.
@@ -107,16 +109,30 @@ plugin's API schemas locally: both make the contract drift silently.
 
 ## Never restart the running DSH instance
 
-The `web` profile runs on `127.0.0.1:3080`, usually with other agents mid-turn.
-Never kill or restart it; reloading it is the user's decision. Verify on a
-second instance instead, with a scratch `DSH_HOME` when the change touches
-stored state:
+Never kill or restart the live instance: other agents may be mid-turn.
+Reloading/restarting is the user's decision. Read the active URL, profile and
+launcher from current runtime context; never infer them from a checked-in
+personal port, home path or profile name. Configure deployment choices in
+machine-local settings, not shared defaults; see
+[personal configuration](docs/personal-configuration.md).
 
-```sh
-DSH_HOME=/private/tmp/dsh-verify dsh web --port 3199 --no-open
-```
+An explicitly configured `dsh` launcher can use the Astahmer-derived supervisor;
+once active, the existing sidebar offers **Restart when idle**. This is a
+whole-Host restart, not a backend hot swap. Do not assume that supervisor is
+installed or active just because its source exists.
 
-Report what the second instance shows and let the user decide when to restart.
+Use a scratch home/profile and the pinned official core for verification.
+Inspect any custom wrapper before relying on `HOME`/`DSH_HOME` isolation. Prefer
+the isolated verifier/fixture or a scratch-only raw-core shim that preserves the
+supplied environment; never copy private account state into shared fixtures.
+
+After merging plugin work, build the affected artifacts in the canonical checkout:
+a worktree-only build or a source-only merge does not update the served bundle.
+With `hmr-gate` active, client-only rebuilds hot-reload and paired Host/client
+rebuilds are deferred with a restart notice. Never request that restart without
+the user's authorization; do not promise protection for manual page refreshes,
+new tabs, every external dependency or jobs outside running Agent turns.
+Report scratch evidence and whether the live supervisor/gate is actually active.
 
 A plugin's `dist/` keeps serving after its sources are gone, so a deleted source
 file looks harmless until the next rebuild. Confirm nothing serves a file before
@@ -147,8 +163,15 @@ removing it; `jj file show -r <change> <path>` restores one from any revision.
 
 ## Version control
 
-This is a [Jujutsu](https://jj-vcs.github.io) repository colocated with git.
-Work lands on `main`; never `jj git push` without asking.
+Detect the checkout's actual VCS metadata before choosing commands. The upstream
+setup uses [Jujutsu](https://jj-vcs.github.io) colocated with Git, but this fork
+may be cloned as Git-only. Without `.jj`, use a separate named Git worktree and
+normal Git commands; do not initialize JJ to satisfy these instructions. The
+JJ-specific rules below apply only in a JJ checkout. Never rewrite or switch
+another agent's worktree, and preserve dirty files. See
+[the fork workflow](docs/fork-maintenance.md).
+
+Work lands on `main`; never push with either Git or JJ without authorization.
 
 - Do parallel work in your own workspace, never in someone else's checkout:
   `jj workspace add ../dshfiles-<topic> --name <topic> -r main`, or a thread
@@ -210,10 +233,10 @@ before touching a profile manifest.
 The checked-in seed is `profiles/web/`. `scripts/profile-sync.ts` is the only
 reconciler: it seeds missing files into the writable `~/.dsh/profiles/web/`,
 applies the seed's plugin dependencies and the marked Cordis region, and keeps
-user-added entries and edits outside that region. The nixfiles `dsh web`
-supervisor runs it before every start and restart, `dshx checkout sync` runs it
-when the seed changed, so a seed change reaches the live profile on the next
-restart without `nixapply`. See
+user-added entries and edits outside that region. An explicitly configured
+launcher can reconcile it before startup; `dshx checkout sync` can run it when
+the seed changes. Do not assume any external machine configuration or automatic
+live deployment. See
 [`docs/profile-installs.md`](docs/profile-installs.md#the-web-profile-reconciles-itself).
 
 A seed row outside the marked region never reaches an existing live profile.
@@ -222,8 +245,8 @@ for it, tell the user the live row needs the same edit — two 0.2.1 breakages
 (`webRuntime` → `webStartup`, the `{{cwd}}` persona suffix) were fixed in the seed
 and stayed broken live.
 
-Experiment in `probe` (or a disposable profile), never in `web`. `probe` is not
-Nix-managed, has its own `node_modules`, and gets its own port:
+Experiment in a disposable `probe` profile, never the active live profile.
+Keep its home, dependencies and port isolated from the running installation:
 
 ```sh
 pnpm profile:sync --profile probe
@@ -241,8 +264,9 @@ measured evidence; remove abandoned experiments from every profile they reached.
 
 Never upgrade the global `@deepseek-ai/dsh` in place; use
 `scripts/dsh-lkg/cli.mjs upgrade <version>`, which proves the new core against
-the live profile first. When DSH is broken, the user's way out is `dsh-lkg`
-(port 3099, with their accounts and threads). The runbook is
+a separately selected profile first. Recovery tooling is optional: inspect its
+local configuration and private-copy behavior before invoking `dsh-lkg`.
+The runbook is
 [`docs/recovery.md`](docs/recovery.md).
 
 ## Writing plugins

@@ -84,6 +84,16 @@ describe('resolveDshxConfig', () => {
     expect(resolved.configDependencies).toEqual([])
   })
 
+  it('preserves opaque manifest metadata while validating the package name', async () => {
+    const { root } = await temporaryProject()
+    const sourceManifest = '{"name":"@test/plugin","__proto__":{"opaque":true},"custom":{"nested":[1,null,true]}}'
+    await writeFile(resolve(root, 'package.json'), sourceManifest)
+    await source(root, 'src/host.ts')
+    const resolved = await resolveDshxConfig({ cwd: root })
+    expect(JSON.stringify(resolved.manifest)).toBe(sourceManifest)
+    expect(Object.hasOwn(resolved.manifest, '__proto__')).toBe(true)
+  })
+
   it('loads only the root TypeScript config and gives explicit fields precedence', async () => {
     const { root } = await temporaryProject()
     await source(root, 'src/host.ts')
@@ -277,6 +287,11 @@ describe('resolveDshxConfig', () => {
     ["export default { dev: { hostRestart: 'sometimes' } }\n", 'hostRestart'],
     ['export default { dev: { typo: true } }\n', 'unknown field'],
     ['export default []\n', 'default-export'],
+    ['export default { name: 7 }\n', 'name'],
+    ["export default { build: { minify: 'yes' } }\n", 'minify'],
+    ["export default { compatibility: { allowUnsupported: 'yes' } }\n", 'allowUnsupported'],
+    ['export default { host: { bundleDependencies: [7] } }\n', 'unique bare package roots'],
+    ["export default { client: { sharedRuntime: { provide: ['zod', 7] } } }\n", 'unique bare module specifiers'],
   ])('rejects invalid config: %s', async (config, message) => {
     const { root } = await temporaryProject()
     await source(root, 'src/host.ts')
@@ -287,6 +302,13 @@ describe('resolveDshxConfig', () => {
       file: resolve(root, 'dshx.config.ts'),
       hint: expect.any(String),
     })
+  })
+
+  it.each(['[]', '{ contract: 7 }', "{ contract: '' }"])('rejects malformed shared module maps: %s', async modules => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await writeFile(resolve(root, 'dshx.config.ts'), `export default { modules: ${modules} }\n`)
+    await expect(resolveDshxConfig({ cwd: root })).rejects.toMatchObject({ code: 'DSHX4007', file: resolve(root, 'dshx.config.ts') })
   })
 
   it('normalizes an opt-in Host HMR contract version', async () => {

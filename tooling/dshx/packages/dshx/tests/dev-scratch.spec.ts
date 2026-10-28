@@ -8,6 +8,7 @@ import { PassThrough } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { chromium } from 'playwright'
+import { chromiumLaunchOptions } from '../src/project/chromium-launch-options.js'
 import { runCli } from '../src/cli/run.js'
 import { ScratchDriveRuntime } from '../src/scratch/drive.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
@@ -80,7 +81,7 @@ describe('dshx dev scratch commands', () => {
   })
 
   it('attaches scratch fixtures through the composer file input', async () => {
-    const browser = await chromium.launch({ headless: true })
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
     try {
       const page = await browser.newPage()
       await page.setContent(`
@@ -103,11 +104,11 @@ describe('dshx dev scratch commands', () => {
 
   it('opens AI Accounts through the sidebar or Settings, then selects fake routes', async () => {
     const modelId = 'dshx_fake_commandcode/gpt-6-luna'
-    const browser = await chromium.launch({ headless: true })
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
     try {
       const page = await browser.newPage()
       await page.setContent(`
-        <button aria-label="AI Accounts" onclick="document.querySelector('#accounts').hidden = false">AI Accounts</button>
+        <nav aria-label="Global panels"><button aria-label="AI Accounts: Accounts" onclick="document.querySelector('#accounts').hidden = false">AI Accounts: Accounts</button></nav>
         <aside id="accounts" role="complementary" aria-label="Provider accounts" hidden>Provider accounts</aside>
         <button aria-label="New session" onclick="const row = document.createElement('div'); row.setAttribute('role', 'treeitem'); row.textContent = 'New Session'; row.onclick = () => { document.querySelector('#composer').hidden = false }; document.body.append(row)"></button>
         <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
@@ -121,6 +122,16 @@ describe('dshx dev scratch commands', () => {
       expect(await composer.isVisible()).toBe(true)
       await ScratchSeedRuntime.chooseFakeProviderModel({ page, timeoutMs: 1_000, modelId })
       expect(await page.getByRole('menuitemradio', { name: modelId, exact: true }).getAttribute('aria-checked')).toBe('true')
+
+      await page.setContent(`
+        <button aria-label="AI Accounts" onclick="throw new Error('Legacy unqualified navigation must not be clicked')">Legacy label</button>
+        <section data-sidebar-workbench-source="dshfiles-thread-sidebar.workbench-navigation">
+          <nav aria-label="Navigation"><button aria-label="AI Accounts: Accounts" onclick="document.querySelector('#accounts').hidden = false">AI Accounts: Accounts</button></nav>
+        </section>
+        <aside id="accounts" role="complementary" aria-label="Provider accounts" hidden>Provider accounts</aside>
+      `)
+      await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
+      expect(await page.getByRole('complementary', { name: 'Provider accounts', exact: true }).isVisible()).toBe(true)
 
       await page.setContent(`
         <button aria-label="Account menu" onclick="document.querySelector('#menu').hidden = false">Account</button>
@@ -160,8 +171,148 @@ describe('dshx dev scratch commands', () => {
     }
   })
 
+  it.each(['settings', 'models'] as const)('waits for the renamed account detail before opening Advanced when its final section is %s', async section => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <section id="selected" aria-label="Selected account">
+          <button role="tab" aria-selected="true" onclick="document.body.dataset.settingsClicks = String(Number(document.body.dataset.settingsClicks) + 1)">Settings</button>
+          <details open><summary>Advanced settings</summary><h3>Runtime paths</h3>
+            <input aria-label="Route slug" value="commandcode_1" onblur="window.commitRename(this)">
+          </details>
+        </section>
+        <p role="status" hidden></p>
+        <script>
+          document.body.dataset.settingsClicks = '0';
+          document.body.dataset.renameCommits = '0';
+          window.commitRename = input => {
+            document.body.dataset.renameCommits = String(Number(document.body.dataset.renameCommits) + 1);
+            const notice = document.querySelector('[role=status]');
+            notice.textContent = 'Renamed to dshx_fake_commandcode.';
+            notice.hidden = false;
+            requestAnimationFrame(() => {
+              const current = document.createElement('section');
+              current.id = 'selected';
+              current.setAttribute('aria-label', 'Selected account');
+              current.innerHTML = '<button role="tab" aria-selected="${section === 'settings'}">Settings</button>'
+                + '<button role="tab" aria-selected="${section === 'models'}">Models</button>'
+                + '<div id="settings-body" ${section === 'models' ? 'hidden' : ''}><details><summary>Advanced settings</summary><h3>Runtime paths</h3>'
+                + '<input aria-label="Route slug" value="dshx_fake_commandcode"></details></div>';
+              current.querySelector('button').onclick = () => {
+                document.body.dataset.settingsClicks = String(Number(document.body.dataset.settingsClicks) + 1);
+                current.querySelector('button').setAttribute('aria-selected', 'true');
+                current.querySelector('#settings-body').hidden = false;
+              };
+              document.querySelector('#selected').replaceWith(current);
+            });
+          };
+        </script>
+      `)
+      await ScratchSeedRuntime.setFakeProviderRouteSlug(page, 1_000)
+      const account = page.getByRole('region', { name: 'Selected account', exact: true })
+      expect(await account.getByRole('heading', { name: 'Runtime paths', exact: true }).isVisible()).toBe(true)
+      expect(await account.getByRole('textbox', { name: 'Route slug', exact: true }).inputValue()).toBe('dshx_fake_commandcode')
+      expect(await page.locator('body').getAttribute('data-settings-clicks')).toBe('1')
+      expect(await page.locator('body').getAttribute('data-rename-commits')).toBe('1')
+      await ScratchSeedRuntime.setFakeProviderRouteSlug(page, 1_000)
+      expect(await page.locator('body').getAttribute('data-settings-clicks')).toBe('1')
+      expect(await page.locator('body').getAttribute('data-rename-commits')).toBe('1')
+    } finally {
+      await browser.close()
+    }
+  })
+
+  it('opens a local draft before requiring its project-dependent composer', async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <button aria-label="New thread" onclick="document.querySelector('#project').hidden = false">New thread</button>
+        <button id="project" aria-label="Choose workspace" onclick="document.querySelector('#composer').hidden = false" hidden>Choose workspace</button>
+        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
+      `)
+      const composer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
+      expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).isVisible()).toBe(true)
+      expect(await composer.isVisible()).toBe(false)
+      await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+      expect(await composer.isVisible()).toBe(true)
+    } finally {
+      await browser.close()
+    }
+  })
+
+  it('opens and prepares a Host-backed New thread composer without a draft chooser or tree fallback', async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <button aria-label="New thread" onclick="requestAnimationFrame(() => { document.querySelector('#session').hidden = false })">New thread</button>
+        <div id="session" data-conversation-session="prewarmed-session" hidden>
+          <div role="textbox" aria-label="Message or run a task, / commands, @ files or sessions" contenteditable="true"></div>
+          <span>sample</span>
+          <button aria-label="Select model">Select model</button>
+        </div>
+      `)
+      const composer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
+      expect(await composer.isVisible()).toBe(true)
+      expect(await page.getByRole('treeitem').count()).toBe(0)
+      expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+      await ScratchSeedRuntime.prepareFakeProviderComposer(page, 'sample', 1_000)
+      expect(await page.getByRole('button', { name: 'Select model', exact: true }).isVisible()).toBe(true)
+    } finally {
+      await browser.close()
+    }
+  })
+
+  it.each(['Describe what you want to build', 'Message or run a task'])('sends a fake provider turn from the visible %s composer only', async label => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <div role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden>untouched</div>
+        <div role="textbox" aria-label="Message or run a task, / commands, @ files or sessions" contenteditable="true" hidden>untouched</div>
+        <div id="active" role="textbox" aria-label="${label}, / commands, @ files or sessions" contenteditable="true" onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.dataset.submitted = this.textContent }"></div>
+      `)
+      await ScratchSeedRuntime.sendFakeProviderTurn(page, 'Deterministic seed prompt', 1_000)
+      expect(await page.locator('#active').getAttribute('data-submitted')).toBe('Deterministic seed prompt')
+      expect(await page.locator('[role="textbox"][hidden]').allTextContents()).toEqual(['untouched', 'untouched'])
+    } finally {
+      await browser.close()
+    }
+  })
+
+  it('finds visible reach text after an older hidden conversation retains the same welcome', async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent('<section hidden><span>Into the Unknown</span></section><section><span id="current-welcome">Into the Unknown</span></section>')
+      const target = ScratchDriveRuntime.locate(page, 'text', 'Into the Unknown')
+      await target.waitFor({ state: 'visible', timeout: 1_000 })
+      expect(await target.getAttribute('id')).toBe('current-welcome')
+      await page.setContent('<section hidden><span>Into the Unknown</span></section>')
+      await expect(ScratchDriveRuntime.locate(page, 'text', 'Into the Unknown').waitFor({ state: 'visible', timeout: 100 })).rejects.toThrow()
+    } finally {
+      await browser.close()
+    }
+  })
+
+  it('waits for a visible new tool result rather than an older retained hidden conversation', async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent('<div hidden>Tool finished.</div>')
+      await expect(ScratchSeedRuntime.waitForToolCallResult(page, 100)).rejects.toThrow()
+      await page.setContent('<div hidden>Tool finished.</div><p>Tool finished.</p>')
+      await ScratchSeedRuntime.waitForToolCallResult(page, 1_000)
+      expect(await page.getByText('Tool finished.', { exact: true }).count()).toBe(2)
+    } finally {
+      await browser.close()
+    }
+  })
+
   it('seeds Backlog Jev enabled idempotently through Settings', async () => {
-    const browser = await chromium.launch({ headless: true })
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
     try {
       const page = await browser.newPage()
       await page.setContent(`
@@ -209,7 +360,7 @@ describe('dshx dev scratch commands', () => {
   })
 
   it('dismisses legacy and current provider setup dialogs on a scratch page', async () => {
-    const browser = await chromium.launch({ headless: true })
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
     try {
       for (const dialog of [
         { name: 'Add an API key to get started', button: 'Configure later' },

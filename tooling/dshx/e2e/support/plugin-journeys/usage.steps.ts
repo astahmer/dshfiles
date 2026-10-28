@@ -1,11 +1,14 @@
 import { cp, mkdir, writeFile } from 'node:fs/promises'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { DatabaseSync } from 'node:sqlite'
 import { zstdCompressSync } from 'node:zlib'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, type Page } from '@playwright/test'
-import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+import { expect, test, type Page } from '@playwright/test'
+import { Given, Then, When } from '../bdd.js'
+import { browserDiagnosticsFor, finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
+import { bootComposedPluginProfile } from '../boot.js'
+import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from '../ai-accounts-workspace.js'
 
 const FIXTURE_SESSIONS = fileURLToPath(new URL('../../../../../plugins/@dshfiles/usage/fixtures/sessions', import.meta.url))
 
@@ -16,6 +19,16 @@ const PRICE_CACHE = {
   source: 'e2e',
   providers: { openai: { 'gpt-6.1-sol': { input: 1.25, output: 10, cacheRead: 0.125 } } },
 }
+
+Given('the isolated Usage analytics profile has a registered workspace', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/usage'],
+    profileLabel: 'usage-registered-workspace',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
 
 const logRows = (page: Page) => page.getByRole('table').getByRole('row')
 const requestButton = (page: Page, name: RegExp) => page.getByRole('table').getByRole('button', { name })
@@ -76,7 +89,7 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 })
 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
-  await page.getByRole('button', { name: 'Usage analytics', exact: true }).click()
+  await globalPanelLink(page, 'Usage: Analytics').click()
   await expect(page.getByRole('heading', { name: 'Usage analytics', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('radio', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
@@ -84,6 +97,16 @@ When('the Usage analytics panel is opened on the range since {string}', async ({
   await expect(page.getByText(/ of the latest \d+ requests$/)).toBeVisible()
   await expect.poll(async () => logRows(page).count(), { timeout: 30_000 }).toBeGreaterThan(200)
 })
+
+const captureUsageEvidence = async (page: Page, label: string): Promise<void> => {
+  const diagnostics = browserDiagnosticsFor(page)
+  const errors = diagnostics.filter(value => value.startsWith('console.error:') || value.startsWith('pageerror:'))
+  expect(errors, `${label} browser errors`).toEqual([])
+  process.stdout.write(
+    `Usage ${label} diagnostics: ${JSON.stringify({ consoleErrors: diagnostics.filter(value => value.startsWith('console.error:')).length, pageErrors: diagnostics.filter(value => value.startsWith('pageerror:')).length, httpErrors: diagnostics.filter(value => value.startsWith('http ')).length })}\n`,
+  )
+  await page.screenshot({ path: test.info().outputPath(`usage-${label}.png`), animations: 'disabled', fullPage: true })
+}
 
 Then('the request log lists requests with tokens, list-price costs, timings and status', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'usage-log-counts-every-request', async () => {
@@ -128,12 +151,18 @@ Then('a failed request opens the thread that made it', async ({ page }: { page: 
     await expect(page.getByText('This turn failed', { exact: false })).toBeVisible()
     await expect(page.getByText('activity timeline journey turn', { exact: true }).first()).toBeVisible()
   })
+  await captureUsageEvidence(page, 'request-log')
   await finishJourneyAssertions(page)
 })
 
 When('the Charts tab is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Charts', exact: true }).click()
-  await expect(page.getByText('Cost over time', { exact: true })).toBeVisible()
+  try {
+    await expect(page.getByText('Cost over time', { exact: true })).toBeVisible()
+  } catch (error) {
+    process.stdout.write(`Usage charts diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}\n`)
+    throw error
+  }
 })
 
 Then('the headline tiles, the charts and the top threads show the indexed usage', async ({ page }: { page: Page }) => {
@@ -176,6 +205,7 @@ Then('the Jev usage card shows DSH-local token estimates', async ({ page }: { pa
     await expect(card.getByLabel('secret:MEMORY_JEV share of input tokens this month')).toHaveAttribute('aria-valuetext', /100K input tokens/u)
     await expect(card.getByText(/DSH-observed requests only; does not include outside DSH/u)).toBeVisible()
   })
+  await captureUsageEvidence(page, 'charts')
 })
 
 Then('selecting a model in the cost breakdown shows its requests in the log', async ({ page }: { page: Page }) => {
@@ -192,7 +222,12 @@ Then('selecting a model in the cost breakdown shows its requests in the log', as
 
 When('the Tools & Jev tab is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Tools & Jev', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Tool calls over time', exact: true })).toBeVisible()
+  try {
+    await expect(page.getByRole('heading', { name: 'Tool calls over time', exact: true })).toBeVisible()
+  } catch (error) {
+    process.stdout.write(`Usage tool charts diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}\n`)
+    throw error
+  }
 })
 
 Then('the tool execution report and Jev call report are visible', async ({ page }: { page: Page }) => {
@@ -206,5 +241,6 @@ Then('the tool execution report and Jev call report are visible', async ({ page 
     await expect(page.getByRole('table').getByRole('row', { name: /Skills\s+—\s+verify-dsh\s+1/u })).toBeVisible()
     await expect(page.getByText(/Arguments, outputs, commands, paths and raw errors are never copied/u)).toBeVisible()
   })
+  await captureUsageEvidence(page, 'tools')
   await finishJourneyAssertions(page)
 })

@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -250,6 +251,8 @@ type InjectedActions = {
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
   startProjectSession: (projectId: string) => void
   drafts?: SessionDrafts['list'] | undefined
+  /** Root uiSession selection; scoped or retained sidebar occurrences do not select the main conversation. */
+  currentSessionId?: ObservableSnapshot<string | undefined>
   /** Fork the thread into another project and settle it; resolves to the continuing thread and whether it settled. */
   continueInProject: (
     sessionId: SessionSummary['id'],
@@ -1294,6 +1297,10 @@ const EMPTY_UNSENT_DRAFTS: Readonly<Record<string, SessionDraft>> = Object.freez
 const EMPTY_SESSION_IDS: ReadonlySet<string> = new Set()
 const EMPTY_HOISTED_SESSIONS: readonly SessionSummary[] = []
 const EMPTY_HOISTED_USAGE_LIMIT_ROWS: readonly UsageLimitRow<SessionSummary>[] = []
+const ABSENT_CURRENT_SESSION_ID: ObservableSnapshot<string | undefined> = {
+  getSnapshot: () => undefined,
+  subscribe: () => () => undefined,
+}
 
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const surface = props.surface ?? 'sidebar'
@@ -1692,7 +1699,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => new Set(Object.entries(mutedThreads).flatMap(([sessionId, mute]) => (isMuteActive(mute, now) ? [sessionId] : []))),
     [mutedThreads, now],
   )
-  const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
+  const currentSessionSource = props.currentSessionId ?? ABSENT_CURRENT_SESSION_ID
+  const currentSessionId = useSyncExternalStore(currentSessionSource.subscribe, currentSessionSource.getSnapshot, currentSessionSource.getSnapshot)
+  const selectedSession = useMemo(() => HostSnapshotsModel.currentSessionOf(sessions, currentSessionId), [sessions, currentSessionId])
   const selectedSessionId = selectedSession?.id
   /**
    * Abandoned New threads. DSH mints the Session (and, when isolation is the default, a whole thread workspace) before
@@ -2080,7 +2089,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setRouteRequest(null)
       return
     }
-    if ((target.retainedBy.mainView ?? 0) > 0) {
+    if (selectedSessionId === target.id) {
       openedRouteId.current = routeRequest
       setRouteRequest(null)
       return
@@ -2088,7 +2097,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (openedRouteId.current === routeRequest) return
     openedRouteId.current = routeRequest
     openThreadRef.current(target.id, { linked: routeFromPageLoad.current })
-  }, [archivedSessionIds, isPrimarySurface, props, routeRequest, sessions, sessionState.phase, setNotice])
+  }, [archivedSessionIds, isPrimarySurface, props, routeRequest, selectedSessionId, sessions, sessionState.phase, setNotice])
 
   useEffect(() => {
     if (!isPrimarySurface || selectedSession === undefined || routeRequest !== null) return
@@ -4291,7 +4300,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuCheckboxItem checked={settingsOpen} onCheckedChange={() => setSettingsOpen(current => !current)}>
-                      {props.tSidebar('threadSidebarSettings')}
+                      {props.tSidebar('threadSidebarThreadListSettings')}
                     </DropdownMenuCheckboxItem>
                   </>
                 )}
@@ -4302,7 +4311,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 type="button"
                 size="icon"
                 variant={settingsOpen ? 'secondary' : 'ghost'}
-                aria-label={props.tSidebar('threadSidebarSettings')}
+                aria-label={props.tSidebar('threadSidebarThreadListSettings')}
                 aria-expanded={settingsOpen}
                 onClick={() => setSettingsOpen(current => !current)}
               >
@@ -4514,7 +4523,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         {settingsOpen && !isBoard ? (
           <section
             className="dshx:mx-2 dshx:mb-2 dshx:grid dshx:min-h-0 dshx:shrink dshx:gap-3 dshx:overflow-y-auto dshx:overscroll-contain dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3"
-            aria-label={props.tSidebar('threadSidebarSettings')}
+            aria-label={props.tSidebar('threadSidebarThreadListSettings')}
           >
             <fieldset className="dshx:grid dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
               <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarViewControls')}</legend>

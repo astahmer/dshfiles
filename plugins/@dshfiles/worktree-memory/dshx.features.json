@@ -6,7 +6,7 @@
       "id": "memory-board",
       "title": "Process memory by workspace",
       "summary": "One page shows the resident memory of every process tree the threads started, grouped by workspace: live background jobs with their owning thread, other children of this Host, and detached trees still running inside a workspace after their parent exited, with the memory-pressure level and a confirmed stop per tree, per workspace section from its header, or for every listed tree. The sidebar entry carries a pressure dot and the detached total.",
-      "reach": ["click button \"RAM\"", "expect text \"What the threads started*\""],
+      "reach": ["click button \"Worktree Memory: RAM\"", "expect text \"What the threads started*\""],
       "surfaces": ["host", "tool", "client"],
       "configuration": [],
       "states": ["loading", "empty", "grouped", "detached", "pressure", "unsupported-platform", "stop-armed", "stopped", "sidebar-badge"],

@@ -7,13 +7,29 @@ export const WORKBENCH_MAIN_PANEL_ID = 'dshfiles-workbench'
 
 export interface WorkbenchPanelProps {
   readonly panelId: string
+  /** Close this occurrence, not an unrelated global page. */
+  readonly onClose?: () => void
+  readonly visible?: boolean
 }
 
+/** A reusable plugin view: every docking pane accepts this same renderer contract. */
 export interface WorkbenchPanelDefinition {
   /** Stable across reloads: saved layouts refer to panels by this id. Prefix it with the owning plugin. */
   readonly id: string
   readonly title: string
   readonly component: ComponentType<WorkbenchPanelProps>
+  /** An owned contributor may expose independent scoped occurrences (e.g. two repositories). */
+  readonly scopedComponent?: ComponentType<WorkbenchPanelProps & { readonly scope: string }>
+  /** Semantic actor identity; tab chrome reads its live metadata from the shared provider. */
+  readonly tabId?: string
+  /** Runtime occurrences (thread/resource tabs) are not duplicate Add-panel sources. */
+  readonly hiddenFromAdd?: boolean
+  /** A reusable source may create independent view occurrences instead of moving a singleton. */
+  readonly allowMultiple?: boolean
+  /** A semantic Start occurrence uses the same New tab chooser as every pane. */
+  readonly newView?: boolean
+  /** Called only for an explicit user close, never for cross-surface adoption. May reject by throwing. */
+  readonly beforeClose?: () => void
   /**
    * Leads the global dock's default layout. The panel the persistent right-hand
    * surface exists for marks itself, so the workbench needs no list of ids; a
@@ -104,7 +120,7 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
     },
     get: id => definitions.get(id),
     list: () => snapshot,
-    listContextMenuPanels: () => snapshot.filter(panel => preference(panel.id)?.contextMenu === true),
+    listContextMenuPanels: () => snapshot.filter(panel => !panel.hiddenFromAdd && panel.tabId === undefined && preference(panel.id)?.contextMenu === true),
     preference,
     setPreference: (id, preference) => {
       if (!definitions.has(id) || !panelPreferenceSchema.safeParse(preference).success) return false
@@ -153,6 +169,26 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
 declare global {
   /** One registry per page, shared by every bundle; the name carries the contract version. */
   var dshfilesWorkbenchPanelsV1: WorkbenchPanelRegistry | undefined
+  /** Native-aside capabilities remain available even before Workbench itself activates. */
+  var dshfilesWorkbenchNativeAsideOwnersV1: Map<string, () => boolean> | undefined
+}
+
+const nativeAsideOwners = (): Map<string, () => boolean> => (globalThis.dshfilesWorkbenchNativeAsideOwnersV1 ??= new Map())
+
+/** Explicit native admission, independent of generic Workbench panel projections and listener order. */
+export class NativeAsideOwners {
+  static register(mainPanelId: string, open: () => boolean): () => void {
+    const owners = nativeAsideOwners()
+    owners.set(mainPanelId, open)
+    return () => {
+      if (owners.get(mainPanelId) === open) owners.delete(mainPanelId)
+    }
+  }
+
+  static request(mainPanelId: string): 'unowned' | 'accepted' | 'declined' {
+    const open = nativeAsideOwners().get(mainPanelId)
+    return open === undefined ? 'unowned' : open() ? 'accepted' : 'declined'
+  }
 }
 
 /**

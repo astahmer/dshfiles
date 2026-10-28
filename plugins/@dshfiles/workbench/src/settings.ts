@@ -4,24 +4,14 @@ import { defineSettings } from '@dshfiles/dshx/settings'
 export const workbenchSettings = defineSettings({
   namespace: 'dshfiles-workbench',
   schema: Schema.object({
-    rightPanel: Schema.union([
-      Schema.const('native').description('Per-thread (the native right sidebar)'),
-      Schema.const('dock').description('Global dock (persistent panels in the right column)'),
-    ])
-      .default('native')
-      .description(
-        'Which surface fills the right column: the native per-thread right sidebar, or the global dock, whose layout and panel set are the same in every thread.',
-      ),
-    bottomPanel: Schema.union([Schema.const('hidden').description('Hidden'), Schema.const('shown').description('Shown below the columns')])
+    // Decode old saved profiles without exposing an obsolete surface choice.
+    // Main content is always tabbed; rightPanel is read only for first-run visibility migration.
+    mainSurface: Schema.union(['native', 'workbench']).default('workbench').hidden(),
+    rightPanel: Schema.union(['native', 'dock']).default('native').hidden(),
+    headerToggle: Schema.boolean().default(false).hidden(),
+    bottomPanel: Schema.union([Schema.const('hidden').description('Hidden'), Schema.const('shown').description('Shown below the centre')])
       .default('hidden')
-      .description(
-        'The global bottom panel: a full-width row under the columns that holds dockable panels, drag one there from the right column or the main workbench.',
-      ),
-    headerToggle: Schema.boolean()
-      .default(false)
-      .description(
-        'Show a button in the conversation header that toggles the workbench in the right side panel. Off keeps the header for thread state; the side panel opens from its own rail.',
-      ),
+      .description('Show the tabbed bottom pane below the left and centre columns. The right pane remains full height.'),
     demoPanels: Schema.boolean()
       .default(false)
       .description('Developer fixtures: offer the Scratchpad and Ticker panels, which count mounts and renders to prove docking never remounts a panel.'),

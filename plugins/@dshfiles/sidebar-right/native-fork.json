@@ -1,0 +1,22 @@
+{
+  "$comment": "Whole native package retained. Bounded deltas export genuine session-owned slot bodies through presentation portals and route expansion/explicit reveals to the registered Workbench dock, including the original expand-only conversation header icon with an observable dock subscription; exact pre-publication page admission lets an explicit picker target another pane without a right-pane reveal. Native installs retain their original controller and shortcuts. Never recreates resources.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-client-ui-sidebar-right",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/client/ui-sidebar-right"
+  },
+  "files": [{ "upstream": "src", "local": "src/native" }],
+  "delta": [
+    "src/native/client/index.ts",
+    "src/native/client/service.ts",
+    "src/native/client/shortcuts.ts",
+    "src/native/client/session-view.ts",
+    "src/native/client/session-views.ts",
+    "src/native/client/tab-info.ts",
+    "src/native/client/shell/SidebarRight.tsx",
+    "src/native/client/shell/RightbarRoot.tsx",
+    "src/native/client/shell/ExpandButton.tsx"
+  ]
+}

@@ -18,6 +18,7 @@ export interface KeyedAccountConfig {
   readonly kind: 'opencode-go' | 'commandcode'
   /** Environment variable holding this account's key. */
   readonly apiKeyEnv: string
+  readonly authSource?: 'cli' | 'reference' | undefined
   /** Alternate API base, for a self-hosted or staging Command Code. */
   readonly apiBaseUrl: string
   readonly enabled: boolean
@@ -114,6 +115,7 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
       instanceId: account.instanceId,
       displayName: account.displayName,
       kind: account.kind,
+      authSource: account.authSource,
       apiKeyEnv: account.apiKeyEnv,
       apiBaseUrl: account.apiBaseUrl,
       enabled: account.enabled,

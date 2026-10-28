@@ -50,6 +50,7 @@ export interface CatalogEntry {
 export interface CommandCodeProviderOptions {
   readonly baseUrl?: string
   readonly keyEnv?: string
+  readonly authSource?: 'cli' | 'reference' | undefined
   readonly resolveCredential?: CredentialValueResolver
   /** Last resort when neither a stored credential nor the key variable holds a key, e.g. `~/.commandcode/auth.json`. */
   readonly readFallbackKey?: () => Promise<string>
@@ -323,13 +324,18 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
           credential?: { key?: string }
         }) => {
           signal.throwIfAborted()
+          if (options.authSource === 'cli') {
+            const key = (await options.readFallbackKey?.()) ?? ''
+            signal.throwIfAborted()
+            return key === '' ? undefined : { auth: { apiKey: key }, source: 'Command Code CLI login' }
+          }
           if (credential?.key !== undefined && credential.key.length > 0) {
             return { auth: { apiKey: credential.key }, source: 'stored credential' }
           }
           const value = await ctx.env(keyEnv)
           signal.throwIfAborted()
           if (value !== undefined && value.length > 0) return { auth: { apiKey: value }, source: keyEnv }
-          const fallback = (await options.readFallbackKey?.()) ?? ''
+          const fallback = options.authSource === 'reference' ? '' : ((await options.readFallbackKey?.()) ?? '')
           signal.throwIfAborted()
           return fallback.length === 0 ? undefined : { auth: { apiKey: fallback }, source: 'Command Code CLI login' }
         },
@@ -339,8 +345,13 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
     // pi-ai calls this during a catalog refresh and owns persistence of the
     // result, so it only has to answer with the models it advertises now.
     fetchModels: async () => {
-      const named = options.resolveCredential === undefined ? CredentialModel.readKeyFromEnv(keyEnv) : await options.resolveCredential(keyEnv)
-      const apiKey = named.length > 0 ? named : ((await options.readFallbackKey?.()) ?? '')
+      const named =
+        options.authSource === 'cli'
+          ? ''
+          : options.resolveCredential === undefined
+            ? CredentialModel.readKeyFromEnv(keyEnv)
+            : await options.resolveCredential(keyEnv)
+      const apiKey = named.length > 0 ? named : options.authSource === 'reference' ? '' : ((await options.readFallbackKey?.()) ?? '')
       return modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey }))
     },
     api: {

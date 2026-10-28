@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "addressable-resources",
+      "title": "Dock genuine session resources as workbench panels",
+      "summary": "In the owned stack Workbench tabs own all pane chrome with no native opt-out. The original sidebar declaring entry renders committed file, diff, terminal or contributed pages into addressable targets, preserving genuine Session bindings, title/menu slots, navigation and cleanup. Resources default to the fullheight right pane, while saved moves to other regions survive. Explicit Workbench picker page intents receive the genuine resource ID before publication and target any pane without revealing the right pane; the selected adopted Session is captured at the click. Closing the pane hides mounted tabs and its native resource carrier, never restores native chrome; explicit opens and the original sidebar toggle drive registered global dock actions. The conversation header's original rightmost Open right sidebar icon and Main Pane options offer opening while closed. The header icon observes only the registered global dock, opens idempotently and disappears while open; retained native carrier expansion cannot change Workbench visibility. The pane's own far-right Close pane icon hides it, never a centre Close right pane control. Empty panes start with the same New tab chooser. Deployments without Workbench retain the original sidebar fallback.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Search threads\"",
+        "click tab \"Everything\"",
+        "fill combobox \"Search the command palette\" \"New terminal\"",
+        "click option \"New terminal*\"",
+        "expect tab \"Terminal*\""
+      ],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["native-absent-workbench-fallback", "workbench", "detached", "moved", "hidden", "closed", "cleanup-rejected"],
+      "failureModes": [
+        "A missing target leaves its native occurrence retained, never creates fake content.",
+        "Provider cleanup rejection preserves the authoritative tab.",
+        "A missing provider uses the original unavailable-content fallback."
+      ],
+      "externalDependencies": [
+        {
+          "id": "native-sidebar-resource-providers",
+          "boundary": "File/diff/terminal bodies use their original session-scoped slot registrations and Host services; this fork owns presentation only.",
+          "deterministicFake": "resource-lifetime.test.ts uses the real native controller, store, registry and TabDomain; lightweight type registrations stand in only for external provider I/O. Real provider rendering is proven by the Workbench scratch journey."
+        }
+      ],
+      "verification": [
+        { "kind": "gherkin", "id": "sidebar-right.workbench-header-opener", "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature" },
+        { "kind": "gherkin", "id": "sidebar-right.workbench-resources", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.header-dock-opener",
+          "file": "plugins/@dshfiles/sidebar-right/src/expand-button.test.tsx",
+          "testName": "opens the real Workbench dock from the header and reappears only after pane close"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.header-carrier-isolation",
+          "file": "plugins/@dshfiles/sidebar-right/src/expand-button.test.tsx",
+          "testName": "ignores native carrier expansion including a different retained Session and releases its dock subscription"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.workbench-global-toggle",
+          "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
+          "testName": "reads and toggles the global Workbench dock without any selected Session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.explicit-versus-restored-resource",
+          "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
+          "testName": "reveals explicit resource open/reopen/focus and terminal intents, but not passive restored stores"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.exact-page-admission",
+          "file": "plugins/@dshfiles/sidebar-right/src/workbench-dock.test.ts",
+          "testName": "admits exact independent terminal records before publication without revealing the right pane"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.target-moves",
+          "file": "plugins/@dshfiles/sidebar-right/src/resource-panels.test.ts",
+          "testName": "moves presentation targets without closing resource lifetimes and ignores stale detach"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.saved-resource-sessions",
+          "file": "plugins/@dshfiles/sidebar-right/src/resource-session-views.test.ts",
+          "testName": "restores only saved resource Sessions through owned references and releases inactive Views after unmount"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.session-resources",
+          "file": "plugins/@dshfiles/sidebar-right/src/resource-lifetime.test.ts",
+          "testName": "preserves real per-session occurrences through target moves and invokes terminal cleanup on explicit close"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation of existing resource services; no new Host I/O, model calls or execution. Providers retain their original spans."
+        }
+      ]
+    }
+  ]
+}

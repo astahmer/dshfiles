@@ -10,6 +10,7 @@ import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { UsagePlanBadge } from './usage-plan-badge.js'
+import { AccountEnabledToggle } from './account-enabled-toggle.js'
 import { useQuotaClock } from './quota-clock.js'
 import { usePreferences } from './use-preferences.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
@@ -44,10 +45,16 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
   )
 }
 
-const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostName: string; readonly readAt: number; readonly now: number }): JSX.Element => {
+const AccountUsageCard = (props: {
+  readonly card: OverviewCard
+  readonly hostName: string
+  readonly readAt: number
+  readonly now: number
+  readonly onConnectAccount: (accountId: string) => void
+}): JSX.Element => {
   const usage = props.card.usage
-  const limited = usage.status === 'ok' && UsageOverviewModel.isCardLimited(usage.windows)
-  const onReserve = usage.status === 'ok' && UsageOverviewModel.reserveInUse(usage.windows) !== undefined
+  const limited = props.card.enabled && usage.status === 'ok' && UsageOverviewModel.isCardLimited(usage.windows)
+  const onReserve = props.card.enabled && usage.status === 'ok' && UsageOverviewModel.reserveInUse(usage.windows) !== undefined
   return (
     <article
       className={cn(
@@ -55,101 +62,98 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
         limited && 'dshx:border-destructive/50 dshx:bg-destructive/5',
       )}
     >
-      <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-        <ProviderGlyph className="dshx:size-3.5" kind={props.card.kind} />
-        <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-semibold">{props.card.displayName}</strong>
-        <UsagePlanBadge plan={usage.plan} />
-        {limited ? (
-          <Badge className="dshx:h-5 dshx:px-1.5 dshx:text-[10px]" variant="destructive">
-            Limit reached
-          </Badge>
-        ) : onReserve ? (
-          <Badge
-            className="dshx:h-5 dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info"
-            title="The weekly limit is spent; Codex requests draw on Luna Reserve."
-            variant="secondary"
-          >
-            On Luna Reserve
-          </Badge>
-        ) : null}
-        <span className="dshx:max-w-[45%] dshx:truncate dshx:text-[11px] dshx:text-muted-foreground" title={props.hostName}>
-          {props.hostName}
-        </span>
-      </header>
-      {usage.windows.map(window => {
-        const tone = quotaTone(window.percentRemaining)
-        const spent = UsageOverviewModel.isExhausted(window.percentRemaining)
-        const resetLabel = window.reserve === true ? 'Reserve refills' : null
-        return (
-          <div className="dshx:flex dshx:flex-col dshx:gap-1" key={window.label}>
-            <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-xs">
-              <span className={cn('dshx:truncate', spent ? 'dshx:font-medium dshx:text-destructive' : 'dshx:text-muted-foreground')}>{window.label}</span>
-              <strong className={cn('dshx:font-semibold dshx:tabular-nums', QUOTA_TONE_TEXT[tone])}>
-                {spent ? '0% left · limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
-              </strong>
-            </div>
-            <Progress
-              aria-label={`${props.card.displayName} ${window.label} remaining`}
-              className={cn('dshx:h-1.5 dshx:bg-muted', QUOTA_TONE_PROGRESS[tone])}
-              value={Math.max(0, Math.min(100, window.percentRemaining))}
-            />
-            <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
-              <span
-                className={spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}
-                title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}
-              >
-                {resetLabel === null
-                  ? UsageOverviewModel.formatResetIn(window.resetsAt, props.now)
-                  : `${resetLabel} · ${UsageOverviewModel.formatResetIn(window.resetsAt, props.now)}`}
-              </span>
-              <span title="Age of this usage snapshot">Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
-            </div>
+      <div className={cn('dshx:flex dshx:flex-col dshx:gap-2', !props.card.enabled && 'dshx:opacity-50')}>
+        <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <ProviderGlyph className="dshx:size-3.5" kind={props.card.kind} />
+          <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-semibold">{props.card.displayName}</strong>
+          {!props.card.enabled ? <span className="dshx:text-[9px] dshx:font-medium dshx:tracking-wide dshx:text-muted-foreground">OFF</span> : null}
+          <UsagePlanBadge plan={usage.plan} />
+          {limited ? (
+            <Badge className="dshx:h-5 dshx:px-1.5 dshx:text-[10px]" variant="destructive">
+              Limit reached
+            </Badge>
+          ) : onReserve ? (
+            <Badge
+              className="dshx:h-5 dshx:bg-info/15 dshx:px-1.5 dshx:text-[10px] dshx:text-info"
+              title="The weekly limit is spent; Codex requests draw on Luna Reserve."
+              variant="secondary"
+            >
+              On Luna Reserve
+            </Badge>
+          ) : null}
+          <span className="dshx:max-w-[45%] dshx:truncate dshx:text-[11px] dshx:text-muted-foreground" title={props.hostName}>
+            {props.hostName}
+          </span>
+        </header>
+        {UsageOverviewModel.bindingWindow(props.card) === undefined ? (
+          <div className="dshx:text-xs dshx:text-muted-foreground">
+            <p className="dshx:font-semibold">{UsageOverviewModel.unavailableStatus(props.card).label}</p>
+            <p>{UsageOverviewModel.unavailableStatus(props.card).reason}</p>
           </div>
-        )
-      })}
-      {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
-      {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (
-        <p className="dshx:text-[11px] dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>
-      ) : null}
+        ) : null}
+        {props.card.enabled && usage.status === 'unauthenticated' ? (
+          <Button className="dshx:self-start" onClick={() => props.onConnectAccount(props.card.instanceId)} size="xs" type="button" variant="outline">
+            Reauthenticate
+          </Button>
+        ) : null}
+        {(usage.status === 'ok' ? UsageOverviewModel.sortWindows(usage.windows) : []).map(window => {
+          const tone = quotaTone(window.percentRemaining)
+          const spent = UsageOverviewModel.isExhausted(window.percentRemaining)
+          const resetLabel = window.reserve === true ? 'Reserve refills' : null
+          return (
+            <div className="dshx:flex dshx:flex-col dshx:gap-1" key={window.label}>
+              <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-xs">
+                <span className={cn('dshx:truncate', props.card.enabled && spent ? 'dshx:font-medium dshx:text-destructive' : 'dshx:text-muted-foreground')}>
+                  {window.label}
+                </span>
+                <strong className={cn('dshx:font-semibold dshx:tabular-nums', props.card.enabled ? QUOTA_TONE_TEXT[tone] : 'dshx:text-muted-foreground')}>
+                  {spent ? '0% left · limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
+                </strong>
+              </div>
+              <Progress
+                aria-label={`${props.card.displayName} ${window.label} remaining`}
+                className={cn(
+                  'dshx:h-1.5 dshx:bg-muted',
+                  props.card.enabled ? QUOTA_TONE_PROGRESS[tone] : 'dshx:*:data-[slot=progress-indicator]:bg-muted-foreground',
+                )}
+                value={Math.max(0, Math.min(100, window.percentRemaining))}
+              />
+              <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+                <span
+                  className={props.card.enabled && spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}
+                  title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}
+                >
+                  {resetLabel === null
+                    ? UsageOverviewModel.formatResetIn(window.resetsAt, props.now)
+                    : `${resetLabel} · ${UsageOverviewModel.formatResetIn(window.resetsAt, props.now)}`}
+                </span>
+                <span title="Age of this usage snapshot">Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
+              </div>
+            </div>
+          )
+        })}
+        {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
+        {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (
+          <p className="dshx:text-[11px] dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>
+        ) : null}
+      </div>
+      <AccountEnabledToggle instanceId={props.card.instanceId} name={props.card.displayName} />
     </article>
   )
 }
 
-const unavailableReason = (card: OverviewCard): string =>
-  card.usage.message ??
-  (card.usage.status === 'unauthenticated' ? 'Not signed in.' : card.usage.status === 'ok' ? 'No quota windows reported.' : 'Usage is not available.')
-
-/** One collapsed line for accounts the popover leaves out: no quota data, or hidden by the user. */
-const HiddenAccounts = (props: {
-  readonly unavailable: readonly OverviewCard[]
-  readonly hidden: readonly OverviewCard[]
-  readonly arrangement: UsageArrangement
-}): JSX.Element | null => {
-  const count = props.unavailable.length + props.hidden.length
+/** Only accounts explicitly hidden by the user belong behind this disclosure. */
+const HiddenAccounts = (props: { readonly hidden: readonly OverviewCard[]; readonly arrangement: UsageArrangement }): JSX.Element | null => {
+  const count = props.hidden.length
   if (count === 0) return null
-  const reasons = [
-    props.unavailable.length > 0 ? `${String(props.unavailable.length)} without quota data` : null,
-    props.hidden.length > 0 ? `${String(props.hidden.length)} hidden by you` : null,
-  ].filter(reason => reason !== null)
   return (
     <Collapsible className="dshx:shrink-0 dshx:border-t dshx:px-3 dshx:py-1.5">
       <CollapsibleTrigger className="dshx:group dshx:flex dshx:w-full dshx:items-center dshx:gap-1 dshx:text-left dshx:text-[11px] dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:underline">
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-          {String(count)} hidden ({reasons.join(', ')})
-        </span>
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{String(count)} hidden by you</span>
         <ChevronDownIcon className="dshx:size-3 dshx:shrink-0 dshx:transition-transform dshx:group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ul className="dshx:mt-1.5 dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto">
-          {props.unavailable.map(card => (
-            <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" key={card.instanceId}>
-              <ProviderGlyph className="dshx:size-3.5" kind={card.kind} />
-              <span className="dshx:shrink-0 dshx:font-medium">{card.displayName}</span>
-              <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground" title={unavailableReason(card)}>
-                {unavailableReason(card)}
-              </span>
-            </li>
-          ))}
           {props.hidden.map(card => (
             <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" key={card.instanceId}>
               <ProviderGlyph className="dshx:size-3.5" kind={card.kind} />
@@ -273,6 +277,7 @@ export const UsageOverview = (props: {
   readonly refreshing: boolean
   readonly onRefresh: () => void
   readonly onOpenHistory: () => void
+  readonly onConnectAccount: (accountId: string) => void
 }): JSX.Element => {
   const [tab, setTab] = useState<ProviderTab>('all')
   const now = useQuotaClock({ resetsAt: [], precision: 'second' })
@@ -280,7 +285,8 @@ export const UsageOverview = (props: {
   const activeTab = tab !== 'all' && !providers.includes(tab) ? 'all' : tab
   const arrangement = useUsageLayout()
   const sections = UsageOverviewModel.overviewSections(props.usage, activeTab, arrangement.layout)
-  const shownIds = sections.cards.map(card => card.instanceId)
+  const visibleCards = UsageOverviewModel.visibleCards(props.usage, activeTab, arrangement.layout)
+  const shownIds = visibleCards.map(card => card.instanceId)
   const { settings, usagePopoverSize } = usePreferences()
   const [draggedSize, setDraggedSize] = useState<{ readonly width: number; readonly height: number } | null>(null)
   const size = draggedSize ?? usagePopoverSize
@@ -350,12 +356,12 @@ export const UsageOverview = (props: {
           <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
             {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
           </p>
-        ) : sections.cards.length === 0 ? (
+        ) : visibleCards.length === 0 ? (
           <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
-            {sections.unavailable.length + sections.hidden.length === 0 ? 'No enabled account for this provider.' : 'No account with quota to show.'}
+            {sections.unavailable.length + sections.hidden.length === 0 ? 'No saved account for this provider.' : 'No account with quota to show.'}
           </p>
         ) : (
-          sections.cards.map(card => (
+          visibleCards.map(card => (
             <ArrangeableAccount
               arrangement={arrangement}
               className="dshx:rounded-lg dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
@@ -366,12 +372,18 @@ export const UsageOverview = (props: {
               name={card.displayName}
               shownIds={shownIds}
             >
-              <AccountUsageCard card={card} hostName={props.usage?.hostName ?? ''} now={now} readAt={props.usage?.readAt ?? now} />
+              <AccountUsageCard
+                card={card}
+                hostName={props.usage?.hostName ?? ''}
+                now={now}
+                readAt={props.usage?.readAt ?? now}
+                onConnectAccount={props.onConnectAccount}
+              />
             </ArrangeableAccount>
           ))
         )}
       </div>
-      {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} unavailable={sections.unavailable} />}
+      {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} />}
     </section>
   )
 }

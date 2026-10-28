@@ -60,7 +60,7 @@
         "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker."
       ],
       "externalDependencies": [],
-      "reach": ["seed multi-host-hosts", "click button \"Hosts\"", "expect heading \"Hosts\"", "expect text \"3 registered*\""],
+      "reach": ["seed multi-host-hosts", "click button \"Multi-host: Hosts\"", "expect heading \"Hosts\"", "expect text \"3 registered*\""],
       "verification": [
         {
           "kind": "unit-test",

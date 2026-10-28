@@ -2,6 +2,7 @@
 
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import { ModelCatalogBuild } from '../model-catalog-build.ts'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { LlmModelInfo } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
@@ -68,6 +69,31 @@ export async function buildModelCatalog(
     routableProviders: groups.map(group => group.id),
     groups,
     failures: catalog.flatMap(item => item.kind === 'failure' ? [item.failure] : []),
+  }
+}
+
+/** Bounded catalog reuse shared by every selector on this Host. */
+export class SessionModelCatalog {
+  private readonly build: ModelCatalogBuild
+
+  constructor(ctx: Context) {
+    this.build = new ModelCatalogBuild(
+      () => JSON.stringify(ctx.agentDefaultModel.currentSelection()),
+      () => buildModelCatalog(ctx),
+    )
+    // Match the Client catalog's input events. Invalidation is lazy: credential/settings
+    // notifications can precede route publication, whose later adapter event must clear
+    // any intervening snapshot too. Never eagerly rebuild from a partially committed input.
+    const invalidate = (): void => { this.build.invalidate() }
+    ctx.on('llm/adapters-updated', invalidate)
+    ctx.on('settings/document-updated', invalidate)
+    ctx.on('credentials/record-updated', invalidate)
+    ctx.on('credentials/reference-updated', invalidate)
+  }
+
+  /** Read one coalesced catalog snapshot for the current deployment default. */
+  read(): Promise<ModelCatalog> {
+    return this.build.load()
   }
 }
 

@@ -94,10 +94,14 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
   }, [timeline])
   const timelineBucket = report?.timelineBucket ?? props.bucket
   const labels = useMemo(() => {
-    const starts = UsageBucketsModel.bucketStarts({ from: props.range.from, to: props.range.to, bucket: timelineBucket, offsetMs: tzOffsetMinutes * 60_000 })
-    const spansDays = props.range.to - props.range.from > UsageBucketsModel.DAY_MS
-    return new Map(starts.map(start => [start, UsageBucketsModel.bucketLabel(start, timelineBucket, spansDays)]))
-  }, [props.range.from, props.range.to, timelineBucket, tzOffsetMinutes])
+    const starts = [
+      ...new Set([
+        ...UsageBucketsModel.bucketStarts({ from: props.range.from, to: props.range.to, bucket: timelineBucket, offsetMs: tzOffsetMinutes * 60_000 }),
+        ...timeline.map(row => row.start),
+      ]),
+    ].sort((left, right) => left - right)
+    return new Map(starts.map(start => [start, UsageBucketsModel.bucketKey(start)]))
+  }, [props.range.from, props.range.to, timelineBucket, tzOffsetMinutes, timeline])
 
   const timelineRows = useMemo(() => {
     const rows = timeline
@@ -120,9 +124,16 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
   const xAxis = useMemo(
     () => ({
       scale: () => scaleBand<string>().domain(axisLabels).padding(0.2),
-      axis: { ticks: { format: UsageBucketsModel.sparseTickFormat(axisLabels) } },
+      axis: {
+        ticks: {
+          format: (value: string) =>
+            UsageBucketsModel.sparseTickFormat(axisLabels)(value) === ''
+              ? ''
+              : UsageBucketsModel.bucketKeyLabel(value, timelineBucket, props.range.to - props.range.from > UsageBucketsModel.DAY_MS),
+        },
+      },
     }),
-    [axisLabels],
+    [axisLabels, timelineBucket, props.range.from, props.range.to],
   )
   const timelineChart = useMemo(
     () =>
@@ -133,9 +144,13 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4 } } },
         },
         color: { domain: categories.map(category => CATEGORY_LABELS[category]), legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.category}: ${String(point.datum.calls)} calls` },
+        tooltip: {
+          use: tooltip,
+          format: point =>
+            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, timelineBucket, props.range.to - props.range.from > UsageBucketsModel.DAY_MS)} · ${point.datum.category}: ${String(point.datum.calls)} calls`,
+        },
       }),
-    [timelineRows, xAxis, categories],
+    [timelineRows, xAxis, categories, timelineBucket, props.range.from, props.range.to],
   )
   const rankedChart = useMemo(
     () =>

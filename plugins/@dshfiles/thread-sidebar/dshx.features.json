@@ -2,13 +2,88 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "workbench-sidebar-assemblies",
+      "title": "Dock the actual sidebar content assemblies",
+      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Thread Sidebar: Threads, Thread Sidebar: Navigation, AI Accounts: Preview and AI Accounts: Controls alongside the Settings Shell: Settings hub, without a separate Rich Composer/current-conversation entry. Mixed or unlabeled footer assemblies use Thread Sidebar: Plugin previews or Thread Sidebar: Plugin controls instead of claiming one plugin owns them. Each group has far-right Pane options, without a persistent Workbench toolbar. The sidebar root delegates authorized slots with real owner props, contexts and live navigation selection; shell.left supplies the flexible tabbed area, including the existing account Preview assembly seated as an ordinary group. The fixed Preview is absent while that actual supported slot is overridden; standalone Sidebar keeps its fallback. Brand/history/palette, native account/settings toolbar and update notices stay fixed. The Threads panel owns its Sidebar settings wheel and the original customization editor's portal seat. Its original middle is absent-occupant compatibility only. The fullheight right pane retains tabs and real Session resources while collapsed, independently of the left/centre bottom row.",
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["sidebar-present", "panel-open", "navigation-current", "declarer-unloaded"],
+      "failureModes": [
+        "The declarer root unload disposes its panel registrations.",
+        "Contextual message, turn, menu and chrome seats are retained inside their original parent assemblies, not shown as misleading blank panels."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.preview-fixed-owner",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-content-seat.test.tsx",
+          "testName": "never mounts a fixed preview while the actual left content slot is overridden"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.preview-standalone-owner",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-content-seat.test.tsx",
+          "testName": "keeps the genuine preview and its actions only for a standalone sidebar, including override teardown"
+        },
+        { "kind": "gherkin", "id": "thread-sidebar.preview-as-regular-tab", "featureFile": "tooling/dshx/e2e/features/workbench-tab-rows.feature" },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.authoritative-current-session",
+          "file": "plugins/@dshfiles/thread-sidebar/src/snapshots.test.ts",
+          "testName": "current Session selection and URL follow the exact binding during overlapping retains, reverse=%s"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.left-content-authority",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-content-seat.test.tsx",
+          "testName": "delegates only the middle to the tab host and keeps fixed chrome outside its capability"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.left-content-collapse",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-content-seat.test.tsx",
+          "testName": "reports collapse without unmounting the docking region"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.workbench-assemblies-registration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
+          "testName": "registers the four real sidebar assemblies and disposes exactly its own entries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.workbench-assemblies-owner",
+          "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
+          "testName": "delegates the workspaces slot with genuine wide and expansion owner props"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.workbench-assemblies-footer",
+          "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
+          "testName": "retains footer contributions as the actual declared slots with their real owner shares"
+        },
+        { "kind": "gherkin", "id": "thread-sidebar.workbench-assemblies", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.explicit-reopen-intent",
+          "file": "plugins/@dshfiles/thread-sidebar/src/main-tab-request.test.ts",
+          "testName": "delivers repeated same-Session sidebar intent even when native navigation would not change"
+        }
+      ],
+      "telemetry": [
+        { "kind": "not-applicable", "reason": "Client-only presentation adapters reuse existing sidebar slots and Host actions; they start no new Host work." }
+      ]
+    },
+    {
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
       "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar) and keeps its own grouping, status/source filters and project scope; park and settle through sidebar preferences and pin/archive through Host APIs.",
       "reach": [
         "expect region \"Threads\"",
         "expect button \"Group: Status\"",
-        "click button \"Thread board\"",
+        "click button \"Thread Sidebar: Board\"",
         "expect region \"Thread board\"",
         "expect region \"Active column\"",
         "expect button \"Group: Status\""
@@ -344,7 +419,7 @@
         "click button \"All threads\"",
         "expect button \"All threads\"",
         "expect button \"Done\"",
-        "click button \"Sidebar settings\"",
+        "click button \"Thread list settings\"",
         "click button \"Manage views\"",
         "click button \"Add view\"",
         "expect checkbox \"Working\"",
@@ -670,7 +745,7 @@
         "expect menuitemradio \"Settle after idle threshold\"",
         "press Escape",
         "press Escape",
-        "click button \"Sidebar settings\"",
+        "click button \"Thread list settings\"",
         "expect checkbox \"Settle inactive threads\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
@@ -804,8 +879,8 @@
         "expect button \"All threads\"",
         "click button \"All threads\"",
         "expect region \"Threads\"",
-        "click button \"Sidebar settings\"",
-        "expect region \"Sidebar settings\""
+        "click button \"Thread list settings\"",
+        "expect region \"Thread list settings\""
       ],
       "surfaces": ["client"],
       "configuration": [],
@@ -873,7 +948,7 @@
         "rightclick text \"Settled archive target\" at 8,8",
         "click menuitem \"Settle\"",
         "expect text \"This thread is settled.\"",
-        "click button \"Sidebar settings\"",
+        "click button \"Thread list settings\"",
         "expect group \"Archive settled threads\""
       ],
       "surfaces": ["client", "settings"],
@@ -1217,8 +1292,8 @@
     {
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
-      "summary": "Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior.",
-      "reach": ["click button \"Customize sidebar\"", "expect heading \"Customize sidebar\"", "click button \"Move up: Settle\"", "expect checkbox \"Settle\""],
+      "summary": "The Threads panel toolbar owns a Sidebar settings gear, not fixed app chrome. It opens the original Root-owned Customize sidebar editor inside that panel through an owned React portal seat, so gear and editor follow moves and remain usable with a hidden tab row or collapsed left column. Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior using the same preferences authority. Standalone/global recovery remains available. The separate list-only sliders control is named Thread list settings; no duplicate preference model or native DOM reparenting is involved.",
+      "reach": ["click button \"Sidebar settings\"", "expect heading \"Customize sidebar\"", "click button \"Move up: Settle\"", "expect checkbox \"Settle\""],
       "surfaces": ["client", "settings", "storage"],
       "configuration": [
         {
@@ -1288,6 +1363,29 @@
           "kind": "gherkin",
           "id": "thread-sidebar.navigation-layout",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.panel-settings-wheel",
+          "featureFile": "tooling/dshx/e2e/features/sidebar-settings-wheel.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.panel-wheel-body-seat",
+          "file": "plugins/@dshfiles/thread-sidebar/src/workbench-panels.test.tsx",
+          "testName": "keeps the settings gear and its editor seat inside the Threads body, independent of tab chrome"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.panel-editor-original-owner",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-customization.test.tsx",
+          "testName": "portals the same Root-owned preference controls into the Threads seat and closes through the owner"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.panel-editor-seat-cleanup",
+          "file": "plugins/@dshfiles/thread-sidebar/src/sidebar-customization.test.tsx",
+          "testName": "follows a moved seat and falls back locally on release without leaving an editor in the old host"
         },
         {
           "kind": "unit-test",
@@ -1500,7 +1598,7 @@
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
       "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
-      "reach": ["click button \"Sidebar settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
+      "reach": ["click button \"Thread list settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {

@@ -5,11 +5,21 @@ import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Plugin } from 'vite'
+import { z } from 'zod'
+import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
+import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { buildHost } from '../src/compiler/index.js'
 import { watchHost } from '../src/compiler/host/build.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
+const hostPluginShape = z.object({
+  name: z.string(),
+  inject: z.unknown().optional(),
+  Config: z.unknown().optional(),
+  apply: z.function({ input: [z.unknown().optional(), z.unknown().optional()], output: z.unknown() }),
+})
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-host-'))
@@ -68,11 +78,7 @@ describe('host compiler', () => {
     expect(code).not.toMatch(/from ['"]dshx\/(?:host|internal-host-runtime)['"]/)
     expect(code).not.toContain(JSON.stringify(root))
     expect(code).toContain('src/host.ts')
-    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as {
-      name: string
-      inject: readonly string[]
-      apply(ctx: unknown): unknown
-    }
+    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const calls: string[] = []
     const ctx = {
       calls,
@@ -120,14 +126,11 @@ describe('host compiler', () => {
     expect(code).not.toMatch(/from ['"](?:dshx\/host|dshx\/internal-host-runtime)['"]/)
     expect(code).toMatch(/from ['"]@deepseek-ai\/dsh-tools['"]/)
     expect(code.match(/from ['"]@deepseek-ai\/dsh-tools['"]/g)).toHaveLength(1)
-    const plugin = (await import(`${pathToFileURL(resolve(root, 'dist/index.js')).href}?test=${Date.now()}`)) as {
-      inject: readonly string[]
-      apply(ctx: unknown): unknown
-    }
+    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(resolve(root, 'dist/index.js')).href}?test=${Date.now()}`))
     const registered: unknown[] = []
     plugin.apply({
       tools: {
-        register(tool: unknown) {
+        register(tool: ToolDefinition) {
           registered.push(tool)
         },
       },
@@ -159,11 +162,9 @@ describe('host compiler', () => {
     })
 
     const output = resolve(root, 'dist/index.js')
-    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as {
-      Config: { '~standard'?: { version?: number; vendor?: string } }
-      inject: readonly string[]
-      apply(ctx: unknown, config?: unknown): unknown
-    }
+    const plugin = hostPluginShape
+      .extend({ Config: z.object({ '~standard': z.object({ version: z.number(), vendor: z.string() }) }) })
+      .parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     expect(plugin.Config['~standard']).toMatchObject({ version: 1, vendor: 'zod' })
     expect(plugin.inject).toContain('connection')
   })
@@ -276,11 +277,11 @@ describe('host compiler', () => {
     const code = await readFile(output, 'utf8')
     expect(code).not.toContain('@dshfiles/dshx/host')
     expect(code).not.toContain('@deepseek-ai/dsh-commands')
-    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as { inject: string[]; apply(ctx: unknown): void }
+    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const registered: unknown[] = []
     plugin.apply({
       commands: {
-        register(command: unknown) {
+        register(command: CommandDefinition) {
           registered.push(command)
           return () => undefined
         },
@@ -314,15 +315,15 @@ describe('host compiler', () => {
     const code = await readFile(output, 'utf8')
     expect(code).not.toContain('@dshfiles/dshx/host')
     expect(code).not.toContain('@deepseek-ai/dsh-system-prompt')
-    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as { inject: string[]; apply(ctx: unknown): void }
+    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     const registered: Array<{ kind: string; value: unknown }> = []
     plugin.apply({
       systemPrompt: {
-        section(value: unknown) {
+        section(value: PromptSection) {
           registered.push({ kind: 'section', value })
           return () => undefined
         },
-        context(value: unknown) {
+        context(value: PromptContext) {
           registered.push({ kind: 'context', value })
           return () => undefined
         },
@@ -393,10 +394,9 @@ describe('host compiler', () => {
     })
 
     const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
-    const map = JSON.parse(await readFile(resolve(root, 'dist/index.js.map'), 'utf8')) as {
-      sources: string[]
-      sourcesContent?: Array<string | null>
-    }
+    const map = z
+      .object({ sources: z.array(z.string()), sourcesContent: z.array(z.string().nullable()).optional() })
+      .parse(JSON.parse(await readFile(resolve(root, 'dist/index.js.map'), 'utf8')))
     expect(code).toMatch(/from ['"]node:path['"]/)
     expect(code).toContain('dshx-host')
     expect(code).toMatch(/sourceMappingURL=index\.js\.map/)
@@ -523,7 +523,7 @@ describe('host compiler', () => {
     })
     const output = resolve(root, 'dist/index.js')
     expect(await readFile(output, 'utf8')).toContain('function apply()')
-    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as { name: string; apply(): unknown }
+    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     expect(plugin.name).toBe('client-only-host')
     expect(plugin.apply()).toBeUndefined()
   })
@@ -548,13 +548,8 @@ describe('host compiler', () => {
       outDir: 'dist',
     })
     const output = resolve(root, 'dist/index.js')
-    const plugin = (await import(`${pathToFileURL(output).href}?test=${Date.now()}`)) as {
-      name: string
-      inject: unknown
-      Config: unknown
-      apply(ctx: { received?: unknown }, config: unknown): unknown
-    }
-    const ctx: { received?: unknown } = {}
+    const plugin = hostPluginShape.parse(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
+    const ctx = { received: undefined }
     const config = { enabled: true }
     expect(plugin.name).toBe('native-host')
     expect(plugin.inject).toEqual({ agents: { mode: 'test' } })
@@ -764,7 +759,9 @@ describe('host compiler', () => {
     expect(wrapper).toContain('createGenerationManager')
     expect(wrapper).toContain(`generation: ${JSON.stringify(generation)}`)
 
-    const manifest = JSON.parse(await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8')) as Record<string, unknown>
+    const manifest = z
+      .strictObject({ version: z.literal(1), generation: z.string(), hostContractVersion: z.string() })
+      .parse(JSON.parse(await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8')))
     expect(manifest).toEqual({ version: 1, generation, hostContractVersion: 'v1' })
 
     const generationCode = await readFile(resolve(root, 'dist/.dshx-host-generations', `${generation}.js`), 'utf8')
@@ -827,10 +824,10 @@ describe('host compiler', () => {
     })
 
     const output = resolve(root, 'dist/index.js')
-    const module = (await import(`${pathToFileURL(output).href}?generation=${Date.now()}`)) as {
-      name: string
-      apply(ctx: Context, config?: unknown): unknown
-    }
+    const module = hostPluginShape
+      .omit({ Config: true })
+      .extend({ inject: z.array(z.string()) })
+      .parse(await import(`${pathToFileURL(output).href}?generation=${Date.now()}`))
     const registered: string[] = []
     const context = new Context()
     context.provide('tools', {
@@ -840,6 +837,7 @@ describe('host compiler', () => {
     })
 
     expect(module.name).toBe('generation-host')
+    expect(module.inject).toEqual(['tools'])
     const fiber = context.plugin(module)
     await fiber
     expect(registered).toEqual(['generation_status'])

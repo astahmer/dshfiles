@@ -6,6 +6,8 @@ One chronological activity feed across agents, sessions, communication, and jj
 workspaces — a shared activity room rather than another thread list. Observation
 only: it never activates, messages, or steers an Agent.
 
+Open the reusable **Activity Timeline: Activity** view from navigation or the Workbench chooser.
+
 ## Data flow
 
 ```

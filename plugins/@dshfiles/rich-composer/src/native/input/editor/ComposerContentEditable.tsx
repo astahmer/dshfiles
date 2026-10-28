@@ -10,6 +10,30 @@ import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode } from 'react'
 import type { LexicalEditor } from 'lexical'
 
+// One shell editor has one physical root. During legacy-view retirement, return
+// that root to its previous mounted host instead of leaving the canonical view
+// detached. Leases own DOM attachment only; the editor and draft stay shell-owned.
+const rootLeases = new WeakMap<LexicalEditor, Array<{ readonly element: HTMLDivElement }>>()
+const leaseRoot = (editor: LexicalEditor, element: HTMLDivElement): (() => void) => {
+  const leases = rootLeases.get(editor) ?? []
+  const lease = { element }
+  leases.push(lease)
+  rootLeases.set(editor, leases)
+  editor.setRootElement(element)
+  return () => {
+    const index = leases.indexOf(lease)
+    if (index < 0) return
+    leases.splice(index, 1)
+    // Disposing an older occurrence must not detach a newer live root.
+    if (editor.getRootElement() === element) {
+      const previous = leases.findLast(candidate => candidate.element.isConnected)
+      editor.setRootElement(previous?.element ?? null)
+      if (previous !== undefined) editor.setEditable(previous.element.getAttribute('contenteditable') === 'true')
+    }
+    if (leases.length === 0) rootLeases.delete(editor)
+  }
+}
+
 /** Host props: the editor binding plus the div passthroughs the bar owns. */
 export interface ComposerContentEditableProps extends HTMLAttributes<HTMLDivElement> {
   /** The shell-owned editor; null renders the same div unbound and inert. */
@@ -28,8 +52,7 @@ export function ComposerContentEditable({ editor, editable, ...rest }: ComposerC
   useLayoutEffect(() => {
     const el = ref.current
     if (editor === null || el === null) return
-    editor.setRootElement(el)
-    return () => { editor.setRootElement(null) }
+    return leaseRoot(editor, el)
   }, [editor])
   useLayoutEffect(() => {
     if (editor !== null) editor.setEditable(editable)

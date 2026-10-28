@@ -23,17 +23,34 @@ import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, c
 import { DocumentTitle } from './DocumentTitle.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
+import { MainSurfaceRendering } from '../../main-surface.ts'
+import type { MainSurfaceMode, RightPanelMode } from '../../regions.ts'
+import type { RightbarOwnerProps } from './index.ts'
 
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.dock' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.main' | 'shell.dock' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
-/** Center column grid item (session-body building block). */
-function CenterColumn(props: { children?: ReactNode }) {
-  return <div className={css.centerCol}>{props.children}</div>
+/**
+ * The stable centre/strip seat survives mode changes. The outer main anchor
+ * precedes all nested keyed outlets, so main-tabs can portal beside it rather
+ * than accidentally attaching inside a workbench panel.
+ */
+export function CenterColumn({ mode, renderSlot, children }: {
+  mode: MainSurfaceMode
+  children?: ReactNode
+} & PropsRenderSlots<'main' | 'shell.main'>) {
+  const renderMain = useMemo(() => MainSurfaceRendering.createRenderer(renderSlot), [renderSlot])
+  return (
+    <div className={css.centerCol} data-main-column>
+      <div className={css.mainSurface} data-slot="main" data-main-surface={mode}>
+        {MainSurfaceRendering.render(mode, renderSlot, renderMain, children)}
+      </div>
+    </div>
+  )
 }
 
 /** Subscribe to the main key without subscribing the column frame to each panel id. */
@@ -47,8 +64,26 @@ function MainPanel({ usePanelInfo, renderSlot }: Pick<PropsRuntime<'root'>, 'use
  * occupant's panel is positioned against the column's right edge, which never
  * moves, so it can hang over the centre when there is no track.
  */
-function RightbarColumn(props: { children?: ReactNode }) {
-  return <div className={css.rightbarCol} data-rightbar-col>{props.children}</div>
+export function RightbarColumn({ mainMode, mode, owner, renderSlot }: {
+  mainMode: MainSurfaceMode
+  mode: RightPanelMode
+  owner: RightbarOwnerProps
+} & PropsRenderSlots<'rightbar' | 'shell.dock'>) {
+  const dock = mode === 'dock'
+  const carrier = dock || mainMode === 'workbench'
+  return (
+    <div className={css.rightbarCol} data-rightbar-col>
+      {/* Keep the dock's live views mounted while closed in Workbench mode. */}
+      <div hidden={!dock} style={dock ? { display: 'contents' } : undefined} data-shell-dock-carrier>
+        {dock || mainMode === 'workbench' ? renderSlot('shell.dock', { ...owner, shown: dock }) : null}
+      </div>
+      {/* Workbench always owns visible views, even with its right pane closed.
+          Retain the authorized native session owner for resource portals. */}
+      <div hidden={carrier} style={carrier ? undefined : { display: 'contents' }} data-native-rightbar-carrier>
+        {!dock || mainMode === 'workbench' ? renderSlot('rightbar', owner) : null}
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -264,8 +299,8 @@ export function AppFrame({
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
   const overlays = useMemo(() => renderSlot('shell.overlay', {}), [renderSlot])
-  // The bottom row: full width below every column. Its height is the frame's,
-  // clamped against the window so a drag can never swallow the conversation.
+  // The bottom row sits below left + centre only; the right pane stays full-height.
+  // Clamp its height so a drag can never swallow the conversation.
   const viewportHeight = typeof window === 'undefined' ? 0 : window.innerHeight
   const bottomHeight = useRef(0)
   bottomHeight.current = layoutInfo.bottomShown
@@ -278,10 +313,14 @@ export function AppFrame({
   // One owner at a time: the global dock a plugin registered into `shell.dock`,
   // or the native per-session occupant. Both receive the same resolved geometry
   // and report their own presentation back through ctx.layout.
-  const rightColumn = useMemo(() => {
-    const owner = { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 }
-    return layoutInfo.rightPanelMode === 'dock' ? renderSlot('shell.dock', owner) : renderSlot('rightbar', owner)
-  }, [renderSlot, layoutInfo.rightPanelMode, normal.rightbar, viewport])
+  const rightColumn = useMemo(() => (
+    <RightbarColumn
+      mainMode={layoutInfo.mainSurfaceMode}
+      mode={layoutInfo.rightPanelMode}
+      owner={{ width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 }}
+      renderSlot={renderSlot}
+    />
+  ), [renderSlot, layoutInfo.rightPanelMode, layoutInfo.mainSurfaceMode, normal.rightbar, viewport])
   // Window-chrome seat over the main panels' top-left corner: only a fully
   // hidden sidebar column on macOS desktop leaves window chrome without a
   // home — the Windows zero-width collapse keeps its controls in the caption
@@ -319,10 +358,8 @@ export function AppFrame({
         {sidebar}
       </div>
       <>
-        <CenterColumn>{main}</CenterColumn>
-        <RightbarColumn>
-          {rightColumn}
-        </RightbarColumn>
+        <CenterColumn mode={layoutInfo.mainSurfaceMode} renderSlot={renderSlot}>{main}</CenterColumn>
+        {rightColumn}
       </>
       {bottomHeight.current > 0 && (
         <div className={css.bottomRow} data-shell-bottom>

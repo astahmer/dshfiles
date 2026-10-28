@@ -30,6 +30,8 @@ idle things sink, and the tracker parts (status, actors, links, search, board) c
 
 Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
 
+Open the reusable **Backlog: Items** view from navigation or the Workbench chooser. Items, Board, Projects and Inbox remain the page’s own view controls.
+
 ## Capture
 
 The **Backlog** sidebar panel has one capture box pinned to the bottom of every view (Enter adds,

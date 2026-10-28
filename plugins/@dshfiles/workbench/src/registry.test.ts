@@ -57,6 +57,14 @@ describe('workbench panel registry', () => {
     expect(registry.movePreference('prefs-b', 'earlier')).toBe(false)
   })
 
+  it('excludes runtime occurrences from reusable context choices even with old enabled preferences', () => {
+    const registry = createWorkbenchPanelRegistry()
+    registry.register({ ...panel('runtime-occurrence'), hiddenFromAdd: true, showInContextMenu: true })
+    registry.setPreference('runtime-occurrence', { contextMenu: true, emptyState: true, order: 0 })
+    expect(registry.get('runtime-occurrence')).toBeDefined()
+    expect(registry.listContextMenuPanels()).toEqual([])
+  })
+
   it('keeps open requests, deduplicated and latest last, until the workbench takes them', () => {
     const registry = createWorkbenchPanelRegistry()
     registry.open('a')

@@ -1,23 +1,33 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { SerializedDockview } from 'dockview-react'
 import { z } from 'zod'
-import { layoutSchema, type LayoutSurface } from './layout-store.js'
+import { layoutSchema, nestedLayoutStores, nestedSurfacePathSchema, type LayoutSurface, type NestedLayouts, type NestedLayoutStores } from './layout-store.js'
 
 /** One named arrangement: whatever each region held when it was saved. A region it did not record stays as it is. */
 export interface SavedLayout {
-  readonly main?: SerializedDockview | undefined
-  readonly dock?: SerializedDockview | undefined
-  readonly bottom?: SerializedDockview | undefined
+  readonly main?: SerializedDockview | null | undefined
+  readonly left?: SerializedDockview | null | undefined
+  readonly dock?: SerializedDockview | null | undefined
+  readonly bottom?: SerializedDockview | null | undefined
+  readonly presentation?:
+    | {
+        readonly bottomShown: boolean
+        readonly rightMode?: 'native' | 'dock' | undefined
+      }
+    | undefined
+  /** Includes unmounted containers; null explicitly restores an empty/default surface. */
+  readonly nested?: NestedLayouts | undefined
 }
 
-const layoutsSchema = z.record(
-  z.string().min(1).max(64),
-  z.object({
-    main: layoutSchema.optional(),
-    dock: layoutSchema.optional(),
-    bottom: layoutSchema.optional(),
-  }),
-)
+export const savedLayoutSchema = z.object({
+  main: layoutSchema.nullable().optional(),
+  left: layoutSchema.nullable().optional(),
+  dock: layoutSchema.nullable().optional(),
+  bottom: layoutSchema.nullable().optional(),
+  presentation: z.object({ bottomShown: z.boolean(), rightMode: z.enum(['native', 'dock']).optional() }).optional(),
+  nested: z.record(nestedSurfacePathSchema, layoutSchema.nullable()).optional(),
+})
+const layoutsSchema = z.record(z.string().min(1).max(64), savedLayoutSchema)
 
 /** Nothing saved yet; one shared empty map keeps the fallback reference stable. */
 const NO_SAVED_LAYOUTS: SavedLayoutMap = {}
@@ -61,8 +71,18 @@ export class SavedLayouts {
     return SavedLayouts.with(SavedLayouts.without(layouts, from), to, layout)
   }
 
+  /** Add all known nested paths, including containers with no mounted Dockview. */
+  static captureNested(layout: SavedLayout, stores: NestedLayoutStores = nestedLayoutStores): SavedLayout {
+    return { ...layout, nested: stores.capture() }
+  }
+
+  /** Restore nested storage before mounting parent layouts; legacy snapshots leave it untouched. */
+  static restoreNested(layout: SavedLayout, stores: NestedLayoutStores = nestedLayoutStores): void {
+    if (layout.nested !== undefined) stores.restore(layout.nested)
+  }
+
   /** One region's entry from a saved layout, or undefined when the layout did not record that region. */
-  static surface(layout: SavedLayout, surface: LayoutSurface): SerializedDockview | undefined {
+  static surface(layout: SavedLayout, surface: LayoutSurface): SerializedDockview | null | undefined {
     return layout[surface]
   }
 }

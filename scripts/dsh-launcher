@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Machine-local launcher choices live outside this checkout. Preserve caller HOME/XDG.
+set -euo pipefail
+launcher_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec "${DSHFILES_NODE_BINARY:-node}" "$launcher_dir/launch-dsh.mjs" "$@"

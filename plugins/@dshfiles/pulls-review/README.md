@@ -6,6 +6,8 @@ Review this thread's changes the way [pulls.review](https://pulls.review) does:
 changed files grouped into scopes, one scope at a time, with review progress —
 inside DSH, for the thread's own jj workspace.
 
+Open the reusable **pulls.review: Reviews** view from navigation or the Workbench chooser.
+
 ## What it does
 
 A thread works in its own jj workspace, so its changes are `jj diff --from

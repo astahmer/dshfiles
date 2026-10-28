@@ -82,7 +82,9 @@ const repositoryFile = (file: string): string => {
 const locate = (page: Page, by: string, rawName: string) => {
   const exact = !rawName.endsWith('*')
   const name = exact ? rawName : rawName.slice(0, -1)
-  if (by === 'text') return page.getByText(name, { exact }).first()
+  // Fixed conversation histories stay mounted; only the visible text is a
+  // user-facing reach target, not an earlier hidden occurrence of that label.
+  if (by === 'text') return page.getByText(name, { exact }).filter({ visible: true }).first()
   if (by === 'label') return page.getByLabel(name, { exact }).first()
   if (by === 'title') return page.getByTitle(name, { exact }).first()
   // SAFETY: the catalog grammar admits any lowercase word; Playwright rejects an unknown ARIA role at run time.
@@ -301,5 +303,6 @@ export class ScratchFeatureCatalog {
 }
 
 export class ScratchDriveRuntime {
+  static readonly locate = locate
   static readonly composerFileInput = (page: Page) => page.locator('[data-composer-card] input[type="file"]').first()
 }

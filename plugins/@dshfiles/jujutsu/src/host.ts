@@ -17,6 +17,7 @@ import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 import { GraphPage } from './graph-page.js'
 import { matchesRevisionSearch } from './graph.js'
+import { ensureJujutsuRepository } from './repository-init.js'
 
 const MAX_OUTPUT = 1_160_000
 const MAX_STDERR = 64_000
@@ -747,6 +748,15 @@ const userFacing =
   }
 
 const jujutsuHostApi = jujutsuApi.host({
+  openRepository: userFacing(async ({ input, ctx, signal }) => {
+    const opened = await ensureJujutsuRepository({
+      path: JujutsuPathModel.validatedRepositoryPath(input.path),
+      runJj: (cwd, args, commandSignal) => runAt(ctx, cwd, undefined, args, commandSignal, { outputLimit: 16_000 }),
+      signal,
+    })
+    const repo = await registerRepo(ctx, opened.root, signal)
+    return { repoId: repo.id, root: repo.root, initialized: opened.initialized }
+  }),
   registerRepository: userFacing(async ({ input, ctx, signal }) => {
     const repo = await registerRepo(ctx, input.path, signal)
     return { repoId: repo.id, root: repo.root }

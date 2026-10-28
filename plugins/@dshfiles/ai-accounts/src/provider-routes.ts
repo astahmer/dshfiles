@@ -1,7 +1,8 @@
 import type { AiAccountsConfig, CodexAccountConfig } from './account-config.js'
 import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { ClaudeAccountModel } from './claude-account.js'
-import { CodexHomeError, CodexHomeModel, type CodexHomeLayout } from './codex-home.js'
+import { CodexHomeError, type CodexHomeLayout } from './codex-home.js'
+import { AccountHomePolicy } from './account-home-policy.js'
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
@@ -31,6 +32,7 @@ export interface KeyedRoute {
   readonly displayName: string
   readonly apiKeyEnv: string
   readonly apiBaseUrl: string
+  readonly authSource?: 'cli' | 'reference' | undefined
   readonly enabled: boolean
 }
 
@@ -91,10 +93,14 @@ export class ProviderRoutes {
       const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, CODEX_KIND)
       let layout: CodexHomeLayout
       try {
-        layout = CodexHomeModel.resolveLayout({
-          homePath: account.homePath,
-          shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
-        })
+        layout = AccountHomePolicy.codexLayoutFor(
+          {
+            instanceId,
+            homePath: account.homePath,
+            shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
+          },
+          config.codexShadowRoot,
+        )
       } catch (error) {
         if (!(error instanceof CodexHomeError)) throw error
         rejected.push(`${instanceId}: ${error.message}`)
@@ -117,6 +123,7 @@ export class ProviderRoutes {
         displayName: displayNameFor(account.displayName, kind, instanceId),
         apiKeyEnv: account.apiKeyEnv,
         apiBaseUrl: account.apiBaseUrl,
+        authSource: account.authSource,
         enabled: account.enabled,
       })
     }

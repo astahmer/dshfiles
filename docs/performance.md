@@ -3,6 +3,56 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Workbench main-seat baseline (2026-10-26)
+
+Measured an existing live instance before builds or browser E2E load; no live restart or deployment. Its private profile name and endpoint are omitted.
+The machine had 12 logical CPUs and load averages 7.00 / 8.35 / 8.87.
+
+| Probe                                              | Before implementation deployment                                                                                         | After deployment                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Host RPC, 20 seconds / 39 samples                  | p50 86 ms; p90 1,596 ms; p99/max 5,555 ms                                                                                | Not measured: live Host remains unchanged                          |
+| Host CPU, 20-second sample                         | 19,908 ms busy; inclusive subprocess-local querySystemctl/rangeActive 8,011 ms, spawn 6,099 ms, Jujutsu runJjAt 3,787 ms | Not measured                                                       |
+| Two thread switches in a separate live browser tab | DOM 918 / 908; long tasks 160 / 120 ms; stabilization 312 / 343 ms (includes 150 ms quiet window)                        | Scratch acceptance is separate, not a comparable live after sample |
+
+The pre-existing Host stalls exceed the 250 ms budget and must not be attributed to the new workbench. The CPU sample
+is inclusive and concurrent agent subprocess traffic was present; it identifies an existing cost, not a benchmark of
+the unreleased UI. A production before/after claim requires the user's restart and the same probes on that version.
+
+Recovery read-only sample at 06:03 Europe/Paris, before this thread's build/browser load: 75 authenticated credentials
+RPCs over 10 seconds, all HTTP 200, p50 7 ms and p99/max 315 ms. Two thread selections in an isolated live browser tab
+showed the composer in 128 / 991 ms, DOM 1,132 / 1,173, and one 124 / 116 ms browser long task respectively. The first
+selection completed six HTTP API reads; only the existing `dshx-bdd4a2d6/list` request exceeded the budget (338 ms).
+The other selection used the existing Session connection, so its HTTP list is not a full transport-byte measurement.
+Machine load was 20.96 / 20.53 / 16.22 on 12 logical CPUs. The live page was still native mode: this is refreshed
+baseline evidence, **not** proof of an after-deployment workbench improvement or regression.
+
+### Controlled scratch comparison after the preview-navigation fix
+
+At `6b52aa5a`, the same two small real Sessions (one prompt and a credential-free failed turn each) were switched by
+real sidebar input in both modes: two warmup switches and six measured switches per mode. The timestamp starts at
+capture-click and ends at the first visible, correctly bound history plus editable composer frame, confirmed over two
+frames. These are descriptive six-sample nearest-rank percentiles, **not** a live deployment or large-history SLO.
+
+| Scratch mode | p50      | p95 / maximum | Median whole-document DOM | Over 250 ms |
+| ------------ | -------- | ------------- | ------------------------- | ----------- |
+| Native       | 111.9 ms | 118.1 ms      | 757                       | 0 / 6       |
+| Workbench    | 32.8 ms  | 37.3 ms       | 901                       | 0 / 6       |
+
+Per-thread median deltas were −80.7 / −76.0 ms. Native recorded four browser long tasks; Workbench recorded none.
+Observed HTTP API requests had no failures, pending-at-ready requests or requests over 250 ms. WebSocket payloads and
+live Host CPU/event-loop attribution are not measured by this comparison; the deployment-after cells above remain
+unverified. The setup also freshly proves that Plugins stays selected after replacing the second thread preview.
+
+[Full redacted measurements](workbench-switch-performance-2026-10-26.json). Reproduce with the pinned raw-core and
+system-Chromium overrides from `verify-dsh`, built artifacts, `DSHX_E2E_PREWARM=0`, and Playwright's
+`workbench-performance.feature.spec.js` target. Full run receipt:
+`.dsh-e2e-evidence/1793034685726-c9d93c3c-9cb3-430b-8010-50178a2a3899/manifest.json`.
+
+The final source was measured again at `4a1f4c76`: Native p50 **115.3 ms**, p95/max **123.5 ms**; Workbench p50
+**33.2 ms**, p95/max **36.8 ms**. Both modes retained the same 757/901 median DOM counts. All twelve interactions and
+observed HTTP API requests stayed below 250 ms. [Repeated redacted measurements](workbench-switch-performance-2026-10-26-final.json).
+This confirms the controlled result, not a production or large-history after-deployment claim.
+
 ## Why earlier attempts stalled
 
 Several audits planned from source reading, request logs and small scratch fixtures, then proposed new helper
@@ -332,7 +382,7 @@ captured again.
 
 A fresh one-switch probe on `127.0.0.1:3080` observed 55 requests; `dshx-9ca8a5fa/sessionRuntime` took 8.2 s and `session/page` took 4.9 s in the browser. Host-lag probes around the same interval had p50 4 ms, p90 32 ms, p99 403 ms, and max 702 ms; machine load was 20–21 and memory pressure was warning. The trace receiver still had no fresh spans because port 4318 was occupied, so browser duration is not treated as isolated server time.
 
-The slow `sessionRuntime` route belongs to `@dshfiles/multi-host`. Its old path called `resolveOwner` for an unclaimed ID; the remote source's `owns` implementation then tried `session/list` against configured runtimes sequentially. The live runtime directory reports two unavailable SSH runtimes. This source path is consistent with the measured delay, though the missing server trace prevents assigning all 8.2 s to SSH.
+The slow `sessionRuntime` route belongs to `@dshfiles/multi-host`. Its old path called `resolveOwner` for an unclaimed ID; the remote source's `owns` implementation then tried `session/list` against configured runtimes sequentially. Private remote-runtime inventory/status observations are omitted. The source path is consistent with delay from unavailable remote calls, but the missing server trace prevents assigning all 8.2 s to SSH.
 
 The optimization now uses an existing session-source ownership claim instead of discovering owners for unknown IDs. The remote source indexes Session-to-runtime ownership from its successful list and reuses that mapping, avoiding an extra remote `session/list` when resolving a known owner. Direct source discovery for actual Session routing remains unchanged. Focused tests assert that an unclaimed local ID does not invoke owner discovery and that a listed remote Session resolves from the local index. The live Host still runs the old bundle, so a matched live after-measurement is pending a user-approved Host restart; no restart was performed.
 
@@ -352,11 +402,11 @@ Other workspace polling changes stop question/quota retries after errors and avo
 
 ## Repeated remote status probes and usage sync (2026-10-25)
 
-| Path | Live baseline | Change | Verification |
-| ---- | ------------ | ------ | ------------ |
-| Remote status | In a 10-minute trace window, `multi-host/runtimeStatus` ran 59 times (p50 1.93 s, p95 9.59 s, p99 10.75 s); `ssh command` ran 141 times with 39% errors (p95 8.89 s). Failed SSH attempts commonly took about 8–9 s. | Cache only recent connection failures for 45 s; reuse query data for 15 s and back off failed status/ping polling to at least 60 s. Explicit reconnect and successful connection clear the error. | Policy/cache tests and multi-host typecheck pass. Live after-measurement is pending a user-approved Host restart; the current live Host still serves old code. |
-| Usage registry | The 30-second Host profile attributed 2.42 s to `syncToolSources` inside a transaction. The read-only usage DB contained about 292k tool rows for a registry of 256 names. | Compare the last successfully synchronized name/source/owner snapshot and skip the transaction when it is unchanged; still pass the current registry to log indexing. | Snapshot/indexer tests and usage typecheck pass. Live after-measurement is pending a user-approved Host restart. |
-| Host event loop | A 60-second live sample had 372 observations (p50 5 ms, p90 117 ms, p99 833 ms, max 4.61 s; 17 stalls over 250 ms). Load was 11–16 on a 10-core machine and later rose to 30, so these wall times are not attributable to one plugin. | The fixes remove repeated work in the confirmed usage and remote-status paths; they do not address general machine contention. | No live after-sample yet: neither changed Host bundle is active on `:3080`, and profiling during a build would distort the comparison. |
+| Path            | Live baseline                                                                                                                                                                                                                         | Change                                                                                                                                                                                            | Verification                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remote status   | In a 10-minute trace window, `multi-host/runtimeStatus` ran 59 times (p50 1.93 s, p95 9.59 s, p99 10.75 s); `ssh command` ran 141 times with 39% errors (p95 8.89 s). Failed SSH attempts commonly took about 8–9 s.                  | Cache only recent connection failures for 45 s; reuse query data for 15 s and back off failed status/ping polling to at least 60 s. Explicit reconnect and successful connection clear the error. | Policy/cache tests and multi-host typecheck pass. Live after-measurement is pending a user-approved Host restart; the current live Host still serves old code. |
+| Usage registry  | The 30-second Host profile attributed 2.42 s to `syncToolSources` inside a transaction. The read-only usage DB contained about 292k tool rows for a registry of 256 names.                                                            | Compare the last successfully synchronized name/source/owner snapshot and skip the transaction when it is unchanged; still pass the current registry to log indexing.                             | Snapshot/indexer tests and usage typecheck pass. Live after-measurement is pending a user-approved Host restart.                                               |
+| Host event loop | A 60-second live sample had 372 observations (p50 5 ms, p90 117 ms, p99 833 ms, max 4.61 s; 17 stalls over 250 ms). Load was 11–16 on a 10-core machine and later rose to 30, so these wall times are not attributable to one plugin. | The fixes remove repeated work in the confirmed usage and remote-status paths; they do not address general machine contention.                                                                    | No live after-sample yet: neither changed Host bundle is active on `:3080`, and profiling during a build would distort the comparison.                         |
 
 The bounded profile also sampled Activity Timeline and background-job work; those owners are separate and need their own trace-backed follow-up rather than speculative edits here. The client/Host bundles were not activated on the live Host, so no latency improvement is claimed yet.
 

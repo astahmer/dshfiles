@@ -54,101 +54,129 @@ const OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS = 120_000
 const streamIdleTimeoutMsFor = (upstreamId: string): number =>
   upstreamId === 'opencode-go' ? OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS : SILENT_REASONING_STREAM_IDLE_TIMEOUT_MS
 
-export const buildProfile = (params: {
-  /** Per-model default effort ids this account pins. */
-  readonly reasoningDefaults?: Readonly<Record<string, string>> | undefined
-  /** Ids this account never offers. */
-  readonly hiddenModelIds?: readonly string[]
-  /** Ids offered ahead of the rest. */
-  readonly favoriteModelIds?: readonly string[]
-  /** Explicit ordering; unlisted ids keep provider order after these. */
-  readonly modelOrder?: readonly string[]
-  readonly upstream:
-    | ReturnType<typeof openaiCodexProvider>
-    | ReturnType<typeof opencodeGoProvider>
-    | ReturnType<typeof anthropicProvider>
-    | ReturnType<typeof githubCopilotProvider>
-    | ReturnType<typeof createCommandCodeProvider>
-  readonly provider: string
-  readonly displayName: string
-  readonly additionalModelIds: readonly string[]
-}): ResolvedPiAiProviderProfile => {
-  const hidden = new Set(params.hiddenModelIds ?? [])
-  const favorites = new Set(params.favoriteModelIds ?? [])
-  const order = params.modelOrder ?? []
-  const rank = (id: string): number => {
-    const listed = order.indexOf(id)
-    if (listed >= 0) return listed
-    // Unlisted models follow the explicit ones, favorites first among them, then
-    // the provider's own order, so adding a model never reshuffles the rest.
-    return order.length + (favorites.has(id) ? 0 : 1)
-  }
-  const upstreamModels = params.upstream.getModels()
-  const offersThinkingOff = params.upstream.id === 'opencode-go'
-  const models = upstreamModels.map(model => {
-    const named = { ...model, provider: params.provider, name: AccountsRules.accountModelName(params.provider, model.name) }
-    return offersThinkingOff ? offerThinkingOff(named) : named
-  })
-  for (const id of new Set(params.additionalModelIds)) {
-    if (models.some(model => model.id === id)) continue
-    // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
-    const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id) : undefined
-    if (described !== undefined) {
-      models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
-      continue
-    }
-    const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
-    const gptFamily = /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(id)?.[1]
-    const familyTemplate = gptFamily === undefined ? undefined : upstreamModels.findLast(model => /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(model.id)?.[1] === gptFamily)
-    const template =
-      familyTemplate ??
-      (id.startsWith('gpt-') ? upstreamModels.find(model => model.id.startsWith('gpt-')) : undefined) ??
-      upstreamModels.find(model => model.api === api) ??
-      upstreamModels[0]
-    if (template === undefined) continue
-    models.push({ ...template, id, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
-  }
-  const offeredModels = models.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
-  // A pinned effort is offered as an override on the model it belongs to, which
-  // is the seam the adapter materializes a default through: an explicit caller
-  // choice still wins, and an unpinned model keeps the provider's own default.
-  const pins = params.reasoningDefaults ?? {}
-  const modelOverrides = Object.fromEntries(
-    Object.entries(pins).flatMap(([modelId, effortId]) => {
-      const model = offeredModels.find(candidate => candidate.id === modelId)
-      if (model === undefined) return []
-      const levels = (model as { thinkingLevelMap?: Record<string, string | null> }).thinkingLevelMap
-      if (levels !== undefined && levels[effortId] === null) return []
-      return [[modelId, { reasoningEfforts: { [effortId]: levels?.[effortId] ?? effortId } }]]
-    }),
-  )
+const profilePins = new WeakMap<ResolvedPiAiProviderProfile, Readonly<Record<string, string>>>()
+const nativeModels = new WeakMap<ResolvedPiAiProviderProfile, ReadonlySet<string>>()
 
-  return {
-    provider: params.provider,
-    displayName: params.displayName,
-    ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
-    transport: 'sse',
-    streamIdleTimeoutMs: streamIdleTimeoutMsFor(params.upstream.id),
-    maxRequestImageBytes: 20_971_520,
-    requestImagePixelBudget: 4_194_304,
-    requestImageMaxBytes: 1_048_576,
-    modelErrors: new Map(),
-    configuredMaxTokens: new Map(),
-    retryPolicy: {
-      mode: 'normal',
-      maxRetries: 2,
-      // EMPTY_RESPONSE: a stop with no answer is a failed attempt, never a finished turn.
-      retryableCodes: ['RATE_LIMIT', 'OVERLOADED', 'TRANSPORT', 'TIMEOUT', 'EMPTY_RESPONSE'],
-      initialDelayMs: 1_000,
-      maxDelayMs: 30_000,
-      jitterRatio: 0.2,
-    },
-    piProvider: {
-      ...params.upstream,
-      id: params.provider,
-      name: params.displayName,
-      getModels: () => offeredModels,
-    },
+/** Match the installed adapter's supported-thinking-level rule before publishing or applying a pin. */
+const supportsEffort = (
+  model: { readonly reasoning: boolean; readonly thinkingLevelMap?: Readonly<Record<string, string | null>> | undefined },
+  effort: string,
+): boolean => {
+  if (!model.reasoning) return false
+  if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) return false
+  const mapped = model.thinkingLevelMap?.[effort]
+  return mapped !== null && ((effort !== 'xhigh' && effort !== 'max') || mapped !== undefined)
+}
+
+export class ProviderProfileModel {
+  static nativeModelIdsForProfile = (profile: ResolvedPiAiProviderProfile): ReadonlySet<string> => nativeModels.get(profile) ?? new Set()
+  static reasoningDefaultsForProfile = (profile: ResolvedPiAiProviderProfile): Readonly<Record<string, string>> => profilePins.get(profile) ?? {}
+
+  static buildProfile = (params: {
+    readonly defaultReasoningEffort?: string | null | undefined
+    /** Per-model default effort ids this account pins. */
+    readonly reasoningDefaults?: Readonly<Record<string, string>> | undefined
+    /** Ids this account never offers. */
+    readonly hiddenModelIds?: readonly string[]
+    /** Ids offered ahead of the rest. */
+    readonly favoriteModelIds?: readonly string[]
+    /** Explicit ordering; unlisted ids keep provider order after these. */
+    readonly modelOrder?: readonly string[]
+    readonly upstream:
+      | ReturnType<typeof openaiCodexProvider>
+      | ReturnType<typeof opencodeGoProvider>
+      | ReturnType<typeof anthropicProvider>
+      | ReturnType<typeof githubCopilotProvider>
+      | ReturnType<typeof createCommandCodeProvider>
+    readonly provider: string
+    readonly displayName: string
+    readonly additionalModelIds: readonly string[]
+  }): ResolvedPiAiProviderProfile => {
+    const hidden = new Set(params.hiddenModelIds ?? [])
+    const favorites = new Set(params.favoriteModelIds ?? [])
+    const order = params.modelOrder ?? []
+    const rank = (id: string): number => {
+      const listed = order.indexOf(id)
+      if (listed >= 0) return listed
+      // Unlisted models follow the explicit ones, favorites first among them, then
+      // the provider's own order, so adding a model never reshuffles the rest.
+      return order.length + (favorites.has(id) ? 0 : 1)
+    }
+    const upstreamModels = params.upstream.getModels()
+    const offersThinkingOff = params.upstream.id === 'opencode-go'
+    const models = upstreamModels.map(model => {
+      const named = { ...model, provider: params.provider, name: AccountsRules.accountModelName(params.provider, model.name) }
+      return offersThinkingOff ? offerThinkingOff(named) : named
+    })
+    for (const id of new Set(params.additionalModelIds)) {
+      if (models.some(model => model.id === id)) continue
+      // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
+      const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id) : undefined
+      if (described !== undefined) {
+        models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
+        continue
+      }
+      const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
+      const gptFamily = /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(id)?.[1]
+      const familyTemplate =
+        gptFamily === undefined ? undefined : upstreamModels.findLast(model => /^gpt-\d+(?:\.\d+)?(.*)$/u.exec(model.id)?.[1] === gptFamily)
+      const template =
+        familyTemplate ??
+        (id.startsWith('gpt-') ? upstreamModels.find(model => model.id.startsWith('gpt-')) : undefined) ??
+        upstreamModels.find(model => model.api === api) ??
+        upstreamModels[0]
+      if (template === undefined) continue
+      models.push({ ...template, id, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
+    }
+    const offeredModels = models.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
+    // A pinned effort is offered as an override on the model it belongs to, which
+    // is the seam the adapter materializes a default through: an explicit caller
+    // choice still wins, and an unpinned model keeps the provider's own default.
+    const pins = Object.fromEntries(
+      offeredModels.flatMap(model => {
+        const override = params.reasoningDefaults?.[model.id]
+        const effort = override !== undefined && supportsEffort(model, override) ? override : params.defaultReasoningEffort
+        return effort != null && supportsEffort(model, effort) ? [[model.id, effort]] : []
+      }),
+    )
+    const modelOverrides = Object.fromEntries(
+      offeredModels.flatMap(model => {
+        const effort = pins[model.id]
+        const levels: Readonly<Record<string, string | null>> | undefined = model.thinkingLevelMap
+        return effort === undefined ? [] : [[model.id, { reasoningEfforts: { [effort]: levels?.[effort] ?? effort } }]]
+      }),
+    )
+
+    const profile: ResolvedPiAiProviderProfile = {
+      provider: params.provider,
+      displayName: params.displayName,
+      ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
+      transport: 'sse',
+      streamIdleTimeoutMs: streamIdleTimeoutMsFor(params.upstream.id),
+      maxRequestImageBytes: 20_971_520,
+      requestImagePixelBudget: 4_194_304,
+      requestImageMaxBytes: 1_048_576,
+      modelErrors: new Map(),
+      configuredMaxTokens: new Map(),
+      retryPolicy: {
+        mode: 'normal',
+        maxRetries: 2,
+        // EMPTY_RESPONSE: a stop with no answer is a failed attempt, never a finished turn.
+        retryableCodes: ['RATE_LIMIT', 'OVERLOADED', 'TRANSPORT', 'TIMEOUT', 'EMPTY_RESPONSE'],
+        initialDelayMs: 1_000,
+        maxDelayMs: 30_000,
+        jitterRatio: 0.2,
+      },
+      piProvider: {
+        ...params.upstream,
+        id: params.provider,
+        name: params.displayName,
+        getModels: () => offeredModels,
+      },
+    }
+    profilePins.set(profile, pins)
+    nativeModels.set(profile, new Set(upstreamModels.map(model => model.id)))
+    return profile
   }
 }
 

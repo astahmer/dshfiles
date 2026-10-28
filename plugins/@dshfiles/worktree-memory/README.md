@@ -6,6 +6,8 @@ Activity Monitor shows forty `node` rows and nothing about which thread started 
 memory of everything the threads spawned by workspace, so "what is eating my RAM" is one look, and "stop it" is two
 clicks. Inspired by Fusebox, a menu-bar app built around Lovable's dev setup; no code is taken from it.
 
+Open the reusable **Worktree Memory: RAM** view from navigation or the Workbench chooser.
+
 ## Where the rows come from
 
 ```

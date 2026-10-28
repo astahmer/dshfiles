@@ -20,7 +20,7 @@ export default defineClient({
     const translate = ctx.locale.bind(WORKTREE_MEMORY_LOCALE_NAMESPACE)
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
-        { name: 'sidebar.panellist', id: PANEL_ID, order: 7, label: () => translate('title'), locale: WORKTREE_MEMORY_LOCALE_NAMESPACE },
+        { name: 'sidebar.panellist', id: PANEL_ID, order: 7, label: () => `Worktree Memory: ${translate('title')}`, locale: WORKTREE_MEMORY_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
             <MemoryGlyph size={props.size} t={props.t} />

@@ -70,7 +70,10 @@ const nearestEdge = (rect: { readonly left: number; readonly right: number; read
   return distances.sort((left, right) => left[1] - right[1])[0]?.[0] ?? 'right'
 }
 
-export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
+export const EdgeUsageWidget = (props: {
+  readonly onOpenUsageHistory: () => void
+  readonly onConnectAccount: (accountId: string) => void
+}): JSX.Element | null => {
   const { edgeWidget } = usePreferences()
   const { layout } = useUsageLayout()
   const { usage, refreshing, failed, refresh } = useAccountsUsage({ enabled: edgeWidget })
@@ -165,7 +168,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     setOpen(current => !current)
   }
 
-  const primaryTone = quotaTone(primary ?? 100)
+  const primaryTone = primary === undefined ? 'dshx:text-muted-foreground' : QUOTA_TONE_TEXT[quotaTone(primary)]
   const vertical = position.edge === 'left' || position.edge === 'right'
 
   // Portal to the body: the sidebar foot has transformed ancestors, and a fixed
@@ -194,7 +197,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
             type="button"
           >
             <span className="dshx:text-[11px] dshx:font-extrabold">AI</span>
-            <span className={cn('dshx:text-[11px] dshx:font-bold dshx:tabular-nums', QUOTA_TONE_TEXT[primaryTone])}>
+            <span className={cn('dshx:text-[11px] dshx:font-bold dshx:tabular-nums', primaryTone)}>
               {primary === undefined ? '·' : String(Math.round(primary))}
             </span>
           </button>
@@ -214,6 +217,10 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
             onOpenHistory={() => {
               setOpen(false)
               props.onOpenUsageHistory()
+            }}
+            onConnectAccount={accountId => {
+              setOpen(false)
+              props.onConnectAccount(accountId)
             }}
             onRefresh={() => void refresh()}
             refreshing={refreshing}

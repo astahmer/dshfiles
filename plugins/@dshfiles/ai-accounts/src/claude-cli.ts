@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import {
@@ -416,7 +416,7 @@ export class ClaudeCliSessions {
     // The CLI prefers an API key from the environment over its login, which would bill the API organization instead.
     delete environment['ANTHROPIC_API_KEY']
     delete environment['ANTHROPIC_AUTH_TOKEN']
-    if (configDir !== join(homedir(), '.claude')) environment['CLAUDE_CONFIG_DIR'] = configDir
+    environment['CLAUDE_CONFIG_DIR'] = configDir
     const args = [
       '-p',
       '--input-format',

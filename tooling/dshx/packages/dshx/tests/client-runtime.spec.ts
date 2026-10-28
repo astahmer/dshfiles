@@ -1,19 +1,29 @@
 import { Context } from '@deepseek-ai/cordis'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import type { PropsLocale, PropsRuntime, SlotComponent } from '@deepseek-ai/dsh-client-ui-slots'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
 import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStore } from '@deepseek-ai/dsh-session'
 import { ClientContributionModel } from '../src/client/define.js'
 import { LocaleNamespaceModel } from '../src/client/locale.js'
-import type { ClientConversationContribution } from '../src/client/types.js'
+import type { ClientComponentDecorator, ClientConversationContribution, LocaleDictionaries } from '../src/client/types.js'
 import { defineConversation } from '../src/conversation/index.js'
 import { createClientModule, createClientPlugin } from '../src/client/runtime.js'
 import { createSettingsClientRuntime } from '../src/settings/client.js'
 import { defineSettings } from '../src/settings/index.js'
 import Schema from '@deepseek-ai/schemastery'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/protocol-2.js'
+
+const contexts: Context[] = []
+function testContext(): Context {
+  const context = new Context()
+  contexts.push(context)
+  return context
+}
+afterEach(async () => {
+  await Promise.all(contexts.splice(0).map(context => context.fiber.dispose()))
+})
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -120,7 +130,7 @@ describe('defineClient', () => {
 describe('Client runtime adapter', () => {
   it('applies definition name, inject normalization, and async setup', async () => {
     const setup = vi.fn(async (ctx: Context) => ctx)
-    const context = {} as Context
+    const context = testContext()
     const plugin = createClientPlugin(
       { name: 'explicit-client', inject: ['remote', 'remote', 'slots'], setup },
       {
@@ -143,12 +153,12 @@ describe('Client runtime adapter', () => {
   })
 
   it('passes a decorator that returns a component using the API context', async () => {
-    const decorateCalls: unknown[] = []
-    const setup = vi.fn((_ctx: Context, decorate: (component: unknown) => unknown) => {
+    const decorateCalls: Array<() => null> = []
+    const setup = vi.fn((_ctx: Context, decorate: ClientComponentDecorator) => {
       decorateCalls.push(decorate(() => null))
     })
     const plugin = createClientPlugin({ inject: ['remote', 'slots'], setup }, { packageId: '@test/plugin' })
-    await plugin.apply({} as Context)
+    await plugin.apply(testContext())
     expect(decorateCalls).toHaveLength(1)
     expect(typeof decorateCalls[0]).toBe('function')
   })
@@ -172,13 +182,13 @@ describe('Client runtime adapter', () => {
     )
     expect(plugin.inject).toEqual(['remote', 'slots'])
     const registered: unknown[] = []
-    const ctx = new Context()
+    const ctx = testContext()
     ctx.provide('slots', {
-      inject(name: string, register: () => unknown) {
+      inject<Result>(name: string, register: () => Result) {
         calls.push(`inject:${name}`)
         return register()
       },
-      register(options: { readonly id?: string }, component: unknown) {
+      register(options: { readonly id?: string }, component: SlotComponent<never>) {
         calls.push(`register:${String(options.id)}`)
         registered.push({ options, component })
         return vi.fn()
@@ -211,20 +221,20 @@ describe('Client runtime adapter', () => {
     )
     expect(plugin.inject).toEqual(['locale', 'slots'])
     const registered: unknown[] = []
-    const ctx = new Context()
+    const ctx = testContext()
     const effect = vi.spyOn(ctx, 'effect')
-    const registerLocale = vi.fn((namespace: string, dictionaries: unknown) => {
+    const registerLocale = vi.fn((namespace: string, dictionaries: LocaleDictionaries) => {
       calls.push(`locale:${namespace}`)
       registered.push({ namespace, dictionaries })
       return dispose
     })
     ctx.provide('locale', { register: registerLocale })
     ctx.provide('slots', {
-      inject(name: string, register: () => unknown) {
+      inject<Result>(name: string, register: () => Result) {
         calls.push(`inject:${name}`)
         return register()
       },
-      register(options: { readonly locale?: string }, registeredComponent: unknown) {
+      register(options: { readonly locale?: string }, registeredComponent: SlotComponent<never>) {
         calls.push(`slot:${String(options.locale)}`)
         registered.push({ options, component: registeredComponent })
         return vi.fn()
@@ -244,8 +254,8 @@ describe('Client runtime adapter', () => {
     const register = vi.fn()
     const plugin = createClientPlugin({ slots: [slot] }, { packageId: '@test/plugin' })
     expect(plugin.inject).toEqual(['slots'])
-    const ctx = new Context()
-    ctx.provide('slots', { inject: (_name: string, apply: () => unknown) => apply(), register })
+    const ctx = testContext()
+    ctx.provide('slots', { inject: <Result>(_name: string, apply: () => Result) => apply(), register })
     plugin.apply(ctx)
     expect(register).toHaveBeenCalledWith({ name: 'test.slot', id: 'native', locale: 'test.native' }, component)
   })
@@ -254,7 +264,7 @@ describe('Client runtime adapter', () => {
     const plugin = createClientPlugin({ slots: [] }, { packageId: '@test/plugin' })
     expect(plugin.inject).toEqual([])
     const inject = vi.fn()
-    const ctx = new Context()
+    const ctx = testContext()
     ctx.provide('slots', { inject, register: vi.fn() })
     plugin.apply(ctx)
     expect(inject).not.toHaveBeenCalled()
@@ -269,7 +279,7 @@ describe('Client runtime adapter', () => {
     const plugin = createClientPlugin({ setup }, { packageId: '@test/plugin' })
 
     expect(plugin.inject).toEqual(['locale', 'slots'])
-    const ctx = new Context()
+    const ctx = testContext()
     ctx.provide('slots', { inject, register: vi.fn() })
     plugin.apply(ctx)
     expect(setup).toHaveBeenCalledOnce()
@@ -289,7 +299,7 @@ describe('Client runtime adapter', () => {
     const setup = vi.fn()
     const plugin = createClientPlugin({ conversations: [], setup }, { packageId: '@test/plugin' })
     expect(plugin.inject).toEqual(['locale', 'slots'])
-    plugin.apply({} as Context)
+    plugin.apply(testContext())
     expect(setup).toHaveBeenCalledOnce()
   })
 
@@ -298,12 +308,12 @@ describe('Client runtime adapter', () => {
     const registered: unknown[] = []
     const plugin = createClientPlugin({ slots: [slot] }, { packageId: '@test/plugin', settingsCapability: true })
     expect(plugin.inject).toEqual(['slots', 'configForms'])
-    const ctx = new Context()
+    const ctx = testContext()
     const get = vi.spyOn(ctx, 'get')
     ctx.provide('configForms', { bind: vi.fn(), describe: vi.fn() })
     ctx.provide('slots', {
-      inject: (_name: string, register: () => unknown) => register(),
-      register: (_options: unknown, component: unknown) => {
+      inject: <Result>(_name: string, register: () => Result) => register(),
+      register: (_options: { readonly id?: string }, component: SlotComponent<never>) => {
         registered.push(component)
       },
     })
@@ -318,12 +328,12 @@ describe('Client runtime adapter', () => {
     const registered: unknown[] = []
     const plugin = createClientPlugin({ inject: ['connection', 'connection'], slots: [slot] }, { packageId: '@test/plugin', apiCapability: true })
     expect(plugin.inject).toEqual(['connection', 'slots'])
-    const ctx = new Context()
+    const ctx = testContext()
     const get = vi.spyOn(ctx, 'get')
     ctx.provide('connection', { rpc: { call: vi.fn() } })
     ctx.provide('slots', {
-      inject: (_name: string, register: () => unknown) => register(),
-      register: (_options: unknown, component: unknown) => {
+      inject: <Result>(_name: string, register: () => Result) => register(),
+      register: (_options: { readonly id?: string }, component: SlotComponent<never>) => {
         registered.push(component)
       },
     })
@@ -362,7 +372,7 @@ describe('Client runtime adapter', () => {
     const apply = vi.fn(() => 'result')
     const source = { name: 'native-client', inject: { slots: null }, Config, apply }
     const plugin = createClientModule(source, { packageId: '@test/plugin', logicalName: 'logical' })
-    const context = {} as Context
+    const context = testContext()
     const config = { enabled: true }
     expect(plugin).toMatchObject({ name: 'native-client', inject: source.inject, Config })
     expect(plugin.apply(context, config)).toBe('result')
@@ -378,7 +388,7 @@ describe('Client runtime adapter', () => {
       },
     )
     expect(plugin.name).toBe('default')
-    plugin.apply({} as Context)
+    plugin.apply(testContext())
     expect(setup).toHaveBeenCalledOnce()
   })
 

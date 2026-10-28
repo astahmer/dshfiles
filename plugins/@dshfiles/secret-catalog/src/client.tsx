@@ -32,7 +32,7 @@ export default defineClient({
   setup(ctx, decorate) {
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     const translate = ctx.locale.bind(SECRET_CATALOG_LOCALE_NAMESPACE)
-    const label = (): string => translate('title')
+    const label = (): string => `Secret Catalog: ${translate('viewSecrets')}`
     const workspaces = (): IWorkspaces => ctx.workspaces
     const workspaceFolders = (): readonly string[] =>
       ctx.workspaces.list

@@ -6,7 +6,7 @@ Feature: Usage analytics
   price cache stands in for the one AI Accounts downloads.
 
   Background:
-    Given the isolated plugin profile "@dshfiles/usage" is booted
+    Given the isolated Usage analytics profile has a registered workspace
     When a thread runs a turn that fails for want of credentials
     And recorded session logs and a price catalog are seeded
     And the Usage analytics panel is opened on the range since "2026-10-01"

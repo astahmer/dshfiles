@@ -51,6 +51,16 @@ export const createCopilotCredentialsService = (provider: CopilotCredentialProvi
     return parsed.success ? parsed.data : undefined
   },
 
+  restoreOwned: async (instanceId: string, owner: string, previous: OAuthCredential | undefined): Promise<void> => {
+    if (provider?.modifyRecord === undefined) return
+    await provider.modifyRecord(CopilotCredentialModel.key(instanceId), async current => {
+      const parsed = current?.kind === 'grant' ? credentialSchema.safeParse(current.payload) : undefined
+      if (!parsed?.success || parsed.data.dshLoginOwner !== owner) return undefined
+      // Returning undefined means 'leave unchanged', not delete. A tombstone scrubs our own grant atomically.
+      return { kind: 'grant', payload: previous ?? { retiredLoginOwner: owner } }
+    })
+  },
+
   remove: async (instanceId: string): Promise<void> => {
     if (provider?.deleteRecord === undefined) throw new Error('DSH credential records are unavailable.')
     await provider.deleteRecord(CopilotCredentialModel.key(instanceId))

@@ -3,6 +3,7 @@ import { test } from 'vitest'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { HostSnapshotsModel } from './snapshots.js'
+import { buildThreadUrl, readThreadUrl } from './thread-url.js'
 
 const summary = (id: string, overrides: Partial<SessionSummary> = {}): SessionSummary => ({
   id: SessionId(id),
@@ -21,6 +22,19 @@ const state = (summaries: readonly SessionSummary[], phase: SessionListState['ph
   byId: Object.fromEntries(summaries.map(item => [item.id, item])),
   phase,
   projectionsBySession: {},
+})
+
+test.each([false, true])('current Session selection and URL follow the exact binding during overlapping retains, reverse=%s', reverse => {
+  const a = summary('a', { retainedBy: { mainView: 1 } })
+  const b = summary('b', { retainedBy: { mainView: 1 } })
+  const selected = HostSnapshotsModel.currentSessionOf(reverse ? [b, a] : [a, b], b.id)
+  assert.equal(selected, b)
+  assert.ok(selected)
+  assert.deepEqual(readThreadUrl(buildThreadUrl('http://localhost:3080/?thread=a', selected.id)), { sessionId: 'b' })
+})
+
+test.each([undefined, SessionId('unlisted')])('current Session selection never substitutes a retained row for absent binding %s', currentSessionId => {
+  assert.equal(HostSnapshotsModel.currentSessionOf([summary('a', { retainedBy: { mainView: 1 } })], currentSessionId), undefined)
 })
 
 test('an equal field set makes two summaries the same', () => {

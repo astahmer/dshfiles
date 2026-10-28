@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import type { AiAccountsConfig } from './account-config.js'
 import { COMMANDCODE_KIND, ProviderRoutes, type KeyedRoute } from './provider-routes.js'
@@ -10,6 +13,80 @@ const route = (apiKeyEnv: string): KeyedRoute => ({
   apiKeyEnv,
   apiBaseUrl: '',
   enabled: true,
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.resetModules()
+})
+
+describe('explicit credential source route propagation', () => {
+  it('preserves CLI/reference source from saved profiles through config and rebuilt routes', async () => {
+    const { AccountDraftModel } = await import('./account-draft.js')
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const cli = { ...AccountDraftModel.newAccountDraft({ kind: 'commandcode', existing: [] }), apiKeyEnv: '', authSource: 'cli' as const }
+    const reference = { ...cli, instanceId: 'commandcode-reference', apiKeyEnv: 'EXPLICIT_API_KEY', authSource: 'reference' as const }
+    const config = configFromAccountsFile({ distribution: 'priority', cooldownMs: 0, shadowRoot: '/synthetic/shadows', accounts: [cli, reference] })
+    expect(config.opencodeAccounts.map(account => account.authSource)).toEqual(['cli', 'reference'])
+    const built = ProviderRoutes.buildRoutes(config)
+    expect(built.routes.get(cli.instanceId)).toMatchObject({ authSource: 'cli', apiKeyEnv: '' })
+    expect(built.routes.get(reference.instanceId)).toMatchObject({ authSource: 'reference', apiKeyEnv: 'EXPLICIT_API_KEY' })
+  })
+})
+
+describe('managed setup Codex routes', () => {
+  it('builds the enabled route directly in the private scratch home created by the Host', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-managed-route-'))
+    vi.stubEnv('DSH_HOME', home)
+    vi.resetModules()
+    const { accountStoreService, AccountStoreModel } = await import('./account-store.js')
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const { ProviderRoutes } = await import('./provider-routes.js')
+    const { CodexHomeModel } = await import('./codex-home.js')
+    const created = await accountStoreService.createSetupAccount({ kind: 'codex', requestId: '11111111-1111-4111-8111-111111111111' })
+    const expectedHome = join(home, 'plugins', 'ai-accounts', 'homes', created.instanceId)
+    expect(created.file.accounts).toEqual([])
+    const draft = created.draft
+    expect(draft.enabled).toBe(false)
+    const enabled = await accountStoreService.upsertAccount({ ...draft, enabled: true })
+    const config = configFromAccountsFile(enabled)
+    const account = config.codexAccounts[0]
+    if (account === undefined) throw new Error('Expected setup Codex config')
+    const built = ProviderRoutes.buildRoutes(config)
+    expect(built.rejected).toEqual([])
+    expect([...built.routes.keys()]).toEqual([created.instanceId])
+    expect(built.routes.get(created.instanceId)).toMatchObject({
+      kind: 'codex',
+      enabled: true,
+      layout: { mode: 'direct', sharedHomePath: expectedHome, effectiveHomePath: expectedHome },
+    })
+    expect(built.routes.get(created.instanceId)).toMatchObject({ layout: AccountStoreModel.codexLayoutFor(account, config.codexShadowRoot) })
+    // The exception belongs to the managed policy, not a relaxation of the raw/global Codex guard.
+    expect(() => CodexHomeModel.resolveLayout({ homePath: expectedHome, shadowHomePath: expectedHome })).toThrow()
+  })
+
+  it('still rejects a near-match path, a mismatched account id, or a noncanonical configured path', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-managed-route-'))
+    vi.stubEnv('DSH_HOME', home)
+    vi.resetModules()
+    const { accountStoreService } = await import('./account-store.js')
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const { ProviderRoutes } = await import('./provider-routes.js')
+    const created = await accountStoreService.createSetupAccount({ kind: 'codex', requestId: '11111111-1111-4111-8111-111111111111' })
+    // Layout validation is a pure fixture: preparation itself never publishes a route.
+    const config = configFromAccountsFile({ ...created.file, accounts: [created.draft] })
+    const account = config.codexAccounts[0]
+    if (account === undefined) throw new Error('Expected setup Codex config')
+    for (const invalid of [
+      { ...account, homePath: `${account.homePath}/near-match`, shadowHomePath: `${account.homePath}/near-match` },
+      { ...account, instanceId: 'codex_manual' },
+      { ...account, homePath: `${account.homePath}/../${created.instanceId}`, shadowHomePath: `${account.homePath}/../${created.instanceId}` },
+    ]) {
+      const built = ProviderRoutes.buildRoutes({ ...config, codexAccounts: [invalid] })
+      expect(built.routes.size).toBe(0)
+      expect(built.rejected).toHaveLength(1)
+    }
+  })
 })
 
 describe('keyed route credentials', () => {

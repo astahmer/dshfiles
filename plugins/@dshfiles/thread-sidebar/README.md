@@ -1,5 +1,11 @@
 # Thread Sidebar
 
+![The Sidebar settings wheel belongs to the Threads panel, not the fixed app header](docs/screenshots/navigation-layout.png)
+
+![The same account Preview docked as an ordinary view with its single tab row hidden](docs/screenshots/preview-as-regular-tab.png)
+
+![Tab-controlled Navigation and Threads between fixed sidebar controls](docs/screenshots/workbench-assemblies.png)
+
 ![Thread sidebar list, with the thread board page open beside it](docs/screenshots/thread-classification.png)
 ![Manage saved views with Inactive and Interrupted filters](docs/screenshots/thread-list-views.png)
 ![Synthetic saved view retained after reload over HTTP LAN access](docs/screenshots/saved-view-http-lan.png)
@@ -16,7 +22,7 @@ non-running threads to Inactive. Remote threads started from this DSH join the
 current view by default: status views classify them as Active or Inactive from
 their live running state, while date, project, and flat views group them
 alongside local threads. Enable **Show remote threads in a separate group** in
-sidebar settings to restore a standalone Remote section; in status views its
+**Thread list settings** to restore a standalone Remote section; in status views its
 header joins the saved `sectionOrder` and can be reordered like local sections.
 Remote runtime status does not include pinned, parked, settled, archived, or
 attention state, so integrated remote sessions only participate in
@@ -24,6 +30,29 @@ Active/Inactive status grouping.
 A local status section with no rows folds away and keeps its saved slot while the
 shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
+
+The reusable board page is **Thread Sidebar: Board**.
+
+**Tabbed left pane.** In the owned stack, Workbench tabs are mandatory, with no
+native-layout opt-out. The flexible middle belongs to its `shell.left` slot:
+**Thread Sidebar: Navigation** and **Thread Sidebar: Threads** are reusable panels, not fixed sidebar furniture. Each group's **+**, named **New tab**, opens an actual chooser tab with **Choose a view**, **Search views**, **Rich Composer: Current conversation**, one **Settings Shell: Settings** hub and plugin views. **Pane options** sits at the group's far-right edge; there is no persistent Workbench toolbar. Threads retains **New thread**, **Search threads**, project creation,
+filters, row actions and keyboard navigation. Its **Sidebar settings** gear opens
+**Customize sidebar** inside that same panel, including after moving it or hiding
+its tab row. The existing Root controller and preferences stay authoritative;
+only the editor's owned React portal seat moves. The fixed header has no duplicate
+customization button. The separate sliders control is **Thread list settings**
+for list-specific options. The logo, Back/Forward and command palette remain
+fixed at the top; native Settings/footer controls remain at the bottom.
+[Settings ownership and verification](docs/panel-settings.md). Without a
+Workbench occupant, the installed slot renderer falls back to the original
+navigation/thread assembly. Collapsing reports the hidden geometry without
+unmounting the live left docking region. That fallback is package compatibility,
+not a user-selectable native layout. The fullheight right Workbench pane likewise
+keeps its tabs and real Session resources mounted while collapsed; the conversation
+main group's Pane options opener, pane-local Close pane icon and original sidebar shortcut address that pane,
+not old native chrome. The bottom row occupies only left and centre.
+
+![The same customization editor follows Threads into the right pane with its tab row hidden and the left sidebar collapsed](docs/screenshots/navigation-layout-editor.png)
 
 **New chat from a project header.** With **Group: Project**, each registered local
 project has an always-visible **+** beside its collapse chevron. It opens a fresh
@@ -100,7 +129,7 @@ auto-settle, notifications or attention polling), so both surfaces can be open
 without doing that work twice.
 
 **Keyboard and multi-select.** ↑/↓ move focus and open the focused thread (or
-only move focus when Sidebar settings says Move focus only); Shift+↑/↓ extends a
+only move focus when **Thread list settings** says Move focus only); Shift+↑/↓ extends a
 range without opening, Home/End jump to the ends of the list, and Ctrl/Cmd+A
 selects every visible row. Shift+click and Ctrl/Cmd+click do the same from the
 pointer, ←/→ fold the containing group section or the row's subagent children,
@@ -339,11 +368,15 @@ is recomputed from measured widths on resize. More also opens **Settings** and
 lists every sidebar page as a flat list (no group heading), so the menu stays
 usable at any width.
 
-`sidebar.footer.above` (list, owner `{}`) is a full-width seat stacked above the
-wide foot, for rows that must not fold into More (the AI Accounts usage strip).
-Its height counts against the header/thread resize limit. The stock sidebar has
-no such seat, so an occupant keeps a footer-action fallback and registers through
-`ctx.slots.inject`, which waits for the declaration.
+`sidebar.footer.above` (list, owner `{}`) remains the genuine full-width contributor seat for the AI Accounts usage strip. With the supported `shell.left` Workbench override, its existing Preview assembly is a regular docked tab group instead of a duplicate fixed strip. The actual public slot entries/subscription select this mode; there is no guessed global bridge or extra SDK field. A standalone Sidebar retains the fixed full-width fallback above its native foot; removing the override restores that fallback. The stock sidebar has no such seat, so an occupant retains its footer-action fallback and registers through `ctx.slots.inject`.
+
+**Workbench sidebar assemblies** are available through the **New tab** chooser while this sidebar root is mounted:
+**Thread Sidebar: Threads** hosts the actual `sidebar.workspaces` occupant in wide mode; **Thread Sidebar: Navigation** renders the actual
+`sidebar.panellist` glyphs inside live navigation buttons; **AI Accounts: Preview** hosts the current AI Accounts-only `sidebar.footer.above` contribution;
+**AI Accounts: Controls** hosts an AI Accounts-only `sidebar.footer.action` aggregate in wide mode. Mixed or unlabeled footer contributors instead use **Thread Sidebar: Plugin previews** or **Thread Sidebar: Plugin controls**; the sidebar never claims another plugin owns a mixed assembly. Each uses this root's authorized renderer,
+original owner props and normal query/settings/sidebar contexts. Its declared seats remain present, but the Preview is not mounted twice. The account-only Preview is initially seated below the existing left groups; prior saved placements win, and explicit closes remain closed. It has the same move/close/single-tab **Hide tab row** controls as any other view. Hover/focus the content's **Show tab row** control or use **Workbench: Show tab rows** to recover it; adding a second tab reveals the row and clears the hidden preference.
+These are content assemblies, not fake independent copies of contextual message/turn/menu slots. The Settings
+launcher, brand and reopen badge remain sidebar chrome; Settings already has its own main/section panel adapters.
 
 **Settings › Plugins › Thread sidebar shortcuts** records the two palette chords
 (record / disable / reset, with Host-conflict and duplicate warnings), which a
@@ -447,7 +480,7 @@ are Warning for Approval and Input, and Success for Turn finished; generic
 working indicators remain Info. Group headings stick to the top while scrolling.
 Subagent attention is
 excluded from groups, labels, and desktop alerts by default; enable **Include
-subagent threads** in Sidebar settings to opt in. An unresolved request stays
+subagent threads** in **Thread list settings** to opt in. An unresolved request stays
 available in its conversation composer and returns to its configured attention
 display when that thread is no longer selected. The Host records attention for
 turn ends that ask for something (`completed`, `error`, `aborted`, `blocked`,

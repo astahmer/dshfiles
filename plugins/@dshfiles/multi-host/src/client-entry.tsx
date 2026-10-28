@@ -26,7 +26,7 @@ export default defineClient({
       return () => window.removeEventListener(OPEN_HOSTS_EVENT, openHosts)
     }, 'multi-host: open hosts page')
     ctx.slots.inject('sidebar.panellist', () =>
-      ctx.slots.register({ name: 'sidebar.panellist', id: 'dshfiles-multi-host-hosts', order: 8, label: 'Hosts' }, HostsGlyph),
+      ctx.slots.register({ name: 'sidebar.panellist', id: 'dshfiles-multi-host-hosts', order: 8, label: 'Multi-host: Hosts' }, HostsGlyph),
     )
     ctx.slots.inject('main', () =>
       ctx.slots.register(

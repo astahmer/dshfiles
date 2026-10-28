@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
@@ -24,6 +25,9 @@ interface HeldDestinationLookup {
 }
 
 const repositories = new WeakMap<Page, ThreadRepository>()
+const divergentCheckouts = new WeakMap<Page, { readonly checkoutCommitId: string; readonly featureCommitId: string }>()
+const existingSharedThreads = new WeakMap<Page, string>()
+const configuredBaseThreads = new WeakMap<Page, { readonly name: string; readonly commitId: string }>()
 /** The thread workspace the New thread screen last provisioned; a started thread's header no longer names it. */
 const provisionedThreads = new WeakMap<Page, string>()
 /** A blank thread whose next visit must find a draft persisted by a previous one. */
@@ -239,6 +243,86 @@ When('a disposable jj repository is chosen as the New thread project', async ({ 
   const repository = await createRepository(page)
   await chooseProjectPath(page, repository.repositoryPath)
   await expect(projectButton(page)).toHaveText('repo')
+})
+
+When('a disposable jj checkout based on {string} is chosen as the New thread project', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = await createRepository(page)
+  // Keep main behind a distinct, nonempty feature revision, and leave the project checkout on its child.
+  jjAt(repository.repositoryPath, repository.temporaryRoot, ['bookmark', 'rename', 'release', bookmark])
+  jjAt(repository.repositoryPath, repository.temporaryRoot, ['new', bookmark])
+  const featureCommitId = commitIdOf(repository, bookmark)
+  expect(featureCommitId).not.toBe(repository.baseCommitId)
+  divergentCheckouts.set(page, { checkoutCommitId: commitIdOf(repository, '@'), featureCommitId })
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+When('the existing shared-checkout thread is remembered', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('button', { name: /^Workspace actions for / })).toBeVisible()
+  const sessionId = new URL(page.url()).searchParams.get('thread')
+  if (sessionId === null) throw new Error('The shared-checkout thread has no Session ID.')
+  existingSharedThreads.set(page, sessionId)
+})
+
+Then('the untouched New chat offers configured main with workspace checked', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-configured-main-default-destination', async () => {
+    await expect(newThreadComposer(page)).toBeEditable()
+    await expect(newThreadComposer(page)).toHaveText('')
+    await expect(projectButton(page)).toHaveText('repo')
+    await expect(page.getByLabel('New thread destination', { exact: true }).getByRole('button', { name: 'main', exact: true })).toBeVisible()
+    await expect(workspaceToggle(page)).toBeChecked()
+    await expect(workspaceToggle(page)).toBeEnabled()
+    expect(workspaceNames(repositoryFor(page))).toEqual(['default'])
+  })
+})
+
+Then('the submitted workspace starts from configured main instead of the checkout feature', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-first-send-parent-is-configured-main', async () => {
+    await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
+    await expect(page.getByText('message sent during workspace preparation', { exact: true })).toBeVisible()
+    const name = await currentHeaderThreadName(page)
+    const parent = commitIdOf(repository, `${name}@-`)
+    expect(parent).toBe(repository.baseCommitId)
+    expect(parent).not.toBe(divergentCheckouts.get(page)?.featureCommitId)
+    configuredBaseThreads.set(page, { name, commitId: commitIdOf(repository, `${name}@`) })
+  })
+})
+
+Then('the submitted workspace starts from the explicitly picked feature bookmark', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-explicit-feature-first-send-parent', async () => {
+    await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
+    await expect(page.getByText('message sent during workspace preparation', { exact: true })).toBeVisible()
+    const name = await currentHeaderThreadName(page)
+    expect(name).not.toBe(configuredBaseThreads.get(page)?.name)
+    expect(commitIdOf(repository, `${name}@-`)).toBe(divergentCheckouts.get(page)?.featureCommitId)
+  })
+})
+
+Then('existing threads and the feature checkout are unchanged', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const checkout = divergentCheckouts.get(page)
+  const configured = configuredBaseThreads.get(page)
+  const sessionId = existingSharedThreads.get(page)
+  if (checkout === undefined || configured === undefined || sessionId === undefined) throw new Error('The configured-base regression snapshots are missing.')
+  await recordAssertion(page, 'jj-new-chat-preserves-existing-destinations', async () => {
+    expect(commitIdOf(repository, 'default@')).toBe(checkout.checkoutCommitId)
+    expect(commitIdOf(repository, 'default@-')).toBe(checkout.featureCommitId)
+    expect(commitIdOf(repository, 'feature/fix')).toBe(checkout.featureCommitId)
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
+    expect(commitIdOf(repository, `${configured.name}@`)).toBe(configured.commitId)
+    // The row's hover actions cover its centre; activate the title at the unobstructed left edge.
+    await page
+      .getByRole('region', { name: 'Threads' })
+      .getByRole('button', { name: /background new thread e2e/u })
+      .click({ position: { x: 24, y: 16 } })
+    await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(sessionId)
+    const header = page.getByRole('button', { name: /^Workspace actions for / })
+    await expect(header).toBeVisible()
+    await expect(header).toHaveAttribute('title', repository.repositoryPath)
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('a disposable jj repository is chosen by its home-relative path', async ({ page }: { page: Page }) => {
@@ -609,11 +693,8 @@ When('the New thread destination lookup is held', async ({ page }: { page: Page 
 
 When('Backlog is selected while the destination lookup is held', async ({ page }: { page: Page }) => {
   await expect.poll(heldDestinationLookupFor(page).wasRequested).toBe(true)
-  await page
-    .getByRole('navigation', { name: 'Sidebar navigation', exact: true })
-    .getByRole('button', { name: 'Backlog', exact: true })
-    .click()
-  await expect(page.getByRole('tab', { name: 'Backlog', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: 'Backlog: Items', exact: true }).click()
+  await expect(page.getByRole('tab', { name: 'Backlog: Items', exact: true })).toHaveAttribute('aria-selected', 'true')
 })
 
 When('the held New thread destination lookup is released', async ({ page }: { page: Page }) => {
@@ -623,7 +704,7 @@ When('the held New thread destination lookup is released', async ({ page }: { pa
 Then('the completed first send leaves Backlog selected', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-new-thread-first-send-keeps-backlog-selected', async () => {
     await expect(page.getByText(/^Thread started in /u)).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Backlog', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Backlog: Items', exact: true })).toHaveAttribute('aria-selected', 'true')
   })
   await finishJourneyAssertions(page)
 })
@@ -944,7 +1025,7 @@ Then('the thread appears in the Settled sidebar section', async ({ page }: { pag
 })
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Thread integration', exact: true }).click()
+  await globalPanelLink(page, 'JJ Integration: Thread integration').click()
   await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
 })
 
@@ -976,7 +1057,10 @@ Then('the thread row details show revisions, sessions, path and preview', async 
 })
 
 Then('the New thread picker shows its Projects and JJ workspace listings for a disposable repository', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: /^(?:New session|New thread)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^(?:New session|New thread)$/ })
+    .first()
+    .click()
   await expect(newThreadComposer(page)).toBeVisible()
   const repository = await createRepository(page)
   await chooseProjectPath(page, repository.repositoryPath)
@@ -993,7 +1077,10 @@ Then('the New thread picker shows its Projects and JJ workspace listings for a d
   await expect.poll(() => workspaceNames(repository)).toContain(provisionedThreadName(page))
   await page.reload()
   await expect(threadComposer(page)).toBeVisible()
-  await page.getByRole('button', { name: /^(?:New session|New thread)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^(?:New session|New thread)$/ })
+    .first()
+    .click()
   await expect(newThreadComposer(page)).toBeVisible()
   await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
   await projectButton(page).click()
@@ -1013,7 +1100,10 @@ const undoQueuedIntegrationButton = (page: Page) => workspaceMenu(page).getByRol
 
 When('the New thread screen is reopened', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: /^(?:New session|New thread)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^(?:New session|New thread)$/ })
+    .first()
+    .click()
   await expect(newThreadComposer(page)).toBeVisible()
 })
 

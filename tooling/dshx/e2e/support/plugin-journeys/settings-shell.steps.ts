@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Request, type Response, type Route } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { realpath } from 'node:fs/promises'
 import { Then, When } from '../bdd.js'
 import { z } from 'zod'
@@ -180,7 +181,7 @@ Then('its settings show a titled switch, a bounded number input and segmented ch
 })
 
 When('the Main tabs plugin page is opened from the Plugins panel', async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await globalPanelLink(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/main-tabs', exact: true }).click()
 })
 

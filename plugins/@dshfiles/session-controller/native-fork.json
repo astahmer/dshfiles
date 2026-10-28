@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-api-session-controller",
@@ -21,6 +21,7 @@
     "src/native/history.ts",
     "src/native/commands.ts",
     "src/native/index.ts",
+    "src/native/catalog.ts",
     "src/native/types.ts",
     "src/native/client/sessions/session.ts",
     "src/native/client/sessions/lineage.ts",

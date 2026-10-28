@@ -41,6 +41,42 @@
       ]
     },
     {
+      "id": "settings-workbench-panels",
+      "title": "One dockable Settings hub with real navigation and forms",
+      "summary": "The New tab chooser offers one Settings Shell: Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. Standalone dialog/tab/side-panel compatibility is unchanged.",
+      "reach": ["click button \"Collapse sidebar\"", "click button \"New tab\"", "click button \"Settings Shell: Settings\"", "expect button \"General\""],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["registered", "open", "label-updated", "source-removed", "disposed"],
+      "failureModes": [
+        "Without a mounted workbench the sources remain registered but no docked panel is shown.",
+        "A removed settings section or namespace unregisters; an existing panel never falls through to another section.",
+        "Build and browser verification must include the workbench registry dependency and the shared stylesheet owner."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "settings-shell.workbench-panels", "featureFile": "tooling/dshx/e2e/features/workbench.feature" },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.workbench-sources-unit",
+          "file": "plugins/@dshfiles/settings-shell/src/workbench-panels.test.tsx",
+          "testName": "offers one Settings hub and keeps individual sections/pages registered but hidden from the chooser"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.workbench-authorized-renderer-unit",
+          "file": "plugins/@dshfiles/settings-shell/src/workbench-panels.test.tsx",
+          "testName": "calls the declaring renderer with only the requested section and closes that panel occurrence"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only projection of existing settings sources into presentation panels; ConfigForm operations retain their existing Host API spans."
+        }
+      ]
+    },
+    {
       "id": "dsh-release-notice",
       "title": "DSH release notice and TL;DR",
       "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
@@ -148,7 +184,7 @@
     {
       "id": "settings-side-panel",
       "title": "Settings in the side panel",
-      "summary": "The thread's right side panel offers Settings beside the other panel cards: picking that card opens a Settings tab in the panel, which lists every section and plugin page and drills into one on a narrow panel (a wide one keeps the dialog's two columns). The gear, the palette and Mod+, can also send Settings there.",
+      "summary": "Settings can occupy a tab in the fullheight Workbench right pane; collapsing that pane preserves its tabs and shows no native guide. For deployments without Workbench, the original thread-side guide offers a Settings card, with narrow drill/back navigation and wide two-column presentation. The gear, palette and Mod+, can use that aside path. The guide-card reach below is the standalone compatibility journey, not an owned-stack layout opt-out.",
       "reach": [
         "click button \"Open right sidebar\"",
         "click text \"Edit Settings in this panel.\"",

@@ -28,8 +28,12 @@ import { SessionControlController } from './control.ts'
 import { SessionHistoryController } from './history.ts'
 import { SessionFileReferences } from './file-references.ts'
 import { ApiSessionList } from './list.ts'
-import { buildModelCatalog, hasProviderApiKey } from './catalog.ts'
+import { buildModelCatalog, hasProviderApiKey, SessionModelCatalog } from './catalog.ts'
 import { installModelSelectionProjection } from './model-selection-projection.ts'
+import { threadModelPolicyProjection } from '../thread-model-policy.ts'
+import { threadModelPolicySchema, type ThreadModelSelect, type ThreadModelSnapshot } from '../thread-model-api.ts'
+import { PluginApiError } from '@dshfiles/dshx/api'
+import { hasApiSessionSubagentOwner } from './agent.ts'
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
 import { ArchivedSessionGate } from './archived-session-gate.ts'
@@ -151,6 +155,7 @@ export class SessionController extends TypertRemoteService {
   private readonly revealPath: (path: string, signal: AbortSignal) => Promise<void>
   private readonly canOpenPath: () => boolean
   private readonly mirrored: MirroredSessions
+  private readonly modelCatalogState: SessionModelCatalog
   private readonly promotions = new Set<Promise<void>>()
 
   /**
@@ -160,9 +165,11 @@ export class SessionController extends TypertRemoteService {
    */
   constructor(ctx: Context, config: Config, internals: SessionControllerInternals = {}) {
     super(ctx, 'sessionController', { namespace: 'session' })
+    this.modelCatalogState = new SessionModelCatalog(ctx)
     ctx.typert.resources.register('session', { field: 'sessionId' })
     const resolved = SessionController.Config(config)
     installModelSelectionProjection(ctx)
+    ctx.sessionProjections.register(threadModelPolicyProjection)
     this.agents = new ApiSessionAgentController(ctx)
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
@@ -337,6 +344,27 @@ export class SessionController extends TypertRemoteService {
     return this.mirrored.selectModel(request, value => this.commands.selectModel(value))
   }
 
+  /** Read local selection intent without creating an Agent or changing deployment defaults. */
+  async threadModelSnapshot(sessionId: SessionId): Promise<ThreadModelSnapshot> {
+    if (!this.ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) throw new PluginApiError('No thread with that id exists.', { code: 'thread-not-found' })
+    if (this.ctx.workspaceRegistry.archivedSessionIds.includes(sessionId)) throw new PluginApiError('Restore the archived thread before changing its model.', { code: 'thread-model-archived' })
+    const signal = AbortSignal.timeout(10_000)
+    const agent = this.ctx.agents.get(sessionId)
+    const header = this.ctx.sessions.get(sessionId)?.header ?? (await this.ctx.get('sessionPersistence')?.stat(sessionId, { signal }))?.header
+    if (header !== undefined && hasApiSessionSubagentOwner(this.ctx, { header }, agent)) throw new PluginApiError('Use subagent routing for this child thread.', { code: 'thread-model-subagent' })
+    const values = await this.localProjections({ sessionId }, signal)
+    if (values === null || values.kind !== 'sequenced') throw new PluginApiError('Open this local thread before changing its account.', { code: 'thread-model-unavailable' })
+    const policy = threadModelPolicySchema.parse(values.values.threadModelPolicy ?? threadModelPolicyProjection.init())
+    const selection = values.values.modelSelection?.next ?? this.ctx.agentDefaultModel.currentSelection()
+    return { sessionId, selection: { ...selection }, revision: policy.revision, preferSelectedProvider: policy.preferSelectedProvider,
+      running: agent !== undefined && (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) }
+  }
+
+  /** Owned Host API only: never mutate the global default, enqueue input, or wake this thread. */
+  selectThreadModel(request: ThreadModelSelect & { sessionId: SessionId }): Promise<ThreadModelSnapshot> {
+    return this.commands.selectThreadModel(request)
+  }
+
   /**
    * Select the first available account model after login when no provider API key is configured.
    * @returns after saving the first available model or retaining the existing default.
@@ -365,19 +393,8 @@ export class SessionController extends TypertRemoteService {
   }
 
   private buildLocalModelCatalog(): Promise<ModelCatalog> {
-    // Composer selectors share this bounded Host-generation snapshot instead of listing providers on every mount.
-    const key = JSON.stringify(this.ctx.agentDefaultModel.currentSelection())
-    const kept = this.catalogBuild
-    if (kept !== undefined && kept.key === key && performance.now() - kept.startedAt < 5_000) return kept.value
-    const value = buildModelCatalog(this.ctx)
-    this.catalogBuild = { key, startedAt: performance.now(), value }
-    value.catch(() => {
-      if (this.catalogBuild?.value === value) this.catalogBuild = undefined
-    })
-    return value
+    return this.modelCatalogState.read()
   }
-
-  private catalogBuild: { readonly key: string; readonly startedAt: number; readonly value: Promise<ModelCatalog> } | undefined
 
   /**
    * Report whether this deployment can hand a Session workspace path to a native desktop.

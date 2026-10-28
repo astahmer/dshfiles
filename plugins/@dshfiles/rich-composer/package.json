@@ -29,7 +29,8 @@
   "dependencies": {
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
-    "@dshfiles/session-controller": "workspace:*"
+    "@dshfiles/session-controller": "workspace:*",
+    "@dshfiles/workbench": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

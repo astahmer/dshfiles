@@ -317,6 +317,7 @@ describe('workspaceToggleMachine', () => {
     const request = WorkspaceToggle.defaultDestinationMove({
       destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
       workspaceId: 'ws-shared',
+      defaultBookmark: 'main',
     })
     expect(request).toEqual({
       isolate: true,
@@ -775,7 +776,7 @@ describe('defaultDestinationMove', () => {
   })
 
   it('isolates a new thread from the project checkout when isolation is the default', () => {
-    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({}), workspaceId: 'project' })).toEqual({
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({}), workspaceId: 'project', defaultBookmark: 'main' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -784,8 +785,50 @@ describe('defaultDestinationMove', () => {
     })
   })
 
+  it('uses the configured base instead of the project checkout bookmark', () => {
+    const checkout = destination({ bookmark: 'fix/sidebar', bookmarks: ['main', 'fix/sidebar'] })
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: checkout, workspaceId: 'project', defaultBookmark: 'main' })).toEqual(isolateRequest())
+  })
+
+  it('lets the Host choose its configured base when the client has not loaded settings', () => {
+    const checkout = destination({ bookmark: 'fix/sidebar', bookmarks: ['main', 'fix/sidebar'] })
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: checkout, workspaceId: 'project' })).toStrictEqual({
+      isolate: true,
+      projectWorkspaceId: 'project',
+      leaving: null,
+      leavingBase: null,
+    })
+  })
+
+  it('shows the configured base for deferred isolation, but keeps explicit and shared destinations truthful', () => {
+    const checkout = destination({ bookmark: 'fix/sidebar' })
+    expect(WorkspaceToggle.startingBookmark({ destination: checkout, isolated: true, defaultBookmark: 'main' })).toBe('main')
+    expect(WorkspaceToggle.startingBookmark({ destination: checkout, isolated: false, defaultBookmark: 'main' })).toBe('fix/sidebar')
+    expect(
+      WorkspaceToggle.startingBookmark({
+        destination: destination({ bookmark: 'fix/sidebar', isolated: true, ownedByAnotherSession: false }),
+        isolated: true,
+        defaultBookmark: 'main',
+      }),
+    ).toBe('fix/sidebar')
+  })
+
+  it('does not guess an explicit base when isolation is toggled before settings load', () => {
+    const checkout = destination({ bookmark: 'fix/sidebar' })
+    const base = WorkspaceToggle.startingBookmark({ destination: checkout, isolated: true, defaultBookmark: undefined })
+    expect(base).toBeNull()
+    // A null chip base makes the checkbox omit base, so the Host can use its own main/develop setting.
+    expect(WorkspaceToggle.isolatingMove({ destination: checkout, workspaceId: 'project' })).not.toHaveProperty('base')
+  })
+
+  it('supports a configured base other than main', () => {
+    expect(
+      WorkspaceToggle.defaultDestinationMove({ destination: destination({ bookmark: 'fix/sidebar' }), workspaceId: 'project', defaultBookmark: 'develop' }),
+    ).toEqual(isolateRequest({ base: 'develop' }))
+  })
+
   it('does not reuse the inherited thread workspace when isolation is the default', () => {
-    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-other' })).toEqual({
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-other', defaultBookmark: 'main' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -827,6 +870,7 @@ describe('defaultDestinationMove', () => {
       WorkspaceToggle.defaultDestinationMove({
         destination: destination({ isolated: true, ownedByAnotherSession: true }),
         workspaceId: 'ws-shared',
+        defaultBookmark: 'main',
       }),
     ).toEqual({
       isolate: true,
@@ -843,6 +887,7 @@ describe('defaultDestinationMove', () => {
       WorkspaceToggle.isolatingMove({
         destination: destination({ isolated: true, isolateByDefault: false, ownedByAnotherSession: true }),
         workspaceId: 'ws-shared',
+        defaultBookmark: 'main',
       }),
     ).toEqual({ isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null, excludeSpareWorkspaceId: 'ws-shared' })
     expect(WorkspaceToggle.isolatingMove({ destination: destination({ vcs: 'none' }), workspaceId: 'ws-shared' })).toBeNull()
@@ -883,6 +928,34 @@ describe('first-send isolation', () => {
     toggle.release()
     await expect(landing).resolves.toEqual({ workspaceId: 'ws-thread-abc123' })
     expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
+  })
+
+  it('never reuses an unresolved-base spare after the Host default changes', async () => {
+    let defaultBookmark = 'main'
+    const payloads: unknown[] = []
+    const toggle = startToggle({
+      provision: async input => {
+        payloads.push(input)
+        return { workspaceId: `ws-${defaultBookmark}` }
+      },
+    })
+    // A legacy/pre-settings warm may have recorded main under the unresolved key. It must never mean develop later.
+    toggle.spares.set(WorkspaceToggle.spareKey('project', undefined), { workspaceId: 'ws-main-spare', name: 'thread-123abc' })
+    const request: ToggleRequest = { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null }
+    const isolate = () =>
+      WorkspaceToggle.isolateFirstSend({
+        client: toggle.actor.getSnapshot().context.client,
+        request,
+        name: 'thread-abc123',
+        signal: new AbortController().signal,
+      })
+    await expect(isolate()).resolves.toEqual({ workspaceId: 'ws-main' })
+    defaultBookmark = 'develop'
+    await expect(isolate()).resolves.toEqual({ workspaceId: 'ws-develop' })
+    expect(payloads).toStrictEqual([
+      { workspaceId: 'project', isolate: true, name: 'thread-abc123' },
+      { workspaceId: 'project', isolate: true, name: 'thread-abc123' },
+    ])
   })
 
   it("takes this project's spare thread workspace and consumes it", async () => {

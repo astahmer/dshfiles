@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
@@ -15,7 +16,7 @@ When('the MCP servers page is opened', async ({ page }: { page: Page }) => {
   await page
     .getByRole('navigation', { name: 'Sidebar navigation', exact: true })
     .or(page.getByRole('navigation', { name: 'Global panels', exact: true }))
-    .getByRole('button', { name: 'MCP servers', exact: true })
+    .getByRole('button', { name: 'MCP Servers: Servers', exact: true })
     .first()
     .click()
   await expect(page.getByRole('heading', { name: 'Global MCP servers', exact: true })).toBeVisible()
@@ -154,7 +155,7 @@ When('public Registry search is turned off and the tool call timeout set to 45 s
 
 Then('the preferences survive a reload', async ({ page }: { page: Page }) => {
   await page.reload()
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'MCP servers', exact: true }).click()
+  await globalPanelLink(page, 'MCP Servers: Servers').click()
   await recordAssertion(page, 'mcp-servers-preferences-persist-in-the-profile', async () => {
     await expect(preferences(page).getByRole('switch', { name: 'Search the public MCP Registry', exact: true })).not.toBeChecked()
     await expect(preferences(page).getByRole('spinbutton', { name: 'Tool call timeout (seconds)' })).toHaveValue('45')

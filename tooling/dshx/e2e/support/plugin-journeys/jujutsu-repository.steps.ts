@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
@@ -88,7 +89,7 @@ When('a disposable Jujutsu repository with two authors is opened in the Jujutsu 
   jj(repository, ['new'])
   await page.evaluate(path => localStorage.setItem('dshfiles.jujutsu.selected', JSON.stringify(path)), repository.path)
   await page.reload()
-  await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
+  await globalPanelLink(page, 'Jujutsu: Revision graph').first().click()
   await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible({ timeout: 30_000 })
 })
 

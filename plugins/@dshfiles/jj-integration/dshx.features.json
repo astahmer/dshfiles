@@ -74,6 +74,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "jj-integration.configured-base-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "jj-integration.home-relative-project-path",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
@@ -690,7 +695,7 @@
         "click button \"View details\"",
         "click button \"Preview\"",
         "expect text \"You\"",
-        "click button \"Thread integration\"",
+        "click button \"JJ Integration: Thread integration\"",
         "expect heading \"Thread integration\""
       ],
       "configuration": [
@@ -824,7 +829,7 @@
       "title": "Thread integration prioritises what needs attention",
       "summary": "Opening the panel from the left sidebar lands on the Needs attention view: conflicts, ready work and blocked workspaces first, with completed or unchanged workspaces one click away. Integration-state tabs and the lifecycle filter stay separate, and switching to All keeps every count visible.",
       "reach": [
-        "click button \"Thread integration\"",
+        "click button \"JJ Integration: Thread integration\"",
         "expect heading \"Thread integration\"",
         "expect button \"Needs attention*\"",
         "click button \"Refresh\"",
@@ -909,7 +914,7 @@
       "id": "thread-integration-empty",
       "title": "Thread integration with no thread workspaces",
       "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
-      "reach": ["click button \"Thread integration\"", "expect heading \"Thread integration\"", "expect text \"No thread workspaces.\""],
+      "reach": ["click button \"JJ Integration: Thread integration\"", "expect heading \"Thread integration\"", "expect text \"No thread workspaces.\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["no-threads", "no-filter-bar"],

@@ -14,7 +14,7 @@ const hostOf = (url: string): string | undefined => {
  */
 export const providerFetch = (input: {
   readonly provider: string
-  readonly operation: 'usage' | 'catalog' | 'credits'
+  readonly operation: 'usage' | 'catalog' | 'credits' | 'verification'
   readonly url: string
   readonly init: RequestInit
   readonly fetch?: typeof fetch | undefined

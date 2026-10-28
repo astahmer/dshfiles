@@ -210,6 +210,17 @@ export const jujutsuApi = defineApi({
   version: 1,
   owner: '@dshfiles/jujutsu',
   methods: {
+    openRepository: method({
+      input: z.object({ path: repoPathSchema }),
+      output: z.object({ repoId: repoIdSchema, root: z.string().max(2048), initialized: z.boolean() }),
+      description:
+        'Open a repository for Jujutsu. Automatically initialize colocated JJ metadata for an existing Git checkout; preserve Git history and files. Does not create Git repositories, fetch or push. Call only when the user asked to open or enable Jujutsu for that folder.',
+      tool: {
+        name: 'jj_open_repository',
+        readOnly: false,
+        render: output => `${output.repoId} · ${output.root}${output.initialized ? ' · Jujutsu enabled alongside Git' : ''}`,
+      },
+    }),
     registerRepository: method({
       input: z.object({ path: repoPathSchema }),
       output: z.object({ repoId: repoIdSchema, root: z.string().max(2048) }),

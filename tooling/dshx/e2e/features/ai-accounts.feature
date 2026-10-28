@@ -2,18 +2,43 @@ Feature: AI Accounts
 
   AI Accounts policy settings are available in the real Settings UI.
 
+  @scenario:ai-accounts.dashboard-reference
+  Scenario: Inspect the populated account dashboard across reference layouts
+    Given the isolated account dashboard reference profile is booted
+    When two synthetic work accounts and recorded account usage populate the dashboard
+    Then the account dashboard reference screens fit desktop mobile and dark layouts
+    And the dashboard model routing and sign-out controls preserve saved account state
+
   @smoke
   @scenario:ai-accounts.account-draft
   @scenario:ai-accounts.save-policy
   Scenario: Keep and save an account draft in manual mode
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
-    When a Codex account draft is edited in manual save mode
+    When a verified loopback account is edited in manual save mode
     Then the manual draft saves and persists when AI Accounts is reopened
+
+  @scenario:ai-accounts.sidebar-add
+  Scenario: Cancel every provisional provider connection without leaving the composer
+    Given the isolated provisional account connections profile is booted
+    When the sidebar add-account shortcut is opened from the composer
+    Then account setup closes without navigating away or losing the composer draft
+
+  @scenario:ai-accounts.login-methods
+  Scenario: Restore explicit CLI key-reference and custom-home sign-in choices
+    Given the isolated provisional account connections profile is booted
+    When restored sign-in methods are configured provisionally without using real credentials
+    Then all restored methods remain provisional and cancelled connections add no accounts
+
+  @scenario:ai-accounts.existing-login-sources
+  Scenario: Reuse a verified reference and an explicit private CLI login
+    Given the isolated provisional account connections profile is booted
+    When a Command Code account backed by a local fake provider is added
+    Then existing reference and CLI methods verify against only the loopback provider
 
   @scenario:ai-accounts.account-removal
   Scenario: Cancel and confirm account removal
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
-    When a Codex account is ready for removal
+    When a verified loopback account is ready for removal
     Then account removal can be canceled and confirmed
 
   @scenario:ai-accounts.failure-recovery
@@ -55,7 +80,7 @@ Feature: AI Accounts
   @scenario:ai-accounts.priority-order
   Scenario: Reorder accounts used by Priority routing
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
-    When two Codex accounts are added with Priority distribution
+    When two verified loopback accounts are added with Priority distribution
     Then the account order controls Priority routing
 
   @scenario:ai-accounts.model-curation
@@ -69,8 +94,24 @@ Feature: AI Accounts
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     Then the account shows the session and weekly windows the provider reports
-    When a second Command Code account whose billing read fails is added
-    Then the failed account reports the provider error instead of a quota
+    When a second Command Code account whose verification fails is attempted
+    Then failed verification reports a retry error without adding the account
+
+  @scenario:ai-accounts.unavailable-accounts
+  Scenario: Keep enabled accounts visible when provider quota sign-in expires
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When two verified accounts use a controllable loopback quota provider
+    Then an expired quota login keeps its sidebar identity without inventing a percentage
+    And quota recovery and explicit hiding preserve saved account identity and order
+
+  @scenario:ai-accounts.disabled-account-preview
+  Scenario: Keep disabled accounts visible and toggle routing from the usage popover
+    Given the isolated AI Accounts and thread account controller profile is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    And two healthy threads use different accounts
+    Then disabling an account in settings keeps its dimmed sidebar preview
+    And usage popover toggles persist enabled state without hiding or reordering accounts
 
   @scenario:ai-accounts.strip-short-names
   Scenario: Rename an account's short name in the usage strip and hide short names
@@ -87,7 +128,31 @@ Feature: AI Accounts
     Then widening the usage popover from its grip lays the accounts out side by side
     And the usage popover keeps its size until its grip is double-clicked
 
-  @scenario:ai-accounts.pool-failover
+  @scenario:ai-accounts.priority-sidebar-sync
+  Scenario: Share account priority order between the page and sidebar tiles
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    And the second Command Code account is moved earlier on the accounts page
+    Then the sidebar tiles follow the shared priority order after reload
+
+  @scenario:ai-accounts.active-chat-switch
+  Scenario: Follow the actual account when switching between chats and a blank draft
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    And two healthy threads use different accounts
+    Then the sidebar account source follows thread switches
+
+  @scenario:ai-accounts.thread-account-switch @scenario:session-controller.thread-local-model
+  Scenario: Switch the current thread account from the sidebar without opening the model picker
+    Given the isolated AI Accounts and thread account controller profile is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    And two healthy threads use different accounts
+    Then the sidebar moves the current thread between accounts without the model picker
+
+  @scenario:ai-accounts.pool-failover @scenario:ai-accounts.active-chat-account
   Scenario: A rate-limited account hands the turn to a healthy one
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When a rate-limited and a healthy Command Code account share a local fake provider
@@ -126,10 +191,10 @@ Feature: AI Accounts
     Then the turn resumes on its own one minute after the reset
 
   @scenario:model-effort-picker.fast-mode-supported
-  Scenario: Fast mode appears only on supported Codex models
-    Given the isolated AI Accounts and model effort picker plugin profile is booted
+  Scenario: Fast mode appears only on supported legacy Codex model catalog entries
+    Given the isolated model picker profile with a legacy inert Codex account is booted
     When a submitted prompt opens a scratch Session
-    And a supported Codex model is selected in the composer picker
+    And a supported legacy Codex model is selected without validating a new connection
     And the reasoning-effort slider is adjusted one step
     Then the picker reflects the adjusted reasoning effort
     And Fast mode works for supported Codex models and stays hidden for Spark

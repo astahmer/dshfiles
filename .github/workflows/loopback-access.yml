@@ -1,0 +1,39 @@
+name: Portable loopback access
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/@dshfiles/loopback-access/**'
+      - '.github/workflows/loopback-access.yml'
+      - 'pnpm-lock.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/@dshfiles/loopback-access/**'
+      - '.github/workflows/loopback-access.yml'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  transport:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm exec turbo run build --filter=@dshfiles/dshx
+      - run: pnpm --dir plugins/@dshfiles/loopback-access typecheck
+      - run: pnpm --dir plugins/@dshfiles/loopback-access test

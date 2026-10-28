@@ -19,6 +19,13 @@ import {
 
 const featuresDir = resolve(dirname(fileURLToPath(import.meta.url)), '../e2e/features')
 
+test('AI Accounts browser tasks include their inert auth fixture without widening unrelated owners', async () => {
+  const { configs } = await planBrowserTasks()
+  const fixture = '$TURBO_ROOT$/plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.ts'
+  assert.ok(configs.get('@dshfiles/ai-accounts').tasks['test:e2e'].inputs.includes(fixture))
+  assert.ok(!configs.get('@dshfiles/editor').tasks['test:e2e'].inputs.includes(fixture))
+})
+
 test('scenario recipe hashes include shared and fixture content with deterministic source ordering', () => {
   const recipe = {
     steps: ['setup'],

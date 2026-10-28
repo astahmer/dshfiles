@@ -52,4 +52,24 @@ export class ModelCurationModel {
     }
     return models
   }
+
+  /** One stable table, with filtering applied after the saved order. */
+  static curationRows = (catalog: readonly CatalogModel[], order: readonly string[], search: string): CatalogModel[] => {
+    const listed = [...new Set(order)].filter(id => catalog.some(model => model.id === id))
+    const ordered = [...listed.flatMap(id => catalog.find(model => model.id === id) ?? []), ...catalog.filter(model => !listed.includes(model.id))]
+    const query = search.trim().toLocaleLowerCase()
+    return ordered.filter(model => `${model.name} ${model.id}`.toLocaleLowerCase().includes(query))
+  }
+
+  static removeAdditionalModel = (account: AccountDraft, modelId: string): Partial<AccountDraft> => {
+    const reasoningDefaults = { ...account.reasoningDefaults }
+    delete reasoningDefaults[modelId]
+    return {
+      additionalModelIds: account.additionalModelIds.filter(id => id !== modelId),
+      hiddenModelIds: account.hiddenModelIds.filter(id => id !== modelId),
+      favoriteModelIds: account.favoriteModelIds.filter(id => id !== modelId),
+      modelOrder: account.modelOrder.filter(id => id !== modelId),
+      reasoningDefaults,
+    }
+  }
 }

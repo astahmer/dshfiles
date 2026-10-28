@@ -17,10 +17,13 @@ node $S/host-lag.mjs 60                       # is the Host event loop itself bl
 node $S/switch-probe.mjs 10                   # per sidebar click: composer, history, long tasks, DOM, bytes, requests
 REQUESTS=1 node $S/switch-probe.mjs 5         # every request a click fires, with its time
 MATCH='^Exact thread title' DUMP=snap.json node $S/switch-probe.mjs 1 && node $S/snapshot-bytes.mjs snap.json
-node $S/host-cpu-profile.mjs "$(lsof -nP -iTCP:3080 -sTCP:LISTEN -t)" 60   # SIGUSR1 inspector, closed afterwards
+# Resolve and verify exactly one Host PID from the current runtime first:
+node $S/host-cpu-profile.mjs "${DSH_HOST_PID:?set the verified Host PID}" 60   # SIGUSR1 inspector, closed afterwards
 ```
 
-Use Node from `.node-version`. The profiler attaches to the live process without restarting it; tell the user before
+Use Node from `.node-version`. Discover the actual live URL/profile rather than assuming a particular port.
+The probes accept `LAUNCH_URL`; keep that token-bearing value in private process configuration and out of logs/source.
+The profiler attaches to the live process without restarting it; tell the user before
 attaching. Never measure while a build or e2e run of yours loads the machine, and check `uptime`: a load average far
 above the core count (leaked `dshx-boot` scratch Hosts, editor jj servers) inflates every number.
 
@@ -58,9 +61,10 @@ above the core count (leaked `dshx-boot` scratch Hosts, editor jj servers) infla
   reads on the store's `op_heads/heads` listing instead of a clock.
 - An auto-load sentinel at the top of a transcript of collapsed Turns stays in range page after page; gate it on the
   reader leaving the tail.
-- For transcripts and Host-gated behaviour, an APFS clone of `~/.dsh` (`cp -cR`, fix the relative `@dshfiles` links,
-  `HOME=<clone> dsh web --port 3197`) reproduces the live profile without touching it; scratch `dshx dev up` profiles
-  miss live data and user-layer patches.
+- Scratch `dshx dev up` profiles do not reproduce private live data or user-layer patches. If representative
+  transcript/profile data is necessary, obtain explicit authorization for a private isolated copy, verify the
+  raw-core launcher's environment isolation, and keep that copy and its evidence out of the repository. Never
+  assume APFS clone support or that a local wrapper honors `HOME`/`DSH_HOME` overrides.
 - The Host's "N entries did not activate … fiber state 1" line is a boot-time snapshot; rows still loading then
   usually activate. Check the browser boot graph (`window.__DSH_BOOT__`) and console for client-side failures.
 - On a starved machine (load ≫ cores) the 1 ms sampler is descheduled: sample deltas reach 100–250 ms and land on

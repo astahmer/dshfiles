@@ -36,7 +36,7 @@ export default defineClient({
     const translate = ctx.locale.bind(BACKGROUND_JOBS_LOCALE_NAMESPACE)
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
-        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => translate('title'), locale: BACKGROUND_JOBS_LOCALE_NAMESPACE },
+        { name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => `Background Jobs: ${translate('title')}`, locale: BACKGROUND_JOBS_LOCALE_NAMESPACE },
         PanelGlyph,
       ),
     )

@@ -82,7 +82,7 @@ const findSetupBody = (setup: ObjectProperty) => {
   return { body: value.body, parameter: value.params[0] }
 }
 
-function modifyHost(source: string, hostFile: string, hookFile: string, event: string): { source?: string; duplicate: boolean; invalidSetup: boolean } {
+function modifyHost(source: string, hostFile: string, hookFile: string, event: string) {
   const sourceFile = SourceSyntax.parse({ file: hostFile, source })
   if (hasHookRegistration(sourceFile, event)) return { duplicate: true, invalidSetup: false }
   const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineHost' })

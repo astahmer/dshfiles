@@ -66,6 +66,7 @@ export class LayoutController implements ILayout {
     private readonly panels: PanelActions,
     private readonly hasMainPanel: (id: MainPanelId) => boolean,
     readonly panelInfo: HostObservable<PanelInfo>,
+    private readonly onPanelRequested?: (panelId: MainPanelId | null) => void,
   ) {}
 
   /** Select a global panel or return to the Conversation. */
@@ -75,6 +76,7 @@ export class LayoutController implements ILayout {
     }
     this.navigation.abort()
     this.panels.selectPanel(panelId)
+    this.onPanelRequested?.(panelId)
   }
 
   /** @returns the new pending navigation's cancellation signal. */

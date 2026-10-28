@@ -39,10 +39,11 @@ const authFileSchema = z.object({
 const keyFromRecord = (record: z.infer<typeof credentialRecordSchema> | undefined): string | undefined =>
   record === undefined ? undefined : record.type === 'oauth' ? record.access : (record.key ?? record.access)
 
-export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: CredentialValueResolver): Promise<string> => {
+export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: CredentialValueResolver, authSource?: 'cli' | 'reference'): Promise<string> => {
   const name = keyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : keyEnv
-  const named = resolveCredential === undefined ? CredentialModel.readKeyFromEnv(name) : await resolveCredential(name)
+  const named = authSource === 'cli' ? '' : resolveCredential === undefined ? CredentialModel.readKeyFromEnv(name) : await resolveCredential(name)
   if (named.length > 0) return named
+  if (authSource === 'reference') return ''
   try {
     const parsed = authFileSchema.safeParse(JSON.parse(await readFile(join(homedir(), '.commandcode', 'auth.json'), 'utf8')))
     if (!parsed.success) return ''
@@ -153,11 +154,17 @@ export class CommandCodeUsageModel {
 const COMMAND_CODE_HEADERS = { 'accept-encoding': 'identity', 'x-cli-environment': 'production', accept: 'application/json' }
 
 export const readCommandCodeUsage = async (
-  input: { readonly keyEnv: string; readonly apiBaseUrl: string; readonly resolveCredential?: CredentialValueResolver | undefined },
+  input: {
+    readonly keyEnv: string
+    readonly apiBaseUrl: string
+    readonly resolveCredential?: CredentialValueResolver | undefined
+    readonly onAuthenticated?: (() => void) | undefined
+    readonly authSource?: 'cli' | 'reference' | undefined
+  },
   signal?: AbortSignal,
 ): Promise<UsageCard> => {
   if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
-  const key = await readCommandCodeKey(input.keyEnv, input.resolveCredential)
+  const key = await readCommandCodeKey(input.keyEnv, input.resolveCredential, input.authSource)
   if (key.length === 0) return ProviderUsageModel.emptyUsage('unauthenticated', 'Export the account key variable or run `cmd login`.')
   let base: string
   try {
@@ -183,6 +190,26 @@ export const readCommandCodeUsage = async (
     ])
     if (credits.status === 401 || credits.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Command Code rejected this key.')
     if (credits.body === undefined) return ProviderUsageModel.emptyUsage('error', `Command Code returned ${String(credits.status)} for billing.`)
+    const billing = creditsSchema.safeParse(credits.body)
+    const identity = whoamiSchema.safeParse(whoami.body)
+    const entitlement = subscriptionSchema.safeParse(subscription.body)
+    if (billing.success) {
+      const limits = billing.data.windowLimits
+      const balance = billing.data.credits
+      const positive =
+        limits === null ||
+        balance === null ||
+        [limits?.fiveHour, limits?.weekly].some(
+          limit => limit === null || limit?.used !== undefined || limit?.cap !== undefined || limit?.exceeded !== undefined,
+        ) ||
+        balance?.planId?.trim() ||
+        balance?.monthlyCredits !== undefined ||
+        balance?.purchasedCredits !== undefined ||
+        balance?.freeCredits !== undefined ||
+        (identity.success && (identity.data.user?.userName?.trim() || identity.data.user?.name?.trim())) ||
+        (entitlement.success && entitlement.data.data?.planId?.trim())
+      if (positive && !signal?.aborted) input.onAuthenticated?.()
+    }
     return CommandCodeUsageModel.parseUsage({ credits: credits.body, whoami: whoami.body, subscription: subscription.body })
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Command Code usage could not be read.')

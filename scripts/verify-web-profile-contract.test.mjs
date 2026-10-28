@@ -71,6 +71,11 @@ test('accepts a declared opt-in bundle omitted from the web profile', () => {
   assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, optInBundle]), [])
 })
 
+test('keeps Manuel-only Resources opt-in without changing web defaults', () => {
+  const localBundle = { name: '@dshfiles/resource-packs', dsh: { bundle: { patch: './cordis.patch.yml' } } }
+  assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, localBundle]), [])
+})
+
 const disableInsideRegion = `# BEGIN NIX-MANAGED DSH PLUGINS
 - id: session-query-sqlite
   disabled: true

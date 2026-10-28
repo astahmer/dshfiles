@@ -12,7 +12,7 @@ import { providerFetch } from './provider-request.js'
 const COPILOT_USER_URL = 'https://api.github.com/copilot_internal/user'
 
 const snapshotSchema = z.object({
-  percent_remaining: z.number(),
+  percent_remaining: z.number().finite().optional(),
   unlimited: z.boolean().optional(),
 })
 
@@ -20,8 +20,8 @@ const copilotUserSchema = z.object({
   copilot_plan: z.string().optional(),
   quota_reset_date: z.string().optional(),
   quota_snapshots: z.object({
-    premium_interactions: snapshotSchema.optional(),
-    chat: snapshotSchema.optional(),
+    premium_interactions: snapshotSchema.nullish(),
+    chat: snapshotSchema.nullish(),
   }),
 })
 
@@ -39,7 +39,7 @@ export class CopilotQuotaModel {
     const resetsAt = user.quota_reset_date === undefined ? Number.NaN : Date.parse(user.quota_reset_date)
     const windows = WINDOWS.flatMap(([key, label]) => {
       const snapshot = user.quota_snapshots[key]
-      if (snapshot === undefined || snapshot.unlimited === true) return []
+      if (snapshot === undefined || snapshot === null || snapshot.unlimited === true || snapshot.percent_remaining === undefined) return []
       return [
         {
           label,
@@ -56,6 +56,7 @@ export class CopilotQuotaModel {
 export const readCopilotUsage = async (input: {
   readonly credential: OAuthCredential | undefined
   readonly signal?: AbortSignal | undefined
+  readonly onAuthenticated?: (() => void) | undefined
   readonly fetch?: typeof fetch
 }): Promise<UsageCard> => {
   if (input.signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
@@ -79,6 +80,16 @@ export const readCopilotUsage = async (input: {
     if (response.status === 429) return ProviderUsageModel.emptyUsage('rate-limited', 'GitHub rate-limited the quota request.')
     if (!response.ok) return ProviderUsageModel.emptyUsage('error', `GitHub returned ${String(response.status)} for Copilot quota.`)
     const user = copilotUserSchema.safeParse(await response.json())
+    if (
+      user.success &&
+      !input.signal?.aborted &&
+      (user.data.copilot_plan?.trim() ||
+        WINDOWS.some(([key]) => {
+          const snapshot = user.data.quota_snapshots[key]
+          return snapshot?.unlimited === true || snapshot?.percent_remaining !== undefined
+        }))
+    )
+      input.onAuthenticated?.()
     const card = user.success ? CopilotQuotaModel.cardFrom(user.data) : null
     return card ?? ProviderUsageModel.emptyUsage('unsupported', 'GitHub returned no Copilot quota this card can show.')
   } catch (cause) {

@@ -3,6 +3,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { useSettings } from '../src/client/index.js'
 import { createHostPlugin } from '../src/host/runtime.js'
 import { defineSettings, type SettingsState, type SettingsValue } from '../src/settings/index.js'
+import { SettingsDefinitionModel } from '../src/settings/define.js'
 
 describe('defineSettings', () => {
   it('preserves namespace, schema identity, defaults, and Host value inference', () => {
@@ -62,6 +63,31 @@ describe('defineSettings', () => {
     expect(() => createHostPlugin({ settings: [restart] }, { packageId: '@test/plugin' })).toThrow(expect.objectContaining({ code: 'DSHX2002' }))
     expect(() => createHostPlugin({ settings: [withBase] }, { packageId: '@test/plugin' })).toThrow('do not accept base or validate')
     expect(() => createHostPlugin({ settings: [withValidate] }, { packageId: '@test/plugin' })).toThrow('do not accept base or validate')
+  })
+
+  it('ignores metadata/callback links and terminates cyclic serialized references', () => {
+    const schema = Schema.object({ enabled: Schema.boolean() })
+    const callback = vi.fn((value: Schemastery.TypeS<typeof schema>) => value)
+    const transformed = Schema.transform(schema, callback)
+    expect(SettingsDefinitionModel.schemaContainsSecret(transformed)).toBe(false)
+    expect(callback).not.toHaveBeenCalled()
+    const recursive: Schema = Schema.lazy(() => Schema.object({ token: Schema.string().role('secret'), children: Schema.array(recursive) }))
+    expect(SettingsDefinitionModel.schemaContainsSecret(recursive)).toBe(true)
+    // A lazy node is not a supported secret container, even when the cycle passes through an array.
+    expect(SettingsDefinitionModel.schemaHasUnsafeSecretPath(recursive)).toBe(true)
+    const plain = Schema.object({ enabled: Schema.boolean().description('secret') })
+    expect(SettingsDefinitionModel.schemaContainsSecret(plain)).toBe(false)
+  })
+
+  it('authenticates only constructor-owned Settings tokens', () => {
+    const contract = defineSettings({ namespace: 'owned', schema: Schema.object({}) })
+    const contribution = contract.host({})
+    expect(SettingsDefinitionModel.isContract(contract)).toBe(true)
+    expect(SettingsDefinitionModel.isHostContribution(contribution)).toBe(true)
+    for (const value of [null, undefined, {}, { namespace: 'owned', schema: contract.schema }, 1, 'owned']) {
+      expect(SettingsDefinitionModel.isContract(value)).toBe(false)
+      expect(SettingsDefinitionModel.isHostContribution(value)).toBe(false)
+    }
   })
 
   it('rejects invalid namespaces and diagnoses secret contracts when a Host claims ownership', () => {

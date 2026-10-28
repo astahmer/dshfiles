@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
@@ -36,7 +37,7 @@ When('a new thread asks the model for a plugin tool and a subagent', async ({ pa
 })
 
 Then('the Traces panel lists the turn as a trace of the thread', async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Traces', exact: true }).click()
+  await globalPanelLink(page, 'Traces: Explorer').click()
   await expect(page.getByRole('heading', { name: 'Traces', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('textbox', { name: 'Search traces', exact: true }).fill('execute_tool subagent')
   const turn = page.getByRole('row', { name: 'dshfiles enter_ai_application_system', exact: true })

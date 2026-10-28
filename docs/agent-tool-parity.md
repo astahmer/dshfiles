@@ -24,6 +24,12 @@ The rules that keep the list honest:
   lightbox, a draft composer) is not agent-actionable; it is listed under
   _Presentation-only_ rather than proposed as a tool.
 
+## Thread-local account handoff (DSH0.2.1-rc.2)
+
+The sidebar **Use this account for this thread** action shares its Host implementation with `ai_accounts_preview_thread_switch` (read-only) and `ai_accounts_switch_thread` (user-requested write). The preview names the exact supported target and selection revision; switch does not send a message, resume stopped work, compact history, save global defaults or reorder accounts. Agents can act only on their own thread. Reopening the menu and choosing another account reverses the account choice after a new review.
+
+The Session-controller fork publishes the reusable `thread-model` contract and corresponding `thread_local_model_state` / `thread_select_local_model` tools. Selection is serialized and revision-checked at commit; it preserves the in-flight request and applies to future requests. Native model-picker behavior remains separate. Optional compaction guidance is presentation/advice only; native `/compact` remains an explicit user decision, not a new automatic tool action. See the [AI Accounts behavior](../plugins/@dshfiles/ai-accounts/README.md#use-an-account-for-the-current-thread) and [native contract](../plugins/@dshfiles/session-controller/README.md#thread-local-model-selection). The historical survey counts below are not recalculated by this scoped addition.
+
 ## Coverage summary
 
 Counts are from the audits below. "Missing" counts proposed tools with a real
@@ -236,9 +242,13 @@ need a Host half somewhere that owns them.
 
 ### workbench
 
-`workbench_open_panel` and `workbench_settings` (`settings/update`,
-`dshfiles-workbench`). Panel registry and layout live in browser state
-(`globalThis.dshfilesWorkbenchPanelsV1`), so a Host-side tool cannot open a panel.
+Workbench docking, Add panel, nested containers, tab preview/pin/reorder, named layouts and resource presentation targets
+are **presentation-only** browser state, not duplicate Host business-state APIs. The shared versioned panel registry
+and tab-semantics provider are the same sources used by Add panel, menus and shortcuts. No fake Host-side
+`workbench_open_panel` tool is claimed. Host settings are already agent-actionable through `settings_list`,
+`settings_set` and `settings_unset` for `dshfiles-workbench` (including `mainSurface`, `rightPanel`, `bottomPanel`).
+Resource close retains the existing provider cleanup contract; thread/archive/rename actions continue using their
+existing Host tools rather than a second workbench implementation.
 
 ### agent-communication
 

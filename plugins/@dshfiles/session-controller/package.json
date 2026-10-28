@@ -30,6 +30,10 @@
       "types": "./src/continuation-api.ts",
       "default": "./dist/continuation-api.js"
     },
+    "./thread-model-api": {
+      "types": "./src/thread-model-api.ts",
+      "default": "./dist/thread-model-api.js"
+    },
     "./typert": "./typert/host.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"

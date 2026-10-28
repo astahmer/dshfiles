@@ -3,13 +3,13 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads' })
-const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Sidebar settings' })
+const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Thread list settings' })
 const viewManager = (page: Page) => page.getByRole('dialog')
 
 const openSidebarSettings = async (page: Page): Promise<void> => {
   const sidebar = threadSidebar(page)
   if (await sidebarSettings(page).isVisible()) return
-  await sidebar.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await sidebar.getByRole('button', { name: 'Thread list settings', exact: true }).click()
   await expect(sidebarSettings(page)).toBeVisible()
 }
 

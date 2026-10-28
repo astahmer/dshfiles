@@ -1,0 +1,541 @@
+{
+  "scope": "scratch-only; not a live-Host performance claim",
+  "complete": true,
+  "budgetMs": 250,
+  "methodology": "Same two real Sessions; equal two-switch warmup; three measured roundtrips per mode; browser capture-click to first bound, editable history frame, confirmed across two frames. Nearest-rank percentiles; six samples are descriptive, not a production SLO.",
+  "limitations": "HTTP /api requests only, no bodies, query strings, origins or credentials. Pending requests are explicit; WebSocket RPC frames and Host event-loop/CPU attribution require the separate live audit.",
+  "modes": [
+    {
+      "mode": "native",
+      "summary": {
+        "count": 6,
+        "p50Ms": 115.3000000002794,
+        "p95Ms": 123.5,
+        "maxMs": 123.5,
+        "medianDomNodes": 757
+      },
+      "samples": [
+        {
+          "startedAtUnixMs": 1793045076476.8,
+          "finishedAtUnixMs": 1793045076600.4001,
+          "latencyMs": 115.3000000002794,
+          "settledMs": 123.60000000009313,
+          "domNodes": 757,
+          "longTasksSupported": true,
+          "longTasks": [
+            {
+              "offsetMs": -2,
+              "durationMs": 60,
+              "overlapMs": 58
+            }
+          ],
+          "thread": 0,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 55.01220703125,
+              "durationMs": 19.457,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/agentPresets/list",
+              "offsetMs": 57.58203125,
+              "durationMs": 27.07,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/schedule/list",
+              "offsetMs": 62.906005859375,
+              "durationMs": 26.515,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/dshx-2c5a0dae/quotaContinuations",
+              "offsetMs": 117.912841796875,
+              "durationMs": 12.384,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [
+              "browser-main-thread-longtasks"
+            ],
+            "unexplainedByLongTasksMs": 57.3000000002794,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045076675,
+          "finishedAtUnixMs": 1793045076800.4001,
+          "latencyMs": 111,
+          "settledMs": 125.39999999990687,
+          "domNodes": 757,
+          "longTasksSupported": true,
+          "longTasks": [
+            {
+              "offsetMs": -1.7999999998137355,
+              "durationMs": 51,
+              "overlapMs": 49.200000000186265
+            }
+          ],
+          "thread": 1,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 49.5048828125,
+              "durationMs": 21.234,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/agentPresets/list",
+              "offsetMs": 58.58984375,
+              "durationMs": 46.49,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/schedule/list",
+              "offsetMs": 58.81494140625,
+              "durationMs": 45.724,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/dshx-2c5a0dae/quotaContinuations",
+              "offsetMs": 113.305908203125,
+              "durationMs": 13.391,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [
+              "browser-main-thread-longtasks"
+            ],
+            "unexplainedByLongTasksMs": 61.799999999813735,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045076877.5,
+          "finishedAtUnixMs": 1793045077000.4001,
+          "latencyMs": 118.60000000009313,
+          "settledMs": 122.89999999990687,
+          "domNodes": 757,
+          "longTasksSupported": true,
+          "longTasks": [
+            {
+              "offsetMs": -2,
+              "durationMs": 58,
+              "overlapMs": 56
+            }
+          ],
+          "thread": 0,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 54.967041015625,
+              "durationMs": 20.866,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/agentPresets/list",
+              "offsetMs": 61.480712890625,
+              "durationMs": 30.704,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/schedule/list",
+              "offsetMs": 70.8251953125,
+              "durationMs": 33.796,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [
+              "browser-main-thread-longtasks"
+            ],
+            "unexplainedByLongTasksMs": 62.60000000009313,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045077077,
+          "finishedAtUnixMs": 1793045077200.9001,
+          "latencyMs": 121.70000000018626,
+          "settledMs": 123.89999999990687,
+          "domNodes": 757,
+          "longTasksSupported": true,
+          "longTasks": [
+            {
+              "offsetMs": -1.8999999999068677,
+              "durationMs": 58,
+              "overlapMs": 56.10000000009313
+            }
+          ],
+          "thread": 1,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 53.05712890625,
+              "durationMs": 20.829,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/agentPresets/list",
+              "offsetMs": 61.57421875,
+              "durationMs": 44.175,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/schedule/list",
+              "offsetMs": 61.791015625,
+              "durationMs": 43.302,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [
+              "browser-main-thread-longtasks"
+            ],
+            "unexplainedByLongTasksMs": 65.60000000009313,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045077275.7002,
+          "finishedAtUnixMs": 1793045077400.3,
+          "latencyMs": 113.89999999990687,
+          "settledMs": 124.59999999962747,
+          "domNodes": 757,
+          "longTasksSupported": true,
+          "longTasks": [
+            {
+              "offsetMs": -1.900000000372529,
+              "durationMs": 58,
+              "overlapMs": 56.09999999962747
+            }
+          ],
+          "thread": 0,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 53.095947265625,
+              "durationMs": 25.779,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/agentPresets/list",
+              "offsetMs": 54.806884765625,
+              "durationMs": 25.15,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/schedule/list",
+              "offsetMs": 57.473876953125,
+              "durationMs": 24.992,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/dshx-2c5a0dae/quotaContinuations",
+              "offsetMs": 115.86376953125,
+              "durationMs": 11.707,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [
+              "browser-main-thread-longtasks"
+            ],
+            "unexplainedByLongTasksMs": 57.8000000002794,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045077479.8,
+          "finishedAtUnixMs": 1793045077617.2002,
+          "latencyMs": 123.5,
+          "settledMs": 137.40000000037253,
+          "domNodes": 757,
+          "longTasksSupported": true,
+          "longTasks": [
+            {
+              "offsetMs": -1.8999999999068677,
+              "durationMs": 61,
+              "overlapMs": 59.10000000009313
+            }
+          ],
+          "thread": 1,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 61.26123046875,
+              "durationMs": 25.54,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/agentPresets/list",
+              "offsetMs": 66.3271484375,
+              "durationMs": 36.837,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/schedule/list",
+              "offsetMs": 66.44384765625,
+              "durationMs": 36.172,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            },
+            {
+              "method": "POST",
+              "path": "/api/dshx-2c5a0dae/quotaContinuations",
+              "offsetMs": 126.507080078125,
+              "durationMs": 14.13,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [
+              "browser-main-thread-longtasks"
+            ],
+            "unexplainedByLongTasksMs": 64.39999999990687,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        }
+      ]
+    },
+    {
+      "mode": "workbench",
+      "summary": {
+        "count": 6,
+        "p50Ms": 33.200000000186265,
+        "p95Ms": 36.799999999813735,
+        "maxMs": 36.799999999813735,
+        "medianDomNodes": 901
+      },
+      "samples": [
+        {
+          "startedAtUnixMs": 1793045078890.8,
+          "finishedAtUnixMs": 1793045078927.6,
+          "latencyMs": 33.200000000186265,
+          "settledMs": 36.8000000002794,
+          "domNodes": 901,
+          "longTasksSupported": true,
+          "longTasks": [],
+          "thread": 0,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 36.044921875,
+              "durationMs": 17.675,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [],
+            "unexplainedByLongTasksMs": 33.200000000186265,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045079026.1,
+          "finishedAtUnixMs": 1793045079064.3,
+          "latencyMs": 34.5,
+          "settledMs": 38.1999999997206,
+          "domNodes": 901,
+          "longTasksSupported": true,
+          "longTasks": [],
+          "thread": 1,
+          "rpc": [],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [],
+            "unexplainedByLongTasksMs": 34.5,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045079157.8,
+          "finishedAtUnixMs": 1793045079196.6,
+          "latencyMs": 35.3000000002794,
+          "settledMs": 38.8000000002794,
+          "domNodes": 901,
+          "longTasksSupported": true,
+          "longTasks": [],
+          "thread": 0,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-2c5a0dae/usage",
+              "offsetMs": 37.89892578125,
+              "durationMs": 21.993,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [],
+            "unexplainedByLongTasksMs": 35.3000000002794,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045079291,
+          "finishedAtUnixMs": 1793045079326.7002,
+          "latencyMs": 32.200000000186265,
+          "settledMs": 35.700000000186265,
+          "domNodes": 901,
+          "longTasksSupported": true,
+          "longTasks": [],
+          "thread": 1,
+          "rpc": [],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [],
+            "unexplainedByLongTasksMs": 32.200000000186265,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045079442.1,
+          "finishedAtUnixMs": 1793045079477.7002,
+          "latencyMs": 31.600000000093132,
+          "settledMs": 35.60000000009313,
+          "domNodes": 901,
+          "longTasksSupported": true,
+          "longTasks": [],
+          "thread": 0,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 33.72705078125,
+              "durationMs": 16.485,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [],
+            "unexplainedByLongTasksMs": 31.600000000093132,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        },
+        {
+          "startedAtUnixMs": 1793045079576.1,
+          "finishedAtUnixMs": 1793045079616.6,
+          "latencyMs": 36.799999999813735,
+          "settledMs": 40.5,
+          "domNodes": 901,
+          "longTasksSupported": true,
+          "longTasks": [],
+          "thread": 1,
+          "rpc": [
+            {
+              "method": "POST",
+              "path": "/api/dshx-b3419035/snapshot",
+              "offsetMs": 39.475830078125,
+              "durationMs": 19.358,
+              "status": 200,
+              "failed": false,
+              "pending": false
+            }
+          ],
+          "budgetExceeded": false,
+          "slowRpc": [],
+          "attribution": {
+            "observedSignals": [],
+            "unexplainedByLongTasksMs": 36.799999999813735,
+            "causalAttribution": "Signals are observations, not causal proof; unexplained over-budget time needs the live Host/network/CPU audit."
+          }
+        }
+      ]
+    }
+  ]
+}

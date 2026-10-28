@@ -1,6 +1,6 @@
 ---
 name: verify-dsh
-description: Launch, check, drive and capture evidence from a scratch DeepSeek Harness (DSH) with `dshx dev up|doctor|open|shot|down`, then clean it up. Use to prove a plugin or UI change works in the real Web UI, to reach a catalog feature as a user would, or to screenshot DSH without touching the live instance on :3080.
+description: Launch, check, drive and capture evidence from a scratch DeepSeek Harness (DSH) with `dshx dev up|doctor|open|shot|down`, then clean it up. Use to prove a plugin or UI change works in the real Web UI, to reach a catalog feature as a user would, or to screenshot DSH without touching the live installation.
 ---
 
 # Verify in a scratch DSH
@@ -17,6 +17,9 @@ pnpm --dir tooling/dshx --filter @dshfiles/dshx build   # once per checkout, and
 
 ## Launch
 
+If your `dsh` command is a personal launcher that rewrites HOME, set `DSHX_DSH_EXECUTABLE` to the absolute executable file of the installed stock core (not that launcher); scratch `dev`, boot checks and E2E use it for both composition and startup while keeping isolated HOME/DSH_HOME.
+If bundled Chromium is unavailable (for example on NixOS), set `DSHX_CHROMIUM_EXECUTABLE` to an absolute installed Chrome/Chromium executable; scratch, Chromium boot checks and E2E keep their isolated profiles and headless options, while actual browser compatibility still requires a successful live pass.
+
 ```sh
 dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
 ```
@@ -25,9 +28,11 @@ Builds the named bundles (plus the client bundles they load), installs a scratch
 profile in a temp `DSH_HOME`, seeds a jj project `sample` with a `main`
 bookmark, starts `dsh` on a free port and a headless Chromium. Without
 `--plugin` it loads every owned bundle (slow). Treat any pending entry as a real
-failure; diagnose its Host activation issue and record a Host gap instead of
-relaxing `doctor`. `--skip-build` reuses `dist/`; `--project <dir>` registers a
+failure; diagnose its provider/composition and activation contract instead of
+relaxing `doctor`. An absent owned provider is not a Host gap. `--skip-build` reuses `dist/`; `--project <dir>` registers a
 real folder instead (kept on `down`); `--name` runs another instance beside it.
+ThreadSidebar's local-draft UI needs the cooperating owned SessionController, RichComposer and Chat bundles; its remote/repository queries also need MultiHost and JjIntegration. A reach using **Search threads**, **Open command palette** or a palette command also loads `@dshfiles/command-palette`, which owns the overlay/event listener; importing its API does not activate that provider. Declare those providers in the scratch composition, not just their imported module dependencies.
+
 Takes ~20 s for three bundles. `up` first runs `down` on every instance under
 the state root whose lease expired or whose `dsh` exited, and names each one.
 
@@ -128,6 +133,8 @@ pnpm check:e2e <plugin>           # its journeys, headless, serial; no filter = 
 pnpm check:e2e <plugin> --force   # ignore the Turbo cache
 ```
 
+For a direct Playwright run after editing a `.feature`, regenerate its consumers first from `tooling/dshx`: `node node_modules/playwright-bdd/dist/cli/index.js --config=playwright.e2e.config.ts`. `DSHX_E2E_PREBUILT=1` and `browser-tasks.mjs --write` do not refresh `.features-gen`; stale consumers can silently keep an old Given/composition. Never hand-edit the generated specs.
+
 Results are cached per package on the built bundles each journey boots, so a
 rerun without changes replays in seconds. A replayed pass is not a new run:
 pass `--force` when a binary outside the repository changed (other than jj).
@@ -156,6 +163,8 @@ A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
 - Fake-provider seeds are rerunnable on the same instance: they reuse the running
   fake provider and finish the `dshx_fake_commandcode` account a failed run left,
   and fail with "AI Accounts never saved …" when the store disagrees with the panel.
+- AI Accounts E2E profiles (alone, owned Chat, model-effort picker) seed their own canonical workspace folder before Host boot; without a selected workspace the native composer shows “Choose workspace”, not a prompt field.
+- AI Accounts setup is provisional: Cancel/X/Escape leaves no new account. Fake Command Code routes set the loopback URL in the pending key dialog's Connection settings, then Verify and add account; rename the saved route in Settings → Advanced only after success, preserving its verified native credential reference. Existing inert Codex catalog fixtures are not new-connection proof.
 - Reaches share one browser and project selection persists. A reach that needs
   the project picker should run before another selects `sample` or use a separate
   `--name` instance. A reach that changes a sidebar view leaves it for the next
@@ -187,8 +196,9 @@ dsh-our-free-model` loads the web profile's keyless free-model bundle (its
 
 ## Safety
 
-- Never touch the live DSH (`127.0.0.1:3080`, `~/.dsh`); `up` refuses that port
-  and only reads `~/.dsh/profiles/web` to copy registry dependencies.
+- Never touch the live DSH. Discover its actual origin/profile/home from current runtime context;
+  the scratch launcher's conventional-port refusal is not a guarantee that a custom live port is safe.
+  It may read local registry dependency metadata; never seed private account or Session state.
 - The launch URL is a secret. It lives only in `state.json` and `host.log`
   (mode 600, deleted by `down`); never print, paste or commit it.
 - Credentials only through env or `secret run`; a scratch copy is mode 600 and

@@ -5,6 +5,7 @@ export const SECRET_CATALOG_LOCALE_NAMESPACE = 'dshfiles.secretCatalog'
 
 const en = {
   title: 'Secret Catalog',
+  viewSecrets: 'Secrets',
   aliasCount: '{count} aliases',
   subtitle: 'Secret CLI aliases and metadata. Values stay hidden until you reveal one.',
   refresh: 'Refresh',
@@ -206,6 +207,7 @@ const en = {
 
 const zh = {
   title: '密钥目录',
+  viewSecrets: '密钥',
   aliasCount: '{count} 个别名',
   subtitle: '密钥 CLI 的别名和元数据。在你主动显示之前，值始终保持隐藏。',
   refresh: '刷新',

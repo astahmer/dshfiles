@@ -90,7 +90,10 @@ export default defineClientPlugin({
       </PluginQueryProvider>
     )
 
-    api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => translate('title'), locale: MCP_LOCALE_NAMESPACE }, () => icon())
+    api.ui.register(
+      { name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => `MCP Servers: ${translate('servers')}`, locale: MCP_LOCALE_NAMESPACE },
+      () => icon(),
+    )
     api.ui.register({ name: 'main', key: PANEL_ID, locale: MCP_LOCALE_NAMESPACE }, RootPanel)
     api.ui.register(
       {

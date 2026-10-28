@@ -6,11 +6,12 @@ import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type ProjectFolderSelection, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { AccountsRules, aiAccountsApi, type AccountDraft, type SecretCatalogKeyOption } from './api.js'
 import { apiKeySetupMachineWithWriter } from './api-key-setup-machine.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
+import { preserveAccountNameEditOnEscape } from './account-name-escape.js'
 
 const catalogOptionKey = (option: SecretCatalogKeyOption): string => JSON.stringify([option.scope, option.alias, option.environment, option.cwd])
 
@@ -24,10 +25,18 @@ interface SecretCatalogImportRequest {
 
 export const ApiKeySetupDialog = (props: {
   readonly draft: AccountDraft
-  readonly state: AccountsPanelState
+  readonly state: Pick<AccountsPanelState, 'credentialInfo' | 'storeCredential' | 'importSecretCatalogKey'>
   readonly folderPicker: WorkspacePickerPorts
   readonly open: boolean
   readonly onOpenChange: (open: boolean) => void
+  readonly setupNotice?: string
+  readonly errorNotice?: string | null
+  readonly connectionControls?: ReactNode
+  readonly submitLabel?: string
+  readonly savingLabel?: string
+  readonly credentialLabel?: string
+  readonly connectionHeading?: ReactNode
+  readonly connectionTitle?: string
 }): JSX.Element => {
   const api = useApi(aiAccountsApi)
   const { onOpenChange } = props
@@ -134,16 +143,30 @@ export const ApiKeySetupDialog = (props: {
 
   return (
     <Dialog onOpenChange={close} open={props.open}>
-      <DialogContent className="dshx-root dshx:max-w-lg">
+      <DialogContent onEscapeKeyDown={preserveAccountNameEditOnEscape} className="dshx-root dshx:max-h-[90dvh] dshx:max-w-lg dshx:overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Configure {props.draft.displayName} key</DialogTitle>
+          <DialogTitle>{props.connectionTitle ?? `Configure ${props.draft.displayName} key`}</DialogTitle>
           <DialogDescription>
-            Store or replace the key for <code className="dshx:font-mono!">{props.draft.apiKeyEnv.trim() || 'Choose a key name first'}</code>. The value never
-            enters AI Accounts JSON or chat.
+            {props.connectionTitle === undefined ? (
+              <>
+                Store or replace the key for <code className="dshx:font-mono!">{props.draft.apiKeyEnv.trim() || 'Choose a key name first'}</code>. The value
+                never enters AI Accounts JSON or chat.
+              </>
+            ) : (
+              'Enter a key to connect.'
+            )}
           </DialogDescription>
+          {props.connectionHeading}
+          {props.setupNotice === undefined ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{props.setupNotice}</p>}
+          {props.errorNotice == null ? null : (
+            <p className="dshx:text-sm dshx:text-destructive" role="alert">
+              {props.errorNotice}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="dshx:flex dshx:flex-col dshx:gap-4">
+          {props.connectionControls === undefined ? null : <fieldset disabled={busy}>{props.connectionControls}</fieldset>}
           {!validCredentialRef ? (
             <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
               <h3 className="dshx:text-sm dshx:font-medium">Choose where this account reads its key</h3>
@@ -152,8 +175,8 @@ export const ApiKeySetupDialog = (props: {
               </p>
             </section>
           ) : null}
-          <section className="dshx:flex dshx:flex-col dshx:gap-2">
-            <h3 className="dshx:text-sm dshx:font-medium">Use a Secret Catalog entry</h3>
+          <details className="dshx:order-2 dshx:text-sm">
+            <summary className="dshx:mb-3 dshx:cursor-pointer dshx:text-xs dshx:text-muted-foreground">Import from Secret Catalog</summary>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
               <Button
                 disabled={busy}
@@ -237,12 +260,11 @@ export const ApiKeySetupDialog = (props: {
                 Secret Catalog is unavailable. You can still enter a key below or configure this reference in the Host environment.
               </p>
             )}
-          </section>
+          </details>
 
-          <section className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:pt-4">
-            <h3 className="dshx:text-sm dshx:font-medium">{canReplace ? 'Replace the current key' : 'Or enter a key'}</h3>
+          <section className="dshx:flex dshx:flex-col dshx:gap-2">
             <label className="dshx:text-sm" htmlFor="ai-account-api-key-value">
-              API key value
+              {props.credentialLabel ?? 'API key value'}
             </label>
             <Input
               autoComplete="new-password"
@@ -259,7 +281,9 @@ export const ApiKeySetupDialog = (props: {
               {credentialInfo === null || credentialInfo === undefined
                 ? 'Waiting for DSH to confirm this credential source is writable.'
                 : targetWritable
-                  ? 'Stored through DSH’s write-only credential API, not in the account profile. Saving replaces the previous stored value.'
+                  ? canReplace
+                    ? 'This replaces the stored credential.'
+                    : 'Stored securely in DSH credentials.'
                   : 'This reference is supplied by a read-only source. Choose a different key name or update that source; DSH cannot replace it here.'}
             </p>
           </section>
@@ -270,7 +294,7 @@ export const ApiKeySetupDialog = (props: {
             Cancel
           </Button>
           <Button disabled={manualValue.length === 0 || busy || !validCredentialRef || !targetWritable} onClick={saveManualKey} type="button">
-            {snapshot.matches('saving') ? 'Saving…' : canReplace ? 'Replace key' : 'Store key'}
+            {snapshot.matches('saving') ? (props.savingLabel ?? 'Saving…') : (props.submitLabel ?? (canReplace ? 'Replace key' : 'Store key'))}
           </Button>
         </DialogFooter>
       </DialogContent>

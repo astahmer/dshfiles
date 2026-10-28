@@ -3,7 +3,7 @@
  * The registration supplies a fresh store and binds its actions to ctx.layout.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
-import type { RightPanelMode } from '../../regions.ts'
+import type { MainSurfaceMode, RightPanelMode } from '../../regions.ts'
 import type { MainPanelId } from './service.ts'
 import {
   BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN,
@@ -24,6 +24,8 @@ type LayoutState = {
 }
 
 type LayoutInfo = {
+  /** Requested centre owner; deliberately not persisted until the default-flip phase. */
+  mainSurfaceMode: MainSurfaceMode
   sidebar: number
   /**
    * Last non-zero sidebar width. Reopening a collapsed sidebar restores it
@@ -82,11 +84,13 @@ type LayoutActions = {
   retainMainPanels: (draft: LayoutState, panelIds: readonly string[]) => void
   setSidebar: (draft: LayoutState, px: number) => void
   toggleSidebar: (draft: LayoutState) => void
+  showSidebar: (draft: LayoutState) => void
   setViewportWidth: (draft: LayoutState, width: number) => void
   setRightbar: (draft: LayoutState, px: number) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
   setMode: (draft: LayoutState, mode: RightPanelMode) => void
+  setMainSurfaceMode: (draft: LayoutState, mode: MainSurfaceMode) => void
   setBottom: (draft: LayoutState, px: number) => void
   openBottom: (draft: LayoutState, px?: number) => void
   closeBottom: (draft: LayoutState) => void
@@ -105,6 +109,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
     init: (): LayoutState => ({
       panelInfo: { activePanelId: null },
       layoutInfo: {
+        mainSurfaceMode: 'native',
         sidebar: SIDEBAR_DEFAULT,
         sidebarLastOpen: SIDEBAR_DEFAULT,
         viewportWidth: window.innerWidth,
@@ -141,6 +146,13 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         if (d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = !d.layoutInfo.narrowExpanded
         else d.layoutInfo.sidebar = d.layoutInfo.sidebar === 0 ? d.layoutInfo.sidebarLastOpen : 0
       },
+      // Recovery is a show intent, not a toggle: repeated calls in one React
+      // batch read the live draft and never close an already-visible sidebar.
+      showSidebar: (d) => {
+        d.layoutInfo.rightbarInstant = false
+        if (d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = true
+        else d.layoutInfo.sidebar = d.layoutInfo.sidebarLastOpen
+      },
       // Crossing the breakpoint in either direction drops the override: the
       // narrow default is auto-collapsed, the wide state is the preference.
       setViewportWidth: (d, width: number) => {
@@ -173,6 +185,9 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       },
       // The frame's right column has one owner at a time: a plugin takes it
       // over for its global dock, or hands it back to the native surface.
+      setMainSurfaceMode: (d, mode: MainSurfaceMode) => {
+        d.layoutInfo.mainSurfaceMode = mode
+      },
       setMode: (d, mode: RightPanelMode) => {
         d.layoutInfo.rightPanelMode = mode
       },

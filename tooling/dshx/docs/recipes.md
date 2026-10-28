@@ -132,6 +132,22 @@ fnm exec --using 22.23.3 pnpm --dir plugins --filter @dshfiles/agent-communicati
 fnm exec --using 22.23.3 pnpm --dir tooling/dshx --filter @dshfiles/dshx exec vitest run tests/communication-service.spec.ts
 ```
 
+## Isolated E2E workspace seeds
+
+A browser scenario that needs a selected project must seed the scratch home, not
+borrow a live workspace or synthesize a Session URL. Use `seedHome` with
+`bootComposedPluginProfile`; a stable `seedKey` identifies a deterministic recipe.
+The AI Accounts fixtures share `seedAiAccountsWorkspace` and
+`AI_ACCOUNTS_WORKSPACE_SEED_KEY` from
+[`ai-accounts-workspace.ts`](../e2e/support/ai-accounts-workspace.ts).
+
+Each prewarmed sibling runs the recipe in its own new home. Changing the recipe
+key, Host environment or resolved core executable prevents sibling reuse. A
+custom seed without a key remains uncacheable. The shared workspace writer uses
+exclusive creation and private permissions; it must never replace existing
+workspace state. Run `vitest run --config e2e/vitest.boot.config.ts` from
+`tooling/dshx` for the seed/cache, executable and owned-process regression checks.
+
 ## Raw Cordis extension
 
 Use the typed DSHX API when it expresses the operation. When the installed Host

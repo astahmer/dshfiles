@@ -56,7 +56,7 @@ Feature: Thread sidebar journeys
   @smoke
   @scenario:thread-sidebar.park-context-menu
   Scenario: Park a thread from its context menu and keep it parked
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     When a nonblank Host thread is parked from its context menu
     Then the Host thread stays parked after reload without an attention error
 
@@ -82,7 +82,7 @@ Feature: Thread sidebar journeys
   @smoke
   @scenario:thread-sidebar.row-pin
   Scenario: Pin a thread from its sidebar row
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     When a nonblank Host thread is pinned from its sidebar row
     Then the thread stays pinned after reload
 
@@ -96,7 +96,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.view-controls
   Scenario: Thread grouping and filters affect rows and survive reload
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When a Host thread is archived and the view is grouped and filtered
     Then only matching rows remain visible after reload
 
@@ -134,7 +134,7 @@ Feature: Thread sidebar journeys
   @scenario:thread-sidebar.attention-colors
   Scenario: Attention status colors are configurable and saved
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When an attention status color is changed in Sidebar settings
+    When an attention status color is changed in Thread list settings
     Then the selected attention color survives a browser reload
 
   @scenario:thread-sidebar.notifications-settings
@@ -153,13 +153,13 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When the header is expanded, reordered, and one destination is hidden
     Then the custom layout survives a browser reload
 
   @scenario:thread-sidebar.footer-more-menu
   Scenario: The header and footer More menus both reach Settings and the pages
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
     When the sidebar footer More menu is opened
     Then the footer menu lists Settings and the sidebar pages and opens the Plugins page
     When the sidebar header More menu is opened
@@ -209,7 +209,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.open-in-side-panel
   Scenario: Open a thread in the right side panel from its row menu, its hover action and the palette
-    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/workspace-nav, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/model-selection, @dshfiles/agent-preset, @dshfiles/ai-accounts, @dshfiles/multi-host, @dshfiles/jj-integration, @dshfiles/command-palette" is booted
     When a nonblank Host thread is opened in the side panel from its context menu
     Then the side panel hosts that thread's scrollable conversation and composer
     And the thread row offers the side-panel hover action

@@ -1,14 +1,25 @@
-import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
+import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
+import { createStoredValue, type StoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { z } from 'zod'
 
-/**
- * Which surface the right column renders.
- *
- * The setting is the source of truth, with one fallback: the native per-session
- * surface renders the resources other plugins open into it (a file preview, a
- * diff, a terminal), and the dock cannot show those bodies until it owns them
- * (M4). While the on-screen Session has such a tab open, the native surface
- * takes the column back, so a clicked file link is never a no-op; the dock
- * returns — with its layout intact — once that Session has no open tabs.
- */
-export const effectiveRightPanelMode = (input: { readonly setting: RightPanelMode; readonly nativeTabsOnScreen: boolean }): RightPanelMode =>
-  input.setting === 'dock' && input.nativeTabsOnScreen ? 'native' : input.setting
+/** Browser presentation state, separate from the obsolete per-profile surface choice. */
+export const rightPaneVisibility = createStoredValue({ key: 'dshfiles.workbench.right-pane-visible.v1', schema: z.boolean().nullable(), fallback: null })
+
+export const createDockPaneActions = (visibility: StoredValue<boolean | null, null> = rightPaneVisibility): DockPaneActions => ({
+  isOpen: () => visibility.get() === true,
+  open: () => {
+    visibility.set(true)
+  },
+  close: () => {
+    visibility.set(false)
+  },
+  toggle: () => {
+    visibility.set(visibility.get() !== true)
+  },
+  subscribe: visibility.subscribe,
+})
+
+/** Migrate once; a deliberate new close must never be overridden by an old `dock` setting. */
+export const migrateDockVisibility = (legacy: 'native' | 'dock' | undefined, visibility: StoredValue<boolean | null, null> = rightPaneVisibility): void => {
+  if (visibility.get() === null) visibility.set(legacy === 'dock')
+}

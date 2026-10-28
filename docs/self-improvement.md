@@ -252,11 +252,11 @@ reproducible by re-running today. The surviving `misunderstood-requirement`
 evidence was read by hand and is real pushback ("no i mean…", "i meant…",
 "thats not ok cause…"); before the fix, every sampled hit was injected text.
 
-The same run also produced a live harness finding, which `validate` now reports
-mechanically: every Session is told to read `~/.agents/USER_PREFERENCES.md`, a
-file that exists in no checkout. That instruction lives in the nixfiles-managed
-`~/.dsh/AGENTS.md`, so the fix is a nixfiles change; it is recorded in the ledger
-rather than silently patched here.
+The same run also found a machine-local harness instruction referring to a
+missing preferences file. `validate` reports this class mechanically. Private
+instruction paths and deployment configuration are omitted; repair the actual
+local instruction owner rather than adding a personal default to shared source.
+The finding belongs in the local improvement ledger, not a silent runtime edit.
 
 ## The second correction defect (2026-10-25)
 

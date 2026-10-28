@@ -67,6 +67,15 @@ describe('client boot card parsing', () => {
 })
 
 describe('pending Client entries', () => {
+  it('reports a missing draft-service owner instead of mistaking absent Preview consent for readiness', () => {
+    const entries = ClientBootCheckModel.parseBootText(
+      'Failed to load plugins\nweb boot: 1 entry did not activate\n@dshfiles/thread-sidebar: pending (waiting for service: sessionDrafts)',
+    )
+    expect(ClientBootCheckModel.clientEntryFailures(entries, ['@dshfiles/thread-sidebar'])).toEqual([
+      { id: '@dshfiles/thread-sidebar', state: 'pending', detail: '(waiting for service: sessionDrafts)' },
+    ])
+  })
+
   it('allows only explicit service waits outside the expected plugin entry', () => {
     const entries = ClientBootCheckModel.parseBootText(
       [

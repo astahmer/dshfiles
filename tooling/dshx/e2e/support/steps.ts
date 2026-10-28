@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, prewarmSibling, traceBootPhase, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
+import { AI_ACCOUNTS_WORKSPACE_SEED_KEY, seedAiAccountsWorkspace } from './ai-accounts-workspace.js'
 import { readScenarioKeys, recordScenarioPass, scenarioIdOfTest } from './scenario-cache.mjs'
 import { ClientBootCheckModel } from '../../packages/dshx/src/project/client-boot-check.js'
 import { DSHFILES_ROOT } from '../../packages/dshx/src/project/local-bundles.js'
@@ -234,11 +235,16 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
   const readyStartedAt = Date.now()
   try {
     await visitScratchProfile(page, profile)
-    const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
-    await expect(previewNotice).toBeVisible()
-    await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
-    await expect(previewNotice).toBeHidden()
+    // Preview consent is optional; a boot failure must report its real audit instead of timing out on that dialog.
+    const boot = await readProfileOutcome(page, profile)
+    assertClientBootReady(boot, profile, 'The isolated scratch profile did not boot cleanly.')
+    expect(boot.slotFailures, 'The isolated scratch profile lost a Slot during boot.').toEqual([])
+    await StartupDialogs.dismissPreviewNotice(page)
     await StartupDialogs.dismissProviderSetupDuringStartup(page)
+    await expect(page.getByRole('dialog').or(page.getByRole('alertdialog')), 'Startup left a modal overlay blocking the app.').toHaveCount(0)
+    const interactive = await readProfileOutcome(page, profile)
+    assertClientBootReady(interactive, profile, 'The isolated scratch profile failed during startup handoff.')
+    expect(interactive.slotFailures, 'The isolated scratch profile lost a Slot during startup handoff.').toEqual([])
     traceBootPhase('profile-interactive', readyStartedAt, profile.profile)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
@@ -286,10 +292,22 @@ Given('the isolated ThreadSidebar and AI Accounts plugin profile is booted', asy
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Given('the isolated Goal Tool and AI Accounts plugin profile is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/goal-tool', '@dshfiles/goal-stall-guard', '@dshfiles/ai-accounts'],
+    profileLabel: 'goal-tool-lifecycle',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Given('the isolated AI Accounts and owned Chat plugin profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/chat'],
     profileLabel: 'ai-accounts-owned-chat',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
   })
   await visitIsolatedPluginProfile(page, profile)
 })
@@ -298,6 +316,8 @@ Given('the isolated AI Accounts and model effort picker plugin profile is booted
   const profile = await bootComposedPluginProfile({
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/model-effort-picker', '@dshfiles/multi-host'],
     profileLabel: 'ai-accounts-model-fallback',
+    seedHome: seedAiAccountsWorkspace,
+    seedKey: AI_ACCOUNTS_WORKSPACE_SEED_KEY,
   })
   await visitIsolatedPluginProfile(page, profile)
 })
@@ -382,11 +402,12 @@ Given('the isolated plugin profile {string} is booted with the session-content i
 })
 
 Given('the isolated plugin composition {string} is booted with the session-content index', async ({ page }: { page: Page }, packageList: string) => {
-  const packageIds = packageList
+  const [packageId, ...companionPackageIds] = packageList
     .split(',')
     .map(packageId => packageId.trim())
     .filter(packageId => packageId.length > 0)
-  if (packageIds.length === 0) throw new Error('The plugin composition names no package.')
+  if (packageId === undefined) throw new Error('The plugin composition names no package.')
+  const packageIds: [string, ...string[]] = [packageId, ...companionPackageIds]
   const profile = await bootComposedPluginProfile({ packageIds, profileLabel: packageIds.join('+'), cordisPatch: sessionContentIndexPatch })
   await visitIsolatedPluginProfile(page, profile)
 })

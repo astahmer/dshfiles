@@ -1,10 +1,11 @@
 import type { ChildrenDecl } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@dshfiles/frame-layout/regions'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
-     * Full-width rows stacked above the wide sidebar foot (a usage strip, a status line). Declared by this sidebar
-     * only; the stock sidebar has no such seat, so occupants keep a footer-action fallback.
+     * Preview contributions rendered by the regular Workbench preview assembly, with a fixed standalone-sidebar fallback.
+     * Declared by this sidebar only; the stock sidebar has no such seat, so occupants keep a footer-action fallback.
      */
     'sidebar.footer.above': {
       kind: 'list'
@@ -15,6 +16,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export const sidebarChildren = {
+  'shell.left': { kind: 'single', scope: 'root' },
   'sidebar.brand.mark': { kind: 'single', scope: 'root' },
   'sidebar.brand.name': { kind: 'single', scope: 'root' },
   'sidebar.toggle.badge': { kind: 'single', scope: 'root' },

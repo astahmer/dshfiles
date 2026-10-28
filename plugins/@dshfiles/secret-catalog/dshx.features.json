@@ -8,7 +8,7 @@
       "reach": [
         "seed fake-secret-cli",
         "seed rebase-ready-thread",
-        "click button \"Secret Catalog\"",
+        "click button \"Secret Catalog: Secrets\"",
         "click button \"Choose a project folder…\"",
         "expect dialog \"Choose a project folder\"",
         "click tab \"Workspaces\"",
@@ -166,7 +166,7 @@
           "testName": "records a secret <verb> span with flag names only, never the alias or the value"
         }
       ],
-      "reach": ["seed fake-secret-cli", "click button \"Secret Catalog\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
+      "reach": ["seed fake-secret-cli", "click button \"Secret Catalog: Secrets\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
     },
     {
       "id": "inline-quick-add",
@@ -174,7 +174,7 @@
       "summary": "Add secret appends an editable row: an env-var style name and a masked value (or Generate on this Host from the row menu, which also offers Copy and Delete). Enter or leaving the row saves it to the viewed scope (the selected project under All) and the default environment; the split arrow opens the detailed dialog.",
       "reach": [
         "seed fake-secret-cli",
-        "click button \"Secret Catalog\"",
+        "click button \"Secret Catalog: Secrets\"",
         "click button \"Add secret\"",
         "fill textbox \"New secret name\" \"STRIPE_API_KEY\"",
         "fill textbox \"New secret value\" \"scratch-fake-typed-value\"",
@@ -247,7 +247,7 @@
       "summary": "Add through a required-first dialog (alias, scope defaulting to the selected project, environment prod, generated or masked value, Advanced fold for item metadata), edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
       "reach": [
         "seed fake-secret-cli",
-        "click button \"Secret Catalog\"",
+        "click button \"Secret Catalog: Secrets\"",
         "click button \"More ways to add a secret\"",
         "click menuitem \"Add with details…\"",
         "click radio \"Enter a value*\"",

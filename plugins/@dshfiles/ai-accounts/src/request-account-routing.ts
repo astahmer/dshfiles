@@ -26,6 +26,14 @@ const compatibleAccountIds = (input: {
 }
 
 export class RequestAccountRouting {
+  /** An older request's automatic retry must not overwrite a later explicit thread selection. */
+  static hasNewPreferredSelection(input: {
+    readonly requestRevision: number | undefined
+    readonly current: { readonly revision: number; readonly preferSelectedProvider: boolean } | null
+  }): boolean {
+    return input.requestRevision !== undefined && input.current?.preferSelectedProvider === true && input.current.revision > input.requestRevision
+  }
+
   static selectRequestAccount(input: {
     readonly provider: string
     readonly model: string
@@ -92,11 +100,12 @@ export class RequestAccountRouting {
     readonly pool: Pick<AccountPool, 'acquire' | 'bindRoute' | 'distribution' | 'isHealthy' | 'routeFor'>
     readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
     readonly chainWalking: boolean
+    readonly preferSelectedProvider?: boolean
     readonly usageOrder?: readonly string[]
     readonly hiddenAccountIds?: readonly string[]
     readonly now?: number | undefined
   }): string {
-    if (input.pool.distribution() === 'sticky') return RequestAccountRouting.preflightAccount(input)
+    if (input.preferSelectedProvider === true || input.pool.distribution() === 'sticky') return RequestAccountRouting.preflightAccount(input)
     if (input.chainWalking) return input.pool.routeFor(input.conversationKey, input.provider, input.now)
     return RequestAccountRouting.selectRequestAccount(input)
   }

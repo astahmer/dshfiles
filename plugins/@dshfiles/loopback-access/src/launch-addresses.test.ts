@@ -59,7 +59,7 @@ describe('clean launch addresses', () => {
     ).toEqual([local('http://localhost:3198/'), lan('http://192.0.2.10:3198/')])
   })
 
-  it.each(['starting', 'stopped', 'failed', 'native-loopback'] as const)('ignores stale forwarded listeners in state %s', state => {
+  it.each(['starting', 'stopped', 'failed', 'disabled', 'native-loopback'] as const)('ignores stale forwarded listeners in state %s', state => {
     expect(LaunchAddressesModel.addresses(server(), status(state), 'http://192.0.2.10:3198')).toEqual([lan('http://192.0.2.10:3198/')])
   })
 

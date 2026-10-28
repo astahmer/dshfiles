@@ -1,47 +1,21 @@
-import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from '@dshfiles/plugin-ui/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
-import { ChevronDownIcon, CopyIcon, PanelRightOpenIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { requestThreadMentionInsertion, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
-import { workbenchPanels } from '@dshfiles/workbench/registry'
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactElement } from 'react'
+import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
 import { requestPanelAside } from './panel-aside.js'
 import { requestThreadAside } from './thread-aside.js'
-import { requestThreadSettle } from './settle-request.js'
-import { buildThreadTabLink } from './thread-link.js'
 import { CompassGlyph } from './start-page.js'
+import { TabMenuItems } from './tab-menu-items.js'
 import type { TabsEvent } from './tabs-machine.js'
 
-export type TabStatus = 'running' | 'needsYou' | 'unread'
-
-interface TabViewBase {
-  readonly id: string
-  readonly title: string
-  readonly active: boolean
-  readonly pinned: boolean
-  readonly preview: boolean
-  readonly available: boolean
-  readonly status: TabStatus | null
-}
-
-export type TabView =
-  | (TabViewBase & { readonly kind: 'thread'; readonly sessionId: string; readonly workspaceId?: string })
-  | (TabViewBase & { readonly kind: 'panel'; readonly panelId: string })
-  | (TabViewBase & { readonly kind: 'start' })
+export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
+import type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
 type DraggedMove =
@@ -105,9 +79,6 @@ const STRIP_BUTTON =
  */
 export const TabStrip = (props: TabStripProps): ReactElement => {
   const { tabs, send, t } = props
-  const registry = workbenchPanels()
-  useSyncExternalStore(registry.subscribe, registry.list, registry.list)
-  const pluginPanels = registry.listContextMenuPanels()
   const scroller = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -119,16 +90,6 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
   const activeId = tabs.find(tab => tab.active)?.id
-  const copy = async (value: string, copiedKey: 'threadIdCopied' | 'threadLinkCopied'): Promise<void> => {
-    try {
-      setStatus(t((await writeClipboard(value)) ? copiedKey : 'clipboardFailure'))
-    } catch {
-      setStatus(t('clipboardFailure'))
-    }
-  }
-  const openAside = (sessionId: string): void => {
-    if (!requestThreadAside(sessionId)) setStatus(t('sidePanelUnavailable'))
-  }
   const renameTab = async (tab: TabView, title: string): Promise<void> => {
     if (tab.kind !== 'thread') return
     try {
@@ -386,95 +347,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent className="dshx-root">
-                {tab.kind === 'start' ? null : (
-                  <ContextMenuItem onSelect={() => send({ type: 'tab.togglePin', tabId: tab.id })}>{t(tab.pinned ? 'unpin' : 'pin')}</ContextMenuItem>
-                )}
-                {tab.preview ? <ContextMenuItem onSelect={() => send({ type: 'tab.keep', tabId: tab.id })}>{t('keepOpen')}</ContextMenuItem> : null}
-                {tab.kind === 'thread' ? <ContextMenuItem onSelect={() => setRenamingTabId(tab.id)}>{t('renameThread')}</ContextMenuItem> : null}
-                {tab.kind === 'start' && !tab.preview ? null : <ContextMenuSeparator />}
-                {tab.kind === 'panel' ? (
-                  <>
-                    <ContextMenuItem onSelect={() => requestPanelAside(tab.panelId)}>
-                      <PanelRightOpenIcon aria-hidden="true" />
-                      {t('openInSidePanel')}
-                    </ContextMenuItem>
-                    {pluginPanels.length > 0 ? (
-                      <ContextMenuSub>
-                        <ContextMenuSubTrigger>{t('openPluginInSidePanel')}</ContextMenuSubTrigger>
-                        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-                          {pluginPanels.map(definition => (
-                            <ContextMenuItem key={definition.id} onSelect={() => requestPanelAside(definition.id)}>
-                              {definition.title}
-                            </ContextMenuItem>
-                          ))}
-                        </ContextMenuSubContent>
-                      </ContextMenuSub>
-                    ) : null}
-                  </>
-                ) : null}
-                {tab.kind === 'thread' ? (
-                  <>
-                    {pluginPanels.length > 0 ? (
-                      <ContextMenuSub>
-                        <ContextMenuSubTrigger>{t('openPluginInSidePanel')}</ContextMenuSubTrigger>
-                        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-                          {pluginPanels.map(definition => (
-                            <ContextMenuItem key={definition.id} onSelect={() => requestPanelAside(definition.id)}>
-                              {definition.title}
-                            </ContextMenuItem>
-                          ))}
-                        </ContextMenuSubContent>
-                      </ContextMenuSub>
-                    ) : null}
-                    <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId, ThreadMentionDrag.activeComposerSessionId())}>
-                      {t('mentionThread')}
-                    </ContextMenuItem>
-                    <ContextMenuSub>
-                      <ContextMenuSubTrigger>{t('threadStatus')}</ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-                        <ContextMenuItem disabled={tab.status === 'running'} onSelect={() => requestThreadSettle(tab.sessionId)}>
-                          {t('settleThread')}
-                        </ContextMenuItem>
-                      </ContextMenuSubContent>
-                    </ContextMenuSub>
-                    <ContextMenuItem onSelect={() => openAside(tab.sessionId)}>
-                      <PanelRightOpenIcon aria-hidden="true" />
-                      {t('openInSidePanel')}
-                    </ContextMenuItem>
-                    <ContextMenuSub>
-                      <ContextMenuSubTrigger>{t('copy')}</ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-                        <ContextMenuItem onSelect={() => void copy(tab.sessionId, 'threadIdCopied')}>
-                          <CopyIcon aria-hidden="true" />
-                          {t('copyThreadId')}
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                          onSelect={() =>
-                            void copy(
-                              buildThreadTabLink({
-                                currentUrl: window.location.href,
-                                sessionId: tab.sessionId,
-                                workspaceId: tab.workspaceId,
-                              }),
-                              'threadLinkCopied',
-                            )
-                          }
-                        >
-                          <CopyIcon aria-hidden="true" />
-                          {t('copyThreadLink')}
-                        </ContextMenuItem>
-                      </ContextMenuSubContent>
-                    </ContextMenuSub>
-                    <ContextMenuSeparator />
-                  </>
-                ) : null}
-                <ContextMenuItem onSelect={() => send({ type: 'tab.close', tabId: tab.id })}>{t('closeTab')}</ContextMenuItem>
-                <ContextMenuItem disabled={tabs.length < 2} onSelect={() => send({ type: 'tab.closeOthers', tabId: tab.id })}>
-                  {t('closeOthers')}
-                </ContextMenuItem>
-                <ContextMenuItem disabled={index === tabs.length - 1} onSelect={() => send({ type: 'tab.closeToRight', tabId: tab.id })}>
-                  {t('closeToRight')}
-                </ContextMenuItem>
+                <TabMenuItems tab={tab} tabs={tabs} send={send} t={t} onRename={() => setRenamingTabId(tab.id)} onStatus={setStatus} />
               </ContextMenuContent>
             </ContextMenu>
           )

@@ -27,7 +27,8 @@ Legacy saved `localhostEnabled: false` values are ignored at startup and removed
 on the next settings save. The API retains an always-true compatibility field for
 older clients/Hosts, not a setting that can disable access. Active status still
 reports actual availability rather than claiming that a failed listener works.
-No checked-in profile enables this bundle.
+Upstream keeps this bundle opt-in. This fork's checked-in `web` profile explicitly
+selects it; installing it does not enable LAN access or change a running Host.
 
 ## Behavior
 
@@ -65,25 +66,37 @@ localhost. A TCP forwarder does not terminate TLS or bypass certificate checks.
 
 ## Install
 
-This bundle is **optional**: no checked-in profile enables it. Build the
-package, then explicitly select it in a profile you own: add a local `link:`
-dependency pointing to this package and include `@dshfiles/loopback-access` in
-that profile's `dsh.profile.bundles` list. Install that profile's dependencies
-and restart it normally. Its bundle patch inserts the owned adjunct and
-`dshfiles-network-terminal-output` rows. It replaces the native Web runtime's
-single-link print policy while preserving its current CLI-aware browser/public
-URL/context configuration. It never edits the native Web server's binding.
+This fork's `web` seed explicitly selects the shared bundle. Existing installations
+receive seed changes through their normal profile synchronization and a later
+user-controlled restart. Other profiles can opt in: build the package, add a local
+`link:` dependency pointing to it, and include `@dshfiles/loopback-access` in the
+profile's `dsh.profile.bundles` list. Install that profile's dependencies and
+restart it normally. Its bundle patch inserts the startup provider, loopback
+adjunct and `dshfiles-network-terminal-output` rows. It delegates native host/port
+fallbacks to immutable startup preferences, with explicit CLI flags taking priority;
+it does not rebind a running server. It replaces the native Web runtime's single-link
+print policy while preserving its CLI-aware browser/public URL/context configuration.
 Disabling the adjunct removes forwarding without modifying the LAN listener.
 To suppress all startup links, disable the terminal-output row too and keep
 native `web-runtime.config.printUrl: false`. Profile overrides apply after the
 bundle: if you restate the Web runtime config, retain that false print policy
 to avoid duplicate native output.
 Installing or building the repository alone does not activate this plugin.
-The seeded `web` synchronizer follows its explicit seed bundle list, which
-omits this package. The existing **all-owned** development flows (scratch
-compositions and syncing an unseeded profile without `--bundle`) deliberately
-select every owned bundle, including this one. For a custom profile, select
-bundles explicitly rather than using that bulk opt-in.
+The seeded `web` synchronizer follows this fork's explicit seed bundle list.
+The existing **all-owned** development flows (scratch compositions and syncing
+an unseeded profile without `--bundle`) deliberately select every owned bundle,
+including this one. For a custom profile, select bundles explicitly rather than
+using that bulk opt-in.
+
+A profile with its own complete native `webserver` override must first delegate
+its host/port fallbacks to the startup provider. Such profiles remain read-only
+in the GUI until their wiring is updated offline and DSH is restarted. Do not use
+`configEditor.edit(webserver, …)` as a deferred save: that public API immediately
+reconciles and may restart listeners and dependents. This fork's pure
+[offline migration](../../../scripts/network-startup-patch.mjs) preserves original
+fallbacks, CLI precedence, comments, unrelated fields and protected regions. The
+source launcher runs it only after its stopped-process guard, before the next
+normal startup; it never migrates an active profile.
 
 The read-only `loopback_access_status` agent tool reports actual listeners and
 non-secret origins. It never returns launch tokens or cookies.
@@ -104,8 +117,10 @@ disposer contract through upstream dshx's public `defineHost({ setup })` API.
 The startup provider reads immutable desired preferences before the native Web
 server starts. The narrow public dshx `readWebStartupOverrides` helper validates
 native CLI overrides without restating the native Context contract in the plugin.
-There is no personal launcher integration, trusted-host exception or replacement
-authentication layer. Listener changes require a user-controlled Host restart.
+The shared implementation needs no personal launcher integration, trusted-host
+exception or replacement authentication layer. This fork's optional offline
+migration is separate from the shared runtime. Listener changes require a
+user-controlled Host restart.
 
 ## License and provenance
 
@@ -117,6 +132,9 @@ The implementation provenance above is unchanged; no third-party proxy code or
 license ownership is claimed.
 
 ## Verification
+
+The [earlier fork verification receipt](docs/verification.md) records pre-merge
+evidence and activation limits; it is not a verification of this upstream sync.
 
 ```sh
 pnpm --dir plugins/@dshfiles/loopback-access typecheck

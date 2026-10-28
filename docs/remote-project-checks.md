@@ -21,10 +21,10 @@ Remotes and execution policy live in the profile patch, next to the actions:
       remoteCooldownMs: 60000 # skip a peer that just failed for this long
     remotes:
       - id: m1
-        sshTarget: m1-perso # an ssh alias from ~/.ssh/config
+        sshTarget: check-peer # illustrative alias from local SSH configuration
         gitRemote: m1 # local jj remote pointing at the peer snapshot repo
         peerRemote: origin # remote name inside the peer checker repo
-        workspace: /Users/me/dev/project-check # absolute peer checker workspace
+        workspace: /absolute/path/to/project-check # set the actual peer checker workspace
         toolchain: [mise, exec, node@22.23.3, --] # optional prefix for run/install commands
         install:
           command: [pnpm, install, --frozen-lockfile]
@@ -48,11 +48,11 @@ Remotes and execution policy live in the profile patch, next to the actions:
 
 `target`:
 
-| Value | Behaviour |
-|---|---|
-| `local` | Today's behaviour; nothing leaves the machine. Default. |
-| `remote` | The pinned peer, else the highest-priority enabled peer. |
-| `auto` | Least busy eligible endpoint: the peer(s) while the laptop is short on free memory, the laptop too once it has headroom. Ties prefer a peer. |
+| Value    | Behaviour                                                                                                                                    |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `local`  | Today's behaviour; nothing leaves the machine. Default.                                                                                      |
+| `remote` | The pinned peer, else the highest-priority enabled peer.                                                                                     |
+| `auto`   | Least busy eligible endpoint: the peer(s) while the laptop is short on free memory, the laptop too once it has headroom. Ties prefer a peer. |
 
 `onRemoteFailure`:
 
@@ -76,7 +76,7 @@ jj git init ~/dev/project-check
 jj -R ~/dev/project-check git remote add origin ~/.dsh/peer/project.git
 
 # on the laptop, inside the jj repository that runs the threads
-jj git remote add m1 ssh://m1-perso/Users/me/.dsh/peer/project.git
+jj git remote add m1 "${PEER_REPOSITORY_URL:?set the peer snapshot repository URL}"
 ```
 
 The peer workspace keeps its `node_modules` and build caches across revisions; the first run
@@ -119,7 +119,7 @@ Details that matter:
 - jj needs a tracked remote bookmark before it creates one (`jj bookmark track <name>@<remote>`),
   and `jj git fetch` takes `--remote` in jj 0.46. Both are encoded in the protocol rather than
   left to the operator's dotfiles.
-- Install detection reads the peer revision *before* fetching: a fetch rebases the peer working
+- Install detection reads the peer revision _before_ fetching: a fetch rebases the peer working
   copy onto the new snapshot, which would hide which files the check is about to change. It then
   diffs with `--from/--to`, because a rewritten change makes `-r A..B` report additions rather
   than modifications.
@@ -147,7 +147,8 @@ Failure codes: `peer-snapshot-unavailable`, `peer-push-failed`, `peer-unreachabl
 
 ```sh
 cd plugins/@dshfiles/project-checks
-DSH_PEER_SPIKE=1 DSH_PEER_SSH=m1-perso DSH_PEER_WORKSPACE=~/dev/checkout-check DSH_PEER_GIT_REMOTE=m1 \
+DSH_PEER_SPIKE=1 DSH_PEER_SSH="${CHECK_PEER_SSH:?set the approved SSH target}" \
+  DSH_PEER_WORKSPACE="${CHECK_PEER_WORKSPACE:?set its absolute checker workspace}" DSH_PEER_GIT_REMOTE=m1 \
   pnpm exec vitest run src/peer.m1.spike.test.ts
 ```
 
@@ -185,7 +186,7 @@ DSH_PEER_SPIKE=1 pnpm --dir plugins/@dshfiles/project-checks exec vitest run src
 pnpm run check:e2e @dshfiles/project-checks
 ```
 
-Measured on 2026-10-21 with `m1-perso` (16 GB, 10 cores, jj 0.45.1, `mise node@22.23.3`):
+Measured on 2026-10-21 with a privately configured peer (16 GB, 10 cores, jj 0.45.1, `mise node@22.23.3`); its host alias is omitted:
 `check:diff` 8.9 s cold (peer dependency install check included), 5.1 s warm on the same
 revision, a failing action 3.7 s, an unreachable peer 1.9 s before the local fallback.
 

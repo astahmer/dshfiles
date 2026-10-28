@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { globalPanelLink } from '../plugin-view-names.js'
 import { expect, type Locator, type Page } from '@playwright/test'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
@@ -83,7 +84,7 @@ Then('Chat scrolls to the bash tool call and highlights it', async ({ page }: { 
 })
 
 When("the Traces panel opens the turn's trace and Open thread is clicked on its model call", async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Traces', exact: true }).click()
+  await globalPanelLink(page, 'Traces: Explorer').click()
   await page.getByRole('textbox', { name: 'Search traces', exact: true }).fill('execute_tool bash')
   await page.getByRole('row', { name: 'dshfiles enter_ai_application_system', exact: true }).first().click()
   await waterfall(page).getByRole('treeitem').filter({ hasText: 'chat gpt-6-luna' }).first().click()
@@ -176,7 +177,7 @@ Then('the model call span shows its own cost', async ({ page }: { page: Page }) 
 })
 
 Then("the Traces panel overview lists the model's calls, tokens and cost", async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Traces', exact: true }).click()
+  await globalPanelLink(page, 'Traces: Explorer').click()
   await page.getByRole('tab', { name: 'Operations', exact: true }).click()
   const table = page.getByTestId('traces-model-costs')
   await recordAssertion(page, 'traces-overview-model-costs', async () => {

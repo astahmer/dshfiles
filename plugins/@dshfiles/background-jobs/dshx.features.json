@@ -6,7 +6,7 @@
       "id": "jobs-board",
       "title": "Cross-Session background jobs board",
       "summary": "One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
-      "reach": ["click button \"Jobs\"", "expect text \"Every background job across Sessions*\""],
+      "reach": ["click button \"Background Jobs: Jobs\"", "expect text \"Every background job across Sessions*\""],
       "surfaces": ["host", "tool", "storage", "client"],
       "configuration": [],
       "states": ["running", "finished", "interrupted", "filtered", "searched", "grouped", "paged", "indexing", "registry-unavailable", "history-only"],
@@ -156,7 +156,7 @@
           "reason": "Client-only: Stop a selection of running jobs renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click button \"Jobs\"", "expect checkbox \"Select all running jobs\""]
+      "reach": ["click button \"Background Jobs: Jobs\"", "expect checkbox \"Select all running jobs\""]
     }
   ]
 }

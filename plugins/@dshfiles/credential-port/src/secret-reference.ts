@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { SecretScope } from './index.js'
 
 /** The environment a reference without `@env` means; Secret Catalog writes `prod` when the user does not choose one. */
 export const DEFAULT_SECRET_ENVIRONMENT = 'prod'
@@ -70,6 +71,8 @@ export const secretCredentialLabelSchema = z
 export interface SecretReferenceResolution {
   readonly reference: SecretReference
   readonly cwd: string | null
+  /** Bind a metadata selection to this exact scope; owners advertising supportsExpectedScope enforce it before reveal. */
+  readonly expectedScope?: SecretScope
 }
 
 /**
@@ -77,6 +80,8 @@ export interface SecretReferenceResolution {
  * never travels to a Client, which is why this is separate from the browser-facing Secret Catalog API.
  */
 export interface SecretCatalogValues {
+  /** Capability fence: older owners may accept extra fields without enforcing them. */
+  readonly supportsExpectedScope?: true
   resolve(input: SecretReferenceResolution): Promise<string>
 }
 

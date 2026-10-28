@@ -12,6 +12,7 @@ describe('jujutsu tool exposure', () => {
       'jj_graph_page',
       'jj_graph_slice',
       'jj_load',
+      'jj_open_repository',
       'jj_prepare_action',
       'jj_reference_graph',
       'jj_register_repository',
@@ -22,7 +23,7 @@ describe('jujutsu tool exposure', () => {
     ])
   })
 
-  test('reads are read-only and the two write steps ask for the user request', () => {
+  test('reads stay read-only and repository opening and revision writes require a user request', () => {
     const readOnly = Object.values(jujutsuApi.methods)
       .filter(method => method.tool?.readOnly === true)
       .map(method => method.tool?.name)
@@ -41,7 +42,8 @@ describe('jujutsu tool exposure', () => {
       'jj_working_diff',
       'jj_workspaces',
     ])
-    for (const name of ['prepare', 'confirm'] as const) {
+    expect(jujutsuApi.methods.openRepository.tool?.readOnly).toBe(false)
+    for (const name of ['openRepository', 'prepare', 'confirm'] as const) {
       expect(jujutsuApi.methods[name].description ?? '').toMatch(/Call only when the user asked/u)
     }
     for (const method of Object.values(jujutsuApi.methods)) {
@@ -51,7 +53,7 @@ describe('jujutsu tool exposure', () => {
     }
   })
 
-  test('every write action stays a two-step prepare then confirm', () => {
+  test('revision actions stay a two-step prepare then confirm', () => {
     // The UI confirms a prepared plan; the tools keep that shape instead of applying actions directly.
     expect(jujutsuApi.methods.prepare.description ?? '').toMatch(/jj_confirm_action/u)
     expect(jujutsuApi.methods.confirm.description ?? '').toMatch(/jj_prepare_action/u)

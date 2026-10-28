@@ -273,7 +273,10 @@ export const planBrowserTasks = async () => {
   const journeyFiles = supportFiles.filter(file => file.startsWith(`${journeysDir}/`))
 
   const sharedSources = supportFiles.filter(file => !file.startsWith(`${journeysDir}/`)).map(file => [file, sources.get(file)])
-  const fixtureInputsByFeature = new Map([['multi-host', ['scripts/profile-sync.ts']]])
+  const fixtureInputsByFeature = new Map([
+    ['multi-host', ['scripts/profile-sync.ts']],
+    ['ai-accounts', ['plugins/@dshfiles/ai-accounts/src/inert-codex-login.fixture.ts']],
+  ])
   const owners = new Map()
   const featureNames = (await readdir(resolve(workspaceRoot, featuresDir))).filter(name => name.endsWith('.feature')).sort()
   for (const featureName of featureNames) {
@@ -333,8 +336,9 @@ export const planBrowserTasks = async () => {
         feature: featureName.replace(/\.feature$/, ''),
         booted: [...scenarioBooted].sort(),
         everyBundle: scenarioEveryBundle,
-        // Hash the matched steps, shared hooks and this feature's explicit fixture recipes. Together with the built
-        // JavaScript of every bundle it reaches, these are content keys: a rebase alone cannot invalidate a receipt.
+        // The scenario-level cache keys on these facts: what its own steps say, the *implementation* of every step it
+        // matched (a step body can change what a scenario proves without touching its text), and the built JavaScript
+        // of every bundle it reaches. All content, so a rebase that leaves the files alone cannot invalidate a receipt.
         stepsHash: scenarioRecipeHash({ steps: scenario.steps, definitions: scenarioDefinitions, sharedSources, fixtureSources }),
       })
     }

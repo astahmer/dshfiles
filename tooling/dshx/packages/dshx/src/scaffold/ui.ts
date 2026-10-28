@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import type { Program } from 'oxc-parser'
+import { z } from 'zod'
 import { SourceSyntax } from '../project/syntax.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
@@ -134,7 +135,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions): { contract?: SlotScaffoldContract; diagnostic?: DshxDiagnostic } {
+const slotMetadataSchema = z.object({ catalog: z.object({}).catchall(z.unknown()) })
+const registrationMetadataSchema = z.object({ replaceRisk: z.string(), registration: z.array(z.unknown()) })
+const registrationFieldSchema = z.object({
+  name: z.string().refine(value => value.trim() !== ''),
+  required: z.boolean(),
+  type: z.string().optional(),
+})
+
+function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions) {
   if (slot.type === 'factory') {
     return {
       diagnostic: diagnostic(
@@ -155,7 +164,8 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
       ),
     }
   }
-  if (!isRecord(slot.metadata) || !isRecord(slot.metadata.catalog)) {
+  const metadata = slotMetadataSchema.safeParse(slot.metadata)
+  if (!metadata.success) {
     return {
       diagnostic: diagnostic(
         'DSHX6111',
@@ -165,8 +175,8 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
       ),
     }
   }
-  const catalog = slot.metadata.catalog
-  if (typeof catalog.replaceRisk !== 'string' || !Array.isArray(catalog.registration)) {
+  const catalog = registrationMetadataSchema.safeParse(metadata.data.catalog)
+  if (!catalog.success) {
     return {
       diagnostic: diagnostic(
         'DSHX6111',
@@ -177,14 +187,9 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
     }
   }
   const registration: string[] = []
-  for (const entry of catalog.registration) {
-    if (
-      !isRecord(entry) ||
-      typeof entry.name !== 'string' ||
-      entry.name.trim() === '' ||
-      typeof entry.required !== 'boolean' ||
-      (entry.type !== undefined && typeof entry.type !== 'string')
-    ) {
+  for (const raw of catalog.data.registration) {
+    const field = registrationFieldSchema.safeParse(raw)
+    if (!field.success) {
       return {
         diagnostic: diagnostic(
           'DSHX6111',
@@ -194,6 +199,7 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
         ),
       }
     }
+    const entry = field.data
     registration.push(entry.name)
     if (entry.required && !['id', 'order'].includes(entry.name)) {
       return {
@@ -236,7 +242,7 @@ function scaffoldContract(slot: SlotSummary, file: string, options: AddUiOptions
       ),
     }
   }
-  return { contract: { kind: slot.kind, registration } }
+  return { contract: { kind: slot.kind, registration } satisfies SlotScaffoldContract }
 }
 
 async function defaultResolveProvider(projectRoot: string, provider: string): Promise<boolean> {
@@ -280,7 +286,7 @@ const hasSlotRegistration = (program: Program, slotName: string): boolean => {
   return found
 }
 
-function modifyClientSource(source: string, file: string, contributionFile: string, slotName: string): { source: string | undefined; duplicate: boolean } {
+function modifyClientSource(source: string, file: string, contributionFile: string, slotName: string) {
   const sourceFile = SourceSyntax.parse({ file, source })
   if (hasSlotRegistration(sourceFile, slotName)) return { source: undefined, duplicate: true }
   const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineClient' })

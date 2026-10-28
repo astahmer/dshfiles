@@ -1,10 +1,54 @@
 # Workbench as the main view — dockable panels for anything, slot-compatible
 
-> **Status: proposed (2026-10-25).** No code yet. Successor to [`plans/global-dock`](../global-dock/README.md):
-> that plan's M1–M3 and cross-region drag landed; its open M4 (native right-sidebar resources) is M5 here.
-> **Resume here:** **M0** — inventory every slot domain and panel source, then start **M1** (the frame seat that puts the
-> workbench in the centre column and hosts the conversation as its first panel). Read [Decisions](#decisions) first;
-> they are answered and binding.
+> **Status: landed locally; awaiting live confirmation (2026-10-26).** Successor to [`plans/global-dock`](../global-dock/README.md).
+> **Resume here:** All 31 current acceptance cases have green proof: 27 in `/tmp/workbench-main-final-accepted-results`,
+> the stronger Session-bound semantic check in `/tmp/workbench-main-semantic-bound-subject-results`, and all three
+> native/resource/nested reruns in `/tmp/workbench-main-final-three-results`. The original run's failures were two startup
+> stalls and two composer-ownership fixture races; fixes preserve/strengthen every original acceptance assertion.
+> New local main `0fb2747b` is merged as `d905e5cf`. One catalog coordinator preserves all four input invalidations,
+> pending-build coalescing and stale-reader forwarding, plus the incoming guarded thread-model/account policies.
+> SessionController now passes 134 tests and its typecheck; SDK seed/lifecycle/parser checks pass 35 tests.
+> All six affected bundles, three owner typechecks, nine Host imports and scoped native-fork provenance pass.
+> All 12 Native cases now have green focused proof, including the repaired panel roundtrip. Original assertions remain,
+> with stronger kept-thread/no-duplicate checks. Stock-native navigation does not write ?thread: use the actor identity.
+> The Native opt-out now survives a real reload, and the legacy default-layout/reload/corrupt-save journey also passes.
+> The controlled performance case exposed a real G1 bug before measurement: after two threads, opening Plugins creates
+> its tab but reselects the first thread. A real-Dockview red regression identifies internal preview retirement using
+> panel.api.close(), whose automatic neighbor activation is reported as user input. Fixed in `6b52aa5a` with public
+> surface.removePanel; real-Dockview regression, all 109 Workbench tests, 27 focused main-tabs tests and types pass.
+> Its rebuilt browser/performance journey now passes: Native p50 111.9/p95 118.1 ms; Workbench p50 32.8/p95 37.3 ms,
+> all 12 measured switches below 250 ms. Full redacted samples and limitations are in docs/performance.md (`78a9cf65`).
+> Main-tabs remains 105/105. Backlog now passes after its missing prebuilt Host entry was properly built.
+> Native aside ownership is fixed in `5b992c0d`: all three dedicated providers register their real native callback;
+> the generic fallback delegates exactly once without relying on window-listener order. Chromium disproved a JSDOM-only
+> capture-phase shortcut, which was removed. The real Native Jujutsu roundtrip now passes with the original direct-pane
+> assertions plus kept-thread/no-Workbench-duplicate guards. Unowned generic panels use the real Session pane's handoff.
+> Workbench is 118/118; all four plugin types pass. The regenerated lock has identical package identities/versions.
+> Full screenshot checks now pass after embedding the incoming preferred-model capture in its owner's README.
+> Interrupted dependency installation was repaired by force-rematerializing the valid frozen lock, without dependency
+> pin changes, casts or native declaration shims; fresh Host/client typechecks and full builds then passed.
+> Managed CLI doctor is green (eight checks), and all eight affected catalog walks/shots pass: main seat, Settings,
+> explicit Native fallback, global dock, semantic provider, nested surfaces, and both native-resource owner aliases.
+> The four seeded shots have only the stock optional `/open-in-app/icon/vscode` image 404 (and its browser console line),
+> no page/request/API errors. The seed now respects real account-editor and composer ownership. All instances are DOWN.
+> Source default is Workbench and explicit Native is preserved. Refreshed UI captures are kept with their owners.
+> Shared-support smoke is now green across focused receipts: nine cases in `/tmp/workbench-main-recovered-smoke-results`,
+> five repaired cases in `/tmp/workbench-main-final-six-results`, and the final Tweet case in `/tmp/workbench-main-final-tweet-results`.
+> Repairs declare actual providers/platform, reuse the real draft/project/submit lifecycle, and remove one redundant
+> Pulls Review stylesheet import; business assertions remain strict. Repeated performance is 115.3 ms Native / 33.2 ms
+> Workbench median, all measured interactions/HTTP requests below 250 ms. No additional full-suite rerun is required.
+> Landed on local `main` as `3f2880c0`; canonical frozen install and all 13 affected SDK/bundle builds passed.
+> Existing canonical dirty files and untracked files are preserved. HMR gate reports Workbench and SessionController
+> waiting for a Host restart. The user authorized adding only the new Sidebar Right bundle to the selected local profile; the supported
+> single-bundle sync completed and its canonical link is verified. Their restart and live confirmation remain.
+> The plan remains open for that explicit live gate; nothing was pushed or restarted.
+> Branch `feat/workbench-main` in this isolated Git worktree.
+> Use native `edit`/`write`: custom `apply_patch` drops the execution file policy (papercut p_17951ffee7). Build once
+> sources settle, then drive the source-linked scratch without rebuilding during a journey.
+> Workbench is now the source default after the original 16 journey gates; explicit native preferences are preserved.
+> No live restart or push occurred. The only live profile edit is the explicitly authorized single-bundle addition.
+> Future source changes get focused checks, not another full run per commit.
+> Decisions below remain binding. Completion requires fresh browser evidence, not just implementation.
 
 ## Objective
 

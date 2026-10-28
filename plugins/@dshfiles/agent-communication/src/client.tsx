@@ -24,7 +24,7 @@ export default defineClient({
   inject: ['slots', 'sessions', 'workspaces'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(AGENT_COMMUNICATION_LOCALE_NAMESPACE)
-    const label = (): string => translate('title')
+    const label = (): string => `Agent Communication: ${translate('messages')}`
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label, locale: AGENT_COMMUNICATION_LOCALE_NAMESPACE }, PanelGlyph),
     )

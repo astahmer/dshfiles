@@ -1,6 +1,16 @@
 {
   "schemaVersion": 1,
   "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/chrome-cdp.ts",
+      "reason": "Production CDP listing, focus lookup and picking run only inside the awaited chromeStatus/chromeLaunch/chromeStop/chromePick API handlers; their automatic dispatch spans cover the entire request. Standalone integration tests call the same helpers directly."
+    },
+    {
+      "file": "src/host.ts",
+      "reason": "The direct network request is chromeState's bounded version probe, awaited only by chromeStatus/chromeLaunch/chromeStop API handlers under their automatic dispatch spans; no startup effect calls that probe."
+    }
+  ],
   "features": [
     {
       "id": "pick-element",
@@ -113,6 +123,11 @@
           "id": "annotations.source-no-guess",
           "file": "plugins/@dshfiles/annotations/tests/source.spec.ts",
           "testName": "returns no match rather than guessing"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "annotations.source-browser",
+          "reason": "This Host-only resolver has no independent browser surface. The pick-and-insert journey covers its source-linked output; focused resolver tests cover class/text mapping and refusal without a source map."
         }
       ],
       "telemetry": [

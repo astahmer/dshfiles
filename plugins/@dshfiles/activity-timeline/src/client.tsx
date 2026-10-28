@@ -25,7 +25,7 @@ export default defineClient({
   inject: ['slots', 'sessions', 'uiWorkspace', 'workspaces'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(ACTIVITY_TIMELINE_LOCALE_NAMESPACE)
-    const label = (): string => translate('title')
+    const label = (): string => `Activity Timeline: ${translate('title')}`
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label, locale: ACTIVITY_TIMELINE_LOCALE_NAMESPACE }, PanelGlyph),
     )
