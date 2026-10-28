@@ -44,7 +44,8 @@ export const resolveWorkspaceDrop = (input: {
   readonly target: DragRevision
   readonly revisions: readonly DragRevision[]
 }): RevisionDropResolution => {
-  const source = input.revisions.find(revision => revision.workspaces.includes(input.workspace)) ??
+  const source =
+    input.revisions.find(revision => revision.workspaces.includes(input.workspace)) ??
     (input.workspace === 'default' ? input.revisions.find(revision => revision.workingCopy) : undefined)
   if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
   return {

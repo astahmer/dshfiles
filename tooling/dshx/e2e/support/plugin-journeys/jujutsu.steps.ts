@@ -115,9 +115,9 @@ const revisionRow = (page: Page, description: string) =>
 
 const dispatchDrop = async (
   page: Page,
-  input: { readonly source: string; readonly target: string; readonly kind: 'revision' | 'bookmark' },
+  input: { readonly source: string; readonly target: string; readonly kind: 'revision' | 'bookmark'; readonly hideTransferData?: boolean },
 ): Promise<boolean> =>
-  page.evaluate(({ source, target, kind }) => {
+  page.evaluate(({ source, target, kind, hideTransferData }) => {
     const findRow = (description: string): HTMLElement | undefined =>
       Array.from(document.querySelectorAll<HTMLElement>('[role="region"] article')).find(row => row.textContent?.includes(description))
     const sourceRow = findRow(source)
@@ -128,6 +128,10 @@ const dispatchDrop = async (
     }
     const dataTransfer = new DataTransfer()
     dragSource.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }))
+    if (hideTransferData) {
+      Object.defineProperty(dataTransfer, 'types', { configurable: true, value: [] })
+      Object.defineProperty(dataTransfer, 'getData', { configurable: true, value: () => '' })
+    }
     targetRow.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }))
     targetRow.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer }))
     const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer })
@@ -179,7 +183,9 @@ Then('revision and bookmark moves preview in the target context without changing
   })
 
   await recordAssertion(page, 'jujutsu-valid-branch-drop-is-cancelled-by-the-row-handler', async () =>
-    expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.targetDescription, kind: 'revision' })).toBe(true),
+    expect(await dispatchDrop(page, { source: fixture.sourceDescription, target: fixture.targetDescription, kind: 'revision', hideTransferData: true })).toBe(
+      true,
+    ),
   )
   const branchPreview = page.getByRole('group', { name: 'Preview branch rebase', exact: true })
   await recordAssertion(page, 'jujutsu-rebase-drop-renders-context-and-host-preview', async () => {

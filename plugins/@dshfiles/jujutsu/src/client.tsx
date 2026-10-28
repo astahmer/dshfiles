@@ -1090,7 +1090,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     }
     const sourceRevisionId = event.dataTransfer.getData(REVISION_MIME)
     if (sourceRevisionId.length > 0) return resolveRevisionDrop({ sourceRevisionId, target, revisions })
-    return { kind: 'noop' as const }
+    const origin = actionActor.getSnapshot().context.dragOrigin
+    if (origin === null) return { kind: 'noop' as const }
+    if (origin.kind === 'revision') return resolveRevisionDrop({ sourceRevisionId: origin.sourceId, target, revisions })
+    if (origin.kind === 'bookmark') return resolveBookmarkDrop({ bookmark: origin.bookmark, sourceRevisionId: origin.sourceId, target, revisions })
+    return resolveWorkspaceDrop({ workspace: origin.workspace, target, revisions })
   }
 
   const dropOn = (event: DragEvent, revision: Revision): void => {
@@ -1735,8 +1739,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       editedAt={editTimes.get(item.revision.commitId)}
                       revisionDate={preferences.revisionDate}
                       menu={revisionMenu(item.revision)}
+                      isLocalDrag={() => actionActor.getSnapshot().context.dragOrigin !== null}
                       onDragEnter={event => {
-                        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME) || hasDragType(event, WORKSPACE_MIME))
+                        if (
+                          actionActor.getSnapshot().context.dragOrigin !== null ||
+                          hasDragType(event, REVISION_MIME) ||
+                          hasDragType(event, BOOKMARK_MIME) ||
+                          hasDragType(event, WORKSPACE_MIME)
+                        )
                           sendAction({ type: 'drag.enter', targetId: item.revision.commitId })
                       }}
                       onDragLeave={() => sendAction({ type: 'drag.leave', targetId: item.revision.commitId })}
@@ -2381,6 +2391,7 @@ interface RevisionRowProps {
   readonly connectionDimmed: boolean
   readonly highlighted: boolean
   readonly dropTarget: boolean
+  readonly isLocalDrag: () => boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
   readonly metrics: GraphMetrics
@@ -2533,7 +2544,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) props.onDragLeave()
       }}
       onDragOver={event => {
-        if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME) || hasDragType(event, WORKSPACE_MIME)) {
+        if (props.isLocalDrag() || hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME) || hasDragType(event, WORKSPACE_MIME)) {
           event.preventDefault()
           event.dataTransfer.dropEffect = 'move'
         }
