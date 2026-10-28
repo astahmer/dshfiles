@@ -18,7 +18,7 @@ describe('sign-out cache invalidation', () => {
   it('detaches a pre-sign-out sweep and never lets its late result repopulate the cache', async () => {
     const old = deferred<string>()
     const read = vi.fn<() => Promise<string>>().mockReturnValueOnce(old.promise).mockResolvedValue('signed-out')
-    const cache = createUsageCache({ ttlMs: 30_000, read })
+    const cache = createUsageCache({ ttlMs: 30_000, timeoutMs: 10_000, read })
     const before = cache.get()
     cache.invalidate()
     expect(await cache.get()).toBe('signed-out')

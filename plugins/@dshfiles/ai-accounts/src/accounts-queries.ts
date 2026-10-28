@@ -166,8 +166,15 @@ export const aiAccountsQueries = {
     }),
 
   /** Bypasses the Host's shared sweep cache; an older Host without `refreshUsage` falls back to the cached read. */
-  readFreshUsage: async (accounts: Pick<AccountsClient, 'usage' | 'refreshUsage'>): Promise<AccountsUsage | null> =>
-    normalizeUsage(await accounts.refreshUsage().catch(() => accounts.usage())),
+  readFreshUsage: async (accounts: Pick<AccountsClient, 'usage' | 'refreshUsage'>): Promise<AccountsUsage | null> => {
+    try {
+      return normalizeUsage(await accounts.refreshUsage())
+    } catch (error) {
+      const routeMissing = isApiError(error) && error.apiId === aiAccountsApi.id && error.method === 'refreshUsage' && isApiOwnerMissing(error)
+      if (!routeMissing) throw error
+      return normalizeUsage(await accounts.usage())
+    }
+  },
 
   keepLastGoodUsage,
 

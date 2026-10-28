@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createUsageCache } from './account-usage.js'
 import type { AccountsUsage } from './api.js'
 import { UsageOverviewModel } from './usage-overview-model.js'
@@ -267,7 +267,7 @@ describe('usage cache', () => {
   it('shares one read between surfaces within the TTL and refreshes on demand', async () => {
     let clock = 0
     let reads = 0
-    const cache = createUsageCache({ ttlMs: 30_000, now: () => clock, read: async () => ++reads })
+    const cache = createUsageCache({ ttlMs: 30_000, timeoutMs: 10_000, now: () => clock, read: async () => ++reads })
     expect(await Promise.all([cache.get(), cache.get()])).toEqual([1, 1])
     clock = 29_999
     expect(await cache.get()).toBe(1)
@@ -276,6 +276,35 @@ describe('usage cache', () => {
     expect(await cache.get()).toBe(3)
     cache.invalidate()
     expect(await cache.get()).toBe(4)
+  })
+
+  it('aborts and releases a timed-out read so the next refresh can recover', async () => {
+    vi.useFakeTimers()
+    try {
+      let reads = 0
+      let firstSignal: AbortSignal | undefined
+      const cache = createUsageCache({
+        ttlMs: 30_000,
+        timeoutMs: 1_000,
+        read: signal => {
+          reads += 1
+          if (reads === 1) {
+            firstSignal = signal
+            return new Promise(() => {})
+          }
+          return Promise.resolve(2)
+        },
+      })
+      const pending = cache.refresh()
+      const rejection = expect(pending).rejects.toThrow('Account usage read timed out')
+      await vi.advanceTimersByTimeAsync(1_000)
+      await rejection
+      expect(firstSignal?.aborted).toBe(true)
+      await expect(cache.refresh()).resolves.toBe(2)
+      expect(reads).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

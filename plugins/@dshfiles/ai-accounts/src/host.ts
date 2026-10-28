@@ -213,7 +213,11 @@ export default definePlugin({
       void usageHistory.close().catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
       void fastModeUsageHistory.close().catch(() => ctx.logger.warn('ai-accounts: Fast mode usage storage could not close cleanly'))
     })
-    runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => AccountsHostApiModel.readAccountsUsage(ctx) })
+    runtime.usageCache = createUsageCache({
+      ttlMs: 30_000,
+      timeoutMs: 30_000,
+      read: signal => AccountsHostApiModel.readAccountsUsage(ctx, signal),
+    })
     ctx.on('credentials/reference-updated', ref => {
       if (accountStoreService.readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
     })

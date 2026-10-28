@@ -375,7 +375,7 @@ const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number
  * on an interval, so a provider that is slow or down costs its own card rather
  * than the panel.
  */
-const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
+const readAccountsUsage = async (ctx: Context, signal?: AbortSignal): Promise<AccountsUsage> => {
   // Read the observed file so a Codex account uses the same shadow home the
   // panel already shows, not a re-derived guess.
   const file = await accountsFile(ctx)
@@ -389,7 +389,7 @@ const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
       displayName: account.displayName,
       kind: account.kind,
       enabled: account.enabled,
-      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential }),
+      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal }),
     }),
   })
   return { readAt: Date.now(), hostName: hostname(), cards }

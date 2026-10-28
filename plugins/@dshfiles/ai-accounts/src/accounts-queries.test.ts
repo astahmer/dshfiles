@@ -130,14 +130,40 @@ describe('ai-accounts queries', () => {
     expect(afterUnreadable?.readAt).toBe(2)
   })
 
-  it('falls back to the cached usage read when the Host has no refreshUsage', async () => {
-    const usage = await aiAccountsQueries.readFreshUsage({
-      refreshUsage: async () => {
-        throw new Error('unknown method')
+  it('falls back to the cached usage read when an older Host lacks refreshUsage', async () => {
+    const accounts = createApiClient(
+      {
+        get: () => ({
+          rpc: {
+            call: async (_channel: string, route: string) => {
+              const method = route.slice(route.lastIndexOf('/') + 1)
+              if (method === 'refreshUsage') throw new Error('HTTP 404')
+              return { ok: true, value: { version: aiAccountsApi.version, output: { readAt: 2, hostName: 'mac', cards: [] } } }
+            },
+          },
+        }),
       },
-      usage: async () => overTheWire({ readAt: 2, hostName: 'mac', cards: [] }),
-    })
+      aiAccountsApi,
+      '@dshfiles/ai-accounts',
+    )
+    const usage = await aiAccountsQueries.readFreshUsage(accounts)
     expect(usage?.readAt).toBe(2)
+  })
+
+  it('does not retry the cached read after a refresh failure', async () => {
+    let fallbackReads = 0
+    await expect(
+      aiAccountsQueries.readFreshUsage({
+        refreshUsage: async () => {
+          throw new Error('usage read timed out')
+        },
+        usage: async () => {
+          fallbackReads += 1
+          return overTheWire({ readAt: 2, hostName: 'mac', cards: [] })
+        },
+      }),
+    ).rejects.toThrow('usage read timed out')
+    expect(fallbackReads).toBe(0)
   })
 
   it('forwards the query signal so an abandoned read is cancelled at the Host', async () => {
