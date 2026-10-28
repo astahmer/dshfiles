@@ -516,11 +516,7 @@ const readResourcePool = async (): Promise<ResourcePool> => {
         .refresh(runtime.id, () =>
           resourceProbeLimiter.run(async () => {
             try {
-              const raw = await withRuntime(
-                runtime.id,
-                gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)),
-                { mutation: false },
-              )
+              const raw = await withRuntime(runtime.id, gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)), { mutation: false })
               const parsed = resourceSnapshotSchema.safeParse(raw)
               if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
               return { ok: true as const, snapshot: parsed.data }
