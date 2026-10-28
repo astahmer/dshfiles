@@ -482,15 +482,19 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
   const repoRoots = [...new Set(locations.flatMap(location => (location === undefined ? [] : [location.repoRoot])))]
   const statusesByRepo = await mapBounded(repoRoots, REPOSITORY_SCAN_CONCURRENCY, repoRoot => cachedThreadStatuses(active, repoRoot))
-  return repoRoots.map((repoRoot, index) => {
-    const owner = byPath.get(repoRoot)
-    return {
-      repoRoot,
-      title: owner?.title ?? basename(repoRoot),
-      workspaceId: owner?.id ?? null,
-      threads: (statusesByRepo[index] ?? []).map(status => threadView(status, byPath.get(status.path), archived, activity)),
-    }
-  })
+  return Promise.all(
+    repoRoots.map(async (repoRoot, index) => {
+      const owner = byPath.get(repoRoot)
+      const bookmarks = await active.bookmarks(repoRoot)
+      return {
+        repoRoot,
+        title: owner?.title ?? basename(repoRoot),
+        workspaceId: owner?.id ?? null,
+        bookmarks: [...bookmarks.names],
+        threads: (statusesByRepo[index] ?? []).map(status => threadView(status, byPath.get(status.path), archived, activity)),
+      }
+    }),
+  )
 }
 
 const repositoryViewsCache = createRepositoryViewsCache({ read: scanRepositories, ttlMs: REPOSITORY_VIEW_TTL_MS })
@@ -726,12 +730,13 @@ const landThread = async (input: {
   readonly path: string
   readonly sessionId: string | undefined
   readonly fromAgent: boolean
+  readonly bookmark?: string | undefined
   readonly signal?: AbortSignal
   /** A queued integration's last chance to be cancelled: read once the guard passed, right before the rebase. */
   readonly stillQueued?: () => boolean
 }): Promise<LandResult> => {
   recordIntegrationProgress(input.path, 'queued')
-  const bookmark = readSettings().bookmark
+  const bookmark = input.bookmark ?? readSettings().bookmark
   const correlationId = randomUUID()
   const activeThreads = requireThreads()
   const location = await activeThreads.locate(input.path)
@@ -751,6 +756,11 @@ const landThread = async (input: {
       // the deferred retry run it once the Host can read idleness. An Agent's own call still reports why it stopped.
       if (!IntegrationRecovery.queuesInsteadOfRefusing({ fromAgent: input.fromAgent, retrying: input.stillQueued !== undefined })) {
         throw new PluginApiError('Could not verify whether this workspace is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
+      }
+      if (input.bookmark !== undefined) {
+        throw new PluginApiError('Could not verify whether this workspace is idle. The selected bookmark was not queued; refresh and retry.', {
+          code: 'thread-activity-unknown',
+        })
       }
       await queueIntegration({ path: input.path, sessionId: input.sessionId })
       throw new PluginApiError('This workspace is not verifiably idle yet; the integration is queued.', { code: 'integration-queued' })
@@ -1470,7 +1480,7 @@ const api = jjIntegrationApi.host({
     return { thread: found?.thread ?? null }
   },
   revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
-  land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
+  land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark }),
   queueLand: ({ input }) => queueIntegration({ path: input.path, sessionId: input.sessionId }),
   cancelQueuedLand: ({ input }) => cancelQueuedIntegration(input.path),
   integrationProgress: ({ input }) => ({ progress: readIntegrationProgress(input.path) }),
@@ -1489,6 +1499,7 @@ const api = jjIntegrationApi.host({
       path: location.workspaceRoot,
       sessionId: caller.kind === 'agent' ? caller.sessionId : undefined,
       fromAgent: caller.kind === 'agent',
+      bookmark: input.bookmark,
     })
     return { summary: landingMessage(result) ?? JSON.stringify(result), result }
   },

@@ -8,8 +8,10 @@
 
 Lets many agents work on one jj repository at once: a thread can run in its own
 jj workspace beside the repository, and **Integrate** moves its finished work
-into `main`. Internally, jj rebases the thread revisions onto current `main`,
-then advances the bookmark to the new tip; existing `main` ancestry stays intact.
+into `main` by default. The integration page lets each ready workspace choose
+another local bookmark before integrating. Internally, jj rebases the thread
+revisions onto that bookmark's current tip, then advances it; existing ancestry
+stays intact.
 Works on stock DSH 0.2.0-rc.2; no core patch.
 
 Open the reusable **JJ Integration: Thread integration** view from navigation or the Workbench chooser.
@@ -104,7 +106,7 @@ One control in the conversation header carries the workspace state:
   cannot lose the only way to the thread's workspace actions.
 - Its menu shows the workspace path, what the workspace state is (ready to
   integrate, up to date, behind `main`, conflicted, shared checkout, or blocked),
-  **Integrate into `main`**, **Open thread workspaces in side panel**, and
+  **Integrate into the configured bookmark** (main by default), **Open thread workspaces in side panel**, and
   **Download session log**.
 - While a session is running or a question waits, **Integrate** becomes
   **Queue integration into `main`**: the Host keeps the request and runs the
@@ -123,10 +125,10 @@ One control in the conversation header carries the workspace state:
 
 ### Integrate from the end of a turn
 
-The newest completed turn carries the same integration one click away: when the
+The newest completed turn carries the configured integration target one click away: when the
 turn ends and the thread workspace is ready (described, conflict-free revisions,
 no Session writing, no question waiting), an inline row beside the answer names
-the pending revisions and offers **Integrate into `main`**. It runs the header
+the pending revisions and offers **Integrate into the configured bookmark**. It runs the header
 control's own land action; the header stays the permanent entry point, and the
 row disappears as soon as the work lands.
 
@@ -167,9 +169,11 @@ the conversation's right side panel, beside Jujutsu and other tools. The main ta
 dragged onto the open side panel moves there through the cancelable
 `dshfiles:move-panel-aside` request this entry answers; the side tab's menu row
 _Move to main area_ reverses it. It is the
-integration control center: a tab per integration state with live counts, a
-separate lifecycle filter, a banner with the primary **Integrate all (n)** action
-while work is ready, and one compact row per workspace grouped into
+integration control center: each ready workspace row has a bookmark combobox
+(defaulting to the configured bookmark, `main` by default) for its individual
+Integrate action. The banner's **Integrate all (n)** action uses the configured
+bookmark. The page also has a tab per integration state with live counts, a
+separate lifecycle filter, and compact rows grouped into
 **Conflicts**, **Ready to integrate**, **Blocked**, **Integrating** and
 **No changes or already integrated**. Empty groups are not rendered at all; their
 counts stay in the filter bar.

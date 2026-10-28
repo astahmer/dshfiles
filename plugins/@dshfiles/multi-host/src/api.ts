@@ -258,6 +258,7 @@ export const jjRepositorySchema = z
     repoRoot: z.string().max(4096),
     title: z.string().max(512),
     workspaceId: z.string().nullable(),
+    bookmarks: z.array(z.string().max(512)).max(10_000).default([]),
     threads: z.array(jjThreadSchema).max(10_000),
   })
   .strip()

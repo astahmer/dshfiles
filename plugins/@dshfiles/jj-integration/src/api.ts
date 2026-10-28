@@ -336,10 +336,10 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     land: method({
-      input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
+      input: z.object({ path: z.string().min(1), sessionId: z.string().optional(), bookmark: z.string().min(1).optional() }).strict(),
       output: landResultSchema,
       description:
-        'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any Session working in that jj workspace is running or waiting for input, and names them; the calling agent may rebase its own thread once it resolved a handed-back problem.',
+        'Rebase the thread at a path: move its described revisions onto the selected bookmark (the configured bookmark by default) and advance it. Never pushes. Refuses while any Session working in that jj workspace is running or waiting for input, and names them; the calling agent may rebase its own thread once it resolved a handed-back problem.',
     }),
     queueLand: method({
       input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
@@ -372,7 +372,7 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     landThread: method({
-      input: threadPathInput,
+      input: threadPathInput.extend({ bookmark: z.string().min(1).optional() }),
       output: z.object({ summary: z.string(), result: landResultSchema.nullable() }).strict(),
       description:
         'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',

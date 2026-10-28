@@ -768,6 +768,22 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)
   })
 
+  it('lands work onto an explicitly selected bookmark without moving main', async () => {
+    const thread = await threads.provision(repo)
+    const mainBefore = jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id')
+    jj(repo, 'bookmark', 'create', 'work/target', '-r', 'main')
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: add feature')
+
+    const location = await threads.locate(thread.path)
+    if (location.threadName === undefined) throw new Error('Expected a thread workspace.')
+    const outcome = await threads.landAt({ ...location, threadName: location.threadName }, { bookmark: 'work/target' })
+
+    expect(outcome.status).toBe('landed')
+    expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'work/target', '-T', 'description.first_line()')).toBe('feat: add feature')
+    expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id')).toBe(mainBefore)
+  })
+
   it('syncs the default checkout to the exact landed commit even if the bookmark advances later', async () => {
     writeFileSync(join(repo, '.secret.json'), 'local\n')
     const thread = await threads.provision(repo)

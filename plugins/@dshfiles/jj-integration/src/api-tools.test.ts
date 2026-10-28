@@ -44,6 +44,12 @@ describe('jj-integration tool exposure', () => {
     const output = jjIntegrationApi.methods.repositories.output
     if (output === undefined) throw new Error('repositories must declare an output schema')
     expect('issues' in (await output['~standard'].validate({ repositories: [] }))).toBe(false)
+    expect(
+      'issues' in
+        (await output['~standard'].validate({
+          repositories: [{ repoRoot: '/work/project', title: 'project', workspaceId: null, threads: [] }],
+        })),
+    ).toBe(false)
     expect('issues' in (await output['~standard'].validate({ repositories: [], refreshing: true, refreshFailed: false }))).toBe(false)
     expect('issues' in (await output['~standard'].validate({ repositories: [], refreshing: 'yes' }))).toBe(true)
 
@@ -74,6 +80,25 @@ describe('jj-integration tool exposure', () => {
     expect(
       'issues' in (await validate({ paths: Array.from({ length: 101 }, (_, index) => `/work/thread-${String(index)}`), force: false, confirm: true })),
     ).toBe(true)
+  })
+
+  test('manual integration accepts an optional non-empty bookmark target', async () => {
+    const schema = jjIntegrationApi.methods.land.input
+    if (schema === undefined) throw new Error('land must declare an input schema')
+    const validate = async (value: { readonly path: string; readonly bookmark?: string }) => await schema['~standard'].validate(value)
+
+    expect('issues' in (await validate({ path: '/work/thread-abc123' }))).toBe(false)
+    expect('issues' in (await validate({ path: '/work/thread-abc123', bookmark: 'release/next' }))).toBe(false)
+    expect('issues' in (await validate({ path: '/work/thread-abc123', bookmark: '' }))).toBe(true)
+  })
+
+  test('agent rebase tool accepts an optional bookmark override', async () => {
+    const schema = jjIntegrationApi.methods.landThread.input
+    if (schema === undefined) throw new Error('landThread must declare an input schema')
+
+    expect('issues' in (await schema['~standard'].validate({}))).toBe(false)
+    expect('issues' in (await schema['~standard'].validate({ bookmark: 'release/next' }))).toBe(false)
+    expect('issues' in (await schema['~standard'].validate({ bookmark: '' }))).toBe(true)
   })
 
   test('threadAt carries the reading Session and stays open to a Host that predates it', async () => {

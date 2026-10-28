@@ -366,13 +366,14 @@ const ThreadRow = (props: {
   readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
+  readonly bookmarks: readonly string[]
   readonly selected: boolean
   readonly selectable: boolean
   readonly job: IntegrationJob | undefined
   readonly busy: boolean
   readonly now: number
   readonly onSelect: () => void
-  readonly onIntegrate: () => void
+  readonly onIntegrate: (bookmark: string) => void
   readonly onDiscard: () => void
 }): JSX.Element => {
   const { thread, t, assessment } = props
@@ -380,6 +381,7 @@ const ThreadRow = (props: {
   const [expanded, setExpanded] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [integrationBookmark, setIntegrationBookmark] = useState(props.bookmark)
   const previewId = useId()
   useEffect(() => {
     if (!props.hostEligibilityStale) return
@@ -610,12 +612,21 @@ const ThreadRow = (props: {
           onClick={event => event.stopPropagation()}
         >
           {assessment.category === 'ready' ? (
-            <Button size="sm" disabled={props.busy || props.job !== undefined} onClick={props.onIntegrate}>
-              {t('integrate')}
-            </Button>
+            <>
+              <Combobox
+                label={t('integrationTarget')}
+                matchTriggerWidth
+                options={[...new Set([...props.bookmarks, props.bookmark])].map(bookmark => ({ value: bookmark, label: bookmark }))}
+                value={integrationBookmark}
+                onValueChange={setIntegrationBookmark}
+              />
+              <Button size="sm" disabled={props.busy || props.job !== undefined} onClick={() => props.onIntegrate(integrationBookmark)}>
+                {t('integrate')}
+              </Button>
+            </>
           ) : null}
           {props.job?.phase === 'failed' ? (
-            <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onIntegrate}>
+            <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onIntegrate(integrationBookmark)}>
               {t('retryIntegration')}
             </Button>
           ) : null}
@@ -805,8 +816,12 @@ export const ThreadWorkspacesPanel = (props: {
   }
   const rebase = useMutation({
     mutationKey: threadRebaseMutationKey,
-    mutationFn: (input: { readonly path: string; readonly signal: AbortSignal }) =>
-      runHostRequest({ signal: input.signal, timeoutMs: 300_000, request: signal => api.land({ path: input.path }, { signal }) }),
+    mutationFn: (input: { readonly path: string; readonly signal: AbortSignal; readonly bookmark?: string }) =>
+      runHostRequest({
+        signal: input.signal,
+        timeoutMs: 300_000,
+        request: signal => api.land(input.bookmark === undefined ? { path: input.path } : { path: input.path, bookmark: input.bookmark }, { signal }),
+      }),
     onSuccess: async (result, input) => {
       if (result.status === 'landed') {
         await queryClient.cancelQueries({ queryKey: threadQueryKeys.repositories })
@@ -1296,13 +1311,14 @@ export const ThreadWorkspacesPanel = (props: {
                                 openSession={props.openSession}
                                 t={t}
                                 bookmark={props.bookmark}
+                                bookmarks={repository.bookmarks}
                                 selected={selectedPaths.has(entry.thread.path)}
                                 selectable={entry.assessment.category === 'ready'}
                                 job={integrationJobs.get(entry.thread.path)}
                                 busy={queueBusy || rebasesPending}
                                 now={now}
                                 onSelect={() => toggleSelectedPath(entry.thread.path)}
-                                onIntegrate={() => startIntegration([entry.thread.path])}
+                                onIntegrate={bookmark => rebase.mutate({ path: entry.thread.path, bookmark, signal: new AbortController().signal })}
                                 onDiscard={() =>
                                   discard.request({ path: entry.thread.path, name: entry.thread.name, unlandedCount: entry.thread.unlanded.length })
                                 }
