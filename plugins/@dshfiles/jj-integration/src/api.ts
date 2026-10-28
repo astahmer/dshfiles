@@ -1,37 +1,13 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { jjRepositoriesSchema, jjRepositorySchema, jjRevisionSchema, jjThreadSchema } from '@dshfiles/multi-host/api'
 import { z } from 'zod'
 import { CleanupJobModel } from './cleanup-jobs.js'
 
-const revisionSchema = z.object({ changeId: z.string(), commitId: z.string(), description: z.string(), conflict: z.boolean() }).strict()
+const revisionSchema = jjRevisionSchema
 export type ThreadRevisionView = z.infer<typeof revisionSchema>
-
-const threadSchema = z
-  .object({
-    name: z.string(),
-    path: z.string(),
-    workspaceId: z.string().nullable(),
-    /** The registered DSH workspace title; absent from a Host older than this field. */
-    workspaceTitle: z.string().optional(),
-    sessionIds: z.array(z.string()),
-    finished: z.boolean(),
-    canRebase: z.boolean().optional(),
-    missing: z.boolean(),
-    behind: z.boolean(),
-    /** Absent from a Host older than this field. */
-    behindCount: z.number().int().nonnegative().optional(),
-    rebasedAt: z.number().int().nonnegative().optional(),
-    rebasedTipChangeId: z.string().min(1).max(128).optional(),
-    /** When the user queued an integration that waits for the thread to go idle; absent when none is queued. */
-    integrationQueuedAt: z.number().int().nonnegative().optional(),
-    integrationQueueEvents: z.array(z.object({ at: z.number().int().nonnegative(), kind: z.enum(['queued', 'unqueued']) }).strict()).optional(),
-    /** Every recorded land, oldest first; absent from a Host older than this field. */
-    integrations: z.array(z.object({ at: z.number().int().nonnegative(), tipChangeId: z.string().min(1).max(128).optional() }).strict()).optional(),
-    unlanded: z.array(revisionSchema),
-  })
-  .strict()
+const threadSchema = jjThreadSchema
 export type ThreadView = z.infer<typeof threadSchema>
-
-const repositorySchema = z.object({ repoRoot: z.string(), title: z.string(), workspaceId: z.string().nullable(), threads: z.array(threadSchema) }).strict()
+const repositorySchema = jjRepositorySchema
 export type RepositoryView = z.infer<typeof repositorySchema>
 
 const integrationProgressSchema = z.object({ phase: z.enum(['queued', 'validating', 'rebasing']), updatedAt: z.number().int().nonnegative() }).strict()
@@ -276,7 +252,7 @@ export const jjIntegrationApi = defineApi({
     noFolder: method({ input: z.object({}).strict(), output: z.object({ workspaceId: z.string() }).strict() }),
     repositories: method({
       input: z.object({}).strict(),
-      output: z.object({ repositories: z.array(repositorySchema), refreshing: z.boolean().optional(), refreshFailed: z.boolean().optional() }).strict(),
+      output: jjRepositoriesSchema,
       description:
         'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
       tool: {

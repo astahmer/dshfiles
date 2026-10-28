@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -8,15 +9,36 @@ import { ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { HostsPage } from './destination/hosts-page.js'
 import { HOSTS_PANEL_ID, OPEN_HOSTS_EVENT } from './destination/state.js'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RemoteThreadView } from './remote-thread-view.js'
+import { RemoteHostFallback } from './remote-host-fallback.js'
 
 const HostsGlyph = (props: { readonly size?: number }): JSX.Element => <ServerIcon aria-hidden size={props.size ?? 18} strokeWidth={1.5} />
 
 export default defineClient({
   name: '@dshfiles/multi-host',
-  inject: ['slots', 'layout', 'uiWorkspace'],
+  inject: ['slots', 'layout', 'uiWorkspace', 'sessions'],
   setup(ctx, decorate) {
+    const openRemoteSession = (rawSessionId: string): void => {
+      const sessionId = SessionId(rawSessionId)
+      const openIfListed = (): void => {
+        if (!ctx.sessions.list.getSnapshot().ids.includes(sessionId)) {
+          console.error(`multi-host: remote Session ${sessionId} is absent after refreshing the local Session list`)
+          return
+        }
+        ctx.uiWorkspace.openSession(sessionId)
+      }
+      if (ctx.sessions.list.getSnapshot().ids.includes(sessionId)) {
+        openIfListed()
+        return
+      }
+      void ctx.sessions
+        .refresh()
+        .then(openIfListed)
+        .catch(error => {
+          console.error('multi-host: could not refresh the local Session list before opening a remote Session', error)
+        })
+    }
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
     const openHosts = (): void => {
       if (isMainPanelId(HOSTS_PANEL_ID)) ctx.layout.selectPanel(HOSTS_PANEL_ID)
@@ -38,12 +60,27 @@ export default defineClient({
         )),
       ),
     )
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.session.header.utilities',
+          id: 'dshfiles-multi-host-open-remote-host',
+          order: 42,
+          inject: sessionId => ({ sessionId }),
+        },
+        decorate((props: { readonly sessionId: SessionId }) => (
+          <PluginQueryProvider>
+            <RemoteHostFallback sessionId={props.sessionId} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('main', () =>
       ctx.slots.register(
         { name: 'main', key: 'dshfiles-multi-host-thread' },
         decorate(() => (
           <PluginQueryProvider>
-            <RemoteThreadView onOpenSession={sessionId => ctx.uiWorkspace.openSession(sessionId as SessionId)} />
+            <RemoteThreadView onOpenSession={openRemoteSession} />
           </PluginQueryProvider>
         )),
       ),

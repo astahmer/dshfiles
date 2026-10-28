@@ -31,6 +31,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
       'multi_host_save_ssh_host',
+      'multi_host_session_jj_repositories',
       'multi_host_set_host_hidden',
       'multi_host_ssh_hosts',
       'multi_host_start_thread',
@@ -128,6 +129,38 @@ describe('multi-host tool exposure', () => {
     expect(resourceSnapshotSchema.safeParse({ ...snapshot, loadAverage1m: -1 }).success).toBe(false)
   })
 
+  test('the remote JJ repository proxy validates bounded read-only data', async () => {
+    const outputSchema = multiHostApi.methods.sessionJjRepositories.output
+    if (outputSchema === undefined) throw new Error('The remote JJ repository API must define an output schema.')
+    const valid = await outputSchema['~standard'].validate({
+      ok: true,
+      repositories: {
+        repositories: [
+          { repoRoot: '/remote/project', title: 'project', workspaceId: 'workspace-1', threads: [], futureStatus: { detail: 'ignored by this client' } },
+        ],
+      },
+    })
+    if ('issues' in valid) throw new Error('The remote JJ repository fixture was rejected.')
+    if (!valid.value.ok) throw new Error('The remote JJ repository fixture must be successful.')
+    expect(valid.value.repositories.repositories[0]).not.toHaveProperty('futureStatus')
+    const backwardCompatible = await outputSchema['~standard'].validate({
+      ok: true,
+      repositories: { repositories: [], refreshing: false },
+    })
+    if ('issues' in backwardCompatible) throw new Error('The remote JJ response without optional newer fields was rejected.')
+    const invalid = await outputSchema['~standard'].validate({
+      ok: true,
+      repositories: { repositories: [{ repoRoot: '/remote/project', title: 'project', workspaceId: 'workspace-1', threads: [{ name: 'thread' }] }] },
+    })
+    expect('issues' in invalid).toBe(true)
+    const missingApi = await outputSchema['~standard'].validate({
+      ok: false,
+      code: 'api-owner-missing',
+      message: 'The remote runtime does not serve this API.',
+    })
+    if ('issues' in missingApi) throw new Error('The missing remote API result was rejected.')
+    expect(missingApi.value.ok).toBe(false)
+  })
   test('inspection stays read-only and every write needs the user to have asked', () => {
     const readOnly = Object.values(multiHostApi.methods)
       .filter(method => method.tool?.readOnly === true)
@@ -145,6 +178,7 @@ describe('multi-host tool exposure', () => {
       'multi_host_resource_snapshot',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
+      'multi_host_session_jj_repositories',
       'multi_host_ssh_hosts',
       'multi_host_status',
       'multi_host_thread_transcript',

@@ -285,9 +285,9 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "multi-host.view-lease",
-          "reason": "The current scratch E2E proves an SSH connection to a second DSH and native session APIs, but does not open the remote DSH UI or verify tunnel-lease release/drop recovery. Keep the browser view lifecycle unverified until a dedicated remote-view journey covers it."
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {
           "kind": "unit-test",
@@ -349,39 +349,34 @@
       ]
     },
     {
-      "id": "waiting-on-host",
-      "title": "A remote turn waiting on the host",
-      "summary": "When a remote turn stops on ask_user_question or holds a tool call open, the open-thread view says what it waits on above the composer and points at the host's DSH; a generic tool call is only called out after a minute because the log cannot tell a slow command from a pending approval.",
+      "id": "remote-host-fallback",
+      "title": "Open a mirrored thread on its host",
+      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's DSH home for native questions, approvals, terminals, and JJ tools. The remote DSH does not consume a Session deep link, so the user locates the thread there.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["running", "waiting-question", "waiting-tool", "finished"],
-      "failureModes": ["A missing waiting field is read as not waiting, so an older Host still renders.", "A tool result or a turn end clears the wait."],
+      "states": ["local-thread-hidden", "remote-owner-resolved", "host-opened", "owner-unavailable", "popup-blocked"],
+      "failureModes": [
+        "A missing local multi-host API is reported without making an unowned runtime call.",
+        "A blocked popup or unavailable runtime leaves the local thread and its data unchanged."
+      ],
       "externalDependencies": [],
       "reach": [
-        "click button \"All remote threads, including ones started on a host\"",
-        "click text \"Question probe\"",
-        "expect text \"is asking a question.*\"",
-        "fill textbox \"Reply on Remote loopback\" \"Here is my answer: name it sample.\"",
-        "click button \"Send reply\"",
-        "expect text \"Here is my answer: name it sample.*\""
+        "click button \"Sidebar settings\"",
+        "click checkbox \"Show remote threads in a separate group\"",
+        "click button \"Remote threads started from this DSH\"",
+        "expect heading \"Remote threads\""
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-host-fallback",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
         {
           "kind": "unit-test",
           "id": "multi-host.waiting-on-host",
           "file": "plugins/@dshfiles/multi-host/tests/transcript.test.ts",
           "testName": "an open ask_user_question call while the turn runs is a question, including an MCP-prefixed name"
-        },
-        {
-          "kind": "unit-test",
-          "id": "multi-host.waiting-clears",
-          "file": "plugins/@dshfiles/multi-host/tests/transcript.test.ts",
-          "testName": "a turn end clears the wait"
-        },
-        {
-          "kind": "not-applicable",
-          "id": "multi-host.waiting-banner-ui",
-          "reason": "No provider credential is available to the headless E2E scratch runtime, so it cannot run a remote agent turn that calls ask_user_question. The banner is driven in the scratch UI with `dshx dev open multi-host/waiting-on-host` against a free-model remote runtime instead."
         }
       ],
       "telemetry": [

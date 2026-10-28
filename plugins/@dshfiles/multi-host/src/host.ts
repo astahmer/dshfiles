@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
 import {
   fileUploadValueSchema,
+  jjRepositoriesSchema,
   multiHostApi,
   resourceSnapshotSchema,
   type ConnectionTestStep,
@@ -1131,6 +1132,32 @@ const multiHostHandlers = multiHostApi.host({
       }
       const runtimeId = await knownSessionRuntime({ sessionId: input.sessionId, sessionSources: [...activeSessionSources] })
       return { ok: true as const, runtimeId }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  sessionJjRepositories: async ({ input, signal }) => {
+    try {
+      const recordedSessions = await RemoteThreadStore.list()
+      const recorded = recordedSessions.find(thread => thread.sessionId === input.sessionId)
+      const runtimeId = recorded?.runtimeId ?? (await knownSessionRuntime({ sessionId: input.sessionId, sessionSources: [...activeSessionSources] }))
+      if (runtimeId === null) return { ok: false as const, code: 'session/not-remote', message: 'This Session has no known remote owner.' }
+      const authorization = await authorizeRemoteSessionRuntime({
+        sessionId: input.sessionId,
+        runtimeId,
+        recordedSessions,
+        sessionSources: [...activeSessionSources],
+      })
+      if (!authorization.ok) return authorization
+      const repositories = await withRuntime(
+        runtimeId,
+        async gateway =>
+          jjRepositoriesSchema.parse(
+            await gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}, signal),
+          ),
+        { mutation: false },
+      )
+      return { ok: true as const, repositories }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }

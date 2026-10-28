@@ -217,6 +217,61 @@ const remoteThreadSchema = z.object({
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = z.enum(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
+export const jjRevisionSchema = z
+  .object({
+    changeId: z.string(),
+    commitId: z.string(),
+    description: z.string(),
+    conflict: z.boolean(),
+  })
+  .strip()
+
+export const jjThreadSchema = z
+  .object({
+    name: z.string(),
+    path: z.string(),
+    workspaceId: z.string().nullable(),
+    workspaceTitle: z.string().optional(),
+    sessionIds: z.array(z.string()).max(10_000),
+    finished: z.boolean(),
+    canRebase: z.boolean().optional(),
+    missing: z.boolean(),
+    behind: z.boolean(),
+    behindCount: z.number().int().nonnegative().optional(),
+    rebasedAt: z.number().int().nonnegative().optional(),
+    rebasedTipChangeId: z.string().min(1).max(128).optional(),
+    integrationQueuedAt: z.number().int().nonnegative().optional(),
+    integrationQueueEvents: z
+      .array(z.object({ at: z.number().int().nonnegative(), kind: z.enum(['queued', 'unqueued']) }).strict())
+      .max(10_000)
+      .optional(),
+    integrations: z
+      .array(z.object({ at: z.number().int().nonnegative(), tipChangeId: z.string().min(1).max(128).optional() }).strict())
+      .max(10_000)
+      .optional(),
+    unlanded: z.array(jjRevisionSchema).max(10_000),
+  })
+  .strip()
+
+export const jjRepositorySchema = z
+  .object({
+    repoRoot: z.string().max(4096),
+    title: z.string().max(512),
+    workspaceId: z.string().nullable(),
+    threads: z.array(jjThreadSchema).max(10_000),
+  })
+  .strip()
+
+export const jjRepositoriesSchema = z
+  .object({
+    repositories: z.array(jjRepositorySchema).max(200),
+    refreshing: z.boolean().optional(),
+    refreshFailed: z.boolean().optional(),
+  })
+  .strip()
+export type JjRevisionView = z.infer<typeof jjRevisionSchema>
+export type JjThreadView = z.infer<typeof jjThreadSchema>
+export type JjRepositoryView = z.infer<typeof jjRepositorySchema>
 
 export const nativeRpcSchema = nativeRpcRequestSchema
 
@@ -613,6 +668,12 @@ export const multiHostApi = defineApi({
       input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtimeId: idSchema.nullable() }), failedSchema]),
       description: 'Return the known runtime for a Session already claimed by a source, or null when no runtime is known.',
+    }),
+    sessionJjRepositories: method({
+      input: z.object({ sessionId: brandedSessionIdSchema }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), repositories: jjRepositoriesSchema }), failedSchema]),
+      description: 'Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.',
+      tool: { name: 'multi_host_session_jj_repositories', readOnly: true, render: compactJson },
     }),
     runtimeFileReferences: method({
       input: z.object({ runtimeId: idSchema, sessionId: brandedSessionIdSchema, query: z.string().max(4096) }).strict(),

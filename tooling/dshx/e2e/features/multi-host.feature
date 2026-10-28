@@ -11,6 +11,7 @@ Feature: Multi-host loopback SSH lifecycle
   @scenario:multi-host.ssh-connect
   @scenario:multi-host.ssh-identity-profile
   @scenario:multi-host.session-routing
+  @scenario:multi-host.view-lease
   @scenario:multi-host.uncertain-mutation
   Scenario: Add a second scratch DSH and verify SSH lifecycle recovery
     Given a loopback SSH DSH pair is booted
@@ -42,6 +43,12 @@ Feature: Multi-host loopback SSH lifecycle
     And the Hosts page is opened
     Then the Hosts page shows live resource metrics
 
+  @scenario:multi-host.remote-host-fallback
+  Scenario: A selected mirrored thread opens its owning host UI
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And a remote thread is created and read over SSH
+    And the mirrored thread opens its owning host UI
   @scenario:multi-host.remote-inventory
   Scenario: A thread started on the host appears in the manager's inventory
     Given a loopback SSH DSH pair is booted
