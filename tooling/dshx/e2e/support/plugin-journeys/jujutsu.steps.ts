@@ -1,7 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, utimes } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -17,6 +18,11 @@ interface JujutsuFixture {
 }
 
 const fixtures = new WeakMap<Page, JujutsuFixture>()
+const cleanupFolderNames = { selected: 'stale-cleanup-selected', preserved: 'stale-cleanup-preserved' } as const
+const cleanupFolderPaths = (fixture: JujutsuFixture) => ({
+  selected: join(fixture.temporaryRoot, 'repo-threads', cleanupFolderNames.selected),
+  preserved: join(fixture.temporaryRoot, 'repo-threads', cleanupFolderNames.preserved),
+})
 const sourceDescription = 'Branch source fixture'
 const childDescription = 'Branch child fixture'
 const targetDescription = 'Destination target fixture'
@@ -357,11 +363,20 @@ After(async ({ page }: { page: Page }) => {
   const fixture = fixtures.get(page)
   if (fixture === undefined) return
   fixtures.delete(page)
-  await rm(fixture.temporaryRoot, { recursive: true, force: true })
+  await rm(fixture.temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 /** The repository state before the cleanup dialog opened, so its preview is proven to remove nothing. */
 const cleanupSnapshots = new WeakMap<Page, string>()
+
+When('two stale untracked folders exist beside the repository', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const paths = cleanupFolderPaths(fixture)
+  for (const path of Object.values(paths)) {
+    await mkdir(path, { recursive: true })
+    await utimes(path, new Date(0), new Date(0))
+  }
+})
 
 When('the repository actions menu opens the workspace cleanup', async ({ page }: { page: Page }) => {
   cleanupSnapshots.set(page, snapshotRepository(fixtureFor(page)))
@@ -372,14 +387,38 @@ When('the repository actions menu opens the workspace cleanup', async ({ page }:
 
 Then('the cleanup dialog shows age presets without removing anything', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
+  const paths = cleanupFolderPaths(fixture)
   const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
   await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'true')
   await expect(dialog.getByRole('radio', { name: '7d', exact: true })).toBeVisible()
   await recordAssertion(page, 'jujutsu-cleanup-age-preset-preview-does-not-remove-items', async () =>
     expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 }),
   )
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await dialog.getByRole('button', { name: /Untracked folders/ }).click()
+  await expect(dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })).toBeVisible()
+  await expect(dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.preserved}`, exact: true })).toBeVisible()
+  expect(existsSync(paths.selected)).toBe(true)
+  expect(existsSync(paths.preserved)).toBe(true)
+  expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
+  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
+})
+
+When('only one stale untracked folder is selected for cleanup', async ({ page }: { page: Page }) => {
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  const selectedFolder = dialog.getByRole('checkbox', { name: `Select ${cleanupFolderNames.selected}`, exact: true })
+  await selectedFolder.click()
+  await expect(selectedFolder).toBeChecked()
+  await expect(dialog.getByRole('button', { name: 'Clean up 1', exact: true })).toBeEnabled()
+})
+
+Then('cleanup removes only the selected folder', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const paths = cleanupFolderPaths(fixture)
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  await dialog.getByRole('button', { name: 'Clean up 1', exact: true }).click()
   await expect(dialog).toBeHidden()
+  await expect.poll(() => existsSync(paths.selected), { timeout: 20_000 }).toBe(false)
+  expect(existsSync(paths.preserved)).toBe(true)
   expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
   await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
   await finishJourneyAssertions(page)

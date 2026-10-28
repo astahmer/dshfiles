@@ -4,6 +4,8 @@ Review a project's or workspace's changes the way [pulls.review](https://pulls.r
 all changed-file diffs in one vertically scrollable view, grouped by scope and
 with per-file review progress — inside DSH.
 
+![pulls.review groups changed files by scope and tracks review progress](docs/screenshots/thread-review-scopes.png)
+
 Open the reusable **pulls.review: Reviews** view from navigation or the Workbench chooser.
 
 ## What it does

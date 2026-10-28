@@ -191,9 +191,8 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
     element.scrollTop = element.scrollHeight
   })
   await expect(revisionRow(page, 'Needle hidden beyond the first page')).toBeVisible({ timeout: 10_000 })
-  const rootRow = revisionsRegion(page)
-    .locator('article')
-    .filter({ has: page.locator('[title^="zzzzzzzz"]') })
+  const rootCommitId = jj(repository, ['--ignore-working-copy', 'log', '--no-graph', '-r', 'root()', '-T', 'commit_id']).trim()
+  const rootRow = revisionsRegion(page).locator(`article[data-commit-id="${rootCommitId}"]`)
   await expect(rootRow).toHaveCount(1)
   const hideImmutable = page.getByRole('checkbox', { name: 'Hide immutable', exact: true })
   await hideImmutable.click()
@@ -215,7 +214,8 @@ Then('its row shows the edit, the creation, or both as the Revision date setting
   }
   await recordAssertion(page, 'jujutsu-row-age-is-the-last-content-edit', async () => {
     await expect(age).toHaveText(/^(now|\d+m)$/)
-    await expect(age).toHaveAttribute('title', /Created .*\nLast edited .*\nLast rewritten /)
+    await age.hover()
+    await expect(page.getByRole('tooltip')).toHaveText(/^Created .*2020.* Last edited .* Last rewritten /u)
   })
   await chooseRevisionDate('Created')
   await recordAssertion(page, 'jujutsu-row-age-can-show-the-creation', async () => {
@@ -375,8 +375,9 @@ Then('hovering the reference previews the revision graph around it', async ({ pa
     await expect(page.getByText('Revision graph · main', { exact: true })).toBeVisible()
     await expect(page.getByText(/^Commit ID: [a-f0-9]{8}$/u)).toBeVisible()
     await expect(page.getByText(/^Change ID: [k-z]{8,64}$/u)).toBeVisible()
-    const fullCommitId = page.locator('[data-dshfiles-jj-preview] code[title]')
-    await expect(fullCommitId).toHaveAttribute('title', /^[a-f0-9]{40,64}$/u)
+    const shortCommitId = page.locator('[data-dshfiles-jj-preview] code').filter({ hasText: /^[a-f0-9]{8}$/u })
+    await shortCommitId.hover()
+    await expect(page.getByRole('tooltip')).toHaveText(/^[a-f0-9]{40,64}$/u)
     const graph = page.getByRole('list', { name: 'Revision graph', exact: true })
     await expect(graph).toBeVisible()
     await expect(graph).toContainText('main')
@@ -480,13 +481,15 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
 })
 
 Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
-  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
+  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 2 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
-  const review = page.locator('[data-review-surface][data-review-source="workspace"]')
+  const review = page.getByTestId('pulls-review-diffs')
   await recordAssertion(page, 'jujutsu-composer-summary-opens-multi-file-workspace-review', async () => {
     await expect(review).toBeVisible()
-    await expect(review.locator('[data-review-file-path]')).toHaveCount(2)
+    await expect(review.getByText('feature.txt', { exact: true })).toBeVisible()
+    await expect(review.getByText('bob.txt', { exact: true })).toBeVisible()
+    await expect(review.getByText('base.txt', { exact: true })).toHaveCount(0)
   })
 })
 
