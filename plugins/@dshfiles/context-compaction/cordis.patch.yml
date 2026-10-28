@@ -1,0 +1,7 @@
+- id: compaction-basic
+  disabled: true
+- insert:
+    - id: dshfiles-context-compaction
+      name: '@dshfiles/context-compaction'
+      config:
+        maxTokens: 8192

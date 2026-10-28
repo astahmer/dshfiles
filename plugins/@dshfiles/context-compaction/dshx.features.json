@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "bounded-compaction",
+      "title": "Bounded compaction summaries",
+      "summary": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["ready", "summarizing", "checkpoint-written", "summary-failed"],
+      "failureModes": [
+        "A system prompt, tool catalog, or one indivisible tool transaction can exceed the safe request budget; compaction fails without rewriting the session history.",
+        "An image-bearing request without model-declared image pricing cannot be safely sized and fails before dispatch."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.chunked-summary",
+          "file": "tests/chunked-summary.spec.ts",
+          "testName": "splits oversized input while keeping tool calls with their results"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "context-compaction.browser-journey",
+          "reason": "This Host-only backend has no browser-owned surface; its behavior is verified through unit tests and a scratch profile boot."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "context compaction summarize",
+          "file": "tests/chunked-summary.spec.ts",
+          "testName": "records bounded summary request metadata"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ]
+    }
+  ]
+}
