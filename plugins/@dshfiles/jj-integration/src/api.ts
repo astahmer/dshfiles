@@ -70,6 +70,7 @@ const threadPathInput = z
   .strict()
 
 const cleanupKindSchema = z.enum(['empty', 'integrated', 'secondary', 'untracked'])
+const cleanupTargetSchema = z.object({ repoRoot: z.string().min(1), name: z.string().min(1), kind: cleanupKindSchema }).strict()
 
 const cleanupWorkspaceSchema = z
   .object({
@@ -115,6 +116,7 @@ const cleanupResultSchema = z
   .strict()
 export type CleanupResult = z.infer<typeof cleanupResultSchema>
 export type CleanupKindView = z.infer<typeof cleanupKindSchema>
+export type CleanupTarget = z.infer<typeof cleanupTargetSchema>
 
 const cleanupJobSchema = z
   .object({
@@ -127,6 +129,7 @@ const cleanupJobSchema = z
         path: z.string().nullable(),
         olderThanHours: z.number().int().nonnegative(),
         kinds: z.array(cleanupKindSchema),
+        targets: z.array(cleanupTargetSchema).max(500).optional(),
         /** `automatic` is the Host's interval run (setting autoCleanup); a Host from before it omits the field. */
         trigger: z.enum(['manual', 'automatic']).optional(),
       })
@@ -161,6 +164,8 @@ const cleanupRequestSchema = z
       .min(0)
       .max(24 * 90),
     kinds: z.array(cleanupKindSchema).min(1).max(4),
+    /** When present, the removal pass is narrowed to these preview rows. */
+    targets: z.array(cleanupTargetSchema).max(500).optional(),
   })
   .strict()
 
@@ -447,7 +452,7 @@ export const jjIntegrationApi = defineApi({
       input: cleanupRequestSchema.extend({ apply: z.boolean() }).strict(),
       output: cleanupResultSchema,
       description:
-        'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision, no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left). Other JJ workspaces are manual-only and opt-in: they must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. JJ snapshots working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
+        'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision, no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left). Other JJ workspaces are manual-only and opt-in: they must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. JJ snapshots working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
     startCleanup: method({

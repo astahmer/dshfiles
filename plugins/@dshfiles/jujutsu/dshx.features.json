@@ -552,7 +552,7 @@
     {
       "id": "workspace-cleanup",
       "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up JJ workspaces dialog accepts 1-, 6-, and 24-hour presets or a custom whole-hour inactivity threshold, previews what qualifies, then starts a background removal job that survives closing the panel: a trail under the panel header reports scanning, each removed or kept workspace, the empty revisions it abandons, and keeps the last result until dismissed. Other JJ workspaces are manual-only and unchecked by default; checking them runs normal jj status to detect unsnapshotted changes, which it snapshots into the working-copy revision while preserving the files.",
+      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for 1h, 6h, 24h, or 7d inactivity windows. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Other JJ workspaces remain manual-only and require explicit selection.",
       "reach": [
         "click button \"Jujutsu: Revision graph\"",
         "click button \"Choose repository\"",
@@ -561,17 +561,15 @@
         "press Enter",
         "click button \"Repository actions\"",
         "click menuitem \"Clean up JJ workspaces\u2026\"",
-        "expect text \"Clean up JJ workspaces\"",
-        "expect checkbox \"Other JJ workspaces\"",
-        "fill spinbutton \"Custom hours\" \"12\"",
-        "expect spinbutton \"Custom hours\"",
+        "expect text \"Clean up workspaces\"",
+        "expect checkbox \"Select all eligible items\"",
+        "expect text \"No workspace qualifies.\"",
         "expect text \"0 empty revisions will be abandoned.\""
       ],
       "surfaces": ["client", "host"],
       "configuration": [],
-      "states": ["preset-threshold", "custom-threshold", "invalid-threshold", "preview", "queued", "running", "done", "failed"],
+      "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed"],
       "failureModes": [
-        "A custom inactivity threshold must be a positive whole number of hours.",
         "A workspace with unlanded work, a busy Session or a queued integration is kept.",
         "A second click on the same scope attaches to the job already running instead of queuing it twice.",
         "A Host restart drops the trail with the job; what it already removed stays removed.",

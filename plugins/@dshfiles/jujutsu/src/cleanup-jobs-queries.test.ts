@@ -120,6 +120,18 @@ describe('requestWorkspaceCleanup', () => {
     expect(api.cleanupWorkspaces).toHaveBeenCalledWith({ ...request, kinds: ['empty', 'integrated'], apply: true })
   })
 
+  it('does not broaden a selected cleanup when the Host lacks the background API', async () => {
+    const api = client({
+      startCleanup: vi.fn(async () => {
+        throw new Error('Unknown API method jj-threads.startCleanup.')
+      }),
+    })
+    const selectedRequest = { ...request, targets: [{ repoRoot: '/work/sample', name: 'thread-one', kind: 'empty' as const }] }
+
+    await expect(requestWorkspaceCleanup(api, selectedRequest)).rejects.toThrow('This DSH Host cannot remove a selected subset.')
+    expect(api.cleanupWorkspaces).not.toHaveBeenCalled()
+  })
+
   it('reports a real refusal instead of removing synchronously behind the user', async () => {
     const api = client({
       startCleanup: vi.fn(async () => {

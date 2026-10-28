@@ -1,4 +1,4 @@
-import type { CleanupResult } from './api.js'
+import type { CleanupResult, CleanupTarget } from './api.js'
 import type { CleanupKind } from './workspace-cleanup.js'
 
 /**
@@ -21,6 +21,7 @@ export type CleanupJobRequest =
       readonly path: string | null
       readonly olderThanHours: number
       readonly kinds: CleanupKind[]
+      readonly targets?: CleanupTarget[]
       readonly trigger: 'manual'
     }
   | {
@@ -61,7 +62,17 @@ export const MAX_CLEANUP_JOBS = 12
 export class CleanupJobModel {
   /** A second click on the same scope attaches to the job already running instead of queuing the same removal twice. */
   static readonly sameRequest = (left: CleanupJobRequest, right: CleanupJobRequest): boolean =>
-    left.path === right.path && left.olderThanHours === right.olderThanHours && [...left.kinds].sort().join() === [...right.kinds].sort().join()
+    left.path === right.path &&
+    left.olderThanHours === right.olderThanHours &&
+    [...left.kinds].sort().join() === [...right.kinds].sort().join() &&
+    ('targets' in left ? (left.targets ?? []) : [])
+      .map(target => JSON.stringify(target))
+      .sort()
+      .join() ===
+      ('targets' in right ? (right.targets ?? []) : [])
+        .map(target => JSON.stringify(target))
+        .sort()
+        .join()
 
   static readonly removedCount = (result: CleanupResult) => ({
     workspaces: result.workspaces.filter(workspace => workspace.outcome === 'removed').length,
@@ -80,6 +91,14 @@ export class CleanupJobModel {
 const emptyProgress: CleanupJobProgress = { total: 0, processed: 0, removed: 0, kept: 0, failed: 0, current: null }
 
 const isLive = (job: CleanupJobView): boolean => job.state === 'queued' || job.state === 'running'
+
+const copyCleanupRequest = (request: CleanupJobRequest): CleanupJobRequest => {
+  if (request.trigger === 'automatic') return { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'automatic' }
+
+  const scope = { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'manual' as const }
+  if (request.targets === undefined) return scope
+  return { ...scope, targets: [...request.targets] }
+}
 
 /**
  * A bounded, newest-first trail of cleanup jobs. A scan keeps the total unknown until it finishes, so progress is
@@ -114,10 +133,7 @@ export const createCleanupJobTrail = (options: { readonly now?: () => number; re
         id: `cleanup-${String(sequence)}`,
         state: 'queued',
         phase: 'queued',
-        request:
-          request.trigger === 'automatic'
-            ? { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'automatic' }
-            : { path: request.path, olderThanHours: request.olderThanHours, kinds: [...request.kinds], trigger: 'manual' },
+        request: copyCleanupRequest(request),
         startedAt: now(),
         finishedAt: null,
         progress: emptyProgress,

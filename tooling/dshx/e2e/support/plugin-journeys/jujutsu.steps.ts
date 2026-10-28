@@ -366,18 +366,16 @@ const cleanupSnapshots = new WeakMap<Page, string>()
 When('the repository actions menu opens the workspace cleanup', async ({ page }: { page: Page }) => {
   cleanupSnapshots.set(page, snapshotRepository(fixtureFor(page)))
   await page.getByRole('button', { name: 'Repository actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Clean up thread workspaces…', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('menuitem', { name: 'Clean up JJ workspaces…', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
 })
 
-Then('a custom cleanup threshold previews workspaces without removing anything', async ({ page }: { page: Page }) => {
+Then('the cleanup dialog shows age presets without removing anything', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
-  const dialog = page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })
-  const customHours = dialog.getByRole('spinbutton', { name: 'Custom hours', exact: true })
-  await customHours.fill('12')
-  await expect(customHours).toHaveValue('12')
-  await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'false')
-  await recordAssertion(page, 'jujutsu-cleanup-custom-threshold-previews-before-removing', async () =>
+  const dialog = page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })
+  await expect(dialog.getByRole('radio', { name: '6h', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(dialog.getByRole('radio', { name: '7d', exact: true })).toBeVisible()
+  await recordAssertion(page, 'jujutsu-cleanup-age-preset-preview-does-not-remove-items', async () =>
     expect(dialog.getByText(/empty revisions? will be abandoned/)).toBeVisible({ timeout: 20_000 }),
   )
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()

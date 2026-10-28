@@ -1,6 +1,6 @@
 import { isApiOwnerMissing, type ApiClient } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
-import { jjIntegrationApi, type CleanupJobView, type CleanupKindView, type CleanupResult } from '@dshfiles/jj-integration/api'
+import { jjIntegrationApi, type CleanupJobView, type CleanupKindView, type CleanupResult, type CleanupTarget } from '@dshfiles/jj-integration/api'
 import { queryOptions, useQuery } from '@dshfiles/plugin-ui/query'
 
 export type JjIntegrationClient = ApiClient<(typeof jjIntegrationApi)['methods']>
@@ -65,6 +65,7 @@ export interface CleanupRequest {
   readonly path: string
   readonly olderThanHours: number
   readonly kinds: readonly CleanupKindView[]
+  readonly targets?: readonly CleanupTarget[]
 }
 
 /** The two verbs a click needs, so a fake client proves both paths without the whole API surface. */
@@ -73,11 +74,13 @@ export interface CleanupStartClient {
     readonly path: string
     readonly olderThanHours: number
     readonly kinds: CleanupKindView[]
+    readonly targets?: CleanupTarget[]
   }) => Promise<{ readonly job: CleanupJobView }>
   readonly cleanupWorkspaces: (input: {
     readonly path: string
     readonly olderThanHours: number
     readonly kinds: CleanupKindView[]
+    readonly targets?: CleanupTarget[]
     readonly apply: boolean
   }) => Promise<CleanupResult>
 }
@@ -87,12 +90,15 @@ export interface CleanupStartClient {
  * asked, so fall back to that and let the trail-less panel wait instead of failing the click.
  */
 export const requestWorkspaceCleanup = async (api: CleanupStartClient, request: CleanupRequest): Promise<void> => {
+  const { targets, ...scope } = request
+  const targetSelection = targets === undefined ? {} : { targets: [...targets] }
   try {
-    await api.startCleanup({ ...request, kinds: [...request.kinds] })
+    await api.startCleanup({ ...scope, kinds: [...scope.kinds], ...targetSelection })
   } catch (error) {
     const failure = error instanceof Error ? error : undefined
     const unknownMethod = failure !== undefined && /Unknown API method/u.test(failure.message)
     if (!isApiOwnerMissing(failure) && !unknownMethod) throw error
-    await api.cleanupWorkspaces({ ...request, kinds: [...request.kinds], apply: true })
+    if (request.targets !== undefined) throw new Error('This DSH Host cannot remove a selected subset. Restart DSH to load the updated cleanup API.')
+    await api.cleanupWorkspaces({ ...scope, kinds: [...scope.kinds], ...targetSelection, apply: true })
   }
 }

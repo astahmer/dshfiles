@@ -121,4 +121,4 @@ Feature: Jujutsu revision interactions
     Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration" is booted
     When a disposable Jujutsu repository is selected
     And the repository actions menu opens the workspace cleanup
-    Then a custom cleanup threshold previews workspaces without removing anything
+    Then the cleanup dialog shows age presets without removing anything

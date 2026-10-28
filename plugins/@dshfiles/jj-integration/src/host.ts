@@ -28,6 +28,7 @@ import {
   jjIntegrationApi,
   type CleanupKindView,
   type CleanupResult,
+  type CleanupTarget,
   type DestinationView,
   type LandResult,
   type RepositoryView,
@@ -35,6 +36,7 @@ import {
   type WorkspaceSyncView,
 } from './api.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
+import { filterCleanupTargets } from './cleanup-targets.js'
 import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
 import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
 import { JsonText } from './json-text.js'
@@ -911,6 +913,7 @@ interface CleanupRequest {
   readonly path?: string | undefined
   readonly olderThanHours: number
   readonly kinds: readonly CleanupKindView[]
+  readonly targets?: readonly CleanupTarget[] | undefined
 }
 
 /** What one scan decided, before anything is removed: the removal pass reports its progress item by item. */
@@ -1031,7 +1034,12 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
     })
     emptyRevisions.push(...found)
   }
-  return { scopedRepoRoot, repoRoots, skipped, workspaces, workspaceIds, untracked, emptyRevisions }
+  let selected = { workspaces, untracked }
+  if (input.apply) {
+    selected =
+      input.targets === undefined ? filterCleanupTargets({ workspaces, untracked }) : filterCleanupTargets({ targets: input.targets, workspaces, untracked })
+  }
+  return { scopedRepoRoot, repoRoots, skipped, workspaces: selected.workspaces, workspaceIds, untracked: selected.untracked, emptyRevisions }
 }
 
 const previewCleanup = async (input: CleanupRequest): Promise<CleanupResult> => {
@@ -1139,13 +1147,16 @@ const applyCleanup = async (input: {
 
 const cleanupRunner = createCleanupJobRunner({
   execute: async ({ request, report }) => {
-    const scan = await scanCleanup({
+    const scanRequest = {
       path: request.path ?? undefined,
       olderThanHours: request.olderThanHours,
       kinds: request.kinds,
-      apply: true,
+      apply: true as const,
       trigger: request.trigger,
-    })
+    }
+    const scan = await ('targets' in request && request.targets !== undefined
+      ? scanCleanup({ ...scanRequest, targets: request.targets })
+      : scanCleanup(scanRequest))
     report.planned(scan.workspaces.length + scan.untracked.length)
     return await applyCleanup({ scan, trigger: request.trigger, report })
   },
@@ -1206,9 +1217,15 @@ const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
   })
 }
 
+const startManualCleanup = (input: CleanupRequest) => {
+  const scope = { path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' as const }
+  if (input.targets === undefined) return cleanupRunner.start(scope)
+  return cleanupRunner.start({ ...scope, targets: [...input.targets] })
+}
+
 const cleanupWorkspaces = async (input: CleanupRequest & { readonly apply: boolean }): Promise<CleanupResult> => {
   if (!input.apply) return await previewCleanup(input)
-  const { done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
+  const { done } = startManualCleanup(input)
   return await done
 }
 
@@ -1468,9 +1485,13 @@ const api = jjIntegrationApi.host({
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
   discardMany: ({ input }) => discardThreads(input),
-  cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
+  cleanupWorkspaces: ({ input }) => {
+    const { targets, ...request } = input
+    if (targets === undefined) return cleanupWorkspaces(request)
+    return cleanupWorkspaces({ ...request, targets })
+  },
   startCleanup: ({ input }) => {
-    const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
+    const { job, done } = startManualCleanup(input)
     // The job owns the removal once queued; its failure is reported on the trail, not to a request that already returned.
     void done.catch(() => undefined)
     return { job }
