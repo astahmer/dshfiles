@@ -309,6 +309,13 @@
   font-weight: 600;
 }
 
+.inlineImageReference {
+  display: inline-flex;
+  max-width: 48px;
+  margin: 0 3px;
+  vertical-align: middle;
+}
+
 .attachmentRow {
   display: flex;
   flex-wrap: wrap;
