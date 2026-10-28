@@ -11,7 +11,7 @@ import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIc
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { jjIntegrationApi, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
@@ -56,6 +56,7 @@ const folderName = (path: string): string =>
 export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.Element => {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
@@ -218,34 +219,40 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     ) : null
 
   const trigger = (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          aria-label={triggerLabel}
-          className="dshx-root dshx:min-w-0 dshx:max-w-44 dshx:shrink dshx:gap-1.5 dshx:px-2"
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          {glyph}
-          <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{name}</span>
-          {countBadge}
-          {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
-          <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent className="dshx:max-w-96">{current?.path ?? cwd ?? triggerLabel}</TooltipContent>
-    </Tooltip>
+    <Button
+      aria-label={triggerLabel}
+      className="dshx-root dshx:min-w-0 dshx:max-w-44 dshx:shrink dshx:gap-1.5 dshx:px-2"
+      size="sm"
+      type="button"
+      variant="outline"
+    >
+      {glyph}
+      <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{name}</span>
+      {countBadge}
+      {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
+      <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
+    </Button>
   )
 
   return (
-    <TooltipProvider>
+          <TooltipProvider>
       <span className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1">
-        <Popover>
+        <Popover open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
           {current === null || current === undefined ? (
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent className="dshx:max-w-96">{cwd ?? triggerLabel}</TooltipContent>
+            </Tooltip>
           ) : (
-            <RevisionGraphHoverCard path={current.path} bookmark={props.bookmark} t={props.t} trigger={<PopoverTrigger asChild>{trigger}</PopoverTrigger>} />
+            <RevisionGraphHoverCard
+              path={current.path}
+              bookmark={props.bookmark}
+              disabled={workspaceMenuOpen}
+              t={props.t}
+              trigger={<PopoverTrigger asChild>{trigger}</PopoverTrigger>}
+            />
           )}
           <PopoverContent align="end" className="dshx-root dshx:w-80 dshx:gap-0 dshx:p-0">
             <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3">
@@ -284,7 +291,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                           {props.t('undoQueuedIntegration')}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}</TooltipContent>
+                      <TooltipContent side="right">{props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}</TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
@@ -305,7 +312,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         {props.t('queueIntegration', { bookmark: props.bookmark })}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{props.t('queueIntegrationHint')}</TooltipContent>
+                    <TooltipContent side="right">{props.t('queueIntegrationHint')}</TooltipContent>
                   </Tooltip>
                   <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">
                     {blockedReason === undefined ? props.t('queueIntegrationHint') : `${blockedReason} ${props.t('queueIntegrationHint')}`}
@@ -328,7 +335,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         {props.t('rebaseOnto', { bookmark: props.bookmark })}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}</TooltipContent>
+                    <TooltipContent side="right">{canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}</TooltipContent>
                   </Tooltip>
                   {blockedReason === undefined ? null : <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">{blockedReason}</p>}
                 </div>
@@ -349,7 +356,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                     {props.t('openSidePanel')}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>{props.t('openSidePanel')}</TooltipContent>
+                <TooltipContent side="right">{props.t('openSidePanel')}</TooltipContent>
               </Tooltip>
               <SessionLogDownloadRow sessionId={props.sessionId} port={props.sessionLog} t={props.t} />
             </div>

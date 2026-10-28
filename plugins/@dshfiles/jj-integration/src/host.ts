@@ -933,7 +933,7 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
   const kinds = input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary') : input.kinds
   const scopedRepoRoot = input.path === undefined ? undefined : (await active.locate(input.path)).repoRoot
   invalidateRepositories()
-  const [repositories, activity, sessionRecords] = await Promise.all([
+  const [registeredRepositories, activity, sessionRecords] = await Promise.all([
     listRepositories(),
     input.apply ? sessionActivity.guard() : sessionActivity.display(),
     kinds.includes('secondary')
@@ -942,6 +942,17 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
           .catch(() => undefined)
       : Promise.resolve([]),
   ])
+  const repositories =
+    scopedRepoRoot === undefined
+      ? registeredRepositories
+      : [
+          registeredRepositories.find(repository => repository.repoRoot === scopedRepoRoot) ?? {
+            repoRoot: scopedRepoRoot,
+            title: basename(scopedRepoRoot),
+            workspaceId: null,
+            threads: [],
+          },
+        ]
   const registry = registryOf()
   const archived = new Set<string>(registry.archivedSessionIds)
   const now = Date.now()
@@ -952,7 +963,6 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
   const emptyRevisions: CleanupResult['emptyRevisions'] = []
   const untracked: PlannedUntracked[] = []
   for (const repository of repositories) {
-    if (scopedRepoRoot !== undefined && repository.repoRoot !== scopedRepoRoot) continue
     repoRoots.push(repository.repoRoot)
     const changedAt = await active.workingCopyChangedAt(repository.repoRoot).catch(() => new Map<string, number>())
     for (const thread of repository.threads) {

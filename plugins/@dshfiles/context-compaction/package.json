@@ -26,7 +26,8 @@
     "test": "dshx test",
     "build": "dshx build",
     "dev": "dshx dev --open",
-    "prepack": "npm run check && npm run build"
+    "prepack": "npm run check && npm run build",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "zod": "catalog:"

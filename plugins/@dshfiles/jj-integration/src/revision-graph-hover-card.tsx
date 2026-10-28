@@ -12,6 +12,7 @@ export const RevisionGraphHoverCard = (props: {
   readonly path: string
   readonly bookmark: string
   readonly t: JjIntegrationTranslate
+  readonly disabled: boolean
   readonly trigger: ReactElement
 }): JSX.Element => {
   const [open, setOpen] = useState(false)
@@ -24,19 +25,20 @@ export const RevisionGraphHoverCard = (props: {
         timeoutMs: 30_000,
         request: hostSignal => api.revisionGraph({ path: props.path }, { signal: hostSignal }),
       }),
-    enabled: open,
+    enabled: open && !props.disabled,
     retry: false,
     staleTime: 2_000,
   })
 
   return (
-    <HoverCard open={open} onOpenChange={setOpen} closeDelay={120} openDelay={180}>
+    <HoverCard open={open && !props.disabled} onOpenChange={nextOpen => setOpen(nextOpen && !props.disabled)} closeDelay={120} openDelay={180}>
       <HoverCardTrigger asChild>{props.trigger}</HoverCardTrigger>
       <HoverCardContent align="start" className="dshx-root dshx:w-[32rem] dshx:max-w-[calc(100vw-1rem)] dshx:p-3" side="bottom" sideOffset={8}>
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
           <div className="dshx:flex dshx:flex-col dshx:gap-1">
             <h2 className="dshx:text-sm dshx:font-medium">{props.t('revisionGraph')}</h2>
             <p className="dshx:text-xs dshx:text-muted-foreground">{props.t('revisionGraphLegend', { bookmark: props.bookmark })}</p>
+            <p className="dshx:break-all dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{props.path}</p>
           </div>
           {graph.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">{props.t('revisionGraphLoading')}</p> : null}
           {graph.isError ? (

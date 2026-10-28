@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { mkdtemp, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
@@ -58,15 +58,32 @@ export const selectModelForNewThread = async (page: Page, model: string): Promis
   await expect(page.getByRole('button', { name: new RegExp(`^Select model, current ${model.replaceAll('/', '\\/')}`) })).toBeVisible()
 }
 
-/** Start a New thread in a registered project with a model from the picker, before its first message. */
+/** Start a New thread in a project or register an absolute folder path, then choose its model. */
 export const startThreadWithModel = async (page: Page, input: { readonly project: string; readonly model: string }): Promise<void> => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await expect(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })).toBeVisible()
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
-  if ((await projectButton.textContent())?.trim() !== input.project) {
+  const expectedProject = input.project.startsWith('/') ? basename(input.project) : input.project
+  if ((await projectButton.textContent())?.trim() !== expectedProject) {
     await projectButton.click()
-    await page.getByRole('menuitem', { name: input.project, exact: true }).click()
+    const projectPicker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+    if ((await projectPicker.count()) > 0) {
+      await expect(projectPicker).toBeVisible()
+      if (input.project.startsWith('/')) {
+        const search = projectPicker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
+        await search.fill(input.project)
+        const registerProject = projectPicker.getByRole('button', { name: 'Register project', exact: true })
+        await expect(registerProject).toBeVisible()
+        await registerProject.click()
+      } else {
+        const projectOption = projectPicker.getByRole('option').filter({ hasText: input.project }).first()
+        await expect(projectOption).toBeVisible()
+        await projectOption.click()
+      }
+    } else {
+      await page.getByRole('menuitem', { name: input.project, exact: true }).click()
+    }
   }
-  await expect(projectButton).toHaveText(input.project)
+  await expect(projectButton).toHaveText(expectedProject)
   await selectModelForNewThread(page, input.model)
 }

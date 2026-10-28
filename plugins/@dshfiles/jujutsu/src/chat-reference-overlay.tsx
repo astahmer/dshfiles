@@ -4,7 +4,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
@@ -42,13 +42,20 @@ export const ChatReferenceOverlay = (): JSX.Element => {
   const [request, setRequest] = useState<ChatReferencePreviewRequest | null>(null)
   const [titleRequests, setTitleRequests] = useState<ChatReferenceTitleRequest[]>([])
   const closeTimer = useRef<number | undefined>(undefined)
+  const cancelClose = useCallback((): void => {
+    if (closeTimer.current === undefined) return
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = undefined
+  }, [])
+  const dismiss = useCallback((): void => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = undefined
+      setRequest(null)
+    }, CLOSE_GRACE_MS)
+  }, [cancelClose])
 
   useEffect(() => {
-    const cancelClose = (): void => {
-      if (closeTimer.current === undefined) return
-      window.clearTimeout(closeTimer.current)
-      closeTimer.current = undefined
-    }
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
       const parsed = chatReferencePreviewRequestSchema.safeParse(event.detail)
@@ -61,13 +68,6 @@ export const ChatReferenceOverlay = (): JSX.Element => {
       const parsed = chatReferenceTitleRequestSchema.safeParse(event.detail)
       if (!parsed.success) return
       setTitleRequests(current => (current.some(request => titleRequestKey(request) === titleRequestKey(parsed.data)) ? current : [...current, parsed.data]))
-    }
-    const dismiss = (): void => {
-      cancelClose()
-      closeTimer.current = window.setTimeout(() => {
-        closeTimer.current = undefined
-        setRequest(null)
-      }, CLOSE_GRACE_MS)
     }
     const closeOnScroll = (event: Event): void => {
       if (event.target instanceof Element && event.target.closest('[data-dshfiles-jj-preview]') !== null) return
@@ -87,7 +87,7 @@ export const ChatReferenceOverlay = (): JSX.Element => {
       window.removeEventListener('scroll', closeOnScroll, true)
       window.removeEventListener('resize', close)
     }
-  }, [])
+  }, [cancelClose, dismiss])
 
   const titleRequest = titleRequests.at(0) ?? null
   const referenced = request?.reference.value
@@ -196,7 +196,7 @@ export const ChatReferenceOverlay = (): JSX.Element => {
   const failure = matches.length > 1 ? 'This reference exists in multiple registered repositories, so it cannot be selected unambiguously.' : undefined
   const rendered = referenceGraph?.graph
   return (
-    <TooltipProvider delayDuration={500}>
+    <TooltipProvider delayDuration={0}>
       <span aria-hidden="true" data-composer-card data-dshfiles-jj-reference-template hidden>
         <ReferenceChip {...referenceTemplateProps} />
       </span>
@@ -220,12 +220,18 @@ export const ChatReferenceOverlay = (): JSX.Element => {
             align="start"
             className="dshx-root dshx:w-[34rem] dshx:max-w-[calc(100vw-1rem)]"
             data-dshfiles-jj-preview
-            onPointerEnter={() => {
-              if (closeTimer.current === undefined) return
-              window.clearTimeout(closeTimer.current)
-              closeTimer.current = undefined
+            onPointerEnter={cancelClose}
+            onPointerLeave={event => {
+              const relatedTarget = event.relatedTarget
+              if (
+                relatedTarget instanceof Element &&
+                (relatedTarget.closest('[data-dshfiles-jj-preview-tooltip]') !== null ||
+                  relatedTarget.querySelector('[data-dshfiles-jj-preview-tooltip]') !== null)
+              ) {
+                return
+              }
+              dismiss()
             }}
-            onPointerLeave={() => setRequest(null)}
             side="bottom"
             sideOffset={6}
           >
@@ -241,7 +247,9 @@ export const ChatReferenceOverlay = (): JSX.Element => {
                       <TooltipTrigger asChild>
                         <code>{referenceGraph.commitId.slice(0, 8)}</code>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom">{referenceGraph.commitId}</TooltipContent>
+                      <TooltipContent data-dshfiles-jj-preview-tooltip onPointerEnter={cancelClose} onPointerLeave={dismiss} side="bottom">
+                        {referenceGraph.commitId}
+                      </TooltipContent>
                     </Tooltip>
                   </span>
                 )}

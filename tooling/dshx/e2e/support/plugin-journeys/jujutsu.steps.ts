@@ -116,8 +116,7 @@ const fixtureFor = (page: Page): JujutsuFixture => {
   return fixture
 }
 
-const revisionRow = (page: Page, description: string) =>
-  page.getByRole('region', { name: 'Revisions', exact: true }).first().locator('article').filter({ hasText: description })
+const revisionRow = (page: Page, description: string) => page.locator('article[data-commit-id]').filter({ hasText: description })
 
 const dispatchDrop = async (
   page: Page,
@@ -379,7 +378,8 @@ When('two stale untracked folders exist beside the repository', async ({ page }:
 })
 
 When('the repository actions menu opens the workspace cleanup', async ({ page }: { page: Page }) => {
-  cleanupSnapshots.set(page, snapshotRepository(fixtureFor(page)))
+  const fixture = fixtureFor(page)
+  cleanupSnapshots.set(page, snapshotRepository(fixture))
   await page.getByRole('button', { name: 'Repository actions', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Clean up JJ workspaces…', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Clean up workspaces', exact: true })).toBeVisible({ timeout: 10_000 })

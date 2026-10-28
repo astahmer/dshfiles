@@ -12,7 +12,7 @@ import { After, Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile, type BootedProfile } from '../boot.js'
 import { startMutationResponseProxy } from '../mutation-response-proxy.mjs'
 import { reserveLoopbackPort, startLoopbackSshd } from '../loopback-sshd.mjs'
-import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
+import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
 import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
@@ -97,6 +97,8 @@ const runtimeDirectorySchema = z.object({
   hosts: z.array(z.object({ id: z.string(), name: z.string() }).passthrough()),
   runtimes: z.array(z.object({ id: z.string(), hostId: z.string(), name: z.string(), remoteHome: z.string(), connected: z.boolean() }).passthrough()),
 })
+
+const runtimeOpenViewSchema = z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }).strict()
 
 const promptAcceptedSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: z.object({ accepted: z.literal(true) }).passthrough() }),
@@ -369,6 +371,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
     manager = await bootComposedPluginProfile({
       packageIds: [
         '@dshfiles/multi-host',
+        '@dshfiles/thread-sidebar',
         '@dshfiles/jj-integration',
         '@dshfiles/rich-composer',
         '@dshfiles/session-controller',
@@ -403,9 +406,9 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await page.getByRole('button', { name: 'Run on Local', exact: true }).click()
-  await page.getByText('Add host…', { exact: true }).click()
+  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
+  await page.getByRole('button', { name: 'Add host', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add host', exact: true })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'SSH destination', exact: true }).click()
@@ -416,9 +419,16 @@ When('the scratch remote is added from the host UI', async ({ page }: { readonly
   await expect(dialog.getByRole('button', { name: 'SSH destination', exact: true })).toContainText(pair.sshd.targetAlias)
   await dialog.getByLabel('Name').fill(scratchRemoteName)
   await dialog.getByLabel('Remote DSH home').fill(pair.remote.homeRoot)
+  await dialog.getByRole('button', { name: 'Test connection', exact: true }).click()
+  const connectionTest = dialog.getByRole('list', { name: 'Connection test' })
+  await expect(connectionTest).toBeVisible({ timeout: 30_000 })
+  await expect(connectionTest).toContainText('SSH login')
+  await expect(connectionTest).toContainText('DSH runtime')
+  await expect(connectionTest).toContainText('multi-host identity')
   await dialog.getByRole('button', { name: 'Add host', exact: true }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true })).toBeVisible()
+  await expect(page.getByText(scratchRemoteName, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'New thread', exact: true }).click()
   const wrapperCalls = (await readFile(pair.wrapperInvocationLogPath, 'utf8')).trim().split(/\r?\n/)
   expect(wrapperCalls).toContain('invoked')
 })
@@ -445,12 +455,11 @@ When('Auto creates a thread through the remote folder picker', async ({ page }: 
     await page.keyboard.press('Escape')
     await expect(initialFolderPicker).toBeHidden()
   }
-  await page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true }).click()
+  await page.getByRole('button', { name: /^Run on /u }).click()
   const autoOption = page.getByRole('option', { name: /^Auto/u })
   await expect(autoOption).toContainText(scratchRemoteName, { timeout: 30_000 })
   await expect(autoOption).toBeEnabled({ timeout: 30_000 })
   await autoOption.click()
-  await expect(page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true })).toBeVisible()
   await page.locator('[data-remote-folder]').click()
 
   const folderPicker = page.getByRole('dialog', { name: /^Choose a project/u })
@@ -578,7 +587,7 @@ When('a Git project is cloned with selected local files', async ({ page }: { rea
   const gitServer = await startScratchGitServer({ projectPath: sourceProjectPath, scratchRoot: pair.sshd.scratchRoot })
 
   try {
-    await page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true }).click()
+    await page.getByRole('button', { name: /^Run on /u }).click()
     const cloneTargetGroup = page.getByRole('group', { name: 'Add project to another machine' })
     const cloneTarget = cloneTargetGroup.getByRole('option', { name: scratchRemoteName, exact: true })
     await expect(cloneTarget).toBeVisible()
@@ -588,8 +597,9 @@ When('a Git project is cloned with selected local files', async ({ page }: { rea
     await expect(dialog).toBeVisible()
     await dialog.getByLabel('Git repository URL').fill(gitServer.repositoryUrl)
     await dialog.getByLabel(`Folder on ${scratchRemoteName}`).fill(destinationPath)
-    await dialog.getByRole('checkbox', { name: 'Copy local ignored and untracked files', exact: true }).check()
+    await dialog.getByRole('checkbox', { name: 'Copy selected local files', exact: true }).check()
     await dialog.getByLabel('Local project folder').fill(sourceProjectPath)
+    await dialog.getByRole('checkbox', { name: 'Also scan ignored files', exact: true }).check()
     await dialog.getByRole('button', { name: 'Find files', exact: true }).click()
 
     const selectedUntracked = dialog.getByRole('checkbox', { name: /selected-untracked\.txt/u })
@@ -598,6 +608,8 @@ When('a Git project is cloned with selected local files', async ({ page }: { rea
     await expect(selectedUntracked).toBeVisible()
     await expect(selectedIgnored).toBeVisible()
     await expect(unselected).toBeVisible()
+    await selectedUntracked.check()
+    await selectedIgnored.check()
     await unselected.uncheck()
     await expect(selectedUntracked).toBeChecked()
     await expect(selectedIgnored).toBeChecked()
@@ -641,6 +653,33 @@ When('a remote thread is created and read over SSH', async ({ page }: { readonly
   expect(sessions.value.items.find(item => item.sessionId === sessionId)?.blank).toBe(true)
   expect(transcript.cwd).toBe(pair.remote.homeRoot)
   observations.set(page, { runtimeId: runtime.id, remoteHome: runtime.remoteHome, sessionId, transcriptCwd: transcript.cwd })
+})
+
+When('the mirrored thread opens its owning host UI', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The remote thread composer journey did not produce an observation.')
+
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Show remote threads in a separate group', exact: true }).check()
+  await page.getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Remote threads started from this DSH', exact: true }).click()
+
+  const remoteThread = page.locator('[data-remote-thread-id]').filter({ hasText: scratchRemoteName })
+  await expect(remoteThread).toHaveAttribute('data-remote-thread-id', `${observation.runtimeId}:${observation.sessionId}`, { timeout: 30_000 })
+  await remoteThread.click()
+
+  const conversation = page.locator('[data-conversation-content]:visible')
+  await expect.poll(() => conversation.getAttribute('data-conversation-session')).toBe(observation.sessionId)
+  const openRemoteHost = page.getByRole('button', { name: 'Open on remote host', exact: true })
+  await expect(openRemoteHost).toBeVisible({ timeout: 30_000 })
+  const call = await hostApi(pairFor(page).manager)
+  const view = runtimeOpenViewSchema.parse(await call('runtimeOpenView', { runtimeId: observation.runtimeId }))
+  allowLoopbackBrowserOrigin(page, view.launchUrl)
+  const [remotePage] = await Promise.all([page.context().waitForEvent('page', { timeout: 30_000 }), openRemoteHost.click()])
+  await expect.poll(() => remotePage.url(), { timeout: 30_000 }).not.toBe('about:blank')
+  await expect(remotePage.getByRole('button', { name: 'New session', exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(new URL(remotePage.url()).origin).not.toBe(new URL(page.url()).origin)
+  await finishJourneyAssertions(page)
 })
 
 When('the remote composer resolves @file suggestions on SSH', async ({ page }: { readonly page: Page }) => {

@@ -1,8 +1,9 @@
 Feature: Multi-host loopback SSH lifecycle
 
   This journey boots repository-owned scratch DSH profiles behind a generated,
-  loopback-only sshd. The manager composes the multi-host, jj-integration,
-  rich-composer, and session-controller fork for mirrored Sessions and the native composer.
+  loopback-only sshd. The manager composes multi-host, thread-sidebar,
+  jj-integration, rich-composer, and the session-controller fork for mirrored Sessions,
+  remote navigation, and the native composer.
   It verifies resource-aware Auto placement, remote Git clone and selected local-file transfer,
   remote composer ownership, tunnel recovery, stale launch rejection, profile-sync cleanup,
   lost-response reconciliation, and scratch cleanup.
@@ -47,7 +48,10 @@ Feature: Multi-host loopback SSH lifecycle
   Scenario: A selected mirrored thread opens its owning host UI
     Given a loopback SSH DSH pair is booted
     When the scratch remote is added from the host UI
-    And a remote thread is created and read over SSH
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    Then the new thread is owned by the automatically selected remote runtime
     And the mirrored thread opens its owning host UI
   @scenario:multi-host.remote-inventory
   Scenario: A thread started on the host appears in the manager's inventory

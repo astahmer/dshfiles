@@ -30,11 +30,9 @@
         "click button \"pulls.review: Reviews\"",
         "expect heading \"pulls.review\"",
         "expect text \"main..@\"",
-        "expect text \"2 files\"",
-        "expect text \"README.md*\"",
-        "expect text \"src/app.ts*\"",
-        "expect text \"Docs\"",
-        "expect text \"Code\""
+        "expect text \"1 file\"",
+        "expect text \"seeded-work.md*\"",
+        "expect text \"Docs\""
       ],
       "verification": [
         {

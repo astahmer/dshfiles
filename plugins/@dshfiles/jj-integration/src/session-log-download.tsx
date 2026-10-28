@@ -4,7 +4,6 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Context } from '@deepseek-ai/cordis'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { DownloadIcon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { JjIntegrationTranslate } from './locales.js'
@@ -69,24 +68,17 @@ export const SessionLogDownloadRow = (props: {
   if (controller === undefined) return null
   const label = downloading ? props.t('preparingSessionLog') : props.t('downloadSessionLog')
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            aria-label={props.t('downloadSessionLog')}
-            className="dshx-root dshx:w-full dshx:justify-start"
-            disabled={downloading}
-            onClick={() => void controller.download(SessionId(props.sessionId))}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            {downloading ? <Spinner /> : <DownloadIcon aria-hidden="true" className="dshx:size-3.5" />}
-            {label}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Button
+      aria-label={props.t('downloadSessionLog')}
+      className="dshx-root dshx:w-full dshx:justify-start"
+      disabled={downloading}
+      onClick={() => void controller.download(SessionId(props.sessionId))}
+      size="sm"
+      type="button"
+      variant="ghost"
+    >
+      {downloading ? <Spinner /> : <DownloadIcon aria-hidden="true" className="dshx:size-3.5" />}
+      {label}
+    </Button>
   )
 }

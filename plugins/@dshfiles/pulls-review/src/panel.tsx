@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { z } from 'zod'
 import { MAX_FILES, pullsReviewApi } from './api.js'
 import { ReviewedMarksModel } from './reviewed.js'
+import { PageReviewContextModel } from './review-page-context.js'
 import type { SessionFocus } from './session-focus.js'
 
 const NO_REVIEWED: Record<string, string[]> = {}
@@ -55,6 +56,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const subscribeMounted = useCallback((listener: () => void) => props.focus.subscribe(listener), [props.focus])
   const readMounted = useCallback(() => props.focus.getSnapshot(), [props.focus])
   const sessionId = useSyncExternalStore(subscribeMounted, readMounted, noBody)
+  const pageReview = useSyncExternalStore(PageReviewContextModel.subscribe, PageReviewContextModel.read, noBody)
 
   const subscribeSessions = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const readCwd = useCallback(() => (sessionId === undefined ? undefined : props.sessions.list.getSnapshot().byId[sessionId]?.cwd), [props.sessions, sessionId])
@@ -65,9 +67,14 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     () => props.workspaces.list.getSnapshot().items,
     () => [],
   )
-  const [selectedPath, setSelectedPath] = useState('')
+  const [selectedPath, setSelectedPath] = useState(() => pageReview?.workspacePath ?? '')
   const [baseRef, setBaseRef] = useState('')
-  const reviewPath = selectedPath || cwd || ''
+  useEffect(() => {
+    if (pageReview === undefined) return
+    setSelectedPath(pageReview.workspacePath ?? '')
+  }, [pageReview])
+  const reviewPath = selectedPath || pageReview?.workspacePath || cwd || ''
+  const reviewSessionId = pageReview?.sessionId ?? sessionId
 
   const query = useQuery({
     queryKey: ['pulls-review', reviewPath, baseRef],
@@ -89,7 +96,11 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
         timeoutMs: 120_000,
         request: signal =>
           api.summarize(
-            { path: reviewPath, ...(baseRef === '' ? {} : { base: baseRef }), ...(sessionId === undefined ? {} : { sessionId: String(sessionId) }) },
+            {
+              path: reviewPath,
+              ...(baseRef === '' ? {} : { base: baseRef }),
+              ...(reviewSessionId === undefined ? {} : { sessionId: String(reviewSessionId) }),
+            },
             { signal },
           ),
       }),

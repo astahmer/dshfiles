@@ -417,8 +417,6 @@
       "summary": "One header control shows the thread's jj workspace name, a badge with revisions ready to integrate, and a menu holding Integrate, the Thread workspaces side panel, and Download session log. A thread that works in the shared project checkout keeps the control and says so, instead of losing the only way to its workspace actions. The session-log row is the only trigger for that export: the export plugin's own header menu is shadowed at a lower priority, and its cell reports each finished export as a toast.",
       "reach": [
         "seed rebase-ready-thread",
-        "click button \"All threads\"",
-        "click text \"Seeded thread to rebase\"",
         "expect button \"Current thread workspace: thread-*\"",
         "click button \"Current thread workspace: thread-*\"",
         "expect text \"Integrate into main\"",

@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { globalPanelLink } from '../plugin-view-names.js'
 import { spawnSync } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { After, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
@@ -215,7 +215,7 @@ Then('its row shows the edit, the creation, or both as the Revision date setting
   await recordAssertion(page, 'jujutsu-row-age-is-the-last-content-edit', async () => {
     await expect(age).toHaveText(/^(now|\d+m)$/)
     await age.hover()
-    await expect(page.getByRole('tooltip')).toHaveText(/^Created .*2020.* Last edited .* Last rewritten /u)
+    await expect(page.getByRole('tooltip')).toHaveText(/^Created .*2020.*Last edited .*Last rewritten .*$/su)
   })
   await chooseRevisionDate('Created')
   await recordAssertion(page, 'jujutsu-row-age-can-show-the-creation', async () => {
@@ -330,6 +330,9 @@ When('the repository is registered and a thread is started in it', async ({ page
   await writeFile(join(threadPath, 'review-one.txt'), 'First reviewed file.\n')
   await writeFile(join(threadPath, 'review-two.txt'), 'Second reviewed file.\n')
   jj(threadRepository, ['describe', '-m', 'Two-file review fixture'])
+  const workspaceDiff = jj(threadRepository, ['diff', '--from', 'main', '--to', '@', '--summary'])
+  expect(workspaceDiff).toContain('review-one.txt')
+  expect(workspaceDiff).toContain('review-two.txt')
 })
 
 /** Register the fixture repository and let its thread answer `prompt`, so the answer renders as markdown. */
@@ -337,7 +340,7 @@ When('the repository is registered and its thread answers {string}', async ({ pa
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
   await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
-  await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
+  await startThreadWithModel(page, { project: repository.path, model: FAKE_COMMAND_CODE_MODEL })
   await sendMessage(page, prompt)
 })
 
@@ -422,7 +425,7 @@ When("both repositories are registered and the first repository's thread answers
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, foreignRepositoryFor(page).path)
   await registerWorkspaceFolder(page, repository.path)
-  await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
+  await startThreadWithModel(page, { project: repository.path, model: FAKE_COMMAND_CODE_MODEL })
   await sendMessage(page, prompt)
 })
 
@@ -481,14 +484,14 @@ Then('the composer dock names the project, thread workspace and bookmark in one 
 })
 
 Then('the composer summary shows an exact revision count against main', async ({ page }: { page: Page }) => {
-  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 2 only on @$/u })
+  const summary = page.getByRole('button', { name: /^Review workspace changes: @ vs main: 1 only on @$/u })
   await recordAssertion(page, 'jujutsu-composer-summary-shows-a-real-ahead-or-behind-count', () => expect(summary).toBeVisible())
   await summary.click()
   const review = page.getByTestId('pulls-review-diffs')
   await recordAssertion(page, 'jujutsu-composer-summary-opens-multi-file-workspace-review', async () => {
     await expect(review).toBeVisible()
-    await expect(review.getByText('feature.txt', { exact: true })).toBeVisible()
-    await expect(review.getByText('bob.txt', { exact: true })).toBeVisible()
+    await expect(review.getByText('review-one.txt', { exact: true })).toBeVisible()
+    await expect(review.getByText('review-two.txt', { exact: true })).toBeVisible()
     await expect(review.getByText('base.txt', { exact: true })).toHaveCount(0)
   })
 })

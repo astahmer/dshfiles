@@ -118,7 +118,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.workspace-cleanup
   Scenario: The repository menu previews a background cleanup before removing anything
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/multi-host" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/home, @dshfiles/multi-host" is booted
     When a disposable Jujutsu repository is selected
     And two stale untracked folders exist beside the repository
     And the repository actions menu opens the workspace cleanup
