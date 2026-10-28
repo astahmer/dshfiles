@@ -266,10 +266,16 @@ Then('its changed files keep literal paths and track review progress', async ({ 
     await expect(row.getByRole('checkbox', { name: 'Mark reviewed feature.txt', exact: true })).toBeVisible()
   })
   await row.getByRole('button', { name: 'Full diff', exact: true }).click()
-  await recordAssertion(page, 'jujutsu-full-diff-shows-every-changed-file', async () => {
-    const diff = page.getByRole('group', { name: /^Full diff of Feature work by Ada · \w+ · 2 files$/ })
-    await expect(diff.getByText(UNICODE_PATH, { exact: true })).toBeVisible()
-    await expect(diff.getByRole('code').filter({ hasText: 'feature' })).toBeVisible()
+  await recordAssertion(page, 'jujutsu-full-diff-reveals-the-patch-section', async () => {
+    await expect(row.getByText('Patch', { exact: true })).toBeVisible()
+    await expect(row.getByText(UNICODE_PATH, { exact: true })).toBeVisible()
+    await expect(row.getByRole('group', { name: /^Full diff of/ })).toHaveCount(0)
+  })
+  await row.getByRole('button', { name: 'Open full-page diff in a tab', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-full-page-diff-opens-in-panel-tab', async () => {
+    await expect(page.getByRole('tab', { name: 'Diff', exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Diff', exact: true })).toHaveAttribute('data-state', 'active')
+    await expect(page.getByRole('group', { name: /^Full diff of Feature work by Ada · \w+ · 2 files$/ })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

@@ -16,14 +16,15 @@ export const InlineRevisionDiff = (props: {
   readonly layout: PatchLayout
   readonly onCancel: () => void
   readonly onOpenInEditor: (path: string) => void
+  readonly fullPage?: boolean
 }): JSX.Element => {
   const files = useMemo(() => (props.patch === undefined ? [] : parsePatchFiles(props.patch).flatMap(parsed => parsed.files)), [props.patch])
   // The diff library virtualizes inside a fixed viewport; a three-line patch should not leave half a screen empty.
   const changedRows = (props.patch ?? '').split('\n').filter(line => /^[+-](?!\+|-)/.test(line)).length
-  const viewportHeight = Math.min(560, Math.max(140, changedRows * 22 + 110))
+  const viewportHeight = props.fullPage ? undefined : Math.min(560, Math.max(140, changedRows * 22 + 110))
   const label = `Full diff of ${props.heading}${props.patch === undefined ? '' : ` · ${String(files.length)} files`}`
   return (
-    <InlinePanel label={label} onCancel={props.onCancel}>
+    <InlinePanel {...(props.fullPage ? { className: 'dshx:min-h-0 dshx:flex-1' } : {})} label={label} onCancel={props.onCancel}>
       <div className="dshx:flex dshx:items-center dshx:gap-2">
         <p className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs dshx:font-medium" role="status">
           {props.heading}
@@ -46,7 +47,10 @@ export const InlineRevisionDiff = (props: {
       )}
       {props.patch !== undefined && files.length === 0 && <p className="dshx:text-xs dshx:text-muted-foreground">This revision has no changed files.</p>}
       {files.length > 0 && (
-        <div className="dshx:overflow-hidden dshx:rounded-sm dshx:border dshx:border-border" style={{ height: viewportHeight }}>
+        <div
+          className="dshx:min-h-0 dshx:flex-1 dshx:overflow-hidden dshx:rounded-sm dshx:border dshx:border-border"
+          style={props.fullPage ? undefined : { height: viewportHeight }}
+        >
           <TooltipProvider delayDuration={500}>
             <PatchView
               className="dshx:h-full"

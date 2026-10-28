@@ -48,6 +48,7 @@ import {
   ChevronRightIcon,
   CopyPlusIcon,
   EllipsisVerticalIcon,
+  Maximize2Icon,
   FolderGit2Icon,
   MonitorIcon,
   RefreshCwIcon,
@@ -76,7 +77,15 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
-import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, resolveWorkspaceDrop, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
+import {
+  BOOKMARK_MIME,
+  BOOKMARK_SOURCE_MIME,
+  resolveBookmarkDrop,
+  resolveRevisionDrop,
+  resolveWorkspaceDrop,
+  REVISION_MIME,
+  WORKSPACE_MIME,
+} from './revision-drop.js'
 import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
 import { openGraphRepository } from './repository-opening.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
@@ -282,6 +291,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenView, setView] = usePanelScopeState<View | null>(scope, 'view', () => PanelScopes.persisted(scope).view ?? null)
+  const [diffTabOpen, setDiffTabOpen] = useState(false)
   const view = chosenView ?? preferences.defaultView
   const [authorFilter, setAuthorFilter] = usePanelScopeState(scope, 'authorFilter', () => '')
   const [textFilter, setTextFilter] = usePanelScopeState(scope, 'textFilter', () => '')
@@ -370,6 +380,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
   const [workspaceRemoval, setWorkspaceRemoval] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
+  const [patchDisclosure, setPatchDisclosure] = useState<{ readonly commitId: string; readonly open: boolean } | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string } | null>(null)
   const [cleanupOpen, setCleanupOpen] = useState(false)
   const [moveSource, setMoveSource] = useState<Revision | null>(null)
@@ -1004,28 +1015,39 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     )
   const bookmarkHidden = bookmarkDraft !== null && !visibleRevisions.some(revision => revision.commitId === bookmarkDraft.commitId)
 
+  const closeFullDiff = (): void => {
+    setFullDiff(null)
+    setDiffTabOpen(false)
+  }
+
   const inlineDiff =
     fullDiff === null ? null : (
       <InlineRevisionDiff
         error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
         focusPath={fullDiff.focusPath}
         layout={diffLayout}
-        onCancel={() => setFullDiff(null)}
+        onCancel={closeFullDiff}
         onOpenInEditor={path => {
-          if (state !== undefined && openInEditor({ path, cwd: state.root })) setFullDiff(null)
+          if (state !== undefined && openInEditor({ path, cwd: state.root })) closeFullDiff()
         }}
         patch={fullDiffQuery.data?.patch}
         heading={fullDiff.title}
+        fullPage={diffTabOpen}
       />
     )
-  const diffHidden = fullDiff !== null && !visibleRevisions.some(revision => revision.commitId === fullDiff.commitId)
-
   const refreshRepository = (): void => {
     if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
   }
 
-  const openFullDiff = (revision: Revision, focusPath: string | null): void =>
+  const openFullDiff = (revision: Revision, focusPath: string | null): void => {
     setFullDiff({ commitId: revision.commitId, title: firstLine(revision.description) + ' · ' + revision.shortestChangeId, focusPath })
+    setDiffTabOpen(true)
+  }
+
+  const revealRevisionPatch = (revision: Revision): void => {
+    setSelection({ commitId: revision.commitId, changeId: revision.changeId })
+    setPatchDisclosure({ commitId: revision.commitId, open: true })
+  }
 
   const updateFileReviews = (changes: readonly ReviewChange[]): void => {
     if (state === undefined || selectedRevision === undefined) return
@@ -1314,7 +1336,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               Describe
             </Button>
           )}
-          <Button onClick={() => openFullDiff(revision, null)} size="xs" type="button" variant="outline">
+          <Button onClick={() => revealRevisionPatch(revision)} size="xs" type="button" variant="outline">
             Full diff
           </Button>
           {!revision.workingCopy && !revision.immutable && (
@@ -1412,11 +1434,26 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 <pre className={CODE_BLOCK}>{details.evolution}</pre>
               </CollapsibleContent>
             </Collapsible>
-            <Collapsible defaultOpen={preferences.diffExpanded}>
-              <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
-                <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
-                Patch
-              </CollapsibleTrigger>
+            <Collapsible
+              onOpenChange={open => setPatchDisclosure({ commitId: revision.commitId, open })}
+              open={patchDisclosure?.commitId === revision.commitId ? patchDisclosure.open : preferences.diffExpanded}
+            >
+              <div className="dshx:flex dshx:items-center dshx:gap-2">
+                <CollapsibleTrigger className={DISCLOSURE_TRIGGER}>
+                  <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-data-[state=open]/disclosure:rotate-90" />
+                  Patch
+                </CollapsibleTrigger>
+                <Button
+                  aria-label="Open full-page diff in a tab"
+                  className="dshx:ml-auto"
+                  onClick={() => openFullDiff(revision, null)}
+                  size="icon-xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Maximize2Icon />
+                </Button>
+              </div>
               <CollapsibleContent>
                 <PatchView className="dshx:h-80 dshx:rounded-md dshx:border" layout={diffLayout} patch={details.patch} />
               </CollapsibleContent>
@@ -1691,8 +1728,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                         rowConfirmAnchorId === item.revision.commitId ||
                         workspaceRemoval?.commitId === item.revision.commitId ||
                         workspaceBase?.commitId === item.revision.commitId ||
-                        bookmarkDraft?.commitId === item.revision.commitId ||
-                        fullDiff?.commitId === item.revision.commitId
+                        bookmarkDraft?.commitId === item.revision.commitId
                       }
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
@@ -1721,7 +1757,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       {workspaceRemoval?.commitId === item.revision.commitId && inlineRemoval}
                       {workspaceBase?.commitId === item.revision.commitId && inlineProvisioner}
                       {bookmarkDraft?.commitId === item.revision.commitId && inlineBookmark}
-                      {fullDiff?.commitId === item.revision.commitId && inlineDiff}
                     </RevisionRow>
                   )}
                 </div>
@@ -1766,6 +1801,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col" value="graph">
         {emptyState ?? graphView}
       </TabsContent>
+      {fullDiff !== null && (
+        <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-auto dshx:p-3" value="diff">
+          {inlineDiff}
+        </TabsContent>
+      )}
       <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col" value="source">
         {emptyState ??
           (state !== undefined && repoId !== null && (
@@ -1794,7 +1834,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground"
     >
       <TooltipProvider>
-        <Tabs className="dshx:min-h-0 dshx:flex-1 dshx:gap-0" onValueChange={value => setView(value === 'source' ? 'source' : 'graph')} value={view}>
+        <Tabs
+          className="dshx:min-h-0 dshx:flex-1 dshx:gap-0"
+          onValueChange={value => {
+            if (value === 'diff') {
+              setDiffTabOpen(true)
+              return
+            }
+            setDiffTabOpen(false)
+            setView(value === 'source' ? 'source' : 'graph')
+          }}
+          value={diffTabOpen ? 'diff' : view}
+        >
           <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
             {!sidePanel && (
               <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:pt-1">
@@ -1812,6 +1863,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 >
                   Revision graph
                 </TabsTrigger>
+                {fullDiff !== null && (
+                  <TabsTrigger
+                    className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
+                    value="diff"
+                  >
+                    Diff
+                  </TabsTrigger>
+                )}
                 <TabsTrigger
                   className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0.5 dshx:after:bottom-[-1px] dshx:after:bg-primary dshx:data-[state=active]:font-semibold"
                   value="source"
@@ -1989,11 +2048,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
           {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
           {removalHidden && inlineRemoval !== null && <div className="dshx:border-b dshx:p-2">{inlineRemoval}</div>}
-          {(provisionerHidden || bookmarkHidden || diffHidden) && (
+          {(provisionerHidden || bookmarkHidden) && (
             <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:p-2">
               {provisionerHidden && inlineProvisioner}
               {bookmarkHidden && inlineBookmark}
-              {diffHidden && inlineDiff}
             </div>
           )}
 
@@ -2264,16 +2322,24 @@ interface InlineDropPreviewProps {
 
 const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
   <section
-    aria-label={props.presentation.kind === 'rebase' ? 'Preview branch rebase' : props.presentation.kind === 'workspace-move' ? 'Preview workspace move' : 'Preview bookmark move'}
+    aria-label={
+      props.presentation.kind === 'rebase'
+        ? 'Preview branch rebase'
+        : props.presentation.kind === 'workspace-move'
+          ? 'Preview workspace move'
+          : 'Preview bookmark move'
+    }
     className="dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-primary/40 dshx:bg-primary/5 dshx:p-3"
     role="group"
   >
     <div className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-1.5 dshx:text-xs">
-      <strong>      {props.presentation.kind === 'rebase'
-        ? 'Rebase branch'
-        : props.presentation.kind === 'workspace-move'
-          ? `Move workspace “${props.presentation.workspace}”`
-          : `Move bookmark “${props.presentation.bookmark}”`}</strong>
+      <strong>
+        {props.presentation.kind === 'rebase'
+          ? 'Rebase branch'
+          : props.presentation.kind === 'workspace-move'
+            ? `Move workspace “${props.presentation.workspace}”`
+            : `Move bookmark “${props.presentation.bookmark}”`}
+      </strong>
       <span className="dshx:text-muted-foreground">from</span>
       <code className="dshx:font-mono!">{props.sourceLabel}</code>
       <span className="dshx:text-muted-foreground">onto</span>
