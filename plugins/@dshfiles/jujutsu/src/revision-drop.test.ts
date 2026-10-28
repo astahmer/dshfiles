@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBookmarkDrop, resolveRevisionDrop, resolveWorkspaceDrop } from './revision-drop.js'
+import { resolveBookmarkDrop, resolveDragOriginDrop, resolveRevisionDrop, resolveWorkspaceDrop } from './revision-drop.js'
 
 const revision = (
   commitId: string,
@@ -49,6 +49,38 @@ describe('revision drop resolution', () => {
     const current = revision('current', [], [], [], true)
     expect(resolveWorkspaceDrop({ workspace: 'default', target: current, revisions: [current, other] }).kind).toBe('noop')
     expect(resolveWorkspaceDrop({ workspace: 'unknown', target: other, revisions: [current, other] })).toEqual({ kind: 'noop' })
+  })
+
+  it('resolves a locally started revision drag when the drop event has no transfer data', () => {
+    expect(resolveDragOriginDrop({ origin: { kind: 'revision', sourceId: 'feature' }, target: other, revisions })).toEqual({
+      kind: 'action',
+      action: { kind: 'rebase', sourceId: 'feature', destinationId: 'other' },
+      presentation: { kind: 'rebase', sourceId: 'feature', destinationId: 'other' },
+    })
+  })
+
+  it('resolves local bookmark drags from their origin', () => {
+    expect(resolveDragOriginDrop({ origin: { kind: 'bookmark', sourceId: 'feature', bookmark: 'feature/bookmark' }, target: other, revisions })).toEqual({
+      kind: 'action',
+      action: { kind: 'bookmark-move', bookmark: 'feature/bookmark', destinationId: 'other' },
+      presentation: { kind: 'bookmark-move', bookmark: 'feature/bookmark', sourceId: 'feature', destinationId: 'other' },
+    })
+  })
+
+  it('resolves workspace drags from their origin', () => {
+    const current = revision('current', [], [], ['review'], true)
+    const destination = revision('destination')
+    expect(
+      resolveDragOriginDrop({
+        origin: { kind: 'workspace', sourceId: 'current', workspace: 'review' },
+        target: destination,
+        revisions: [current, destination],
+      }),
+    ).toEqual({
+      kind: 'action',
+      action: { kind: 'workspace-edit', name: 'review', commitId: 'destination' },
+      presentation: { kind: 'workspace-move', sourceId: 'current', destinationId: 'destination', workspace: 'review' },
+    })
   })
 
   it('prepares local bookmark moves with the bookmark source revision', () => {

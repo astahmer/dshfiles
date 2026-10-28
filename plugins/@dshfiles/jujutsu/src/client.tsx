@@ -81,6 +81,7 @@ import {
   BOOKMARK_MIME,
   BOOKMARK_SOURCE_MIME,
   resolveBookmarkDrop,
+  resolveDragOriginDrop,
   resolveRevisionDrop,
   resolveWorkspaceDrop,
   REVISION_MIME,
@@ -1091,10 +1092,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const sourceRevisionId = event.dataTransfer.getData(REVISION_MIME)
     if (sourceRevisionId.length > 0) return resolveRevisionDrop({ sourceRevisionId, target, revisions })
     const origin = actionActor.getSnapshot().context.dragOrigin
-    if (origin === null) return { kind: 'noop' as const }
-    if (origin.kind === 'revision') return resolveRevisionDrop({ sourceRevisionId: origin.sourceId, target, revisions })
-    if (origin.kind === 'bookmark') return resolveBookmarkDrop({ bookmark: origin.bookmark, sourceRevisionId: origin.sourceId, target, revisions })
-    return resolveWorkspaceDrop({ workspace: origin.workspace, target, revisions })
+    return origin === null ? { kind: 'noop' as const } : resolveDragOriginDrop({ origin, target, revisions })
   }
 
   const dropOn = (event: DragEvent, revision: Revision): void => {

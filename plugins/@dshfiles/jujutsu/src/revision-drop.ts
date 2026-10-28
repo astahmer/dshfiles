@@ -1,5 +1,5 @@
 import type { Revision, Mutation } from './api.js'
-import type { DropPresentation } from './revision-action-machine.js'
+import type { DragOrigin, DropPresentation } from './revision-action-machine.js'
 import { SourceControlModel } from './source-control.js'
 
 export const REVISION_MIME = 'application/x-jujutsu-revision'
@@ -79,4 +79,23 @@ export const resolveBookmarkDrop = (input: {
       bookmark: input.bookmark,
     },
   }
+}
+
+export const resolveDragOriginDrop = (input: {
+  readonly origin: DragOrigin
+  readonly target: DragRevision
+  readonly revisions: readonly DragRevision[]
+}): RevisionDropResolution => {
+  if (input.origin.kind === 'revision') {
+    return resolveRevisionDrop({ sourceRevisionId: input.origin.sourceId, target: input.target, revisions: input.revisions })
+  }
+  if (input.origin.kind === 'bookmark') {
+    return resolveBookmarkDrop({
+      bookmark: input.origin.bookmark,
+      sourceRevisionId: input.origin.sourceId,
+      target: input.target,
+      revisions: input.revisions,
+    })
+  }
+  return resolveWorkspaceDrop({ workspace: input.origin.workspace, target: input.target, revisions: input.revisions })
 }
