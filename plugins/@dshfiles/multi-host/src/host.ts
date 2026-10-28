@@ -5,7 +5,17 @@ import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
 import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
-import { fileUploadValueSchema, multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
+import {
+  fileUploadValueSchema,
+  multiHostApi,
+  resourceSnapshotSchema,
+  type ConnectionTestStep,
+  type ResourcePool,
+  type ResourcePoolEntry,
+  type ResourceProbe,
+  type RuntimeStatus,
+  type SessionSummary,
+} from './api.js'
 import { connectLocal } from './connectors/local.js'
 import { shellQuote, SshConnector } from './connectors/ssh.js'
 import { GatewayRequestError, GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
@@ -14,6 +24,7 @@ import { createRemoteSessionSource } from './remote-session-source.js'
 import { authorizeRemoteSessionRuntime } from './session-runtime-authorization.js'
 import { knownSessionRuntime } from './session-runtime.js'
 import { createRuntimeStatusCache } from './runtime-status-snapshot-cache.js'
+import { createResourceProbeLimiter, readResourceSnapshot, selectAutoHost } from './resource-snapshot.js'
 import type {} from '@dshfiles/session-source-port'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
@@ -175,6 +186,13 @@ const viewLeaseTtlMs = 30 * 60_000
 const maxViewLeases = 8
 const connectionErrors = new Map<string, { readonly code: string; readonly message: string; readonly at: string }>()
 const runtimeStatusCache = createRuntimeStatusCache<RuntimeStatus>({ successTtlMs: 30_000, failureTtlMs: 45_000 })
+const runtimeResourceCache = createRuntimeStatusCache<ResourceProbe>({
+  successTtlMs: 30_000,
+  failureTtlMs: 45_000,
+  maxEntries: 128,
+  spanName: 'multi-host resource snapshot refresh',
+})
+const resourceProbeLimiter = createResourceProbeLimiter(4)
 
 const connectRuntime = async ({
   host,
@@ -471,8 +489,72 @@ const officialNodeOf = ({ facts, minimum = '22.19.0' }: { readonly facts: Remote
   return facts.node.nix ? official : (facts.node.path ?? official)
 }
 
+const readResourcePool = async (): Promise<ResourcePool> => {
+  const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
+  const remoteHosts = hosts.filter(host => host.connector.kind === 'ssh')
+  const entries: ResourcePoolEntry[] = remoteHosts.map(host => {
+    const runtime = runtimes
+      .filter(item => item.hostId === host.id && item.locator.kind === 'ssh')
+      .sort((left, right) => (right.lastSeenAt ?? right.createdAt).localeCompare(left.lastSeenAt ?? left.createdAt) || left.id.localeCompare(right.id))[0]
+    if (runtime === undefined) {
+      return {
+        hostId: host.id,
+        hostName: host.name,
+        runtimeId: null,
+        destination: null,
+        hidden: host.hidden,
+        probe: { ok: false, code: 'runtime-unavailable', message: 'No remote DSH runtime is registered.' },
+        stale: false,
+        refreshing: false,
+      }
+    }
+
+    const cached = runtimeResourceCache.read(runtime.id)
+    if (cached.stale) {
+      void runtimeResourceCache
+        .refresh(runtime.id, () =>
+          resourceProbeLimiter.run(async () => {
+            try {
+              const raw = await withRuntime(
+                runtime.id,
+                gateway => gateway.api('resourceSnapshot', undefined, AbortSignal.timeout(5_000)),
+                { mutation: false },
+              )
+              const parsed = resourceSnapshotSchema.safeParse(raw)
+              if (!parsed.success) return { ok: false as const, code: 'resource-invalid', message: 'The remote host returned unsupported resource data.' }
+              return { ok: true as const, snapshot: parsed.data }
+            } catch (error) {
+              const failure = safeFailure(error)
+              return {
+                ok: false as const,
+                code: failure.code.slice(0, 128),
+                message: 'Resource data is unavailable. Reconnect the runtime or update its multi-host plugin.',
+              }
+            }
+          }),
+        )
+        .catch(() => undefined)
+    }
+    const current = runtimeResourceCache.read(runtime.id)
+    return {
+      hostId: host.id,
+      hostName: host.name,
+      runtimeId: runtime.id,
+      destination: { kind: 'runtime', runtimeId: runtime.id },
+      hidden: host.hidden,
+      probe: current.status ?? { ok: false, code: 'resource-refreshing', message: 'Waiting for a fresh resource snapshot.' },
+      stale: current.stale,
+      refreshing: current.refreshing,
+    }
+  })
+
+  return { hosts: entries, selected: selectAutoHost(entries) }
+}
+
 const multiHostHandlers = multiHostApi.host({
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
+  resourceSnapshot: async () => readResourceSnapshot(),
+  resourcePool: async () => readResourcePool(),
   list: async () => {
     const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
     return { hosts: hosts.map(record => hostSummary(record, runtimes)), runtimes: runtimes.map(runtimeSummary) }
@@ -776,6 +858,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   runtimeReconnect: async ({ input }) => {
     runtimeStatusCache.invalidate(input.runtimeId)
+    runtimeResourceCache.invalidate(input.runtimeId)
     await pool.close(input.runtimeId)
     connectionErrors.delete(input.runtimeId)
     try {

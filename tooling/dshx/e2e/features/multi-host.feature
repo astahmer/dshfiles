@@ -1,9 +1,10 @@
 Feature: Multi-host loopback SSH lifecycle
 
-  This journey boots two repository-owned scratch DSH profiles behind a generated,
-  loopback-only sshd. The manager composes @dshfiles/multi-host and @dshfiles/jj-integration
-  to expose the host picker; it verifies remote Git clone and selected local-file transfer,
-  native remote composer ownership, tunnel recovery, stale launch rejection, profile-sync cleanup,
+  This journey boots repository-owned scratch DSH profiles behind a generated,
+  loopback-only sshd. The manager composes the multi-host, jj-integration,
+  rich-composer, and session-controller fork for mirrored Sessions and the native composer.
+  It verifies resource-aware Auto placement, remote Git clone and selected local-file transfer,
+  remote composer ownership, tunnel recovery, stale launch rejection, profile-sync cleanup,
   lost-response reconciliation, and scratch cleanup.
 
   @scenario:multi-host.identity-profile
@@ -24,6 +25,22 @@ Feature: Multi-host loopback SSH lifecycle
     And a lost mutation response is reconciled without replay
     And the remote DSH crashes and its scratch home is cleaned
     Then the scratch DSH readiness and recovery checks pass
+
+  @scenario:multi-host.auto-destination
+  Scenario: Auto chooses the registered remote host for a native new thread
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And Auto creates a thread through the remote folder picker
+    And the remote model picker selects its model
+    And the native composer sends a prompt to the remote Session
+    Then the new thread is owned by the automatically selected remote runtime
+
+  @scenario:multi-host.host-resources
+  Scenario: The Hosts page shows live SSH resource pressure
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And the Hosts page is opened
+    Then the Hosts page shows live resource metrics
 
   @scenario:multi-host.remote-inventory
   Scenario: A thread started on the host appears in the manager's inventory

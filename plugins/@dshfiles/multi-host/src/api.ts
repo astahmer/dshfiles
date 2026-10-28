@@ -81,6 +81,43 @@ const runtimeStatusSchema = z.discriminatedUnion('ok', [
   }),
 ])
 
+export const resourceSnapshotSchema = z
+  .object({
+    sampledAt: z.string().datetime(),
+    platform: z.string().min(1).max(32),
+    cpuCount: z.number().int().nonnegative().max(4096),
+    loadAverage1m: z.number().finite().nonnegative().nullable(),
+    memoryTotalBytes: z.number().int().nonnegative(),
+    memoryFreeBytes: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(snapshot => snapshot.memoryFreeBytes <= snapshot.memoryTotalBytes, 'Free memory cannot exceed total memory.')
+
+const resourceProbeSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), snapshot: resourceSnapshotSchema }),
+  z.object({ ok: z.literal(false), code: z.string().max(128), message: z.string().max(512) }),
+])
+
+const resourcePoolEntrySchema = z.object({
+  hostId: idSchema,
+  hostName: z.string().min(1).max(120),
+  runtimeId: idSchema.nullable(),
+  destination: z.object({ kind: z.literal('runtime'), runtimeId: idSchema }).strict().nullable(),
+  hidden: z.boolean(),
+  probe: resourceProbeSchema,
+  stale: z.boolean(),
+  refreshing: z.boolean(),
+})
+
+const resourceSelectionSchema = z.object({
+  hostId: idSchema,
+  hostName: z.string().min(1).max(120),
+  runtimeId: idSchema,
+  score: z.number().finite().nonnegative(),
+})
+
+const resourcePoolSchema = z.object({ hosts: z.array(resourcePoolEntrySchema).max(64), selected: resourceSelectionSchema.nullable() }).strict()
+
 const failedSchema = failureSchema.extend({ ok: z.literal(false) })
 const runtimeRegistrationSchema = z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), runtime: runtimeSummarySchema }), failedSchema])
 const remoteHomeSchema = z
@@ -364,6 +401,18 @@ export const multiHostApi = defineApi({
       output: runtimeIdentitySchema,
       description: 'Identity of this DSH runtime as other hosts see it. Read-only.',
       tool: { name: 'multi_host_identity', readOnly: true, render: compactJson },
+    }),
+    resourceSnapshot: method({
+      input: z.void(),
+      output: resourceSnapshotSchema,
+      description: 'Read CPU load and memory capacity for this DSH machine. Read-only.',
+      tool: { name: 'multi_host_resource_snapshot', readOnly: true, render: compactJson },
+    }),
+    resourcePool: method({
+      input: z.void(),
+      output: resourcePoolSchema,
+      description: 'Read resource snapshots for registered hosts and the least-pressured eligible remote destination. Read-only.',
+      tool: { name: 'multi_host_resource_pool', readOnly: true, render: compactJson },
     }),
     list: method({
       input: z.void(),
@@ -804,5 +853,10 @@ export type RuntimeSummary = z.infer<typeof runtimeSummarySchema>
 export type WorkspaceSummary = z.infer<typeof workspaceSchema>
 export type SessionSummary = z.infer<typeof sessionSchema>
 export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>
+export type ResourceSnapshot = z.infer<typeof resourceSnapshotSchema>
+export type ResourceProbe = z.infer<typeof resourceProbeSchema>
+export type ResourcePoolEntry = z.infer<typeof resourcePoolEntrySchema>
+export type ResourceSelection = z.infer<typeof resourceSelectionSchema>
+export type ResourcePool = z.infer<typeof resourcePoolSchema>
 export type NativeRpcRequest = z.infer<typeof nativeRpcSchema>
 export type NativeRpcResult = z.infer<typeof nativeRpcResultSchema>

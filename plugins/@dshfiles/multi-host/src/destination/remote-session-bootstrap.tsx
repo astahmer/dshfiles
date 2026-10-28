@@ -9,6 +9,28 @@ import type { MultiHostClient } from './queries.js'
 const bootstrapFailureSchema = z.object({ message: z.string(), code: z.string().optional() }).strict()
 type BootstrapFailure = z.infer<typeof bootstrapFailureSchema>
 
+const createdSessions = new Map<string, string>()
+const sessionCreations = new Map<string, Promise<string>>()
+
+const createSessionOnce = async (target: string, create: () => Promise<string>): Promise<string> => {
+  const created = createdSessions.get(target)
+  if (created !== undefined) return created
+
+  const pending = sessionCreations.get(target)
+  if (pending !== undefined) return pending
+
+  const operation = create().then(sessionId => {
+    createdSessions.set(target, sessionId)
+    return sessionId
+  })
+  sessionCreations.set(target, operation)
+  try {
+    return await operation
+  } finally {
+    if (sessionCreations.get(target) === operation) sessionCreations.delete(target)
+  }
+}
+
 /** Creates an empty remote Session so the ordinary conversation and composer own the first draft too. */
 export const RemoteSessionBootstrap = (props: {
   readonly api: MultiHostClient
@@ -16,14 +38,22 @@ export const RemoteSessionBootstrap = (props: {
   readonly hostName: string
   readonly cwd: string | undefined
   readonly prepareCwd?: () => Promise<string>
-  readonly onStarted: (sessionId: string) => void
+  readonly onStarted: (sessionId: string) => void | Promise<void>
 }) => {
   const [attempt, setAttempt] = useState(0)
   const [starting, setStarting] = useState(false)
   const [failure, setFailure] = useState<BootstrapFailure | null>(null)
   const attempted = useRef<string | undefined>(undefined)
+  const api = useRef(props.api)
+  const runtimeId = useRef(props.runtimeId)
+  const hostName = useRef(props.hostName)
+  const cwd = useRef(props.cwd)
   const prepareCwd = useRef(props.prepareCwd)
   const onStarted = useRef(props.onStarted)
+  api.current = props.api
+  runtimeId.current = props.runtimeId
+  hostName.current = props.hostName
+  cwd.current = props.cwd
   prepareCwd.current = props.prepareCwd
   onStarted.current = props.onStarted
 
@@ -38,18 +68,24 @@ export const RemoteSessionBootstrap = (props: {
     setFailure(null)
     setStarting(true)
     void (async () => {
-      const cwd = prepareCwd.current === undefined ? props.cwd : await prepareCwd.current()
-      if (cwd === undefined) throw new Error('Choose a folder on this host first.')
-      const result = await props.api.threadCreate({ runtimeId: props.runtimeId, cwd })
-      if (!result.ok) {
-        throw { message: `${result.message} (${result.code})`, code: result.code } satisfies BootstrapFailure
+      const sessionId = await createSessionOnce(target, async () => {
+        const remoteCwd = prepareCwd.current === undefined ? cwd.current : await prepareCwd.current()
+        if (remoteCwd === undefined) throw new Error('Choose a folder on this host first.')
+        const result = await api.current.threadCreate({ runtimeId: runtimeId.current, cwd: remoteCwd })
+        if (!result.ok) {
+          throw { message: `${result.message} (${result.code})`, code: result.code } satisfies BootstrapFailure
+        }
+        return result.sessionId
+      })
+      if (active) {
+        await onStarted.current(sessionId)
+        createdSessions.delete(target)
       }
-      if (active) onStarted.current(result.sessionId)
     })()
       .catch(error => {
         if (!active) return
         const parsed = bootstrapFailureSchema.safeParse(error)
-        setFailure(parsed.success ? parsed.data : { message: errorMessage(error, `Could not start a thread on ${props.hostName}.`) })
+        setFailure(parsed.success ? parsed.data : { message: errorMessage(error, `Could not start a thread on ${hostName.current}.`) })
       })
       .finally(() => {
         if (active) setStarting(false)
@@ -57,7 +93,7 @@ export const RemoteSessionBootstrap = (props: {
     return () => {
       active = false
     }
-  }, [attempt, props.api, props.cwd, props.hostName, props.runtimeId, target])
+  }, [attempt, target])
 
   if (target === undefined) return null
   if (failure !== null) {

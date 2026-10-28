@@ -8,7 +8,7 @@ one tunnel open per host. Works on stock DSH 0.2.0-rc.2, no core patch.
 
 Manage hosts on a dedicated page:
 
-![Manage hosts and clone a project onto a remote machine](docs/screenshots/host-management.png)
+![Manage remote hosts and inspect the resource pressure used by Auto placement](docs/screenshots/host-management.png)
 
 The dedicated reusable hosts page is **Multi-host: Hosts** in navigation and the Workbench chooser.
 

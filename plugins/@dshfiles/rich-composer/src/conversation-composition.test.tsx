@@ -163,7 +163,9 @@ const fixture = (id: string, initialView = 'chat') => {
     hero: false,
     useComposerBlock: selected(undefined),
     useDraftWorkspace: selected(undefined),
+    useRemoteWorkspace: selected(undefined),
     selectWorkspace: async () => undefined,
+    resolveRemoteWorkspace: async () => undefined,
     // This is the official public local-Views composition: the Content body
     // owns the composer independently of its caller-selected Session view.
     useFactorySlot: name => (name === 'views' ? FixedViews : NoWidthControls),

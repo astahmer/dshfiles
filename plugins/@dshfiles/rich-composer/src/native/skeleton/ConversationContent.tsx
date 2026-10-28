@@ -4,6 +4,7 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { confirmedRemoteWorkspaceCwd } from '../../remote-workspace-context.ts'
 import css from './ConversationRoot.module.css'
 
 function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
@@ -22,8 +23,8 @@ function NoConversationWidthControls() {
 export function ConversationContent(props: ConversationContentProps) {
   const {
     sessionId, phase, hero, useSession, useSessions, useSessionStatus,
-    useWorkspaces, useInput, useComposerBlock, useDraftWorkspace, renderSlot, renderSlotChain,
-    selectWorkspace, t, useFactorySlot,
+    useWorkspaces, useInput, useComposerBlock, useDraftWorkspace, useRemoteWorkspace,
+    resolveRemoteWorkspace, renderSlot, renderSlotChain, selectWorkspace, t, useFactorySlot,
   } = props
   const session = useSession(snapshot => snapshot)
   const Views = useFactorySlot('views', ConversationSessionView)
@@ -67,6 +68,7 @@ export function ConversationContent(props: ConversationContentProps) {
   }, [])
 
   const draftWorkspaceId = useDraftWorkspace(id => id)
+  const remoteWorkspace = useRemoteWorkspace(ownership => ownership)
   const sessionWorkspace = sessionId === undefined
     ? undefined
     : workspaces.items.find(workspace => workspace.sessionIds.includes(sessionId))
@@ -88,20 +90,26 @@ export function ConversationContent(props: ConversationContentProps) {
   const zone: InputZone | undefined =
     session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
-  // The chip is a selector; label resolution walks the flow top-down:
-  //   1. a just-picked workspace (pending) → its title;
-  //   2. cold start, no session yet → placeholder ("Choose workspace");
-  //   3. the blank session's workspace is in the list → its title;
-  //   4. list still loading → cwd folder name bridges so the title does not
-  //      flash on refresh (empty cwd → placeholder);
-  //   5. list ready but no owning workspace (deleted from the sidebar) →
-  //      placeholder, never the deleted folder's name via cwd.
+  useEffect(() => {
+    if (
+      !hero || sessionId === undefined || sessionWorkspace !== undefined || cwd === undefined || cwd === '' ||
+      remoteWorkspace !== undefined
+    ) return
+    void resolveRemoteWorkspace()
+  }, [hero, sessionId, sessionWorkspace?.workspaceId, cwd, remoteWorkspace, resolveRemoteWorkspace])
+
+  const remoteWorkspaceCwd = confirmedRemoteWorkspaceCwd({ ownership: remoteWorkspace, cwd })
+  const remoteWorkspaceTitle = remoteWorkspaceCwd === undefined ? undefined : workspaceLabel(remoteWorkspaceCwd)
+
+  // The chip is a selector; a confirmed remote Session uses its own cwd instead
+  // of pretending its path belongs to the manager's local Workspace list.
   // A title still automatic reads in the reader's language, matching the
   // sidebar row the same Workspace has there.
   const storedChipTitle = pendingWorkspace?.title
     ?? (sessionId === undefined
       ? undefined
       : sessionWorkspace?.title
+        ?? remoteWorkspaceTitle
         ?? (workspaces.phase === 'ready' || cwd === undefined || cwd === ''
           ? undefined
           : workspaceLabel(cwd)))
@@ -136,9 +144,9 @@ export function ConversationContent(props: ConversationContentProps) {
     </div>
   )
 
-  // The placeholder chip ("Choose workspace") and the Workspace-trigger input travel
-  // together: no workspace picked yet (cold start, no session at all), or a
-  // blank session whose workspace vanished (deleted from the sidebar). The
+  // The placeholder chip ("Choose workspace") and Workspace-trigger input travel
+  // together for a cold start or an unowned blank Session. Confirmed remote
+  // Sessions get the same composer without claiming a manager-local Workspace.
   // bar is ONE session-maybe slot rendered unconditionally — inert is a prop,
   // not a different tree, so the textarea DOM survives the transition.
   const inert = sessionId === undefined || (hero && chipTitle === undefined)

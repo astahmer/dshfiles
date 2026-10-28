@@ -51,10 +51,20 @@
     {
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "A Hosts page lists every registered host in the destination picker's order: add an existing folder or clone a Git repository as a remote project, optionally copy selected ignored or untracked files, hide a host without deleting it, drag rows or use the arrows to reorder, and reconnect, edit or remove from the same row.",
+      "summary": "The Hosts page lists registered machines, shows live one-minute load and memory use, and lets users manage remote projects. Auto selects the eligible runtime with the lowest normalized resource pressure; hosts can be hidden, reordered, reconnected, edited, or removed.",
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
-      "states": ["empty", "listed", "local-files-scanned", "local-files-selected", "hidden", "reordered"],
+      "states": [
+        "empty",
+        "listed",
+        "resources-current",
+        "resources-stale",
+        "resources-unavailable",
+        "local-files-scanned",
+        "local-files-selected",
+        "hidden",
+        "reordered"
+      ],
       "failureModes": [
         "A partial or duplicate order is refused and the stored order stays.",
         "Hiding a host keeps its runtimes, threads and remote data; it only leaves the destination picker.",
@@ -102,9 +112,9 @@
           "testName": "extracts selected files but refuses symlinked destination folders"
         },
         {
-          "kind": "not-applicable",
-          "id": "multi-host.host-page-browser",
-          "reason": "The Hosts page needs registered hosts, which the loopback SSH journey does not seed. The catalog reach drives the real page with the multi-host-hosts scratch seed (dshx dev open multi-host/host-management), and the store/order unit tests prove hide, reorder and order persistence."
+          "kind": "gherkin",
+          "id": "multi-host.host-resources",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         }
       ],
       "telemetry": [
@@ -178,11 +188,25 @@
     {
       "id": "session-routing",
       "title": "Use the native composer for remote threads",
-      "summary": "Open a native thread composer on a selected remote host, then keep its model catalog and reasoning-effort picker, file attachments, and @ file references bound to that Session's owning runtime; follow and reply in the same native chat.",
+      "summary": "The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime, and follow/reply in the native chat.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["folder-chosen", "starting", "running", "finished", "offline", "waiting-on-host", "model-loading", "uploading", "resolving-file-reference"],
+      "states": [
+        "auto-selecting",
+        "auto-assigned",
+        "no-eligible-host",
+        "folder-chosen",
+        "starting",
+        "running",
+        "finished",
+        "offline",
+        "waiting-on-host",
+        "model-loading",
+        "uploading",
+        "resolving-file-reference"
+      ],
       "failureModes": [
+        "Auto skips hidden, stale, unsupported, or unreachable hosts and leaves the current destination unchanged when none is eligible.",
         "A capability or version mismatch disables incompatible actions.",
         "A file-reference request for an unowned Session or wrong runtime is refused before the remote filesystem is queried.",
         "An unknown mutation result after a lost reply is inspected and never automatically replayed."
@@ -194,6 +218,7 @@
           "deterministicFake": "Use an injected in-memory gateway transport with synthetic token and runtime identities; no real DSH profile credentials."
         }
       ],
+      "reach": ["seed multi-host-hosts", "click button \"New session\"", "click button \"Run on Local\"", "expect text \"Auto\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -204,6 +229,17 @@
           "kind": "gherkin",
           "id": "multi-host.uncertain-mutation",
           "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "multi-host.auto-destination",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.resource-selection",
+          "file": "plugins/@dshfiles/multi-host/src/resource-snapshot.test.ts",
+          "testName": "ranks hosts by their highest normalized CPU or memory pressure"
         },
         {
           "kind": "unit-test",
@@ -222,6 +258,12 @@
           "span": "<namespace>/<method>",
           "file": "plugins/@dshfiles/multi-host/src/connectors/connector-spans.test.ts",
           "testName": "records one <namespace>/<method> gateway span with the outcome code, never the arguments"
+        },
+        {
+          "kind": "custom",
+          "span": "multi-host resource snapshot refresh",
+          "file": "plugins/@dshfiles/multi-host/src/runtime-status-snapshot-cache.test.ts",
+          "testName": "uses the domain span name for resource refreshes"
         }
       ]
     },

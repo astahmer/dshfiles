@@ -238,7 +238,29 @@ export default defineClient({
       openWorkspace: composerNavigation.open,
       pickWorkspace: composerNavigation.pickWorkspace,
       bindWorkspacePicker: composerNavigation.bind,
-      openSession: sessionId => ctx.uiWorkspace.openSession(SessionId(sessionId)),
+      openSession: async sessionId => {
+        const target = SessionId(sessionId)
+        await ctx.sessions.refresh()
+        if (ctx.sessions.list.getSnapshot().byId[target] === undefined) {
+          await new Promise<void>((resolve, reject) => {
+            let unsubscribe = (): void => undefined
+            const timeout = setTimeout(() => {
+              unsubscribe()
+              reject(new Error('The remote thread did not appear in the Session list after refresh.'))
+            }, 5_000)
+            const finish = (): void => {
+              clearTimeout(timeout)
+              unsubscribe()
+              resolve()
+            }
+            unsubscribe = ctx.sessions.list.subscribe(() => {
+              if (ctx.sessions.list.getSnapshot().byId[target] !== undefined) finish()
+            })
+            if (ctx.sessions.list.getSnapshot().byId[target] !== undefined) finish()
+          })
+        }
+        ctx.uiWorkspace.openSession(target)
+      },
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
     const integrationTimeline = new IntegrationTimeline()

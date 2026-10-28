@@ -40,7 +40,7 @@ export interface DestinationBarServices {
   readonly openWorkspace: (workspaceId: string, signal: AbortSignal) => Promise<void>
   readonly pickWorkspace: (workspaceId: string) => boolean
   readonly bindWorkspacePicker: (pick: (workspaceId: string) => void) => () => void
-  readonly openSession: (sessionId: string) => void
+  readonly openSession: (sessionId: string) => void | Promise<void>
 }
 
 /** The host chip leads the native row; `display: contents` lets each chip of the bar be an item of that row. */

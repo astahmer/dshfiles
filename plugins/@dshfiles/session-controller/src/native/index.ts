@@ -307,7 +307,8 @@ export class SessionController extends TypertRemoteService {
   async list(request: SessionListRequest, signal: AbortSignal): Promise<SessionListValue> {
     const items = await this.listState.list(request, signal)
     const merged = await this.mirrored.merge(items, request, signal)
-    return { items: merged.filter(item => this.ctx.remoteAccess.allows({ kind: 'session', id: item.sessionId })) }
+    const visible = merged.filter(item => this.ctx.remoteAccess.allows({ kind: 'session', id: item.sessionId }))
+    return { items: visible }
   }
 
   /**

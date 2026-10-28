@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:https'
-import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
@@ -17,9 +17,9 @@ import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
 import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
 import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
+import { startFakeCommandCode } from '../fake-command-code.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
-const jjIntegrationPackageId = '@dshfiles/jj-integration'
 const multiHostApiId = 'multi-host'
 const scratchRemoteName = 'Scratch SSH runtime'
 
@@ -54,7 +54,21 @@ const connectionTestSchema = z.discriminatedUnion('ok', [
 ])
 
 const transcriptSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), cwd: z.string(), entries: z.array(z.unknown()) }).passthrough(),
+  z
+    .object({
+      ok: z.literal(true),
+      cwd: z.string(),
+      entries: z.array(
+        z
+          .object({
+            seq: z.number().int(),
+            kind: z.enum(['user', 'assistant', 'tool', 'status']),
+            text: z.string(),
+          })
+          .passthrough(),
+      ),
+    })
+    .passthrough(),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
 ])
 
@@ -140,6 +154,16 @@ type JourneyObservation = {
 }
 
 const observations = new WeakMap<Page, JourneyObservation>()
+
+type AutoDestinationObservation = {
+  readonly runtimeId: string
+  readonly folderPath: string
+  readonly previousSessionIds: readonly string[]
+  readonly sessionId: string
+  readonly prompt?: string
+}
+
+const autoDestinationObservations = new WeakMap<Page, AutoDestinationObservation>()
 
 const updateObservation = (page: Page, update: Partial<JourneyObservation>): void => {
   const previous = observations.get(page)
@@ -298,15 +322,58 @@ const startScratchGitServer = async (input: { readonly projectPath: string; read
 }
 
 Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
+  const fakeCommandCode = await startFakeCommandCode(page)
   const sshd = await startLoopbackSshd({ gitSslNoVerify: true })
   let remote: BootedProfile | undefined
   let manager: BootedProfile | undefined
   try {
-    remote = await bootComposedPluginProfile({ packageIds: [multiHostPackageId], profileLabel: 'multi-host-remote' })
+    remote = await bootComposedPluginProfile({
+      packageIds: ['@dshfiles/multi-host', '@dshfiles/ai-accounts'],
+      profileLabel: 'multi-host-remote',
+      hostEnv: { DSH_E2E_REMOTE_KEY: 'e2e-fake-key-ALPHA1' },
+      seedHome: async homeRoot => {
+        const accountsPath = join(homeRoot, 'plugins', 'ai-accounts', 'accounts.json')
+        await mkdir(dirname(accountsPath), { recursive: true })
+        await writeFile(
+          accountsPath,
+          `${JSON.stringify(
+            {
+              distribution: 'sticky',
+              cooldownMs: 300_000,
+              shadowRoot: '',
+              accounts: [
+                {
+                  instanceId: 'commandcode_work',
+                  kind: 'commandcode',
+                  displayName: 'Command Code 1',
+                  enabled: true,
+                  homePath: '',
+                  shadowHomePath: '',
+                  apiKeyEnv: 'DSH_E2E_REMOTE_KEY',
+                  apiBaseUrl: fakeCommandCode.baseUrl,
+                  badge: '',
+                  accentColor: '',
+                  providerIcon: '',
+                  additionalModelIds: [],
+                },
+              ],
+            },
+            null,
+            2,
+          )}\n`,
+        )
+      },
+    })
     let wrapperInvocationLogPath: string | undefined
     let tunnelProcessLogPath: string | undefined
     manager = await bootComposedPluginProfile({
-      packageIds: [multiHostPackageId, jjIntegrationPackageId],
+      packageIds: [
+        '@dshfiles/multi-host',
+        '@dshfiles/jj-integration',
+        '@dshfiles/rich-composer',
+        '@dshfiles/session-controller',
+        '@dshfiles/model-effort-picker',
+      ],
       profileLabel: 'multi-host-manager',
       seedHome: async homeRoot => {
         const seeded = await sshd.seedClientHome(homeRoot)
@@ -354,6 +421,140 @@ When('the scratch remote is added from the host UI', async ({ page }: { readonly
   await expect(page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true })).toBeVisible()
   const wrapperCalls = (await readFile(pair.wrapperInvocationLogPath, 'utf8')).trim().split(/\r?\n/)
   expect(wrapperCalls).toContain('invoked')
+})
+
+When('Auto creates a thread through the remote folder picker', async ({ page }: { readonly page: Page }) => {
+  let threadCreateRequests = 0
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.endsWith('/threadCreate')) threadCreateRequests += 1
+  })
+  const pair = pairFor(page)
+  const call = await hostApi(pair.manager)
+  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const host = directory.hosts.find(item => item.name === scratchRemoteName)
+  if (host === undefined) throw new Error('The saved scratch SSH host was not listed by the manager DSH.')
+  const runtime = directory.runtimes.find(item => item.hostId === host.id)
+  if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
+  const previousSessionIds = remoteThreadListSchema.parse(await call('threadList')).threads.map(thread => thread.sessionId)
+  const folderPath = join(pair.remote.homeRoot, 'projects', `auto-${randomUUID()}`)
+  await mkdir(folderPath, { recursive: true })
+  const canonicalFolderPath = await realpath(folderPath)
+
+  const initialFolderPicker = page.getByRole('dialog', { name: /^Choose a project/u })
+  if ((await initialFolderPicker.count()) > 0) {
+    await page.keyboard.press('Escape')
+    await expect(initialFolderPicker).toBeHidden()
+  }
+  await page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true }).click()
+  const autoOption = page.getByRole('option', { name: /^Auto/u })
+  await expect(autoOption).toContainText(scratchRemoteName, { timeout: 30_000 })
+  await expect(autoOption).toBeEnabled({ timeout: 30_000 })
+  await autoOption.click()
+  await expect(page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true })).toBeVisible()
+  await page.locator('[data-remote-folder]').click()
+
+  const folderPicker = page.getByRole('dialog', { name: /^Choose a project/u })
+  const pathInput = folderPicker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
+  await pathInput.fill(folderPath)
+  await pathInput.press('Enter')
+  await expect(folderPicker.locator('p').filter({ hasText: folderPath }).first()).toBeVisible({ timeout: 30_000 })
+  await folderPicker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await expect(folderPicker).toBeHidden()
+  expect(threadCreateRequests).toBe(1)
+  let remoteSessionId: string | undefined
+  await expect
+    .poll(
+      async () => {
+        remoteSessionId = remoteThreadListSchema
+          .parse(await call('threadList'))
+          .threads.find(thread => !previousSessionIds.includes(thread.sessionId))?.sessionId
+        return remoteSessionId
+      },
+      { timeout: 30_000 },
+    )
+    .toBeDefined()
+  if (remoteSessionId === undefined) throw new Error('The manager did not list the new remote Session.')
+  const conversation = page.locator('[data-conversation-content]')
+  await expect.poll(() => conversation.getAttribute('data-conversation-session')).toBe(remoteSessionId)
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await expect(composer).toBeVisible({ timeout: 30_000 })
+  await expect(composer).toBeEnabled()
+
+  autoDestinationObservations.set(page, { runtimeId: runtime.id, folderPath: canonicalFolderPath, previousSessionIds, sessionId: remoteSessionId })
+})
+
+When('the remote model picker selects its model', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const picker = page.getByRole('button', { name: /deepseek-flash, reasoning Default/u })
+  await expect(picker).toBeVisible()
+  await picker.click()
+  const models = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  await expect(models).toBeVisible()
+  const model = models.getByRole('button', { name: /gpt-6-luna/u })
+  await expect(model).toBeVisible()
+  await model.click()
+  await expect(page.locator('[data-model-picker-text]')).toHaveText('GPT-6 Luna')
+})
+
+When('the native composer sends a prompt to the remote Session', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const prompt = `remote-composer-${randomUUID()}`
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill(prompt)
+  const send = page.getByRole('button', { name: 'Send message', exact: true })
+  await expect(send).toBeEnabled()
+  await send.click()
+  autoDestinationObservations.set(page, { ...observation, prompt })
+})
+
+When('the Hosts page is opened', async ({ page }: { readonly page: Page }) => {
+  await page.getByRole('button', { name: 'Hosts', exact: true }).click()
+  await expect(page.getByTestId('dshfiles-hosts-page')).toBeVisible()
+})
+
+Then('the Hosts page shows live resource metrics', async ({ page }: { readonly page: Page }) => {
+  const hostsPage = page.getByTestId('dshfiles-hosts-page')
+  await expect(hostsPage.getByText('Auto destination', { exact: true })).toBeVisible()
+  await expect(hostsPage.getByText('Load · 1m', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(hostsPage.getByText('Memory used', { exact: true }).first()).toBeVisible()
+  await expect(hostsPage.getByTestId(/^host-resources-/).first()).toBeVisible()
+  await expect(hostsPage.getByText(/^Every machine this one can run threads on/)).toHaveCount(0)
+})
+
+Then('the new thread is owned by the automatically selected remote runtime', async ({ page }: { readonly page: Page }) => {
+  const observation = autoDestinationObservations.get(page)
+  if (observation === undefined) throw new Error('The Auto destination journey did not create a remote thread.')
+  const call = await hostApi(pairFor(page).manager)
+  await expect
+    .poll(async () => remoteThreadListSchema.parse(await call('threadList')).threads.find(thread => thread.sessionId === observation.sessionId), {
+      timeout: 30_000,
+    })
+    .toBeDefined()
+  const threads = remoteThreadListSchema.parse(await call('threadList')).threads
+  const created = threads.find(thread => thread.sessionId === observation.sessionId)
+  if (created === undefined) throw new Error('The manager did not list the new remote thread.')
+  expect(created.runtimeId).toBe(observation.runtimeId)
+  const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: SessionId(created.sessionId) }))
+  expect(ownership).toMatchObject({ ok: true, runtimeId: observation.runtimeId })
+  if (observation.prompt === undefined) throw new Error('The native composer did not submit a prompt.')
+  await expect
+    .poll(
+      async () => {
+        const transcript = transcriptSchema.parse(
+          await call('threadTranscript', {
+            runtimeId: observation.runtimeId,
+            sessionId: observation.sessionId,
+          }),
+        )
+        if (!transcript.ok) throw new Error(`The remote transcript could not be read: ${transcript.code}.`)
+        expect(transcript.cwd).toBe(observation.folderPath)
+        return transcript.entries.some(entry => entry.kind === 'user' && entry.text.includes(observation.prompt))
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 })
 
 When('a Git project is cloned with selected local files', async ({ page }: { readonly page: Page }) => {

@@ -402,14 +402,20 @@ export interface ConvViewOwnerProps {
 /** Base props of one target-owned Conversation View entry. */
 export type ConvViewProps = PropsRuntime<'conversation.view'>
 
+/** A local Workspace or confirmed Multi-Host ownership for a blank Session. */
+export type RemoteSessionWorkspaceOwnership = 'unconfirmed' | 'remote'
+
 /** Business callbacks injected into the resident Conversation shell. */
 export interface ConversationInjected {
   /** Connect and open a blank Session in the selected Workspace. */
   selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
+  /** Resolve remote ownership for a Session that has no local Workspace. */
+  resolveRemoteWorkspace: () => Promise<void>
   /** Session-addressed composer block source, or the stable absent source. */
   hooks: {
     composerBlock: ObservableSnapshot<ComposerBlock | undefined>
     draftWorkspace: ObservableSnapshot<WorkspaceId | undefined>
+    remoteWorkspace: ObservableSnapshot<RemoteSessionWorkspaceOwnership | undefined>
   }
 }
 

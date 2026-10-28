@@ -1,7 +1,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
@@ -15,9 +15,9 @@ import { hostDestination, openHostsPage, setHostDestination } from './state.js'
 const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
 
 /**
- * The first chip of the new-thread destination bar: where the thread runs. Local, or a visible registered host with
- * its live status; "Add host…" opens the add dialog and "Manage hosts…" the dedicated Hosts page. A started thread
- * keeps its host, so the bar only appears on a blank thread.
+ * The first chip of the new-thread destination bar: where the thread runs. Auto chooses a visible remote host with
+ * the least resource pressure; Local and concrete hosts remain available. "Add host…" opens the add dialog and
+ * "Manage hosts…" opens the Hosts page. A started thread keeps its host, so the bar only appears on a blank thread.
  */
 export const HostChip = (props: { readonly api: MultiHostClient; readonly unavailable?: boolean; readonly localProjectPath?: string | undefined }) => {
   const { api } = props
@@ -26,6 +26,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
   const destination = hostDestination.useValue()
   const directory = useQuery({ ...multiHostQueries.directory(api, open ? 4_000 : 30_000), enabled: props.unavailable !== true })
+  const resourcePool = useQuery({ ...multiHostQueries.resourcePool(api, open ? 5_000 : false), enabled: open && props.unavailable !== true })
   const hosts = directory.data?.hosts ?? []
   const runtimes = directory.data?.runtimes ?? []
   const selected: RuntimeSummary | undefined = destination.kind === 'runtime' ? runtimes.find(runtime => runtime.id === destination.runtimeId) : undefined
@@ -77,6 +78,23 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
           <Command>
             <CommandList>
               <CommandGroup heading="Run on">
+                <CommandItem
+                  value="auto"
+                  disabled={resourcePool.data?.selected === null || resourcePool.data === undefined}
+                  onSelect={() => {
+                    const selected = resourcePool.data?.selected
+                    if (selected === null || selected === undefined) return
+                    setHostDestination({ kind: 'runtime', runtimeId: selected.runtimeId })
+                    setOpen(false)
+                  }}
+                >
+                  <SparklesIcon className="dshx:size-3.5" />
+                  <span className="dshx:flex-1">Auto</span>
+                  <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                    {resourcePool.data?.selected?.hostName ??
+                      (resourcePool.isFetching || resourcePool.data?.hosts.some(host => host.refreshing) === true ? 'Updating…' : 'Unavailable')}
+                  </span>
+                </CommandItem>
                 <CommandItem
                   value="local"
                   onSelect={() => {

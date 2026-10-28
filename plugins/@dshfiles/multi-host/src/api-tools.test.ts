@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { multiHostApi } from './api.js'
+import { multiHostApi, resourceSnapshotSchema } from './api.js'
 
 describe('multi-host tool exposure', () => {
   test('every remote/host action a human can take is a named tool', () => {
@@ -25,6 +25,8 @@ describe('multi-host tool exposure', () => {
       'multi_host_remove_host',
       'multi_host_remove_runtime',
       'multi_host_reorder_hosts',
+      'multi_host_resource_pool',
+      'multi_host_resource_snapshot',
       'multi_host_runtime_control',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
@@ -96,6 +98,21 @@ describe('multi-host tool exposure', () => {
     expect(validation.value.groups[0]?.models[0]?.reasoning?.efforts[0]?.id).toBe('high')
   })
 
+  test('resource snapshots reject impossible machine metrics', () => {
+    const snapshot = {
+      sampledAt: '2026-10-28T05:00:00.000Z',
+      platform: 'linux',
+      cpuCount: 8,
+      loadAverage1m: 1.25,
+      memoryTotalBytes: 100,
+      memoryFreeBytes: 60,
+    }
+
+    expect(resourceSnapshotSchema.safeParse(snapshot).success).toBe(true)
+    expect(resourceSnapshotSchema.safeParse({ ...snapshot, memoryFreeBytes: 101 }).success).toBe(false)
+    expect(resourceSnapshotSchema.safeParse({ ...snapshot, loadAverage1m: -1 }).success).toBe(false)
+  })
+
   test('inspection stays read-only and every write needs the user to have asked', () => {
     const readOnly = Object.values(multiHostApi.methods)
       .filter(method => method.tool?.readOnly === true)
@@ -109,6 +126,8 @@ describe('multi-host tool exposure', () => {
       'multi_host_list',
       'multi_host_local_project_files',
       'multi_host_models',
+      'multi_host_resource_pool',
+      'multi_host_resource_snapshot',
       'multi_host_runtime_logs',
       'multi_host_runtime_status',
       'multi_host_ssh_hosts',

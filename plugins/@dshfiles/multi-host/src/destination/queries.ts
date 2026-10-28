@@ -9,6 +9,7 @@ export type MultiHostClient = ApiClient<(typeof multiHostApi)['methods']>
 export const multiHostKeys = {
   all: ['multi-host'] as const,
   directory: ['multi-host', 'directory'] as const,
+  resourcePool: ['multi-host', 'resource-pool'] as const,
   status: (runtimeId: string) => ['multi-host', 'status', runtimeId] as const,
   models: (runtimeId: string) => ['multi-host', 'models', runtimeId] as const,
   browse: (runtimeId: string, path: string | undefined) => ['multi-host', 'browse', runtimeId, path ?? '~'] as const,
@@ -22,6 +23,14 @@ export const multiHostQueries = {
     queryOptions({
       queryKey: multiHostKeys.directory,
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list(undefined, { signal: hostSignal }) }),
+      refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
+      retry: false,
+    }),
+  resourcePool: (api: MultiHostClient, refetchInterval: number | false = false) =>
+    queryOptions({
+      queryKey: multiHostKeys.resourcePool,
+      queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 10_000, request: hostSignal => api.resourcePool(undefined, { signal: hostSignal }) }),
+      staleTime: 5_000,
       refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : refetchInterval),
       retry: false,
     }),

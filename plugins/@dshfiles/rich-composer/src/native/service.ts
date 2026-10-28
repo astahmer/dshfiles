@@ -22,9 +22,10 @@ import type {} from '@deepseek-ai/dsh-client-file-upload/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
   ComposerAttachment, ComposerFileAttachment, ComposerImageAttachment, DraftFileUpload,
+  RemoteSessionWorkspaceOwnership,
 } from './contract/slots.ts'
 import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
@@ -181,6 +182,8 @@ export class ConversationController extends Service implements IConversation {
   private activeFileUploads = 0
   private readonly maxConcurrentFileUploads: number
   private readonly multiHost: ReturnType<typeof createApiClient<typeof multiHostApi.methods>>
+  private readonly remoteWorkspaceOwnership = createSnapshotStore<Record<string, RemoteSessionWorkspaceOwnership>>({})
+  private readonly remoteWorkspaceRequests = new Map<string, { readonly controller: AbortController; readonly promise: Promise<void> }>()
 
   /**
    * @param ctx - owning root context (the plugin apply context; the service
@@ -202,6 +205,8 @@ export class ConversationController extends Service implements IConversation {
     ctx.effect(() => async () => {
       const operations = [...this.fileUploadOperations.values()]
       for (const operation of operations) operation.controller.abort()
+      for (const request of this.remoteWorkspaceRequests.values()) request.controller.abort()
+      this.remoteWorkspaceRequests.clear()
       await Promise.allSettled([...this.pendingFileUploads])
       this.fileUploadOperations.clear()
       this.fileUploadQueue.length = 0
@@ -211,6 +216,38 @@ export class ConversationController extends Service implements IConversation {
       this.draftAttachments.clear()
       this.fileUploads.set({})
     }, 'conversation draft attachments')
+  }
+
+  remoteWorkspaceFor(sessionId: SessionId): ObservableSnapshot<RemoteSessionWorkspaceOwnership | undefined> {
+    const key = String(sessionId)
+    return {
+      getSnapshot: () => this.remoteWorkspaceOwnership.getSnapshot()[key],
+      subscribe: listener => this.remoteWorkspaceOwnership.subscribe(listener),
+    }
+  }
+
+  resolveRemoteWorkspace(sessionId: SessionId): Promise<void> {
+    const key = String(sessionId)
+    if (this.remoteWorkspaceOwnership.getSnapshot()[key] !== undefined) return Promise.resolve()
+    const existing = this.remoteWorkspaceRequests.get(key)
+    if (existing !== undefined) return existing.promise
+
+    const controller = new AbortController()
+    const promise = this.multiHost.sessionRuntime({ sessionId }, { signal: controller.signal })
+      .then(result => {
+        if (controller.signal.aborted || !result.ok) return
+        this.remoteWorkspaceOwnership.update(state => {
+          state[key] = result.runtimeId === null ? 'unconfirmed' : 'remote'
+        })
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.remoteWorkspaceRequests.get(key)?.controller === controller) {
+          this.remoteWorkspaceRequests.delete(key)
+        }
+      })
+    this.remoteWorkspaceRequests.set(key, { controller, promise })
+    return promise
   }
 
   /**
