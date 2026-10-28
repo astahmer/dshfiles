@@ -114,7 +114,7 @@ const stopProcessGroup = async child => {
   if (!killed || !groupKilled) throw new Error(`Owned OpenSSH process group ${processGroupId} did not stop after SIGKILL.`)
 }
 
-export const startLoopbackSshd = async () => {
+export const startLoopbackSshd = async (options = { gitSslNoVerify: false }) => {
   const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-multi-host-sshd-'))
   const resolvedScratchRoot = resolve(scratchRoot)
   if (resolvedScratchRoot !== scratchRoot || !resolvedScratchRoot.startsWith(`${resolve(tmpdir())}${sep}`)) {
@@ -172,6 +172,7 @@ export const startLoopbackSshd = async () => {
       'PrintMotd no',
       'PrintLastLog no',
       'LogLevel ERROR',
+      ...(options.gitSslNoVerify ? ['SetEnv GIT_SSL_NO_VERIFY=1'] : []),
     ].join('\n')
     await writeFile(configPath, `${config}\n`, { mode: 0o600 })
     await writeFile(knownHostsPath, `${hostKeyAlias} ${hostPublicKey.trim()}\n`, { mode: 0o600 })

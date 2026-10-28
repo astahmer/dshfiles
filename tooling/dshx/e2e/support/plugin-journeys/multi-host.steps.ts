@@ -3,6 +3,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { createServer } from 'node:https'
 import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -190,8 +191,114 @@ const isProcessRunning = (processId: number): boolean => {
 
 const hostApi = async (profile: BootedProfile) => connectDshxApi({ url: profile.url, packageId: multiHostPackageId, apiId: multiHostApiId, version: 1 })
 
+const runScratchGit = (input: { readonly args: readonly string[]; readonly cwd: string }): void => {
+  const result = spawnSync('git', [...input.args], {
+    cwd: input.cwd,
+    encoding: 'utf8',
+    timeout: 10_000,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' },
+  })
+  if (result.error !== undefined || result.status !== 0) {
+    throw new Error(`The scratch Git repository could not be prepared: ${result.error?.message ?? result.stderr.trim()}`)
+  }
+}
+
+const startScratchGitServer = async (input: { readonly projectPath: string; readonly scratchRoot: string }) => {
+  const repositoryPath = join(input.scratchRoot, 'source-project.git')
+  runScratchGit({ args: ['clone', '--bare', input.projectPath, repositoryPath], cwd: input.scratchRoot })
+  const keyPath = join(input.scratchRoot, 'git-server.key')
+  const certificatePath = join(input.scratchRoot, 'git-server.crt')
+  const certificateResult = spawnSync(
+    'openssl',
+    ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', certificatePath, '-days', '1', '-subj', '/CN=127.0.0.1'],
+    { cwd: input.scratchRoot, encoding: 'utf8', timeout: 10_000 },
+  )
+  if (certificateResult.error !== undefined || certificateResult.status !== 0) {
+    throw new Error(`The scratch Git HTTPS certificate could not be created: ${certificateResult.error?.message ?? certificateResult.stderr.trim()}`)
+  }
+
+  const [key, certificate] = await Promise.all([readFile(keyPath), readFile(certificatePath)])
+  let serverPort = 0
+  const server = createServer({ key, cert: certificate }, (request, response) => {
+    const requestUrl = new URL(request.url ?? '/', 'https://127.0.0.1')
+    if (!requestUrl.pathname.startsWith('/source-project.git/')) {
+      response.writeHead(404).end()
+      return
+    }
+    const requestChunks: Buffer[] = []
+    request.on('data', chunk => requestChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+    request.on('end', () => {
+      const requestBody = Buffer.concat(requestChunks)
+      const result = spawnSync('git', ['http-backend'], {
+        cwd: input.scratchRoot,
+        input: requestBody,
+        timeout: 15_000,
+        maxBuffer: 8_000_000,
+        env: {
+          ...process.env,
+          CONTENT_LENGTH: request.headers['content-length'] ?? String(requestBody.byteLength),
+          CONTENT_TYPE: request.headers['content-type'] ?? '',
+          GATEWAY_INTERFACE: 'CGI/1.1',
+          GIT_HTTP_EXPORT_ALL: '1',
+          GIT_PROJECT_ROOT: input.scratchRoot,
+          HTTP_HOST: request.headers.host ?? '127.0.0.1',
+          PATH_INFO: requestUrl.pathname,
+          QUERY_STRING: requestUrl.search.slice(1),
+          REMOTE_ADDR: '127.0.0.1',
+          REQUEST_METHOD: request.method ?? 'GET',
+          SERVER_NAME: '127.0.0.1',
+          SERVER_PORT: String(serverPort),
+          SERVER_PROTOCOL: 'HTTP/1.1',
+        },
+      })
+      if (result.error !== undefined || result.status !== 0) {
+        response.writeHead(502, { 'Content-Type': 'text/plain' })
+        response.end(result.error?.message ?? (result.stderr.toString('utf8').trim() || 'Git HTTP backend failed.'))
+        return
+      }
+      const crlfSeparator = Buffer.from('\r\n\r\n')
+      const lfSeparator = Buffer.from('\n\n')
+      const crlfOffset = result.stdout.indexOf(crlfSeparator)
+      const separatorOffset = crlfOffset === -1 ? result.stdout.indexOf(lfSeparator) : crlfOffset
+      const separatorLength = crlfOffset === -1 ? 2 : 4
+      if (separatorOffset === -1) {
+        response.writeHead(502, { 'Content-Type': 'text/plain' })
+        response.end('Git HTTP backend returned an invalid response.')
+        return
+      }
+      let statusCode = 200
+      const responseHeaders: Record<string, string> = {}
+      for (const line of result.stdout.subarray(0, separatorOffset).toString('utf8').split(/\r?\n/u)) {
+        const colonOffset = line.indexOf(':')
+        if (colonOffset === -1) continue
+        const name = line.slice(0, colonOffset).trim()
+        const value = line.slice(colonOffset + 1).trim()
+        if (name.toLowerCase() === 'status') statusCode = Number.parseInt(value, 10)
+        else responseHeaders[name] = value
+      }
+      response.writeHead(statusCode, responseHeaders)
+      response.end(result.stdout.subarray(separatorOffset + separatorLength))
+    })
+  })
+  await new Promise<void>((resolveServer, rejectServer) => {
+    server.once('error', rejectServer)
+    server.listen(0, '127.0.0.1', resolveServer)
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') {
+    await new Promise<void>((resolveServer, rejectServer) => server.close(error => (error === undefined ? resolveServer() : rejectServer(error))))
+    throw new Error('The scratch Git HTTPS server did not bind to a TCP port.')
+  }
+  serverPort = address.port
+  return {
+    repositoryUrl: `https://127.0.0.1:${serverPort}/source-project.git`,
+    close: async (): Promise<void> =>
+      await new Promise<void>((resolveServer, rejectServer) => server.close(error => (error === undefined ? resolveServer() : rejectServer(error)))),
+  }
+}
+
 Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Page }) => {
-  const sshd = await startLoopbackSshd()
+  const sshd = await startLoopbackSshd({ gitSslNoVerify: true })
   let remote: BootedProfile | undefined
   let manager: BootedProfile | undefined
   try {
@@ -229,6 +336,7 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
 
 When('the scratch remote is added from the host UI', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: 'Run on Local', exact: true }).click()
   await page.getByText('Add host…', { exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add host', exact: true })
@@ -246,6 +354,64 @@ When('the scratch remote is added from the host UI', async ({ page }: { readonly
   await expect(page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true })).toBeVisible()
   const wrapperCalls = (await readFile(pair.wrapperInvocationLogPath, 'utf8')).trim().split(/\r?\n/)
   expect(wrapperCalls).toContain('invoked')
+})
+
+When('a Git project is cloned with selected local files', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const sourceProjectPath = join(pair.sshd.scratchRoot, 'source-project')
+  const destinationPath = join(pair.sshd.scratchRoot, 'remote-project')
+  await mkdir(sourceProjectPath, { recursive: true })
+  await Promise.all([
+    writeFile(join(sourceProjectPath, '.gitignore'), 'selected-ignored.txt\n'),
+    writeFile(join(sourceProjectPath, 'tracked.txt'), 'tracked from the cloned repository\n'),
+    writeFile(join(sourceProjectPath, 'selected-untracked.txt'), 'selected untracked file\n'),
+    writeFile(join(sourceProjectPath, 'selected-ignored.txt'), 'selected ignored file\n'),
+    writeFile(join(sourceProjectPath, 'unselected.txt'), 'this file must stay local\n'),
+  ])
+  runScratchGit({ args: ['init', '--quiet'], cwd: sourceProjectPath })
+  runScratchGit({ args: ['add', '.gitignore', 'tracked.txt'], cwd: sourceProjectPath })
+  runScratchGit({
+    args: ['-c', 'user.name=DSH E2E', '-c', 'user.email=dsh-e2e@example.invalid', 'commit', '--quiet', '-m', 'scratch project'],
+    cwd: sourceProjectPath,
+  })
+  const gitServer = await startScratchGitServer({ projectPath: sourceProjectPath, scratchRoot: pair.sshd.scratchRoot })
+
+  try {
+    await page.getByRole('button', { name: `Run on ${scratchRemoteName}`, exact: true }).click()
+    const cloneTargetGroup = page.getByRole('group', { name: 'Add project to another machine' })
+    const cloneTarget = cloneTargetGroup.getByRole('option', { name: scratchRemoteName, exact: true })
+    await expect(cloneTarget).toBeVisible()
+    await cloneTarget.click()
+
+    const dialog = page.getByRole('dialog', { name: `Clone project to ${scratchRemoteName}`, exact: true })
+    await expect(dialog).toBeVisible()
+    await dialog.getByLabel('Git repository URL').fill(gitServer.repositoryUrl)
+    await dialog.getByLabel(`Folder on ${scratchRemoteName}`).fill(destinationPath)
+    await dialog.getByRole('checkbox', { name: 'Copy local ignored and untracked files', exact: true }).check()
+    await dialog.getByLabel('Local project folder').fill(sourceProjectPath)
+    await dialog.getByRole('button', { name: 'Find files', exact: true }).click()
+
+    const selectedUntracked = dialog.getByRole('checkbox', { name: /selected-untracked\.txt/u })
+    const selectedIgnored = dialog.getByRole('checkbox', { name: /selected-ignored\.txt/u })
+    const unselected = dialog.getByRole('checkbox', { name: /unselected\.txt/u })
+    await expect(selectedUntracked).toBeVisible()
+    await expect(selectedIgnored).toBeVisible()
+    await expect(unselected).toBeVisible()
+    await unselected.uncheck()
+    await expect(selectedUntracked).toBeChecked()
+    await expect(selectedIgnored).toBeChecked()
+    await expect(unselected).not.toBeChecked()
+
+    await dialog.getByRole('button', { name: 'Clone project', exact: true }).click()
+    await expect(dialog.getByText('Project cloned and added. Copied 2 local file(s).', { exact: true })).toBeVisible({ timeout: 30_000 })
+    expect(await readFile(join(destinationPath, 'tracked.txt'), 'utf8')).toBe('tracked from the cloned repository\n')
+    expect(await readFile(join(destinationPath, 'selected-untracked.txt'), 'utf8')).toBe('selected untracked file\n')
+    expect(await readFile(join(destinationPath, 'selected-ignored.txt'), 'utf8')).toBe('selected ignored file\n')
+    expect(existsSync(join(destinationPath, 'unselected.txt'))).toBe(false)
+    await dialog.getByRole('button', { name: 'Done', exact: true }).click()
+  } finally {
+    await gitServer.close()
+  }
 })
 
 When('a remote thread is created and read over SSH', async ({ page }: { readonly page: Page }) => {
@@ -284,15 +450,17 @@ When('the remote composer resolves @file suggestions on SSH', async ({ page }: {
   const ownership = sessionRuntimeSchema.parse(await call('sessionRuntime', { sessionId: observation.sessionId }))
   if (!ownership.ok) throw new Error(`The owning runtime could not be resolved: ${ownership.code}.`)
   expect(ownership.runtimeId).toBe(observation.runtimeId)
-  const result = fileReferencesSchema.parse(await call('runtimeFileReferences', {
-    runtimeId: observation.runtimeId,
-    sessionId: SessionId(observation.sessionId),
-    query: 'remote-composer-reference',
-  }))
+  const result = fileReferencesSchema.parse(
+    await call('runtimeFileReferences', {
+      runtimeId: observation.runtimeId,
+      sessionId: SessionId(observation.sessionId),
+      query: 'remote-composer-reference',
+    }),
+  )
   if (!result.ok) throw new Error(`Remote file-reference discovery failed: ${result.code}: ${result.message}.`)
-  expect(result.candidates).toEqual(expect.arrayContaining([
-    expect.objectContaining({ kind: 'file', path: expect.stringContaining('remote-composer-reference.txt') }),
-  ]))
+  expect(result.candidates).toEqual(
+    expect.arrayContaining([expect.objectContaining({ kind: 'file', path: expect.stringContaining('remote-composer-reference.txt') })]),
+  )
 })
 
 When('a remote file attachment is staged on its owning SSH host', async ({ page }: { readonly page: Page }) => {
@@ -301,12 +469,14 @@ When('a remote file attachment is staged on its owning SSH host', async ({ page 
   if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   const call = await hostApi(pair.manager)
   const content = 'A file staged by the native remote composer.\n'
-  const result = fileUploadSchema.parse(await call('sessionUploadFile', {
-    runtimeId: observation.runtimeId,
-    sessionId: observation.sessionId,
-    data: Buffer.from(content).toString('base64'),
-    name: 'remote-composer-attachment.txt',
-  }))
+  const result = fileUploadSchema.parse(
+    await call('sessionUploadFile', {
+      runtimeId: observation.runtimeId,
+      sessionId: observation.sessionId,
+      data: Buffer.from(content).toString('base64'),
+      name: 'remote-composer-attachment.txt',
+    }),
+  )
   if (!result.ok) throw new Error(`Remote attachment upload failed: ${result.code}: ${result.message}`)
   expect(result.value.file).toMatchObject({ name: 'remote-composer-attachment.txt', bytes: Buffer.byteLength(content) })
 })
