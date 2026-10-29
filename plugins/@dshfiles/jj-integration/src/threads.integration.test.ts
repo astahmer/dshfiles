@@ -224,6 +224,38 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(await threads.branchPoint(source.path)).toBe(commitIdAt(source.path, '@'))
   })
 
+  it('keeps a spare that jj already lists out of the threads until its record is written', async () => {
+    let markSpareAdded = (): void => undefined
+    const spareAdded = new Promise<void>(resolve => {
+      markSpareAdded = resolve
+    })
+    let releaseSpare = (): void => undefined
+    const spareReleased = new Promise<void>(resolve => {
+      releaseSpare = resolve
+    })
+    let workspaceAdds = 0
+    const gatedExecutor: JjExecutor = async input => {
+      const result = await executor(input)
+      if (input.args[0] !== 'workspace' || input.args[1] !== 'add') return result
+      workspaceAdds += 1
+      if (workspaceAdds !== 2) return result
+      markSpareAdded()
+      await spareReleased
+      return result
+    }
+    const gatedThreads = createThreads({ executor: gatedExecutor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
+    const thread = await gatedThreads.provision(repo)
+    await spareAdded
+
+    expect(jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"').trim().split('\n')).toHaveLength(3)
+    expect((await gatedThreads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
+
+    releaseSpare()
+    const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
+    await expect.poll(() => existsSync(spares), { timeout: 20_000 }).toBe(true)
+    expect((await gatedThreads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
+  })
+
   it('checks the next thread out ahead, then hands it over under the requested name on the bookmark as it is now', async () => {
     const first = await threads.provision(repo)
     const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')

@@ -758,10 +758,11 @@ export const createThreads = (options: {
 
   const list = async (repoRoot: string): Promise<readonly ThreadStatus[]> => {
     const directory = options.threadsDirectory(repoRoot)
+    const listedNames = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)).split('\n')
+    // Snapshot before reading the record: a spare that leaves the set has already written it.
+    const inFlightSpares = new Set(sparesBeingAdded)
     const spares = new Set(Object.values(await readSpares(repoRoot)))
-    const names = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot))
-      .split('\n')
-      .filter(name => name.length > 0 && !spares.has(name))
+    const names = listedNames.filter(name => name.length > 0 && !spares.has(name) && !inFlightSpares.has(name))
     const rebaseMetadata = await readRebaseMetadata(repoRoot)
     /** Two read-only `jj` calls per thread, run with bounded parallelism: a store with dozens of thread workspaces stays responsive. */
     const statuses = new Array<ThreadStatus | undefined>(names.length)
@@ -838,6 +839,8 @@ export const createThreads = (options: {
   const sparesFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-spare-workspaces.json')
   const spareWrites = new Map<string, Promise<unknown>>()
   const warming = new Map<string, Promise<void>>()
+  // A spare exists in `jj workspace list` before its record is written; until then it is still not a thread.
+  const sparesBeingAdded = new Set<string>()
   const readSpares = async (repoRoot: string): Promise<Readonly<Record<string, string>>> => {
     const parsed = JsonText.decode(sparesSchema, await readFile(sparesFile(repoRoot), 'utf8').catch(() => '{}'))
     return parsed?.success === true ? parsed.data : {}
@@ -868,9 +871,14 @@ export const createThreads = (options: {
       if (usableSpare(repoRoot, (await readSpares(repoRoot))[target]) !== undefined) return
       const name = `thread-${randomBytes(3).toString('hex')}`
       const directory = options.threadsDirectory(repoRoot)
-      await mkdir(directory, { recursive: true })
-      await jj(['workspace', 'add', join(directory, name), '--name', name, '-r', target], repoRoot)
-      await updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
+      sparesBeingAdded.add(name)
+      try {
+        await mkdir(directory, { recursive: true })
+        await jj(['workspace', 'add', join(directory, name), '--name', name, '-r', target], repoRoot)
+        await updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
+      } finally {
+        sparesBeingAdded.delete(name)
+      }
     })()
       .catch(() => undefined)
       .finally(() => {
