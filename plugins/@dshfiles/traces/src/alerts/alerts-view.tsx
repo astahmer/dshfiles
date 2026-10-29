@@ -1,4 +1,4 @@
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, usePlugin } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -77,13 +77,9 @@ const draftOf = (rule: AlertRule): AlertRuleDraft => ({
   markThreads: rule.markThreads,
 })
 
-type NotificationState = 'unsupported' | NotificationPermission
-
-const notificationState = (): NotificationState =>
-  typeof window === 'undefined' || !('Notification' in window) ? 'unsupported' : window.Notification.permission
-
 const NotificationPermissionButton = (props: { readonly t: TracesAlertsTranslate }): JSX.Element | null => {
-  const [permission, setPermission] = useState<NotificationState>(notificationState)
+  const plugin = usePlugin()
+  const [permission, setPermission] = useState(plugin.notifications.permission)
   if (permission === 'unsupported') return null
   if (permission === 'granted')
     return (
@@ -98,7 +94,7 @@ const NotificationPermissionButton = (props: { readonly t: TracesAlertsTranslate
       </span>
     )
   return (
-    <Button variant="outline" size="sm" onClick={() => void window.Notification.requestPermission().then(setPermission)}>
+    <Button variant="outline" size="sm" onClick={() => void plugin.notifications.requestPermission().then(setPermission)}>
       <BellIcon /> <span className="dshx:@max-pane-compact:sr-only">{props.t('notificationsAllow')}</span>
     </Button>
   )

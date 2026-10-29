@@ -1,5 +1,5 @@
 import { Toast } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, usePlugin } from '@dshfiles/dshx/client'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
@@ -31,20 +31,6 @@ const claimEvents = (latestEventId: number, events: readonly AlertEvent[]): read
 
 const titleOf = (event: AlertEvent, t: TracesAlertsTranslate): string => `${event.kind === 'firing' ? t('toastFiring') : t('toastResolved')}: ${event.ruleName}`
 
-const notifySystem = (event: AlertEvent, t: TracesAlertsTranslate, onOpen: () => void): void => {
-  if (!('Notification' in window) || window.Notification.permission !== 'granted') return
-  try {
-    const notification = new window.Notification(titleOf(event, t), { body: t('toastOpen'), tag: `dshfiles-traces-alert-${String(event.id)}` })
-    notification.onclick = () => {
-      window.focus()
-      onOpen()
-      notification.close()
-    }
-  } catch {
-    // Some browsers only allow notifications from a service worker; the in-app banner already said it.
-  }
-}
-
 /**
  * Lives in the shell overlay so an alert is announced wherever the user is: an in-app banner through the Host's own
  * Toast, and a browser notification when the user allowed them. Only firing events of rules that announce, and resolutions
@@ -53,6 +39,7 @@ const notifySystem = (event: AlertEvent, t: TracesAlertsTranslate, onOpen: () =>
 export const AlertNotifier = (props: { readonly onOpenAlerts: () => void; readonly t: TracesAlertsTranslate }): JSX.Element | null => {
   const t = props.t
   const client = useApi(tracesAlertsApi)
+  const plugin = usePlugin()
   const announcedId = storedAnnouncedId.useValue()
   const feed = useQuery(alertsQueries.feed(client, announcedId))
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
@@ -65,8 +52,14 @@ export const AlertNotifier = (props: { readonly onOpenAlerts: () => void; readon
     if (newest === undefined) return
     const more = fresh.length > 1 ? ` (+${String(fresh.length - 1)})` : ''
     setAnnouncement({ sequence: newest.id, text: `${titleOf(newest, t)}${more}` })
-    for (const event of fresh.filter(candidate => candidate.kind === 'firing')) notifySystem(event, t, props.onOpenAlerts)
-  }, [feed.data, t, props.onOpenAlerts])
+    for (const event of fresh.filter(candidate => candidate.kind === 'firing'))
+      plugin.notifications.notify({
+        title: titleOf(event, t),
+        body: t('toastOpen'),
+        tag: `dshfiles-traces-alert-${String(event.id)}`,
+        onClick: props.onOpenAlerts,
+      })
+  }, [feed.data, t, props.onOpenAlerts, plugin])
 
   if (announcement === null) return null
   return (
