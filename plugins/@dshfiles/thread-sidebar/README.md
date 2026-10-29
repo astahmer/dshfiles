@@ -177,6 +177,19 @@ notice (`src/settle-request.ts`): the sidebar owns this status, so the notice as
 through the cancelable `dshfiles:thread-settle` window event instead of writing a
 second copy.
 
+Settled exists because auto-archive used to push idle threads into the native
+archived state, and native navigation drops an archived Session from the main
+view right after it opens, so clicking an idle thread fought that cleanup.
+Threads already natively archived stay archived; there is no migration sweep.
+The Host no-wake gate (`src/settled-gate.ts`) walks the subagent lineage through
+live agents' headers plus the child's recorded `parentSession`, so a settled
+grandparent whose intermediate subagent is no longer live is not detected; the
+client refuses to settle a thread with a running descendant, which covers the
+case that matters. Every preference decoder field needs the same default as the
+Host schema: Schemastery drops a null-valued union field from its resolved
+output, and one field without a default once made the strict decoder reject
+every Host document, silently falling back to browser storage.
+
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its
 own **Settings › Thread sidebar** section (`src/settings-tab.tsx`, registered by
