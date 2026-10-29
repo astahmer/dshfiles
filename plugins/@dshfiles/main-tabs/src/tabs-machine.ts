@@ -65,6 +65,7 @@ export type TabsEvent =
   | { readonly type: 'tab.closeOthers'; readonly tabId: string }
   | { readonly type: 'tab.closeToRight'; readonly tabId: string }
   | { readonly type: 'tab.togglePin'; readonly tabId: string }
+  | { readonly type: 'tab.reopenClosed' }
   | { readonly type: 'tab.keep'; readonly tabId: string }
   | { readonly type: 'thread.keep'; readonly sessionId: string }
   | { readonly type: 'thread.replace'; readonly sourceSessionId: string; readonly sessionId: string }
@@ -97,6 +98,14 @@ interface TabsContext {
    * share one panel, each with its own scope), so picking the tab that is visibly active must still announce its scope.
    */
   readonly shownTabId: string | null
+  /** Tabs the user closed on this page, oldest first, for reopening; eviction past the limit is not a close. */
+  readonly closed: readonly ClosedTab[]
+}
+
+interface ClosedTab {
+  readonly scopeKey: string
+  readonly target: HostTarget
+  readonly title?: string | undefined
 }
 
 interface TabsInput {
@@ -245,6 +254,19 @@ const moveTab = (set: TabSet, tabId: string, toIndex: number): TabSet => {
 
 const withSet = (context: TabsContext, set: TabSet): Pick<TabsContext, 'sets'> => ({ sets: { ...context.sets, [context.scopeKey]: set } })
 
+const MAX_CLOSED_TABS = 20
+
+/** Like `withSet`, remembering every tab the new set drops so the user can reopen it. */
+const withClosedSet = (context: TabsContext, set: TabSet): Pick<TabsContext, 'sets' | 'closed'> => {
+  const kept = new Set(set.tabs.map(tab => tab.id))
+  const dropped = currentSet(context).tabs.flatMap((tab): ClosedTab[] =>
+    kept.has(tab.id) || tab.target.kind === 'start' ? [] : [{ scopeKey: context.scopeKey, target: tab.target, title: tab.title }],
+  )
+  return { ...withSet(context, set), closed: [...context.closed, ...dropped].slice(-MAX_CLOSED_TABS) }
+}
+
+const lastClosed = (context: TabsContext): ClosedTab | undefined => context.closed.findLast(tab => tab.scopeKey === context.scopeKey)
+
 /** One title for every set holding that tab id; a scoped panel keeps its tab across projects. */
 const withTitle = (sets: TabsContext['sets'], tabId: string, title: string): TabsContext['sets'] =>
   Object.fromEntries(Object.entries(sets).map(([key, set]) => [key, { ...set, tabs: set.tabs.map(tab => (tab.id === tabId ? { ...tab, title } : tab)) }]))
@@ -382,6 +404,7 @@ export const tabsMachine = setup({
       pendingTarget: null,
       restored: false,
       shownTabId: null,
+      closed: [],
     }
   },
   // Settings are read by a component after boot; until the first read the machine only records what the Host shows.
@@ -498,7 +521,7 @@ export const tabsMachine = setup({
           target: '.navigating',
           actions: [
             assign(({ context, event }) =>
-              withSet(
+              withClosedSet(
                 context,
                 removeTabs(currentSet(context), tab => tab.id === event.tabId),
               ),
@@ -513,7 +536,7 @@ export const tabsMachine = setup({
           actions: [
             assign(({ context }) => {
               const set = currentSet(context)
-              return withSet(
+              return withClosedSet(
                 context,
                 removeTabs(set, tab => tab.id === set.activeTabId),
               )
@@ -528,7 +551,7 @@ export const tabsMachine = setup({
             assign(({ context, event }) => {
               const set = currentSet(context)
               if (!set.tabs.some(tab => tab.id === event.tabId)) return {}
-              return withSet(context, { tabs: set.tabs.filter(tab => tab.pinned || tab.id === event.tabId), activeTabId: event.tabId })
+              return withClosedSet(context, { tabs: set.tabs.filter(tab => tab.pinned || tab.id === event.tabId), activeTabId: event.tabId })
             }),
             'navigateToActive',
             'persist',
@@ -542,7 +565,7 @@ export const tabsMachine = setup({
               const index = set.tabs.findIndex(tab => tab.id === event.tabId)
               if (index === -1) return {}
               const next = removeTabs(set, tab => !tab.pinned && set.tabs.indexOf(tab) > index)
-              return withSet(context, next.tabs.some(tab => tab.id === set.activeTabId) ? next : { ...next, activeTabId: event.tabId })
+              return withClosedSet(context, next.tabs.some(tab => tab.id === set.activeTabId) ? next : { ...next, activeTabId: event.tabId })
             }),
             'navigateToActive',
             'persist',
@@ -550,6 +573,19 @@ export const tabsMachine = setup({
         },
         'tab.title': {
           actions: [assign(({ context, event }) => ({ sets: withTitle(context.sets, event.tabId, event.title) })), 'persist'],
+        },
+        'tab.reopenClosed': {
+          guard: ({ context }) => lastClosed(context) !== undefined,
+          actions: [
+            raise(({ context }) => {
+              const tab = lastClosed(context)
+              return { type: 'tab.open' as const, target: tab?.target ?? { kind: 'start' as const }, newTab: true, title: tab?.title }
+            }),
+            assign(({ context }) => {
+              const tab = lastClosed(context)
+              return { closed: context.closed.filter(closed => closed !== tab) }
+            }),
+          ],
         },
         'tab.togglePin': {
           actions: [

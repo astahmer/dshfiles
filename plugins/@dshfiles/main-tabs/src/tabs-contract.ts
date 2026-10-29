@@ -25,6 +25,10 @@ export interface MainTabsService {
   focus(tabId: string): boolean
   /** Close a tab of the current strip; false when it has no such tab. */
   close(tabId: string): boolean
+  /** Pin a tab to the start of the strip, where it has no close button, or unpin it; false when it has no such tab. */
+  pin(tabId: string, pinned: boolean): boolean
+  /** Reopen the tab closed most recently in the current strip on this page, as ⌘⇧T does; false when none was. */
+  reopenClosed(): boolean
 }
 
 export const MainTabs = defineContract<MainTabsService>('@dshfiles/main-tabs.tabs', { owner: '@dshfiles/main-tabs' })

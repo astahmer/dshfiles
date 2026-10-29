@@ -323,6 +323,8 @@ export default defineClient({
         enabled: tabsEnabled,
         currentSet,
         isListedThread: sessionId => ctx.sessions.list.getSnapshot().ids.some(id => id === sessionId),
+        canReopen: () => actor.getSnapshot().can({ type: 'tab.reopenClosed' }),
+        send: event => actor.send(event),
       }),
     )
 
@@ -562,6 +564,13 @@ export default defineClient({
         desktop: { code: 'KeyT', modifiers: ['primary'] },
         web: { code: 'KeyT', modifiers: ['primary', 'alt'] },
         event: { type: 'tab.new' },
+      },
+      {
+        id: 'mainTabs.reopenClosed',
+        label: () => translate('reopenClosedTab'),
+        desktop: { code: 'KeyT', modifiers: ['primary', 'shift'] },
+        web: { code: 'KeyT', modifiers: ['primary', 'alt', 'shift'] },
+        event: { type: 'tab.reopenClosed' },
       },
       {
         // DSH's own page.close owns Mod+W on every desktop shell, and the Host's shortcut registry

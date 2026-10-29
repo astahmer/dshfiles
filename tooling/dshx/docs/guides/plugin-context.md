@@ -101,7 +101,7 @@ Import the token from the owner's dshx module (the owner as a workspace dependen
 | Contract | Module | What |
 | --- | --- | --- |
 | `CommandPalette` | `@dshfiles/command-palette/palette-contract` | `open(mode)`, `close()`, `setRecentLimit(n)`, live `state` |
-| `MainTabs` | `@dshfiles/main-tabs/tabs-contract` | live `tabs` of the current strip, `open(target, { newTab?, title? })` returning the tab id, `focus(tabId)`, `close(tabId)` |
+| `MainTabs` | `@dshfiles/main-tabs/tabs-contract` | live `tabs` of the current strip, `open(target, { newTab?, title? })` returning the tab id, `focus(tabId)`, `close(tabId)`, `pin(tabId, pinned)`, `reopenClosed()` |
 
 ```ts
 const tabs = api.use(MainTabs).get()

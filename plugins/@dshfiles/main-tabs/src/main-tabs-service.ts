@@ -1,6 +1,6 @@
 import type { HostTarget, WorkbenchTab, WorkbenchTabsProvider } from '@dshfiles/workbench/tabs'
 import type { MainTabsService } from './tabs-contract.js'
-import { tabIdOf, type TabSet } from './tabs-machine.js'
+import { tabIdOf, type TabSet, type TabsEvent } from './tabs-machine.js'
 
 const NO_TABS: readonly WorkbenchTab[] = []
 
@@ -10,6 +10,9 @@ export const createMainTabsService = (ports: {
   readonly enabled: () => boolean
   readonly currentSet: () => TabSet | undefined
   readonly isListedThread: (sessionId: string) => boolean
+  /** Whether the current strip has a closed tab to reopen. */
+  readonly canReopen: () => boolean
+  readonly send: (event: TabsEvent) => void
 }): MainTabsService => {
   const tabs = (): readonly WorkbenchTab[] => {
     const snapshot = ports.provider.getSnapshot()
@@ -31,6 +34,17 @@ export const createMainTabsService = (ports: {
     close: tabId => {
       if (!has(tabId)) return false
       ports.provider.actions.close(tabId)
+      return true
+    },
+    pin: (tabId, pinned) => {
+      const tab = ports.enabled() ? ports.currentSet()?.tabs.find(candidate => candidate.id === tabId) : undefined
+      if (tab === undefined || tab.target.kind === 'start') return false
+      if (tab.pinned !== pinned) ports.provider.actions.togglePin(tabId)
+      return true
+    },
+    reopenClosed: () => {
+      if (!ports.enabled() || !ports.canReopen()) return false
+      ports.send({ type: 'tab.reopenClosed' })
       return true
     },
   }
