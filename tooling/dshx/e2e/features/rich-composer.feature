@@ -19,3 +19,9 @@ Feature: Rich composer references
     Given the isolated rich-composer, input-trigger and attachment-gallery plugin profile is booted
     When an image is attached to a new thread composer
     Then an image reference can be mentioned repeatedly and opens its selected image
+
+  @scenario:rich-composer.composer-contract
+  Scenario: A plugin writes the draft and adds chips through the Composer contract
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/input-trigger, @dshfiles/session-controller" is booted
+    When a plugin sets the draft and attaches a quote, a note and a file through the Composer contract
+    Then the composer shows the draft with the quote, note and file chips

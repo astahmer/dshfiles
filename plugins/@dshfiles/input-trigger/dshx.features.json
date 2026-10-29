@@ -99,8 +99,13 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "unit-test",
+          "kind": "gherkin",
           "id": "input-trigger.command-slash-entries",
+          "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.command-slash-entries-unit",
           "file": "plugins/@dshfiles/input-trigger/src/command-slash-source.test.ts",
           "testName": "runs a picked command and clears its token"
         }

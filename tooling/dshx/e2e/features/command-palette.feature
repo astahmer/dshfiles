@@ -111,3 +111,9 @@ Feature: Command palette
     When Cmd+K opens the command palette
     When the palette query is "New thread"
     Then the New thread action is available and can run
+
+  @scenario:command-palette.command-effective-keys
+  Scenario: The empty palette suggests a command with the keys it answers to
+    Given the isolated plugin composition of "@dshfiles/command-palette, @dshfiles/shortcuts" is booted
+    When the command palette is opened
+    Then the empty palette suggests "Toggle sidebar" with the keys "Mod+B"

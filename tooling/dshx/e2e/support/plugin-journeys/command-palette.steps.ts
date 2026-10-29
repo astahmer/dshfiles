@@ -285,3 +285,10 @@ Then('command, content, line, and help prefixes open their matching views', asyn
   })
   await finishJourneyAssertions(page)
 })
+
+Then('the empty palette suggests {string} with the keys {string}', async ({ page }: { page: Page }, title: string, keys: string) => {
+  const option = paletteOption(page, new RegExp(title))
+  await recordAssertion(page, 'suggested-command-shows-before-typing', () => expect(option).toBeVisible())
+  await recordAssertion(page, 'suggested-command-shows-effective-keys', () => expect(option).toContainText(keys))
+  await finishJourneyAssertions(page)
+})

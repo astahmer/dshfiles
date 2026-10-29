@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
+import type {} from '../../../packages/dshx/src/client/broker.js'
+import type { ComposerService } from '../../../packages/dshx/src/client/app-services.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
@@ -73,6 +75,44 @@ Then('an image reference can be mentioned repeatedly and opens its selected imag
     }
     await expect(imageReferences).toHaveCount(3)
     await expect(imageReferences.nth(2)).toHaveText('Image 1')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a plugin sets the draft and attaches a quote, a note and a file through the Composer contract', async ({ page }: { page: Page }) => {
+  await page.waitForFunction(() => globalThis.__dshxBrokerV1?.contracts.get('dshx.composer')?.live.status === 'active')
+  await newThreadComposer(page).click()
+  const applied = await page.evaluate(() => {
+    const live = globalThis.__dshxBrokerV1?.contracts.get('dshx.composer')?.live
+    if (live?.status !== 'active') throw new Error('dshx.composer is not provided')
+    // SAFETY: the broker stores contract values untyped; `dshx.composer` is only ever provided with a ComposerService.
+    const composer = live.value as ComposerService
+    return [
+      composer.setText({ text: 'Please review ' }),
+      composer.attach({ attachment: { kind: 'quote', text: 'const answer = 42' } }),
+      composer.attach({ attachment: { kind: 'note', text: 'keep the API narrow', label: 'Reviewer note' } }),
+      composer.attach({ attachment: { kind: 'file', path: 'README.md' } }),
+    ]
+  })
+  expect(applied).toEqual([true, true, true, true])
+})
+
+Then('the composer shows the draft with the quote, note and file chips', async ({ page }: { page: Page }) => {
+  const composer = newThreadComposer(page)
+  await recordAssertion(page, 'composer-contract-chips-render', async () => {
+    await expect(composer).toContainText('Please review')
+    await expect(composer).toContainText('const answer = 42')
+    await expect(composer).toContainText('Reviewer note')
+    await expect(composer).toContainText('README.md')
+  })
+  await recordAssertion(page, 'composer-contract-reads-the-draft', async () => {
+    const draft = await page.evaluate(() => {
+      const live = globalThis.__dshxBrokerV1?.contracts.get('dshx.composer')?.live
+      // SAFETY: as above, `dshx.composer` holds a ComposerService.
+      return live?.status === 'active' ? (live.value as ComposerService).text() : undefined
+    })
+    expect(draft).toContain('> const answer = 42')
+    expect(draft).toContain('keep the API narrow')
   })
   await finishJourneyAssertions(page)
 })

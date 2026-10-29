@@ -10,3 +10,11 @@ Feature: Shared input trigger engine
     When threads named "deploy" and "fix the deploy script" are started
     And a new thread composer types "@\"fix the"
     Then a mention row includes the thread "fix the deploy script"
+
+  @scenario:input-trigger.command-slash-entries
+  Scenario: A command's / entry runs it from the composer
+    Given the isolated plugin composition of "@dshfiles/input-trigger, @dshfiles/rich-composer, @dshfiles/session-controller, @dshfiles/shortcuts" is booted
+    When "/side" is typed in the composer
+    Then the slash menu offers the "Toggle sidebar" command
+    When Enter picks the highlighted slash entry
+    Then the sidebar collapses and the composer draft is empty

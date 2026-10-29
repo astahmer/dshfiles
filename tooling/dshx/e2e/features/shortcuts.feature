@@ -32,3 +32,10 @@ Feature: Shortcuts
     Given the isolated plugin profile "@dshfiles/shortcuts" is booted
     When primary+Shift+B is pressed
     Then the sidebar remains expanded after the unmatched chord
+
+  @scenario:shortcuts.editable-command-keys
+  Scenario: A user rebinds an editable command in Keyboard shortcuts
+    Given the isolated plugin profile "@dshfiles/shortcuts" is booted
+    When a plugin contributes the editable command "Say hello" on "Mod+Shift+Y"
+    And "Say hello" is rebound to primary+Shift+U in Keyboard shortcuts
+    Then primary+Shift+U runs "Say hello" and primary+Shift+Y no longer does

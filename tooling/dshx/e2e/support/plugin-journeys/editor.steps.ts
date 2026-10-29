@@ -3,6 +3,8 @@ import { globalPanelLink } from '../plugin-view-names.js'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
+import type {} from '../../../packages/dshx/src/client/broker.js'
+import type { SessionScreenService } from '../../../packages/dshx/src/client/app-services.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
 
@@ -211,3 +213,64 @@ After(async ({ page }: { page: Page }) => {
   workspaces.delete(page)
   await rm(root, { recursive: true, force: true })
 })
+
+const sessionScreen = async (page: Page): Promise<void> => {
+  await page.waitForFunction(() => globalThis.__dshxBrokerV1?.contracts.get('dshx.session-screen')?.live.status === 'active')
+}
+
+Then('SessionScreen indexes {string} and {string} for the mounted session', async ({ page }: { page: Page }, first: string, second: string) => {
+  await sessionScreen(page)
+  await recordAssertion(page, 'session-screen-index-is-ready', async () => {
+    const index = await page.evaluate(
+      () =>
+        new Promise<{ readonly mounted: string | undefined; readonly sessionId: string; readonly files: readonly string[] } | undefined>(resolve => {
+          const live = globalThis.__dshxBrokerV1?.contracts.get('dshx.session-screen')?.live
+          if (live?.status !== 'active') return resolve(undefined)
+          // SAFETY: the broker stores contract values untyped; `dshx.session-screen` is only ever provided with a SessionScreenService.
+          const screen = live.value as SessionScreenService
+          let done = false
+          const settle = (): void => {
+            const state = screen.files.index.get()
+            if (done || state.status !== 'ready') return
+            done = true
+            resolve({ mounted: screen.mounted.get(), sessionId: state.sessionId, files: state.files })
+          }
+          // Subscribing starts the walk and may publish synchronously, so the unsubscribe waits for the answer.
+          const stop = screen.files.index.subscribe(settle)
+          settle()
+          const release = (): void => (done ? stop() : void setTimeout(release, 50))
+          release()
+        }),
+    )
+    expect(index?.files).toEqual(expect.arrayContaining([first, second]))
+    expect(index?.sessionId).toBe(index?.mounted)
+  })
+})
+
+Then(
+  'SessionScreen lists {string} under {string} and its search finds {string}',
+  async ({ page }: { page: Page }, file: string, directory: string, hit: string) => {
+    const found = await page.evaluate(
+      async ({ directory, query }) => {
+        const live = globalThis.__dshxBrokerV1?.contracts.get('dshx.session-screen')?.live
+        if (live?.status !== 'active') throw new Error('dshx.session-screen is not provided')
+        // SAFETY: as above, `dshx.session-screen` holds a SessionScreenService.
+        const screen = live.value as SessionScreenService
+        return { listed: await screen.files.list({ path: directory }), hits: await screen.files.search({ query }) }
+      },
+      {
+        directory,
+        query:
+          hit
+            .split('/')
+            .at(-1)
+            ?.replace(/\.\w+$/, '') ?? hit,
+      },
+    )
+    await recordAssertion(page, 'session-screen-lists-a-tree-level', () =>
+      expect(found.listed).toContainEqual(expect.objectContaining({ path: file, type: 'file' })),
+    )
+    await recordAssertion(page, 'session-screen-search-finds-the-file', () => expect(found.hits).toContainEqual({ path: hit, kind: 'file' }))
+    await finishJourneyAssertions(page)
+  },
+)

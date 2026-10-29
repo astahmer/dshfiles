@@ -440,8 +440,13 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "unit-test",
+          "kind": "gherkin",
           "id": "command-palette.command-effective-keys",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.command-effective-keys-unit",
           "file": "plugins/@dshfiles/command-palette/src/contributed-commands.test.ts",
           "testName": "shows the keys a command answers to now and marks a suggested one"
         }

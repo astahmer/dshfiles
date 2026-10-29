@@ -110,6 +110,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "shortcuts.editable-command-keys",
+          "featureFile": "tooling/dshx/e2e/features/shortcuts.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "shortcuts.editable-command-listing",
           "file": "plugins/@dshfiles/shortcuts/src/editable-commands.test.ts",

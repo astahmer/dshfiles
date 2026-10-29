@@ -254,6 +254,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "rich-composer.composer-contract",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "rich-composer.composer-snippets",
           "file": "plugins/@dshfiles/rich-composer/tests/composer-snippets.test.ts",

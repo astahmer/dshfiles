@@ -32,3 +32,11 @@ Feature: Workspace editor
     When the editor placement is set to "Workbench (dockable main-area panel)" in the plugin settings
     And "README.md" is opened with Go to file
     Then "README.md" opens in the "workbench" editor with its disk content
+
+  @scenario:editor.session-screen-contract
+  Scenario: Plugins read the mounted session's workspace files through SessionScreen
+    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette, @dshfiles/workbench, @dshfiles/frame-layout" is booted
+    When a disposable workspace with source, dependency and version-control files has a thread
+    Then Go to file lists workspace sources but not dependency or version-control files
+    And SessionScreen indexes "README.md" and "src/hello.ts" for the mounted session
+    And SessionScreen lists "src/hello.ts" under "src" and its search finds "src/hello.ts"

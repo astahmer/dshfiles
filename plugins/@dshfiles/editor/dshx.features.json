@@ -177,6 +177,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "editor.session-screen-contract",
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "editor.session-screen-index",
           "file": "plugins/@dshfiles/editor/src/session-screen.test.ts",
