@@ -102,6 +102,7 @@ import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js
 import { GraphRowAnchorModel, type GraphRowAnchor } from './graph-row-anchor.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
+import { WorkspaceLabels } from './workspace-labels.js'
 
 type View = 'graph' | 'source'
 
@@ -2430,7 +2431,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const draggable = !revision.immutable
   const described = revision.description.trim().length > 0
   const changeId = reverseHexChangeId(revision.changeId, Math.max(3, revision.shortestChangeId.length))
-  const workspaceLabels = revision.workingCopy && revision.workspaces.length === 0 ? ['default'] : revision.workspaces
+  const rowWorkspaces = WorkspaceLabels.forRow(revision)
   const workspaceLabel = (workspace: string): JSX.Element => (
     <span
       className={cn(
@@ -2469,7 +2470,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   ]
   const labels = (
     <>
-      {workspaceLabels.map(workspace =>
+      {rowWorkspaces.shown.map(workspace =>
         workspace === 'default' ? (
           <Tooltip key={workspace}>
             <TooltipTrigger asChild>
@@ -2488,6 +2489,16 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
             {props.workspaceMenu(workspace, revision.commitId)}
           </ContextMenu>
         ),
+      )}
+      {rowWorkspaces.hidden.length > 0 && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="dshx:h-4 dshx:flex-none dshx:rounded-full dshx:border dshx:border-border dshx:px-1.5 dshx:text-[11px] dshx:leading-[14px] dshx:font-medium dshx:text-muted-foreground">
+              +{rowWorkspaces.hidden.length} more
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{rowWorkspaces.overflowHint}</TooltipContent>
+        </Tooltip>
       )}
       {bookmarks.map(({ name, label, key, local }) => (
         <ContextMenu key={key}>

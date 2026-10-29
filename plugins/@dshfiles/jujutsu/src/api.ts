@@ -2,6 +2,8 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 
 export const REVISION_PAGE_SIZE = 10
+// One revision can be the working copy of every thread workspace; the Host's bounded jj output still caps the row.
+const MAX_REVISION_WORKSPACES = 1024
 
 export const revisionSchema = z.object({
   commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
@@ -18,7 +20,7 @@ export const revisionSchema = z.object({
   localBookmarks: z.array(z.string().max(256)).max(64),
   remoteBookmarksText: z.string().max(32_768).default(''),
   tags: z.array(z.string().max(256)).max(64),
-  workspaces: z.array(z.string().max(128)).max(32),
+  workspaces: z.array(z.string().max(128)).max(MAX_REVISION_WORKSPACES),
   workingCopy: z.boolean(),
   mine: z.boolean(),
   immutable: z.boolean(),

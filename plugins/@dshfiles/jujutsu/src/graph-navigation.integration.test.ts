@@ -62,6 +62,22 @@ test('landmarks resolve in a repository with many workspaces and a squash merge 
   assert.equal(navigation.landmarks.find(item => item.kind === 'default')?.status, 'resolved')
 }, 60_000)
 
+test('a revision that is the working copy of more than 32 workspaces still reads with every workspace name', async () => {
+  const { repo, jj, id, run } = await fixture()
+  jj(['bookmark', 'create', 'main'])
+  const main = id()
+  const names = Array.from({ length: 40 }, (_, index) => `ws-${index}`)
+  for (const name of names) {
+    const path = join(repo, '..', name)
+    jj(['workspace', 'add', '--name', name, '-r', main, path])
+    jj(['-R', path, 'edit', main])
+  }
+  const navigation = await GraphNavigationReads.readGraphNavigation(run)
+  const landmark = navigation.landmarks.find(item => item.kind === 'main')
+  assert.equal(landmark?.status, 'resolved')
+  assert.deepEqual([...(landmark?.revisions[0]?.workspaces ?? [])].sort(), ['default', ...names].sort())
+}, 120_000)
+
 test('main@origin resolves the exact fetched remote bookmark independently of local main', async () => {
   const remote = await fixture()
   remote.jj(['bookmark', 'create', 'main'])
