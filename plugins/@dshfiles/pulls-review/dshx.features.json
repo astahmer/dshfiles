@@ -167,7 +167,7 @@
     {
       "id": "batch-reviewed-marks",
       "title": "Mark a selection of changed files reviewed",
-      "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in local review progress. A plain click on Mark reviewed still toggles that file.",
+      "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.",
       "surfaces": ["client"],
       "configuration": [],
       "states": ["unselected", "range-selected", "marked", "cleared"],
@@ -191,8 +191,8 @@
       ],
       "telemetry": [
         {
-          "kind": "not-applicable",
-          "reason": "Client-only: Mark a selection of scope files reviewed renders browser state and starts no Host work of its own."
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ],
       "reach": ["click button \"pulls.review: Reviews\"", "expect checkbox \"Select all files in this review\""]

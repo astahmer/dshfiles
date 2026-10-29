@@ -1,5 +1,11 @@
-/** How many review scopes one browser keeps marks for; the rest are evicted oldest-first. */
+import { z } from 'zod'
+import { MAX_FILES } from './api.js'
+
+/** How many review scopes the Host keeps marks for; the rest are evicted oldest-first. */
 export const MAX_REVIEWED_KEYS = 20
+
+const reviewedMarksSchema = z.record(z.string(), z.array(z.string().max(2048)).max(MAX_FILES))
+export type ReviewedMarks = z.infer<typeof reviewedMarksSchema>
 
 /**
  * Reviewed marks are keyed by workspace, base and working-copy revision, so a
@@ -9,7 +15,7 @@ const reviewedKeyOf = (path: string, base: string, head: string): string => `${p
 
 const toggleReviewed = (paths: readonly string[], path: string): string[] => (paths.includes(path) ? paths.filter(entry => entry !== path) : [...paths, path])
 
-/** Write one key and drop the least recently touched ones, so localStorage stays bounded. */
+/** Write one key and drop the least recently touched ones, so the stored record stays bounded. */
 const recordReviewed = (record: Readonly<Record<string, readonly string[]>>, key: string, paths: readonly string[]) => {
   const next: Record<string, string[]> = {}
   for (const [existing, value] of Object.entries(record)) if (existing !== key) next[existing] = [...value]
@@ -20,6 +26,9 @@ const recordReviewed = (record: Readonly<Record<string, readonly string[]>>, key
 }
 
 export class ReviewedMarksModel {
+  static readonly schema = reviewedMarksSchema
+  /** Where marks lived before they moved to the Host; read once, then removed. */
+  static readonly legacyBrowserKey = 'dshfiles-pulls-review:reviewed'
   static readonly keyOf = reviewedKeyOf
   static readonly toggle = toggleReviewed
   static readonly record = recordReviewed

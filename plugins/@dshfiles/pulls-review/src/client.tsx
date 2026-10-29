@@ -8,6 +8,7 @@ import { GitPullRequest } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PullsReviewPanel } from './panel.js'
 import { PageReviewContextModel } from './review-page-context.js'
+import { ReviewedMarksModel } from './reviewed.js'
 import { createSessionFocus } from './session-focus.js'
 
 const PANEL_ID = 'pulls-review'
@@ -21,6 +22,21 @@ export default defineClientPlugin({
     const ctx = api.raw.ctx
     const focus = createSessionFocus(ctx.sidebarRight.mounted)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-pulls-review: remember the on-screen thread')
+    const reviewed = api.storage.store({ key: 'reviewed', scope: 'global', schema: ReviewedMarksModel.schema, initial: {} })
+    void reviewed.ready.then(
+      () => {
+        let stored: unknown = null
+        try {
+          stored = JSON.parse(globalThis.localStorage?.getItem(ReviewedMarksModel.legacyBrowserKey) ?? 'null')
+        } catch {
+          stored = null
+        }
+        const legacy = ReviewedMarksModel.schema.safeParse(stored)
+        if (legacy.success && Object.keys(reviewed.get()).length === 0) reviewed.set(legacy.data)
+        globalThis.localStorage?.removeItem(ReviewedMarksModel.legacyBrowserKey)
+      },
+      (error: unknown) => console.warn('pulls.review: reviewed marks stay unsaved until the Host storage answers.', error),
+    )
     api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: 'pulls.review: Reviews' }, () => <GitPullRequest aria-hidden />)
     api.provide(Changes, {
       review: input => {
@@ -30,7 +46,7 @@ export default defineClientPlugin({
     })
     api.ui.register({ name: 'main', key: PANEL_ID }, () => (
       <PluginQueryProvider>
-        <PullsReviewPanel focus={focus} sessions={ctx.sessions} workspaces={ctx.workspaces} />
+        <PullsReviewPanel focus={focus} sessions={ctx.sessions} workspaces={ctx.workspaces} reviewed={reviewed} />
       </PluginQueryProvider>
     ))
   },

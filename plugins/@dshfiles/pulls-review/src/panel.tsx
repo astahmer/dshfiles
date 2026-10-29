@@ -1,6 +1,6 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useSubscribable, type HostStore } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -9,28 +9,21 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { Check, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { z } from 'zod'
-import { MAX_FILES, pullsReviewApi } from './api.js'
-import { ReviewedMarksModel } from './reviewed.js'
+import { pullsReviewApi } from './api.js'
+import { ReviewedMarksModel, type ReviewedMarks } from './reviewed.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import type { SessionFocus } from './session-focus.js'
-
-const NO_REVIEWED: Record<string, string[]> = {}
-const reviewedStore = createStoredValue({
-  key: 'dshfiles-pulls-review:reviewed',
-  schema: z.record(z.string(), z.array(z.string().max(2048)).max(MAX_FILES)),
-  fallback: NO_REVIEWED,
-})
 
 export interface PullsReviewPanelProps {
   readonly sessions: ISessions
   readonly focus: SessionFocus
   readonly workspaces: IWorkspaces
+  /** Kept on the Host, so marks made in one browser show in every other. */
+  readonly reviewed: HostStore<ReviewedMarks>
 }
 
 const noBody = (): undefined => undefined
@@ -51,7 +44,8 @@ const Stat = (props: { readonly label: string; readonly tone?: 'add' | 'del' }):
 
 export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const api = useApi(pullsReviewApi)
-  const reviewed = reviewedStore.useValue()
+  const reviewedStore = props.reviewed
+  const reviewed = useSubscribable(reviewedStore)
 
   const subscribeMounted = useCallback((listener: () => void) => props.focus.subscribe(listener), [props.focus])
   const readMounted = useCallback(() => props.focus.getSnapshot(), [props.focus])
