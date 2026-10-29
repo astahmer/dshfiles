@@ -57,6 +57,6 @@ Resume here: pick the next item.
 | #   | Gap                                                                      |
 | --- | ------------------------------------------------------------------------ |
 | D30 | Undo/redo snapshots rolling back conversation and files together         |
-| D31 | Session warming to keep provider prompt caches alive between prompts     |
+| D31 | Done: `@dshfiles/session-warming` (off by default) keeps each thread's last loop request from the `llm/stream` waterfall and re-sends it with one output token every `intervalMinutes` after the turn ends; cost guard `maxWarmupsPerIdle` (3) per pause and a rolling `maxWarmupsPerHour` (30) across threads, a failure stops the thread until its next turn; `session_warming_status` tool |
 | D32 | Done: `@dshfiles/policies` installs one global `ctx.tools.guard` over rules edited in Settings › dshfiles-policies (tool glob + argument regex + reason); a match is refused after every permission and approval, a broken pattern fails closed. Agent gets read-only `policies_list` / `policy_check`, deliberately no write tool |
 | D33 | Done: `@dshfiles/references` saves a named directory (read in place) or git URL (shallow clone under `$DSH_HOME/references`), attaches it per Session (`/reference`, `reference_*` tools) and names attached ones with their paths in the runtime context; stored in the `dshfiles_references` storage domain |

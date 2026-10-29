@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "prompt-cache-warming",
+      "title": "Keep an idle thread's prompt cache warm, within a budget",
+      "summary": "Opt-in: after a turn ends, re-send the thread's exact last model request with one output token every intervalMinutes, so the provider keeps its prefix cache; stop after maxWarmupsPerIdle per idle period, a rolling maxWarmupsPerHour across threads, a failure, or when the next turn starts.",
+      "surfaces": ["host", "integration"],
+      "configuration": [
+        { "key": "enabled", "defaultValue": "false", "constraints": "Off schedules nothing.", "coveredBy": ["session-warming.disabled"] },
+        { "key": "intervalMinutes", "defaultValue": "4", "constraints": "1–55 minutes.", "coveredBy": ["session-warming.idle-limit"] },
+        { "key": "maxWarmupsPerIdle", "defaultValue": "3", "constraints": "1–20 per thread between two prompts.", "coveredBy": ["session-warming.idle-limit"] },
+        {
+          "key": "maxWarmupsPerHour",
+          "defaultValue": "30",
+          "constraints": "1–600 across threads in a rolling hour.",
+          "coveredBy": ["session-warming.hourly-budget"]
+        },
+        {
+          "key": "providers",
+          "defaultValue": "[]",
+          "constraints": "Provider routes to warm; empty warms every provider.",
+          "coveredBy": ["session-warming.disabled"]
+        }
+      ],
+      "states": ["waiting", "warmed", "idle-limit", "hourly-limit", "failed", "disabled"],
+      "failureModes": [
+        "A warm-up the provider refuses (for example one output token below a thinking budget) stops that thread until its next turn.",
+        "A stopped thread drops its held request, so an idle conversation is not kept in memory for a timer that will not fire.",
+        "A changed provider or model drops the old timer instead of warming a cache the next request will not use."
+      ],
+      "externalDependencies": [
+        {
+          "id": "model-provider",
+          "boundary": "DSH's own ctx.llm.stream with the thread's recorded loop request, maxTokens 1 and a 60 s timeout.",
+          "deterministicFake": "A stub stream yielding a usage chunk in src/warming.test.ts; timers run on vitest fake timers."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-warming.idle-limit",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "re-sends the last request each interval after a turn, up to the per-idle limit, then waits for the next turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-warming.disabled",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "never warms while disabled or for a provider outside the list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-warming.hourly-budget",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "shares one rolling hourly budget across threads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-warming.failure",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "stops a thread whose warm-up failed until its next turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-warming.model-change",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "drops a thread’s timer when its model changes or it is forgotten"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-warming.request",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "re-sends the request for one output token and reports the cache reads in a span"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "session-warming warm",
+          "file": "plugins/@dshfiles/session-warming/src/warming.test.ts",
+          "testName": "re-sends the request for one output token and reports the cache reads in a span"
+        }
+      ]
+    }
+  ]
+}

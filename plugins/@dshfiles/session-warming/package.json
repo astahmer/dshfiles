@@ -1,0 +1,63 @@
+{
+  "name": "@dshfiles/session-warming",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Opt-in prompt-cache keep-alive: re-send an idle thread's last request for one output token before the provider cache expires, within a per-thread and hourly budget.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "scripts": {
+    "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "catalog:",
+    "@deepseek-ai/dsh-session": "catalog:",
+    "@deepseek-ai/dsh-tools": "catalog:",
+    "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
+    "@types/node": "22.20.5",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
+    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "host": {
+      "inject": [
+        "@deepseek-ai/dsh-llm",
+        "@deepseek-ai/dsh-session",
+        "@deepseek-ai/dsh-tools"
+      ]
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

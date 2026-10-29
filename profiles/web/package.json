@@ -54,6 +54,7 @@
     "@dshfiles/send-after-upload": "link:../../plugins/@dshfiles/send-after-upload",
     "@dshfiles/session-controller": "link:../../plugins/@dshfiles/session-controller",
     "@dshfiles/session-search": "link:../../plugins/@dshfiles/session-search",
+    "@dshfiles/session-warming": "link:../../plugins/@dshfiles/session-warming",
     "@dshfiles/settings-shell": "link:../../plugins/@dshfiles/settings-shell",
     "@dshfiles/shared-runtime": "link:../../plugins/@dshfiles/shared-runtime",
     "@dshfiles/shared-streams": "link:../../plugins/@dshfiles/shared-streams",
@@ -155,6 +156,7 @@
         "@dshfiles/git-worktrees",
         "@dshfiles/references",
         "@dshfiles/policies",
+        "@dshfiles/session-warming",
         "@dshfiles/hmr-gate"
       ]
     }
