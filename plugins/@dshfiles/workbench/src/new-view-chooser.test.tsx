@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { NewThreadSource } from './new-thread-source.js'
 import { NewViewChooser } from './new-view-chooser.js'
 import type { WorkbenchPanelDefinition } from './registry.js'
 
@@ -61,5 +62,20 @@ describe('NewViewChooser', () => {
     fireEvent.change(input, { target: { value: 'unavailable view' } })
     expect(screen.getByText('No matching views.')).toBeDefined()
     expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('offers New thread first and finds it by searching new or thread', () => {
+    const newThread = NewThreadSource.create(() => undefined).definition
+    const definitions = [source('backlog', 'Backlog: Items'), source('dshfiles-settings', 'Settings Shell: Settings'), newThread]
+    const select = vi.fn()
+    render(<NewViewChooser definitions={definitions} onSelect={select} />)
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['New thread', 'Settings Shell: Settings', 'Backlog: Items'])
+    const input = screen.getByRole('textbox', { name: 'Search views' })
+    for (const query of ['new', 'Thread']) {
+      fireEvent.change(input, { target: { value: query } })
+      expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['New thread'])
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'New thread' }))
+    expect(select).toHaveBeenCalledWith(newThread)
   })
 })

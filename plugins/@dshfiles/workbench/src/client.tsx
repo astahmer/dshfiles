@@ -44,6 +44,7 @@ import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 import { NewViewTabs } from './new-view.js'
+import { NewThreadSource } from './new-thread-source.js'
 import { TabRows } from './tab-row-visibility.js'
 import { SidebarPreviewMigration } from './sidebar-preview-migration.js'
 
@@ -274,7 +275,9 @@ export default defineClient({
                 return () => renderMain(panelId)
               },
               surfaces: () => regions.entries().map(([, api]) => api),
-              open: id => semanticPanelOpener.place(id),
+              open: id => {
+                if (!newThreadSource.admit(id)) semanticPanelOpener.place(id)
+              },
               scopeLayouts: { capture: captureLayout, restore: applyLayout },
             })
             const sync = (): void => {
@@ -580,6 +583,32 @@ export default defineClient({
       'workbench: semantic tab move-aside admission',
     )
 
+    const newThreadSource = NewThreadSource.create((api, panelId, selection) => {
+      const region = regions.entries().find(([, candidate]) => candidate === api)?.[0]
+      if (region === undefined) return
+      const group = selection.group !== undefined && api.groups.includes(selection.group) ? selection.group : undefined
+      adoptPanel(group === undefined ? { region, api, panelId } : { region, api, panelId, position: { referenceGroup: group, direction: 'within' } })
+      if (selection.replacePanelId !== undefined) registry.get(selection.replacePanelId)?.beforeClose?.()
+      NewViewTabs.completeSelection(api, panelId, selection)
+    })
+    ctx.effect(() => {
+      let unregister: (() => void) | undefined
+      const offerWhileTabsEnabled = (): void => {
+        const enabled = workbenchTabs().getSnapshot().enabled
+        if (enabled && unregister === undefined) unregister = registry.register(newThreadSource.definition)
+        if (enabled || unregister === undefined) return
+        unregister()
+        unregister = undefined
+      }
+      const unsubscribe = workbenchTabs().subscribe(offerWhileTabsEnabled)
+      offerWhileTabsEnabled()
+      return () => {
+        unsubscribe()
+        unregister?.()
+        newThreadSource.clear()
+      }
+    }, 'workbench: New thread launcher')
+
     const newSemanticPanelOpener = () =>
       createSemanticPanelOpener({
         tabs: workbenchTabs,
@@ -606,6 +635,7 @@ export default defineClient({
       (region: WorkbenchRegionId) =>
       (definition: WorkbenchPanelDefinition, api: DockviewApi, target?: { readonly group?: DockviewGroupPanel; readonly replacePanelId?: string }): void => {
         if (terminalSource.open(definition, api, target)) return
+        if (newThreadSource.open(definition, api, target)) return
         if (
           target === undefined &&
           definition.mainPanelId !== undefined &&
@@ -797,6 +827,7 @@ export default defineClient({
           clearScopeLayouts: () => semanticLayouts.remove(),
           discardPendingPlacements: () => {
             terminalSource.clear()
+            newThreadSource.clear()
             pendingOpen.clear()
             registry.takeOpenRequests()
             nativeAside.reset()
