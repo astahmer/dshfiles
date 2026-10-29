@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, vi } from 'vitest'
@@ -8,7 +8,8 @@ import { readCodexUsage } from './usage.js'
 import { seedInertCodexLogin } from './inert-codex-login.fixture.js'
 
 it('satisfies only credential presence in a private home and refuses quota before any network access', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'inert-codex-e2e-'))
+  // The fixture compares against the real path; macOS tmpdir() is a /var symlink to /private/var.
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'inert-codex-e2e-')))
   const instanceId = 'codex_work_11111111111141118111111111111111'
   const target = join(home, 'plugins/ai-accounts/homes', instanceId)
   const draft = {
