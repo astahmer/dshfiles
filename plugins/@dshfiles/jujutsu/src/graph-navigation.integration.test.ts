@@ -46,6 +46,22 @@ test('landmarks resolve exact local tips, missing remote, and do not snapshot di
   assert.equal(jj(['--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id']), operations)
 })
 
+test('landmarks resolve in a repository with many workspaces and a squash merge description longer than a page', async () => {
+  const { repo, jj, id, run } = await fixture()
+  const merged = Array.from({ length: 2000 }, (_, index) => `* fold commit ${index} into main`).join('\n')
+  jj(['describe', '-m', `chore: bring work onto main\n\n${merged}`])
+  jj(['bookmark', 'create', 'main'])
+  const main = id()
+  for (const index of Array.from({ length: 25 }, (_, value) => value))
+    jj(['workspace', 'add', '--name', `ws-${index}`, '-r', main, join(repo, '..', `ws-${index}`)])
+  jj(['new', main])
+  const navigation = await GraphNavigationReads.readGraphNavigation(run)
+  const landmark = navigation.landmarks.find(item => item.kind === 'main')
+  assert.equal(landmark?.status, 'resolved')
+  assert.ok((landmark?.revisions[0]?.description.length ?? 0) > 50_000)
+  assert.equal(navigation.landmarks.find(item => item.kind === 'default')?.status, 'resolved')
+}, 60_000)
+
 test('main@origin resolves the exact fetched remote bookmark independently of local main', async () => {
   const remote = await fixture()
   remote.jj(['bookmark', 'create', 'main'])

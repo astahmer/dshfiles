@@ -7,7 +7,8 @@ export const revisionSchema = z.object({
   commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
   changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
   shortestChangeId: z.string().min(1).max(32),
-  description: z.string().max(20_000),
+  // A squash merge can carry every folded commit message; the Host's bounded jj output is what caps it.
+  description: z.string().max(1_000_000),
   author: z.string().max(320),
   authorTime: z.string().max(64),
   // Older Hosts omit it; day headings fall back to the author time.
