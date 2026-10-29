@@ -551,7 +551,15 @@ const mutationPreview = (action: Mutation, revisions: readonly Revision[], selec
         title: 'Move workspace',
         summary: 'Move workspace ' + action.name + ' to ' + destination.shortestChangeId,
         detail:
-          'Workspace: ' + action.name + '\nFolder: ' + workspacePath + '\nDestination: ' + destination.shortestChangeId + ' (' + destination.commitId + ')\n\nOnly this workspace’s working copy moves; its uncommitted files are snapshotted by Jujutsu first.',
+          'Workspace: ' +
+          action.name +
+          '\nFolder: ' +
+          workspacePath +
+          '\nDestination: ' +
+          destination.shortestChangeId +
+          ' (' +
+          destination.commitId +
+          ')\n\nOnly this workspace’s working copy moves; its uncommitted files are snapshotted by Jujutsu first.',
       }
     }
     case 'workspace-forget': {
@@ -683,8 +691,7 @@ const prepareMutation = async (
     const workspaces = await readWorkspaces(ctx, repo, signal)
     const target = workspaces.find(workspace => workspace.name === action.name)
     if (target === undefined) throw new Error('Workspace is no longer present. Refresh and try again.')
-    if (action.kind === 'workspace-forget' && workspaces.length <= 1)
-      throw new Error('Workspace removal refused: this is the repository’s only workspace.')
+    if (action.kind === 'workspace-forget' && workspaces.length <= 1) throw new Error('Workspace removal refused: this is the repository’s only workspace.')
     workspaceRoot = target.path
     workspacePath = target.path
   }

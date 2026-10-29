@@ -5,11 +5,14 @@ import { TabRows } from './tab-row-visibility.js'
 const disposers: Array<() => void> = []
 beforeEach(() => {
   vi.useFakeTimers()
-  vi.stubGlobal('ResizeObserver', class {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  })
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  )
 })
 afterEach(() => {
   for (const dispose of disposers.splice(0).reverse()) dispose()

@@ -93,37 +93,37 @@ const NoteCard = (props: { readonly note: PanelNote; readonly onOpenThread: (ses
       <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Metadata">
         <SectionHeading heading="Metadata" />
         <TooltipProvider delayDuration={500}>
-        <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
-          <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <dd className="dshx:truncate">{PanelFormat.projectName(props.note.project)}</dd>
-              </TooltipTrigger>
-              <TooltipContent>{props.note.project}</TooltipContent>
-            </Tooltip>
-          </div>
-          <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Type</dt>
-            <dd>{tone.label}</dd>
-          </div>
-          <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Status</dt>
-            <dd>{noteStatusLabels[props.note.status]}</dd>
-          </div>
-          <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Scope</dt>
-            <dd className="dshx:truncate">{props.note.scope}</dd>
-          </div>
-          <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Created</dt>
-            <dd>{PanelFormat.formatStamp(props.note.createdAt)}</dd>
-          </div>
-          <div className="dshx:flex dshx:flex-col">
-            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Updated</dt>
-            <dd>{PanelFormat.formatStamp(props.note.updatedAt)}</dd>
-          </div>
-        </dl>
+          <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
+            <div className="dshx:flex dshx:flex-col">
+              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <dd className="dshx:truncate">{PanelFormat.projectName(props.note.project)}</dd>
+                </TooltipTrigger>
+                <TooltipContent>{props.note.project}</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="dshx:flex dshx:flex-col">
+              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Type</dt>
+              <dd>{tone.label}</dd>
+            </div>
+            <div className="dshx:flex dshx:flex-col">
+              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Status</dt>
+              <dd>{noteStatusLabels[props.note.status]}</dd>
+            </div>
+            <div className="dshx:flex dshx:flex-col">
+              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Scope</dt>
+              <dd className="dshx:truncate">{props.note.scope}</dd>
+            </div>
+            <div className="dshx:flex dshx:flex-col">
+              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Created</dt>
+              <dd>{PanelFormat.formatStamp(props.note.createdAt)}</dd>
+            </div>
+            <div className="dshx:flex dshx:flex-col">
+              <dt className="dshx:text-[11px] dshx:text-muted-foreground">Updated</dt>
+              <dd>{PanelFormat.formatStamp(props.note.updatedAt)}</dd>
+            </div>
+          </dl>
         </TooltipProvider>
         {props.note.status === 'valid' ? null : (
           <p className="dshx:text-[11px] dshx:text-muted-foreground">
@@ -264,21 +264,21 @@ const DigestCard = (props: { readonly thread: PanelThread; readonly onOpenThread
     <section className="dshx:flex dshx:flex-col dshx:gap-2" aria-label="Metadata">
       <SectionHeading heading="Metadata" />
       <TooltipProvider delayDuration={500}>
-      <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
-        <div className="dshx:flex dshx:flex-col">
-          <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <dd className="dshx:truncate">{PanelFormat.projectName(props.thread.project)}</dd>
-            </TooltipTrigger>
-            <TooltipContent>{props.thread.project}</TooltipContent>
-          </Tooltip>
-        </div>
-        <div className="dshx:flex dshx:flex-col">
-          <dt className="dshx:text-[11px] dshx:text-muted-foreground">Digested</dt>
-          <dd>{props.thread.digestedAt === null ? 'not yet' : PanelFormat.formatStamp(props.thread.digestedAt)}</dd>
-        </div>
-      </dl>
+        <dl className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-2 dshx:text-xs">
+          <div className="dshx:flex dshx:flex-col">
+            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Project</dt>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <dd className="dshx:truncate">{PanelFormat.projectName(props.thread.project)}</dd>
+              </TooltipTrigger>
+              <TooltipContent>{props.thread.project}</TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="dshx:flex dshx:flex-col">
+            <dt className="dshx:text-[11px] dshx:text-muted-foreground">Digested</dt>
+            <dd>{props.thread.digestedAt === null ? 'not yet' : PanelFormat.formatStamp(props.thread.digestedAt)}</dd>
+          </div>
+        </dl>
       </TooltipProvider>
     </section>
   </div>

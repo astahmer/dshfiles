@@ -108,7 +108,10 @@ const resourcePoolEntrySchema = z.object({
   hostId: idSchema,
   hostName: z.string().min(1).max(120),
   runtimeId: idSchema.nullable(),
-  destination: z.object({ kind: z.literal('runtime'), runtimeId: idSchema }).strict().nullable(),
+  destination: z
+    .object({ kind: z.literal('runtime'), runtimeId: idSchema })
+    .strict()
+    .nullable(),
   hidden: z.boolean(),
   probe: resourceProbeSchema,
   stale: z.boolean(),

@@ -43,11 +43,11 @@ Workbench invokes that explicit authority before generic placement and acknowled
 
 ## Settings (`dshfiles-main-tabs`)
 
-| Key           | Default   | Meaning                                                                                                                                      |
-| ------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`     | `true`    | Enable the standalone compatibility strip. Workbench always keeps its conversation-tab owner enabled.                                                                                                     |
-| `maxTabs`     | `12`      | Past it the least recently used unpinned tab closes.                                                                                         |
-| `openMode`    | `preview` | Panels and standalone conversations: `preview`, `new`, or `replace` (never pinned). Workbench conversations are always kept.                                 |
+| Key           | Default   | Meaning                                                                                                                                                                                                                                                         |
+| ------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`     | `true`    | Enable the standalone compatibility strip. Workbench always keeps its conversation-tab owner enabled.                                                                                                                                                           |
+| `maxTabs`     | `12`      | Past it the least recently used unpinned tab closes.                                                                                                                                                                                                            |
+| `openMode`    | `preview` | Panels and standalone conversations: `preview`, `new`, or `replace` (never pinned). Workbench conversations are always kept.                                                                                                                                    |
 | `persistence` | `project` | Native: `project` follows each project (including jj thread workspaces; subagents follow their parent), `global` shares a set. Workbench holds the adopted scene while browsing conversations; changing this setting explicitly can select another saved scene. |
 
 Tabs, order, pins, the preview flag and the active tab are saved in `localStorage` (`dshfiles.main-tabs.v1`). A reload that lands on the New thread screen reopens the saved active tab. A malformed document is ignored.

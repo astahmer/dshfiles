@@ -12,21 +12,39 @@ const tabId = z.string().regex(/^tab[1-9][0-9]*$/u)
 const nodeId = z.union([paneId, splitId])
 const rectangle = z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })
 const node = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('pane'), id: paneId, host: z.enum(['dock', 'float']), tabs: z.array(tabId), activeTabId: tabId.optional(), rect: rectangle.optional() }),
-  z.object({ kind: z.literal('split'), id: splitId, axis: z.enum(['row', 'column']), children: z.array(nodeId).min(2), sizes: z.array(z.number().positive()).min(2) }),
+  z.object({
+    kind: z.literal('pane'),
+    id: paneId,
+    host: z.enum(['dock', 'float']),
+    tabs: z.array(tabId),
+    activeTabId: tabId.optional(),
+    rect: rectangle.optional(),
+  }),
+  z.object({
+    kind: z.literal('split'),
+    id: splitId,
+    axis: z.enum(['row', 'column']),
+    children: z.array(nodeId).min(2),
+    sizes: z.array(z.number().positive()).min(2),
+  }),
 ])
 const layout = z.object({
   nodes: z.record(nodeId, node),
   tabs: z.record(tabId, z.object({ id: tabId, kind: z.string().min(1), contentId: z.string().min(1), title: z.string() })),
-  rootId: nodeId, floats: z.array(paneId), activePaneId: paneId,
-  expanded: z.boolean(), mode: z.enum(['push', 'fullscreen']),
+  rootId: nodeId,
+  floats: z.array(paneId),
+  activePaneId: paneId,
+  expanded: z.boolean(),
+  mode: z.enum(['push', 'fullscreen']),
 })
 const surface = z.object({ layout, minted: z.int().nonnegative() })
 const envelope = z.object({ bySession: z.record(z.string(), z.unknown()) })
 
 function validateReferences(value: z.infer<typeof surface>): void {
   const { layout, minted } = value
-  const reject: () => never = () => { throw new Error('Invalid saved sidebar layout references') }
+  const reject: () => never = () => {
+    throw new Error('Invalid saved sidebar layout references')
+  }
   const visited = new Set<string>()
   const usedTabs = new Set<string>()
   const pending = [{ id: layout.rootId, host: 'dock' }, ...layout.floats.map(id => ({ id, host: 'float' }))]
@@ -38,9 +56,15 @@ function validateReferences(value: z.infer<typeof surface>): void {
     if (visited.has(id) || entry === undefined) reject()
     visited.add(id)
     if (entry.kind === 'split') {
-      if (host !== 'dock' || id !== layout.rootId || entry.axis !== 'row' || entry.children.length !== 2
-        || entry.children.length !== entry.sizes.length
-        || Math.abs(entry.sizes.reduce((sum, size) => sum + size, 0) - 1) > 1e-9) reject()
+      if (
+        host !== 'dock' ||
+        id !== layout.rootId ||
+        entry.axis !== 'row' ||
+        entry.children.length !== 2 ||
+        entry.children.length !== entry.sizes.length ||
+        Math.abs(entry.sizes.reduce((sum, size) => sum + size, 0) - 1) > 1e-9
+      )
+        reject()
       pending.push(...entry.children.map(id => ({ id, host })))
     } else {
       if (entry.host !== host || (host === 'float' ? entry.rect === undefined || entry.tabs.length !== 1 : entry.rect !== undefined)) reject()
@@ -51,8 +75,12 @@ function validateReferences(value: z.infer<typeof surface>): void {
       }
     }
   }
-  if (visited.size !== Object.keys(layout.nodes).length || usedTabs.size !== Object.keys(layout.tabs).length
-    || layout.nodes[layout.activePaneId]?.kind !== 'pane') reject()
+  if (
+    visited.size !== Object.keys(layout.nodes).length ||
+    usedTabs.size !== Object.keys(layout.tabs).length ||
+    layout.nodes[layout.activePaneId]?.kind !== 'pane'
+  )
+    reject()
 }
 
 /**
@@ -63,8 +91,11 @@ function validateReferences(value: z.infer<typeof surface>): void {
 export function readSidebarLayout(sessionId: string): SurfaceState | undefined {
   if (typeof localStorage === 'undefined') return undefined
   let raw: string | null
-  try { raw = localStorage.getItem(`${sidebarPersistence}.${sessionId}`) }
-  catch (_storageUnavailable) { return undefined }
+  try {
+    raw = localStorage.getItem(`${sidebarPersistence}.${sessionId}`)
+  } catch (_storageUnavailable) {
+    return undefined
+  }
   if (raw === null) return undefined
   try {
     const saved = envelope.parse(JSON.parse(raw)).bySession[sessionId]
@@ -86,8 +117,11 @@ export function readSidebarLayout(sessionId: string): SurfaceState | undefined {
 export function writeSidebarLayout(sessionId: string, surface: SurfaceState): void {
   if (typeof localStorage === 'undefined') return
   const saved = { bySession: { [sessionId]: { layout: surface.layout, minted: surface.minted } } }
-  try { localStorage.setItem(`${sidebarPersistence}.${sessionId}`, JSON.stringify(saved)) }
-  catch (error) { console.error('Sidebar layout persistence failed:', error) }
+  try {
+    localStorage.setItem(`${sidebarPersistence}.${sessionId}`, JSON.stringify(saved))
+  } catch (error) {
+    console.error('Sidebar layout persistence failed:', error)
+  }
 }
 
 /**
@@ -96,6 +130,9 @@ export function writeSidebarLayout(sessionId: string, surface: SurfaceState): vo
  */
 export function clearSidebarLayout(sessionId: string): void {
   if (typeof localStorage === 'undefined') return
-  try { localStorage.removeItem(`${sidebarPersistence}.${sessionId}`) }
-  catch (_storageUnavailable) { /* The invalid layout is still excluded from this window. */ }
+  try {
+    localStorage.removeItem(`${sidebarPersistence}.${sessionId}`)
+  } catch (_storageUnavailable) {
+    /* The invalid layout is still excluded from this window. */
+  }
 }

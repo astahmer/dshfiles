@@ -33,7 +33,9 @@ export class SidebarSessionView {
     source: 'sidebarView' | 'sidebarResourceView' = 'sidebarView',
   ) {
     this.reference = sessions.retain(sessionId, { source })
-    void this.reference.ready.catch((error: unknown) => { console.error('Sidebar Session opening failed:', error) })
+    void this.reference.ready.catch((error: unknown) => {
+      console.error('Sidebar Session opening failed:', error)
+    })
   }
 
   /** Whether an initialized retained body still needs this view. */

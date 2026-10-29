@@ -52,86 +52,86 @@ const PlanSection = (props: { readonly plan: HandoffPlan; readonly now: number; 
   const widthOf = (segment: { readonly start: number; readonly end: number }): string => `${String(((segment.end - segment.start) / total) * 100)}%`
   return (
     <TooltipProvider delayDuration={500}>
-    <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:pb-5">
-      <header className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:justify-between dshx:gap-2">
-        <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-base dshx:font-medium">
-          <ProviderGlyph className="dshx:size-5" kind={plan.kind} />
-          {KIND_LABEL[plan.kind]}
-        </span>
-        <span className={cn('dshx:text-sm', plan.noneFreeWorkHours > 0 ? 'dshx:font-medium' : 'dshx:text-muted-foreground')}>
-          {plan.lanes.length === 0
-            ? 'No forecast'
-            : plan.noneFreeHours === 0
-              ? 'An account free all week'
-              : `~${String(plan.noneFreeWorkHours)} work h none free · ${Format.duration(plan.noneFreeHours * HOUR_MS)} in all`}
-        </span>
-      </header>
+      <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:pb-5">
+        <header className="dshx:flex dshx:flex-wrap dshx:items-baseline dshx:justify-between dshx:gap-2">
+          <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-base dshx:font-medium">
+            <ProviderGlyph className="dshx:size-5" kind={plan.kind} />
+            {KIND_LABEL[plan.kind]}
+          </span>
+          <span className={cn('dshx:text-sm', plan.noneFreeWorkHours > 0 ? 'dshx:font-medium' : 'dshx:text-muted-foreground')}>
+            {plan.lanes.length === 0
+              ? 'No forecast'
+              : plan.noneFreeHours === 0
+                ? 'An account free all week'
+                : `~${String(plan.noneFreeWorkHours)} work h none free · ${Format.duration(plan.noneFreeHours * HOUR_MS)} in all`}
+          </span>
+        </header>
 
-      {plan.lanes.length === 0 ? (
-        <p className="dshx:text-sm dshx:text-muted-foreground">No account of this kind has a forecast yet, so there is no hand-off to plan.</p>
-      ) : (
-        <div className="dshx:flex dshx:flex-col dshx:gap-1">
-          <DayRuler now={now} plan={plan} />
-          <div
-            className="dshx:flex dshx:h-7 dshx:overflow-hidden dshx:rounded-md"
-            role="img"
-            aria-label={`Who serves ${KIND_LABEL[plan.kind]} over the next seven days`}
-          >
-            {plan.segments.map(segment => (
-              <Tooltip key={segment.start}>
-                <TooltipTrigger asChild>
-                  <span
-                    className={cn(
-                      'dshx:border-r dshx:border-background dshx:last:border-r-0',
-                      segment.instanceId === null ? 'dshx:bg-destructive/15 dshx:text-destructive/70' : toneOf(order.indexOf(segment.instanceId)),
-                    )}
-                    style={segment.instanceId === null ? { ...HATCH, width: widthOf(segment) } : { width: widthOf(segment) }}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{`${nameOf(segment.instanceId)} · ${span(segment.start, segment.end, now)}`}</TooltipContent>
-              </Tooltip>
+        {plan.lanes.length === 0 ? (
+          <p className="dshx:text-sm dshx:text-muted-foreground">No account of this kind has a forecast yet, so there is no hand-off to plan.</p>
+        ) : (
+          <div className="dshx:flex dshx:flex-col dshx:gap-1">
+            <DayRuler now={now} plan={plan} />
+            <div
+              className="dshx:flex dshx:h-7 dshx:overflow-hidden dshx:rounded-md"
+              role="img"
+              aria-label={`Who serves ${KIND_LABEL[plan.kind]} over the next seven days`}
+            >
+              {plan.segments.map(segment => (
+                <Tooltip key={segment.start}>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        'dshx:border-r dshx:border-background dshx:last:border-r-0',
+                        segment.instanceId === null ? 'dshx:bg-destructive/15 dshx:text-destructive/70' : toneOf(order.indexOf(segment.instanceId)),
+                      )}
+                      style={segment.instanceId === null ? { ...HATCH, width: widthOf(segment) } : { width: widthOf(segment) }}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{`${nameOf(segment.instanceId)} · ${span(segment.start, segment.end, now)}`}</TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+            <WorkBand plan={plan} workHours={props.workHours} />
+            {plan.lanes.map((lane, index) => (
+              <div className="dshx:grid dshx:grid-cols-[minmax(6rem,9rem)_minmax(0,1fr)] dshx:items-center dshx:gap-2" key={lane.instanceId}>
+                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+                  <span aria-hidden className={cn('dshx:size-2.5 dshx:shrink-0 dshx:rounded-[2px]', toneOf(index))} />
+                  <span className="dshx:truncate">{lane.displayName}</span>
+                </span>
+                <span className="dshx:flex dshx:h-1.5">
+                  {lane.free.map((free, hour) => (
+                    <span className={cn('dshx:flex-1', free ? 'dshx:bg-muted-foreground/25' : 'dshx:bg-destructive/60')} key={hour} />
+                  ))}
+                </span>
+              </div>
             ))}
           </div>
-          <WorkBand plan={plan} workHours={props.workHours} />
-          {plan.lanes.map((lane, index) => (
-            <div className="dshx:grid dshx:grid-cols-[minmax(6rem,9rem)_minmax(0,1fr)] dshx:items-center dshx:gap-2" key={lane.instanceId}>
-              <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-                <span aria-hidden className={cn('dshx:size-2.5 dshx:shrink-0 dshx:rounded-[2px]', toneOf(index))} />
-                <span className="dshx:truncate">{lane.displayName}</span>
-              </span>
-              <span className="dshx:flex dshx:h-1.5">
-                {lane.free.map((free, hour) => (
-                  <span className={cn('dshx:flex-1', free ? 'dshx:bg-muted-foreground/25' : 'dshx:bg-destructive/60')} key={hour} />
-                ))}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+        )}
 
-      <ol className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
-        {plan.segments.slice(0, PLAN_STEP_LIMIT).map((segment, index) => (
-          <li className="dshx:grid dshx:grid-cols-[1.5rem_minmax(0,1fr)_auto] dshx:items-baseline dshx:gap-2" key={segment.start}>
-            <span className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{String(index + 1)}</span>
-            <span className={cn('dshx:min-w-0 dshx:truncate', segment.instanceId === null && 'dshx:text-destructive')}>
-              {segment.instanceId === null
-                ? 'No account free'
-                : index === 0
-                  ? `Work on ${nameOf(segment.instanceId)}`
-                  : `Hand off to ${nameOf(segment.instanceId)}`}
-              {segment.instanceId === null && segment.workHours > 0 ? ` · ${String(segment.workHours)} work h` : ''}
-            </span>
-            <span className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">
-              {index === 0 ? `now → ${Format.moment(segment.end, now)}` : span(segment.start, segment.end, now)}
-            </span>
-          </li>
-        ))}
-      </ol>
-      {plan.segments.length > PLAN_STEP_LIMIT ? (
-        <p className="dshx:text-xs dshx:text-muted-foreground">{String(plan.segments.length - PLAN_STEP_LIMIT)} later hand-offs on the bar above.</p>
-      ) : null}
-      {plan.unread.length === 0 ? null : <p className="dshx:text-xs dshx:text-muted-foreground">Left out without a forecast: {plan.unread.join(', ')}.</p>}
-    </section>
+        <ol className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm">
+          {plan.segments.slice(0, PLAN_STEP_LIMIT).map((segment, index) => (
+            <li className="dshx:grid dshx:grid-cols-[1.5rem_minmax(0,1fr)_auto] dshx:items-baseline dshx:gap-2" key={segment.start}>
+              <span className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{String(index + 1)}</span>
+              <span className={cn('dshx:min-w-0 dshx:truncate', segment.instanceId === null && 'dshx:text-destructive')}>
+                {segment.instanceId === null
+                  ? 'No account free'
+                  : index === 0
+                    ? `Work on ${nameOf(segment.instanceId)}`
+                    : `Hand off to ${nameOf(segment.instanceId)}`}
+                {segment.instanceId === null && segment.workHours > 0 ? ` · ${String(segment.workHours)} work h` : ''}
+              </span>
+              <span className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">
+                {index === 0 ? `now → ${Format.moment(segment.end, now)}` : span(segment.start, segment.end, now)}
+              </span>
+            </li>
+          ))}
+        </ol>
+        {plan.segments.length > PLAN_STEP_LIMIT ? (
+          <p className="dshx:text-xs dshx:text-muted-foreground">{String(plan.segments.length - PLAN_STEP_LIMIT)} later hand-offs on the bar above.</p>
+        ) : null}
+        {plan.unread.length === 0 ? null : <p className="dshx:text-xs dshx:text-muted-foreground">Left out without a forecast: {plan.unread.join(', ')}.</p>}
+      </section>
     </TooltipProvider>
   )
 }

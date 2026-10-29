@@ -190,92 +190,92 @@ export const AnalyticsTab = (props: {
         </Select>
       </div>
       <TooltipProvider delayDuration={500}>
-      <div className="dshx:grid dshx:grid-cols-5 dshx:gap-2 dshx:@max-pane-compact:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
-        <StatCard
-          label="Digest calls"
-          value={PanelFormat.formatCount(digestCalls)}
-          detail={`${PanelFormat.formatCount(usage.digests.model)} by a cheap model`}
-          Icon={ActivityIcon}
-          iconTile="dshx:bg-info/10 dshx:text-info"
-          spark={points.map(point => point.digests)}
-        />
-        <StatCard
-          label="Digest cost"
-          value={PanelFormat.formatUsd(usage.costs.total.digest.usd)}
-          detail={`${PanelFormat.formatCount(usage.costs.total.digest.calls)} priced calls`}
-          Icon={CoinsIcon}
-          iconTile="dshx:bg-warning/10 dshx:text-warning"
-          spark={points.map(point => point.digestUsd)}
-          sparkTone="dshx:bg-warning/70"
-        />
-        <StatCard
-          label="Jev calls"
-          value={PanelFormat.formatCount(usage.jev.calls)}
-          detail={PanelFormat.formatUsd(usage.costs.total.jev.usd)}
-          Icon={ZapIcon}
-          iconTile="dshx:bg-violet/10 dshx:text-violet"
-          spark={points.map(point => point.jevCalls)}
-          sparkTone="dshx:bg-violet/70"
-        />
-        <StatCard
-          label="Searches"
-          value={PanelFormat.formatCount(search.calls)}
-          detail={`${PanelFormat.formatCount(search.withResults)} found · ${PanelFormat.formatCount(search.empty)} empty`}
-          Icon={SearchIcon}
-          iconTile="dshx:bg-success/10 dshx:text-success"
-          spark={points.map(point => point.searchFound + point.searchEmpty)}
-          sparkTone="dshx:bg-success/70"
-        />
-        <StatCard
-          label="Reads"
-          value={PanelFormat.formatCount(read.calls)}
-          detail={`${PanelFormat.formatCount(read.withResults)} found · ${PanelFormat.formatCount(read.empty)} missing`}
-          Icon={BookOpenIcon}
-          iconTile="dshx:bg-teal/10 dshx:text-teal"
-          spark={points.map(point => point.readFound + point.readMissing)}
-          sparkTone="dshx:bg-teal/70"
-        />
-        <StatCard
-          label="Citations"
-          value={PanelFormat.formatCount(usage.citations)}
-          detail={`${PanelFormat.formatCount(effectiveness.citations.total)} cited memories`}
-          Icon={QuoteIcon}
-          iconTile="dshx:bg-info/10 dshx:text-info"
-          spark={points.map(point => point.citations)}
-        />
-        <StatCard
-          label="User corrections"
-          value={PanelFormat.formatCount(effectiveness.citations.userCorrected)}
-          detail="heuristic signal"
-          Icon={ThumbsUpIcon}
-          iconTile="dshx:bg-warning/10 dshx:text-warning"
-          spark={points.map(point => point.userCorrected)}
-          sparkTone="dshx:bg-warning/70"
-        />
-        <StatCard
-          label="Start blocks"
-          value={PanelFormat.formatCount(effectiveness.block.threads)}
-          detail={`${PanelFormat.formatCount(usage.blocksServed)} total frozen`}
-          Icon={LayersIcon}
-          iconTile="dshx:bg-primary/10 dshx:text-primary"
-          spark={points.map(point => point.blockRequests)}
-        />
-        <StatCard
-          label="Avg block size"
-          value={PanelFormat.formatBytes(effectiveness.block.meanBytes)}
-          detail={`largest ${PanelFormat.formatBytes(effectiveness.block.maxBytes)}`}
-          Icon={GaugeIcon}
-          iconTile="dshx:bg-muted dshx:text-muted-foreground"
-        />
-        <StatCard
-          label="Model requests"
-          value={PanelFormat.formatCount(effectiveness.block.requests)}
-          detail="carried a start block"
-          Icon={UsersIcon}
-          iconTile="dshx:bg-muted dshx:text-muted-foreground"
-          spark={points.map(point => point.blockRequests)}
-        />
-      </div>
+        <div className="dshx:grid dshx:grid-cols-5 dshx:gap-2 dshx:@max-pane-compact:grid-cols-2 dshx:@max-pane-narrow:grid-cols-1">
+          <StatCard
+            label="Digest calls"
+            value={PanelFormat.formatCount(digestCalls)}
+            detail={`${PanelFormat.formatCount(usage.digests.model)} by a cheap model`}
+            Icon={ActivityIcon}
+            iconTile="dshx:bg-info/10 dshx:text-info"
+            spark={points.map(point => point.digests)}
+          />
+          <StatCard
+            label="Digest cost"
+            value={PanelFormat.formatUsd(usage.costs.total.digest.usd)}
+            detail={`${PanelFormat.formatCount(usage.costs.total.digest.calls)} priced calls`}
+            Icon={CoinsIcon}
+            iconTile="dshx:bg-warning/10 dshx:text-warning"
+            spark={points.map(point => point.digestUsd)}
+            sparkTone="dshx:bg-warning/70"
+          />
+          <StatCard
+            label="Jev calls"
+            value={PanelFormat.formatCount(usage.jev.calls)}
+            detail={PanelFormat.formatUsd(usage.costs.total.jev.usd)}
+            Icon={ZapIcon}
+            iconTile="dshx:bg-violet/10 dshx:text-violet"
+            spark={points.map(point => point.jevCalls)}
+            sparkTone="dshx:bg-violet/70"
+          />
+          <StatCard
+            label="Searches"
+            value={PanelFormat.formatCount(search.calls)}
+            detail={`${PanelFormat.formatCount(search.withResults)} found · ${PanelFormat.formatCount(search.empty)} empty`}
+            Icon={SearchIcon}
+            iconTile="dshx:bg-success/10 dshx:text-success"
+            spark={points.map(point => point.searchFound + point.searchEmpty)}
+            sparkTone="dshx:bg-success/70"
+          />
+          <StatCard
+            label="Reads"
+            value={PanelFormat.formatCount(read.calls)}
+            detail={`${PanelFormat.formatCount(read.withResults)} found · ${PanelFormat.formatCount(read.empty)} missing`}
+            Icon={BookOpenIcon}
+            iconTile="dshx:bg-teal/10 dshx:text-teal"
+            spark={points.map(point => point.readFound + point.readMissing)}
+            sparkTone="dshx:bg-teal/70"
+          />
+          <StatCard
+            label="Citations"
+            value={PanelFormat.formatCount(usage.citations)}
+            detail={`${PanelFormat.formatCount(effectiveness.citations.total)} cited memories`}
+            Icon={QuoteIcon}
+            iconTile="dshx:bg-info/10 dshx:text-info"
+            spark={points.map(point => point.citations)}
+          />
+          <StatCard
+            label="User corrections"
+            value={PanelFormat.formatCount(effectiveness.citations.userCorrected)}
+            detail="heuristic signal"
+            Icon={ThumbsUpIcon}
+            iconTile="dshx:bg-warning/10 dshx:text-warning"
+            spark={points.map(point => point.userCorrected)}
+            sparkTone="dshx:bg-warning/70"
+          />
+          <StatCard
+            label="Start blocks"
+            value={PanelFormat.formatCount(effectiveness.block.threads)}
+            detail={`${PanelFormat.formatCount(usage.blocksServed)} total frozen`}
+            Icon={LayersIcon}
+            iconTile="dshx:bg-primary/10 dshx:text-primary"
+            spark={points.map(point => point.blockRequests)}
+          />
+          <StatCard
+            label="Avg block size"
+            value={PanelFormat.formatBytes(effectiveness.block.meanBytes)}
+            detail={`largest ${PanelFormat.formatBytes(effectiveness.block.maxBytes)}`}
+            Icon={GaugeIcon}
+            iconTile="dshx:bg-muted dshx:text-muted-foreground"
+          />
+          <StatCard
+            label="Model requests"
+            value={PanelFormat.formatCount(effectiveness.block.requests)}
+            detail="carried a start block"
+            Icon={UsersIcon}
+            iconTile="dshx:bg-muted dshx:text-muted-foreground"
+            spark={points.map(point => point.blockRequests)}
+          />
+        </div>
       </TooltipProvider>
       <div className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
         <DigestActivityChart points={chartPoints} />

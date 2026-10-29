@@ -294,7 +294,12 @@
       "id": "board-column-preferences",
       "title": "Customize Backlog board columns",
       "summary": "Reorder or hide status columns on the board without changing item states; the preference stays in this browser across Host restarts, and the Items view still contains every item.",
-      "reach": ["click button \"Backlog: Items\"", "click button \"Board\"", "click button \"Configure board columns\"", "expect button \"Configure board columns\""],
+      "reach": [
+        "click button \"Backlog: Items\"",
+        "click button \"Board\"",
+        "click button \"Configure board columns\"",
+        "expect button \"Configure board columns\""
+      ],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["default-order", "custom-order", "hidden-column"],

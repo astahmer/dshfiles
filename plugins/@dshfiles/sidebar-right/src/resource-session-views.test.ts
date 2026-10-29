@@ -17,8 +17,12 @@ it('restores only saved resource Sessions through owned references and releases 
       readonly sessionId = sessionId
       readonly ready = ready
       readonly release = release
-      get binding(): SessionReference['binding'] { throw new Error('unneeded in lifecycle test') }
-      [Symbol.dispose](): void { release() }
+      get binding(): SessionReference['binding'] {
+        throw new Error('unneeded in lifecycle test')
+      }
+      [Symbol.dispose](): void {
+        release()
+      }
     }
     return new Reference()
   })
@@ -31,7 +35,10 @@ it('restores only saved resource Sessions through owned references and releases 
   views.retainResourceSessions([a, b, a])
   expect(retain).toHaveBeenCalledTimes(2)
   expect(retain).toHaveBeenCalledWith(a, { source: 'sidebarResourceView' })
-  expect(views.source.getSnapshot().map(view => [view.sessionId, view.selected])).toEqual([[a, false], [b, false]])
+  expect(views.source.getSnapshot().map(view => [view.sessionId, view.selected])).toEqual([
+    [a, false],
+    [b, false],
+  ])
   const first = views.source.getSnapshot()[0]
   if (first === undefined) throw new Error('expected saved resource View')
   const unmount = views.mount(first.reference)
@@ -68,8 +75,12 @@ it('bounds saved Session opening concurrency at four and stops queued acquisitio
       readonly sessionId = sessionId
       readonly ready = ready
       readonly release = release
-      get binding(): SessionReference['binding'] { throw new Error('not required for acquisition test') }
-      [Symbol.dispose](): void { release() }
+      get binding(): SessionReference['binding'] {
+        throw new Error('not required for acquisition test')
+      }
+      [Symbol.dispose](): void {
+        release()
+      }
     }
     return new Reference()
   }

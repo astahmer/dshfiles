@@ -106,5 +106,7 @@ it('returns no candidate when snapshots are unavailable or unsupported', () => {
   }
 
   expect(resourcePressureScore(noLoad)).toBeUndefined()
-  expect(selectAutoHost([entry({ hostId: 'unsupported', hostName: 'Unsupported', runtimeId: 'runtime-unsupported', snapshot: noLoad }), unavailable])).toBeNull()
+  expect(
+    selectAutoHost([entry({ hostId: 'unsupported', hostName: 'Unsupported', runtimeId: 'runtime-unsupported', snapshot: noLoad }), unavailable]),
+  ).toBeNull()
 })

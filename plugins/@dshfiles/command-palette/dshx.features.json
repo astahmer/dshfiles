@@ -5,35 +5,18 @@
       "id": "palette-search",
       "title": "Search threads and workspace files",
       "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all.",
-      "surfaces": [
-        "client"
-      ],
-      "reach": [
-        "press Meta+Shift+P",
-        "click tab \"Threads\"",
-        "expect tab \"Everything\""
-      ],
+      "surfaces": ["client"],
+      "reach": ["press Meta+Shift+P", "click tab \"Threads\"", "expect tab \"Everything\""],
       "configuration": [
         {
           "key": "threadsScope",
           "defaultValue": "project",
           "constraints": "One of project or all; without a current project the Threads tab lists every thread.",
-          "choices": [
-            "project",
-            "all"
-          ],
-          "coveredBy": [
-            "command-palette.threads-project-scope"
-          ]
+          "choices": ["project", "all"],
+          "coveredBy": ["command-palette.threads-project-scope"]
         }
       ],
-      "states": [
-        "closed",
-        "open-empty",
-        "thread-results",
-        "file-results",
-        "content-results"
-      ],
+      "states": ["closed", "open-empty", "thread-results", "file-results", "content-results"],
       "failureModes": [
         "A thread title or project match is omitted from results.",
         "A child session or subagent appears in the Threads list.",
@@ -105,27 +88,11 @@
       "id": "action-registry",
       "title": "Register and invoke typed palette actions",
       "summary": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
-      "reach": [
-        "click button \"New thread\"",
-        "click button \"Open command palette\"",
-        "expect option \"New thread*\"",
-        "expect option \"Use dark theme*\""
-      ],
-      "surfaces": [
-        "client",
-        "api"
-      ],
+      "reach": ["click button \"New thread\"", "click button \"Open command palette\"", "expect option \"New thread*\"", "expect option \"Use dark theme*\""],
+      "surfaces": ["client", "api"],
       "configuration": [],
-      "states": [
-        "registered",
-        "available",
-        "selected",
-        "disposed"
-      ],
-      "failureModes": [
-        "A duplicate or unnamespaced action id enters the registry.",
-        "A disposed action remains visible or callable."
-      ],
+      "states": ["registered", "available", "selected", "disposed"],
+      "failureModes": ["A duplicate or unnamespaced action id enters the registry.", "A disposed action remains visible or callable."],
       "externalDependencies": [],
       "verification": [
         {
@@ -179,21 +146,10 @@
       "id": "contributed-commands",
       "title": "List commands other plugins contribute through dshx",
       "summary": "Show every scoped, visible dshx Command under Commands, grey out disabled ones and follow them as plugins load, reload or withdraw them.",
-      "reach": [
-        "press Meta+Shift+P",
-        "fill combobox \"Search the command palette\" \"Toggle sidebar\"",
-        "expect option \"Toggle sidebar*\""
-      ],
-      "surfaces": [
-        "client"
-      ],
+      "reach": ["press Meta+Shift+P", "fill combobox \"Search the command palette\" \"Toggle sidebar\"", "expect option \"Toggle sidebar*\""],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "listed",
-        "disabled",
-        "hidden",
-        "withdrawn"
-      ],
+      "states": ["listed", "disabled", "hidden", "withdrawn"],
       "failureModes": [
         "A command without the package scope is warned about and left out instead of breaking the registry.",
         "A withdrawn command stays listed."
@@ -229,21 +185,10 @@
       "id": "frecency-ranking",
       "title": "Rank recently used actions and files",
       "summary": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "unused",
-        "recently-used",
-        "frecent",
-        "evicted"
-      ],
-      "failureModes": [
-        "Recent use fails to affect result ordering.",
-        "Usage storage grows beyond its configured bound."
-      ],
+      "states": ["unused", "recently-used", "frecent", "evicted"],
+      "failureModes": ["Recent use fails to affect result ordering.", "Usage storage grows beyond its configured bound."],
       "externalDependencies": [],
       "verification": [
         {
@@ -287,16 +232,9 @@
       "id": "palette-prefix-routing",
       "title": "Route prefixed searches to the right content",
       "summary": "Use palette prefixes to switch between commands, indexed content, line navigation, and the Backlog capture flow.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "command-prefix",
-        "content-prefix",
-        "line-prefix",
-        "backlog-prefix"
-      ],
+      "states": ["command-prefix", "content-prefix", "line-prefix", "backlog-prefix"],
       "failureModes": [
         "A recognized prefix searches the wrong content type.",
         "A line prefix is parsed as ordinary search text.",
@@ -355,17 +293,9 @@
         "click option \"Ask DSH: how do I rebind a shortcut?\"",
         "expect text \"Ask DSH · how do I rebind a shortcut?\""
       ],
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "palette-empty",
-        "ask-input",
-        "sending",
-        "thread-opened",
-        "send-failed"
-      ],
+      "states": ["palette-empty", "ask-input", "sending", "thread-opened", "send-failed"],
       "failureModes": [
         "Tab on an empty palette does not open the ask bar.",
         "The question never becomes the new thread's first message.",
@@ -456,18 +386,10 @@
       "id": "performance-budget",
       "title": "Keep palette ranking within the interaction budget",
       "summary": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",
-      "surfaces": [
-        "client"
-      ],
+      "surfaces": ["client"],
       "configuration": [],
-      "states": [
-        "open",
-        "query-change",
-        "ranked-results"
-      ],
-      "failureModes": [
-        "Opening or typing exceeds the documented palette interaction budget."
-      ],
+      "states": ["open", "query-change", "ranked-results"],
+      "failureModes": ["Opening or typing exceeds the documented palette interaction budget."],
       "externalDependencies": [],
       "verification": [
         {

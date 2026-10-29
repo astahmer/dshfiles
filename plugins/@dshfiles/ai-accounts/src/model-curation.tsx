@@ -233,7 +233,9 @@ export const ModelCuration = (props: {
                         {custom ? (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onSelect={() => {
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => {
                                 const patch = ModelCurationModel.removeAdditionalModel({ account, modelId: model.id })
                                 if (patch !== null) customize(patch)
                               }}

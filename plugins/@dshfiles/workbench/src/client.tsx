@@ -519,10 +519,13 @@ export default defineClient({
           const active = api.activePanel
           // API insertion order is not visual order (Navigation was inserted
           // above Threads). Seat the former footer below the lowest docked group.
-          const reference = api.groups.filter(group => group.api.location.type === 'grid').reduce<DockviewGroupPanel | undefined>((bottom, candidate) => {
-            if (bottom === undefined) return candidate
-            return candidate.element.getBoundingClientRect().bottom > bottom.element.getBoundingClientRect().bottom ? candidate : bottom
-          }, undefined) ?? api.addGroup()
+          const reference =
+            api.groups
+              .filter(group => group.api.location.type === 'grid')
+              .reduce<DockviewGroupPanel | undefined>((bottom, candidate) => {
+                if (bottom === undefined) return candidate
+                return candidate.element.getBoundingClientRect().bottom > bottom.element.getBoundingClientRect().bottom ? candidate : bottom
+              }, undefined) ?? api.addGroup()
           api.addPanel({
             id: preview.id,
             component: WORKBENCH_COMPONENT,

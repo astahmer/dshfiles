@@ -244,39 +244,39 @@ const ResizeGrip = (props: {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-    <div
-      aria-label="Resize usage popover"
-      className={cn(
-        'dshx:absolute dshx:z-10 dshx:size-3 dshx:touch-none dshx:rounded-sm dshx:opacity-40 dshx:hover:bg-accent dshx:hover:opacity-100',
-        direction.y < 0 ? 'dshx:top-0' : 'dshx:bottom-0',
-        direction.x < 0 ? 'dshx:left-0' : 'dshx:right-0',
-        direction.x < 0 === direction.y < 0 ? 'dshx:cursor-nwse-resize' : 'dshx:cursor-nesw-resize',
-      )}
-      onDoubleClick={props.onReset}
-      onLostPointerCapture={() => {
-        drag.current = null
-        if (last.current !== null) props.onCommit(last.current)
-        last.current = null
-      }}
-      onPointerDown={event => {
-        const rect = props.target.current?.getBoundingClientRect()
-        if (rect === undefined || event.button !== 0) return
-        event.preventDefault()
-        event.currentTarget.setPointerCapture(event.pointerId)
-        drag.current = { x: event.clientX, y: event.clientY, width: rect.width, height: rect.height, direction }
-      }}
-      onPointerMove={event => {
-        const size = sizeAt(event)
-        if (size === null) return
-        last.current = size
-        props.onResize(size)
-      }}
-      role="separator"
-    >
-      <svg aria-hidden className={cn('dshx:size-3', direction.x < 0 && 'dshx:-scale-x-100', direction.y < 0 && 'dshx:-scale-y-100')} viewBox="0 0 12 12">
-        <path d="M11 4 4 11M11 8 8 11" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.2" />
-      </svg>
-    </div>
+        <div
+          aria-label="Resize usage popover"
+          className={cn(
+            'dshx:absolute dshx:z-10 dshx:size-3 dshx:touch-none dshx:rounded-sm dshx:opacity-40 dshx:hover:bg-accent dshx:hover:opacity-100',
+            direction.y < 0 ? 'dshx:top-0' : 'dshx:bottom-0',
+            direction.x < 0 ? 'dshx:left-0' : 'dshx:right-0',
+            direction.x < 0 === direction.y < 0 ? 'dshx:cursor-nwse-resize' : 'dshx:cursor-nesw-resize',
+          )}
+          onDoubleClick={props.onReset}
+          onLostPointerCapture={() => {
+            drag.current = null
+            if (last.current !== null) props.onCommit(last.current)
+            last.current = null
+          }}
+          onPointerDown={event => {
+            const rect = props.target.current?.getBoundingClientRect()
+            if (rect === undefined || event.button !== 0) return
+            event.preventDefault()
+            event.currentTarget.setPointerCapture(event.pointerId)
+            drag.current = { x: event.clientX, y: event.clientY, width: rect.width, height: rect.height, direction }
+          }}
+          onPointerMove={event => {
+            const size = sizeAt(event)
+            if (size === null) return
+            last.current = size
+            props.onResize(size)
+          }}
+          role="separator"
+        >
+          <svg aria-hidden className={cn('dshx:size-3', direction.x < 0 && 'dshx:-scale-x-100', direction.y < 0 && 'dshx:-scale-y-100')} viewBox="0 0 12 12">
+            <path d="M11 4 4 11M11 8 8 11" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.2" />
+          </svg>
+        </div>
       </TooltipTrigger>
       <TooltipContent>Drag to resize · double-click to fit content</TooltipContent>
     </Tooltip>
@@ -311,110 +311,110 @@ export const UsageOverview = (props: {
   const sectionRef = useRef<HTMLElement>(null)
   return (
     <TooltipProvider delayDuration={500}>
-    <section
-      aria-label="AI account usage"
-      className={cn('dshx-root dshx:relative dshx:flex dshx:min-h-0 dshx:flex-col', size.height === 0 && 'dshx:max-h-[min(640px,75vh)]')}
-      ref={sectionRef}
-      style={{
-        width: `min(${String(size.width === 0 ? DEFAULT_WIDTH : size.width)}px, calc(100vw - 16px))`,
-        height: size.height === 0 ? undefined : `min(${String(size.height)}px, var(--radix-popover-content-available-height, calc(100vh - 16px)))`,
-      }}
-    >
-      <ResizeGrip
-        onCommit={committed => {
-          void Promise.all([settings.set('usagePopoverWidth', committed.width), settings.set('usagePopoverHeight', committed.height)])
-            .catch(() => false)
-            .finally(() => setDraggedSize(null))
+      <section
+        aria-label="AI account usage"
+        className={cn('dshx-root dshx:relative dshx:flex dshx:min-h-0 dshx:flex-col', size.height === 0 && 'dshx:max-h-[min(640px,75vh)]')}
+        ref={sectionRef}
+        style={{
+          width: `min(${String(size.width === 0 ? DEFAULT_WIDTH : size.width)}px, calc(100vw - 16px))`,
+          height: size.height === 0 ? undefined : `min(${String(size.height)}px, var(--radix-popover-content-available-height, calc(100vh - 16px)))`,
         }}
-        onReset={() => {
-          setDraggedSize(null)
-          void Promise.all([settings.unset('usagePopoverWidth'), settings.unset('usagePopoverHeight')]).catch(() => false)
-        }}
-        onResize={setDraggedSize}
-        target={sectionRef}
-      />
-      <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:px-2 dshx:py-1.5">
-        <ToggleGroup
-          aria-label="Provider"
-          className="dshx:min-w-0 dshx:overflow-x-auto"
-          onValueChange={value => {
-            const next = KIND_GROUPS.find(kind => kind === value)
-            setTab(next ?? 'all')
+      >
+        <ResizeGrip
+          onCommit={committed => {
+            void Promise.all([settings.set('usagePopoverWidth', committed.width), settings.set('usagePopoverHeight', committed.height)])
+              .catch(() => false)
+              .finally(() => setDraggedSize(null))
           }}
-          size="sm"
-          type="single"
-          value={activeTab}
-        >
-          <ToggleGroupItem className="dshx:px-2 dshx:text-xs" value="all">
-            All
-          </ToggleGroupItem>
-          {providers.map(kind => (
-            <ToggleGroupItem aria-label={KIND_LABEL[kind]} className="dshx:px-1.5" key={kind} value={kind}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:inline-flex">
-                    <ProviderGlyph kind={kind} />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>{KIND_LABEL[kind]}</TooltipContent>
-              </Tooltip>
+          onReset={() => {
+            setDraggedSize(null)
+            void Promise.all([settings.unset('usagePopoverWidth'), settings.unset('usagePopoverHeight')]).catch(() => false)
+          }}
+          onResize={setDraggedSize}
+          target={sectionRef}
+        />
+        <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:px-2 dshx:py-1.5">
+          <ToggleGroup
+            aria-label="Provider"
+            className="dshx:min-w-0 dshx:overflow-x-auto"
+            onValueChange={value => {
+              const next = KIND_GROUPS.find(kind => kind === value)
+              setTab(next ?? 'all')
+            }}
+            size="sm"
+            type="single"
+            value={activeTab}
+          >
+            <ToggleGroupItem className="dshx:px-2 dshx:text-xs" value="all">
+              All
             </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <Button className="dshx:ml-auto dshx:shrink-0 dshx:text-xs" onClick={props.onOpenHistory} size="xs" type="button" variant="ghost">
-          Open usage history
-        </Button>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              aria-label={props.refreshing ? 'Refreshing usage' : 'Refresh usage'}
-              className="dshx:shrink-0"
-              disabled={props.refreshing}
-              onClick={props.onRefresh}
-              size="icon-xs"
-              type="button"
-              variant="ghost"
-            >
-              <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Refresh usage</TooltipContent>
-        </Tooltip>
-      </header>
-      <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] dshx:content-start dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
-        {props.usage === null ? (
-          <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
-            {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
-          </p>
-        ) : visibleCards.length === 0 ? (
-          <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
-            {sections.unavailable.length + sections.hidden.length === 0 ? 'No saved account for this provider.' : 'No account with quota to show.'}
-          </p>
-        ) : (
-          visibleCards.map(card => (
-            <ArrangeableAccount
-              arrangement={arrangement}
-              className="dshx:rounded-lg dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
-              direction="column"
-              focusable
-              id={card.instanceId}
-              key={card.instanceId}
-              name={card.displayName}
-              shownIds={shownIds}
-            >
-              <AccountUsageCard
-                card={card}
-                hostName={props.usage?.hostName ?? ''}
-                now={now}
-                readAt={props.usage?.readAt ?? now}
-                onConnectAccount={props.onConnectAccount}
-              />
-            </ArrangeableAccount>
-          ))
-        )}
-      </div>
-      {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} />}
-    </section>
+            {providers.map(kind => (
+              <ToggleGroupItem aria-label={KIND_LABEL[kind]} className="dshx:px-1.5" key={kind} value={kind}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:inline-flex">
+                      <ProviderGlyph kind={kind} />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{KIND_LABEL[kind]}</TooltipContent>
+                </Tooltip>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <Button className="dshx:ml-auto dshx:shrink-0 dshx:text-xs" onClick={props.onOpenHistory} size="xs" type="button" variant="ghost">
+            Open usage history
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                aria-label={props.refreshing ? 'Refreshing usage' : 'Refresh usage'}
+                className="dshx:shrink-0"
+                disabled={props.refreshing}
+                onClick={props.onRefresh}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              >
+                <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh usage</TooltipContent>
+          </Tooltip>
+        </header>
+        <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] dshx:content-start dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
+          {props.usage === null ? (
+            <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
+              {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
+            </p>
+          ) : visibleCards.length === 0 ? (
+            <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
+              {sections.unavailable.length + sections.hidden.length === 0 ? 'No saved account for this provider.' : 'No account with quota to show.'}
+            </p>
+          ) : (
+            visibleCards.map(card => (
+              <ArrangeableAccount
+                arrangement={arrangement}
+                className="dshx:rounded-lg dshx:outline-none dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
+                direction="column"
+                focusable
+                id={card.instanceId}
+                key={card.instanceId}
+                name={card.displayName}
+                shownIds={shownIds}
+              >
+                <AccountUsageCard
+                  card={card}
+                  hostName={props.usage?.hostName ?? ''}
+                  now={now}
+                  readAt={props.usage?.readAt ?? now}
+                  onConnectAccount={props.onConnectAccount}
+                />
+              </ArrangeableAccount>
+            ))
+          )}
+        </div>
+        {props.usage === null ? null : <HiddenAccounts arrangement={arrangement} hidden={sections.hidden} />}
+      </section>
     </TooltipProvider>
   )
 }

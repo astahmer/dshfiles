@@ -35,11 +35,7 @@ interface ConversationEventDescriptorInput {
 const isObjectValue = (value: unknown): value is object => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const isEventDescriptorInput = (value: unknown): value is ConversationEventDescriptorInput =>
-  isObjectValue(value) &&
-  'role' in value &&
-  (value.role === 'start' || value.role === 'update') &&
-  'id' in value &&
-  typeof value.id === 'function'
+  isObjectValue(value) && 'role' in value && (value.role === 'start' || value.role === 'update') && 'id' in value && typeof value.id === 'function'
 
 function validateDefinition(definition: {
   readonly kind: string

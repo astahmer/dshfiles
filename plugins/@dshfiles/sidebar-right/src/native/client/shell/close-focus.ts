@@ -12,7 +12,9 @@ import { visibleSidebarPane } from '../focus.ts'
  */
 export function openWithPaneFocus(document: Document, sessionId: SessionId, open: () => PaneId | undefined): void {
   let paneId: PaneId | undefined
-  flushSync(() => { paneId = open() })
+  flushSync(() => {
+    paneId = open()
+  })
   if (paneId !== undefined) visibleSidebarPane(document, sessionId, paneId)?.focus({ preventScroll: true })
 }
 
@@ -27,8 +29,7 @@ export function closeWithPaneFocus(document: Document, sessionId: SessionId, pan
   const before = document.activeElement
   const owner = before?.closest<HTMLElement>('[data-sidebar-right-session]')
   const source = before?.closest<HTMLElement>('[data-dockkit-pane], [data-dockkit-float]')
-  const retain = owner?.dataset.sidebarRightSession === sessionId
-    && (source?.dataset.dockkitPane ?? source?.dataset.dockkitFloat) === paneId
+  const retain = owner?.dataset.sidebarRightSession === sessionId && (source?.dataset.dockkitPane ?? source?.dataset.dockkitFloat) === paneId
   flushSync(close)
   if (!retain || (document.activeElement !== document.body && document.activeElement !== before)) return
   visibleSidebarPane(document, sessionId, paneId)?.focus({ preventScroll: true })

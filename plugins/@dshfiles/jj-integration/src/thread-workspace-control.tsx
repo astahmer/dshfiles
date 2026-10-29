@@ -235,7 +235,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   )
 
   return (
-          <TooltipProvider>
+    <TooltipProvider>
       <span className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1">
         <Popover open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
           {current === null || current === undefined ? (
@@ -335,7 +335,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         {props.t('rebaseOnto', { bookmark: props.bookmark })}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="right">{canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}</TooltipContent>
+                    <TooltipContent side="right">
+                      {canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}
+                    </TooltipContent>
                   </Tooltip>
                   {blockedReason === undefined ? null : <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">{blockedReason}</p>}
                 </div>

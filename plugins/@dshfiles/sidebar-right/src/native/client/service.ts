@@ -88,7 +88,11 @@ interface SidebarRightSessions {
  * @param host - the viewport rule and focus continuity the commands use.
  * @returns the controller; store adoption and scope removal; naming the on-screen Session; and recording a seat's room rule.
  */
-export function createSidebarRightController(tabs: SidebarRightTabRegistry, pin: PinResource, host: SidebarRightHost): {
+export function createSidebarRightController(
+  tabs: SidebarRightTabRegistry,
+  pin: PinResource,
+  host: SidebarRightHost,
+): {
   controller: SidebarRightController
   adopt: (sessionId: SessionId, store: SidebarRightSurfaceStore) => () => void
   forget: (sessionId: SessionId) => void
@@ -102,12 +106,16 @@ export function createSidebarRightController(tabs: SidebarRightTabRegistry, pin:
   const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source })
   return {
     controller,
-    forget: (sessionId) => {
+    forget: sessionId => {
       inventory.remove(sessionId)
       rooms.delete(sessionId)
     },
-    show: (sessionId) => { if (onScreen.getSnapshot() !== sessionId) onScreen.set(sessionId) },
-    measure: (sessionId, canSplitPane) => { rooms.set(sessionId, canSplitPane) },
+    show: sessionId => {
+      if (onScreen.getSnapshot() !== sessionId) onScreen.set(sessionId)
+    },
+    measure: (sessionId, canSplitPane) => {
+      rooms.set(sessionId, canSplitPane)
+    },
     adopt(sessionId, store) {
       adopted.get(sessionId)?.unsubscribe()
       const sync = (): void => {
@@ -282,7 +290,9 @@ export class SidebarRightController implements ISidebarRight {
   registerCloseHandler(kind: string, handler: SidebarRightCloseHandler): () => void {
     if (this.closeHandlers.has(kind)) throw new Error(`sidebarRight: close handler already registered for ${kind}`)
     this.closeHandlers.set(kind, handler)
-    return () => { if (this.closeHandlers.get(kind) === handler) this.closeHandlers.delete(kind) }
+    return () => {
+      if (this.closeHandlers.get(kind) === handler) this.closeHandlers.delete(kind)
+    }
   }
 
   /**
@@ -392,7 +402,9 @@ export class SidebarRightController implements ISidebarRight {
     if (actions === undefined || surface === undefined) return
     const tab = surface.layout.tabs[tabId]
     if (tab === undefined || !canCloseTab(surface, tabId)) return
-    this.removeAfterCleanup(sessionId, tab, () => { actions.closeTab(sessionId, tabId) })
+    this.removeAfterCleanup(sessionId, tab, () => {
+      actions.closeTab(sessionId, tabId)
+    })
   }
 
   private removeAfterCleanup(sessionId: SessionId, tab: TabRecord, commit: () => void): void {
@@ -401,12 +413,7 @@ export class SidebarRightController implements ISidebarRight {
   }
 
   /** Claim a resource and place it in one session; an address outside the scheme or one no type claims throws. */
-  private placeResource(
-    sessionId: SessionId,
-    actions: SurfaceActions,
-    address: string,
-    options: SidebarRightOpenResourceOptions,
-  ): void {
+  private placeResource(sessionId: SessionId, actions: SurfaceActions, address: string, options: SidebarRightOpenResourceOptions): void {
     if (!address.startsWith(RESOURCE_SCHEME)) {
       throw new Error(`sidebarRight: no registered tab type claims "${address}"`)
     }
@@ -438,31 +445,36 @@ export class SidebarRightController implements ISidebarRight {
     workbenchAdmission?: (tabId: TabId) => void,
   ): void {
     const surface = this.adopted.get(sessionId)?.store.getSnapshot().bySession[sessionId]
-    const targetPane = surface === undefined ? undefined : placement.paneId ?? activeDockPaneId(surface.layout)
+    const targetPane = surface === undefined ? undefined : (placement.paneId ?? activeDockPaneId(surface.layout))
     const target = targetPane === undefined ? undefined : surface?.layout.nodes[targetPane]
-    const preferNewPane = placement.preferNewPane === true
-      && placement.replaceTab === undefined
-      && surface !== undefined
-      && target?.kind === 'pane'
-      && target.host === 'dock'
-      && target.tabs.length > 0
-      && canSplit(surface.layout)
-      && dockPaneIds(surface.layout).length < 2
-      && this.mounted.getSnapshot() === sessionId
-      && this.canSplitPane(sessionId, target.id)
+    const preferNewPane =
+      placement.preferNewPane === true &&
+      placement.replaceTab === undefined &&
+      surface !== undefined &&
+      target?.kind === 'pane' &&
+      target.host === 'dock' &&
+      target.tabs.length > 0 &&
+      canSplit(surface.layout) &&
+      dockPaneIds(surface.layout).length < 2 &&
+      this.mounted.getSnapshot() === sessionId &&
+      this.canSplitPane(sessionId, target.id)
     const commit = (): void => {
-      actions.openContent(sessionId, {
-        kind: claim.kind,
-        contentId: claim.contentId,
-        title: claim.title,
-        ...placement.paneId === undefined ? {} : { paneId: placement.paneId },
-        ...preferNewPane ? { preferNewPane: true } : {},
-        ...placement.replaceTab === undefined ? {} : { replaceTab: placement.replaceTab },
-        ...placement.revealIfOpened === undefined ? {} : { revealIfOpened: placement.revealIfOpened },
-      }, (tabId) => {
-        workbenchAdmission?.(tabId)
-        this.tabDomain.navigate(sessionId, tabId, { address, params })
-      })
+      actions.openContent(
+        sessionId,
+        {
+          kind: claim.kind,
+          contentId: claim.contentId,
+          title: claim.title,
+          ...(placement.paneId === undefined ? {} : { paneId: placement.paneId }),
+          ...(preferNewPane ? { preferNewPane: true } : {}),
+          ...(placement.replaceTab === undefined ? {} : { replaceTab: placement.replaceTab }),
+          ...(placement.revealIfOpened === undefined ? {} : { revealIfOpened: placement.revealIfOpened }),
+        },
+        tabId => {
+          workbenchAdmission?.(tabId)
+          this.tabDomain.navigate(sessionId, tabId, { address, params })
+        },
+      )
       // Only explicit navigation reveals the global pane. Adoption/restoration
       // and passive metadata projection never call this path.
       if (workbenchAdmission === undefined) this.revealDock(claim.kind)
@@ -470,11 +482,23 @@ export class SidebarRightController implements ISidebarRight {
     const layout = surface?.layout
     const replaced = placement.replaceTab === undefined ? undefined : layout?.tabs[placement.replaceTab]
     const replacementPane = replaced === undefined || layout === undefined ? undefined : findTabPane(layout, replaced.id)
-    const revealed = layout === undefined ? undefined
-      : claim.contentId === pageAddress(claim.kind)
-        ? findPaneContentTab(layout, replacementPane?.host === 'dock' ? replacementPane.id : placement.paneId ?? activeDockPaneId(layout), claim.contentId, claim.kind)
-        : placement.revealIfOpened === false ? undefined : findContentTab(layout, claim.contentId, claim.kind)
-    if (replaced === undefined || replaced.id === revealed) { commit(); return }
+    const revealed =
+      layout === undefined
+        ? undefined
+        : claim.contentId === pageAddress(claim.kind)
+          ? findPaneContentTab(
+              layout,
+              replacementPane?.host === 'dock' ? replacementPane.id : (placement.paneId ?? activeDockPaneId(layout)),
+              claim.contentId,
+              claim.kind,
+            )
+          : placement.revealIfOpened === false
+            ? undefined
+            : findContentTab(layout, claim.contentId, claim.kind)
+    if (replaced === undefined || replaced.id === revealed) {
+      commit()
+      return
+    }
     this.removeAfterCleanup(sessionId, replaced, commit)
   }
 
@@ -551,13 +575,14 @@ export class SidebarRightController implements ISidebarRight {
     const resourceSessionId = resource?.dataset.sidebarRightSession as SessionId | undefined
     if (resourceSessionId !== undefined) {
       const surface = this.adopted.get(resourceSessionId)?.store.getSnapshot().bySession[resourceSessionId]
-      return surface === undefined ? undefined : sidebarTargetFromElement(element, resourceSessionId, surface.layout,
-        tabId => this.tabDomain.occurrence(resourceSessionId, { id: tabId }))
+      return surface === undefined
+        ? undefined
+        : sidebarTargetFromElement(element, resourceSessionId, surface.layout, tabId => this.tabDomain.occurrence(resourceSessionId, { id: tabId }))
     }
     const screen = this.screen()
-    return screen === undefined ? undefined
-      : sidebarTargetFromElement(element, screen.sessionId, screen.surface.layout,
-        tabId => this.tabDomain.occurrence(screen.sessionId, { id: tabId }))
+    return screen === undefined
+      ? undefined
+      : sidebarTargetFromElement(element, screen.sessionId, screen.surface.layout, tabId => this.tabDomain.occurrence(screen.sessionId, { id: tabId }))
   }
 
   /**
@@ -570,12 +595,14 @@ export class SidebarRightController implements ISidebarRight {
     if (focused !== undefined || element?.closest('[data-sidebar-right-session]')) return focused
     const screen = this.screen()
     if (screen === undefined) return undefined
-    const { sessionId, surface: { layout } } = screen
+    const {
+      sessionId,
+      surface: { layout },
+    } = screen
     const pane = getPane(layout, activeDockPaneId(layout))
     const tabId = pane.activeTabId
     const held = tabId === undefined ? undefined : this.tabDomain.occurrence(sessionId, { id: tabId })
-    return { sessionId, paneId: pane.id, host: pane.host, tabId,
-      occurrence: held, navigationRevision: held?.navigation.getSnapshot().revision }
+    return { sessionId, paneId: pane.id, host: pane.host, tabId, occurrence: held, navigationRevision: held?.navigation.getSnapshot().revision }
   }
 
   /**
@@ -597,8 +624,8 @@ export class SidebarRightController implements ISidebarRight {
         this.focus(tab.id)
       } else {
         this.openTab(kind, {
-          ...target.host === 'dock' ? { paneId: target.paneId } : {},
-          ...tab?.kind === 'guide' ? { replaceTab: tab.id } : {},
+          ...(target.host === 'dock' ? { paneId: target.paneId } : {}),
+          ...(tab?.kind === 'guide' ? { replaceTab: tab.id } : {}),
         })
       }
       return this.mountedSurface()?.layout.activePaneId
@@ -640,18 +667,24 @@ export class SidebarRightController implements ISidebarRight {
    */
   isTargetCurrent(target: SidebarRightTarget): boolean {
     const background = this.mounted.getSnapshot() !== target.sessionId
-    if (background && (typeof document === 'undefined' || ![...document.querySelectorAll<HTMLElement>('[data-sidebar-resource-panel]')]
-      .some(element => element.dataset.sidebarRightSession === target.sessionId
-        && element.dataset.sidebarRightOccurrence === target.occurrence?.id
-        && element.closest('[hidden], [aria-hidden="true"]') === null))) return false
+    if (
+      background &&
+      (typeof document === 'undefined' ||
+        ![...document.querySelectorAll<HTMLElement>('[data-sidebar-resource-panel]')].some(
+          element =>
+            element.dataset.sidebarRightSession === target.sessionId &&
+            element.dataset.sidebarRightOccurrence === target.occurrence?.id &&
+            element.closest('[hidden], [aria-hidden="true"]') === null,
+        ))
+    )
+      return false
     const layout = this.adopted.get(target.sessionId)?.store.getSnapshot().bySession[target.sessionId]?.layout
     const pane = layout?.nodes[target.paneId]
     if (pane?.kind !== 'pane' || pane.host !== target.host) return false
     if (target.tabId === undefined) return pane.activeTabId === undefined
     if (!pane.tabs.includes(target.tabId) || layout?.tabs[target.tabId] === undefined) return false
     const held = this.tabDomain.occurrence(target.sessionId, { id: target.tabId })
-    return held === target.occurrence && !held.signal.aborted
-      && held.navigation.getSnapshot().revision === target.navigationRevision
+    return held === target.occurrence && !held.signal.aborted && held.navigation.getSnapshot().revision === target.navigationRevision
   }
 
   /**
@@ -699,7 +732,9 @@ export class SidebarRightController implements ISidebarRight {
     if (!canSplit(layout) || dockPaneIds(layout).length >= 2 || !this.canSplitPane(sessionId, target)) return undefined
     let created: PaneId | undefined
     this.host.openWithFocus(sessionId, () => {
-      actions.splitPane(sessionId, target, (id) => { created = id })
+      actions.splitPane(sessionId, target, id => {
+        created = id
+      })
       return created
     })
     return created

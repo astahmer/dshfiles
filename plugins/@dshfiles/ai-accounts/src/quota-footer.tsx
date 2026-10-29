@@ -402,54 +402,56 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
   const stripTitle = items.map(item => describeItem(item, now)).join('\n') || label
   return (
     <TooltipProvider delayDuration={500}>
-    <Popover onOpenChange={setOpen} open={open}>
-      <Tooltip>
-      <TooltipTrigger asChild>
-      <PopoverTrigger asChild>
-        <button
-          aria-label={activeLabel}
-          aria-current={activeProfile === undefined ? undefined : 'true'}
-          data-active-account={activeProfile?.instanceId}
-          className={cn(
-            meterButtonClass,
-            'dshx:h-auto dshx:min-h-8 dshx:flex-col dshx:gap-0.5 dshx:overflow-hidden dshx:py-1',
-            open && 'dshx:bg-accent dshx:text-foreground',
-            activeProfile !== undefined && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
-          )}
-          type="button"
-        >
-          {/* The rail is ~56px wide: the glyph over the percent, no account tag or reset, so nothing clips. */}
-          {critical === undefined ? (
-            activeProfile === undefined ? (
-              <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
-            ) : (
-              <ProviderGlyph kind={activeProfile.kind} className="dshx:size-4 dshx:shrink-0" />
-            )
-          ) : 'unavailable' in critical ? (
-            <>
-              <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
-              <span className="dshx:text-[10px] dshx:text-muted-foreground">{critical.unavailable.label === 'Sign in again' ? 'Sign in' : 'No quota'}</span>
-            </>
-          ) : (
-            <>
-              <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
-              <span
+      <Popover onOpenChange={setOpen} open={open}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                aria-label={activeLabel}
+                aria-current={activeProfile === undefined ? undefined : 'true'}
+                data-active-account={activeProfile?.instanceId}
                 className={cn(
-                  'dshx:text-[10px] dshx:leading-none dshx:font-semibold dshx:tabular-nums',
-                  critical.exhausted ? 'dshx:text-destructive' : QUOTA_TONE_TEXT[quotaTone(critical.percentRemaining)],
+                  meterButtonClass,
+                  'dshx:h-auto dshx:min-h-8 dshx:flex-col dshx:gap-0.5 dshx:overflow-hidden dshx:py-1',
+                  open && 'dshx:bg-accent dshx:text-foreground',
+                  activeProfile !== undefined && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
                 )}
+                type="button"
               >
-                {critical.exhausted ? '0%' : `${String(Math.round(critical.percentRemaining))}%`}
-              </span>
-            </>
-          )}
-        </button>
-      </PopoverTrigger>
-      </TooltipTrigger>
-      <TooltipContent className="dshx-root dshx:whitespace-pre-line">{stripTitle}</TooltipContent>
-      </Tooltip>
-      <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} onConnectAccount={props.onConnectAccount} />
-    </Popover>
+                {/* The rail is ~56px wide: the glyph over the percent, no account tag or reset, so nothing clips. */}
+                {critical === undefined ? (
+                  activeProfile === undefined ? (
+                    <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
+                  ) : (
+                    <ProviderGlyph kind={activeProfile.kind} className="dshx:size-4 dshx:shrink-0" />
+                  )
+                ) : 'unavailable' in critical ? (
+                  <>
+                    <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
+                    <span className="dshx:text-[10px] dshx:text-muted-foreground">
+                      {critical.unavailable.label === 'Sign in again' ? 'Sign in' : 'No quota'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <ProviderGlyph className="dshx:size-3.5" kind={critical.kind} />
+                    <span
+                      className={cn(
+                        'dshx:text-[10px] dshx:leading-none dshx:font-semibold dshx:tabular-nums',
+                        critical.exhausted ? 'dshx:text-destructive' : QUOTA_TONE_TEXT[quotaTone(critical.percentRemaining)],
+                      )}
+                    >
+                      {critical.exhausted ? '0%' : `${String(Math.round(critical.percentRemaining))}%`}
+                    </span>
+                  </>
+                )}
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent className="dshx-root dshx:whitespace-pre-line">{stripTitle}</TooltipContent>
+        </Tooltip>
+        <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} onConnectAccount={props.onConnectAccount} />
+      </Popover>
     </TooltipProvider>
   )
 }

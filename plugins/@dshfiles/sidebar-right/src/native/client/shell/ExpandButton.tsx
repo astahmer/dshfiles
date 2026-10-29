@@ -26,11 +26,10 @@ import type { createSidebarRightStore } from '../stores.ts'
 import css from './ExpandButton.module.css'
 
 /** The button's props: the header corner seat, the shared store, and copy. */
-export type ExpandButtonProps =
-  & PropsRuntime<'conversation.session.header.corner'>
-  & PropsStore<ReturnType<typeof createSidebarRightStore>>
-  & PropsLocale<'sidebarRight'>
-  & InjectFace<{
+export type ExpandButtonProps = PropsRuntime<'conversation.session.header.corner'> &
+  PropsStore<ReturnType<typeof createSidebarRightStore>> &
+  PropsLocale<'sidebarRight'> &
+  InjectFace<{
     dock: () => DockPaneActions | undefined
     hooks: { shortcuts: HostObservable<readonly ShortcutCatalogEntry[]>; workbenchMode: HostObservable<boolean> }
   }>
@@ -39,9 +38,15 @@ const closed = (): boolean => false
 const subscribeNothing = (): (() => void) => () => {}
 
 /** The expand control while the panel is collapsed; nothing while it is shown. */
-export function ExpandButton({ sessionId, useStore, actions, t, useShortcuts, useWorkbenchMode, dock }: Pick<
-  ExpandButtonProps, 'sessionId' | 'useStore' | 'actions' | 't' | 'useShortcuts' | 'useWorkbenchMode' | 'dock'
->): ReactNode {
+export function ExpandButton({
+  sessionId,
+  useStore,
+  actions,
+  t,
+  useShortcuts,
+  useWorkbenchMode,
+  dock,
+}: Pick<ExpandButtonProps, 'sessionId' | 'useStore' | 'actions' | 't' | 'useShortcuts' | 'useWorkbenchMode' | 'dock'>): ReactNode {
   // A session with no surface yet is collapsed: the panel seat materializes the
   // surface on its own mount, and until then there is nothing expanded.
   const shortcut = useShortcuts(entries => entries.find(entry => entry.id === 'sidebar.right.toggle'))

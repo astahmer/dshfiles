@@ -39,11 +39,9 @@ export function sidebarTargetFromElement(
   const tabId = (tabElement?.dataset.dockkitTab ?? tabElement?.dataset.sidebarRightTab ?? pane.activeTabId) as TabId | undefined
   if (tabId !== undefined && (!pane.tabs.includes(tabId) || layout.tabs[tabId] === undefined)) return undefined
   const held = tabId === undefined ? undefined : occurrence(tabId)
-  const marker = element.closest<HTMLElement>('[data-sidebar-right-occurrence]')
-    ?? tabElement?.querySelector<HTMLElement>('[data-sidebar-right-occurrence]')
+  const marker = element.closest<HTMLElement>('[data-sidebar-right-occurrence]') ?? tabElement?.querySelector<HTMLElement>('[data-sidebar-right-occurrence]')
   if (marker !== null && marker !== undefined && marker.dataset.sidebarRightOccurrence !== held?.id) return undefined
-  return { sessionId, paneId, host: pane.host, tabId, occurrence: held,
-    navigationRevision: held?.navigation.getSnapshot().revision }
+  return { sessionId, paneId, host: pane.host, tabId, occurrence: held, navigationRevision: held?.navigation.getSnapshot().revision }
 }
 
 /**
@@ -54,15 +52,19 @@ export function sidebarTargetFromElement(
  * @returns a surviving visible pane, or undefined when the Session has none.
  */
 export function visibleSidebarPane(document: Document, sessionId: SessionId, paneId: PaneId): HTMLElement | undefined {
-  const panes = [...document.querySelectorAll<HTMLElement>('[data-dockkit-pane], [data-dockkit-float]')]
-    .filter((pane) => {
-      const owner = pane.closest<HTMLElement>('[data-sidebar-right-session]')
-      return owner?.dataset.sidebarRightSession === sessionId
-        && pane.closest('[hidden], [aria-hidden="true"]') === null
-        && (pane.hasAttribute('data-dockkit-float') || owner.hasAttribute('data-sidebar-right-open'))
-    })
-  return panes.find(pane => (pane.dataset.dockkitPane ?? pane.dataset.dockkitFloat) === paneId)
-    ?? panes.find(pane => pane.hasAttribute('data-dockkit-pane-active') || pane.hasAttribute('data-dockkit-float-active')) ?? panes[0]
+  const panes = [...document.querySelectorAll<HTMLElement>('[data-dockkit-pane], [data-dockkit-float]')].filter(pane => {
+    const owner = pane.closest<HTMLElement>('[data-sidebar-right-session]')
+    return (
+      owner?.dataset.sidebarRightSession === sessionId &&
+      pane.closest('[hidden], [aria-hidden="true"]') === null &&
+      (pane.hasAttribute('data-dockkit-float') || owner.hasAttribute('data-sidebar-right-open'))
+    )
+  })
+  return (
+    panes.find(pane => (pane.dataset.dockkitPane ?? pane.dataset.dockkitFloat) === paneId) ??
+    panes.find(pane => pane.hasAttribute('data-dockkit-pane-active') || pane.hasAttribute('data-dockkit-float-active')) ??
+    panes[0]
+  )
 }
 
 /**
@@ -79,10 +81,12 @@ export function observeSidebarFocus(document: Document): () => void {
     focused = undefined
     removal.disconnect()
     if (document.activeElement !== document.body) return
-    const moved = previous.occurrence === undefined ? undefined
-      : [...document.querySelectorAll<HTMLElement>('[data-sidebar-right-occurrence]')]
-        .find(marker => marker.dataset.sidebarRightOccurrence === previous.occurrence)
-        ?.closest<HTMLElement>('[data-dockkit-pane], [data-dockkit-float]')
+    const moved =
+      previous.occurrence === undefined
+        ? undefined
+        : [...document.querySelectorAll<HTMLElement>('[data-sidebar-right-occurrence]')]
+            .find(marker => marker.dataset.sidebarRightOccurrence === previous.occurrence)
+            ?.closest<HTMLElement>('[data-dockkit-pane], [data-dockkit-float]')
     const paneId = (moved?.dataset.dockkitPane ?? moved?.dataset.dockkitFloat) as PaneId | undefined
     visibleSidebarPane(document, previous.sessionId, paneId ?? previous.paneId)?.focus({ preventScroll: true })
   })
@@ -96,29 +100,38 @@ export function observeSidebarFocus(document: Document): () => void {
     const sessionId = owner?.dataset.sidebarRightSession as SessionId | undefined
     const paneId = (pane.dataset.dockkitPane ?? pane.dataset.dockkitFloat) as PaneId | undefined
     if (owner === null || sessionId === undefined || paneId === undefined) return
-    const tab = element.closest<HTMLElement>('[data-dockkit-tab]')
-      ?? pane.querySelector<HTMLElement>('[role="tab"][aria-selected="true"], [data-dockkit-float-title]')
-    const marker = element.closest<HTMLElement>('[data-sidebar-right-occurrence]')
-      ?? tab?.querySelector<HTMLElement>('[data-sidebar-right-occurrence]')
+    const tab =
+      element.closest<HTMLElement>('[data-dockkit-tab]') ?? pane.querySelector<HTMLElement>('[role="tab"][aria-selected="true"], [data-dockkit-float-title]')
+    const marker = element.closest<HTMLElement>('[data-sidebar-right-occurrence]') ?? tab?.querySelector<HTMLElement>('[data-sidebar-right-occurrence]')
     focused = { element, sessionId, paneId, occurrence: marker?.dataset.sidebarRightOccurrence }
     removal.observe(owner, { childList: true, subtree: true })
     // Observe removal of the whole Session seat as well as its tab bodies.
     if (owner.parentElement !== null) removal.observe(owner.parentElement, { childList: true })
   }
   const focusout = (event: FocusEvent): void => {
-    if (event.relatedTarget === null && focused?.element.isConnected) { focused = undefined; removal.disconnect() }
+    if (event.relatedTarget === null && focused?.element.isConnected) {
+      focused = undefined
+      removal.disconnect()
+    }
   }
   const pointer = (event: PointerEvent): void => {
     const element = event.composedPath().find(value => value instanceof Element)
     if (!(element instanceof Element)) return
     const pane = element.closest<HTMLElement>('[data-sidebar-right-session] [data-dockkit-pane], [data-sidebar-right-session] [data-dockkit-float]')
-    if (pane === null) { focused = undefined; removal.disconnect() }
+    if (pane === null) {
+      focused = undefined
+      removal.disconnect()
+    }
     const control = element.closest('button, input, textarea, select, a, [contenteditable], [tabindex], iframe')
     if (pane !== null && (control === null || control === pane)) {
       pane.focus({ preventScroll: true })
     }
   }
-  const blur = (): void => { queueMicrotask(() => { if (active) capture() }) }
+  const blur = (): void => {
+    queueMicrotask(() => {
+      if (active) capture()
+    })
+  }
   document.addEventListener('focusin', capture)
   document.addEventListener('focusout', focusout)
   document.addEventListener('pointerdown', pointer, true)

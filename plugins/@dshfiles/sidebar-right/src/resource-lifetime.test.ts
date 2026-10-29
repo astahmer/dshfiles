@@ -15,8 +15,12 @@ it('preserves real per-session occurrences through target moves and invokes term
   const pin = vi.fn()
   const owner = createSidebarRightController(types, pin, {
     autoFullscreen: () => false,
-    openWithFocus: (_session, open) => { open() },
-    closeWithFocus: (_session, _pane, close) => { close() },
+    openWithFocus: (_session, open) => {
+      open()
+    },
+    closeWithFocus: (_session, _pane, close) => {
+      close()
+    },
   })
   // SAFETY: deterministic fixture identities name the two real stores adopted immediately below.
   const a = 'session-a' as SessionId
@@ -38,7 +42,15 @@ it('preserves real per-session occurrences through target moves and invokes term
   if (terminal === undefined) throw new Error('expected a real terminal record')
   const held = owner.controller.tabDomain.occurrence(a, terminal)
   const bridge = SidebarResourcePanelModel.create()
-  const rows = records.map(tab => ({ id: SidebarResourcePanelModel.id(a, tab.id), sessionId: a, tabId: tab.id, kind: tab.kind, title: tab.title, address: tab.contentId, navigationRevision: 1 }))
+  const rows = records.map(tab => ({
+    id: SidebarResourcePanelModel.id(a, tab.id),
+    sessionId: a,
+    tabId: tab.id,
+    kind: tab.kind,
+    title: tab.title,
+    address: tab.contentId,
+    navigationRevision: 1,
+  }))
   bridge.publish(a, rows, tabId => {
     const record = records.find(tab => tab.id === tabId)
     if (record !== undefined) owner.controller.closeIn(a, record.id)
@@ -55,8 +67,9 @@ it('preserves real per-session occurrences through target moves and invokes term
   resourceElement.dataset.sidebarRightSession = a
   resourceElement.dataset.sidebarRightTab = terminal.id
   resourceElement.dataset.sidebarRightOccurrence = held.id
-  const terminalPane = Object.values(storeA.getSnapshot().bySession[a]?.layout.nodes ?? {})
-    .find(node => node.kind === 'pane' && node.tabs.includes(terminal.id))
+  const terminalPane = Object.values(storeA.getSnapshot().bySession[a]?.layout.nodes ?? {}).find(
+    node => node.kind === 'pane' && node.tabs.includes(terminal.id),
+  )
   if (terminalPane === undefined) throw new Error('expected terminal pane')
   resourceElement.dataset.dockkitPane = terminalPane.id
   document.body.append(resourceElement)

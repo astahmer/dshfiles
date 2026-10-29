@@ -11,7 +11,10 @@ import { computeColumns } from './native/client/columns.js'
 import { createLayoutStore } from './native/client/stores.js'
 
 const geometryCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/client/AppFrame.module.css'), 'utf8')
-afterEach(() => { document.head.innerHTML = ''; document.body.innerHTML = '' })
+afterEach(() => {
+  document.head.innerHTML = ''
+  document.body.innerHTML = ''
+})
 
 describe('narrow frame recovery geometry', () => {
   it.each([360, 480, 768])('keeps left and centre reachable after revealing a remembered 420px sidebar at %spx', viewport => {
@@ -95,8 +98,7 @@ describe('native rightbar resource carrier', () => {
       }
       const owner = { width: 400, viewportWidth: 1200, canShow: true }
       const column = RightbarColumn({ mainMode, mode, owner, renderSlot })
-      const carrier = Children.toArray(column.props.children).find(child =>
-        isValidElement(child) && 'data-native-rightbar-carrier' in child.props)
+      const carrier = Children.toArray(column.props.children).find(child => isValidElement(child) && 'data-native-rightbar-carrier' in child.props)
       expect(isValidElement<{ hidden: boolean; style?: CSSProperties; children: ReactNode }>(carrier)).toBe(true)
       if (!isValidElement<{ hidden: boolean; style?: CSSProperties; children: ReactNode }>(carrier)) return
       expect(carrier.props.hidden).toBe(hidden)
@@ -105,8 +107,7 @@ describe('native rightbar resource carrier', () => {
       const keepsNative = mainMode === 'workbench' || mode === 'native'
       expect(called.mock.calls.some(([slot]) => slot === 'rightbar')).toBe(keepsNative)
       expect(carrier.props.children).toBe(keepsNative ? 'rightbar' : null)
-      const dockCarrier = Children.toArray(column.props.children).find(child =>
-        isValidElement(child) && 'data-shell-dock-carrier' in child.props)
+      const dockCarrier = Children.toArray(column.props.children).find(child => isValidElement(child) && 'data-shell-dock-carrier' in child.props)
       expect(isValidElement<{ hidden: boolean; style?: CSSProperties; children: ReactNode }>(dockCarrier)).toBe(true)
       if (!isValidElement<{ hidden: boolean; style?: CSSProperties; children: ReactNode }>(dockCarrier)) return
       expect(dockCarrier.props.hidden).toBe(mode !== 'dock')

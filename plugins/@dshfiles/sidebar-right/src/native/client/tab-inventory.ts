@@ -28,12 +28,21 @@ export class SidebarTabInventory {
         if (key === null || !key.startsWith(`${sidebarPersistence}.`)) continue
         const sessionId = key.slice(sidebarPersistence.length + 1) as SessionId
         const saved = readSidebarLayout(sessionId)
-        if (saved !== undefined) this.sessions.set(sessionId, Object.values(saved.layout.tabs).map(tab => ({
-          sessionId, tabId: tab.id, kind: tab.kind, contentId: tab.contentId,
-        })))
+        if (saved !== undefined)
+          this.sessions.set(
+            sessionId,
+            Object.values(saved.layout.tabs).map(tab => ({
+              sessionId,
+              tabId: tab.id,
+              kind: tab.kind,
+              contentId: tab.contentId,
+            })),
+          )
       }
       this.publish()
-    } catch (_storageUnavailable) { /* Adopted in-memory layouts still publish their open tabs. */ }
+    } catch (_storageUnavailable) {
+      /* Adopted in-memory layouts still publish their open tabs. */
+    }
   }
 
   /**
@@ -42,7 +51,10 @@ export class SidebarTabInventory {
    * @param tabs - current committed records.
    */
   update(sessionId: SessionId, tabs: readonly TabRecord[]): void {
-    this.sessions.set(sessionId, tabs.map(tab => ({ sessionId, tabId: tab.id, kind: tab.kind, contentId: tab.contentId })))
+    this.sessions.set(
+      sessionId,
+      tabs.map(tab => ({ sessionId, tabId: tab.id, kind: tab.kind, contentId: tab.contentId })),
+    )
     this.publish()
   }
 
@@ -50,7 +62,10 @@ export class SidebarTabInventory {
    * Forget a permanently cleared scope.
    * @param sessionId - removed Session scope.
    */
-  remove(sessionId: SessionId): void { this.sessions.delete(sessionId); this.publish() }
+  remove(sessionId: SessionId): void {
+    this.sessions.delete(sessionId)
+    this.publish()
+  }
 
   private publish(): void {
     const next = [...this.sessions.values()].flat()

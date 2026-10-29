@@ -13,10 +13,15 @@ describe('main surface seat', () => {
   it('reports repeated navigation requests even when the selected key does not change', () => {
     const instance = createLayoutStore().create()
     const requested = vi.fn()
-    const layout = new LayoutController(instance.actions, () => true, {
-      getSnapshot: () => instance.getSnapshot().panelInfo,
-      subscribe: listener => instance.subscribe(listener),
-    }, requested)
+    const layout = new LayoutController(
+      instance.actions,
+      () => true,
+      {
+        getSnapshot: () => instance.getSnapshot().panelInfo,
+        subscribe: listener => instance.subscribe(listener),
+      },
+      requested,
+    )
     layout.selectPanel(null)
     layout.selectPanel(null)
     expect(requested.mock.calls).toEqual([[null], [null]])

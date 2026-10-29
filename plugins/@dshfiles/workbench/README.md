@@ -77,10 +77,10 @@ contributes an editor panel, and [`@dshfiles/jujutsu`](../jujutsu/README.md) a r
 
 ## Settings (`dshfiles-workbench`)
 
-| Key            | Default     | Meaning                                                                                                                                                              |
-| -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bottomPanel`  | `hidden`    | `shown` opens the tabbed bottom pane below left and centre; `hidden` closes it. |
-| `demoPanels`   | `false`     | Developer fixtures: the Scratchpad and Ticker panels, which count mounts and renders to prove docking never remounts.                                                |
+| Key           | Default  | Meaning                                                                                                               |
+| ------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `bottomPanel` | `hidden` | `shown` opens the tabbed bottom pane below left and centre; `hidden` closes it.                                       |
+| `demoPanels`  | `false`  | Developer fixtures: the Scratchpad and Ticker panels, which count mounts and renders to prove docking never remounts. |
 
 The owned frame (`@dshfiles/frame-layout`) is required. It owns the geometry and publishes the existing main, right and bottom seats. Browser-local right-pane visibility is the single owner of open/close state; the frame and sidebar shortcut consume registered `DockPaneActions` rather than mirroring a Session's expansion state. Hidden legacy `mainSurface`, `rightPanel` and `headerToggle` keys only decode old profiles. The old dock value seeds visibility once; subsequent closes and reloads preserve the browser's choice.
 

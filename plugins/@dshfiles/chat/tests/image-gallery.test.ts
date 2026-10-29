@@ -91,9 +91,7 @@ describe('Chat image gallery scope', () => {
       fallbackImage: { src: 'image:external', alt: 'external.png' },
     })
 
-    expect(gallery.images.map(item => item.src)).toEqual([
-      'image:first', 'image:second', 'image:third', 'image:external',
-    ])
+    expect(gallery.images.map(item => item.src)).toEqual(['image:first', 'image:second', 'image:third', 'image:external'])
     expect(gallery.initialIndex).toBe(3)
   })
 })

@@ -36,16 +36,20 @@ export interface GuideInjected {
 }
 
 /** The guide body's composed props: the tab it draws, its chain child, and the entries. */
-export type GuideBodyProps =
-  & PropsRuntime<'sidebar.right.pane.tab'>
-  & PropsRenderSlots<'sidebar.right.tab.guide' | 'sidebar.right.tab.guide.entry'>
-  & InjectFace<GuideInjected>
+export type GuideBodyProps = PropsRuntime<'sidebar.right.pane.tab'> &
+  PropsRenderSlots<'sidebar.right.tab.guide' | 'sidebar.right.tab.guide.entry'> &
+  InjectFace<GuideInjected>
 
 /** Entry count past which the guide drops the capsules' descriptions to stay light. */
 const MAX_DESCRIBED_ENTRIES = 4
 
 /** One entry capsule: the contributing type's glyph and title, and its description while the guide is short. */
-function EntryBox({ entry, described, onPick, shortcut }: {
+function EntryBox({
+  entry,
+  described,
+  onPick,
+  shortcut,
+}: {
   shortcut: ShortcutCatalogEntry | undefined
   entry: SidebarRightGuideBox
   described: boolean
@@ -59,7 +63,9 @@ function EntryBox({ entry, described, onPick, shortcut }: {
       className={css.entry}
       data-sidebar-right-guide-entry={entry.kind}
       aria-keyshortcuts={shortcut?.aria}
-      onClick={() => { onPick(entry) }}
+      onClick={() => {
+        onPick(entry)
+      }}
     >
       {/* The glyph rides the capsule's height: 22 beside a bare title, 26 beside two lines. */}
       <span className={css.entryIcon}>
@@ -78,7 +84,9 @@ function EntryBox({ entry, described, onPick, shortcut }: {
 function ShippedGuide({ children }: { children: ReactNode }): ReactNode {
   return (
     <div className={css.guide} data-sidebar-right-guide>
-      <span className={css.hero} aria-hidden="true"><CompassGlyph size={56} /></span>
+      <span className={css.hero} aria-hidden="true">
+        <CompassGlyph size={56} />
+      </span>
       {children}
     </div>
   )
@@ -92,20 +100,39 @@ export function GuideBody({ useTabInfo, useGuideEntries, renderSlot, renderSlotC
   const options = {
     hookContext: useTabInfo,
     fallback: (
-      <ShippedGuide>{entries.map((entry) => {
-        const described = entries.length <= MAX_DESCRIBED_ENTRIES
-        const description = described ? entry.description?.() : undefined
-        return <div key={JSON.stringify([entry.providerId, entry.id])} className={css.entryCell}>
-          {renderSlot('sidebar.right.tab.guide.entry', {
-            entryId: entry.id, kind: entry.kind, title: entry.title(),
-            ...description === undefined ? {} : { description },
-          }, {
-            entryKey: entry.providerId, hookContext: useTabInfo,
-            fallback: <EntryBox entry={entry} described={described} shortcut={shortcuts.find(shortcut => shortcut.id === entry.commandId)}
-              onPick={(selected) => { tab.actions.openTab(selected.kind, { replaceTab: true }) }} />,
-          })}
-        </div>
-      })}</ShippedGuide>
+      <ShippedGuide>
+        {entries.map(entry => {
+          const described = entries.length <= MAX_DESCRIBED_ENTRIES
+          const description = described ? entry.description?.() : undefined
+          return (
+            <div key={JSON.stringify([entry.providerId, entry.id])} className={css.entryCell}>
+              {renderSlot(
+                'sidebar.right.tab.guide.entry',
+                {
+                  entryId: entry.id,
+                  kind: entry.kind,
+                  title: entry.title(),
+                  ...(description === undefined ? {} : { description }),
+                },
+                {
+                  entryKey: entry.providerId,
+                  hookContext: useTabInfo,
+                  fallback: (
+                    <EntryBox
+                      entry={entry}
+                      described={described}
+                      shortcut={shortcuts.find(shortcut => shortcut.id === entry.commandId)}
+                      onPick={selected => {
+                        tab.actions.openTab(selected.kind, { replaceTab: true })
+                      }}
+                    />
+                  ),
+                },
+              )}
+            </div>
+          )
+        })}
+      </ShippedGuide>
     ),
   } satisfies ChainRenderOpts & { hookContext: HookContextOf<'sidebar.right.tab.guide'> }
   return renderSlotChain('sidebar.right.tab.guide', {}, options)

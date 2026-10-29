@@ -185,8 +185,7 @@ export function assessProjectCompatibility(manifest: JsonObject, installedVersio
  */
 const HOST_PROVIDED_SCOPE = '@deepseek-ai/'
 
-const isJsonObject = (value: JsonValue | undefined): value is JsonObject =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
+const isJsonObject = (value: JsonValue | undefined): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /**
  * Packages under the Host scope that are ordinary libraries rather than Host

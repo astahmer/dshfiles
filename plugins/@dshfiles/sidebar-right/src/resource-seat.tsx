@@ -18,7 +18,11 @@ export interface ResourceSeatInjected {
 type ResourceSeatProps = RightbarSeatProps & InjectFace<ResourceSeatInjected>
 
 /** Records remain in their original session store; only their presentation travels through a portal. */
-function AddressableTab({ props, tab, target }: {
+function AddressableTab({
+  props,
+  tab,
+  target,
+}: {
   readonly props: ResourceSeatProps
   readonly tab: TabRecord
   readonly target: SidebarResourceTarget | undefined
@@ -32,25 +36,49 @@ function AddressableTab({ props, tab, target }: {
   if (target === undefined || layout === undefined) return null
   const pane = findTabPane(layout, tab.id)
   const shared = {
-    renderSlot: props.renderSlot, occurrence: props.occurrence, useTabTypes: props.useTabTypes,
-    useTabNavigation: props.useTabNavigation, useStore: props.useStore, fullscreen: false,
-    active: target.visible, retainTab: props.retainTab, shortcuts, tab, embedded: true,
+    renderSlot: props.renderSlot,
+    occurrence: props.occurrence,
+    useTabTypes: props.useTabTypes,
+    useTabNavigation: props.useTabNavigation,
+    useStore: props.useStore,
+    fullscreen: false,
+    active: target.visible,
+    retainTab: props.retainTab,
+    shortcuts,
+    tab,
+    embedded: true,
   }
   return createPortal(
-    <section className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col" data-sidebar-right-session={props.sessionId} data-sidebar-resource-panel={target.id}
-      data-sidebar-right-open aria-hidden={!target.visible || undefined} data-dockkit-pane={pane.id} data-sidebar-right-tab={tab.id}
-      data-sidebar-right-occurrence={occurrence.id} tabIndex={-1}>
+    <section
+      className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col"
+      data-sidebar-right-session={props.sessionId}
+      data-sidebar-resource-panel={target.id}
+      data-sidebar-right-open
+      aria-hidden={!target.visible || undefined}
+      data-dockkit-pane={pane.id}
+      data-sidebar-right-tab={tab.id}
+      data-sidebar-right-occurrence={occurrence.id}
+      tabIndex={-1}
+    >
       <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-2">
-        <div className="dshx:min-w-0 dshx:flex-1 dshx:truncate"><TabSlot {...shared} seat="sidebar.right.pane.tab.title" fallback={tab.title} /></div>
+        <div className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+          <TabSlot {...shared} seat="sidebar.right.pane.tab.title" fallback={tab.title} />
+        </div>
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={tab.title}><MoreHorizontalIcon /></Button></DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label={tab.title}>
+              <MoreHorizontalIcon />
+            </Button>
+          </DropdownMenuTrigger>
           <DropdownMenuContent>{props.renderSlot('sidebar.right.tab.menu.item', { tab, dismiss: () => setMenuOpen(false) })}</DropdownMenuContent>
         </DropdownMenu>
       </header>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-hidden">
         <TabSlot {...shared} seat="sidebar.right.pane.tab" fallback={<p>{props.t('tab.unavailable')}</p>} />
       </div>
-    </section>, target.element, occurrence.id,
+    </section>,
+    target.element,
+    occurrence.id,
   )
 }
 
@@ -58,11 +86,25 @@ function AddressableTab({ props, tab, target }: {
 function AddressableSeat(props: ResourceSeatProps): ReactNode {
   const surface = props.useStore(state => state.bySession[props.sessionId])
   const targets = props.useResourceTargets(value => value)
-  const tabs = useMemo(() => Object.values(surface?.layout.tabs ?? {}).filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel'), [surface])
+  const tabs = useMemo(
+    () => Object.values(surface?.layout.tabs ?? {}).filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel'),
+    [surface],
+  )
   useLayoutEffect(() => {
     if (surface === undefined) props.actions.open(props.sessionId)
   }, [surface, props.actions, props.sessionId])
-  return <>{tabs.map(tab => <AddressableTab key={tab.id} props={props} tab={tab} target={targets.find(target => target.id === SidebarResourcePanelModel.id(props.sessionId, tab.id))} />)}</>
+  return (
+    <>
+      {tabs.map(tab => (
+        <AddressableTab
+          key={tab.id}
+          props={props}
+          tab={tab}
+          target={targets.find(target => target.id === SidebarResourcePanelModel.id(props.sessionId, tab.id))}
+        />
+      ))}
+    </>
+  )
 }
 
 /** No native chrome or frame report is mounted in workbench mode; native mode uses the original seat unchanged. */

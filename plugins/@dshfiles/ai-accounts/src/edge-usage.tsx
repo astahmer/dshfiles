@@ -182,63 +182,63 @@ export const EdgeUsageWidget = (props: {
   return createPortal(
     <aside aria-label="AI Accounts usage" className="dshx-root">
       <TooltipProvider delayDuration={500}>
-      <Popover onOpenChange={setOpen} open={open}>
-        <Tooltip>
-        <TooltipTrigger asChild>
-        <PopoverAnchor asChild>
-          <button
-            aria-expanded={open}
-            aria-label={primary === undefined ? 'Open AI Accounts usage' : `${Math.round(primary)}% left on the tightest account`}
-            className={cn(
-              'dshx-root dshx:fixed dshx:z-[10000] dshx:flex dshx:cursor-grab dshx:touch-none dshx:items-center dshx:justify-center dshx:border dshx:bg-background/90 dshx:text-foreground dshx:shadow-md dshx:backdrop-blur-md dshx:select-none dshx:hover:bg-secondary dshx:active:cursor-grabbing',
-              vertical ? 'dshx:min-h-16 dshx:w-10 dshx:flex-col dshx:gap-1 dshx:py-2' : 'dshx:h-10 dshx:w-[76px] dshx:gap-1.5',
-              EDGE_SHAPE[position.edge],
-              open && 'dshx:bg-secondary',
-            )}
-            onClick={handleToggle}
-            onPointerCancel={handlePointerUp}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            ref={triggerRef}
-            style={{ left: position.x, top: position.y }}
-            type="button"
+        <Popover onOpenChange={setOpen} open={open}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverAnchor asChild>
+                <button
+                  aria-expanded={open}
+                  aria-label={primary === undefined ? 'Open AI Accounts usage' : `${Math.round(primary)}% left on the tightest account`}
+                  className={cn(
+                    'dshx-root dshx:fixed dshx:z-[10000] dshx:flex dshx:cursor-grab dshx:touch-none dshx:items-center dshx:justify-center dshx:border dshx:bg-background/90 dshx:text-foreground dshx:shadow-md dshx:backdrop-blur-md dshx:select-none dshx:hover:bg-secondary dshx:active:cursor-grabbing',
+                    vertical ? 'dshx:min-h-16 dshx:w-10 dshx:flex-col dshx:gap-1 dshx:py-2' : 'dshx:h-10 dshx:w-[76px] dshx:gap-1.5',
+                    EDGE_SHAPE[position.edge],
+                    open && 'dshx:bg-secondary',
+                  )}
+                  onClick={handleToggle}
+                  onPointerCancel={handlePointerUp}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  ref={triggerRef}
+                  style={{ left: position.x, top: position.y }}
+                  type="button"
+                >
+                  <span className="dshx:text-[11px] dshx:font-extrabold">AI</span>
+                  <span className={cn('dshx:text-[11px] dshx:font-bold dshx:tabular-nums', primaryTone)}>
+                    {primary === undefined ? '·' : String(Math.round(primary))}
+                  </span>
+                </button>
+              </PopoverAnchor>
+            </TooltipTrigger>
+            <TooltipContent>Drag to move · click to view AI accounts usage</TooltipContent>
+          </Tooltip>
+          <PopoverContent
+            aria-label="Account quota"
+            className="dshx-root dshx:z-[10001] dshx:w-auto dshx:p-0"
+            collisionPadding={8}
+            onInteractOutside={event => {
+              if (event.target instanceof Node && triggerRef.current?.contains(event.target)) event.preventDefault()
+            }}
+            side={POPOVER_SIDE[position.edge]}
+            sideOffset={8}
           >
-            <span className="dshx:text-[11px] dshx:font-extrabold">AI</span>
-            <span className={cn('dshx:text-[11px] dshx:font-bold dshx:tabular-nums', primaryTone)}>
-              {primary === undefined ? '·' : String(Math.round(primary))}
-            </span>
-          </button>
-        </PopoverAnchor>
-        </TooltipTrigger>
-        <TooltipContent>Drag to move · click to view AI accounts usage</TooltipContent>
-        </Tooltip>
-        <PopoverContent
-          aria-label="Account quota"
-          className="dshx-root dshx:z-[10001] dshx:w-auto dshx:p-0"
-          collisionPadding={8}
-          onInteractOutside={event => {
-            if (event.target instanceof Node && triggerRef.current?.contains(event.target)) event.preventDefault()
-          }}
-          side={POPOVER_SIDE[position.edge]}
-          sideOffset={8}
-        >
-          <UsageOverview
-            failed={failed}
-            onOpenHistory={() => {
-              setOpen(false)
-              props.onOpenUsageHistory()
-            }}
-            onConnectAccount={accountId => {
-              setOpen(false)
-              props.onConnectAccount(accountId)
-            }}
-            onRefresh={() => void refresh()}
-            refreshing={refreshing}
-            usage={usage}
-          />
-        </PopoverContent>
-      </Popover>
+            <UsageOverview
+              failed={failed}
+              onOpenHistory={() => {
+                setOpen(false)
+                props.onOpenUsageHistory()
+              }}
+              onConnectAccount={accountId => {
+                setOpen(false)
+                props.onConnectAccount(accountId)
+              }}
+              onRefresh={() => void refresh()}
+              refreshing={refreshing}
+              usage={usage}
+            />
+          </PopoverContent>
+        </Popover>
       </TooltipProvider>
     </aside>,
     document.body,

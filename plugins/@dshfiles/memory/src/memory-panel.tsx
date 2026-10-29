@@ -203,113 +203,113 @@ export const MemoryPanel = (props: { readonly openThread: (sessionId: string) =>
   }
   return (
     <TooltipProvider delayDuration={500}>
-    <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground">
-      <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-3 dshx:px-5 dshx:pt-5 dshx:pb-2">
-        <div className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-2xl dshx:bg-primary/10 dshx:text-primary dshx:ring-1 dshx:ring-primary/15">
-          <BrainIcon className="dshx:size-6" />
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <h1 className="dshx:text-xl dshx:font-semibold dshx:leading-tight">Memory</h1>
-            {usage.data === undefined ? null : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:inline-flex">
-                    <Badge variant="outline" className="dshx:border-transparent dshx:bg-muted dshx:text-[10px] dshx:text-muted-foreground">
-                      {usage.data.retrieval.active === 'hybrid'
-                        ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
-                        : usage.data.retrieval.requested === 'hybrid'
-                          ? 'Retrieval: BM25 (hybrid unavailable)'
-                          : 'Retrieval: BM25'}
-                    </Badge>
-                  </span>
-                </TooltipTrigger>
-                {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
-              </Tooltip>
-            )}
+      <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground">
+        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-3 dshx:px-5 dshx:pt-5 dshx:pb-2">
+          <div className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-2xl dshx:bg-primary/10 dshx:text-primary dshx:ring-1 dshx:ring-primary/15">
+            <BrainIcon className="dshx:size-6" />
           </div>
-          <p className="dshx:text-xs dshx:text-muted-foreground">{subtitleOf(tab)}</p>
-        </div>
-        <div className="dshx:flex dshx:items-center dshx:gap-2">
-          <Select value={project === '' ? 'all' : project} onValueChange={value => setProject(value === 'all' ? '' : value)}>
-            <SelectTrigger aria-label="Memory project" className={projectTrigger} size="sm">
-              <SelectValue>
-                {selectedProject === undefined ? 'All projects' : `${PanelFormat.projectName(selectedProject.project)} · ${selectedProject.notes}`}
-              </SelectValue>
-              <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
-            </SelectTrigger>
-            <SelectContent align="end" className="dshx:max-w-80">
-              <SelectItem value="all">All projects</SelectItem>
-              {projectItems.map(item => (
-                <SelectItem key={item.project} value={item.project}>
-                  {PanelFormat.projectName(item.project)} · {item.threads} threads · {item.notes} notes
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" onClick={() => setAdding(true)}>
-            <PlusIcon /> Add memory
-          </Button>
-        </div>
-      </header>
-      <Tabs value={tab} onValueChange={value => setTab(memoryTabOf(value))} className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-0">
-        <div className="dshx:px-5">
-          <TabsList aria-label="Memory views" variant="line" className="dshx:w-fit dshx:gap-4 dshx:border-b dshx:border-border">
-            <TabsTrigger value="notes" className="dshx:gap-1.5 dshx:px-1 dshx:pb-2 dshx:text-sm">
-              <FileTextIcon className="dshx:size-4" /> Notes
-            </TabsTrigger>
-            <TabsTrigger value="threads" className="dshx:gap-1.5 dshx:px-1 dshx:pb-2 dshx:text-sm">
-              <MessagesSquareIcon className="dshx:size-4" /> Threads
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="dshx:gap-1.5 dshx:px-1 dshx:pb-2 dshx:text-sm">
-              <BarChart3Icon className="dshx:size-4" /> Analytics
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="notes" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-          <NotesTab
-            project={project === '' ? undefined : project}
-            openThread={props.openThread}
-            focusNoteId={MemoryFocusModel.noteIdOf(focus)}
-            selectedId={selectedNoteId}
-            onSelect={setSelectedNoteId}
-          />
-        </TabsContent>
-        <TabsContent value="threads" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-          <ThreadsTab
-            project={project === '' ? undefined : project}
-            openThread={props.openThread}
-            focusThreadId={MemoryFocusModel.threadIdOf(focus)}
-            selectedId={selectedThreadId}
-            onSelect={setSelectedThreadId}
-            openNote={id => {
-              setTab('notes')
-              setSelectedNoteId(id)
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="analytics" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-          <AnalyticsTab
-            project={project === '' ? undefined : project}
-            days={days}
-            onDaysChange={setDays}
-            usage={usage.data}
-            openThread={props.openThread}
-            openNote={id => {
-              setTab('notes')
-              setSelectedNoteId(id)
-            }}
-          />
-        </TabsContent>
-      </Tabs>
-      <AddMemoryDialog
-        open={adding}
-        onOpenChange={setAdding}
-        projects={projectItems}
-        defaultProject={project === '' ? defaultAddProject : project}
-        onCreated={noteCreated}
-      />
-    </main>
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+              <h1 className="dshx:text-xl dshx:font-semibold dshx:leading-tight">Memory</h1>
+              {usage.data === undefined ? null : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:inline-flex">
+                      <Badge variant="outline" className="dshx:border-transparent dshx:bg-muted dshx:text-[10px] dshx:text-muted-foreground">
+                        {usage.data.retrieval.active === 'hybrid'
+                          ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
+                          : usage.data.retrieval.requested === 'hybrid'
+                            ? 'Retrieval: BM25 (hybrid unavailable)'
+                            : 'Retrieval: BM25'}
+                      </Badge>
+                    </span>
+                  </TooltipTrigger>
+                  {usage.data.retrieval.reason === null ? null : <TooltipContent>{usage.data.retrieval.reason}</TooltipContent>}
+                </Tooltip>
+              )}
+            </div>
+            <p className="dshx:text-xs dshx:text-muted-foreground">{subtitleOf(tab)}</p>
+          </div>
+          <div className="dshx:flex dshx:items-center dshx:gap-2">
+            <Select value={project === '' ? 'all' : project} onValueChange={value => setProject(value === 'all' ? '' : value)}>
+              <SelectTrigger aria-label="Memory project" className={projectTrigger} size="sm">
+                <SelectValue>
+                  {selectedProject === undefined ? 'All projects' : `${PanelFormat.projectName(selectedProject.project)} · ${selectedProject.notes}`}
+                </SelectValue>
+                <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
+              </SelectTrigger>
+              <SelectContent align="end" className="dshx:max-w-80">
+                <SelectItem value="all">All projects</SelectItem>
+                {projectItems.map(item => (
+                  <SelectItem key={item.project} value={item.project}>
+                    {PanelFormat.projectName(item.project)} · {item.threads} threads · {item.notes} notes
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={() => setAdding(true)}>
+              <PlusIcon /> Add memory
+            </Button>
+          </div>
+        </header>
+        <Tabs value={tab} onValueChange={value => setTab(memoryTabOf(value))} className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-0">
+          <div className="dshx:px-5">
+            <TabsList aria-label="Memory views" variant="line" className="dshx:w-fit dshx:gap-4 dshx:border-b dshx:border-border">
+              <TabsTrigger value="notes" className="dshx:gap-1.5 dshx:px-1 dshx:pb-2 dshx:text-sm">
+                <FileTextIcon className="dshx:size-4" /> Notes
+              </TabsTrigger>
+              <TabsTrigger value="threads" className="dshx:gap-1.5 dshx:px-1 dshx:pb-2 dshx:text-sm">
+                <MessagesSquareIcon className="dshx:size-4" /> Threads
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="dshx:gap-1.5 dshx:px-1 dshx:pb-2 dshx:text-sm">
+                <BarChart3Icon className="dshx:size-4" /> Analytics
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="notes" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+            <NotesTab
+              project={project === '' ? undefined : project}
+              openThread={props.openThread}
+              focusNoteId={MemoryFocusModel.noteIdOf(focus)}
+              selectedId={selectedNoteId}
+              onSelect={setSelectedNoteId}
+            />
+          </TabsContent>
+          <TabsContent value="threads" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+            <ThreadsTab
+              project={project === '' ? undefined : project}
+              openThread={props.openThread}
+              focusThreadId={MemoryFocusModel.threadIdOf(focus)}
+              selectedId={selectedThreadId}
+              onSelect={setSelectedThreadId}
+              openNote={id => {
+                setTab('notes')
+                setSelectedNoteId(id)
+              }}
+            />
+          </TabsContent>
+          <TabsContent value="analytics" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+            <AnalyticsTab
+              project={project === '' ? undefined : project}
+              days={days}
+              onDaysChange={setDays}
+              usage={usage.data}
+              openThread={props.openThread}
+              openNote={id => {
+                setTab('notes')
+                setSelectedNoteId(id)
+              }}
+            />
+          </TabsContent>
+        </Tabs>
+        <AddMemoryDialog
+          open={adding}
+          onOpenChange={setAdding}
+          projects={projectItems}
+          defaultProject={project === '' ? defaultAddProject : project}
+          onCreated={noteCreated}
+        />
+      </main>
     </TooltipProvider>
   )
 }

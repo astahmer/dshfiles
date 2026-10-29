@@ -154,8 +154,7 @@ test('workspace-edit moves one workspace without moving another on the same revi
 
   const action: Mutation = { kind: 'workspace-edit', name: 'review-b', commitId: destinationId }
   runJj(secondWorkspace, home, JujutsuMutationModel.buildMutationArgv(action))
-  const workingCopyId = (cwd: string): string =>
-    runJj(cwd, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
+  const workingCopyId = (cwd: string): string => runJj(cwd, home, ['log', '--no-graph', '--revisions', '@', '--template', 'self.commit_id().short(64)']).trim()
 
   assert.deepEqual(
     { first: workingCopyId(firstWorkspace), second: workingCopyId(secondWorkspace), default: workingCopyId(repo) },

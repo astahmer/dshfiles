@@ -71,7 +71,10 @@ test('workspace-add uses a listed revision and one literal isolated destination 
 test('workspace-edit runs jj edit at a named workspace and validates the target revision', () => {
   assert.deepEqual(JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: id }), ['edit', id])
   assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: '../outside', commitId: id }), /valid workspace name/)
-  assert.throws(() => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: 'not-a-revision' }), /Invalid revision id/)
+  assert.throws(
+    () => JujutsuMutationModel.buildMutationArgv({ kind: 'workspace-edit', name: 'review-branch-1', commitId: 'not-a-revision' }),
+    /Invalid revision id/,
+  )
 })
 
 test('workspace-forget names exactly one workspace and never the default one', () => {

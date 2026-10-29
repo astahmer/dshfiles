@@ -34,15 +34,11 @@ export class MainSurfaceRendering {
     renderMain: MainSurfaceOwnerProps['renderMain'],
     native: ReactNode,
   ): ReactNode {
-    return mode === 'workbench'
-      ? renderSlot('shell.main', { renderMain }, { fallback: native })
-      : native
+    return mode === 'workbench' ? renderSlot('shell.main', { renderMain }, { fallback: native }) : native
   }
 
   /** Narrow the frame-authorized renderer without exposing another slot domain. */
   static createRenderer(renderSlot: PropsRenderSlots<'main'>['renderSlot']): MainSurfaceOwnerProps['renderMain'] {
-    return entryKey => entryKey === 'dshfiles-workbench'
-      ? null
-      : renderSlot('main', {}, { entryKey })
+    return entryKey => (entryKey === 'dshfiles-workbench' ? null : renderSlot('main', {}, { entryKey }))
   }
 }
