@@ -128,31 +128,6 @@ const startApiQueryEffect = <T>(options: ApiQueryEffectOptions<T>): (() => void)
   }
 }
 
-const isStructuredJsonValue = <T>(value: T): value is T & object =>
-  value !== null && Object(value) === value && Object.prototype.toString.call(value) !== '[object Function]'
-const isBigIntValue = <T>(value: T): boolean => Object.prototype.toString.call(value) === '[object BigInt]'
-
-function formatStableJson(value: unknown, seen = new Set<object>()): string {
-  if (!isStructuredJsonValue(value)) {
-    if (isBigIntValue(value)) throw new TypeError('API query input must be JSON serializable.')
-    return JSON.stringify(value) ?? 'undefined'
-  }
-  if (seen.has(value)) throw new TypeError('API query input must not contain cycles.')
-  seen.add(value)
-  try {
-    const jsonValue = 'toJSON' in value && typeof value.toJSON === 'function' ? value.toJSON() : value
-    if (jsonValue !== value) return formatStableJson(jsonValue, seen)
-    if (Array.isArray(value))
-      return `[${value.map(item => (item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 'null' : formatStableJson(item, seen))).join(',')}]`
-    const entries = Object.entries(value)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .filter(([, entry]) => entry !== undefined && typeof entry !== 'function' && typeof entry !== 'symbol')
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${formatStableJson(entry, seen)}`).join(',')}}`
-  } finally {
-    seen.delete(value)
-  }
-}
-
 // Every runtime client method accepts an optional input; the method form relates both input shapes of ApiMethodClient.
 interface ApiQueryMethod<M> {
   call(input: ApiClientInput<M> | undefined, options: ApiCallOptions): Promise<ApiClientOutput<M>>
@@ -178,7 +153,7 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     data: undefined,
     error: null,
   })
-  const fingerprint = runtime().useMemo(() => formatStableJson(input), [input])
+  const fingerprint = runtime().useMemo(() => ApiProtocolModel.stableJson(input), [input])
   const [revision, setRevision] = runtime().useState(0)
   const manualRevision = runtime().useRef(0)
 

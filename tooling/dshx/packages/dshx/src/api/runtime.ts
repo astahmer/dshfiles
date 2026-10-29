@@ -32,6 +32,83 @@ interface ConnectionLifecycleLike {
 
 const clientConnections = new WeakMap<object, ConnectionLifecycleLike | undefined>()
 
+interface InflightCall {
+  readonly result: Promise<RpcResult>
+  readonly controller: AbortController
+  waiters: number
+}
+
+const INFLIGHT_KEY = Symbol.for('@dshfiles/dshx.api-inflight.v1')
+
+/** Every plugin bundles its own dshx copy, so in-flight reads live on the page, keyed by the Connection RPC caller. */
+const inflightCalls = (rpc: Pick<ClientConnectionRpc, 'call'>): Map<string, InflightCall> => {
+  // SAFETY: only this module writes the versioned symbol, and always this WeakMap shape.
+  const holder = globalThis as { [INFLIGHT_KEY]?: WeakMap<object, Map<string, InflightCall>> }
+  holder[INFLIGHT_KEY] ??= new WeakMap()
+  const existing = holder[INFLIGHT_KEY].get(rpc)
+  if (existing !== undefined) return existing
+  const created = new Map<string, InflightCall>()
+  holder[INFLIGHT_KEY].set(rpc, created)
+  return created
+}
+
+const isReadOnly = (definition: AnyApiMethodDefinition | undefined): boolean => definition?.readOnly === true || definition?.tool?.readOnly === true
+
+/**
+ * Join the identical read already in flight, or start it. The shared request ends only when every caller that joined
+ * it aborted; a caller that aborts alone leaves with its own abort. Joiners get a copy, never the first caller's objects.
+ */
+const coalesce = (calls: Map<string, InflightCall>, key: string, request: (signal: AbortSignal) => Promise<RpcResult>, signal: AbortSignal | undefined) => {
+  const start = (): InflightCall => {
+    const controller = new AbortController()
+    const created: InflightCall = { controller, waiters: 0, result: request(controller.signal) }
+    const forget = (): void => {
+      if (calls.get(key) === created) calls.delete(key)
+    }
+    created.result.then(forget, forget)
+    calls.set(key, created)
+    return created
+  }
+  const existing = calls.get(key)
+  const joined = existing !== undefined
+  const shared = existing ?? start()
+  shared.waiters += 1
+  return new Promise<{ readonly result: RpcResult; readonly joined: boolean }>((resolve, reject) => {
+    let settled = false
+    const leave = (): void => {
+      settled = true
+      shared.waiters -= 1
+      signal?.removeEventListener('abort', abort)
+    }
+    const abort = (): void => {
+      if (settled) return
+      leave()
+      if (shared.waiters === 0) {
+        if (calls.get(key) === shared) calls.delete(key)
+        shared.controller.abort(signal?.reason)
+      }
+      reject(signal?.reason)
+    }
+    if (signal?.aborted === true) {
+      abort()
+      return
+    }
+    signal?.addEventListener('abort', abort, { once: true })
+    shared.result.then(
+      result => {
+        if (settled) return
+        leave()
+        resolve({ result: joined ? structuredClone(result) : result, joined })
+      },
+      cause => {
+        if (settled) return
+        leave()
+        reject(cause)
+      },
+    )
+  })
+}
+
 function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
   const code = result.error?.code
   const message = result.error?.message ?? `API method ${method} failed.`
@@ -76,7 +153,18 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
         span?.context === undefined
           ? { version: contract.version, input }
           : { version: contract.version, input, [TraceparentModel.envelopeField]: TraceparentModel.format(span.context) }
-      const result = await rpc.call('/api', `${channel.slice(1)}/${name}`, request, options?.signal)
+      const endpoint = `${channel.slice(1)}/${name}`
+      const result = isReadOnly(contract.methods[name])
+        ? await coalesce(
+            inflightCalls(rpc),
+            `${endpoint}\0${contract.version}\0${ApiProtocolModel.stableJson(input)}`,
+            signal => rpc.call('/api', endpoint, request, signal),
+            options?.signal,
+          ).then(shared => {
+            if (shared.joined) span?.setAttribute('dshx.api.coalesced', true)
+            return shared.result
+          })
+        : await rpc.call('/api', endpoint, request, options?.signal)
       span?.setAttribute('dshx.api.outcome', result.ok ? 'ok' : (result.error?.code ?? 'remote'))
       if (!result.ok) span?.setStatus('error', result.error?.code ?? 'remote')
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)

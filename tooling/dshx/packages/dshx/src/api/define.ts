@@ -34,6 +34,7 @@ function method<const InputSchema extends ApiSchema | undefined = undefined, con
   readonly input?: InputSchema
   readonly output?: OutputSchema
   readonly description?: string
+  readonly readOnly?: boolean
   readonly tool?: ApiToolExposure<OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown>
 }): MethodFromSchemas<InputSchema, OutputSchema>
 function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {

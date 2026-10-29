@@ -150,6 +150,25 @@ type ApiCallResult<T> =
   | { readonly ok: false; readonly error: ApiError };
 ```
 
+## Read-only methods share in-flight requests
+
+Mark a method without side effects `readOnly: true` (a method whose `tool.readOnly` is true counts too):
+
+```ts
+board: method({ input: boardFilterSchema, output: boardSchema, readOnly: true }),
+```
+
+Client calls of such a method with the same contract, method, version and input (compared as key-sorted JSON) that
+overlap in time share one Connection request. Every caller gets its own copy of the result. A caller that aborts
+leaves with an `aborted` error while the others keep waiting; the request itself is aborted only when every caller
+left. Calls of any other method always send their own request, so a mutation never runs fewer times than it was
+called. Host-to-Host calls (`createHostApiClient`) are in process and are not coalesced.
+
+Calls are not batched into one HTTP request. Each method is its own exact Connection route, admitted and traced on
+its own; a batch route would re-implement dispatch, per-call abort and trace propagation inside one envelope, and
+every call of a tick would wait for the slowest one. Coalescing removes the duplicate-read storms batching was meant
+for without that head-of-line blocking.
+
 ## `useApiQuery`
 
 ```tsx
@@ -198,7 +217,7 @@ type ApiQueryResult<T> =
 - `enabled: false` disables automatic reads; `refetch()` still executes one read.
 - A caller-provided abort becomes an `ApiError` with `kind: 'aborted'`.
 - Structured inputs use a stable JSON fingerprint. Query inputs must be JSON-serializable and acyclic.
-- There is no global cache, dedupe, optimistic update, business retry, or persisted query state.
+- Identical in-flight reads of a `readOnly` method share one request (see [Read-only methods](#read-only-methods-share-in-flight-requests)); there is no optimistic update, business retry, or persisted query state.
 
 ## Errors
 

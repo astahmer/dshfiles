@@ -29,6 +29,11 @@ export interface ApiMethodMetadata {
   readonly description?: string
   /** Expose the method to the agent; requires input and output schemas that publish Standard JSON Schema. */
   readonly tool?: ApiToolExposure
+  /**
+   * The method has no side effects, so identical in-flight Client calls (same input) share one request. A method
+   * whose `tool.readOnly` is true counts as read-only too. Leave it unset for anything that writes.
+   */
+  readonly readOnly?: boolean
 }
 
 export interface ApiMethodOptions<InputSchema extends ApiSchema = ApiSchema, OutputSchema extends ApiSchema = ApiSchema> extends ApiMethodMetadata {
