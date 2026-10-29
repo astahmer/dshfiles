@@ -85,9 +85,17 @@ When('{string} is opened with Go to file', async ({ page }: { page: Page }, file
 When('the editor placement is set to {string} in the plugin settings', async ({ page }: { page: Page }, placement: string) => {
   await openGlobalPanel(page, 'Plugins')
   await page.getByRole('button', { name: 'View @dshfiles/editor', exact: true }).click()
-  await page.getByRole('combobox', { name: 'Editor placement', exact: true }).selectOption({ label: placement })
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  const placementField = page.getByRole('combobox', { name: 'Editor placement', exact: true })
+  // A right-panel editor shows its own Save; take the one of the form that holds the placement field.
+  const saveSettings = page
+    .locator('*')
+    .filter({ has: placementField })
+    .filter({ has: page.getByRole('button', { name: 'Save', exact: true }) })
+    .last()
+    .getByRole('button', { name: 'Save', exact: true })
+  await placementField.selectOption({ label: placement })
+  await saveSettings.click()
+  await expect(saveSettings).toBeDisabled()
   // Leaving a global panel can land on the panel shown before it, so the thread is reopened until its view is on screen.
   await expect(async () => {
     await page.getByRole('treeitem', { name: /^editor e2e thread/ }).click()
@@ -162,7 +170,8 @@ Then('{string} opens in the {string} editor with its disk content', async ({ pag
       return
     }
     await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread')
-    await expect(page.getByRole('tab', { name: 'Editor Close', exact: true })).toHaveAttribute('aria-selected', 'true')
+    // The owned right sidebar names its tab after the view; its Close control is a separate button.
+    await expect(page.getByRole('tab', { name: 'Editor', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(workbenchEditor).toHaveCount(0)
   })
   await recordAssertion(page, `editor-shows-${fileName.replaceAll('.', '-').toLowerCase()}-from-disk`, async () => {

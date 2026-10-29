@@ -10,7 +10,7 @@ Feature: Workspace editor
   @scenario:editor.save-conflict
   @scenario:editor.write-boundaries
   Scenario: Find, edit and save workspace files within the Host's write boundaries
-    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette, @dshfiles/workbench" is booted
+    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette, @dshfiles/workbench, @dshfiles/frame-layout" is booted
     When a disposable workspace with source, dependency and version-control files has a thread
     Then Go to file lists workspace sources but not dependency or version-control files
     When "hello.ts" is opened with Go to file
@@ -24,7 +24,7 @@ Feature: Workspace editor
 
   @scenario:editor.placement
   Scenario: Files opened from other panels follow the editor placement setting
-    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette, @dshfiles/workbench" is booted
+    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette, @dshfiles/workbench, @dshfiles/frame-layout, @dshfiles/sidebar-right" is booted
     When a disposable workspace with source, dependency and version-control files has a thread
     And the editor placement is set to "Right panel tab" in the plugin settings
     And "hello.ts" is opened with Go to file
