@@ -264,28 +264,25 @@ export default defineHost({
     threadQueueHost,
     threadViewsHost,
   ],
+  // A settled Session runs no model step until it is unsettled: a late wake (subagent settlement, queued
+  // follow-up, reminder) proposes a step this rejects, which the loop ends as `blocked` without a request.
+  hooks: ctx => ({
+    promptAdmission: ({ agent }) =>
+      underSettledSession({
+        header: agent.session.header,
+        settledSessionIds: settledSessionIdsFromHost(),
+        // Live agents carry the durable headers of a chain the walk can still read; a settled parent
+        // that is not live answers from the child's own recorded parentSession instead.
+        parentHeader: sessionId => ctx.agents.list().find(candidate => String(candidate.id) === sessionId)?.session.header,
+      })
+        ? 'reject'
+        : undefined,
+  }),
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {
     setThreadActionsContext(ctx)
     ctx.sessionProjections.register(threadSidebarModelRouteProjection)
-    // A settled Session runs no model step until it is unsettled: a late wake (subagent settlement, queued
-    // follow-up, reminder) proposes a step this rejects, which the loop ends as `blocked` without a request.
-    ctx.effect(
-      () =>
-        ctx.on('agent/pre-step', ({ agent }, next) =>
-          underSettledSession({
-            header: agent.session.header,
-            settledSessionIds: settledSessionIdsFromHost(),
-            // Live agents carry the durable headers of a chain the walk can still read; a settled parent
-            // that is not live answers from the child's own recorded parentSession instead.
-            parentHeader: sessionId => ctx.agents.list().find(candidate => String(candidate.id) === sessionId)?.session.header,
-          })
-            ? Promise.resolve({ kind: 'reject' })
-            : next(),
-        ),
-      'thread-sidebar: settled-thread gate',
-    )
     // One durable attention record per session, written where the turn actually ends, so every browser,
     // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.
     ctx.effect(() => {

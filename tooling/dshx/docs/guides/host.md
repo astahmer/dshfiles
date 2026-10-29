@@ -21,6 +21,7 @@ interface HostDefinition {
   readonly models?: readonly ModelDiscoveryContribution[]
   readonly skills?: readonly SkillRegistration[]
   readonly mcpServers?: readonly McpServerConfig[]
+  readonly hooks?: HostHooks | ((ctx: Context) => HostHooks)
   readonly setup?: (ctx: Context) => void | Promise<void>
 }
 ```
@@ -101,6 +102,49 @@ DSHX does not keep a disposer array. Register lifecycle ownership with `ctx.effe
 ## Runtime validation
 
 The built adapter reports a Host-definition diagnostic when the default export is not a `defineHost()` object, contains an unknown field, uses a malformed contribution, or supplies a non-function `setup`. Native DSH Host modules remain supported when they export named `name`, `inject`, `Config`, and `apply` instead of a default definition.
+
+## Hooks that rewrite behaviour: `hooks`
+
+Typed hooks over DSH's own middleware. Each runs in DSH's chain for that point; `undefined` leaves the decision to the
+rest of the chain, and a hook that throws is logged under `dshx:hooks` and treated as `undefined`. Pass a function of
+the Host context to read services (`hooks: ctx => ({ … })`); a factory declares the services it reads in `inject`.
+
+```ts
+export default defineHost({
+  hooks: {
+    promptAdmission: ({ agent, messages }) => (isPaused(agent.id) ? 'reject' : { messages: messages.map(redact) }),
+    request: ({ config }) => (config.model.startsWith('opus') ? { maxTokens: 8_000 } : undefined),
+    systemPrompt: ({ assembly }) => ({ ...assembly, sections: [...assembly.sections, { name: 'acme:rule', text: 'Cite files.' }] }),
+    retry: ({ failure }) => (failure.code === 'OVERLOADED' ? 'retry' : undefined),
+    permission: request => (request.toolName === 'read' ? 'allowed-once' : undefined),
+    toolBefore: execution => (execution.name === 'bash' && isDestructive(execution.arguments) ? { kind: 'deny', reason: 'Ask first.' } : undefined),
+    toolAfter: (execution, result) => (result.isError ? undefined : { kind: 'accept', content: redactContent(result.content) }),
+    shellEnv: { name: 'acme', variables: { ACME_HOME: { description: 'Acme root' } }, resolve: () => ({ ACME_HOME: '/opt/acme' }) },
+    http: (request, response) => {
+      if (request.url !== '/api/acme/health') return false
+      response.end('ok')
+      return true
+    },
+  },
+})
+```
+
+| Hook | DSH point | Runs | Returns |
+| --- | --- | --- | --- |
+| `promptAdmission` | `agent/pre-step` | before later listeners | `{ messages }` to replace what the step admits (text, files), `'reject'` to hold the step |
+| `request` | `agent/request` | after the chain | a patch of provider, model, reasoning effort, temperature, max tokens, stop |
+| `systemPrompt` | `system-prompt/assemble` | after the chain | the assembly: sections, contexts, tool schemas |
+| `retry` | `agent/request-error` | after the chain | `'retry'` or `'stop'` |
+| `permission` | `approval/request` | before the chain | an approval outcome, answering for the user |
+| `toolBefore` | `tools/pre-execute` | before the chain | `allow`, `deny`, `cancel` or `ask` |
+| `toolAfter` | `tools/post-execute` | after the chain (not after a `block`) | `accept` with new content or value, or `block` with feedback |
+| `shellEnv` | `shellEnv.register` | per `bash` call | environment variables |
+| `http` | `connection/request` | for authenticated requests under `/api`, before Connection routes them | `true` once the response is written |
+
+Not covered: request hooks by kind for side calls (compaction, titles). `llm/stream` is the only point that sees them,
+and its `next()` streams the original options, so a listener cannot rewrite them without running the whole chain twice.
+The agent loop's message list is rewritten through `@dshfiles/request-messages`' `agent/request-messages` event, and its
+tool list through [`toolEdits`](#editing-other-plugins-tools-tooledits). WebSocket upgrades have no DSH middleware point.
 
 ## Registering agents, providers, models, skills and MCP servers
 

@@ -7,6 +7,7 @@ import type { AnyApiMethodDefinition, ApiHostRegistration } from '../api/types.j
 import type { SettingsContribution } from '../settings/types.js'
 import type { ToolEdit } from './tool-edits.js'
 import type { HostRegistrations } from './registrations.js'
+import type { HostHooks } from './hooks.js'
 
 /** A system-prompt section wrapped only to preserve its registration kind. */
 declare const promptContributionBrand: unique symbol
@@ -45,5 +46,7 @@ export interface HostDefinition<ConfigSchema extends StandardSchemaV1 = Standard
   readonly apis?: readonly ApiHostRegistration<Record<string, AnyApiMethodDefinition>, any>[]
   /** Hide, rename, update other plugins' tools per agent, or present an agent's tools as code; see the Host guide. */
   readonly toolEdits?: readonly ToolEdit[]
+  /** Rewrite behaviour at DSH's middleware points: prompt admission, requests, retries, permissions, tools, shell, HTTP. */
+  readonly hooks?: HostHooks | ((ctx: Context) => HostHooks)
   readonly setup?: (ctx: Context, config: StandardSchemaV1.InferOutput<ConfigSchema>) => void | Effect<void>
 }
