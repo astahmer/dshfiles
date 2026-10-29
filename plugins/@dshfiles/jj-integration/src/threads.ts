@@ -1487,9 +1487,11 @@ export const createThreads = (options: {
           path: z
             .string()
             .min(1)
+            .nullable()
             .parse(JSON.parse(line.slice(separator + 1))),
         }
       })
+      .filter((record): record is { readonly name: string; readonly path: string } => record.path !== null)
     const realRepoRoot = realpathSync(repoRoot)
     const threadDirectory = resolve(options.threadsDirectory(repoRoot))
     const out: SecondaryWorkspaceStatus[] = []

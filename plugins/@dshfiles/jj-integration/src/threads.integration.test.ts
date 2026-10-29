@@ -108,6 +108,22 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(readFileSync(join(decoyPath, 'keep.txt'), 'utf8')).toBe('decoy\n')
   })
 
+  it('skips a workspace whose root JJ does not know instead of failing the listing', async () => {
+    const secondaryPath = join(root, 'known-root')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'known-root')
+    const withUnknownRoot: JjExecutor = async input => {
+      const result = await executor(input)
+      if (!input.args.includes('list')) return result
+      return { ...result, stdout: `${result.stdout}"unknown-root"\tnull\n` }
+    }
+    const listing = createThreads({ executor: withUnknownRoot, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
+
+    const names = (await listing.secondaryWorkspaces(repo)).map(workspace => workspace.name)
+
+    expect(names).toContain('known-root')
+    expect(names).not.toContain('unknown-root')
+  })
+
   it('keeps an outer secondary workspace when it contains another JJ workspace', async () => {
     const outerPath = join(root, 'outer')
     const nestedPath = join(outerPath, 'nested')

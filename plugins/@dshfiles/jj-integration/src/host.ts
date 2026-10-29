@@ -1001,7 +1001,14 @@ const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean; re
       workspaces.push({ repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
     }
     if (kinds.includes('secondary')) {
-      const secondary = await active.secondaryWorkspaces(repository.repoRoot)
+      const secondary = await active.secondaryWorkspaces(repository.repoRoot).catch((error: unknown) => {
+        hostContext?.logger.warn(
+          'jj-integration: could not list secondary workspaces in %s: %s',
+          repository.repoRoot,
+          error instanceof Error ? error.message : String(error),
+        )
+        return []
+      })
       for (const workspace of secondary) {
         const resolved = await registry.resolveByPath(workspace.path)
         const registered = resolved?.path === workspace.path ? resolved : undefined
