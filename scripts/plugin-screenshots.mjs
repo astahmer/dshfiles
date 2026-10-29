@@ -83,7 +83,8 @@ const readCatalog = name => {
 
 const plugins = PluginScreenshots.gatedPlugins({
   catalogs: readdirSync(pluginsRoot, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
+    // A folder left with only an ignored dist/ after its plugin was removed is not a package.
+    .filter(entry => entry.isDirectory() && existsSync(join(pluginsRoot, entry.name, 'package.json')))
     .map(entry => readCatalog(entry.name)),
   ignored,
 })
