@@ -1,4 +1,3 @@
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { useSettings } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useEffect, useId, useState } from 'react'
@@ -6,7 +5,7 @@ import type { EditorSettingsTranslate } from './editor-settings-locales.js'
 import { openFileLinksPreference } from './open-file-links-preference.js'
 import { editorSettings } from './settings.js'
 
-interface EditorOpenFileLinksSettingProps extends PropsRuntime<'settings.general.item'> {
+interface EditorOpenFileLinksSettingProps {
   readonly t: EditorSettingsTranslate
 }
 

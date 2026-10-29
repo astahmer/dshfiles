@@ -5,7 +5,7 @@ import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient, FileViewer, Files, type FilesService, SessionScreen } from '@dshfiles/dshx/client'
+import { defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -78,17 +78,14 @@ export default defineClient({
       return settingsForm.subscribe(mirrorSettings)
     }, 'dshfiles-editor: mirror placement and file-link settings')
 
-    ctx.slots.inject('settings.general.item', () =>
-      ctx.slots.register(
-        {
-          name: 'settings.general.item',
-          id: EDITOR_OPEN_FILE_LINKS_OWNER_ID,
-          order: 18,
-          locale: EDITOR_SETTINGS_LOCALE_NAMESPACE,
-        },
-        decorate(EditorOpenFileLinksSetting),
-      ),
-    )
+    const tSettings = ctx.locale.bind(EDITOR_SETTINGS_LOCALE_NAMESPACE)
+    const OpenFileLinksRow = (): JSX.Element => <EditorOpenFileLinksSetting t={tSettings} />
+    const plugin = metadata?.plugin
+    if (plugin !== undefined)
+      plugin.add(SettingsSection, (track): SettingsSectionItem => {
+        track(plugin.environment.locale)
+        return { id: EDITOR_OPEN_FILE_LINKS_OWNER_ID, title: tSettings('openFileLinksTitle'), order: 18, placement: 'general', component: OpenFileLinksRow }
+      })
 
     const clientSessions = clientSessionsSchema.safeParse(ctx.sessions)
     const store = createEditorStore({
@@ -271,7 +268,7 @@ export default defineClient({
             return result.ok
           },
         }) ?? (() => {})
-      const provided = metadata?.plugin?.provide(
+      const provided = plugin?.provide(
         SessionScreen,
         createSessionScreen({
           current: {
