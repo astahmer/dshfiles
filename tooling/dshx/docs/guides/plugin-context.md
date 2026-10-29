@@ -103,6 +103,19 @@ Import the token from the owner's dshx module (the owner as a workspace dependen
 | `CommandPalette` | `@dshfiles/command-palette/palette-contract` | `open(mode)`, `close()`, `setRecentLimit(n)`, live `state` |
 | `MainTabs` | `@dshfiles/main-tabs/tabs-contract` | live `tabs` of the current strip, `open(target, { newTab?, title? })` returning the tab id, `focus(tabId)`, `close(tabId)`, `pin(tabId, pinned)`, `reopenClosed()` |
 
+App contracts are declared by dshx itself, so a consumer needs no dependency on whichever plugin provides them:
+
+| Contract | Provider | What |
+| --- | --- | --- |
+| `Files` | `@dshfiles/editor` | for the session on screen: `watch(listener, { signal? })` follows the workspace file list (`no-session`, then `indexing`/`ready` replies), `open({ path, line?, cwd? })` opens a file in the editor, `openIn({ path, application?, reveal? })` hands an absolute Host path to another app or the file manager (desktop Hosts) |
+| `Changes` | `@dshfiles/pulls-review` | `review({ workspacePath, sessionId? })` opens the review page on a workspace's changes |
+| `Browser` | `@dshfiles/chat` | live `available` and `open(url)` for an http(s) URL in the embedded browser pane beside the session on screen |
+
+```ts
+const files = api.use(Files).get()
+if (files.status === 'active') files.value.open({ path: 'src/index.ts', line: 12 })
+```
+
 ```ts
 const tabs = api.use(MainTabs).get()
 if (tabs.status === 'active') tabs.value.open({ kind: 'panel', panelId: 'traces' }, { newTab: true })
