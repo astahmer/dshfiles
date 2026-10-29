@@ -19,6 +19,7 @@ const start = () => {
     threadAside: vi.fn(() => false),
     panelAside: vi.fn(() => false),
     renameThread: vi.fn(async () => undefined),
+    startSession: vi.fn(),
   })
   const publication = createWorkbenchTabsPublication(actions)
   const publish = (): void => {
