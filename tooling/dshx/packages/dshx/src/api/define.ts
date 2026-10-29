@@ -1,7 +1,9 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type {
+  AnyApiEventDefinition,
   AnyApiMethodDefinition,
   ApiContract,
+  ApiEventDefinition,
   ApiHandlers,
   ApiHostOptions,
   ApiHostRegistration,
@@ -41,6 +43,11 @@ function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
   return { ...options }
 }
 
+/** Declare an event the Host publishes; `schema` checks the payload on the Host and again in the browser. */
+const event = <Input, Output>(options: { readonly schema: ApiSchema<Input, Output>; readonly description?: string }): ApiEventDefinition<Input, Output> => ({
+  ...options,
+})
+
 function assertId(id: string): void {
   if (!/^[A-Za-z0-9._-]+$/.test(id) || id.includes('/')) {
     throw new Error(`Invalid API id ${JSON.stringify(id)}; use a stable single-segment identifier.`)
@@ -59,17 +66,28 @@ function apiHostRegistrationParts(value: ApiHostRegistration): ApiHostRegistrati
   return parts
 }
 
-function defineApi<const Methods extends Record<string, AnyApiMethodDefinition>>(definition: {
+function defineApi<
+  const Methods extends Record<string, AnyApiMethodDefinition>,
+  const Events extends Record<string, AnyApiEventDefinition> = Record<never, AnyApiEventDefinition>,
+>(definition: {
   readonly id: string
   readonly version: number
   readonly owner?: string
   readonly methods: Methods
-}): ApiContract<Methods> {
+  readonly events?: Events
+}): ApiContract<Methods, Events> {
   assertId(definition.id)
+  for (const [name, declared] of Object.entries(definition.events ?? {})) {
+    if (!/^[A-Za-z0-9._-]+$/.test(name))
+      throw new Error(`API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} must use letters, numbers, ".", "_" or "-".`)
+    if (typeof declared.schema?.['~standard']?.validate !== 'function') {
+      throw new Error(`API ${JSON.stringify(definition.id)} event ${JSON.stringify(name)} needs a Standard Schema; declare it with event({ schema }).`)
+    }
+  }
   if (!Number.isInteger(definition.version) || definition.version < 1) {
     throw new Error(`API ${JSON.stringify(definition.id)} version must be a positive integer.`)
   }
-  const contract: ApiContract<Methods> = {
+  const contract: ApiContract<Methods, Events> = {
     ...definition,
     host<const Handlers extends ApiHandlers<Methods>>(
       handlers: Handlers & Record<Exclude<keyof Handlers, keyof Methods>, never>,
@@ -119,6 +137,7 @@ const dshxRegistryApi = defineApi({
 
 export class ApiDefinitionModel {
   static readonly method = method
+  static readonly event = event
   static readonly isHostRegistration = isApiHostRegistration
   static readonly hostRegistrationParts = apiHostRegistrationParts
   static readonly define = defineApi

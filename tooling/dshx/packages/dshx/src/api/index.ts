@@ -5,10 +5,12 @@ export const defineApi = ApiDefinitionModel.define
 export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner
 export const dshxRegistryApi = ApiDefinitionModel.registryApi
 export const method = ApiDefinitionModel.method
+export const event = ApiDefinitionModel.event
 /** Call a registered dshx API by identity; see {@link RegisteredApiSpec}. */
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
 export { isApiError, isApiOwnerMissing, PluginApiError } from './common.js'
 export type {
+  AnyApiEventDefinition,
   AnyApiMethodDefinition,
   ApiCaller,
   ApiCallOptions,
@@ -19,6 +21,10 @@ export type {
   ApiContract,
   ApiError,
   ApiErrorKind,
+  ApiEventClientPayload,
+  ApiEventDefinition,
+  ApiEventHostPayload,
+  ApiEventStatus,
   ApiHandler,
   ApiHandlerContext,
   ApiHostInput,

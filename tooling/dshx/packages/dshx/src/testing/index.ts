@@ -99,12 +99,12 @@ export function provideTestConnection(ctx: Context): TestConnection {
       peer,
     )
   return {
-    /** Routes the mounted plugins registered, without the registry listing and browser-traces API dshx serves on the first one's behalf. */
+    /** Routes the mounted plugins registered, without the registry listing, browser-traces API and event stream dshx serves on the first one's behalf. */
     get routeCount() {
       const dshxPrefixes = [ApiDefinitionModel.registryApi.id, BROWSER_TRACES_API.id].map(
         apiId => `/api${ApiProtocolModel.apiChannel(ApiDefinitionModel.registryOwner, apiId)}/`,
       )
-      return [...routes.keys()].filter(path => !dshxPrefixes.some(prefix => path.startsWith(prefix))).length
+      return [...routes.keys()].filter(path => path !== ApiProtocolModel.eventsPath && !dshxPrefixes.some(prefix => path.startsWith(prefix))).length
     },
     requestApi: ({ packageId, apiId, method, version, input }) =>
       requestRpc({ endpoint: `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${method}`, payload: { version, input } }),

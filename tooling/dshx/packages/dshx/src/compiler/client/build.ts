@@ -46,6 +46,7 @@ const CLIENT_HOOKS_PATH = fileURLToPath(new URL('../../client/hooks.js', import.
 const CLIENT_PLUGIN_CONTEXT_PATH = fileURLToPath(new URL('../../client/plugin-context.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
+const API_CLIENT_EVENTS_PATH = fileURLToPath(new URL('../../api/client-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
@@ -159,7 +160,9 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `import { HostCommandsModel } from ${JSON.stringify(CLIENT_HOST_COMMANDS_PATH)}`,
           'export const hasHostCommandRegistry = HostCommandsModel.hasRegistry',
           'export const runHostCommand = HostCommandsModel.run',
-          `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `export { useApi, useApiEvent, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
+          `import { ApiClientEventsModel } from ${JSON.stringify(API_CLIENT_EVENTS_PATH)}`,
+          'export const subscribeApiEvent = ApiClientEventsModel.subscribe',
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',
           'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
@@ -193,8 +196,9 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {
         return [
-          `import { useApi as useApiImplementation, useApiQuery as useApiQueryImplementation } from ${JSON.stringify(CLIENT_API_PATH)}`,
+          `import { useApi as useApiImplementation, useApiEvent as useApiEventImplementation, useApiQuery as useApiQueryImplementation } from ${JSON.stringify(CLIENT_API_PATH)}`,
           'export function useApi(...args) { return useApiImplementation(...args) }',
+          'export function useApiEvent(...args) { return useApiEventImplementation(...args) }',
           'export function useApiQuery(...args) { return useApiQueryImplementation(...args) }',
           '',
         ].join('\n')
@@ -213,6 +217,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner',
           'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
           'export const method = ApiDefinitionModel.method',
+          'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')

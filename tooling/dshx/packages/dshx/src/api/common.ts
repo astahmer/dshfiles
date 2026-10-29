@@ -113,6 +113,14 @@ export class ApiProtocolModel {
     return `/dshx-${stableHash(`${packageId}\0${apiId}`)}`
   }
 
+  /** The one browser event stream of a DSH process, below Connection's authenticated `/api` channel. */
+  static readonly eventsPath = '/api/dshx-events'
+
+  /** `<channel>/<event>`: the key a browser subscribes to, unique per owner, API and event. */
+  static eventKey(owner: string, apiId: string, event: string): string {
+    return `${ApiProtocolModel.apiChannel(owner, apiId).slice(1)}/${event}`
+  }
+
   static jsonBytes(value: unknown): number {
     if (value === undefined) return 0
     const active = new Set<object>()

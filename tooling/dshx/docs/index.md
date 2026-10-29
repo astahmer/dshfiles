@@ -13,7 +13,7 @@ DSHX exposes a small authoring surface and keeps compiler/runtime internals out 
 
 1. [Host](./guides/host.md) — `defineHost`, Tools, Commands, registration order, injection, and lifecycle.
 2. [Client, Locale, and Slots](./guides/client.md) — `defineClient`, `defineLocale`, `defineSlot`, official Slot props, Hook-driven capabilities, and lifecycle.
-3. [Typed API](./guides/api.md) — `defineApi`, Standard Schema transforms, Host handlers, imperative calls, `useApiQuery`, and errors.
+3. [Typed API](./guides/api.md) — `defineApi`, Standard Schema transforms, Host handlers, imperative calls, `useApiQuery`, Host events (`useApiEvent`), and errors.
 4. [Settings](./guides/settings.md) — shared Schemastery contract, Host ownership, safe Client decoding, reads, and mutations.
 5. [Prompt](./guides/prompt.md) — Prompt Sections, dynamic Contexts, ordering, scope, assembly, and ownership.
 6. [Conversation](./guides/conversation.md) — experimental pure event lifecycle plus React renderer.

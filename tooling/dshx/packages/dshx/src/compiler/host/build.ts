@@ -36,6 +36,7 @@ const HOST_WEB_STARTUP_PATH = fileURLToPath(new URL('../../host/web-startup.js',
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
+const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
 const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
@@ -124,6 +125,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const createHostApiClient = HostApiClientModel.create',
           'export const isApiServed = HostApiClientModel.isServed',
           'export const listApis = HostApiClientModel.list',
+          `import { HostApiEventsModel } from ${JSON.stringify(API_HOST_EVENTS_PATH)}`,
+          'export const publishApiEvent = HostApiEventsModel.publish',
           '',
         ].join('\n')
       }
@@ -134,6 +137,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner',
           'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
           'export const method = ApiDefinitionModel.method',
+          'export const event = ApiDefinitionModel.event',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')

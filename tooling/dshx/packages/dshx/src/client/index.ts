@@ -32,7 +32,10 @@ export type {
   SlotContribution,
   SlotOptions,
 } from './types.js'
-export { useApi, useApiQuery } from '../api/client.js'
+export { useApi, useApiEvent, useApiQuery } from '../api/client.js'
+import { ApiClientEventsModel } from '../api/client-events.js'
+/** Follow a Host-published API event outside React; see `useApiEvent`. */
+export const subscribeApiEvent = ApiClientEventsModel.subscribe
 export const createApiClient = ApiRuntimeModel.createClient
 /** Call a dshx API discovered through `dshxRegistryApi` without importing its contract. */
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient

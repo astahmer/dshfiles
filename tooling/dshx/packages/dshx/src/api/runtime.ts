@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiClientContract, ApiError } from './types.js'
+import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiClientContract, ApiError } from './types.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
 import type { BrowserSpan } from '../tracing/browser.js'
 import { BrowserTracingRegistryModel } from '../tracing/browser-registry.js'
@@ -31,6 +31,14 @@ interface ConnectionLifecycleLike {
 }
 
 const clientConnections = new WeakMap<object, ConnectionLifecycleLike | undefined>()
+
+/** What `subscribeApiEvent` needs from a client: its contract and the package that serves it. */
+interface ClientEventTarget {
+  readonly contract: ApiClientContract
+  readonly owner: string
+}
+
+const clientEventTargets = new WeakMap<object, ClientEventTarget>()
 
 interface InflightCall {
   readonly result: Promise<RpcResult>
@@ -133,11 +141,10 @@ function browserCallSpan(packageId: string, apiId: string, method: string): Brow
   })
 }
 
-function createApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
-  context: ContextLike | Context | undefined,
-  contract: ApiClientContract<Methods>,
-  packageId = 'plugin',
-): ApiClient<Methods> {
+function createApiClient<
+  const Methods extends Record<string, AnyApiMethodDefinition>,
+  const Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+>(context: ContextLike | Context | undefined, contract: ApiClientContract<Methods, Events>, packageId = 'plugin'): ApiClient<Methods, Events> {
   const connection = context === undefined || typeof context.get !== 'function' ? undefined : (context.get('connection') as ClientConnectionLike | undefined)
   const channel = ApiProtocolModel.apiChannel(contract.owner ?? packageId, contract.id)
   const call = async (name: string, input: unknown, options?: ApiCallOptions): Promise<unknown> => {
@@ -208,7 +215,8 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
     }
   }
   clientConnections.set(client, connection as ConnectionLifecycleLike | undefined)
-  return client as ApiClient<Methods>
+  clientEventTargets.set(client, { contract, owner: contract.owner ?? packageId })
+  return client as ApiClient<Methods, Events>
 }
 
 /**
@@ -251,10 +259,18 @@ function apiConnectionAvailable<const Methods extends Record<string, AnyApiMetho
   return typeof source?.getSnapshot !== 'function' || source.getSnapshot() !== undefined
 }
 
+/** Internal: the contract and owner behind a client created by this module. */
+function apiClientEventTarget<const Methods extends Record<string, AnyApiMethodDefinition>, const Events extends Record<string, AnyApiEventDefinition>>(
+  client: ApiClient<Methods, Events>,
+): ClientEventTarget | undefined {
+  return clientEventTargets.get(client)
+}
+
 export class ApiRuntimeModel {
   static readonly errorFromRemote = errorFromRemote
   static readonly createClient = createApiClient
   static readonly createRegisteredClient = createRegisteredApiClient
   static readonly subscribeConnection = subscribeApiConnection
   static readonly connectionAvailable = apiConnectionAvailable
+  static readonly eventTarget = apiClientEventTarget
 }

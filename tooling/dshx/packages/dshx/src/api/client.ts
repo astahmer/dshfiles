@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type {
+  AnyApiEventDefinition,
   AnyApiMethodDefinition,
   ApiClientContract,
   ApiCallOptions,
@@ -8,12 +9,15 @@ import type {
   ApiClientOutput,
   ApiContract,
   ApiError,
+  ApiEventClientPayload,
+  ApiEventStatus,
   ApiFetchStatus,
   ApiQueryOptions,
   ApiQueryResult,
 } from './types.js'
 import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel, type ContextLike } from './runtime.js'
+import { ApiClientEventsModel } from './client-events.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => ReactRuntime) | undefined
@@ -21,7 +25,12 @@ let react: ReactRuntime | undefined
 let apiContext: import('react').Context<ApiClientRuntime | undefined> | undefined
 
 export interface ApiClientRuntime {
-  client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods>
+  client<
+    const Methods extends Record<string, AnyApiMethodDefinition>,
+    const Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+  >(
+    contract: ApiClientContract<Methods, Events>,
+  ): ApiClient<Methods, Events>
 }
 
 export const createApiClient = ApiRuntimeModel.createClient
@@ -45,11 +54,14 @@ function context(): import('react').Context<ApiClientRuntime | undefined> {
 const createApiClientRuntime = (ctx: ContextLike, packageId: string): ApiClientRuntime => {
   const clients = new Map<object, ApiClient>()
   return {
-    client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods> {
+    client<
+      const Methods extends Record<string, AnyApiMethodDefinition>,
+      const Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+    >(contract: ApiClientContract<Methods, Events>): ApiClient<Methods, Events> {
       const existing = clients.get(contract)
       if (existing !== undefined) {
         // SAFETY: the map is keyed by contract identity, so a cached client was created for this exact contract.
-        return existing as ApiClient<Methods>
+        return existing as ApiClient<Methods, Events>
       }
       const created = ApiRuntimeModel.createClient(ctx, contract, packageId)
       clients.set(contract, created)
@@ -62,10 +74,32 @@ const provideApiContext = (component: (props: any) => ReactNode, client: ApiClie
   return (props: any) => runtime().createElement(context().Provider, { value: client }, runtime().createElement(component, props))
 }
 
-export function useApi<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods> {
+export function useApi<
+  const Methods extends Record<string, AnyApiMethodDefinition>,
+  const Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>,
+>(contract: ApiClientContract<Methods, Events>): ApiClient<Methods, Events> {
   const client = runtime().useContext(context())
   if (client !== undefined) return client.client(contract)
   throw new Error(`API ${JSON.stringify(contract.id)} is unavailable outside a DSHX Client Slot component.`)
+}
+
+/**
+ * Follow one event the API's Host publishes; returns whether it is `live`. Keep a polling fallback for any other
+ * status, and read once more when it turns `live`: events missed while disconnected are not replayed.
+ */
+export function useApiEvent<
+  const Methods extends Record<string, AnyApiMethodDefinition>,
+  const Events extends Record<string, AnyApiEventDefinition>,
+  K extends keyof Events & string,
+>(contract: ApiClientContract<Methods, Events>, event: K, listener: (payload: ApiEventClientPayload<Events[K]>) => void): ApiEventStatus {
+  const api = useApi(contract)
+  const [status, setStatus] = runtime().useState<ApiEventStatus>('connecting')
+  const latest = runtime().useRef(listener)
+  runtime().useEffect(() => {
+    latest.current = listener
+  })
+  runtime().useEffect(() => ApiClientEventsModel.subscribe(api, event, { onEvent: payload => latest.current(payload), onStatus: setStatus }), [api, event])
+  return status
 }
 
 interface ApiQueryEffectOptions<T> {

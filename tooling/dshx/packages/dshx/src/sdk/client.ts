@@ -9,7 +9,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import type { AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
+import type { AnyApiEventDefinition, AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 import type { ClientContext, ClientDefinition } from '../client/types.js'
 import type { PluginContext } from '../client/plugin-context.js'
@@ -72,7 +72,9 @@ export interface ClientCapabilities {
   readonly composer: ComposerApi
   readonly rpc: {
     /** Calls the native Connection; shares the Host contract's inferred types. */
-    use<Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiContract<Methods>): ApiClient<Methods>
+    use<Methods extends Record<string, AnyApiMethodDefinition>, Events extends Record<string, AnyApiEventDefinition> = Record<string, AnyApiEventDefinition>>(
+      contract: ApiContract<Methods, Events>,
+    ): ApiClient<Methods, Events>
   }
 }
 

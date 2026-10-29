@@ -17,7 +17,7 @@ interface ClientDefinition {
 }
 ```
 
-There are no Client `api`, `apis`, or `settings` fields. Calling `useApi`, `useApiQuery`, or `useSettings` from retained Client code declares the corresponding capability.
+There are no Client `api`, `apis`, or `settings` fields. Calling `useApi`, `useApiQuery`, `useApiEvent`, or `useSettings` from retained Client code declares the corresponding capability.
 
 ```tsx
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
