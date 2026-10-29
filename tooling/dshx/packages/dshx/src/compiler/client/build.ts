@@ -178,7 +178,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `import { PluginContextModel } from ${JSON.stringify(CLIENT_PLUGIN_CONTEXT_PATH)}`,
           'export const constantSource = PluginContextModel.constant',
           'export const createSource = PluginContextModel.signal',
-          `export { Command, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
+          `export { Command, Composer, Dialogs, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
           `export { LinkHandler, MarkdownLinks } from ${JSON.stringify(CLIENT_LINKS_PATH)}`,
           `export { Browser, Changes, Files } from ${JSON.stringify(CLIENT_APP_CONTRACTS_PATH)}`,
           `export { ComposerAction, ComposerPill, FileViewer, HeaderAction, MenuItem, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,

@@ -69,7 +69,7 @@ export type { ItemSource, PluginContext, PluginServices, Track } from './plugin-
 export const constantSource = PluginContextModel.constant
 export const createSource = PluginContextModel.signal
 
-export { Command, Dialogs, Toasts } from './app-services.js'
+export { Command, Composer, Dialogs, Toasts } from './app-services.js'
 export { LinkHandler, MarkdownLinks } from './links.js'
 export { Browser, Changes, Files } from './app-contracts.js'
 export type { BrowserService, ChangesService, FilesListing, FilesService } from './app-contracts.js'
@@ -79,6 +79,10 @@ export type {
   AppearanceState,
   CommandItem,
   CommandsService,
+  ComposerAttachment,
+  ComposerModelSelection,
+  ComposerService,
+  ComposerTarget,
   ConfirmInput,
   DialogsService,
   EnvironmentService,

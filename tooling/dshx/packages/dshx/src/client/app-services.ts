@@ -83,7 +83,43 @@ export interface CommandItem {
   run(): void | false | Promise<void>
 }
 
+/** Leave `sessionId` out to address the composer the user sees. */
+export interface ComposerTarget {
+  readonly sessionId?: string
+}
+
+/** A chip in the composer: a workspace file, or text sent as a quote or a note. */
+export type ComposerAttachment =
+  | { readonly kind: 'file'; readonly path: string }
+  | { readonly kind: 'quote' | 'note'; readonly text: string; readonly label?: string }
+
+export interface ComposerModelSelection {
+  readonly provider: string
+  readonly model: string
+  /** Reasoning effort, e.g. `high`; the model's default when absent. */
+  readonly variant?: string
+}
+
+/** The conversation composer: its draft, chips and model. Verbs return false when no composer can take them. */
+export interface ComposerService {
+  /** Session id of the composer on screen; undefined on a screen without one. */
+  readonly current: Subscribable<string | undefined>
+  /** Whether the composer on screen holds keyboard focus. */
+  readonly focused: Subscribable<boolean>
+  /** The draft as plain text, chips in their clipboard form. */
+  text(target?: ComposerTarget): string | undefined
+  /** Replace the whole draft. */
+  setText(input: ComposerTarget & { readonly text: string }): boolean
+  /** Insert at the caret, or at the end when the composer never had focus. */
+  insert(input: ComposerTarget & { readonly text: string }): boolean
+  attach(input: ComposerTarget & { readonly attachment: ComposerAttachment }): boolean
+  /** Choose the model and variant the next message uses. */
+  setModel(input: ComposerTarget & { readonly selection: ComposerModelSelection }): Promise<boolean>
+  focus(target?: ComposerTarget): boolean
+}
+
 export const Dialogs = BrowserBroker.defineContract<DialogsService>('dshx.dialogs')
+export const Composer = BrowserBroker.defineContract<ComposerService>('dshx.composer')
 export const Toasts = BrowserBroker.defineContract<ToastsService>('dshx.toasts')
 export const Command = BrowserBroker.defineRegistry<CommandItem>('dshx.command')
 

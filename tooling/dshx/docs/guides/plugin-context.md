@@ -200,6 +200,27 @@ is no longer current.
 
 `@dshfiles/dialogs` provides `Dialogs` and `Toasts` with plugin-ui components.
 
+### Composer
+
+`Composer` (from `@dshfiles/dshx/client`, provided by `@dshfiles/rich-composer`) reads and edits the conversation
+composer. Each verb addresses the composer on screen, or `sessionId`, and returns false when that composer is absent or
+locked by a send in flight.
+
+```ts
+const composer = await api.whenActive(Composer)
+composer.insert({ text: 'Fix the failing test' })
+composer.attach({ attachment: { kind: 'quote', text: selection } })
+await composer.setModel({ selection: { provider: 'deepseek', model: 'deepseek-chat', variant: 'high' } })
+```
+
+| Member | What |
+| --- | --- |
+| `current`, `focused` | live session id of the composer on screen, and whether it holds keyboard focus |
+| `text()`, `setText({ text })`, `insert({ text })` | the draft with chips in clipboard form; replace it; insert at the caret |
+| `attach({ attachment })` | a chip: `{ kind: 'file', path }`, or `{ kind: 'quote' \| 'note', text, label? }` sent as a block quote or inside `<note>` |
+| `setModel({ selection })` | `provider`, `model` and `variant` (reasoning effort) for the next message |
+| `focus()` | give the composer keyboard focus |
+
 ## Stored state: `defineStore`
 
 ```ts
