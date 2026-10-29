@@ -46,7 +46,8 @@
     "build": "node scripts/derive-typert.mjs && tsc -p tsconfig.host.json && dshx build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.host-tests.json",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
     "mime-types": "3.0.2",

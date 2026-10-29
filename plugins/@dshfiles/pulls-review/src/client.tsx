@@ -23,20 +23,14 @@ export default defineClientPlugin({
     const focus = createSessionFocus(ctx.sidebarRight.mounted)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-pulls-review: remember the on-screen thread')
     const reviewed = hostStorage(api).store({ key: 'reviewed', scope: 'global', schema: ReviewedMarksModel.schema, initial: {} })
-    void reviewed.ready.then(
-      () => {
-        let stored: unknown = null
-        try {
-          stored = JSON.parse(globalThis.localStorage?.getItem(ReviewedMarksModel.legacyBrowserKey) ?? 'null')
-        } catch {
-          stored = null
-        }
-        const legacy = ReviewedMarksModel.schema.safeParse(stored)
-        if (legacy.success && Object.keys(reviewed.get()).length === 0) reviewed.set(legacy.data)
+    void reviewed.ready
+      .then(() => {
+        const legacyText = globalThis.localStorage?.getItem(ReviewedMarksModel.legacyBrowserKey) ?? 'null'
         globalThis.localStorage?.removeItem(ReviewedMarksModel.legacyBrowserKey)
-      },
-      (error: unknown) => console.warn('pulls.review: reviewed marks stay unsaved until the Host storage answers.', error),
-    )
+        const legacy = ReviewedMarksModel.schema.safeParse(JSON.parse(legacyText))
+        if (legacy.success && Object.keys(reviewed.get()).length === 0) reviewed.set(legacy.data)
+      })
+      .catch((error: unknown) => console.warn('pulls.review: reviewed marks stay unsaved until the Host storage answers.', error))
     api.ui.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: 'pulls.review: Reviews' }, () => <GitPullRequest aria-hidden />)
     api.provide(Changes, {
       review: input => {

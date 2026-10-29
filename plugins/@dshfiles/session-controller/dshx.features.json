@@ -144,6 +144,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "session-controller.drive-threads",
+          "featureFile": "tooling/dshx/e2e/features/session-controller.feature"
+        },
+        {
           "kind": "host-test",
           "id": "session-controller.sessions-api-instructions",
           "file": "plugins/@dshfiles/session-controller/tests/host/sessions-api.test.ts",
