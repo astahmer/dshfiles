@@ -23,6 +23,11 @@
       "externalDependencies": [],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "policies.denied-call",
+          "featureFile": "tooling/dshx/e2e/features/policies.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "policies.matching",
           "file": "plugins/@dshfiles/policies/src/policies.test.ts",

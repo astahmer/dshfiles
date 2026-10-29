@@ -1526,7 +1526,9 @@ Then('the left pane content is tab controlled between fixed chrome', async ({ pa
     await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
     const sidebarSettings = left.getByRole('button', { name: 'Sidebar settings', exact: true })
     await expect(sidebarSettings).toBeVisible()
-    expect(await sidebarSettings.evaluate(element => element.closest('[data-workbench-panel-id]')?.getAttribute('data-workbench-panel-id'))).toBe('dshfiles-thread-sidebar.workbench-threads')
+    expect(await sidebarSettings.evaluate(element => element.closest('[data-workbench-panel-id]')?.getAttribute('data-workbench-panel-id'))).toBe(
+      'dshfiles-thread-sidebar.workbench-threads',
+    )
     await expect(page.getByRole('button', { name: 'Customize sidebar', exact: true })).toHaveCount(0)
     await expect(page.locator('[data-slot-error]')).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('tabbed-workbench.png'), animations: 'disabled' })

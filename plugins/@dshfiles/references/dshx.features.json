@@ -23,6 +23,11 @@
       ],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "references.attach-directory",
+          "featureFile": "tooling/dshx/e2e/features/references.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "references.kind",
           "file": "plugins/@dshfiles/references/src/references.test.ts",

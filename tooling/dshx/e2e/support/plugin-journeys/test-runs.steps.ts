@@ -24,7 +24,10 @@ Then('the finished tool call shows a Vitest results card', async ({ page }: { pa
   const commandGroup = page.getByText('Ran commands', { exact: true }).last()
   const testCardToggle = card.getByRole('button', { name: /^Ran tests\b/ })
   if (!(await commandGroup.isVisible())) {
-    await page.getByText(/^Completed in /).last().click()
+    await page
+      .getByText(/^Completed in /)
+      .last()
+      .click()
     await expect(commandGroup).toBeVisible({ timeout: 20_000 })
   }
   if (!(await testCardToggle.isVisible())) await commandGroup.click()

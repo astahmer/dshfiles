@@ -1,12 +1,6 @@
 {
   "schemaVersion": 1,
   "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/host.ts",
-      "reason": "Snapshots and restores run in the VCS provider plugin through in-process vcs-provider API calls, each under that provider's automatic api-dispatch span; this plugin starts no process or request of its own."
-    }
-  ],
   "features": [
     {
       "id": "turn-undo-redo",
@@ -29,6 +23,11 @@
         "expect text \"Redo the undone turn and its files\""
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "session-undo.undo-redo-files",
+          "featureFile": "tooling/dshx/e2e/features/session-undo.feature"
+        },
         {
           "kind": "unit-test",
           "id": "session-undo.undo-redo",

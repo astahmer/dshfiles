@@ -35,6 +35,11 @@
       ],
       "verification": [
         {
+          "kind": "not-applicable",
+          "id": "git-worktrees.git-thread-worktrees-browser",
+          "reason": "Host-only: this plugin draws no screen. A worktree is created only when another Host plugin (backlog's isolated item thread) calls vcs-provider/provision with `isolate` on, and listing or removing one is an agent tool; the real git behaviour is covered by the integration tests against temporary repositories."
+        },
+        {
           "kind": "host-test",
           "id": "git-worktrees.provision",
           "file": "plugins/@dshfiles/git-worktrees/src/git-worktrees.integration.test.ts",
@@ -72,6 +77,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "git-worktrees.git-file-snapshots-browser",
+          "reason": "Host-only: snapshot and restore are vcs-provider API methods with no UI of their own; the browser path that drives them is session-undo's Undo/Redo, covered by session-undo.undo-redo-files, and the git behaviour by the integration test against a temporary repository."
+        },
         {
           "kind": "host-test",
           "id": "git-worktrees.snapshot-restore",

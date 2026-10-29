@@ -8,9 +8,24 @@
       "summary": "Opt-in: after a turn ends, re-send the thread's exact last model request with one output token every intervalMinutes, so the provider keeps its prefix cache; stop after maxWarmupsPerIdle per idle period, a rolling maxWarmupsPerHour across threads, a failure, or when the next turn starts.",
       "surfaces": ["host", "integration"],
       "configuration": [
-        { "key": "enabled", "defaultValue": "false", "constraints": "Off schedules nothing.", "coveredBy": ["session-warming.disabled"] },
-        { "key": "intervalMinutes", "defaultValue": "4", "constraints": "1–55 minutes.", "coveredBy": ["session-warming.idle-limit"] },
-        { "key": "maxWarmupsPerIdle", "defaultValue": "3", "constraints": "1–20 per thread between two prompts.", "coveredBy": ["session-warming.idle-limit"] },
+        {
+          "key": "enabled",
+          "defaultValue": "false",
+          "constraints": "Off schedules nothing.",
+          "coveredBy": ["session-warming.disabled"]
+        },
+        {
+          "key": "intervalMinutes",
+          "defaultValue": "4",
+          "constraints": "1–55 minutes.",
+          "coveredBy": ["session-warming.idle-limit"]
+        },
+        {
+          "key": "maxWarmupsPerIdle",
+          "defaultValue": "3",
+          "constraints": "1–20 per thread between two prompts.",
+          "coveredBy": ["session-warming.idle-limit"]
+        },
         {
           "key": "maxWarmupsPerHour",
           "defaultValue": "30",
@@ -38,6 +53,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "session-warming.warm-idle-thread",
+          "featureFile": "tooling/dshx/e2e/features/session-warming.feature"
+        },
         {
           "kind": "unit-test",
           "id": "session-warming.idle-limit",
