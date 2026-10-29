@@ -42,8 +42,10 @@ jobs:
         run: pnpm run test:inventory
         working-directory: tooling/dshx
 
-      - name: Build create-dshx for the scaffold catalog test
-        run: pnpm --dir tooling/dshx/packages/create-dshx run build
+      - name: Build dshx and create-dshx for the catalog test and Gherkin discovery
+        run: |
+          pnpm --dir tooling/dshx/packages/dshx run build
+          pnpm --dir tooling/dshx/packages/create-dshx run build
 
       - name: Test feature catalog invariants
         run: pnpm run test:feature-coverage
